@@ -377,3 +377,72 @@ nativeTest(
   },
   60000,
 );
+
+nativeTest(
+  "native CLI lists stable page aliases and accepts them for page commands",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-page-ids-"));
+    try {
+      const document = parseDocument(
+        readFileSync(join(fixtureRoot, "erd.jsonl"), "utf8"),
+      );
+      const editor = new Editor({ document });
+      const schema = editor.currentPageId;
+      editor.createPage({ name: "Other page", kind: "sequence" });
+      writeFileSync(
+        join(cwd, "mixed.jsonl"),
+        serializeDocument(editor.getSnapshot()),
+      );
+      const listing = compare(
+        ["pages", "mixed.jsonl", "--format", "json"],
+        cwd,
+      );
+      const pages = JSON.parse(listing.stdout.toString()) as {
+        id: string;
+        shortId: string;
+      }[];
+      const alias = pages.find((page) => page.id === schema)!.shortId;
+      expect(alias).toHaveLength(11);
+      compare(["pages", "mixed.jsonl", "--kind", "erd"], cwd);
+      for (const args of [
+        ["inspect", "mixed.jsonl", "--page", alias, "--format", "json"],
+        ["export", "mixed.jsonl", "--page", alias, "--format", "svg"],
+        ["ddl", "mixed.jsonl", "--page", alias],
+        ["arrange", "mixed.jsonl", "--page", alias],
+        ["edit", "mixed.jsonl", "--ops", "-", "--dry-run"],
+      ])
+        compare(
+          args,
+          cwd,
+          args[0] === "edit"
+            ? JSON.stringify([
+                { op: "rename-page", id: alias, name: "Renamed" },
+              ])
+            : undefined,
+        );
+      for (const format of ["png", "pdf"]) {
+        const result = Bun.spawnSync(
+          [
+            binary!,
+            "export",
+            "mixed.jsonl",
+            "--page",
+            alias,
+            "--format",
+            format,
+            "--output",
+            `out.${format}`,
+          ],
+          { cwd },
+        );
+        expect(result.exitCode).toBe(0);
+        expect([
+          ...readFileSync(join(cwd, `out.${format}`)).subarray(0, 4),
+        ]).toEqual(format === "png" ? [137, 80, 78, 71] : [37, 80, 68, 70]);
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  60000,
+);

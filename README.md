@@ -171,9 +171,23 @@ in a dropdown. Select the ERD page of a mixed ERD/sequence document to export on
 page. Changing this selector also switches the editor's current page. SVG, PNG,
 and PDF support the whole current page, selected artwork, or an artboard.
 
-The CLI uses an exact page name or id. It requires `--page` for a document with
-several pages, unless `--element` identifies the owning page. Run `inspect` to
-list pages; duplicate page names require an id. For example:
+Each page also has a stable 11-character short ID shown in the page properties,
+the export page selector, and CLI output. It is derived from the full stored ID;
+renaming and reordering do not change it, and existing JSONL files do not need
+migration. Internal page IDs and element references remain unchanged. A single JSONL file
+contains multiple pages. Reordering changes fractional `order` keys and can move
+page metadata lines in the file; element lines stay sorted by page ID and element
+ID, independently of display order. Legacy pages without valid unique order keys
+are assigned those keys on their first explicit ordering operation.
+
+Use `nodetto-cli pages mixed.jsonl` to list page numbers, short IDs, names,
+kinds and full IDs, or add `--format json` for scripts. `--kind erd` filters the
+listing. Numbers represent current display positions; use IDs in scripts.
+
+Every CLI `--page` option and edit page reference accepts a short ID, full ID,
+or exact name. A document with several pages requires `--page` unless
+`--element` identifies the owning page. Ambiguous aliases or names require a
+full ID. For example:
 
 ```bash
 nodetto-cli export mixed.jsonl --page Schema --format svg --output schema.svg

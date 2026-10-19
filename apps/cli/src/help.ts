@@ -8,6 +8,7 @@ Usage: nodetto-cli <command> [options]
 
 Look at a document
   nodetto-cli open <file>         Open a file in the desktop app
+  nodetto-cli pages <doc>         List page numbers, short IDs, names and kinds
   nodetto-cli inspect <doc>       Compact outline (or JSON) of pages and elements
   nodetto-cli types [<type>]      Element types and the fields each one takes
   nodetto-cli validate <doc>      Check that a document parses and is valid
@@ -79,7 +80,29 @@ Example:
 
 ${EXIT_CODES}`,
 
-  inspect: `Usage: nodetto-cli inspect <doc.jsonl> [--page <id|name>] [--format outline|json]
+  pages: `Usage: nodetto-cli pages <doc.jsonl> [--format text|json] [--kind <page kind>]
+
+List pages in display order, including page number, stable short ID, full ID,
+name and diagram kind. The number is a current display position, not an ID.
+
+  --format  text (default) or json (an array of page summaries).
+  --kind    Only pages of this kind (erd, sequence, uml, freeform,
+            architecture or bpmn). Original display numbers are retained.
+
+Short IDs are stable 11-character URL-safe aliases derived from stored page
+IDs. They survive renaming, reordering, saving and reopening. Full IDs and
+existing references stay unchanged; listing a document never rewrites it.
+Every --page option and edit page reference accepts a short ID, full ID or
+exact name. Ambiguous aliases/names require a full ID.
+
+Examples:
+  nodetto-cli pages mixed.jsonl
+  nodetto-cli pages mixed.jsonl --kind erd --format json
+  nodetto-cli export mixed.jsonl --page <short-id> --format pdf --output schema.pdf
+
+${EXIT_CODES}`,
+
+  inspect: `Usage: nodetto-cli inspect <doc.jsonl> [--page <short-id|id|name>] [--format outline|json]
                            [--type <prefix>] [--ids short|full]
 
 Print what the document contains.
@@ -89,7 +112,8 @@ Print what the document contains.
                     size WxH and the essential semantic fields (columns, relation
                     ends, message text). Styling is omitted. Cheap to read for AI.
   --format json     The exact element records, for precise reads.
-  --page            Only this page (id or name). Default: every page.
+  --page            Only this page (short ID, full ID or name). Default: every page.
+                    Page headings include stable short IDs; JSON includes shortId.
   --type            Only elements whose type starts with this prefix
                     (for example erd.table, bpmn., frame).
   --ids short       (default) Shortest unique id prefix of at least six
@@ -150,7 +174,7 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
 
   - "id", "from", "to" and place targets accept a unique id prefix, or "@ref"
     for an element added earlier in the batch with "ref"; "page" accepts an id,
-    a name or "@ref".
+    a short ID, a name or "@ref".
   - add: given semantic fields are merged over the type's defaults (run
     "nodetto-cli types <type>"). Without x/y or "place", the element goes to the
     right of the page content, centred on the previous auto-placed element.
@@ -192,7 +216,7 @@ Example:
 
 ${EXIT_CODES}`,
 
-  export: `Usage: nodetto-cli export <doc.jsonl> --format <format> [--page <id|name>]
+  export: `Usage: nodetto-cli export <doc.jsonl> --format <format> [--page <short-id|id|name>]
                           [--element <id>] [--output <file>] [--font-dir <dir>] [--padding <n>]
                           [--background <#rrggbb|transparent>] [--scale <n>]
                           [--pdf-page artwork|a4|letter]
@@ -205,9 +229,9 @@ Render one page exactly as the app's page export does.
   --format       svg, png, pdf, html, mermaid, d2 or code (required).
                  html writes a website ZIP; code uses --element and --code-format.
                  SQL: use nodetto-cli ddl. BPMN XML: use nodetto-cli bpmn export.
-  --page         Export only this page by id or exact name, regardless of kind.
+  --page         Export only this page by short ID, full ID or exact name.
                  Required when the document has several pages (unless --element
-                 implies one). Use inspect to list page ids, names and kinds.
+                 implies one). Use pages to list short IDs, full IDs, names and kinds.
   --element      Render only this element's area (a frame renders everything
                  inside it). Accepts a unique id prefix; implies its page.
                  Use it to check one part of a large diagram.
@@ -246,7 +270,7 @@ Example (check a drawing):
 ${EXIT_CODES}`,
 
   ddl: `Usage: nodetto-cli ddl <document.jsonl> [--dialect postgresql|mysql|sqlite]
-                       [--page <page id or name>] [--output <file.sql>]
+                       [--page <short-id|id|name>] [--output <file.sql>]
                        [--check <file.sql>] [--strict]
 
 Print the deterministic schema DDL the editor's Database DDL panel generates for
@@ -262,7 +286,7 @@ ERD tables.
 ${EXIT_CODES}`,
 
   arrange: `Usage: nodetto-cli arrange <document.jsonl> [--mode tidy|overlaps]
-                           [--direction LR|TB] [--page <page id or name>]
+                           [--direction LR|TB] [--page <short-id|id|name>]
                            [--write] [--check]
 
 Run the editor's Tidy layout (default) or Remove overlaps on one page and print
@@ -290,7 +314,7 @@ Parse and validate a document; print warnings and errors and a one-line summary.
 
 ${EXIT_CODES}`,
 
-  lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <page id or name>]
+  lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
                         [--config <file>] [--format text|json]
 
 Lint BPMN pages from a nodetto document or BPMN XML. Text output is empty when
@@ -300,7 +324,7 @@ directory is used when --config is not given.
 Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
 
   bpmn: `Usage: nodetto-cli bpmn import <file.bpmn> [--output <doc.jsonl>] [--strict]
-       nodetto-cli bpmn export <document.jsonl> [--page <page id or name>]
+       nodetto-cli bpmn export <document.jsonl> [--page <short-id|id|name>]
                                [--output <file.bpmn> | --check <file.bpmn>] [--strict]
 
 Import or export BPMN 2.0 XML.

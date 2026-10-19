@@ -32,6 +32,7 @@ import {
   updateComponentVariantProperty,
 } from "@nodetto/core";
 import {
+  shortPageId,
   BOOLEAN_OPERATIONS,
   type BooleanOperation,
   ARROWHEADS,
@@ -1903,8 +1904,27 @@ export function PageSection(props: PageSectionProps): JSX.Element {
           onCommit={(name) => props.editor.renamePage(props.page.id, name)}
         />
       </Field>
+      <Field label="Page ID">
+        <input
+          class="nodetto-input"
+          aria-label="Short page ID"
+          readOnly
+          value={shortPageId(props.page.id)}
+          onFocus={(event) => event.currentTarget.select()}
+          title="Stable short ID. Use with CLI --page."
+        />
+      </Field>
       <details class="nodetto-inspector-details">
         <summary>Page settings</summary>
+        <Field label="Full page ID">
+          <input
+            class="nodetto-input"
+            aria-label="Full page ID"
+            readOnly
+            value={props.page.id}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        </Field>
         <Field label="Diagram format">
           <SelectInput
             label="Page diagram format"

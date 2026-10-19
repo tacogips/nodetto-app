@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { shortPageId } from "@nodetto/ir";
 import { parseDocument } from "@nodetto/io";
 import { runCliAsync } from "./cli.ts";
 import { type CommandIo, EXIT_ERROR, EXIT_OK, runCli } from "./commands.ts";
@@ -242,7 +243,9 @@ test("inspect prints a compact outline with short ids and nested columns", () =>
   expect(result.exitCode).toBe(EXIT_OK);
   const lines = result.stdout.split("\n");
   expect(lines[0]).toBe('document "Shop"');
-  expect(lines[1]).toBe('  page p1 "Schema" erd (3 elements)');
+  expect(lines[1]).toBe(
+    `  page p1 "Schema" erd (3 elements) [${shortPageId("p1")}]`,
+  );
   expect(result.stdout).toMatch(/erd\.table \S+ users @0,0 \d+x\d+/);
   expect(result.stdout).toContain("      column user_id uuid not-null");
   expect(result.stdout).toMatch(

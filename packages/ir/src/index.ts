@@ -275,3 +275,9 @@ export {
   type UiControlKind,
   type UiControlSemantic,
 } from "./ui-controls.ts";
+
+export {
+  shortPageId,
+  resolvePageQuery,
+  type PageResolution,
+} from "./page-id.ts";

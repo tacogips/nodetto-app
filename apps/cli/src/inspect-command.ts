@@ -9,6 +9,7 @@
 import { type Box, Editor } from "@nodetto/core";
 import {
   isDatabaseObjectType,
+  shortPageId,
   type Document,
   type Element,
   getElementTypeDefinition,
@@ -370,6 +371,7 @@ export function inspectCommand(
       document: { id: document.id, title: document.title },
       pages: pages.map((page) => ({
         ...page,
+        shortId: shortPageId(page.id),
         elements: elementsOf(page).filter(
           (element) =>
             typeFilter === undefined || element.type.startsWith(typeFilter),
@@ -387,7 +389,7 @@ export function inspectCommand(
   for (const page of pages) {
     const elements = elementsOf(page);
     lines.push(
-      `  page ${page.id} ${quote(page.name)} ${page.kind} (${elements.length} elements)`,
+      `  page ${page.id} ${quote(page.name)} ${page.kind} (${elements.length} elements) [${shortPageId(page.id)}]`,
     );
     lines.push(...pageOutline(editor, page, elements, typeFilter, short));
   }

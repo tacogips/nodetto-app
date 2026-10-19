@@ -24,6 +24,7 @@ import {
   isPlainObject,
   type KeyOrder,
   type Page,
+  resolvePageQuery,
   validateDocument,
 } from "@nodetto/ir";
 import {
@@ -178,16 +179,9 @@ class Batch {
     const byRef = value.startsWith("@")
       ? this.refs.get(value.slice(1))
       : undefined;
-    const exact = pages.find((page) => page.id === (byRef ?? value));
-    if (exact) return exact;
-    const named = pages.filter((page) => page.name === value);
-    if (named.length === 1) return named[0] as Page;
-    throw new OperationError(
-      index,
-      named.length
-        ? `Several pages are named "${value}"; use the page id.`
-        : `No page has the id or name "${value}".`,
-    );
+    const resolved = resolvePageQuery(pages, byRef ?? value);
+    if (resolved.ok) return resolved.page;
+    throw new OperationError(index, resolved.message);
   }
 
   /** Replace "@ref" strings and id prefixes in reference fields with ids. */

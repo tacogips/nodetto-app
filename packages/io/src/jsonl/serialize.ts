@@ -148,8 +148,8 @@ function compareElements(left: Element, right: Element): number {
 /**
  * Serialize a document to JSONL.
  *
- * Determinism (design section 6): the document record first, then pages by
- * id, then elements by page then id, then any record kind this build does
+ * Determinism (design section 6): the document record first, then page metadata by
+ * display order, then elements by page ID then element ID, then any record kind this build does
  * not model — those sort by their canonical text, which starts with `kind`,
  * since they have no id we can rely on. Keys follow the declared order for
  * the record and for the element's registered semantic payload; unknown

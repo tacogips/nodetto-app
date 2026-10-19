@@ -2,7 +2,7 @@ import {
   HtmlExportSection,
   type SaveHtmlBundle,
 } from "./inspector/HtmlExportSection.tsx";
-import { isDatabaseObjectType } from "@nodetto/ir";
+import { isDatabaseObjectType, shortPageId } from "@nodetto/ir";
 import type { Editor } from "@nodetto/core";
 import { availableMermaidKinds } from "@nodetto/io";
 import {
@@ -170,7 +170,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
             <For each={pages()}>
               {(item) => (
                 <option value={item.id}>
-                  {item.name} ({item.kind})
+                  {item.name} ({item.kind}) · {shortPageId(item.id)}
                 </option>
               )}
             </For>

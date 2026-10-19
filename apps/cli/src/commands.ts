@@ -22,11 +22,14 @@ import {
 } from "@nodetto/io";
 import {
   isDatabaseObjectType,
+  resolvePageQuery,
+  shortPageId,
   type Document,
   type Page,
   type ValidationIssue,
 } from "@nodetto/ir";
 import { helpFor, OVERVIEW } from "./help.ts";
+import { pagesCommand } from "./pages-command.ts";
 import { inspectCommand } from "./inspect-command.ts";
 import { typesCommand } from "./types-command.ts";
 import { editCommand } from "./edit-command.ts";
@@ -168,18 +171,15 @@ export function selectPage(
   const candidates = candidatePages ?? erdPages(document);
   if (query !== undefined) {
     const searchPages = candidatePages ?? document.pages;
-    const byId = searchPages.find((page) => page.id === query);
-    if (byId) return byId;
-    const byName = searchPages.filter((page) => page.name === query);
-    if (byName.length === 1) return byName[0] as Page;
-    if (byName.length > 1)
-      return `Several pages are named "${query}"; pass the page id instead.`;
-    return `No page has the id or name "${query}".`;
+    const resolved = resolvePageQuery(searchPages, query);
+    return resolved.ok ? resolved.page : resolved.message;
   }
   if (candidates.length === 1) return candidates[0] as Page;
   if (!candidates.length) return noneMessage;
   return `The document has ${candidates.length} ${candidateDescription}; choose one with --page:\n${candidates
-    .map((page) => `  ${page.id}\t${page.name}`)
+    .map(
+      (page) => `  ${shortPageId(page.id)}\t${page.name} (full id: ${page.id})`,
+    )
     .join("\n")}`;
 }
 
@@ -705,6 +705,8 @@ export function runCli(
       return editCommand(io, rest);
     case "types":
       return typesCommand(io, rest);
+    case "pages":
+      return pagesCommand(io, rest);
     case "inspect":
       return inspectCommand(io, rest);
     case "open":
