@@ -271,12 +271,14 @@ ${EXIT_CODES}`,
 
   ddl: `Usage: nodetto-cli ddl <document.jsonl> [--dialect postgresql|mysql|sqlite]
                        [--page <short-id|id|name>] [--output <file.sql>]
-                       [--check <file.sql>] [--strict]
+                       [--check <file.sql>] [--strict] [--frame <id>]
 
 Print the deterministic schema DDL the editor's Database DDL panel generates for
 one ERD page. Without --page, the document must contain exactly one page with
 ERD tables.
 
+  --frame    Export only this frame and its nested contents on the selected page.
+             Cross-scope references produce warnings and are omitted.
   --dialect  postgresql (default), mysql or sqlite.
   --output   Write the SQL to a file instead of stdout.
   --check    Compare the generated SQL with an existing file; exit 1 when it is

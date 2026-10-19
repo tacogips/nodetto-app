@@ -661,3 +661,5 @@ export {
   HANDOFF_FORMATS,
   type HandoffFormat,
 } from "./handoff-export.ts";
+
+export { nodeLabelLayout } from "./node-label.ts";

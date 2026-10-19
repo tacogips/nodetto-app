@@ -204,3 +204,63 @@ test("write failures exit with the error code, not the drift code", () => {
     expect(result.stderr).toContain("ENOSPC");
   }
 });
+
+test("DDL frame scopes validate page ownership and retain check/strict behavior", () => {
+  const lines = ERD.trim().split("\n");
+  const frame = {
+    kind: "element",
+    id: "db-frame",
+    page: "p1",
+    type: "frame",
+    index: "a1",
+    semantic: { name: "Database", memberIds: ["t-users"] },
+    visual: { x: 0, y: 0, width: 500, height: 500 },
+  };
+  const source = [...lines, JSON.stringify(frame), ""].join("\n");
+  const io = memoryIo({ "doc.jsonl": source });
+  const args = [
+    "ddl",
+    "doc.jsonl",
+    "--frame",
+    "db-frame",
+    "--dialect",
+    "sqlite",
+  ];
+  const scoped = runCli(args, io, "test");
+  expect(scoped.exitCode).toBe(EXIT_OK);
+  expect(scoped.stdout).toContain('CREATE TABLE "users"');
+  expect(runCli([...args, "--output", "scope.sql"], io, "test").exitCode).toBe(
+    EXIT_OK,
+  );
+  expect(runCli([...args, "--check", "scope.sql"], io, "test").exitCode).toBe(
+    EXIT_OK,
+  );
+  expect(
+    runCli(["ddl", "doc.jsonl", "--frame", "t-users"], io, "test").stderr,
+  ).toContain("frame on the selected --page");
+  expect(
+    runCli(["ddl", "doc.jsonl", "--frame", "missing"], io, "test").exitCode,
+  ).toBe(EXIT_ERROR);
+  const wrongPage = `${source}${JSON.stringify({ kind: "page", id: "p2", name: "Other", pageKind: "erd" })}\n`;
+  const otherIo = memoryIo({ "doc.jsonl": wrongPage });
+  expect(
+    runCli(
+      ["ddl", "doc.jsonl", "--page", "p2", "--frame", "db-frame"],
+      otherIo,
+      "test",
+    ).exitCode,
+  ).toBe(EXIT_ERROR);
+  const emptyFrame = {
+    ...frame,
+    id: "empty",
+    semantic: { name: "Empty", memberIds: [] },
+  };
+  io.files.set(
+    "doc.jsonl",
+    [source, JSON.stringify(emptyFrame), ""].join("\n"),
+  );
+  expect(
+    runCli(["ddl", "doc.jsonl", "--frame", "empty", "--strict"], io, "test")
+      .exitCode,
+  ).toBe(EXIT_WARNINGS);
+});

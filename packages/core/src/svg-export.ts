@@ -1,3 +1,4 @@
+import { nodeLabelLayout } from "./node-label.ts";
 import type { UiControlSemantic } from "@nodetto/ir";
 import {
   DATABASE_OBJECT_LABELS,
@@ -620,6 +621,57 @@ function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
 }
 
 function renderNode(element: Element, box: Box, theme: SvgTheme): string {
+  const layout = nodeLabelLayout(readString(element.semantic, "label"), {
+    ...element.visual,
+    width: box.width,
+    height: box.height,
+  });
+  const clipId = `node-label-${Array.from(element.id, (character) => character.codePointAt(0)?.toString(16)).join("-")}`;
+  const anchor = element.visual.style?.textAlign ?? "middle";
+  const x =
+    anchor === "start"
+      ? box.x + 10
+      : anchor === "end"
+        ? box.x + box.width - 10
+        : box.x + box.width / 2;
+  const label =
+    wrap(
+      "defs",
+      {},
+      wrap(
+        "clipPath",
+        { id: clipId },
+        tag("rect", {
+          x: box.x + 10,
+          y: box.y,
+          width: layout.width,
+          height: box.height,
+        }),
+      ),
+    ) +
+    wrap(
+      "g",
+      { "clip-path": `url(#${clipId})` },
+      layout.lines
+        .map((line, index) =>
+          text(
+            textStyled(
+              {
+                x,
+                y: box.y + layout.top + (index + 0.5) * layout.lineHeight,
+                "text-anchor": anchor,
+                "dominant-baseline": "central",
+                fill: theme.ink,
+                "font-size": layout.fontSize,
+                "xml:space": "preserve",
+              },
+              element.visual,
+            ),
+            line,
+          ),
+        )
+        .join(""),
+    );
   return (
     tag(
       element.visual.style?.cornerRadii ? "path" : "rect",
@@ -647,13 +699,7 @@ function renderNode(element: Element, box: Box, theme: SvgTheme): string {
         element.visual,
         element.id,
       ),
-    ) +
-    centredLabel(
-      box,
-      readString(element.semantic, "label"),
-      element.visual,
-      theme,
-    )
+    ) + label
   );
 }
 

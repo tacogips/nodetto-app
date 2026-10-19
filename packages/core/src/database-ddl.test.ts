@@ -637,3 +637,82 @@ test("an empty table's name cannot break out of its skip comment", () => {
       .all(),
   ).toHaveLength(1);
 });
+
+test("frame DDL isolates nested databases and diagnoses cross-scope dependencies", () => {
+  const { editor } = databaseFixture();
+  const pageId = editor.currentPageId;
+  // Explicit members are authoritative even when geometry overlaps another frame.
+  editor.apply([
+    {
+      type: "createElement",
+      element: editor.buildElement("frame", {
+        id: "db-a",
+        semantic: { name: "A", memberIds: ["nested"] },
+      }),
+    },
+    {
+      type: "createElement",
+      element: editor.buildElement("frame", {
+        id: "nested",
+        semantic: { name: "Nested", memberIds: ["orders", "local-view"] },
+      }),
+    },
+    {
+      type: "createElement",
+      element: editor.buildElement("frame", {
+        id: "db-b",
+        semantic: { name: "B", memberIds: ["users"] },
+      }),
+    },
+    {
+      type: "createElement",
+      element: editor.buildElement("erd.view", {
+        id: "local-view",
+        semantic: {
+          name: "local_view",
+          definition: "SELECT * FROM users",
+          dependsOn: ["users"],
+        },
+      }),
+    },
+  ]);
+  for (const dialect of ["postgresql", "mysql", "sqlite"] as const) {
+    const a = generateDatabaseDdl(editor, pageId, dialect, { frameId: "db-a" });
+    const b = generateDatabaseDdl(editor, pageId, dialect, { frameId: "db-b" });
+    expect(a.tableCount).toBe(1);
+    expect(b.tableCount).toBe(1);
+    expect(a.sql).toContain(
+      dialect === "mysql" ? "CREATE TABLE `orders`" : 'CREATE TABLE "orders"',
+    );
+    expect(a.sql).not.toContain(
+      dialect === "mysql" ? "CREATE TABLE `users`" : 'CREATE TABLE "users"',
+    );
+    expect(a.sql).not.toContain("FOREIGN KEY");
+    expect(a.sql).not.toContain("CREATE VIEW");
+    expect(
+      a.warnings.some((warning) =>
+        warning.includes("outside the selected frame"),
+      ),
+    ).toBe(true);
+    expect(
+      a.warnings.some((warning) => warning.includes("Definition omitted")),
+    ).toBe(true);
+    expect(generateDatabaseDdl(editor, pageId, dialect).tableCount).toBe(2);
+  }
+  editor.apply([
+    {
+      type: "createElement",
+      element: editor.buildElement("frame", {
+        id: "empty-db",
+        semantic: { name: "Empty", memberIds: [] },
+      }),
+    },
+  ]);
+  expect(
+    generateDatabaseDdl(editor, pageId, "sqlite", { frameId: "empty-db" })
+      .tableCount,
+  ).toBe(0);
+  expect(() =>
+    generateDatabaseDdl(editor, pageId, "sqlite", { frameId: "users" }),
+  ).toThrow("frame on the selected page");
+});

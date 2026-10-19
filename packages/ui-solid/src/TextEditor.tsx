@@ -147,11 +147,14 @@ function placeEditor(
   }
 
   const fontSize = style.fontSize ?? BASE_FONT_SIZE;
-  if (field === "text") {
+  if (field === "text" || element.type === "node.generic") {
     return {
       ...box,
       fontSize,
-      align: cssAlign(style.textAlign, "left"),
+      align: cssAlign(
+        style.textAlign,
+        element.type === "node.generic" ? "center" : "left",
+      ),
       bold: false,
       color: style.color,
       padding: "6px 8px",
@@ -178,7 +181,9 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
   let textarea: HTMLTextAreaElement | undefined;
   let done = false;
-  const multiline = (): boolean => props.target.field === "text";
+  const multiline = (): boolean =>
+    props.target.field === "text" ||
+    props.editor.store.get(props.target.id)?.type === "node.generic";
   const draft = textEditDraft(props.editor, props.target.id);
   const initial = draft?.value ?? "";
   const [conflict, setConflict] = createSignal(false);

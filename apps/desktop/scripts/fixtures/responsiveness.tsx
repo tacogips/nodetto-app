@@ -1,3 +1,5 @@
+import DatabaseExportSection from "../../../../packages/ui-solid/src/inspector/DatabaseExportSection.tsx";
+import { TextEditor } from "../../../../packages/ui-solid/src/TextEditor.tsx";
 // Dev-server-only fixture: exercise Solid's DOM runtime, not its SSR runtime.
 import { Editor, setGroupMask } from "@nodetto/core";
 import {
@@ -675,6 +677,151 @@ async function runInvalidation() {
   };
 }
 
+async function runScreenshotFixes() {
+  editor.loadDocument(new Editor().getSnapshot());
+  const pageId = editor.currentPageId;
+  const created = [
+    editor.buildElement("node.generic", {
+      id: "multiline-node",
+      semantic: { label: "Title\n説明\n\nDescriptionWithoutSpaces" },
+      visual: { x: 30, y: 30, width: 180, height: 140 },
+    }),
+    editor.buildElement("erd.table", {
+      id: "table-a",
+      semantic: {
+        tableName: "database_a",
+        columns: [{ id: "a-id", name: "id", dataType: "int", pk: true }],
+      },
+      visual: { x: 300, y: 30 },
+    }),
+    editor.buildElement("erd.table", {
+      id: "table-b",
+      semantic: {
+        tableName: "database_b",
+        columns: [{ id: "b-id", name: "id", dataType: "int", pk: true }],
+      },
+      visual: { x: 600, y: 30 },
+    }),
+    editor.buildElement("frame", {
+      id: "frame-a",
+      semantic: { name: "Database A", memberIds: ["table-a"] },
+      visual: { x: 280, y: 10, width: 300, height: 240 },
+    }),
+    editor.buildElement("frame", {
+      id: "frame-b",
+      semantic: { name: "Database B", memberIds: ["table-b"] },
+      visual: { x: 580, y: 10, width: 300, height: 240 },
+    }),
+  ];
+  editor.apply(
+    created.map((element) => ({ type: "createElement" as const, element })),
+  );
+  editor.selection.set(["multiline-node"]);
+  await frame();
+  const lines = node("multiline-node").querySelectorAll(
+    ".nodetto-node-label > span",
+  );
+  assert(lines.length >= 4, "multiline node did not preserve lines");
+  assert(
+    lines[0]?.textContent === "Title" && lines[1]?.textContent === "説明",
+    "node text lost line boundaries",
+  );
+  const first = lines[0]?.getBoundingClientRect();
+  const second = lines[1]?.getBoundingClientRect();
+  assert(first && second && second.top > first.top, "node lines overlap");
+  const labelField = document.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Label"]',
+  );
+  assert(labelField, "node Inspector must offer multiline label editing");
+  if (!labelField) throw new Error("missing multiline label field");
+  labelField.value = "Edited title\n編集した説明";
+  labelField.dispatchEvent(new Event("change", { bubbles: true }));
+  await frame();
+  assert(
+    (editor.store.get("multiline-node")?.semantic as { label: string })
+      .label === "Edited title\n編集した説明",
+    "Inspector flattened label newlines",
+  );
+  editor.undo();
+  await frame();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const stopEditor = render(
+    () => (
+      <TextEditor
+        editor={editor}
+        target={{ id: "multiline-node", field: "label" }}
+        onDone={() => {}}
+      />
+    ),
+    host,
+  );
+  await frame();
+  const inline = host.querySelector("textarea");
+  assert(
+    inline?.getAttribute("wrap") === "soft",
+    "inline node editor must support multiline",
+  );
+  if (!inline) throw new Error("missing inline editor");
+  const newline = new KeyboardEvent("keydown", {
+    key: "Enter",
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  inline.dispatchEvent(newline);
+  assert(!newline.defaultPrevented, "Shift+Enter must insert a newline");
+  stopEditor();
+  const stopDdl = render(
+    () => <DatabaseExportSection editor={editor} pageId={pageId} />,
+    host,
+  );
+  await frame();
+  const scope = host.querySelector<HTMLSelectElement>(
+    'select[aria-label="Database DDL scope"]',
+  );
+  const sql = () =>
+    host.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Generated database SQL"]',
+    )?.value ?? "";
+  assert(
+    scope &&
+      sql().includes('CREATE TABLE "database_a"') &&
+      sql().includes('CREATE TABLE "database_b"'),
+    "whole-page DDL is incomplete",
+  );
+  if (!scope) throw new Error("missing DDL scope");
+  scope.value = "frame-a";
+  scope.dispatchEvent(new Event("change", { bubbles: true }));
+  await frame();
+  assert(
+    sql().includes('CREATE TABLE "database_a"') &&
+      !sql().includes('CREATE TABLE "database_b"'),
+    "frame A DDL leaks another database",
+  );
+  scope.value = "frame-b";
+  scope.dispatchEvent(new Event("change", { bubbles: true }));
+  await frame();
+  assert(
+    sql().includes('CREATE TABLE "database_b"') &&
+      !sql().includes('CREATE TABLE "database_a"'),
+    "frame B DDL leaks another database",
+  );
+  editor.apply([{ type: "deleteElements", ids: ["frame-b"] }]);
+  await frame();
+  assert(
+    scope.value === "" && sql().includes('CREATE TABLE "database_a"'),
+    "deleted DDL scope did not reset to page",
+  );
+  stopDdl();
+  host.remove();
+  return {
+    multilineLines: lines.length,
+    inlineNewlines: true,
+    scopedDdl: true,
+  };
+}
+
 function heldSize() {
   return {
     width: node().style.width,
@@ -688,6 +835,7 @@ declare global {
       run: typeof run;
       runErd: typeof runErd;
       runInvalidation: typeof runInvalidation;
+      runScreenshotFixes: typeof runScreenshotFixes;
       heldSize: typeof heldSize;
       undo: () => void;
     };
@@ -697,6 +845,7 @@ window.responsiveness = {
   run,
   runErd,
   runInvalidation,
+  runScreenshotFixes,
   heldSize,
   undo: () => editor.undo(),
 };

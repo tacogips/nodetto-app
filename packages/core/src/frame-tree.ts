@@ -1,4 +1,10 @@
-import type { Element, ElementId, FrameSemantic, PageId } from "@nodetto/ir";
+import {
+  getElementTypeDefinition,
+  type Element,
+  type ElementId,
+  type FrameSemantic,
+  type PageId,
+} from "@nodetto/ir";
 import { compareFractional } from "./fractional.ts";
 import { memberIdsOf } from "./group.ts";
 import type { ShapeContext } from "./shape-util.ts";
@@ -11,17 +17,24 @@ const parentCache = new WeakMap<
   WeakMap<readonly Element[], ReadonlyMap<ElementId, ElementId>>
 >();
 
+const nonEdgeParentCache = new WeakMap<
+  ShapeContext,
+  WeakMap<readonly Element[], ReadonlyMap<ElementId, ElementId>>
+>();
+
 /** Frame membership follows the IR's geometric containment contract. */
 export function frameParents(
   store: Store,
   page: PageId,
   context: ShapeContext,
+  includeEdges = true,
 ): ReadonlyMap<ElementId, ElementId> {
   const elements = store.getPageElements(page);
-  let pages = parentCache.get(context);
+  const cache = includeEdges ? parentCache : nonEdgeParentCache;
+  let pages = cache.get(context);
   if (!pages) {
     pages = new WeakMap();
-    parentCache.set(context, pages);
+    cache.set(context, pages);
   }
   const cached = pages.get(elements);
   if (cached) return cached;
@@ -54,7 +67,12 @@ export function frameParents(
     return parents;
   }
   for (const element of elements) {
-    if (parents.has(element.id)) continue;
+    if (
+      parents.has(element.id) ||
+      (!includeEdges &&
+        getElementTypeDefinition(element.type)?.category === "edge")
+    )
+      continue;
     const box = context.boundsOf(element.id);
     if (!box) continue;
     let parent: Element | undefined;

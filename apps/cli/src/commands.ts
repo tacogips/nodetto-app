@@ -488,7 +488,11 @@ function normalizeNewlines(text: string): string {
 }
 
 function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
-  const parsed = parseArgs(args, VALUE_OPTIONS, new Set(["--strict"]));
+  const parsed = parseArgs(
+    args,
+    new Set([...VALUE_OPTIONS, "--frame"]),
+    new Set(["--strict"]),
+  );
   if (typeof parsed === "string") return fail(`${parsed}\n\n${helpFor("ddl")}`);
   if (parsed.positional.length !== 1)
     return fail(`ddl expects exactly one document path.\n\n${helpFor("ddl")}`);
@@ -505,7 +509,13 @@ function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const page = selectPage(loaded.document, parsed.options.get("--page"));
   if (typeof page === "string") return fail(page);
   const editor = new Editor({ document: loaded.document });
-  const ddl = generateDatabaseDdl(editor, page.id, dialect);
+  const frameId = parsed.options.get("--frame");
+  if (frameId !== undefined) {
+    const frame = editor.store.get(frameId);
+    if (frame?.type !== "frame" || frame.page !== page.id)
+      return fail("--frame must identify a frame on the selected --page.");
+  }
+  const ddl = generateDatabaseDdl(editor, page.id, dialect, { frameId });
   const warningText = ddl.warnings
     .map((warning) => `warning: ${warning}\n`)
     .join("");

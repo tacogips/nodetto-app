@@ -1,3 +1,4 @@
+import { expandContainers } from "./frame-tree.ts";
 import { databaseObjectsDdl } from "./database-objects-ddl.ts";
 import type {
   Element,
@@ -273,13 +274,31 @@ export function generateDatabaseDdl(
   editor: Editor,
   pageId: PageId,
   dialect: DatabaseDialect,
+  options: { readonly frameId?: string } = {},
 ): DatabaseDdl {
   const warnings: string[] = [];
   // Schema output never follows canvas stacking order. Composite/column order
   // remains authored because those positions carry database semantics.
   const compare = (a: string, b: string): number =>
     a < b ? -1 : a > b ? 1 : 0;
-  const elements = [...editor.store.getPageElements(pageId)];
+  const pageElements = editor.store.getPageElements(pageId);
+  let elements = [...pageElements];
+  if (options.frameId !== undefined) {
+    const frame = editor.store.get(options.frameId);
+    if (frame?.type !== "frame" || frame.page !== pageId)
+      throw new Error("DDL scope must be a frame on the selected page.");
+    const included = new Set(
+      expandContainers(editor.store, [frame.id], editor.createShapeContext(1)),
+    );
+    elements = elements.filter((element) => {
+      if (included.has(element.id)) return true;
+      if (element.type !== "erd.relation") return false;
+      const relation = element.semantic as ErdRelationSemantic;
+      return (
+        included.has(relation.from.table) || included.has(relation.to.table)
+      );
+    });
+  }
   const tableSemantic = new Map(
     elements
       .filter((element) => element.type === "erd.table")
@@ -405,7 +424,7 @@ export function generateDatabaseDdl(
     const remote = tablesById.get(remoteEnd.table);
     if (!local || !remote) {
       warnings.push(
-        `${relation.id}: relation references a table outside this page.`,
+        `${relation.id}: relation references a table outside ${options.frameId === undefined ? "this page" : "the selected frame"}; constraint omitted.`,
       );
       continue;
     }

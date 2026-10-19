@@ -701,3 +701,55 @@ test("orthogonal routes avoid collapsed BPMN sub-processes", () => {
   expect(points?.length).toBeGreaterThan(2);
   expect(points?.every((point) => point.y === 50)).toBe(false);
 });
+
+test("cold routing excludes obstacles inherited from a hidden frame", () => {
+  const editor = makeEditor({
+    document: document([
+      element({
+        id: "hidden-frame",
+        type: "frame",
+        index: "a1",
+        semantic: { name: "Hidden" },
+        visual: { x: 140, y: 60, width: 120, height: 100, hidden: true },
+      }),
+      element({
+        id: "obstacle",
+        type: "node.generic",
+        index: "a2",
+        semantic: { label: "Obstacle" },
+        visual: { x: 160, y: 80, width: 80, height: 60 },
+      }),
+      element({
+        id: "source",
+        type: "node.generic",
+        index: "a3",
+        semantic: { label: "From" },
+        visual: { x: 0, y: 0, width: 100, height: 100 },
+      }),
+      element({
+        id: "target",
+        type: "node.generic",
+        index: "a4",
+        semantic: { label: "To" },
+        visual: { x: 300, y: 200, width: 100, height: 100 },
+      }),
+      element({
+        id: "edge",
+        type: "edge.generic",
+        index: "a5",
+        semantic: { from: "source", to: "target", routing: "orthogonal" },
+      }),
+    ]),
+  });
+  const edge = editor.store.get("edge")!;
+  const context = editor.createShapeContext();
+  const cold = resolveConnector(edge, context, readDirectEndpoints);
+  expect(context.isHidden?.("obstacle")).toBe(true);
+  expect(cold?.points).toEqual([
+    { x: 100, y: 50 },
+    { x: 200, y: 50 },
+    { x: 200, y: 250 },
+    { x: 300, y: 250 },
+  ]);
+  expect(resolveConnector(edge, context, readDirectEndpoints)).toBe(cold);
+});
