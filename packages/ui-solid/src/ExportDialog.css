@@ -1,13 +1,16 @@
 .nodetto-export-dialog {
-  width: min(720px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 32px));
   max-height: calc(100dvh - 48px);
   box-sizing: border-box;
   padding: 0;
   border: 1px solid var(--nodetto-line);
-  border-radius: 10px;
+  border-radius: 16px;
   background: var(--nodetto-surface, white);
   color: var(--nodetto-ink);
+  box-shadow: 0 24px 80px #0003;
   overflow: auto;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .nodetto-export-dialog::backdrop {
   background: #0006;
@@ -16,32 +19,137 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  gap: 16px;
+  padding: 20px 24px;
 }
 .nodetto-export-dialog h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 20px;
+  font-weight: 600;
 }
-.nodetto-export-dialog [role="tablist"] {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 12px 8px;
+.nodetto-export-choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 0 24px 20px;
   border-bottom: 1px solid var(--nodetto-line);
 }
-.nodetto-export-dialog [role="tab"] {
-  padding: 6px 10px;
+.nodetto-export-dialog label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
 }
-.nodetto-export-dialog [role="tab"][aria-selected="true"] {
-  background: var(--nodetto-accent);
-  color: white;
+.nodetto-export-choices p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--nodetto-muted);
+  font-size: 13px;
 }
-.nodetto-export-dialog [role="tabpanel"] {
-  padding: 8px 12px 12px;
+.nodetto-export-panel {
+  padding: 24px;
+}
+.nodetto-export-panel > :is(section, div) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+}
+.nodetto-export-panel
+  > :is(section, div)
+  > :is(label, fieldset, p, textarea, ul) {
+  flex-basis: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .nodetto-export-dialog :is(input, select, textarea, button) {
   font: inherit;
 }
+.nodetto-export-dialog
+  :is(select, textarea, .nodetto-input, button:not(.nodetto-help-hint)) {
+  box-sizing: border-box;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 8px;
+  color: var(--nodetto-ink);
+  background: var(--nodetto-surface, white);
+}
+.nodetto-export-dialog :is(select, .nodetto-input) {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+}
+.nodetto-export-dialog button:not(.nodetto-help-hint) {
+  min-height: 40px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.nodetto-export-dialog button:not(.nodetto-help-hint):hover:not(:disabled) {
+  background: var(--nodetto-accent-soft);
+  border-color: var(--nodetto-accent);
+}
+.nodetto-export-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.nodetto-export-dialog
+  :is(button, select, textarea, .nodetto-input):focus-visible {
+  outline: 2px solid var(--nodetto-accent);
+  outline-offset: 3px;
+}
 .nodetto-export-dialog textarea {
+  width: 100%;
   max-width: 100%;
+  padding: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.nodetto-export-dialog .nodetto-export-settings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 16px;
+  margin: 0 0 8px !important;
+}
+.nodetto-export-dialog .nodetto-export-settings > p {
+  grid-column: 1 / -1;
+}
+.nodetto-export-dialog .nodetto-export-settings select {
+  min-height: 42px;
+}
+.nodetto-export-panel p {
+  margin: 0;
+  color: var(--nodetto-muted);
+  font-size: 13px;
+}
+.nodetto-export-panel p:empty {
+  display: none;
+}
+.nodetto-export-dialog .nodetto-export-primary {
+  margin-left: auto;
+  padding-inline: 24px;
+  color: white;
+  border-color: var(--nodetto-accent);
+  background: var(--nodetto-accent);
+}
+.nodetto-export-dialog .nodetto-export-primary:hover:not(:disabled) {
+  color: white;
+  background: color-mix(in srgb, var(--nodetto-accent) 85%, black);
+}
+@media (max-width: 520px) {
+  .nodetto-export-dialog > header {
+    padding: 16px;
+  }
+  .nodetto-export-choices {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+  .nodetto-export-panel {
+    padding: 20px 16px;
+  }
+  .nodetto-export-dialog .nodetto-export-settings {
+    grid-template-columns: 1fr;
+  }
 }

@@ -156,11 +156,33 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   after that check can still race the atomic replacement.
 - `export` renders SVG with the editor's serializer, PNG with resvg using system
   fonts (embedded in the compiled sidecar), and PDF with the app's page layout.
+  It also exports HTML website ZIPs, Mermaid, D2, and every output in the Code
+  panel (`--format code --element <id> --code-format <output>`). SQL uses `ddl`,
+  and BPMN XML uses `bpmn export`; both accept `--page`.
 - The desktop app applies outside changes to an open file live, keeping the
   camera and selection. With unsaved local edits it merges three ways at element
   and field level (a move and a rename of the same table both survive) and
   autosaves the result; only the same field changed on both sides, or a file that
   now holds a different document, raises the "File changed on disk" banner.
+
+The app's **Export** dialog has a **Page** selector showing each page's name and
+kind. Formats are grouped into Artwork, Diagram source, and Web & developer
+in a dropdown. Select the ERD page of a mixed ERD/sequence document to export only that
+page. Changing this selector also switches the editor's current page. SVG, PNG,
+and PDF support the whole current page, selected artwork, or an artboard.
+
+The CLI uses an exact page name or id. It requires `--page` for a document with
+several pages, unless `--element` identifies the owning page. Run `inspect` to
+list pages; duplicate page names require an id. For example:
+
+```bash
+nodetto-cli export mixed.jsonl --page Schema --format svg --output schema.svg
+nodetto-cli export mixed.jsonl --page Schema --format png --output schema.png
+nodetto-cli export mixed.jsonl --page Schema --format pdf --output schema.pdf
+nodetto-cli export mixed.jsonl --page Schema --format mermaid --mermaid-kind erDiagram --output schema.mmd
+nodetto-cli export mixed.jsonl --page Schema --format d2 --output schema.d2
+nodetto-cli ddl mixed.jsonl --page Schema --output schema.sql
+```
 
 Sequence documents can omit optional geometry: participant order determines
 default columns, and message order determines spaced timeline rows. Lifelines

@@ -22,7 +22,11 @@ export function HtmlExportSection(props: {
       .getPageElements(props.editor.currentPageId)
       .filter((e) => e.type === "frame");
   });
-  const [scope, setScope] = createSignal(props.id ?? "all");
+  const [preferredScope, setScope] = createSignal(props.id ?? "all");
+  const scope = () =>
+    frames().some((frame) => frame.id === preferredScope())
+      ? preferredScope()
+      : "all";
   const [error, setError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [done, setDone] = createSignal(false);
@@ -57,13 +61,13 @@ export function HtmlExportSection(props: {
   return (
     <div>
       <label>
-        Pages{" "}
+        Artboards{" "}
         <select
           aria-label="HTML pages"
           value={scope()}
           onChange={(event) => setScope(event.currentTarget.value)}
         >
-          <option value="all">All artboards</option>
+          <option value="all">All artboards on this page</option>
           <For each={frames()}>
             {(frame) => (
               <option value={frame.id}>

@@ -655,3 +655,9 @@ export {
 } from "./templates/design-templates.ts";
 
 export { connectScreenTransition, screenFrame } from "./screen-transition.ts";
+
+export {
+  exportHandoff,
+  HANDOFF_FORMATS,
+  type HandoffFormat,
+} from "./handoff-export.ts";

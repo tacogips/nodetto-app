@@ -38,7 +38,14 @@ const Code = lazy(() =>
     default: m.HandoffSection,
   })),
 );
-type Tab = ExportFormat | "mermaid" | "d2" | "sql" | "bpmn" | "code" | "html";
+type Format =
+  | ExportFormat
+  | "mermaid"
+  | "d2"
+  | "sql"
+  | "bpmn"
+  | "code"
+  | "html";
 
 export interface ExportDialogProps {
   readonly editor: Editor;
@@ -51,11 +58,15 @@ export interface ExportDialogProps {
 
 export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
-  const [tab, setTab] = createSignal<Tab>("svg");
+  const [format, setFormat] = createSignal<Format>("svg");
   let dialog: HTMLDialogElement | undefined;
   const page = createMemo(() => {
     signals.rev();
     return props.editor.store.getPage(props.editor.currentPageId);
+  });
+  const pages = createMemo(() => {
+    signals.rev();
+    return props.editor.store.listPages();
   });
   const selected = createMemo(() => {
     signals.rev();
@@ -63,7 +74,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     const id = ids.length === 1 ? ids[0] : undefined;
     return id ? props.editor.store.get(id) : undefined;
   });
-  const tabs = createMemo(() => {
+  const formats = createMemo(() => {
     signals.rev();
     return [
       { id: "svg", label: "SVG", enabled: true },
@@ -89,11 +100,27 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       },
       { id: "bpmn", label: "BPMN", enabled: page()?.kind === "bpmn" },
       { id: "code", label: "Code", enabled: selected() !== undefined },
-    ] satisfies readonly { id: Tab; label: string; enabled: boolean }[];
+    ] satisfies readonly { id: Format; label: string; enabled: boolean }[];
   });
   // Switching pages or deleting the selection cannot leave an unavailable panel active.
   const active = () =>
-    tabs().find((t) => t.id === tab())?.enabled ? tab() : "svg";
+    formats().find((t) => t.id === format())?.enabled ? format() : "svg";
+  const formatGroups: readonly { label: string; ids: readonly Format[] }[] = [
+    { label: "Artwork", ids: ["svg", "png", "pdf"] },
+    { label: "Diagram source", ids: ["mermaid", "d2", "sql", "bpmn"] },
+    { label: "Web & developer", ids: ["html", "code"] },
+  ];
+  const descriptions: Record<Format, string> = {
+    svg: "Scalable vector artwork for editing and sharing.",
+    png: "A raster image with adjustable resolution and background.",
+    pdf: "A document sized to your artwork or a printed page.",
+    mermaid: "Editable Mermaid source for ER, UML and sequence diagrams.",
+    d2: "Editable D2 diagram source.",
+    sql: "Database schema SQL in your preferred dialect.",
+    bpmn: "BPMN 2.0 XML for other process modeling tools.",
+    html: "A website ZIP containing artboard HTML, CSS and assets.",
+    code: "Design details, web code and native code for the selected element.",
+  };
   const artworkFormat = (): ExportFormat | undefined => {
     const value = active();
     return value === "svg" || value === "png" || value === "pdf"
@@ -103,32 +130,15 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   onMount(() => {
     const previous = document.activeElement;
     dialog?.showModal();
-    dialog?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();
+    dialog
+      ?.querySelector<HTMLSelectElement>('[aria-label="Export format"]')
+      ?.focus();
     onCleanup(() => {
       dialog?.close();
       if (previous instanceof HTMLElement && previous.isConnected)
         previous.focus();
     });
   });
-  const navigate = (event: KeyboardEvent) => {
-    const direction =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (!direction && event.key !== "Home" && event.key !== "End") return;
-    event.preventDefault();
-    const enabled = tabs().filter((t) => t.enabled);
-    const index = enabled.findIndex((t) => t.id === active());
-    const next =
-      event.key === "Home"
-        ? enabled[0]
-        : event.key === "End"
-          ? enabled.at(-1)
-          : enabled[(index + direction + enabled.length) % enabled.length];
-    if (!next) return;
-    setTab(next.id);
-    dialog
-      ?.querySelector<HTMLButtonElement>(`#nodetto-export-tab-${next.id}`)
-      ?.focus();
-  };
   return (
     <dialog
       ref={dialog}
@@ -147,29 +157,60 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
           Close
         </button>
       </header>
-      <div role="tablist" aria-label="Export format" onKeyDown={navigate}>
-        <For each={tabs()}>
-          {(item) => (
-            <button
-              type="button"
-              role="tab"
-              id={`nodetto-export-tab-${item.id}`}
-              aria-controls="nodetto-export-panel"
-              aria-selected={active() === item.id}
-              tabIndex={active() === item.id ? 0 : -1}
-              disabled={!item.enabled}
-              onClick={() => setTab(item.id)}
-            >
-              {item.label}
-            </button>
-          )}
-        </For>
+      <div class="nodetto-export-choices">
+        <label>
+          Page
+          <select
+            aria-label="Export page"
+            value={page()?.id ?? ""}
+            onChange={(event) =>
+              props.editor.setCurrentPage(event.currentTarget.value)
+            }
+          >
+            <For each={pages()}>
+              {(item) => (
+                <option value={item.id}>
+                  {item.name} ({item.kind})
+                </option>
+              )}
+            </For>
+          </select>
+        </label>
+        <label>
+          Format
+          <select
+            aria-label="Export format"
+            aria-describedby="nodetto-export-description"
+            value={active()}
+            onChange={(event) => {
+              const value = formats().find(
+                (item) => item.id === event.currentTarget.value,
+              );
+              if (value?.enabled) setFormat(value.id);
+            }}
+          >
+            <For each={formatGroups}>
+              {(group) => (
+                <optgroup label={group.label}>
+                  <For each={group.ids}>
+                    {(id) => {
+                      const item = () =>
+                        formats().find((entry) => entry.id === id);
+                      return (
+                        <option value={id} disabled={!item()?.enabled}>
+                          {item()?.label}
+                        </option>
+                      );
+                    }}
+                  </For>
+                </optgroup>
+              )}
+            </For>
+          </select>
+        </label>
+        <p id="nodetto-export-description">{descriptions[active()]}</p>
       </div>
-      <div
-        role="tabpanel"
-        id="nodetto-export-panel"
-        aria-labelledby={`nodetto-export-tab-${active()}`}
-      >
+      <div class="nodetto-export-panel" id="nodetto-export-panel">
         <Suspense fallback={<p role="status">Loading…</p>}>
           <Switch>
             <Match when={artworkFormat()}>

@@ -1,5 +1,11 @@
+import {
+  availableMermaidKinds,
+  exportMermaid,
+  exportD2,
+  type MermaidDiagramKind,
+} from "@nodetto/io";
 import { encodeRasterDataUrl, isRasterAttachmentPath } from "@nodetto/ir";
-// `nodetto-cli export`: render one page to SVG, PNG or PDF.
+// `nodetto-cli export`: page artwork, semantic diagrams and developer handoff.
 //
 // SVG is the core serializer's page export, byte for byte what the app's page
 // export produces. PNG rasterizes that SVG with resvg instead of a browser
@@ -7,6 +13,9 @@ import { encodeRasterDataUrl, isRasterAttachmentPath } from "@nodetto/ir";
 
 import {
   Editor,
+  exportHandoff,
+  HANDOFF_FORMATS,
+  type HandoffFormat,
   exportHtmlBundle,
   encodeHtmlBundleZip,
   PDF_PAGE_SIZES,
@@ -42,9 +51,23 @@ const EXPORT_OPTIONS = new Set([
   "--margin",
   "--element",
   "--font-dir",
+  "--mermaid-kind",
+  "--code-format",
 ]);
 
-type ExportFormat = "svg" | "png" | "pdf" | "html";
+const EXPORT_FORMATS = [
+  "svg",
+  "png",
+  "pdf",
+  "html",
+  "mermaid",
+  "d2",
+  "code",
+] as const;
+type ExportFormat = (typeof EXPORT_FORMATS)[number];
+function isExportFormat(value: string | undefined): value is ExportFormat {
+  return EXPORT_FORMATS.some((format) => format === value);
+}
 
 function isPdfPageSize(value: string): value is PdfPageSize {
   return Object.hasOwn(PDF_PAGE_SIZES, value);
@@ -90,22 +113,25 @@ export async function exportCommand(
     );
   const path = parsed.positional[0] as string;
   const format = parsed.options.get("--format");
-  if (
-    format !== "svg" &&
-    format !== "png" &&
-    format !== "pdf" &&
-    format !== "html"
-  )
+  if (!isExportFormat(format))
     return fail(
       format === undefined
-        ? `export requires --format svg, png, pdf or html.\n\n${helpFor("export")}`
-        : `Unsupported format "${format}". Choose svg, png, pdf or html.`,
+        ? `export requires --format ${EXPORT_FORMATS.join(", ")}.\n\n${helpFor("export")}`
+        : `Unsupported format "${format}". Choose ${EXPORT_FORMATS.join(", ")}.`,
     );
   const exportFormat: ExportFormat = format;
   const outputPath = parsed.options.get("--output");
-  if (exportFormat !== "svg" && outputPath === undefined)
+  if (["png", "pdf", "html"].includes(exportFormat) && outputPath === undefined)
     return fail(`${exportFormat.toUpperCase()} export requires --output.`);
 
+  const mermaidKind = parsed.options.get("--mermaid-kind");
+  if (mermaidKind !== undefined && exportFormat !== "mermaid")
+    return fail("--mermaid-kind requires --format mermaid.");
+  const codeFormat = parsed.options.get("--code-format") ?? "css";
+  if (!HANDOFF_FORMATS.includes(codeFormat as HandoffFormat))
+    return fail(`--code-format must be one of ${HANDOFF_FORMATS.join(", ")}.`);
+  if (parsed.options.has("--code-format") && exportFormat !== "code")
+    return fail("--code-format requires --format code.");
   const padding = parseNumber(parsed.options.get("--padding"), 16);
   if (!Number.isFinite(padding) || padding < 0 || padding > 256)
     return fail("--padding must be a number between 0 and 256.");
@@ -158,8 +184,68 @@ export async function exportCommand(
     "pages",
   );
   if (typeof page === "string") return fail(page);
+  if (
+    elementId &&
+    loaded.document.elements.find((element) => element.id === elementId)
+      ?.page !== page.id
+  )
+    return fail("--element does not belong to the selected --page.");
+  if (elementId && (exportFormat === "mermaid" || exportFormat === "d2"))
+    return fail(`${exportFormat} exports a whole page; omit --element.`);
+  if (exportFormat === "code" && !elementId)
+    return fail(
+      "Code export requires --element (select an artboard for generated code).",
+    );
   const editor = new Editor({ document: loaded.document });
   editor.setCurrentPage(page.id);
+  if (
+    exportFormat === "mermaid" ||
+    exportFormat === "d2" ||
+    exportFormat === "code"
+  ) {
+    try {
+      let text: string;
+      let warnings = loaded.warnings;
+      if (exportFormat === "code") {
+        text = exportHandoff(
+          editor,
+          elementId as string,
+          codeFormat as HandoffFormat,
+        );
+      } else {
+        const kinds = availableMermaidKinds(loaded.document, page.id);
+        if (
+          exportFormat === "mermaid" &&
+          mermaidKind !== undefined &&
+          !kinds.includes(mermaidKind as MermaidDiagramKind)
+        )
+          return fail(
+            `--mermaid-kind is not available on this page. Choose ${kinds.join(", ") || "a page containing ERD, UML or sequence elements"}.`,
+          );
+        if (exportFormat === "mermaid" && kinds.length === 0)
+          return fail(`Page "${page.name}" has no Mermaid-compatible content.`);
+        const report =
+          exportFormat === "d2"
+            ? exportD2(loaded.document, page.id)
+            : exportMermaid(
+                loaded.document,
+                page.id,
+                (mermaidKind ?? kinds[0]) as MermaidDiagramKind,
+              );
+        text = report.code;
+        warnings += report.warnings
+          .map((warning) => `warning: ${warning.message}\n`)
+          .join("");
+      }
+      if (outputPath === undefined) return ok(text, warnings);
+      const failure = writeOutput(io, outputPath, text);
+      return failure
+        ? fail(`${warnings}${failure}`)
+        : ok("", `${warnings}Wrote ${outputPath}.\n`);
+    } catch (error) {
+      return fail(`Cannot export ${exportFormat}: ${describe(error)}`);
+    }
+  }
   const resolveAsset = (source: string): string => {
     const cached = editor.assets.resolve(source);
     if (cached) return cached;

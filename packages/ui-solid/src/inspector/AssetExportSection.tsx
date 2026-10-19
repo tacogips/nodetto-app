@@ -321,6 +321,7 @@ export function AssetExportSection(props: {
       </Show>
       <button
         type="button"
+        class="nodetto-export-primary"
         disabled={busy() || !!preview().error}
         onClick={() => void download()}
       >

@@ -18,7 +18,7 @@ Draw and edit
   nodetto-cli arrange <doc>       Tidy the layout of one page
 
 Render
-  nodetto-cli export <doc>        Render a page to SVG, PNG or PDF
+  nodetto-cli export <doc>        Export a page or selected artwork
 
 Convert and check
   nodetto-cli ddl <doc>           Database DDL from an ERD page
@@ -192,21 +192,35 @@ Example:
 
 ${EXIT_CODES}`,
 
-  export: `Usage: nodetto-cli export <doc.jsonl> --format svg|png|pdf|html [--page <id|name>]
+  export: `Usage: nodetto-cli export <doc.jsonl> --format <format> [--page <id|name>]
                           [--element <id>] [--output <file>] [--font-dir <dir>] [--padding <n>]
                           [--background <#rrggbb|transparent>] [--scale <n>]
                           [--pdf-page artwork|a4|letter]
                           [--orientation portrait|landscape] [--margin <mm>]
+                          [--mermaid-kind erDiagram|classDiagram|sequenceDiagram]
+                          [--code-format <output>]
 
 Render one page exactly as the app's page export does.
 
-  --format       svg, png, pdf or html (required; html writes a website ZIP).
-  --page         Page id or name; required when the document has several pages.
+  --format       svg, png, pdf, html, mermaid, d2 or code (required).
+                 html writes a website ZIP; code uses --element and --code-format.
+                 SQL: use nodetto-cli ddl. BPMN XML: use nodetto-cli bpmn export.
+  --page         Export only this page by id or exact name, regardless of kind.
+                 Required when the document has several pages (unless --element
+                 implies one). Use inspect to list page ids, names and kinds.
   --element      Render only this element's area (a frame renders everything
                  inside it). Accepts a unique id prefix; implies its page.
                  Use it to check one part of a large diagram.
-  --output       Output file. SVG prints to stdout without it; PNG and PDF
-                 require it.
+  --output       Output file. PNG, PDF and HTML require it; text formats print
+                 to stdout when omitted.
+  --mermaid-kind Mermaid diagram kind; defaults to the first available kind on
+                 the selected page. Does not include any other document pages.
+  --code-format  Code panel output (default css): css, json, linked, palette,
+                 typography, layout, html, code-css, code-linked, manifest,
+                 responsive-html, responsive-css, responsive-linked,
+                 responsive-manifest, swiftui, compose, mobile-assets,
+                 adaptive-swiftui, adaptive-compose, adaptive-manifest,
+                 accessibility-audit. Generated code requires an artboard.
   --padding      Space around the content in canvas units, 0-256 (default 16).
   --background   Six-digit hex color, or transparent. Default: #ffffff for PNG
                  and PDF, transparent for SVG.
@@ -225,6 +239,9 @@ PNG text uses those fonts, so metrics can differ slightly from the app.
 
 Example (check a drawing):
   nodetto-cli export flow.jsonl --page Flow --format png --output /tmp/flow.png
+  nodetto-cli export mixed.jsonl --page Schema --format svg --output schema.svg
+  nodetto-cli export mixed.jsonl --page Schema --format mermaid --output schema.mmd
+  nodetto-cli export design.jsonl --element artboard-id --format code --code-format swiftui
 
 ${EXIT_CODES}`,
 

@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Editor } from "@nodetto/core";
+import { Editor, HANDOFF_FORMATS } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
 
 const binary = process.env.NODETTO_CLI_TEST_BINARY;
@@ -297,4 +297,83 @@ nativeTest(
     }
   },
   30000,
+);
+
+nativeTest(
+  "native CLI exports Mermaid, D2 and every Code panel output",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-exports-"));
+    try {
+      for (const format of ["mermaid", "d2"])
+        compare(["export", join(fixtureRoot, "erd.jsonl"), "--format", format]);
+      const editor = new Editor();
+      const frame = editor.createElement("frame", {
+        semantic: { name: "Home", platform: "web" },
+        visual: { x: 0, y: 0, width: 400, height: 300 },
+      });
+      editor.createElement("ui.control", {
+        semantic: { control: "button", label: "Submit" },
+        visual: { x: 20, y: 20, width: 100, height: 40 },
+      });
+      editor.createPage({ name: "Sequence", kind: "sequence" });
+      editor.createElement("sequence.participant", {
+        semantic: { name: "Excluded actor", kind: "actor", order: "a0" },
+      });
+      const schema = editor.createPage({ name: "Schema", kind: "erd" });
+      editor.createElement("erd.table", {
+        semantic: { tableName: "selected_users", columns: [] },
+      });
+      writeFileSync(
+        join(cwd, "design.jsonl"),
+        serializeDocument(editor.getSnapshot()),
+      );
+      for (const page of [schema, "Schema"]) {
+        for (const format of ["svg", "mermaid", "d2"]) {
+          const result = compare(
+            ["export", "design.jsonl", "--page", page, "--format", format],
+            cwd,
+          );
+          expect(result.stdout.toString()).toContain("selected_users");
+          expect(result.stdout.toString()).not.toContain("Excluded actor");
+        }
+        for (const format of ["png", "pdf"]) {
+          const result = Bun.spawnSync(
+            [
+              binary!,
+              "export",
+              "design.jsonl",
+              "--page",
+              page,
+              "--format",
+              format,
+              "--output",
+              `schema.${format}`,
+            ],
+            { cwd },
+          );
+          expect(result.exitCode).toBe(0);
+          expect([
+            ...readFileSync(join(cwd, `schema.${format}`)).slice(0, 4),
+          ]).toEqual(format === "png" ? [137, 80, 78, 71] : [37, 80, 68, 70]);
+        }
+      }
+      for (const format of HANDOFF_FORMATS)
+        compare(
+          [
+            "export",
+            "design.jsonl",
+            "--element",
+            frame,
+            "--format",
+            "code",
+            "--code-format",
+            format,
+          ],
+          cwd,
+        );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  60000,
 );
