@@ -106,3 +106,38 @@ test("layer flags reject non-booleans", () => {
     ),
   ).toBe(true);
 });
+
+test("visibility queries never route connectors on unrelated pages", () => {
+  const editor = fixture();
+  const page = editor.createPage({ id: "unrelated", name: "Unrelated" });
+  editor.apply([
+    { type: "updateVisual", id: "frame", visual: { hidden: true } },
+    {
+      type: "createElement",
+      element: editor.buildElement("frame", {
+        id: "other-frame",
+        visual: { x: 0, y: 0, width: 500, height: 500 },
+      }),
+    },
+    {
+      type: "createElement",
+      element: editor.buildElement("edge.generic", {
+        id: "other-edge",
+        semantic: {
+          from: "other-frame",
+          to: "other-frame",
+          routing: "orthogonal",
+        },
+      }),
+    },
+  ]);
+  expect(editor.store.get("other-edge")?.page).toBe(page);
+  const edgeUtil = editor.getShapeUtil("edge.generic");
+  editor.registry.register({
+    ...edgeUtil,
+    getBounds() {
+      throw new Error("unrelated route evaluated");
+    },
+  });
+  expect(editor.createShapeContext().isHidden?.("child")).toBe(true);
+});

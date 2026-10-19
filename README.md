@@ -1399,3 +1399,23 @@ checks run before publication.
 used by both desktop and CLI. Host adapters own dialogs, transport and sandbox
 identity. Diagram behavior stays in the shared TypeScript packages; Boa hosts
 that code for the CLI. See [native host boundaries](design-docs/specs/native-hosts.md).
+
+### Multiline nodes and scoped schema export
+
+Generic node labels support line breaks and wrapping. Edit the label in the
+Inspector's multiline field, or use Shift+Enter in the inline editor to insert
+a line break. Enter commits an inline edit. Canvas and SVG-derived exports use
+the same line layout.
+
+To export one database frame from an ERD page, choose its frame in the Database
+DDL panel's scope selector, or run:
+
+```bash
+nodetto-cli ddl diagram.jsonl --page Schema --frame database-frame-id --dialect postgresql
+```
+
+The scope follows frame ownership, including nested frames and groups. Relations
+that cross the scope produce a warning and no foreign key. Database objects
+whose authored dependencies are excluded are omitted with a warning. Review
+raw SQL definitions for unauthored external dependencies. Whole-page export
+remains the default; `--strict`, `--output` and `--check` also work with frames.

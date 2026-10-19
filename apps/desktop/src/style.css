@@ -487,8 +487,7 @@ input {
 
 .nodetto-node-label {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre;
 }
 
 .nodetto-sequence-participant {

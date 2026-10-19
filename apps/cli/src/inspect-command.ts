@@ -275,26 +275,48 @@ function pageOutline(
   const isConnector = (element: Element): boolean =>
     isKnownElementType(element.type) &&
     getElementTypeDefinition(element.type)?.category === "edge";
-  // Shapes read top-to-bottom, left-to-right; connectors follow them, and
-  // sequence messages keep their timeline order.
+  // Precompute geometry outside the comparator. Pairwise "same row" tolerances
+  // are non-transitive and can panic native Array.sort; use a total order.
   const ordered = (list: readonly Element[]): Element[] =>
-    [...list].sort((left, right) => {
-      const edge = Number(isConnector(left)) - Number(isConnector(right));
-      if (edge !== 0) return edge;
-      const leftOrder = semanticOf(left)["order"];
-      const rightOrder = semanticOf(right)["order"];
-      if (typeof leftOrder === "string" && typeof rightOrder === "string")
-        return leftOrder < rightOrder ? -1 : leftOrder > rightOrder ? 1 : 0;
-      const a = bounds(left.id);
-      const b = bounds(right.id);
-      if (a && b) {
-        // Same row when the vertical centres are within half the smaller height.
-        const dy = a.y + a.height / 2 - (b.y + b.height / 2);
-        if (Math.abs(dy) > Math.min(a.height, b.height) / 2) return dy;
-        return a.x - b.x;
-      }
-      return left.id < right.id ? -1 : 1;
-    });
+    list
+      .map((element) => ({
+        element,
+        edge: Number(isConnector(element)),
+        order:
+          typeof semanticOf(element)["order"] === "string"
+            ? String(semanticOf(element)["order"])
+            : undefined,
+        box: bounds(element.id),
+      }))
+      .sort((a, b) => {
+        const edge = a.edge - b.edge;
+        if (edge !== 0) return edge;
+        // Keep authored timeline order in its own category to avoid mixing
+        // pairwise semantic ordering with spatial ordering.
+        const authored =
+          Number(a.order === undefined) - Number(b.order === undefined);
+        if (authored !== 0) return authored;
+        if (
+          a.order !== undefined &&
+          b.order !== undefined &&
+          a.order !== b.order
+        )
+          return a.order < b.order ? -1 : 1;
+        const missing = Number(a.box === null) - Number(b.box === null);
+        if (missing !== 0) return missing;
+        if (a.box && b.box) {
+          const position =
+            a.box.y + a.box.height / 2 - (b.box.y + b.box.height / 2) ||
+            a.box.x - b.box.x;
+          if (position !== 0) return position;
+        }
+        return a.element.id < b.element.id
+          ? -1
+          : a.element.id > b.element.id
+            ? 1
+            : 0;
+      })
+      .map(({ element }) => element);
   const lines: string[] = [];
   const walk = (parent: string | undefined, depth: number): void => {
     for (const element of ordered(children.get(parent) ?? [])) {

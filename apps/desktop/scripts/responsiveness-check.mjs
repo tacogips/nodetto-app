@@ -60,7 +60,10 @@ try {
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.method === "Runtime.exceptionThrown")
-      errors.push(message.params.exceptionDetails.text);
+      errors.push(
+        message.params.exceptionDetails.exception?.description ??
+          message.params.exceptionDetails.text,
+      );
     const entry = pending.get(message.id);
     if (entry) {
       pending.delete(message.id);
@@ -101,8 +104,12 @@ try {
     }
     await Bun.sleep(100);
   }
-  if (!ready) throw new Error("fixture did not load");
-  if (process.argv.includes("--invalidation-only")) {
+  if (!ready) throw new Error(`fixture did not load: ${errors.join("; ")}`);
+  if (process.argv.includes("--screenshot-fixes-only")) {
+    const result = await evaluate("window.responsiveness.runScreenshotFixes()");
+    if (errors.length) throw new Error(errors.join(", "));
+    console.log(JSON.stringify({ passed: true, ...result }));
+  } else if (process.argv.includes("--invalidation-only")) {
     const result = await evaluate("window.responsiveness.runInvalidation()");
     if (errors.length) throw new Error(errors.join(", "));
     console.log(JSON.stringify({ passed: true, ...result }));

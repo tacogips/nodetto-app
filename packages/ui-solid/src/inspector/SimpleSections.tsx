@@ -174,7 +174,7 @@ export function NodeSection(props: ElementSectionProps): JSX.Element {
   return (
     <Section title="Node">
       <Field label="Label">
-        <TextInput
+        <TextArea
           label="Label"
           value={stringOf(semantic(), "label")}
           onCommit={(label) =>

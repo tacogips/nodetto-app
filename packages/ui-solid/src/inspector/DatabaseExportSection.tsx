@@ -44,10 +44,21 @@ export function DatabaseExportSection(props: {
 }): JSX.Element {
   const signals = createEditorSignals(props.editor);
   const [dialect, setDialect] = createSignal<DatabaseDialect>("postgresql");
+  const [scope, setScope] = createSignal("");
+  const frames = createMemo(() => {
+    signals.rev();
+    return props.editor.store
+      .getPageElements(props.pageId)
+      .filter((element) => element.type === "frame");
+  });
+  const frameId = () =>
+    frames().some((frame) => frame.id === scope()) ? scope() : undefined;
   const [status, setStatus] = createSignal("");
   const report = createMemo(() => {
     signals.rev();
-    return generateDatabaseDdl(props.editor, props.pageId, dialect());
+    return generateDatabaseDdl(props.editor, props.pageId, dialect(), {
+      frameId: frameId(),
+    });
   });
   const copy = async (): Promise<void> => {
     try {
@@ -66,7 +77,7 @@ export function DatabaseExportSection(props: {
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${fileStem(pageName)}.${dialect()}.sql`;
+    link.download = `${fileStem(pageName)}${frameId() ? `.${fileStem(frameId() ?? "")}` : ""}.${dialect()}.sql`;
     document.body.append(link);
     try {
       link.click();
@@ -78,6 +89,26 @@ export function DatabaseExportSection(props: {
   };
   return (
     <section class="nodetto-inspector-section">
+      <label>
+        DDL scope
+        <select
+          aria-label="Database DDL scope"
+          value={frameId() ?? ""}
+          onChange={(event) => {
+            setScope(event.currentTarget.value);
+            setStatus("");
+          }}
+        >
+          <option value="">Whole page</option>
+          <For each={frames()}>
+            {(frame) => (
+              <option value={frame.id}>
+                {(frame.semantic as { name?: string }).name || frame.id}
+              </option>
+            )}
+          </For>
+        </select>
+      </label>
       <label>
         SQL dialect
         <select
@@ -115,6 +146,7 @@ export function DatabaseExportSection(props: {
           "font-family": "monospace",
         }}
       />
+      <For each={report().warnings}>{(warning) => <p>{warning}</p>}</For>
       <p role="status">{status()}</p>
     </section>
   );
