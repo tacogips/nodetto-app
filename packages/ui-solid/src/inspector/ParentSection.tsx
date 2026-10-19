@@ -6,7 +6,8 @@ import {
   groupOf,
 } from "@nodetto/core";
 import type { Element, FrameSemantic, Visual } from "@nodetto/ir";
-import { createSignal, For, type JSX, Show } from "solid-js";
+import { createMemo, createSignal, For, type JSX, Show } from "solid-js";
+import { createEditorSignals } from "../adapter.ts";
 import {
   Field,
   Section,
@@ -20,14 +21,18 @@ export function ParentSection(props: {
   readonly element: Element;
 }): JSX.Element {
   const [message, setMessage] = createSignal("");
-  const parent = () =>
-    frameParents(
-      props.editor.store,
-      props.element.page,
-      props.editor.createShapeContext(),
-    ).get(props.element.id);
-  const options = () => {
-    const context = props.editor.createShapeContext();
+  const signals = createEditorSignals(props.editor);
+  const shapeContext = createMemo(() => {
+    signals.rev();
+    return props.editor.createShapeContext();
+  });
+  const parent = createMemo(() =>
+    frameParents(props.editor.store, props.element.page, shapeContext()).get(
+      props.element.id,
+    ),
+  );
+  const options = createMemo(() => {
+    const context = shapeContext();
     const descendants = new Set(
       expandContainers(props.editor.store, [props.element.id], context),
     );
@@ -46,7 +51,7 @@ export function ParentSection(props: {
           label: (item.semantic as FrameSemantic).name || "Artboard",
         })),
     ];
-  };
+  });
   const parentLayout = () => {
     const id = parent();
     const frame = id ? props.editor.store.get(id) : undefined;

@@ -184,12 +184,12 @@ export function Inspector(props: InspectorProps): JSX.Element {
     };
     return labels[type];
   };
-  const disabled = () => {
+  const disabled = createMemo(() => {
     signals.rev();
     if (props.editor.readOnly) return true;
     const context = props.editor.createShapeContext();
     return selectedIds().some((id) => context.isLocked?.(id));
-  };
+  });
   createEffect(on(selectedElementId, () => setActiveTab("shape")));
   createEffect(
     on([() => props.focus, selectedElementId], ([focus, id]) => {

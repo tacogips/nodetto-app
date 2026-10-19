@@ -1,4 +1,5 @@
 // Start Vite, then: bun scripts/responsiveness-check.mjs http://localhost:1420
+// Add --erd-only [--relations] for the large ERD benchmark.
 // Isolated headless Chrome, with no additional browser-test dependencies.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -39,7 +40,8 @@ try {
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
       pages = await (await fetch(`http://localhost:${port}/json/list`)).json();
-      break;
+      if (pages.some((page) => page.type === "page")) break;
+      await Bun.sleep(100);
     } catch {
       await Bun.sleep(100);
     }
@@ -99,45 +101,64 @@ try {
     await Bun.sleep(100);
   }
   if (!ready) throw new Error("fixture did not load");
-  const results = await evaluate("window.responsiveness.run()");
-  const handle =
-    await evaluate(`Array.from(document.querySelectorAll('.nodetto-handle')).map(node=>{
+  if (process.argv.includes("--erd-only")) {
+    const erd = await evaluate(
+      `window.responsiveness.runErd(${process.argv.includes("--relations")})`,
+    );
+    if (errors.length) throw new Error(errors.join(", "));
+    console.log(JSON.stringify({ passed: true, erd }));
+  } else {
+    const results = await evaluate("window.responsiveness.run()");
+    const handle =
+      await evaluate(`Array.from(document.querySelectorAll('.nodetto-handle')).map(node=>{
     const box=node.getBoundingClientRect();return {x:box.x+box.width/2,y:box.y+box.height/2};
   }).sort((a,b)=>(b.x+b.y)-(a.x+a.y))[0]`);
-  if (!handle) throw new Error("missing resize handle");
-  const mouse = (type, x, y, buttons) =>
-    send("Input.dispatchMouseEvent", {
-      type,
-      x,
-      y,
-      button: "left",
-      buttons,
-      clickCount: 1,
-      pointerType: "mouse",
-    });
-  await mouse("mousePressed", handle.x, handle.y, 1);
-  for (let i = 1; i <= 15; i++) {
-    await mouse(
-      "mouseMoved",
-      handle.x + (70 * i) / 15,
-      handle.y + (30 * i) / 15,
-      1,
+    if (!handle) throw new Error("missing resize handle");
+    const mouse = (type, x, y, buttons) =>
+      send("Input.dispatchMouseEvent", {
+        type,
+        x,
+        y,
+        button: "left",
+        buttons,
+        clickCount: 1,
+        pointerType: "mouse",
+      });
+    await mouse("mousePressed", handle.x, handle.y, 1);
+    for (let i = 1; i <= 15; i++) {
+      await mouse(
+        "mouseMoved",
+        handle.x + (70 * i) / 15,
+        handle.y + (30 * i) / 15,
+        1,
+      );
+      await Bun.sleep(12);
+    }
+    await Bun.sleep(60);
+    const held = await evaluate("window.responsiveness.heldSize()");
+    if (held.width !== "170px" || held.height !== "100px" || !held.batching)
+      throw new Error(`held resize failed: ${JSON.stringify(held)}`);
+    await mouse("mouseReleased", handle.x + 70, handle.y + 30, 0);
+    await evaluate("window.responsiveness.undo()");
+    await Bun.sleep(60);
+    const undo = await evaluate("window.responsiveness.heldSize()");
+    if (undo.width !== "100px" || undo.height !== "70px" || undo.batching)
+      throw new Error(`resize undo failed: ${JSON.stringify(undo)}`);
+    const erd = await evaluate("window.responsiveness.runErd()");
+    const erdRelations = await evaluate("window.responsiveness.runErd(true)");
+    if (errors.length)
+      throw new Error(`uncaught browser errors: ${errors.join(", ")}`);
+    console.log(
+      JSON.stringify({
+        passed: true,
+        ...results,
+        erd,
+        erdRelations,
+        held,
+        undo,
+      }),
     );
-    await Bun.sleep(12);
   }
-  await Bun.sleep(60);
-  const held = await evaluate("window.responsiveness.heldSize()");
-  if (held.width !== "170px" || held.height !== "100px" || !held.batching)
-    throw new Error(`held resize failed: ${JSON.stringify(held)}`);
-  await mouse("mouseReleased", handle.x + 70, handle.y + 30, 0);
-  await evaluate("window.responsiveness.undo()");
-  await Bun.sleep(60);
-  const undo = await evaluate("window.responsiveness.heldSize()");
-  if (undo.width !== "100px" || undo.height !== "70px" || undo.batching)
-    throw new Error(`resize undo failed: ${JSON.stringify(undo)}`);
-  if (errors.length)
-    throw new Error(`uncaught browser errors: ${errors.join(", ")}`);
-  console.log(JSON.stringify({ passed: true, ...results, held, undo }));
 } finally {
   ws?.close();
   chrome.kill();

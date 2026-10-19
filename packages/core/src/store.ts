@@ -75,6 +75,7 @@ export class Store {
   private readonly pageMap = new Map<PageId, Page>();
   private readonly elementMap = new Map<ElementId, Element>();
   private readonly listeners = new Set<StoreListener>();
+  private readonly pageElements = new Map<PageId, readonly Element[]>();
 
   constructor(document?: Document, fallbackId = "document") {
     this.meta = emptyMeta(fallbackId);
@@ -118,13 +119,17 @@ export class Store {
 
   /** Elements of one page, bottom to top. */
   getPageElements(pageId: PageId): readonly Element[] {
+    const cached = this.pageElements.get(pageId);
+    if (cached) return cached;
     const out: Element[] = [];
     for (const element of this.elementMap.values()) {
       if (element.page === pageId) {
         out.push(element);
       }
     }
-    return out.sort(compareElementOrder);
+    out.sort(compareElementOrder);
+    this.pageElements.set(pageId, out);
+    return out;
   }
 
   subscribe(listener: StoreListener): () => void {
@@ -137,6 +142,7 @@ export class Store {
   /** Replace the whole document. Announced as one diff. */
   loadDocument(document: Document): void {
     const removed = [...this.elementMap.keys()];
+    this.pageElements.clear();
     this.pageMap.clear();
     this.elementMap.clear();
     this.meta = {
@@ -171,6 +177,19 @@ export class Store {
     const updated: ElementId[] = [];
     const removed: ElementId[] = [];
     let pagesChanged = false;
+    // Invalidate before mutation/notification, including moves between pages.
+    for (const element of [
+      ...(commit.insert ?? []),
+      ...(commit.update ?? []),
+    ]) {
+      const previous = this.elementMap.get(element.id);
+      if (previous) this.pageElements.delete(previous.page);
+      this.pageElements.delete(element.page);
+    }
+    for (const id of commit.remove ?? []) {
+      const previous = this.elementMap.get(id);
+      if (previous) this.pageElements.delete(previous.page);
+    }
     for (const page of commit.insertPages ?? []) {
       this.pageMap.set(page.id, page);
       pagesChanged = true;

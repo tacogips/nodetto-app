@@ -306,7 +306,7 @@ export function maskSources(
   const out = new Set<ElementId>();
   const elements = Array.isArray(source)
     ? source
-    : (source as Store).getSnapshot().elements;
+    : (source as Store).listElements();
   for (const element of elements) {
     if (element.type !== "group") continue;
     const semantic = element.semantic as GroupSemantic;

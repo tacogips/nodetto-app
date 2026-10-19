@@ -4,6 +4,13 @@ import { memberIdsOf } from "./group.ts";
 import type { ShapeContext } from "./shape-util.ts";
 import type { Store } from "./store.ts";
 
+// Contexts already memoize geometry; share the matching ownership scan among
+// visibility, clipping, selection and container expansion in that context.
+const parentCache = new WeakMap<
+  ShapeContext,
+  WeakMap<readonly Element[], ReadonlyMap<ElementId, ElementId>>
+>();
+
 /** Frame membership follows the IR's geometric containment contract. */
 export function frameParents(
   store: Store,
@@ -11,6 +18,13 @@ export function frameParents(
   context: ShapeContext,
 ): ReadonlyMap<ElementId, ElementId> {
   const elements = store.getPageElements(page);
+  let pages = parentCache.get(context);
+  if (!pages) {
+    pages = new WeakMap();
+    parentCache.set(context, pages);
+  }
+  const cached = pages.get(elements);
+  if (cached) return cached;
   const frames = elements.filter((element) => element.type === "frame");
   const parents = new Map<ElementId, ElementId>();
   const explicitFrames = new Set<ElementId>();
@@ -35,7 +49,10 @@ export function frameParents(
     }
   }
   // Explicit membership needs no geometric ownership scan.
-  if (explicitFrames.size === frames.length) return parents;
+  if (explicitFrames.size === frames.length) {
+    pages.set(elements, parents);
+    return parents;
+  }
   for (const element of elements) {
     if (parents.has(element.id)) continue;
     const box = context.boundsOf(element.id);
@@ -44,13 +61,6 @@ export function frameParents(
     let area = Number.POSITIVE_INFINITY;
     for (const frame of frames) {
       if (explicitFrames.has(frame.id)) continue;
-      let ancestor: string | undefined = frame.id;
-      const visited = new Set<string>();
-      while (ancestor && !visited.has(ancestor) && ancestor !== element.id) {
-        visited.add(ancestor);
-        ancestor = parents.get(ancestor);
-      }
-      if (ancestor === element.id) continue;
       if (frame.id === element.id) continue;
       // A frame only owns content drawn above it; overlapping copies must
       // not capture the original's content or form equal-size cycles.
@@ -64,6 +74,13 @@ export function frameParents(
         box.y + box.height > bounds.y + bounds.height
       )
         continue;
+      let ancestor: string | undefined = frame.id;
+      const visited = new Set<string>();
+      while (ancestor && !visited.has(ancestor) && ancestor !== element.id) {
+        visited.add(ancestor);
+        ancestor = parents.get(ancestor);
+      }
+      if (ancestor === element.id) continue;
       const candidateArea = bounds.width * bounds.height;
       if (
         candidateArea < area ||
@@ -77,6 +94,7 @@ export function frameParents(
     }
     if (parent) parents.set(element.id, parent.id);
   }
+  pages.set(elements, parents);
   return parents;
 }
 

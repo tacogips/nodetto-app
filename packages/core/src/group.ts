@@ -46,6 +46,10 @@ export function memberIdsOf(element: Element): readonly ElementId[] {
     : [];
 }
 
+// Page arrays are stable until a store commit changes that page. Weak keys
+// release obsolete indexes without retaining closed documents.
+const groupParents = new WeakMap<readonly Element[], Map<ElementId, Element>>();
+
 /**
  * The group on the same page whose member list names `id`, or `null`.
  * A well-formed document has at most one; the lowest id wins otherwise so
@@ -56,16 +60,21 @@ export function groupOf(store: Store, id: ElementId): Element | null {
   if (!element) {
     return null;
   }
-  let found: Element | null = null;
-  for (const candidate of store.getPageElements(element.page)) {
-    if (candidate.id === id || !memberIdsOf(candidate).includes(id)) {
-      continue;
+  const elements = store.getPageElements(element.page);
+  let parents = groupParents.get(elements);
+  if (!parents) {
+    parents = new Map<ElementId, Element>();
+    for (const candidate of elements) {
+      for (const member of memberIdsOf(candidate)) {
+        if (candidate.id === member) continue;
+        const previous = parents.get(member);
+        if (!previous || compareFractional(candidate.id, previous.id) < 0)
+          parents.set(member, candidate);
+      }
     }
-    if (found === null || compareFractional(candidate.id, found.id) < 0) {
-      found = candidate;
-    }
+    groupParents.set(elements, parents);
   }
-  return found;
+  return parents.get(id) ?? null;
 }
 
 /** `id` first, then each enclosing group outward. */
