@@ -69,17 +69,24 @@ export interface ShapeUtil {
 
 export class ShapeUtilRegistry {
   private readonly utils = new Map<string, ShapeUtil>();
+  private revisionCount = 0;
+
+  get revision(): number {
+    return this.revisionCount;
+  }
 
   constructor(private fallback: ShapeUtil) {}
 
   register(util: ShapeUtil): this {
     this.utils.set(util.type, util);
+    this.revisionCount += 1;
     return this;
   }
 
   /** Replace the util used for element types nothing is registered for. */
   setFallback(util: ShapeUtil): this {
     this.fallback = util;
+    this.revisionCount += 1;
     return this;
   }
 

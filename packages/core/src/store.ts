@@ -72,6 +72,12 @@ function emptyMeta(id: DocId): DocumentMeta {
 
 export class Store {
   private meta: DocumentMeta;
+  private revisionCount = 0;
+
+  /** Changes before subscribers run, including document replacement. */
+  get revision(): number {
+    return this.revisionCount;
+  }
   private readonly pageMap = new Map<PageId, Page>();
   private readonly elementMap = new Map<ElementId, Element>();
   private readonly listeners = new Set<StoreListener>();
@@ -251,6 +257,7 @@ export class Store {
   }
 
   private emit(diff: StoreDiff): void {
+    this.revisionCount += 1;
     for (const listener of [...this.listeners]) {
       listener(diff);
     }

@@ -13,6 +13,20 @@ export function planFrameTranslations(
   /** Elements whose final position the batch already set; never carried. */
   placed?: ReadonlySet<ElementId>,
 ): Command[] {
+  // Moving a table does not translate frame contents. Establish this before
+  // resolving geometric ownership, which includes all connector routes.
+  if (
+    !before.listElements().some((element) => {
+      if (element.type !== "frame") return false;
+      const next = after.get(element.id);
+      return (
+        next &&
+        ((element.visual.x ?? 0) !== (next.visual.x ?? 0) ||
+          (element.visual.y ?? 0) !== (next.visual.y ?? 0))
+      );
+    })
+  )
+    return [];
   const parents = new Map<ElementId, ElementId>();
   const context = createShapeContext(before, registry, 1);
   for (const page of before.listPages())

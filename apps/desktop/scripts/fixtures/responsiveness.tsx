@@ -334,7 +334,11 @@ async function run() {
     selectionP95Ms: timings[28],
   };
 }
-async function runErd(withRelations = false) {
+async function runErd(
+  withRelations = false,
+  relationCount = 39,
+  orthogonal = false,
+) {
   editor.apply([
     {
       type: "deleteElements",
@@ -370,11 +374,21 @@ async function runErd(withRelations = false) {
       ...frames,
       ...tables,
       ...(withRelations
-        ? tables.slice(1).map((table, i) =>
+        ? Array.from({ length: relationCount }, (_, i) =>
             editor.buildElement("erd.relation", {
               semantic: {
-                from: { table: tables[i].id, column: "c0" },
-                to: { table: table.id, column: "c0" },
+                from: { table: tables[i % tables.length].id, column: "c0" },
+                to: {
+                  table:
+                    tables[
+                      ((i % tables.length) +
+                        1 +
+                        Math.floor(i / tables.length)) %
+                        tables.length
+                    ].id,
+                  column: "c0",
+                },
+                routing: orthogonal ? "orthogonal" : "straight",
                 cardinality: "1:*",
               },
             }),
@@ -403,6 +417,18 @@ async function runErd(withRelations = false) {
   await frame();
   const originalNode = node(table.id);
   const originalRow = originalNode.querySelector(".nodetto-erd-row");
+  const connectorPath = () => {
+    const line = document.querySelector(
+      ".nodetto-connector line, .nodetto-connector polyline",
+    );
+    return line
+      ? ["x1", "y1", "x2", "y2", "points"]
+          .map((name) => line.getAttribute(name))
+          .join(";")
+      : null;
+  };
+  const originalConnector = connectorPath();
+  if (withRelations) assert(originalConnector, "missing ERD connector artwork");
   editor.beginBatch();
   for (let i = 1; i <= 30; i++) {
     const start = performance.now();
@@ -413,6 +439,11 @@ async function runErd(withRelations = false) {
       node(table.id).style.left === `${20 + i}px`,
       "ERD drag did not paint",
     );
+    if (withRelations)
+      assert(
+        connectorPath() !== originalConnector,
+        "ERD connector did not follow its moving endpoint",
+      );
     assert(node(table.id) === originalNode, "ERD drag replaced the table DOM");
     assert(
       node(table.id).querySelector(".nodetto-erd-row") === originalRow,
@@ -423,6 +454,11 @@ async function runErd(withRelations = false) {
   editor.undo();
   await frame();
   assert(node(table.id).style.left === "20px", "ERD drag undo failed");
+  if (withRelations)
+    assert(
+      connectorPath() === originalConnector,
+      "ERD connector undo stayed stale",
+    );
   editor.redo();
   await frame();
   assert(node(table.id).style.left === "50px", "ERD drag redo failed");
@@ -432,7 +468,8 @@ async function runErd(withRelations = false) {
   };
   return {
     tables: tables.length,
-    relations: withRelations ? tables.length - 1 : 0,
+    relations: withRelations ? relationCount : 0,
+    orthogonal,
     frames: frames.length,
     selection: stats(selection),
     movement: stats(movement),

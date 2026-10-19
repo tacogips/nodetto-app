@@ -333,6 +333,14 @@ export class Editor {
   private readonly idSource: IdSource;
   private readonly rng: Rng;
   private rasterMaskSampler: RasterMaskSampler | undefined;
+  private shapeContextCache:
+    | {
+        readonly storeRevision: number;
+        readonly registryRevision: number;
+        readonly sampler: RasterMaskSampler | undefined;
+        readonly context: ShapeContext;
+      }
+    | undefined;
   private readonly listeners = new Set<EditorListener>();
   private readonly bpmnRejectionListeners = new Set<
     (rejection: BpmnRejection) => void
@@ -1204,13 +1212,29 @@ export class Editor {
   }
 
   createShapeContext(zoom: number = this.camera.get().z): ShapeContext {
-    return createShapeContext(
+    const cached = this.shapeContextCache;
+    if (
+      cached &&
+      cached.storeRevision === this.store.revision &&
+      cached.registryRevision === this.registry.revision &&
+      cached.sampler === this.rasterMaskSampler &&
+      cached.context.zoom === zoom
+    )
+      return cached.context;
+    const context = createShapeContext(
       this.store,
       this.registry,
       zoom,
       this.rasterMaskSampler,
       this.assets.resolve,
     );
+    this.shapeContextCache = {
+      storeRevision: this.store.revision,
+      registryRevision: this.registry.revision,
+      sampler: this.rasterMaskSampler,
+      context,
+    };
+    return context;
   }
 
   getBounds(id: ElementId, context = this.createShapeContext()): Box | null {

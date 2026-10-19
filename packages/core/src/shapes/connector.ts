@@ -407,26 +407,36 @@ function endpointRotation(element: Element | undefined): number {
     : (element.visual.rotation ?? 0);
 }
 
-function obstacleBoxes(
+interface RoutingObstacle {
+  readonly id: ElementId;
+  readonly box: Box;
+}
+
+const pageObstacles = new WeakMap<
+  ShapeContext,
+  Map<string, readonly RoutingObstacle[]>
+>();
+
+function routingObstacles(
   element: Element,
-  endpointIds: ReadonlySet<ElementId>,
-  start: Vec,
-  end: Vec,
   context: ShapeContext,
-): readonly Box[] {
+): readonly RoutingObstacle[] {
+  let pages = pageObstacles.get(context);
+  if (!pages) {
+    pages = new Map();
+    pageObstacles.set(context, pages);
+  }
+  const cached = pages.get(element.page);
+  if (cached) return cached;
   const elements = context.elementsOnPage?.(element.page) ?? [];
   const grouped = groupedIds(elements);
-  const boxes: Box[] = [];
+  const obstacles: RoutingObstacle[] = [];
   for (const candidate of elements) {
-    if (candidate.id === element.id || endpointIds.has(candidate.id)) continue;
     const category = getElementTypeDefinition(candidate.type)?.category;
     if (
       category === "edge" ||
       category === "resource" ||
       candidate.type === "group" ||
-      // Backdrop frames are painted beneath connectors; their contents are
-      // the obstacles. A grouped frame keeps its group's paint order and so
-      // can hide a line: it stays an obstacle (see backdrops.ts).
       isConnectorBackdrop(candidate, (id) => grouped.has(id)) ||
       context.isHidden?.(candidate.id) ||
       context.isMaskSource?.(candidate.id)
@@ -435,28 +445,73 @@ function obstacleBoxes(
     const raw = context.boundsOf(candidate.id);
     if (!raw) continue;
     const visible = rotatedBox(raw, candidate.visual.rotation ?? 0);
-    const box = {
-      x: visible.x - CONNECTOR_OBSTACLE_CLEARANCE,
-      y: visible.y - CONNECTOR_OBSTACLE_CLEARANCE,
-      width: visible.width + CONNECTOR_OBSTACLE_CLEARANCE * 2,
-      height: visible.height + CONNECTOR_OBSTACLE_CLEARANCE * 2,
-    };
+    obstacles.push({
+      id: candidate.id,
+      box: {
+        x: visible.x - CONNECTOR_OBSTACLE_CLEARANCE,
+        y: visible.y - CONNECTOR_OBSTACLE_CLEARANCE,
+        width: visible.width + CONNECTOR_OBSTACLE_CLEARANCE * 2,
+        height: visible.height + CONNECTOR_OBSTACLE_CLEARANCE * 2,
+      },
+    });
+  }
+  pages.set(element.page, obstacles);
+  return obstacles;
+}
+
+function obstacleBoxes(
+  element: Element,
+  endpointIds: ReadonlySet<ElementId>,
+  start: Vec,
+  end: Vec,
+  context: ShapeContext,
+): readonly Box[] {
+  const boxes: Box[] = [];
+  for (const { id, box } of routingObstacles(element, context)) {
+    if (endpointIds.has(id)) continue;
     const contains = (point: Vec) =>
       point.x >= box.x &&
       point.x <= box.x + box.width &&
       point.y >= box.y &&
       point.y <= box.y + box.height;
-    // A frame containing an endpoint is an ancestor surface, not an obstacle.
+    // A surface containing an endpoint must not block its own connector.
     if (!contains(start) && !contains(end)) boxes.push(box);
   }
   return boxes;
 }
+
+// Reuse routes across bounds, picking, handles and paint in one context.
+const resolvedRoutes = new WeakMap<
+  ShapeContext,
+  WeakMap<Element, Map<EndpointReader, ConnectorEndpoints | null>>
+>();
 
 /**
  * Resolve a connector's endpoints through the shape registry, or `null` when
  * either referenced element is missing or has no bounds.
  */
 export function resolveConnector(
+  element: Element,
+  context: ShapeContext,
+  readEndpoints: EndpointReader,
+): ConnectorEndpoints | null {
+  let elements = resolvedRoutes.get(context);
+  if (!elements) {
+    elements = new WeakMap();
+    resolvedRoutes.set(context, elements);
+  }
+  let readers = elements.get(element);
+  if (!readers) {
+    readers = new Map();
+    elements.set(element, readers);
+  }
+  if (readers.has(readEndpoints)) return readers.get(readEndpoints) ?? null;
+  const result = computeConnector(element, context, readEndpoints);
+  readers.set(readEndpoints, result);
+  return result;
+}
+
+function computeConnector(
   element: Element,
   context: ShapeContext,
   readEndpoints: EndpointReader,
@@ -586,6 +641,7 @@ export function resolveConnector(
           context,
         ),
         horizontal ? "h" : "v",
+        element,
       );
     }
     const firstBend = preferred[1] as Vec;

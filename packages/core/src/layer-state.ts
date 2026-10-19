@@ -6,6 +6,17 @@ import type { Store } from "./store.ts";
 
 /** Inherited state is derived, leaving children's own flags unchanged. */
 export function layerStates(store: Store, context: ShapeContext) {
+  // Without authored flags, no ancestor can contribute inherited state. Avoid
+  // geometry (and connector routing) just to establish that every layer is visible.
+  if (
+    !store
+      .listElements()
+      .some((element) => element.visual.hidden || element.visual.locked)
+  )
+    return {
+      isHidden: (_id: ElementId) => false,
+      isLocked: (_id: ElementId) => false,
+    };
   const parents = new Map<ElementId, ElementId[]>();
   for (const page of store.listPages()) {
     for (const [child, parent] of frameParents(store, page.id, context)) {

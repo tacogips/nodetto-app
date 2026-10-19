@@ -103,7 +103,7 @@ try {
   if (!ready) throw new Error("fixture did not load");
   if (process.argv.includes("--erd-only")) {
     const erd = await evaluate(
-      `window.responsiveness.runErd(${process.argv.includes("--relations")})`,
+      `window.responsiveness.runErd(${process.argv.includes("--relations")}, ${Number(process.env.RELATION_COUNT ?? 39)}, ${process.argv.includes("--orthogonal")})`,
     );
     if (errors.length) throw new Error(errors.join(", "));
     console.log(JSON.stringify({ passed: true, erd }));

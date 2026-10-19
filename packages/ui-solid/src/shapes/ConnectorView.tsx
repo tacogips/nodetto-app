@@ -20,8 +20,9 @@ import {
   type ShapeContext,
 } from "@nodetto/core";
 import type { Element } from "@nodetto/ir";
-import { For, type JSX, Match, Show, Switch } from "solid-js";
+import { createMemo, For, type JSX, Match, Show, Switch } from "solid-js";
 import { BpmnNotationPrimitiveView } from "./BpmnShapeView.tsx";
+import { sameConnectorGeometry } from "../connector-geometry.ts";
 import { svgStyle } from "./visual.ts";
 
 export const MARKER_ARROW = "nodetto-arrow";
@@ -51,15 +52,20 @@ function markerUrl(kind: MarkerKind | null, prefix = ""): string | undefined {
 }
 
 export function ConnectorView(props: ConnectorViewProps): JSX.Element {
-  const geometry = () =>
-    resolveConnector(
-      props.element,
-      props.context,
-      endpointReaderFor(props.element.type),
-    );
+  const geometry = createMemo(
+    () =>
+      resolveConnector(
+        props.element,
+        props.context,
+        endpointReaderFor(props.element.type),
+      ),
+    null,
+    { equals: sameConnectorGeometry },
+  );
   const decoration = () => connectorDecoration(props.element);
-  const warning = () =>
-    shapeAuthoringWarnings(props.element, props.context).join("\n");
+  const warning = createMemo(() =>
+    shapeAuthoringWarnings(props.element, props.context).join("\n"),
+  );
   const warningStyle = (): JSX.CSSProperties | undefined =>
     warning() ? { stroke: "#b45309", "stroke-dasharray": "6 4" } : undefined;
 
