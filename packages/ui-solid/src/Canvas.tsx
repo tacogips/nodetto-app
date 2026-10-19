@@ -373,9 +373,10 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   // A nudge batch still waiting on its timer must not outlive the canvas.
   onCleanup(() => interaction.dispose());
 
+  const cameraZoom = createMemo(() => signals.camera().z);
   const context = createMemo(() => {
     signals.rev();
-    return props.editor.createShapeContext(signals.camera().z);
+    return props.editor.createShapeContext(cameraZoom());
   });
 
   const elements = createMemo<readonly Element[]>(() => {
@@ -628,7 +629,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     return box ? { element, box, paint } : null;
   });
 
-  const zoom = () => signals.camera().z;
+  const zoom = cameraZoom;
   const handleSize = () => HANDLE_SIZE / zoom();
 
   const endpointHandle = (
@@ -646,6 +647,32 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       onDblClick={(event) => event.stopPropagation()}
     />
   );
+
+  // Keep box views mounted through immutable position/style updates. Complex
+  // group wrappers retain their keyed lifetime when topology changes.
+  const renderStableVisualUnit = (
+    id: ElementId,
+    ancestors: ReadonlySet<ElementId> = new Set(),
+  ): JSX.Element => {
+    const initial = props.editor.store.get(id);
+    if (!initial) return null;
+    const element = createMemo(() => {
+      signals.rev();
+      return props.editor.store.get(initial.id) ?? initial;
+    });
+    return (
+      <Show
+        when={!isGroup(element()) && !isConnector(element())}
+        fallback={
+          <Show when={element()} keyed>
+            {(value) => renderVisualUnit(value, ancestors)}
+          </Show>
+        }
+      >
+        {renderShape(element)}
+      </Show>
+    );
+  };
 
   const renderVisualUnit = (
     element: Element,
@@ -676,8 +703,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
         });
       });
       const contents = () => (
-        <For each={children()}>
-          {(child) => renderVisualUnit(child, nextAncestors)}
+        <For each={children().map((child) => child.id)}>
+          {(id) => renderStableVisualUnit(id, nextAncestors)}
         </For>
       );
       const surface = createMemo(() => {
@@ -753,33 +780,41 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
           selected={isSelected(element.id)}
         />
       );
-    const box = props.editor
-      .getShapeUtil(element.type)
-      .getBounds(element, context());
-    return box ? (
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          "clip-path": clipCss(
-            context().clipPolygonOf?.(element.id) ??
-              context().clipOf?.(element.id),
-          ),
-        }}
-      >
-        <ShapeView
-          resolveAsset={(source) => {
-            signals.rev();
-            return props.editor.assets.resolve(source);
-          }}
-          warnings={shapeAuthoringWarnings(element, context())}
-          element={element}
-          box={box}
-          selected={isSelected(element.id)}
-          showLayoutGrids
-        />
-      </div>
-    ) : null;
+    return renderShape(() => element);
+  };
+
+  const renderShape = (element: () => Element): JSX.Element => {
+    const box = createMemo(() =>
+      props.editor.getShapeUtil(element().type).getBounds(element(), context()),
+    );
+    return (
+      <Show when={box()}>
+        {(bounds) => (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              "clip-path": clipCss(
+                context().clipPolygonOf?.(element().id) ??
+                  context().clipOf?.(element().id),
+              ),
+            }}
+          >
+            <ShapeView
+              resolveAsset={(source) => {
+                signals.rev();
+                return props.editor.assets.resolve(source);
+              }}
+              warnings={shapeAuthoringWarnings(element(), context())}
+              element={element()}
+              box={bounds()}
+              selected={isSelected(element().id)}
+              showLayoutGrids
+            />
+          </div>
+        )}
+      </Show>
+    );
   };
 
   return (
@@ -844,8 +879,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       >
         <Show when={backdropRoots().length > 0}>
           <div class="nodetto-layer nodetto-shape-layer nodetto-backdrop-layer">
-            <For each={backdropRoots()}>
-              {(element) => renderVisualUnit(element)}
+            <For each={backdropRoots().map((element) => element.id)}>
+              {(id) => renderStableVisualUnit(id)}
             </For>
           </div>
         </Show>
@@ -889,8 +924,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
         </svg>
 
         <div class="nodetto-layer nodetto-shape-layer">
-          <For each={visualRoots()}>
-            {(element) => renderVisualUnit(element)}
+          <For each={visualRoots().map((element) => element.id)}>
+            {(id) => renderStableVisualUnit(id)}
           </For>
         </div>
 

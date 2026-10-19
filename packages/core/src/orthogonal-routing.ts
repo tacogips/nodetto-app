@@ -250,6 +250,18 @@ function gridRoute(
   return compactRoute(route.reverse());
 }
 
+interface CachedRoute {
+  readonly preferred: string;
+  readonly direction: Direction;
+  readonly dependencies: readonly string[];
+  readonly attempts: readonly (readonly Vec[])[];
+  readonly result: readonly Vec[];
+}
+
+const routeCache = new WeakMap<object, CachedRoute>();
+const obstacleKey = (box: Box): string =>
+  `${box.x},${box.y},${box.width},${box.height}`;
+
 /**
  * Find a deterministic rectilinear route that keeps the supplied clearance
  * rectangles out of every segment. The preferred route is returned byte-for-
@@ -259,6 +271,7 @@ export function avoidOrthogonalObstacles(
   preferred: readonly Vec[],
   obstacles: readonly Box[],
   endpointDirection: Direction,
+  cacheKey?: object,
 ): readonly Vec[] {
   if (preferred.length < 2) return preferred;
   const start = preferred[0] as Vec;
@@ -266,18 +279,60 @@ export function avoidOrthogonalObstacles(
   const usable = obstacles.filter(
     (box) => !inside(box, start) && !inside(box, end),
   );
-  if (!routeBlocked(preferred, usable)) return preferred;
+  const preferredKey = preferred
+    .map((point) => `${point.x},${point.y}`)
+    .join(";");
+  const previous = cacheKey ? routeCache.get(cacheKey) : undefined;
+  if (
+    previous &&
+    previous.preferred === preferredKey &&
+    previous.direction === endpointDirection
+  ) {
+    const dependencies = new Set(previous.dependencies);
+    const retained = usable
+      .map(obstacleKey)
+      .filter((key) => dependencies.has(key));
+    // The grid searches depend only on obstacles intersecting one of their
+    // attempted paths. Reuse only if those obstacles and their order survive,
+    // and no other obstacle now intersects any attempted path.
+    if (
+      retained.length === previous.dependencies.length &&
+      retained.every((key, index) => key === previous.dependencies[index]) &&
+      usable.every(
+        (box) =>
+          dependencies.has(obstacleKey(box)) ||
+          previous.attempts.every((attempt) => !routeBlocked(attempt, [box])),
+      )
+    )
+      return previous.result;
+  }
+  const attempts: (readonly Vec[])[] = [preferred];
   let active = usable.filter((box) => routeBlocked(preferred, [box]));
+  const finish = (result: readonly Vec[]): readonly Vec[] => {
+    if (cacheKey) {
+      const used = new Set(active);
+      routeCache.set(cacheKey, {
+        preferred: preferredKey,
+        direction: endpointDirection,
+        dependencies: usable.filter((box) => used.has(box)).map(obstacleKey),
+        attempts,
+        result,
+      });
+    }
+    return result;
+  };
+  if (active.length === 0) return finish(preferred);
   let route: readonly Vec[] | null = null;
   for (let attempt = 0; attempt <= usable.length; attempt += 1) {
     route = gridRoute(start, end, preferred, active, endpointDirection);
-    if (!route) return preferred;
+    if (!route) return finish(preferred);
+    attempts.push(route);
     const added = usable.filter(
       (box) =>
         !active.includes(box) && routeBlocked(route as readonly Vec[], [box]),
     );
-    if (added.length === 0) return route;
+    if (added.length === 0) return finish(route);
     active = [...active, ...added];
   }
-  return route ?? preferred;
+  return finish(route ?? preferred);
 }

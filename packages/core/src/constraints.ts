@@ -54,6 +54,16 @@ export function planConstraints(
   registry: ShapeUtilRegistry,
   onlyIds?: ReadonlySet<ElementId>,
 ): Command[] {
+  if (
+    !after
+      .listElements()
+      .some(
+        (element) =>
+          element.visual.horizontalConstraint ||
+          element.visual.verticalConstraint,
+      )
+  )
+    return [];
   const oldContext = createShapeContext(before, registry, 1);
   const parents = new Map<ElementId, ElementId>();
   for (const page of before.listPages())

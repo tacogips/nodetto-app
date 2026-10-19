@@ -334,6 +334,148 @@ async function run() {
     selectionP95Ms: timings[28],
   };
 }
+async function runErd(
+  withRelations = false,
+  relationCount = 39,
+  orthogonal = false,
+) {
+  editor.apply([
+    {
+      type: "deleteElements",
+      ids: editor.store.listElements().map((e) => e.id),
+    },
+  ]);
+  const frames = Array.from({ length: 40 }, (_, i) =>
+    editor.buildElement("frame", {
+      semantic: { name: `Frame ${i}`, clipContent: true },
+      visual: {
+        x: (i % 8) * 400,
+        y: Math.floor(i / 8) * 600,
+        width: 380,
+        height: 580,
+      },
+    }),
+  );
+  const tables = frames.map((f, i) =>
+    editor.buildElement("erd.table", {
+      semantic: {
+        tableName: `Table ${i}`,
+        columns: Array.from({ length: 16 }, (_, j) => ({
+          id: `c${j}`,
+          name: `column${j}`,
+          dataType: "text",
+        })),
+      },
+      visual: { x: (f.visual.x ?? 0) + 20, y: (f.visual.y ?? 0) + 40 },
+    }),
+  );
+  editor.apply(
+    [
+      ...frames,
+      ...tables,
+      ...(withRelations
+        ? Array.from({ length: relationCount }, (_, i) =>
+            editor.buildElement("erd.relation", {
+              semantic: {
+                from: { table: tables[i % tables.length].id, column: "c0" },
+                to: {
+                  table:
+                    tables[
+                      ((i % tables.length) +
+                        1 +
+                        Math.floor(i / tables.length)) %
+                        tables.length
+                    ].id,
+                  column: "c0",
+                },
+                routing: orthogonal ? "orthogonal" : "straight",
+                cardinality: "1:*",
+              },
+            }),
+          )
+        : []),
+    ].map((element) => ({
+      type: "createElement" as const,
+      element,
+    })),
+  );
+  await frame();
+  const selection = [];
+  const movement = [];
+  for (const table of tables.slice(0, 30)) {
+    const start = performance.now();
+    editor.selection.set([table.id]);
+    selection.push(performance.now() - start);
+    await frame();
+    assert(
+      node(table.id).classList.contains("nodetto-selected"),
+      "ERD selection did not paint",
+    );
+  }
+  const table = tables[0];
+  editor.selection.set([table.id]);
+  await frame();
+  const originalNode = node(table.id);
+  const originalRow = originalNode.querySelector(".nodetto-erd-row");
+  const connectorPath = () => {
+    const line = document.querySelector(
+      ".nodetto-connector line, .nodetto-connector polyline",
+    );
+    return line
+      ? ["x1", "y1", "x2", "y2", "points"]
+          .map((name) => line.getAttribute(name))
+          .join(";")
+      : null;
+  };
+  const originalConnector = connectorPath();
+  if (withRelations) assert(originalConnector, "missing ERD connector artwork");
+  editor.beginBatch();
+  for (let i = 1; i <= 30; i++) {
+    const start = performance.now();
+    editor.moveElements([{ id: table.id, x: 20 + i, y: 40 + i }]);
+    movement.push(performance.now() - start);
+    await frame();
+    assert(
+      node(table.id).style.left === `${20 + i}px`,
+      "ERD drag did not paint",
+    );
+    if (withRelations)
+      assert(
+        connectorPath() !== originalConnector,
+        "ERD connector did not follow its moving endpoint",
+      );
+    assert(node(table.id) === originalNode, "ERD drag replaced the table DOM");
+    assert(
+      node(table.id).querySelector(".nodetto-erd-row") === originalRow,
+      "ERD drag replaced column rows",
+    );
+  }
+  editor.endBatch();
+  editor.undo();
+  await frame();
+  assert(node(table.id).style.left === "20px", "ERD drag undo failed");
+  if (withRelations)
+    assert(
+      connectorPath() === originalConnector,
+      "ERD connector undo stayed stale",
+    );
+  editor.redo();
+  await frame();
+  assert(node(table.id).style.left === "50px", "ERD drag redo failed");
+  const stats = (values: number[]) => {
+    values.sort((a, b) => a - b);
+    return { medianMs: values[15], p95Ms: values[28] };
+  };
+  return {
+    tables: tables.length,
+    relations: withRelations ? relationCount : 0,
+    orthogonal,
+    frames: frames.length,
+    selection: stats(selection),
+    movement: stats(movement),
+  };
+}
+
 function heldSize() {
   return {
     width: node().style.width,
@@ -345,9 +487,10 @@ declare global {
   interface Window {
     responsiveness: {
       run: typeof run;
+      runErd: typeof runErd;
       heldSize: typeof heldSize;
       undo: () => void;
     };
   }
 }
-window.responsiveness = { run, heldSize, undo: () => editor.undo() };
+window.responsiveness = { run, runErd, heldSize, undo: () => editor.undo() };

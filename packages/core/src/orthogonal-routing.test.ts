@@ -70,3 +70,73 @@ describe("orthogonal obstacle routing", () => {
       ).toBe(false);
   });
 });
+
+test("cached routes survive unrelated moves and invalidate blocking obstacle changes", () => {
+  const key = {};
+  const preferred = [
+    { x: 0, y: 0 },
+    { x: 50, y: 0 },
+    { x: 50, y: 100 },
+    { x: 100, y: 100 },
+  ];
+  const blocker = { x: 40, y: 20, width: 20, height: 60 };
+  const far = { x: 500, y: 500, width: 20, height: 20 };
+  const route = avoidOrthogonalObstacles(preferred, [blocker, far], "h", key);
+  expect(
+    avoidOrthogonalObstacles(
+      preferred,
+      [blocker, { ...far, x: 600 }],
+      "h",
+      key,
+    ),
+  ).toBe(route);
+  for (const obstacles of [
+    [],
+    [far],
+    [blocker],
+    [{ ...blocker, y: 10, height: 80 }],
+    [blocker, { x: 20, y: 75, width: 20, height: 20 }],
+    [far, blocker],
+  ]) {
+    expect(avoidOrthogonalObstacles(preferred, obstacles, "h", key)).toEqual(
+      avoidOrthogonalObstacles(preferred, obstacles, "h"),
+    );
+  }
+});
+
+test("cached routing matches fresh routing across deterministic scene edits", () => {
+  const key = {};
+  let state = 12345;
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+  let obstacles: Box[] = Array.from({ length: 8 }, () => ({
+    x: 10 + Math.floor(random() * 150),
+    y: 10 + Math.floor(random() * 150),
+    width: 10 + Math.floor(random() * 20),
+    height: 10 + Math.floor(random() * 20),
+  }));
+  for (let i = 0; i < 60; i++) {
+    const preferred = [
+      { x: 0, y: 0 },
+      { x: 80, y: 0 },
+      { x: 80, y: 180 },
+      { x: 180, y: 180 },
+    ];
+    if (i % 7 === 0) preferred[3] = { x: 180 + i, y: 180 };
+    if (i % 5 === 0) obstacles = obstacles.slice().reverse();
+    if (i % 3 === 0 || obstacles.length >= 8) obstacles = obstacles.slice(1);
+    else
+      obstacles.push({
+        x: 10 + Math.floor(random() * 150),
+        y: 10 + Math.floor(random() * 150),
+        width: 20,
+        height: 20,
+      });
+    const direction = i % 11 === 0 ? "v" : "h";
+    expect(
+      avoidOrthogonalObstacles(preferred, obstacles, direction, key),
+    ).toEqual(avoidOrthogonalObstacles(preferred, obstacles, direction));
+  }
+});
