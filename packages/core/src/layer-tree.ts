@@ -145,7 +145,7 @@ export function layerRows(
   const matches = new Set<string>();
   const matchDetails = new Map<string, string>();
   for (const element of elements) {
-    const terms = searchTerms(element);
+    const terms = search ? searchTerms(element) : [];
     const content = terms.join(" ").toLowerCase();
     if (search && !content.includes(search)) continue;
     const detail = search

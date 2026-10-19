@@ -159,3 +159,60 @@ test("fixed warnings clear immediately with new references and do not mutate ele
   ).toEqual([]);
   expect(JSON.stringify(edge)).toBe(before);
 });
+
+test("warning results are reused until a referenced element changes", () => {
+  const source = make("a", "uml.class", {
+    name: "A",
+    attributes: [],
+    methods: [],
+  });
+  const target = make("b", "uml.class", {
+    name: "B",
+    attributes: [],
+    methods: [],
+  });
+  const edge = make("edge", "uml.association", {
+    from: "a",
+    to: "b",
+    kind: "association",
+  });
+  const records = new Map([
+    [source.id, source],
+    [target.id, target],
+  ]);
+  const context = { resolve: (id: string) => records.get(id) };
+  const first = shapeAuthoringWarnings(edge, context);
+  records.set("unrelated", make("unrelated", "node.generic", { label: "new" }));
+  expect(shapeAuthoringWarnings(edge, context)).toBe(first);
+  records.delete(target.id);
+  expect(shapeAuthoringWarnings(edge, context)).toContain(
+    "Target endpoint is missing.",
+  );
+  records.set(target.id, target);
+  expect(shapeAuthoringWarnings(edge, context)).toEqual([]);
+});
+
+test("warning cache tracks attachment availability independently of document records", () => {
+  const image = make("image", "image.raster", {
+    src: "artifacts/image.png",
+    alt: "image",
+  });
+  let asset: string | undefined;
+  const context = { resolve: () => undefined, resolveAsset: () => asset };
+  expect(
+    shapeAuthoringWarnings(image, context).some((warning) =>
+      warning.includes("Attachment is unavailable"),
+    ),
+  ).toBe(true);
+  asset = "data:image/png;base64,available";
+  expect(shapeAuthoringWarnings(image, context)).toEqual([]);
+  asset = undefined;
+  expect(
+    shapeAuthoringWarnings(image, context).some((warning) =>
+      warning.includes("Attachment is unavailable"),
+    ),
+  ).toBe(true);
+  expect(shapeAuthoringWarnings(image, { resolve: () => undefined })).toEqual(
+    [],
+  );
+});

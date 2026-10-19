@@ -78,10 +78,12 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
         >
           <Show when={props.element.visual.style?.strokeGradient}>
             {(gradient) => {
-              const x = Math.min(resolved().start.x, resolved().end.x);
-              const y = Math.min(resolved().start.y, resolved().end.y);
-              const width = Math.abs(resolved().end.x - resolved().start.x);
-              const height = Math.abs(resolved().end.y - resolved().start.y);
+              const x = () => Math.min(resolved().start.x, resolved().end.x);
+              const y = () => Math.min(resolved().start.y, resolved().end.y);
+              const width = () =>
+                Math.abs(resolved().end.x - resolved().start.x);
+              const height = () =>
+                Math.abs(resolved().end.y - resolved().start.y);
               const linear = () => {
                 const current = gradient();
                 return current.type === "linear" ? current : null;
@@ -101,7 +103,7 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
               const vector = () => {
                 const current = linear();
                 return current
-                  ? linearGradientVector(current.angle, width, height)
+                  ? linearGradientVector(current.angle, width(), height())
                   : undefined;
               };
               return (
@@ -111,10 +113,10 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                       <linearGradient
                         id={strokeGradientId(props.element.id)}
                         gradientUnits="userSpaceOnUse"
-                        x1={x + (vector()?.x1 ?? 0) * width}
-                        y1={y + (vector()?.y1 ?? 0) * height}
-                        x2={x + (vector()?.x2 ?? 1) * width}
-                        y2={y + (vector()?.y2 ?? 1) * height}
+                        x1={x() + (vector()?.x1 ?? 0) * width()}
+                        y1={y() + (vector()?.y1 ?? 0) * height()}
+                        x2={x() + (vector()?.x2 ?? 1) * width()}
+                        y2={y() + (vector()?.y2 ?? 1) * height()}
                       >
                         <For each={gradient().stops}>
                           {(stop) => (
@@ -131,10 +133,11 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                       <radialGradient
                         id={strokeGradientId(props.element.id)}
                         gradientUnits="userSpaceOnUse"
-                        cx={x + (radial()?.centerX ?? 0.5) * width}
-                        cy={y + (radial()?.centerY ?? 0.5) * height}
+                        cx={x() + (radial()?.centerX ?? 0.5) * width()}
+                        cy={y() + (radial()?.centerY ?? 0.5) * height()}
                         r={
-                          (radial()?.radius ?? 0.5) * Math.max(width, height, 1)
+                          (radial()?.radius ?? 0.5) *
+                          Math.max(width(), height(), 1)
                         }
                       >
                         <For each={gradient().stops}>
@@ -152,10 +155,10 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                       <pattern
                         id={strokeGradientId(props.element.id)}
                         patternUnits="userSpaceOnUse"
-                        x={x}
-                        y={y}
-                        width={Math.max(width, 1)}
-                        height={Math.max(height, 1)}
+                        x={x()}
+                        y={y()}
+                        width={Math.max(width(), 1)}
+                        height={Math.max(height(), 1)}
                       >
                         <For
                           each={
@@ -164,10 +167,10 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                                   angular() as NonNullable<
                                     ReturnType<typeof angular>
                                   >,
-                                  width,
-                                  height,
-                                  x,
-                                  y,
+                                  width(),
+                                  height(),
+                                  x(),
+                                  y(),
                                 )
                               : []
                           }
@@ -186,16 +189,16 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                       <pattern
                         id={strokeGradientId(props.element.id)}
                         patternUnits="userSpaceOnUse"
-                        x={x}
-                        y={y}
-                        width={Math.max(width, 1)}
-                        height={Math.max(height, 1)}
+                        x={x()}
+                        y={y()}
+                        width={Math.max(width(), 1)}
+                        height={Math.max(height(), 1)}
                       >
                         <rect
-                          x={x}
-                          y={y}
-                          width={Math.max(width, 1)}
-                          height={Math.max(height, 1)}
+                          x={x()}
+                          y={y()}
+                          width={Math.max(width(), 1)}
+                          height={Math.max(height(), 1)}
                           fill={sampleGradient(gradient().stops, 1).color}
                           fill-opacity={
                             sampleGradient(gradient().stops, 1).opacity
@@ -208,10 +211,10 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                                   diamond() as NonNullable<
                                     ReturnType<typeof diamond>
                                   >,
-                                  width,
-                                  height,
-                                  x,
-                                  y,
+                                  width(),
+                                  height(),
+                                  x(),
+                                  y(),
                                 )
                               : []
                           }

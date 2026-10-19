@@ -109,12 +109,26 @@ export function Layers(props: {
     return props.editor.createShapeContext();
   });
   const warningsFor = (id: ElementId) => {
+    signals.rev();
     const element = props.editor.store.get(id);
     return element ? shapeAuthoringWarnings(element, warningContext()) : [];
   };
-  const rowMap = createMemo(
-    () => new Map(rows().map((row) => [row.element.id, row])),
-  );
+  type Row = ReturnType<typeof layerRows>[number];
+  const rowMap = createMemo((previous: Map<ElementId, Row>) => {
+    return new Map(
+      rows().map((row) => {
+        const old = previous.get(row.element.id);
+        const unchanged =
+          old &&
+          old.element === row.element &&
+          old.depth === row.depth &&
+          old.hasChildren === row.hasChildren &&
+          old.matched === row.matched &&
+          old.matchDetail === row.matchDetail;
+        return [row.element.id, unchanged ? old : row];
+      }),
+    );
+  }, new Map<ElementId, Row>());
   return (
     <nav class="nodetto-layers" aria-label="Layers">
       <div hidden={props.simple}>
@@ -233,6 +247,7 @@ export function Layers(props: {
         {(id) => (
           <Show when={rowMap().get(id)}>
             {(row) => {
+              const warning = createMemo(() => warningsFor(id).join("\n"));
               let nameButton: HTMLButtonElement | undefined;
               onCleanup(() => {
                 nameButtons.delete(id);
@@ -353,11 +368,11 @@ export function Layers(props: {
                       }}
                     >
                       {layerName(row().element)}
-                      <Show when={warningsFor(id).length}>
+                      <Show when={warning()}>
                         <span
                           class="nodetto-layer-warning"
-                          title={warningsFor(id).join("\n")}
-                          aria-label={warningsFor(id).join("\n")}
+                          title={warning()}
+                          aria-label={warning()}
                         >
                           !
                         </span>

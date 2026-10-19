@@ -1,5 +1,6 @@
 // Start Vite, then: bun scripts/responsiveness-check.mjs http://localhost:1420
-// Add --erd-only [--relations] for the large ERD benchmark.
+// Add --erd-only [--relations] for the large ERD benchmark, or
+// --invalidation-only to check DOM preservation and reactive invalidation.
 // Isolated headless Chrome, with no additional browser-test dependencies.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -101,7 +102,11 @@ try {
     await Bun.sleep(100);
   }
   if (!ready) throw new Error("fixture did not load");
-  if (process.argv.includes("--erd-only")) {
+  if (process.argv.includes("--invalidation-only")) {
+    const result = await evaluate("window.responsiveness.runInvalidation()");
+    if (errors.length) throw new Error(errors.join(", "));
+    console.log(JSON.stringify({ passed: true, ...result }));
+  } else if (process.argv.includes("--erd-only")) {
     const erd = await evaluate(
       `window.responsiveness.runErd(${process.argv.includes("--relations")}, ${Number(process.env.RELATION_COUNT ?? 39)}, ${process.argv.includes("--orthogonal")})`,
     );
@@ -146,6 +151,9 @@ try {
       throw new Error(`resize undo failed: ${JSON.stringify(undo)}`);
     const erd = await evaluate("window.responsiveness.runErd()");
     const erdRelations = await evaluate("window.responsiveness.runErd(true)");
+    const invalidation = await evaluate(
+      "window.responsiveness.runInvalidation()",
+    );
     if (errors.length)
       throw new Error(`uncaught browser errors: ${errors.join(", ")}`);
     console.log(
@@ -154,6 +162,7 @@ try {
         ...results,
         erd,
         erdRelations,
+        invalidation,
         held,
         undo,
       }),

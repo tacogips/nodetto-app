@@ -17,10 +17,62 @@ import {
 import { erdForeignKeyWarning } from "./erd-foreign-key.ts";
 import type { ShapeContext } from "./shape-util.ts";
 
+type WarningContext = Pick<ShapeContext, "resolve" | "resolveAsset">;
+interface WarningCache {
+  readonly references: ReadonlyMap<string, Element | undefined>;
+  readonly assets: ReadonlyMap<string, string | undefined>;
+  readonly hasAssetResolver: boolean;
+  readonly warnings: readonly string[];
+}
+const warningCache = new WeakMap<Element, WarningCache>();
+
 /** Incomplete authoring states are warnings, never assertions or saved styles. */
 export function shapeAuthoringWarnings(
   element: Element,
-  context: Pick<ShapeContext, "resolve" | "resolveAsset">,
+  context: WarningContext,
+): readonly string[] {
+  const cached = warningCache.get(element);
+  if (
+    cached &&
+    cached.hasAssetResolver === Boolean(context.resolveAsset) &&
+    [...cached.references].every(
+      ([id, value]) => context.resolve(id) === value,
+    ) &&
+    [...cached.assets].every(
+      ([source, value]) => context.resolveAsset?.(source) === value,
+    )
+  )
+    return cached.warnings;
+  const references = new Map<string, Element | undefined>();
+  const assets = new Map<string, string | undefined>();
+  const warnings = computeAuthoringWarnings(element, {
+    resolve: (id) => {
+      const value = context.resolve(id);
+      references.set(id, value);
+      return value;
+    },
+    ...(context.resolveAsset
+      ? {
+          resolveAsset: (source: string) => {
+            const value = context.resolveAsset?.(source);
+            assets.set(source, value);
+            return value;
+          },
+        }
+      : {}),
+  });
+  warningCache.set(element, {
+    references,
+    assets,
+    hasAssetResolver: Boolean(context.resolveAsset),
+    warnings,
+  });
+  return warnings;
+}
+
+function computeAuthoringWarnings(
+  element: Element,
+  context: WarningContext,
 ): readonly string[] {
   const warnings: string[] = [];
   const semantic = element.semantic as Record<string, unknown>;

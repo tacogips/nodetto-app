@@ -476,6 +476,205 @@ async function runErd(
   };
 }
 
+async function runInvalidation() {
+  await runErd(true, 39);
+  const tables = editor.store
+    .listElements()
+    .filter((element) => element.type === "erd.table");
+  const target = tables[0];
+  const untouched = tables[20];
+  assert(target && untouched, "missing invalidation fixtures");
+  const row = Array.from(document.querySelectorAll(".nodetto-layer-row")).find(
+    (candidate) =>
+      candidate
+        .querySelector(".nodetto-layer-name")
+        ?.textContent?.startsWith("Table 20"),
+  );
+  assert(row, "missing untouched layer row");
+  const shape = node(untouched.id);
+  let shapeMutations = 0;
+  let rowMutations = 0;
+  const shapeObserver = new MutationObserver((records) => {
+    shapeMutations += records.length;
+  });
+  const rowObserver = new MutationObserver((records) => {
+    rowMutations += records.length;
+  });
+  const options = {
+    attributes: true,
+    childList: true,
+    characterData: true,
+    subtree: true,
+  };
+  shapeObserver.observe(shape, options);
+  rowObserver.observe(row, options);
+  for (let i = 1; i <= 10; i++) {
+    editor.moveElements([{ id: target.id, x: 50 + i, y: 70 + i }]);
+    await frame();
+  }
+  shapeObserver.disconnect();
+  rowObserver.disconnect();
+  const relation = editor.store
+    .listElements()
+    .find((element) => element.type === "erd.relation");
+  assert(relation, "missing relation");
+  const connector = document.querySelector(".nodetto-connector");
+  editor.apply([
+    {
+      type: "updateVisual",
+      id: relation.id,
+      visual: { style: { stroke: "#ff0000" } },
+    },
+  ]);
+  await frame();
+  const connectorPreserved =
+    connector === document.querySelector(".nodetto-connector");
+  assert(connectorPreserved, "connector style edit replaced its SVG subtree");
+  assert(
+    connector?.querySelector("line, polyline")?.getAttribute("stroke") ===
+      "#ff0000",
+    "connector stroke stayed stale",
+  );
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: relation.id,
+      semantic: { ...(relation.semantic as object), cardinality: "1:1" },
+    },
+  ]);
+  await frame();
+  assert(
+    connector === document.querySelector(".nodetto-connector"),
+    "connector semantic edit replaced its SVG subtree",
+  );
+  assert(
+    connector?.textContent?.includes("1:1"),
+    "connector label stayed stale",
+  );
+  editor.selection.set([tables[1].id, tables[2].id]);
+  const inner = editor.groupSelection();
+  assert(inner, "missing render-test group");
+  editor.selection.set([inner, tables[3].id]);
+  const outer = editor.groupSelection();
+  assert(outer, "missing render-test outer group");
+  await frame();
+  const groupNode = document.querySelector<HTMLElement>(
+    `[data-group-id="${outer}"]`,
+  );
+  const childNode = node(tables[1].id);
+  editor.apply([
+    { type: "updateVisual", id: outer, visual: { style: { opacity: 0.4 } } },
+  ]);
+  await frame();
+  assert(
+    groupNode === document.querySelector(`[data-group-id="${outer}"]`),
+    "group style edit replaced its subtree",
+  );
+  assert(
+    node(tables[1].id) === childNode,
+    "ancestor style edit replaced nested child DOM",
+  );
+  assert(groupNode?.style.opacity === "0.4", "group opacity stayed stale");
+  const outerElement = editor.store.get(outer);
+  assert(outerElement, "group missing after styling");
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: outer,
+      semantic: {
+        ...(outerElement.semantic as object),
+        isolate: true,
+        memberIds: [inner, tables[3].id, tables[4].id],
+      },
+    },
+  ]);
+  await frame();
+  assert(
+    groupNode?.style.isolation === "isolate",
+    "group isolation stayed stale",
+  );
+  assert(
+    groupNode.contains(node(tables[4].id)),
+    "new group member did not render in its parent",
+  );
+  assert(
+    node(tables[1].id) === childNode,
+    "group membership edit replaced an unchanged nested child",
+  );
+  editor.apply([
+    {
+      type: "updateVisual",
+      id: relation.id,
+      visual: {
+        style: {
+          strokeGradient: {
+            type: "linear",
+            angle: 0,
+            stops: [
+              { offset: 0, color: "#000000" },
+              { offset: 1, color: "#ffffff" },
+            ],
+          },
+        },
+      },
+    },
+  ]);
+  await frame();
+  const gradient = connector?.querySelector("linearGradient");
+  assert(gradient, "missing connector gradient");
+  const gradientX = gradient.getAttribute("x1");
+  editor.moveElements([{ id: target.id, x: 90, y: 80 }]);
+  await frame();
+  assert(
+    connector?.querySelector("linearGradient") === gradient,
+    "endpoint movement replaced gradient DOM",
+  );
+  assert(
+    gradient.getAttribute("x1") !== gradientX,
+    "connector gradient geometry stayed stale",
+  );
+  const assetPath = "artifacts/render-test.png";
+  const image = editor.createElement("image.raster", {
+    semantic: { src: assetPath, alt: "render test" },
+    visual: { x: 50, y: 50, width: 10, height: 10 },
+  });
+  await frame();
+  assert(
+    node(image).querySelector(".nodetto-shape-warning"),
+    "missing attachment warning",
+  );
+  const imageRecord = editor.store.get(image);
+  editor.assets.set(
+    assetPath,
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+  );
+  await frame();
+  assert(
+    editor.store.get(image) === imageRecord,
+    "asset test must not change document records",
+  );
+  assert(
+    !node(image).querySelector(".nodetto-shape-warning"),
+    "attachment warning did not clear after loading",
+  );
+  editor.assets.clear();
+  await frame();
+  assert(
+    node(image).querySelector(".nodetto-shape-warning"),
+    "attachment warning did not return after unloading",
+  );
+  assert(
+    shapeMutations === 0 && rowMutations === 0,
+    "unrelated movement mutated untouched artwork or layer row",
+  );
+  return {
+    shapeMutations,
+    rowMutations,
+    connectorPreserved,
+    groupPreserved: true,
+  };
+}
+
 function heldSize() {
   return {
     width: node().style.width,
@@ -488,9 +687,16 @@ declare global {
     responsiveness: {
       run: typeof run;
       runErd: typeof runErd;
+      runInvalidation: typeof runInvalidation;
       heldSize: typeof heldSize;
       undo: () => void;
     };
   }
 }
-window.responsiveness = { run, runErd, heldSize, undo: () => editor.undo() };
+window.responsiveness = {
+  run,
+  runErd,
+  runInvalidation,
+  heldSize,
+  undo: () => editor.undo(),
+};

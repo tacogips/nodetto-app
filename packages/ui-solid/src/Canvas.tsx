@@ -648,8 +648,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     />
   );
 
-  // Keep box views mounted through immutable position/style updates. Complex
-  // group wrappers retain their keyed lifetime when topology changes.
+  // Keep visual units mounted through immutable position/style updates.
   const renderStableVisualUnit = (
     id: ElementId,
     ancestors: ReadonlySet<ElementId> = new Set(),
@@ -664,8 +663,17 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       <Show
         when={!isGroup(element()) && !isConnector(element())}
         fallback={
-          <Show when={element()} keyed>
-            {(value) => renderVisualUnit(value, ancestors)}
+          <Show
+            when={isGroup(element())}
+            fallback={
+              <InlineConnector
+                element={element()}
+                context={context()}
+                selected={isSelected(id)}
+              />
+            }
+          >
+            {renderGroup(element, ancestors)}
           </Show>
         }
       >
@@ -674,119 +682,122 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     );
   };
 
-  const renderVisualUnit = (
-    element: Element,
+  const renderGroup = (
+    element: () => Element,
     ancestors: ReadonlySet<ElementId> = new Set(),
   ): JSX.Element => {
-    if (isGroup(element)) {
-      if (ancestors.has(element.id)) return null;
-      const nextAncestors = new Set(ancestors).add(element.id);
-      const semantic = element.semantic as { isolate?: boolean };
-      const boolean = createMemo(() => booleanGeometry(element, context()));
-      const rasterMask = createMemo(() => {
-        signals.rev();
-        return rasterGroupMaskCss(props.editor, element.id);
+    const id = untrack(() => element().id);
+    if (ancestors.has(id)) return null;
+    const nextAncestors = new Set(ancestors).add(id);
+    const semantic = () => element().semantic as { isolate?: boolean };
+    const boolean = createMemo(() => booleanGeometry(element(), context()));
+    const rasterMask = createMemo(() => {
+      signals.rev();
+      return rasterGroupMaskCss(props.editor, element().id);
+    });
+    const groupBounds = createMemo(() => {
+      signals.rev();
+      return rasterMask() ? props.editor.getBounds(element().id) : null;
+    });
+    const children = createMemo(() => {
+      signals.rev();
+      return memberIdsOf(element()).flatMap((id) => {
+        const child = props.editor.store.get(id);
+        return child &&
+          !context().isHidden?.(id) &&
+          !context().isMaskSource?.(id)
+          ? [child]
+          : [];
       });
-      const groupBounds = createMemo(() => {
-        signals.rev();
-        return rasterMask() ? props.editor.getBounds(element.id) : null;
-      });
-      const children = createMemo(() => {
-        signals.rev();
-        return memberIdsOf(element).flatMap((id) => {
-          const child = props.editor.store.get(id);
-          return child &&
-            !context().isHidden?.(id) &&
-            !context().isMaskSource?.(id)
-            ? [child]
-            : [];
-        });
-      });
-      const contents = () => (
-        <For each={children().map((child) => child.id)}>
-          {(id) => renderStableVisualUnit(id, nextAncestors)}
-        </For>
-      );
-      const surface = createMemo(() => {
-        const geometry = boolean();
-        if (geometry)
-          return {
-            bounds: geometry.bounds,
-            mask: booleanMaskCss(geometry),
-            mode: "alpha" as const,
-            operation: geometry.operation,
-          };
-        const mask = rasterMask();
-        const bounds = groupBounds();
-        return mask && bounds
-          ? {
-              bounds,
-              mask,
-              mode:
-                (element.semantic as { maskMode?: "alpha" | "luminance" })
-                  .maskMode ?? "alpha",
-              operation: undefined,
-            }
-          : null;
-      });
-      return (
-        <div
-          data-group-id={element.id}
-          data-boolean-operation={surface()?.operation}
-          style={{
-            position: "absolute",
-            inset: surface() ? undefined : 0,
-            left: surface() ? `${surface()?.bounds.x}px` : undefined,
-            top: surface() ? `${surface()?.bounds.y}px` : undefined,
-            width: surface() ? `${surface()?.bounds.width}px` : undefined,
-            height: surface() ? `${surface()?.bounds.height}px` : undefined,
-            overflow: "visible",
-            "pointer-events": "none",
-            opacity: element.visual.style?.opacity ?? 1,
-            filter: effectsCss(element.visual.style),
-            "backdrop-filter": backdropEffectsCss(element.visual.style),
-            "mix-blend-mode": element.visual.style?.blendMode ?? "normal",
-            isolation: semantic.isolate ? "isolate" : undefined,
-            "mask-image": surface()?.mask,
-            "mask-mode": surface()?.mode,
-            "mask-repeat": surface() ? "no-repeat" : undefined,
-            "mask-size": surface() ? "100% 100%" : undefined,
-          }}
-        >
-          <Show when={surface()} fallback={contents()}>
-            {(current) => (
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${-current().bounds.x}px`,
-                  top: `${-current().bounds.y}px`,
-                  width: "1px",
-                  height: "1px",
-                  overflow: "visible",
-                }}
-              >
-                {contents()}
-              </div>
-            )}
-          </Show>
-        </div>
-      );
-    }
-    if (isConnector(element))
-      return (
-        <InlineConnector
-          element={element}
-          context={context()}
-          selected={isSelected(element.id)}
-        />
-      );
-    return renderShape(() => element);
+    });
+    const contents = () => (
+      <For each={children().map((child) => child.id)}>
+        {(id) => renderStableVisualUnit(id, nextAncestors)}
+      </For>
+    );
+    const surface = createMemo(() => {
+      const geometry = boolean();
+      if (geometry)
+        return {
+          bounds: geometry.bounds,
+          mask: booleanMaskCss(geometry),
+          mode: "alpha" as const,
+          operation: geometry.operation,
+        };
+      const mask = rasterMask();
+      const bounds = groupBounds();
+      return mask && bounds
+        ? {
+            bounds,
+            mask,
+            mode:
+              (element().semantic as { maskMode?: "alpha" | "luminance" })
+                .maskMode ?? "alpha",
+            operation: undefined,
+          }
+        : null;
+    });
+    return (
+      <div
+        data-group-id={element().id}
+        data-boolean-operation={surface()?.operation}
+        style={{
+          position: "absolute",
+          inset: surface() ? undefined : 0,
+          left: surface() ? `${surface()?.bounds.x}px` : undefined,
+          top: surface() ? `${surface()?.bounds.y}px` : undefined,
+          width: surface() ? `${surface()?.bounds.width}px` : undefined,
+          height: surface() ? `${surface()?.bounds.height}px` : undefined,
+          overflow: "visible",
+          "pointer-events": "none",
+          opacity: element().visual.style?.opacity ?? 1,
+          filter: effectsCss(element().visual.style),
+          "backdrop-filter": backdropEffectsCss(element().visual.style),
+          "mix-blend-mode": element().visual.style?.blendMode ?? "normal",
+          isolation: semantic().isolate ? "isolate" : undefined,
+          "mask-image": surface()?.mask,
+          "mask-mode": surface()?.mode,
+          "mask-repeat": surface() ? "no-repeat" : undefined,
+          "mask-size": surface() ? "100% 100%" : undefined,
+        }}
+      >
+        <Show when={surface()} fallback={contents()}>
+          {(current) => (
+            <div
+              style={{
+                position: "absolute",
+                left: `${-current().bounds.x}px`,
+                top: `${-current().bounds.y}px`,
+                width: "1px",
+                height: "1px",
+                overflow: "visible",
+              }}
+            >
+              {contents()}
+            </div>
+          )}
+        </Show>
+      </div>
+    );
   };
 
   const renderShape = (element: () => Element): JSX.Element => {
-    const box = createMemo(() =>
-      props.editor.getShapeUtil(element().type).getBounds(element(), context()),
-    );
+    const warnings = createMemo(() => {
+      signals.rev();
+      return shapeAuthoringWarnings(element(), context());
+    });
+    const box = createMemo(() => context().boundsOf(element().id), null, {
+      equals: (a, b) =>
+        a === b ||
+        Boolean(
+          a &&
+            b &&
+            a.x === b.x &&
+            a.y === b.y &&
+            a.width === b.width &&
+            a.height === b.height,
+        ),
+    });
     return (
       <Show when={box()}>
         {(bounds) => (
@@ -805,7 +816,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
                 signals.rev();
                 return props.editor.assets.resolve(source);
               }}
-              warnings={shapeAuthoringWarnings(element(), context())}
+              warnings={warnings()}
               element={element()}
               box={bounds()}
               selected={isSelected(element().id)}
@@ -888,27 +899,38 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
         <svg class="nodetto-layer nodetto-connector-layer">
           <title>Connectors</title>
           <ConnectorMarkers />
-          <For each={connectors()}>
-            {(element) => (
-              <g
-                style={{
-                  "clip-path": clipCss(
-                    context().clipPolygonOf?.(element.id) ??
-                      context().clipOf?.(element.id),
-                  ),
-                  opacity: element.visual.style?.opacity ?? 1,
-                  filter: effectsCss(element.visual.style),
-                  "backdrop-filter": backdropEffectsCss(element.visual.style),
-                  "mix-blend-mode": element.visual.style?.blendMode ?? "normal",
-                }}
-              >
-                <ConnectorView
-                  element={element}
-                  context={context()}
-                  selected={isSelected(element.id)}
-                />
-              </g>
-            )}
+          <For each={connectors().map((element) => element.id)}>
+            {(id) => {
+              const initial = props.editor.store.get(id);
+              if (!initial) return null;
+              const element = createMemo(() => {
+                signals.rev();
+                return props.editor.store.get(id) ?? initial;
+              });
+              return (
+                <g
+                  style={{
+                    "clip-path": clipCss(
+                      context().clipPolygonOf?.(element().id) ??
+                        context().clipOf?.(element().id),
+                    ),
+                    opacity: element().visual.style?.opacity ?? 1,
+                    filter: effectsCss(element().visual.style),
+                    "backdrop-filter": backdropEffectsCss(
+                      element().visual.style,
+                    ),
+                    "mix-blend-mode":
+                      element().visual.style?.blendMode ?? "normal",
+                  }}
+                >
+                  <ConnectorView
+                    element={element()}
+                    context={context()}
+                    selected={isSelected(element().id)}
+                  />
+                </g>
+              );
+            }}
           </For>
           <Show when={interaction.pending()}>
             {(pending) => (
