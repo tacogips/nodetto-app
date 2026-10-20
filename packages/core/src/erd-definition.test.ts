@@ -91,12 +91,12 @@ test("malformed or unsupported input fails without partial columns", () => {
 test("PostgreSQL definitions accept session-user defaults", () => {
   expect(
     parseErdDefinition(
-      "recorded_by text NOT NULL DEFAULT CURRENT_USER",
+      "created_by text NOT NULL DEFAULT CURRENT_USER",
       "postgresql",
     ).columns,
   ).toEqual([
     {
-      name: "recorded_by",
+      name: "created_by",
       dataType: "text",
       pk: false,
       nullable: false,
@@ -104,6 +104,6 @@ test("PostgreSQL definitions accept session-user defaults", () => {
     },
   ]);
   expect(
-    parseErdDefinition("recorded_by text DEFAULT CURRENT_USER", "sqlite").error,
+    parseErdDefinition("created_by text DEFAULT CURRENT_USER", "sqlite").error,
   ).toBe("Column 1: Use a literal or CURRENT_TIMESTAMP/DATE/TIME default.");
 });
