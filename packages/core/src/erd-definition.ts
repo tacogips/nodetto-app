@@ -144,10 +144,17 @@ export function parseErdDefinition(
             const value =
               /^DEFAULT\s+('(?:[^']|'')*'|[+-]?\d+(?:\.\d+)?|TRUE\b|FALSE\b|NULL\b|CURRENT_TIMESTAMP\b|CURRENT_DATE\b|CURRENT_TIME\b)\s*/i.exec(
                 rest,
-              );
+              ) ??
+              (dialect === "postgresql"
+                ? /^DEFAULT\s+(CURRENT_USER\b|SESSION_USER\b|CURRENT_ROLE\b)\s*/i.exec(
+                    rest,
+                  )
+                : null);
             if (!value)
               throw new Error(
-                "Use a literal or CURRENT_TIMESTAMP/DATE/TIME default.",
+                dialect === "postgresql"
+                  ? "Use a literal, CURRENT_TIMESTAMP/DATE/TIME or CURRENT_USER/SESSION_USER/CURRENT_ROLE default."
+                  : "Use a literal or CURRENT_TIMESTAMP/DATE/TIME default.",
               );
             defaultExpression = value[1];
             rest = rest.slice(value[0].length);

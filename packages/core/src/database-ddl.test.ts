@@ -556,7 +556,7 @@ test("stored generated columns are portable and unsafe expressions are omitted",
       "GENERATED ALWAYS AS (quantity; DROP TABLE line_items)",
     );
     expect(result.warnings).toEqual([
-      'line_items.unsafe_total: unsafe or unsupported generated expression "quantity; DROP TABLE line_items" was omitted. Use one portable row-local SQL expression.',
+      'line_items.unsafe_total: generated expression "quantity; DROP TABLE line_items" was omitted because it contains a statement separator or SQL comment. Use one portable row-local SQL expression.',
     ]);
     if (dialect === "sqlite") {
       const database = new Database(":memory:");
@@ -715,4 +715,202 @@ test("frame DDL isolates nested databases and diagnoses cross-scope dependencies
   expect(() =>
     generateDatabaseDdl(editor, pageId, "sqlite", { frameId: "users" }),
   ).toThrow("frame on the selected page");
+});
+
+function checkTable(
+  checks: readonly { id: string; name?: string; expression: string }[],
+) {
+  const editor = makeEditor();
+  editor.createElement("erd.table", {
+    id: "t-sample",
+    semantic: {
+      tableName: "sample_items",
+      columns: [
+        { id: "id", name: "id", dataType: "integer", pk: true },
+        { id: "a", name: "a", dataType: "text", nullable: true },
+        { id: "b", name: "b", dataType: "text", nullable: true },
+      ],
+      checks,
+    },
+    visual: { x: 0, y: 0, width: 200 },
+  });
+  return editor;
+}
+
+test("long CHECK expressions are emitted and enforced (#44)", () => {
+  // Sixteen CASE terms: well over the former 512-character cap.
+  const terms = Array.from(
+    { length: 16 },
+    (_, index) =>
+      `CASE WHEN ${index % 2 ? "a" : "b"} IS NOT NULL THEN 1 ELSE 0 END`,
+  );
+  const expression = `${terms.join(" + ")} >= 0 AND (a IS NOT NULL OR b IS NOT NULL)`;
+  expect(expression.length).toBeGreaterThan(512);
+  const editor = checkTable([{ id: "long", name: "ck_long", expression }]);
+  for (const dialect of ["postgresql", "mysql", "sqlite"] as const) {
+    const result = generateDatabaseDdl(editor, editor.currentPageId, dialect);
+    expect(result.warnings).toEqual([]);
+    expect(result.sql).toContain(`CHECK (${expression})`);
+  }
+  const database = new Database(":memory:");
+  try {
+    database.exec(
+      generateDatabaseDdl(editor, editor.currentPageId, "sqlite").sql,
+    );
+    database.exec("INSERT INTO sample_items (id, a) VALUES (1, 'x')");
+    expect(() =>
+      database.exec("INSERT INTO sample_items (id) VALUES (2)"),
+    ).toThrow();
+  } finally {
+    database.close();
+  }
+});
+
+test("omitted CHECK expressions report the specific reason, including the length limit", () => {
+  const editor = checkTable([
+    { id: "huge", expression: `a IN (${"'x', ".repeat(2000)}'y')` },
+    { id: "cast", expression: "a::int > 0" },
+    { id: "empty", expression: "  " },
+  ]);
+  const result = generateDatabaseDdl(editor, editor.currentPageId, "sqlite");
+  expect(result.warnings).toEqual([
+    "sample_items: check empty was omitted because its expression is empty.",
+    "sample_items: check huge was omitted because its expression is 10010 characters long, over the 8192-character limit.",
+    'sample_items: check cast was omitted because its expression contains ":"; write casts as CAST(value AS type).',
+  ]);
+  expect(result.sql).not.toContain("CHECK");
+});
+
+test("CHECK expressions using functions the dialect lacks are flagged (#43)", () => {
+  const editor = checkTable([
+    {
+      id: "one-of",
+      name: "ck_one_of",
+      expression: "num_nonnulls(a, b) = 1",
+    },
+    {
+      id: "portable",
+      name: "ck_portable",
+      expression:
+        "CASE WHEN a IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN b IS NOT NULL THEN 1 ELSE 0 END <= 2 AND CAST(id AS VARCHAR(20)) <> '' AND coalesce(length(a), 0) < 100 AND a NOT IN ('num_nonnulls(x)')",
+    },
+    { id: "pattern", name: "ck_pattern", expression: "a ILIKE 'x%'" },
+  ]);
+
+  const sqlite = generateDatabaseDdl(editor, editor.currentPageId, "sqlite");
+  expect(sqlite.warnings).toEqual([
+    "sample_items: check ck_one_of uses num_nonnulls(), which SQLite does not support; the database will reject this DDL unless the expression is rewritten for SQLite.",
+    "sample_items: check ck_pattern uses ILIKE, which SQLite does not support; the database will reject this DDL unless the expression is rewritten for SQLite.",
+  ]);
+  // The authored constraint is kept rather than silently dropped.
+  expect(sqlite.sql).toContain("CHECK (num_nonnulls(a, b) = 1)");
+
+  const postgres = generateDatabaseDdl(
+    editor,
+    editor.currentPageId,
+    "postgresql",
+  );
+  expect(postgres.warnings).toEqual([]);
+
+  const mysql = generateDatabaseDdl(editor, editor.currentPageId, "mysql");
+  expect(mysql.warnings).toEqual([
+    "sample_items: check ck_one_of uses num_nonnulls(), which MySQL does not support; the database will reject this DDL unless the expression is rewritten for MySQL.",
+    "sample_items: check ck_pattern uses ILIKE, which MySQL does not support; the database will reject this DDL unless the expression is rewritten for MySQL.",
+  ]);
+
+  const portable = checkTable([
+    {
+      id: "portable",
+      expression:
+        "CASE WHEN a IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN b IS NOT NULL THEN 1 ELSE 0 END = 1",
+    },
+  ]);
+  const portableSqlite = generateDatabaseDdl(
+    portable,
+    portable.currentPageId,
+    "sqlite",
+  );
+  expect(portableSqlite.warnings).toEqual([]);
+  const database = new Database(":memory:");
+  try {
+    database.exec(portableSqlite.sql);
+    database.exec("INSERT INTO sample_items (id, a) VALUES (1, 'x')");
+    expect(() =>
+      database.exec("INSERT INTO sample_items (id, a, b) VALUES (2, 'x', 'y')"),
+    ).toThrow();
+  } finally {
+    database.close();
+  }
+});
+
+test("PostgreSQL-only functions in generated columns are flagged for SQLite", () => {
+  const editor = makeEditor();
+  editor.createElement("erd.table", {
+    semantic: {
+      tableName: "pairs",
+      columns: [
+        { id: "a", name: "a", dataType: "text", nullable: true },
+        {
+          id: "count",
+          name: "present",
+          dataType: "integer",
+          generatedExpression: "num_nonnulls(a)",
+        },
+      ],
+    },
+    visual: { x: 0, y: 0, width: 200 },
+  });
+  const sqlite = generateDatabaseDdl(editor, editor.currentPageId, "sqlite");
+  expect(sqlite.warnings).toEqual([
+    "pairs.present: generated expression uses num_nonnulls(), which SQLite does not support; the database will reject this DDL unless the expression is rewritten for SQLite.",
+  ]);
+  expect(
+    generateDatabaseDdl(editor, editor.currentPageId, "postgresql").warnings,
+  ).toEqual([]);
+});
+
+test("session-user defaults are emitted for PostgreSQL and omitted elsewhere (#45)", () => {
+  const editor = makeEditor();
+  editor.createElement("erd.table", {
+    semantic: {
+      tableName: "sample_items",
+      columns: [
+        { id: "id", name: "id", dataType: "integer", pk: true },
+        {
+          id: "recorded-by",
+          name: "recorded_by",
+          dataType: "text",
+          defaultExpression: "CURRENT_USER",
+        },
+        {
+          id: "session",
+          name: "session_name",
+          dataType: "text",
+          defaultExpression: "session_user",
+        },
+      ],
+    },
+    visual: { x: 0, y: 0, width: 200 },
+  });
+  const postgres = generateDatabaseDdl(
+    editor,
+    editor.currentPageId,
+    "postgresql",
+  );
+  expect(postgres.warnings).toEqual([]);
+  expect(postgres.sql).toContain(
+    '"recorded_by" TEXT NOT NULL DEFAULT CURRENT_USER',
+  );
+  expect(postgres.sql).toContain(
+    '"session_name" TEXT NOT NULL DEFAULT session_user',
+  );
+  for (const dialect of ["mysql", "sqlite"] as const) {
+    const result = generateDatabaseDdl(editor, editor.currentPageId, dialect);
+    const label = dialect === "mysql" ? "MySQL" : "SQLite";
+    expect(result.warnings).toEqual([
+      `sample_items.recorded_by: default CURRENT_USER is PostgreSQL-only; ${label} does not support it as a column default, so it was omitted.`,
+      `sample_items.session_name: default session_user is PostgreSQL-only; ${label} does not support it as a column default, so it was omitted.`,
+    ]);
+    expect(result.sql).not.toMatch(/DEFAULT (?:CURRENT_USER|session_user)/);
+  }
 });

@@ -184,6 +184,15 @@ function isUniqueKey(
   );
 }
 
+const DIALECT_LABEL: Readonly<Record<DatabaseDialect, string>> = {
+  postgresql: "PostgreSQL",
+  mysql: "MySQL",
+  sqlite: "SQLite",
+};
+
+/** PostgreSQL session-user defaults (SQL-standard, written without parentheses). */
+const SESSION_USER_DEFAULT = /^(?:current_user|session_user|current_role)$/i;
+
 function defaultFor(
   column: ErdColumn,
   dialect: DatabaseDialect,
@@ -207,41 +216,49 @@ function defaultFor(
     /^(?:gen_random_uuid|uuid_generate_v4)\(\)$/i.test(raw)
   )
     return raw;
+  if (SESSION_USER_DEFAULT.test(raw)) {
+    if (dialect === "postgresql") return raw;
+    warnings.push(
+      `${tableName}.${column.name}: default ${raw} is PostgreSQL-only; ${DIALECT_LABEL[dialect]} does not support it as a column default, so it was omitted.`,
+    );
+    return undefined;
+  }
   warnings.push(
-    `${tableName}.${column.name}: unsupported default expression "${raw}" was omitted. Use a literal, CURRENT_DATE/TIME/TIMESTAMP or a supported UUID function.`,
+    `${tableName}.${column.name}: unsupported default expression "${raw}" was omitted. Use a literal, CURRENT_DATE/TIME/TIMESTAMP, a supported UUID function or (PostgreSQL) CURRENT_USER/SESSION_USER/CURRENT_ROLE.`,
   );
   return undefined;
 }
 
 function generatedFor(
   column: ErdColumn,
+  dialect: DatabaseDialect,
   warnings: string[],
   tableName: string,
 ): string | undefined {
   const raw = column.generatedExpression?.trim();
   if (!raw) return undefined;
-  if (safeCheckExpression(raw)) return raw;
-  warnings.push(
-    `${tableName}.${column.name}: unsafe or unsupported generated expression "${raw}" was omitted. Use one portable row-local SQL expression.`,
-  );
-  return undefined;
+  const subject = `${tableName}.${column.name}: generated expression`;
+  const problem = expressionProblem(raw);
+  if (problem) {
+    warnings.push(
+      `${subject} "${raw}" was omitted because it ${problem}. Use one portable row-local SQL expression.`,
+    );
+    return undefined;
+  }
+  const incompatibility = dialectIncompatibility(raw, dialect, subject);
+  if (incompatibility) warnings.push(incompatibility);
+  return raw;
 }
 
-function safeCheckExpression(raw: string): boolean {
-  if (!raw || raw.length > 512) return false;
-  for (const character of raw) {
-    const code = character.charCodeAt(0);
-    if (code < 32 || code === 127) return false;
-  }
-  if (
-    raw.includes(";") ||
-    raw.includes("--") ||
-    raw.includes("/*") ||
-    raw.includes("*/")
-  )
-    return false;
-  if (!/^[A-Za-z0-9_\s'(),.+\-*/%<>=!|&]+$/.test(raw)) return false;
-  let depth = 0;
+/**
+ * Longest CHECK or generated-column expression the exporter emits. The cap
+ * bounds the safety scan only; every supported database accepts far longer
+ * expressions.
+ */
+export const MAX_SQL_EXPRESSION_LENGTH = 8192;
+
+/** Blank out string literals; undefined when a literal is unterminated. */
+function outsideStringLiterals(raw: string): string | undefined {
   let outside = "";
   for (let i = 0; i < raw.length; i += 1) {
     const character = raw[i] as string;
@@ -255,18 +272,216 @@ function safeCheckExpression(raw: string): boolean {
         if (raw[i] === "'") break;
         i += 1;
       }
-      if (i >= raw.length) return false;
+      if (i >= raw.length) return undefined;
       outside += " ";
       continue;
     }
-    if (character === "(") depth += 1;
-    if (character === ")" && --depth < 0) return false;
     outside += character;
   }
-  if (depth !== 0) return false;
-  return !/\b(?:select|insert|update|delete|drop|alter|create|attach|detach|pragma|union|with)\b/i.test(
-    outside,
-  );
+  return outside;
+}
+
+/**
+ * Why a CHECK or generated expression cannot be emitted safely, phrased to
+ * follow "it", or undefined when it is one row-local expression.
+ */
+function expressionProblem(raw: string): string | undefined {
+  if (!raw) return "is empty";
+  if (raw.length > MAX_SQL_EXPRESSION_LENGTH)
+    return `is ${raw.length} characters long, over the ${MAX_SQL_EXPRESSION_LENGTH}-character limit`;
+  for (const character of raw) {
+    const code = character.charCodeAt(0);
+    if (code < 32 || code === 127)
+      return "contains a line break or control character";
+  }
+  if (
+    raw.includes(";") ||
+    raw.includes("--") ||
+    raw.includes("/*") ||
+    raw.includes("*/")
+  )
+    return "contains a statement separator or SQL comment";
+  const unsupported = /[^A-Za-z0-9_\s'(),.+\-*/%<>=!|&]/.exec(raw)?.[0];
+  if (unsupported)
+    return unsupported === ":"
+      ? 'contains ":"; write casts as CAST(value AS type)'
+      : `contains the unsupported character "${unsupported}"`;
+  const outside = outsideStringLiterals(raw);
+  if (outside === undefined) return "has an unterminated string literal";
+  let depth = 0;
+  for (const character of outside) {
+    if (character === "(") depth += 1;
+    if (character === ")" && --depth < 0) return "has unbalanced parentheses";
+  }
+  if (depth !== 0) return "has unbalanced parentheses";
+  const statement =
+    /\b(?:select|insert|update|delete|drop|alter|create|attach|detach|pragma|union|with)\b/i.exec(
+      outside,
+    )?.[0];
+  return statement
+    ? `contains ${statement.toUpperCase()}; only row-local expressions are allowed`
+    : undefined;
+}
+
+/** Keywords that may precede "(" without naming a function. */
+const PARENTHESIZED_KEYWORDS = new Set([
+  "all",
+  "and",
+  "any",
+  "as",
+  "between",
+  "case",
+  "cast",
+  "else",
+  "end",
+  "escape",
+  "exists",
+  "glob",
+  "ilike",
+  "in",
+  "is",
+  "like",
+  "not",
+  "null",
+  "or",
+  "regexp",
+  "rlike",
+  "some",
+  "then",
+  "when",
+]);
+
+/** SQLite's built-in scalar functions; anything else must be registered by the host. */
+const SQLITE_FUNCTIONS = new Set(
+  [
+    // Core functions.
+    "abs changes char coalesce concat concat_ws format hex if ifnull iif instr",
+    "last_insert_rowid length likelihood likely lower ltrim max min nullif",
+    "octet_length printf quote random randomblob replace round rtrim sign",
+    "soundex substr substring total_changes trim typeof unhex unicode",
+    "unlikely upper zeroblob",
+    // Math functions.
+    "acos acosh asin asinh atan atan2 atanh ceil ceiling cos cosh degrees exp",
+    "floor ln log log10 log2 mod pi pow power radians sin sinh sqrt tan tanh",
+    "trunc",
+    // Date and time functions.
+    "date time datetime julianday unixepoch strftime timediff",
+    // JSON functions.
+    "json jsonb json_array jsonb_array json_array_length json_error_position",
+    "json_extract jsonb_extract json_insert jsonb_insert json_object",
+    "jsonb_object json_patch jsonb_patch json_pretty json_quote json_remove",
+    "jsonb_remove json_replace jsonb_replace json_set jsonb_set json_type",
+    "json_valid",
+  ]
+    .join(" ")
+    .split(" "),
+);
+
+/**
+ * Functions known from another dialect that this one lacks. PostgreSQL and
+ * MySQL allow user-defined functions in checks, so they use a deny list
+ * rather than SQLite's closed built-in set.
+ */
+const MISSING_FUNCTIONS: Readonly<
+  Record<Exclude<DatabaseDialect, "sqlite">, ReadonlySet<string>>
+> = {
+  postgresql: new Set([
+    "datetime",
+    "hex",
+    "if",
+    "ifnull",
+    "iif",
+    "instr",
+    "isnull",
+    "json_extract",
+    "json_valid",
+    "julianday",
+    "locate",
+    "printf",
+    "randomblob",
+    "strftime",
+    "typeof",
+    "unhex",
+    "unixepoch",
+    "zeroblob",
+  ]),
+  mysql: new Set([
+    "age",
+    "array_length",
+    "btrim",
+    "cardinality",
+    "date_part",
+    "iif",
+    "json_array_length",
+    "json_typeof",
+    "jsonb_array_length",
+    "jsonb_typeof",
+    "julianday",
+    "num_nonnulls",
+    "num_nulls",
+    "printf",
+    "regexp_match",
+    "regexp_matches",
+    "split_part",
+    "starts_with",
+    "strftime",
+    "to_char",
+    "typeof",
+    "unixepoch",
+  ]),
+};
+
+/** Operators supported only by some dialects. */
+const DIALECT_OPERATORS: readonly {
+  readonly pattern: RegExp;
+  readonly label: string;
+  readonly dialects: readonly DatabaseDialect[];
+}[] = [
+  { pattern: /\bilike\b/i, label: "ILIKE", dialects: ["postgresql"] },
+  {
+    pattern: /\bsimilar\s+to\b/i,
+    label: "SIMILAR TO",
+    dialects: ["postgresql"],
+  },
+  { pattern: /\bglob\b/i, label: "GLOB", dialects: ["sqlite"] },
+  // SQLite's REGEXP calls a regexp() function that is not built in.
+  { pattern: /\b(?:regexp|rlike)\b/i, label: "REGEXP", dialects: ["mysql"] },
+  {
+    pattern: /\bis\s+(?:not\s+)?distinct\s+from\b/i,
+    label: "IS DISTINCT FROM",
+    dialects: ["postgresql", "sqlite"],
+  },
+];
+
+/**
+ * A warning for a safe expression that calls functions or operators the
+ * target dialect does not provide. The expression is still emitted: dropping
+ * an authored constraint silently is worse than a failing migration.
+ */
+function dialectIncompatibility(
+  raw: string,
+  dialect: DatabaseDialect,
+  subject: string,
+): string | undefined {
+  const outside = outsideStringLiterals(raw) ?? raw;
+  const found = new Set<string>();
+  for (const match of outside.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g)) {
+    const name = (match[1] as string).toLowerCase();
+    if (PARENTHESIZED_KEYWORDS.has(name)) continue;
+    // CAST(value AS VARCHAR(10)) names a type, not a function.
+    if (/\bas\s*$/i.test(outside.slice(0, match.index))) continue;
+    const missing =
+      dialect === "sqlite"
+        ? !SQLITE_FUNCTIONS.has(name)
+        : MISSING_FUNCTIONS[dialect].has(name);
+    if (missing) found.add(`${match[1]}()`);
+  }
+  for (const operator of DIALECT_OPERATORS)
+    if (!operator.dialects.includes(dialect) && operator.pattern.test(outside))
+      found.add(operator.label);
+  if (!found.size) return undefined;
+  const label = DIALECT_LABEL[dialect];
+  return `${subject} uses ${[...found].join(", ")}, which ${label} does not support; the database will reject this DDL unless the expression is rewritten for ${label}.`;
 }
 
 /** Deterministic, read-only SQL schema export for one ERD page. */
@@ -393,12 +608,20 @@ export function generateDatabaseDdl(
         compare(a.expression, b.expression),
     )) {
       const expression = check.expression.trim();
-      if (!safeCheckExpression(expression)) {
+      const subject = `${table.semantic.tableName}: check ${check.name?.trim() || check.id}`;
+      const problem = expressionProblem(expression);
+      if (problem) {
         warnings.push(
-          `${table.semantic.tableName}: check ${check.name?.trim() || check.id} has an empty, unsafe or unsupported expression and was omitted.`,
+          `${subject} was omitted because its expression ${problem}.`,
         );
         continue;
       }
+      const incompatibility = dialectIncompatibility(
+        expression,
+        dialect,
+        subject,
+      );
+      if (incompatibility) warnings.push(incompatibility);
       table.constraints.push(
         `CONSTRAINT ${constraintName(check.name?.trim() || `ck_${table.semantic.tableName}_${check.id}`, Boolean(check.name?.trim()))} CHECK (${expression})`,
       );
@@ -524,6 +747,7 @@ export function generateDatabaseDdl(
       if (!column.nullable || column.pk) parts.push("NOT NULL");
       const generatedExpression = generatedFor(
         column,
+        dialect,
         warnings,
         table.semantic.tableName,
       );

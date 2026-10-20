@@ -285,6 +285,11 @@ ERD tables.
              out of date.
   --strict   Exit 3 when the export reports warnings.
 
+CHECK and generated-column expressions must be one row-local SQL expression of
+at most 8192 characters; unsafe or longer ones are omitted with a warning that
+names the reason. Expressions calling functions or operators the target dialect
+lacks (for example num_nonnulls() or ILIKE on SQLite) are kept but warned.
+
 ${EXIT_CODES}`,
 
   arrange: `Usage: nodetto-cli arrange <document.jsonl> [--mode tidy|overlaps]
