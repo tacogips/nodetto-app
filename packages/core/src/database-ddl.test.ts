@@ -416,23 +416,81 @@ test("unsafe or malformed check expressions are omitted with warnings", () => {
         },
         { id: "quote", expression: "state = 'open" },
         { id: "comment", expression: "balance >= 0 -- bypass" },
-        { id: "newline", expression: "balance >= 0\nAND balance < 100" },
+        { id: "newline", expression: "balance >= 0\n  AND balance < 100" },
+        // MySQL reads \' as an escaped quote, which would end the first
+        // literal later and expose the second literal's text as SQL.
+        {
+          id: "backslash",
+          expression: "state = '\\' AND state <> '; DROP TABLE accounts; --'",
+        },
+        { id: "literal-break", expression: "state <> 'a\nb'" },
+        { id: "unicode-space", expression: "balance\u3000>= 0" },
+        {
+          id: "literal-then-select",
+          expression: "state <> 'x' UNION SELECT 1",
+        },
       ],
     },
   });
   editor.apply([{ type: "createElement", element: table }]);
 
   const result = generateDatabaseDdl(editor, editor.currentPageId, "sqlite");
-  expect(result.checkCount).toBe(7);
+  expect(result.checkCount).toBe(11);
   expect(result.sql).toContain(
     'CONSTRAINT "ck_accounts_valid" CHECK (balance >= 0)',
   );
   expect(result.sql).toContain(
     `CONSTRAINT "Valid state" CHECK (state IN ('open', 'closed'))`,
   );
+  expect(result.sql).toContain(
+    'CONSTRAINT "ck_accounts_newline" CHECK (balance >= 0 AND balance < 100)',
+  );
   expect(result.sql).not.toContain("DROP TABLE accounts");
   expect(result.sql).not.toContain("SELECT min");
-  expect(result.warnings).toHaveLength(5);
+  expect(result.sql).not.toContain("UNION SELECT 1)");
+  expect([...result.warnings].sort()).toEqual(
+    [
+      "accounts: check comment was omitted because its expression contains a statement separator or SQL comment.",
+      "accounts: check inject was omitted because its expression contains a statement separator or SQL comment.",
+      'accounts: check backslash was omitted because its expression contains "\\"; backslash escapes differ between dialects.',
+      "accounts: check literal-break was omitted because its expression contains a line break or control character inside a string literal.",
+      "accounts: check literal-then-select was omitted because its expression contains UNION; only row-local expressions are allowed.",
+      "accounts: check quote was omitted because its expression has an unterminated string literal.",
+      "accounts: check subquery was omitted because its expression contains SELECT; only row-local expressions are allowed.",
+      'accounts: check unicode-space was omitted because its expression contains the unsupported character "\u3000".',
+    ].sort(),
+  );
+});
+
+test("string literals may contain any printable text", () => {
+  const editor = checkTable([
+    { id: "email", expression: "a LIKE '%@%.%'" },
+    {
+      id: "status",
+      expression: "b IN ('下書き', '公開', 'a;b', 'x--y', '#1')",
+    },
+  ]);
+  for (const dialect of ["postgresql", "mysql", "sqlite"] as const)
+    expect(
+      generateDatabaseDdl(editor, editor.currentPageId, dialect).warnings,
+    ).toEqual([]);
+  const database = new Database(":memory:");
+  try {
+    database.exec(
+      generateDatabaseDdl(editor, editor.currentPageId, "sqlite").sql,
+    );
+    database.exec(
+      "INSERT INTO widgets (id, a, b) VALUES (1, 'me@example.test', '公開')",
+    );
+    expect(() =>
+      database.exec("INSERT INTO widgets (id, a) VALUES (2, 'no-at-sign')"),
+    ).toThrow();
+    expect(() =>
+      database.exec("INSERT INTO widgets (id, b) VALUES (3, 'other')"),
+    ).toThrow();
+  } finally {
+    database.close();
+  }
 });
 
 test("one-to-one constraints and incomplete relations produce actionable SQL warnings", () => {

@@ -413,15 +413,17 @@ expression; the editor marks them with a function (f-hook) glyph, keeps them
 mutually exclusive with defaults and primary keys, and emits `GENERATED ALWAYS AS (...) STORED` for all
 three targets after a conservative row-local expression safety check. Stable-ID
 table check constraints accept portable,
-single-expression SQL predicates of up to 8,192 characters and are omitted with
-a warning naming the reason if they are longer or contain unsafe syntax. Check
-and generated expressions that call functions or operators the target dialect
+single-expression SQL predicates of up to 8,192 characters; line breaks are
+exported as spaces and string literals may contain any printable text except
+backslashes. Expressions are omitted with a warning naming the reason if they
+are longer or contain unsafe syntax. Check and generated expressions that call functions or operators the target dialect
 lacks (for example PostgreSQL's `num_nonnulls()` or `ILIKE` on SQLite) are kept
 and reported as warnings, so `--strict` fails before the migration does.
 Column defaults accept literals and `CURRENT_DATE/TIME/TIMESTAMP`; PostgreSQL
 also accepts `gen_random_uuid()`, `uuid_generate_v4()`, `CURRENT_USER`,
 `SESSION_USER` and `CURRENT_ROLE`, which other dialects omit with a warning.
-PostgreSQL and MySQL foreign keys are emitted after all tables so forward references and cycles remain executable; SQLite keeps
+PostgreSQL and MySQL foreign keys are emitted after all tables so forward
+references and cycles remain executable; SQLite keeps
 them inline. The panel supports copy and `.sql` download and reports incomplete
 endpoints, many-to-many relations that need junction tables, duplicate names,
 unsafe/custom types, defaults or generated expressions, and other review items.

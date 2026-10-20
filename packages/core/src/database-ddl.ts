@@ -247,7 +247,7 @@ function generatedFor(
   }
   const incompatibility = dialectIncompatibility(raw, dialect, subject);
   if (incompatibility) warnings.push(incompatibility);
-  return raw;
+  return scanExpression(raw)?.normalized ?? raw;
 }
 
 /**
@@ -257,12 +257,32 @@ function generatedFor(
  */
 export const MAX_SQL_EXPRESSION_LENGTH = 8192;
 
-/** Blank out string literals; undefined when a literal is unterminated. */
-function outsideStringLiterals(raw: string): string | undefined {
+interface ScannedExpression {
+  /** The expression with each string literal replaced by one space. */
+  readonly outside: string;
+  readonly literals: readonly string[];
+  /**
+   * The emitted form: whitespace runs containing a tab or line break collapse
+   * to one space outside literals, so authored multi-line expressions export
+   * on one line while single-line expressions stay byte-for-byte unchanged.
+   */
+  readonly normalized: string;
+}
+
+/** Split out string literals; undefined when a literal is unterminated. */
+function scanExpression(raw: string): ScannedExpression | undefined {
   let outside = "";
+  let normalized = "";
+  const literals: string[] = [];
+  let segment = "";
+  const flushSegment = () => {
+    normalized += segment.replace(/ *[\t\n\r][\t\n\r ]*/g, " ");
+    segment = "";
+  };
   for (let i = 0; i < raw.length; i += 1) {
     const character = raw[i] as string;
     if (character === "'") {
+      const start = i;
       i += 1;
       while (i < raw.length) {
         if (raw[i] === "'" && raw[i + 1] === "'") {
@@ -273,41 +293,62 @@ function outsideStringLiterals(raw: string): string | undefined {
         i += 1;
       }
       if (i >= raw.length) return undefined;
+      const literal = raw.slice(start, i + 1);
+      literals.push(literal);
+      flushSegment();
+      normalized += literal;
       outside += " ";
       continue;
     }
     outside += character;
+    segment += character;
   }
-  return outside;
+  flushSegment();
+  return { outside, literals, normalized: normalized.trim() };
+}
+
+/** Whether text has a control character; tab, LF and CR count only when not allowed. */
+function hasControlCharacter(text: string, allowWhitespace: boolean): boolean {
+  for (const character of text) {
+    const code = character.charCodeAt(0);
+    if (allowWhitespace && (code === 9 || code === 10 || code === 13)) continue;
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
 }
 
 /**
  * Why a CHECK or generated expression cannot be emitted safely, phrased to
- * follow "it", or undefined when it is one row-local expression.
+ * follow "it", or undefined when it is one row-local expression. Only text
+ * outside string literals is restricted to the portable character set;
+ * literal contents are free apart from backslashes and control characters.
  */
 function expressionProblem(raw: string): string | undefined {
   if (!raw) return "is empty";
   if (raw.length > MAX_SQL_EXPRESSION_LENGTH)
     return `is ${raw.length} characters long, over the ${MAX_SQL_EXPRESSION_LENGTH}-character limit`;
-  for (const character of raw) {
-    const code = character.charCodeAt(0);
-    if (code < 32 || code === 127)
-      return "contains a line break or control character";
-  }
+  // MySQL treats backslash as a literal escape by default, so a backslash
+  // would let MySQL and this scanner disagree about where a literal ends.
+  if (raw.includes("\\"))
+    return 'contains "\\"; backslash escapes differ between dialects';
+  const scanned = scanExpression(raw);
+  if (scanned === undefined) return "has an unterminated string literal";
+  const { outside, literals } = scanned;
+  if (literals.some((literal) => hasControlCharacter(literal, false)))
+    return "contains a line break or control character inside a string literal";
+  if (hasControlCharacter(outside, true)) return "contains a control character";
   if (
-    raw.includes(";") ||
-    raw.includes("--") ||
-    raw.includes("/*") ||
-    raw.includes("*/")
+    outside.includes(";") ||
+    outside.includes("--") ||
+    outside.includes("/*") ||
+    outside.includes("*/")
   )
     return "contains a statement separator or SQL comment";
-  const unsupported = /[^A-Za-z0-9_\s'(),.+\-*/%<>=!|&]/.exec(raw)?.[0];
+  const unsupported = /[^A-Za-z0-9_ \t\n\r(),.+\-*/%<>=!|&]/.exec(outside)?.[0];
   if (unsupported)
     return unsupported === ":"
       ? 'contains ":"; write casts as CAST(value AS type)'
       : `contains the unsupported character "${unsupported}"`;
-  const outside = outsideStringLiterals(raw);
-  if (outside === undefined) return "has an unterminated string literal";
   let depth = 0;
   for (const character of outside) {
     if (character === "(") depth += 1;
@@ -463,7 +504,7 @@ function dialectIncompatibility(
   dialect: DatabaseDialect,
   subject: string,
 ): string | undefined {
-  const outside = outsideStringLiterals(raw) ?? raw;
+  const outside = scanExpression(raw)?.outside ?? raw;
   const found = new Set<string>();
   for (const match of outside.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g)) {
     const name = (match[1] as string).toLowerCase();
@@ -474,7 +515,7 @@ function dialectIncompatibility(
       dialect === "sqlite"
         ? !SQLITE_FUNCTIONS.has(name)
         : MISSING_FUNCTIONS[dialect].has(name);
-    if (missing) found.add(`${match[1]}()`);
+    if (missing) found.add(`${name}()`);
   }
   for (const operator of DIALECT_OPERATORS)
     if (!operator.dialects.includes(dialect) && operator.pattern.test(outside))
@@ -623,7 +664,7 @@ export function generateDatabaseDdl(
       );
       if (incompatibility) warnings.push(incompatibility);
       table.constraints.push(
-        `CONSTRAINT ${constraintName(check.name?.trim() || `ck_${table.semantic.tableName}_${check.id}`, Boolean(check.name?.trim()))} CHECK (${expression})`,
+        `CONSTRAINT ${constraintName(check.name?.trim() || `ck_${table.semantic.tableName}_${check.id}`, Boolean(check.name?.trim()))} CHECK (${scanExpression(expression)?.normalized ?? expression})`,
       );
     }
   }
