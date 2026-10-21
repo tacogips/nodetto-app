@@ -58,6 +58,14 @@ function typeFor(
   let normalized = raw.toLowerCase().replace(/\s+/g, " ");
   // PostgreSQL's documented alternative spellings share canonical mappings.
   const aliases: Readonly<Record<string, string>> = {
+    dec: "decimal",
+    "char varying": "character varying",
+    nchar: "character",
+    "national char": "character",
+    "national character": "character",
+    "nchar varying": "character varying",
+    "national char varying": "character varying",
+    "national character varying": "character varying",
     int2: "smallint",
     int4: "integer",
     int8: "bigint",
@@ -78,14 +86,17 @@ function typeFor(
     "$1$3$2",
   );
   const spelling =
-    /^([a-z][a-z0-9_ ]*?)(\(\s*\d+(?:\s*,\s*\d+)?\s*\))?(\[\])?$/.exec(
+    /^([a-z][a-z0-9_ ]*?)(\(\s*\d+(?:\s*,\s*\d+)?\s*\))?((?:\[\])*)$/.exec(
       normalized,
     );
   if (spelling) {
-    const base = aliases[spelling[1] ?? ""] ?? spelling[1] ?? "";
+    let base = aliases[spelling[1] ?? ""] ?? spelling[1] ?? "";
     const parameters = (spelling[2] ?? "").replace(/\s+/g, "");
     const array = spelling[3] ?? "";
-    if (aliases[spelling[1] ?? ""]) raw = `${base}${parameters}${array}`;
+    // Bare bpchar has unlimited length; only bpchar(n) aliases character(n).
+    if (base === "bpchar" && parameters) base = "character";
+    if (aliases[spelling[1] ?? ""] || base !== spelling[1])
+      raw = `${base}${parameters}${array}`;
     // Native PostgreSQL types (including arrays) are not user-defined types.
     const builtins = new Set([
       "smallint",
@@ -97,6 +108,7 @@ function typeFor(
       "numeric",
       "decimal",
       "boolean",
+      "bpchar",
       "character",
       "character varying",
       "text",
