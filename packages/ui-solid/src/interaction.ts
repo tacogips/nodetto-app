@@ -353,6 +353,7 @@ type Gesture =
       readonly from: ElementId;
       readonly componentKind?: UmlComponentRelationshipKind;
       readonly connectorType?: string;
+      readonly logicalRelation?: boolean;
       readonly screenTransition?: boolean;
     }
   | {
@@ -1287,6 +1288,7 @@ export function createInteraction(
       componentKind: componentRelationshipFor(options.tool()),
       screenTransition,
       connectorType,
+      logicalRelation: options.tool() === Tool.Relation,
     };
     const bounds = editor.getBounds(from);
     setPending({ from: bounds ? boxCentre(bounds) : point, to: point });
@@ -2012,7 +2014,13 @@ export function createInteraction(
                 target,
                 gesture.componentKind,
               )
-            : editor.connectSmart(gesture.from, target);
+            : gesture.connectorType === "erd.relation"
+              ? editor.connectErdRelation(
+                  gesture.from,
+                  target,
+                  gesture.logicalRelation === true,
+                )
+              : editor.connectSmart(gesture.from, target);
         if (created) {
           editor.selection.set([created]);
         }

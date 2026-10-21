@@ -1001,6 +1001,7 @@ describe("left shape palette creation", () => {
       "Materialized view",
       "Function",
       "Procedure",
+      "Relation",
       "Foreign key",
       "Text",
       "Frame",
@@ -1110,6 +1111,7 @@ describe("creationFor", () => {
       Tool.Dependency,
       Tool.Realization,
       Tool.ComponentConnector,
+      Tool.Relation,
       Tool.ForeignKey,
       Tool.Association,
       Tool.SequenceMessage,
@@ -3487,4 +3489,32 @@ describe("state transition authoring gestures", () => {
       editor.store.get([...editor.selection.ids()][0]!)?.semantic,
     ).toMatchObject({ from: a, to: a });
   });
+});
+
+describe("logical relation and foreign key tools", () => {
+  for (const tool of [Tool.Relation, Tool.ForeignKey]) {
+    test(`${tool} creates the requested constraint kind in one undo step`, () => {
+      const editor = new Editor();
+      const a = editor.createElement("erd.table", { visual: { x: 0, y: 0 } });
+      const b = editor.createElement("erd.table", { visual: { x: 400, y: 0 } });
+      const before = editor.history.undoSize;
+      const { interaction } = interactionFor(editor, tool);
+      interaction.onPointerDown(pointer({ clientX: 40, clientY: 20 }));
+      interaction.onPointerMove(pointer({ clientX: 440, clientY: 20 }));
+      interaction.onPointerUp(pointer({ clientX: 440, clientY: 20 }));
+      const id = [...editor.selection.ids()][0]!;
+      expect(editor.store.get(id)?.semantic).toMatchObject({
+        from: { table: a },
+        to: { table: b },
+      });
+      expect(
+        (editor.store.get(id)?.semantic as { logical?: boolean }).logical ===
+          true,
+      ).toBe(tool === Tool.Relation);
+      expect(editor.history.undoSize).toBe(before + 1);
+      editor.undo();
+      expect(editor.store.get(id)).toBeUndefined();
+      interaction.dispose();
+    });
+  }
 });

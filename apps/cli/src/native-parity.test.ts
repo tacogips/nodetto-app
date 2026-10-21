@@ -527,3 +527,67 @@ nativeTest(
   },
   60000,
 );
+
+nativeTest(
+  "native CLI creates a flowchart with decisions and retry paths",
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "nodetto-flowchart-"));
+    try {
+      const file = join(dir, "flowchart.jsonl");
+      writeFileSync(
+        file,
+        '{"kind":"document","schemaVersion":1,"id":"flowchart","title":"Request flowchart"}\n{"kind":"page","id":"p1","name":"Flowchart","pageKind":"flowchart"}\n',
+      );
+      const ops = join(
+        import.meta.dir,
+        "../../../examples/flowchart/request.ops.json",
+      );
+      const result = Bun.spawnSync([binary!, "edit", file, "--ops", ops]);
+      expect(result.exitCode).toBe(0);
+      const document = parseDocument(readFileSync(file, "utf8"));
+      expect(
+        document.elements.filter((element) => element.type === "shape.geo"),
+      ).toHaveLength(7);
+      expect(
+        document.elements.filter((element) => element.type === "edge.generic"),
+      ).toHaveLength(7);
+      compare(["validate", file]);
+      compare(["inspect", file, "--format", "json"]);
+      compare([
+        "export",
+        file,
+        "--format",
+        "mermaid",
+        "--mermaid-kind",
+        "flowchart",
+      ]);
+      for (const format of ["svg", "png", "pdf"]) {
+        const output = join(dir, `flowchart.${format}`);
+        expect(
+          Bun.spawnSync([
+            binary!,
+            "export",
+            file,
+            "--format",
+            format,
+            "--output",
+            output,
+          ]).exitCode,
+        ).toBe(0);
+        const bytes = readFileSync(output);
+        expect(bytes.byteLength).toBeGreaterThan(100);
+        if (format === "svg") {
+          expect(bytes.toString()).toContain("Read request");
+          expect(bytes.toString()).toContain("Retry");
+        }
+        if (format === "png")
+          expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+        if (format === "pdf")
+          expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  60000,
+);

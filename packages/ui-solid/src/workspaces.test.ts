@@ -62,6 +62,7 @@ test("every workspace preference round-trips", () => {
 test("semantic workspaces promote their own authoring tools and share endpoint-aware connectors", () => {
   expect(workspaceById("erd").tools.map((entry) => entry.tool)).toEqual([
     "erd.table",
+    Tool.Relation,
     Tool.ForeignKey,
   ]);
   expect(workspaceById("class").tools.map((entry) => entry.tool)).toEqual([
@@ -159,6 +160,7 @@ test("ERD foreign keys stay beside tables and General provides a separate Note t
     "Materialized view",
     "Function",
     "Procedure",
+    "Relation",
     "Foreign key",
   ]);
   const general = shapePaletteGroups("flow").find(
@@ -187,4 +189,26 @@ test("state tools are reachable in focused and general palettes", () => {
   for (const tool of expected)
     expect(workspaceShapes("all").map((item) => item.tool)).toContain(tool);
   expect(isConnectorTool(Tool.StateTransition)).toBe(true);
+});
+
+test("flowchart mode exposes standard notation and a directed flow tool", () => {
+  expect(shapePaletteGroups("flowchart")[0]?.label).toBe("Flowchart");
+  expect(workspaceShapes("flowchart").map((item) => item.tool)).toEqual([
+    Tool.FlowStart,
+    Tool.FlowEnd,
+    Tool.FlowProcess,
+    Tool.FlowDecision,
+    Tool.FlowInputOutput,
+    Tool.FlowDatabase,
+    Tool.Connector,
+    Tool.Text,
+  ]);
+  expect(creationFor(Tool.FlowDecision)?.semantic).toEqual({
+    geo: "diamond",
+    label: "Condition?",
+  });
+  expect(creationFor(Tool.FlowInputOutput)?.semantic).toEqual({
+    geo: "parallelogram",
+    label: "Input / Output",
+  });
 });

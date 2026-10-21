@@ -544,7 +544,7 @@ export function ErdRelationSection(
     columnOptions("from", -1).length > 0 && columnOptions("to", -1).length > 0;
 
   return (
-    <Section title="Foreign key">
+    <Section title={semantic().logical === true ? "Relation" : "Foreign key"}>
       <Field label="Cardinality">
         <SelectInput
           label="Cardinality"
@@ -564,12 +564,19 @@ export function ErdRelationSection(
       </Field>
       <Field label="Constraint">
         <Checkbox
-          label="Logical reference (no foreign key)"
-          title="Draw and document the join path without emitting a database constraint"
-          checked={semantic().logical === true}
-          onCommit={(logical) => write(setErdLogical(semantic(), logical))}
+          label="Foreign key"
+          title="Enforce this relation as a database foreign key and include the constraint in DDL"
+          checked={semantic().logical !== true}
+          onCommit={(foreignKey) =>
+            write(setErdLogical(semantic(), !foreignKey))
+          }
         />
       </Field>
+      <p>
+        {semantic().logical === true
+          ? "Documents a column-to-column join path for query and index planning. No database constraint is exported."
+          : "Enforced database constraint. Included in DDL export."}
+      </p>
       <Show when={semantic().logical !== true}>
         <Field label="On delete">
           <SelectInput
@@ -646,7 +653,7 @@ export function ErdRelationSection(
           {(pair, index) => (
             <div class="nodetto-row nodetto-row-erd-relation" role="row">
               <SelectInput
-                label={`Foreign key source column ${index + 1}`}
+                label={`${semantic().logical === true ? "Relation" : "Foreign key"} source column ${index + 1}`}
                 value={pair().from}
                 options={columnOptions("from", index)}
                 onCommit={(column) =>
@@ -654,7 +661,7 @@ export function ErdRelationSection(
                 }
               />
               <SelectInput
-                label={`Foreign key target column ${index + 1}`}
+                label={`${semantic().logical === true ? "Relation" : "Foreign key"} target column ${index + 1}`}
                 value={pair().to}
                 options={columnOptions("to", index)}
                 onCommit={(column) =>

@@ -222,7 +222,7 @@ ${EXIT_CODES}`,
                           [--background <#rrggbb|transparent>] [--scale <n>]
                           [--pdf-page artwork|a4|letter]
                           [--orientation portrait|landscape] [--margin <mm>]
-                          [--mermaid-kind erDiagram|classDiagram|sequenceDiagram|stateDiagram-v2]
+                          [--mermaid-kind erDiagram|classDiagram|sequenceDiagram|stateDiagram-v2|flowchart]
                           [--code-format <output>]
 
 Render one page exactly as the app's page export does.

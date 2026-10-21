@@ -28,6 +28,7 @@ export const PAGE_KINDS = [
   "uml",
   "sequence",
   "state",
+  "flowchart",
   "architecture",
   "bpmn",
 ] as const;

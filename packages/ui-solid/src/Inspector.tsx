@@ -163,6 +163,10 @@ export function Inspector(props: InspectorProps): JSX.Element {
       (single()?.semantic as { prototype?: boolean }).prototype === true
     )
       return "Transition";
+    if (type === "erd.relation")
+      return (single()?.semantic as { logical?: boolean }).logical === true
+        ? "Relation"
+        : "Foreign key";
     if (isDatabaseObjectType(type)) return DATABASE_OBJECT_LABELS[type];
     if (Object.values(UmlComponentType).some((candidate) => candidate === type))
       return "Component";

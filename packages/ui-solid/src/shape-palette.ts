@@ -2,6 +2,15 @@ import { Tool, type ToolKind } from "./tools.ts";
 import { workspaceById, type WorkspaceId } from "./workspaces.ts";
 
 export const PALETTE_ICONS = {
+  view: "M2 16Q16 1 30 16Q16 31 2 16zM21 16a5 5 0 11-10 0 5 5 0 0110 0z",
+  materializedView: "M3 6h20v17H3zM3 12h20M10 12v11M8 27h20V11M13 7v5",
+  function:
+    "M17 4h-3c-3 0-3 3-3 6v16c0 3-2 3-4 3M6 12h13M23 9c-4 5-4 11 0 16M29 9c4 5 4 11 0 16M23 14l6 6m0-6l-6 6",
+  procedure:
+    "M4 3h24v26H4zM9 9h10M9 16h10M9 23h10M23 7l3 2-3 2m0 3l3 2-3 2m0 3l3 2-3 2",
+  relation: "M2 16h5m4 0h5m4 0h5M25 16l5-7m-5 7l5 7",
+  foreignKey:
+    "M2 16h18M20 16l4-7m-4 7l4 7M10 7a4 4 0 11-8 0 4 4 0 018 0zM10 7h11m-3 0v4m3-4v3",
   initial:
     "M16 6a10 10 0 110 20 10 10 0 010-20zM16 10a6 6 0 110 12 6 6 0 010-12z",
   final: "M16 3a13 13 0 110 26 13 13 0 010-26zM16 9a7 7 0 110 14 7 7 0 010-14z",
@@ -63,7 +72,21 @@ export const COMMON_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.Frame, label: "Frame", icon: "frame" },
 ];
 
+export const FLOWCHART_SHAPES: readonly ShapePaletteItem[] = [
+  { tool: Tool.FlowStart, label: "Start", icon: "ellipse" },
+  { tool: Tool.FlowEnd, label: "End", icon: "ellipse" },
+  { tool: Tool.FlowProcess, label: "Process", icon: "rect" },
+  { tool: Tool.FlowDecision, label: "Decision", icon: "diamond" },
+  {
+    tool: Tool.FlowInputOutput,
+    label: "Input / Output",
+    icon: "parallelogram",
+  },
+  { tool: Tool.FlowDatabase, label: "Database", icon: "cylinder" },
+];
+
 export const DIAGRAM_SHAPES: readonly ShapePaletteItem[] = [
+  ...FLOWCHART_SHAPES,
   { tool: Tool.State, label: "State", icon: "node" },
   { tool: Tool.InitialState, label: "Initial", icon: "initial" },
   { tool: Tool.FinalState, label: "Final", icon: "final" },
@@ -85,11 +108,16 @@ export const DIAGRAM_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.Realization, label: "Realization", icon: "edge" },
   { tool: Tool.ComponentConnector, label: "Component connector", icon: "edge" },
   { tool: Tool.Table, label: "Table", icon: "table" },
-  { tool: Tool.View, label: "View", icon: "table" },
-  { tool: Tool.MaterializedView, label: "Materialized view", icon: "table" },
-  { tool: Tool.Function, label: "Function", icon: "service" },
-  { tool: Tool.Procedure, label: "Procedure", icon: "service" },
-  { tool: Tool.ForeignKey, label: "Foreign key", icon: "edge" },
+  { tool: Tool.View, label: "View", icon: "view" },
+  {
+    tool: Tool.MaterializedView,
+    label: "Materialized view",
+    icon: "materializedView",
+  },
+  { tool: Tool.Function, label: "Function", icon: "function" },
+  { tool: Tool.Procedure, label: "Procedure", icon: "procedure" },
+  { tool: Tool.Relation, label: "Relation", icon: "relation" },
+  { tool: Tool.ForeignKey, label: "Foreign key", icon: "foreignKey" },
   { tool: Tool.Class, label: "Class", icon: "class" },
   { tool: Tool.Association, label: "Association", icon: "edge" },
   { tool: Tool.Actor, label: "Actor", icon: "actor" },
@@ -178,9 +206,15 @@ const PRIMARY_TOOLS = {
     Tool.MaterializedView,
     Tool.Function,
     Tool.Procedure,
+    Tool.Relation,
     Tool.ForeignKey,
     Tool.Text,
     Tool.Frame,
+  ],
+  flowchart: [
+    ...FLOWCHART_SHAPES.map((item) => item.tool),
+    Tool.Connector,
+    Tool.Text,
   ],
   state: [
     Tool.State,
@@ -279,6 +313,7 @@ export function shapePaletteGroups(
         Tool.MaterializedView,
         Tool.Function,
         Tool.Procedure,
+        Tool.Relation,
         Tool.ForeignKey,
       ].some((candidate) => candidate === tool)
     )
@@ -290,6 +325,11 @@ export function shapePaletteGroups(
       tool === Tool.SequenceMessage
     )
       return "Sequence";
+    if (
+      FLOWCHART_SHAPES.some((item) => item.tool === tool) ||
+      (id === "flowchart" && tool === Tool.Connector)
+    )
+      return "Flowchart";
     if (tool.startsWith("state")) return "State transition";
     if (DIAGRAM_SHAPES.some((item) => item.tool === tool)) return "UML";
     if (BPMN_SHAPES.some((item) => item.tool === tool)) return "BPMN";

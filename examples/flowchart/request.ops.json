@@ -1,0 +1,165 @@
+[
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "start",
+    "semantic": {
+      "geo": "ellipse",
+      "label": "Start"
+    },
+    "visual": {
+      "x": 40,
+      "y": 168,
+      "width": 128,
+      "height": 56
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "read",
+    "semantic": {
+      "geo": "parallelogram",
+      "label": "Read request"
+    },
+    "visual": {
+      "x": 240,
+      "y": 156,
+      "width": 180,
+      "height": 80
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "valid",
+    "semantic": {
+      "geo": "diamond",
+      "label": "Valid?"
+    },
+    "visual": {
+      "x": 500,
+      "y": 136,
+      "width": 160,
+      "height": 120
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "process",
+    "semantic": {
+      "geo": "rect",
+      "label": "Process request"
+    },
+    "visual": {
+      "x": 760,
+      "y": 156,
+      "width": 180,
+      "height": 80
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "store",
+    "semantic": {
+      "geo": "cylinder",
+      "label": "Save result"
+    },
+    "visual": {
+      "x": 778,
+      "y": 340,
+      "width": 144,
+      "height": 96
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "error",
+    "semantic": {
+      "geo": "rect",
+      "label": "Report error"
+    },
+    "visual": {
+      "x": 490,
+      "y": 340,
+      "width": 180,
+      "height": 80
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "end",
+    "semantic": {
+      "geo": "ellipse",
+      "label": "End"
+    },
+    "visual": {
+      "x": 1020,
+      "y": 360,
+      "width": 128,
+      "height": 56
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@start",
+    "to": "@read"
+  },
+  {
+    "op": "connect",
+    "from": "@read",
+    "to": "@valid"
+  },
+  {
+    "op": "connect",
+    "from": "@valid",
+    "to": "@process",
+    "label": "Yes"
+  },
+  {
+    "op": "connect",
+    "from": "@valid",
+    "to": "@error",
+    "label": "No"
+  },
+  {
+    "op": "connect",
+    "from": "@error",
+    "to": "@read",
+    "label": "Retry",
+    "semantic": {
+      "routing": "manual",
+      "routingWaypoints": [
+        {
+          "u": -0.22915,
+          "v": -96.65
+        },
+        {
+          "u": 0.419486,
+          "v": -244.84
+        }
+      ]
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@process",
+    "to": "@store"
+  },
+  {
+    "op": "connect",
+    "from": "@store",
+    "to": "@end"
+  }
+]

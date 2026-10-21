@@ -8,6 +8,7 @@ export type WorkspaceId =
   | "component"
   | "sequence"
   | "state"
+  | "flowchart"
   | "flow"
   | "bpmn"
   | "all";
@@ -41,6 +42,7 @@ export const WORKSPACES = [
     shapes: false,
     tools: [
       { tool: "erd.table", label: "Table" },
+      { tool: Tool.Relation, label: "Relation" },
       { tool: Tool.ForeignKey, label: "Foreign key" },
     ],
   },
@@ -105,6 +107,21 @@ export const WORKSPACES = [
       { tool: Tool.FinalState, label: "Final" },
       { tool: Tool.ChoiceState, label: "Choice" },
       { tool: Tool.StateTransition, label: "Transition" },
+    ],
+  },
+  {
+    id: "flowchart",
+    label: "Flowchart",
+    design: false,
+    shapes: false,
+    tools: [
+      { tool: Tool.FlowStart, label: "Start" },
+      { tool: Tool.FlowEnd, label: "End" },
+      { tool: Tool.FlowProcess, label: "Process" },
+      { tool: Tool.FlowDecision, label: "Decision" },
+      { tool: Tool.FlowInputOutput, label: "Input / Output" },
+      { tool: Tool.FlowDatabase, label: "Database" },
+      { tool: Tool.Connector, label: "Flow" },
     ],
   },
   { id: "all", label: "All tools", design: true, shapes: true, tools: [] },

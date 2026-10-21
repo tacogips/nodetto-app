@@ -206,6 +206,25 @@ same resolved geometry without rewriting the imported document on open.
 
 See [the design](design-docs/specs/design-cli-ai-drawing.md).
 
+## Flowcharts and ERD relations
+
+The **Flowchart** mode and shape category provide Start, End, Process, Decision,
+Input / Output, Database and labeled Flow arrows. See the
+[CLI flowchart example](examples/flowchart/README.md) for a decision and retry
+flow and Mermaid export.
+
+The ERD category provides separate **Relation** and **Foreign key** tools.
+Relation draws a dashed field-to-field join path for index and query planning;
+it does not emit a database constraint or inferred uniqueness in DDL. Foreign
+key draws a solid enforced relation and exports its constraint. The **Foreign
+key** switch in the relation inspector converts between them, preserving table
+and column mappings. Constraint-only settings are removed when enforcement is
+disabled. Existing JSONL uses `erd.relation` with `logical: true` for the
+unenforced variant; absence of the flag remains an enforced foreign key.
+
+View, Materialized view, Function, Procedure, Relation and Foreign key each have
+distinct palette icons and explanatory tooltips.
+
 ## State transition diagrams
 
 Select **State transition** mode to draw states, initial/final markers, choices,

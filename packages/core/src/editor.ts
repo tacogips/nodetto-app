@@ -1332,7 +1332,17 @@ export class Editor {
     }
     return this.createElement(
       "edge.generic",
-      { page, semantic: { from, to, arrowheads: { end: "arrow" } } },
+      {
+        page,
+        semantic: {
+          from,
+          to,
+          arrowheads: { end: "arrow" },
+          ...(this.store.getPage(page)?.kind === "flowchart"
+            ? { routing: "orthogonal" }
+            : {}),
+        },
+      },
       applyOptions,
     );
   }
@@ -2742,18 +2752,7 @@ export class Editor {
       return message.id;
     }
     if (source.type === "erd.table" && target.type === "erd.table") {
-      return this.createElement(
-        "erd.relation",
-        {
-          page: source.page,
-          semantic: {
-            from: { table: from },
-            to: { table: to },
-            cardinality: "1:*",
-          },
-        },
-        applyOptions,
-      );
+      return this.connectErdRelation(from, to, false, applyOptions);
     }
     if (source.type === "uml.class" && target.type === "uml.class") {
       return this.createElement(
@@ -2773,6 +2772,42 @@ export class Editor {
         applyOptions,
       );
     return this.connect(from, to, source.page, applyOptions);
+  }
+
+  /** Logical relations and enforced foreign keys share endpoint mappings. */
+  connectErdRelation(
+    from: ElementId,
+    to: ElementId,
+    logical: boolean,
+    options: ApplyOptions = {},
+  ): ElementId | null {
+    const source = this.store.get(from);
+    const target = this.store.get(to);
+    const context = this.createShapeContext();
+    if (
+      this.readOnly ||
+      !source ||
+      !target ||
+      source.page !== target.page ||
+      source.type !== "erd.table" ||
+      target.type !== "erd.table" ||
+      context.isLocked?.(from) ||
+      context.isLocked?.(to)
+    )
+      return null;
+    return this.createElement(
+      "erd.relation",
+      {
+        page: source.page,
+        semantic: {
+          from: { table: from },
+          to: { table: to },
+          cardinality: "1:*",
+          ...(logical ? { logical: true } : {}),
+        },
+      },
+      options,
+    );
   }
 
   /** Component relationships never borrow class-association semantics. */

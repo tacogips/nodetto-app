@@ -20,6 +20,7 @@ export const MERMAID_DIAGRAM_KINDS = [
   "classDiagram",
   "sequenceDiagram",
   "stateDiagram-v2",
+  "flowchart",
 ] as const;
 
 export type MermaidDiagramKind = (typeof MERMAID_DIAGRAM_KINDS)[number];
@@ -431,6 +432,63 @@ function stateDiagram(elements: readonly Element[]): MermaidExportReport {
   };
 }
 
+function flowchart(elements: readonly Element[]): MermaidExportReport {
+  const nodes = elements.filter(
+    (element) =>
+      element.type === "shape.geo" || element.type === "node.generic",
+  );
+  const aliases = aliasMap(nodes, "F");
+  const warnings: MermaidExportWarning[] = [];
+  const lines = ["flowchart TD"];
+  for (const node of nodes) {
+    const semantic = node.semantic as { geo?: string; label?: string };
+    const alias = aliases.get(node.id) as string;
+    const label = `"${text(semantic.label, " ")}"`;
+    const shape = semantic.geo;
+    lines.push(
+      `  ${alias}${shape === "ellipse" ? `([${label}])` : shape === "diamond" ? `{${label}}` : shape === "parallelogram" ? `[/${label}/]` : shape === "cylinder" ? `[(${label})]` : `[${label}]`}`,
+    );
+    if (
+      shape &&
+      !["rect", "ellipse", "diamond", "parallelogram", "cylinder"].includes(
+        shape,
+      )
+    )
+      warnings.push({
+        elementId: node.id,
+        message: `Shape ${shape} exported as a process rectangle.`,
+      });
+  }
+  let relationCount = 0;
+  for (const edge of elements.filter(
+    (element) => element.type === "edge.generic",
+  )) {
+    const semantic = edge.semantic as {
+      from: string;
+      to: string;
+      label?: string;
+      prototype?: boolean;
+    };
+    if (semantic.prototype) continue;
+    const from = aliases.get(semantic.from);
+    const to = aliases.get(semantic.to);
+    if (!from || !to) {
+      relationWarning(warnings, edge, "Flow");
+      continue;
+    }
+    const label = semantic.label ? `|"${text(semantic.label, "")}"|` : "";
+    lines.push(`  ${from} -->${label} ${to}`);
+    relationCount++;
+  }
+  return {
+    kind: "flowchart",
+    code: `${lines.join("\n")}\n`,
+    elementCount: nodes.length,
+    relationCount,
+    warnings,
+  };
+}
+
 export function availableMermaidKinds(
   document: Document,
   pageId: PageId,
@@ -441,9 +499,16 @@ export function availableMermaidKinds(
       ? elements.some((element) => element.type === "erd.table")
       : kind === "classDiagram"
         ? elements.some((element) => element.type === "uml.class")
-        : kind === "stateDiagram-v2"
-          ? elements.some((element) => element.type === "state.node")
-          : elements.some((element) => element.type === "sequence.participant"),
+        : kind === "flowchart"
+          ? elements.some(
+              (element) =>
+                element.type === "shape.geo" || element.type === "node.generic",
+            )
+          : kind === "stateDiagram-v2"
+            ? elements.some((element) => element.type === "state.node")
+            : elements.some(
+                (element) => element.type === "sequence.participant",
+              ),
   );
 }
 
@@ -458,6 +523,8 @@ export function exportMermaid(
       return erDiagram(elements);
     case "classDiagram":
       return classDiagram(elements);
+    case "flowchart":
+      return flowchart(elements);
     case "stateDiagram-v2":
       return stateDiagram(elements);
     case "sequenceDiagram":

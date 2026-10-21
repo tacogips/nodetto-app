@@ -58,6 +58,7 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "text.note",
     "frame",
   ],
+  flowchart: ["shape.geo", "node.generic", "edge.generic", "text.note"],
   state: ["state.node", "state.transition", "text.note"],
   sequence: [
     "sequence.participant",

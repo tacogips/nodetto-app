@@ -91,13 +91,25 @@ export function ShapePalette(props: {
             aria-label={`Draw ${item.label.toLowerCase()}`}
             aria-pressed={props.tool === item.tool}
             title={
-              item.tool === Tool.Freehand
-                ? "Freehand — drag on the canvas"
-                : isConnectorTool(item.tool)
-                  ? `${item.label} — drag from one shape to another`
-                  : item.tool === Tool.Port
-                    ? "Port — click a component boundary"
-                    : `${item.label} — select, then click the canvas`
+              item.tool === Tool.Relation
+                ? "Relation — connect columns to document a join path; no database constraint or DDL"
+                : item.tool === Tool.ForeignKey
+                  ? "Foreign key — connect columns with an enforced database constraint included in DDL"
+                  : item.tool === Tool.View
+                    ? "View — a saved database query"
+                    : item.tool === Tool.MaterializedView
+                      ? "Materialized view — stored query results"
+                      : item.tool === Tool.Function
+                        ? "Function — a callable routine that returns a value"
+                        : item.tool === Tool.Procedure
+                          ? "Procedure — a callable sequence of database operations"
+                          : item.tool === Tool.Freehand
+                            ? "Freehand — drag on the canvas"
+                            : isConnectorTool(item.tool)
+                              ? `${item.label} — drag from one shape to another`
+                              : item.tool === Tool.Port
+                                ? "Port — click a component boundary"
+                                : `${item.label} — select, then click the canvas`
             }
             on:pointerdown={(event) => {
               if (event.button !== 0 || !creationFor(item.tool) || readOnly())

@@ -1,0 +1,16 @@
+{"kind":"document","schemaVersion":1,"id":"request-flowchart","title":"Request flowchart"}
+{"kind":"page","id":"p1","name":"Request processing","pageKind":"flowchart"}
+{"kind":"element","id":"end","page":"p1","type":"shape.geo","index":"zw","semantic":{"geo":"ellipse","label":"End"},"visual":{"x":1020,"y":360,"width":128,"height":56}}
+{"kind":"element","id":"error","page":"p1","type":"shape.geo","index":"zo","semantic":{"geo":"rect","label":"Report error"},"visual":{"x":490,"y":340,"width":180,"height":80}}
+{"kind":"element","id":"flow-1","page":"p1","type":"edge.generic","index":"zy","semantic":{"from":"start","to":"read","arrowheads":{"end":"arrow"},"routing":"orthogonal"}}
+{"kind":"element","id":"flow-2","page":"p1","type":"edge.generic","index":"zz","semantic":{"from":"read","to":"valid","arrowheads":{"end":"arrow"},"routing":"orthogonal"}}
+{"kind":"element","id":"flow-3","page":"p1","type":"edge.generic","index":"zzc","semantic":{"from":"valid","to":"process","label":"Yes","arrowheads":{"end":"arrow"},"routing":"orthogonal"}}
+{"kind":"element","id":"flow-4","page":"p1","type":"edge.generic","index":"zzn","semantic":{"from":"valid","to":"error","label":"No","arrowheads":{"end":"arrow"},"routing":"orthogonal"}}
+{"kind":"element","id":"flow-5","page":"p1","type":"edge.generic","index":"zzp","semantic":{"from":"error","to":"read","label":"Retry","arrowheads":{"end":"arrow"},"routing":"manual","routingWaypoints":[{"u":-0.22915,"v":-96.65},{"u":0.419486,"v":-244.84}]}}
+{"kind":"element","id":"flow-6","page":"p1","type":"edge.generic","index":"zzr","semantic":{"from":"process","to":"store","arrowheads":{"end":"arrow"},"routing":"orthogonal"}}
+{"kind":"element","id":"flow-7","page":"p1","type":"edge.generic","index":"zzy","semantic":{"from":"store","to":"end","arrowheads":{"end":"arrow"},"routing":"orthogonal"}}
+{"kind":"element","id":"process","page":"p1","type":"shape.geo","index":"w","semantic":{"geo":"rect","label":"Process request"},"visual":{"x":760,"y":156,"width":180,"height":80}}
+{"kind":"element","id":"read","page":"p1","type":"shape.geo","index":"W","semantic":{"geo":"parallelogram","label":"Read request"},"visual":{"x":240,"y":156,"width":180,"height":80}}
+{"kind":"element","id":"start","page":"p1","type":"shape.geo","index":"P","semantic":{"geo":"ellipse","label":"Start"},"visual":{"x":40,"y":168,"width":128,"height":56}}
+{"kind":"element","id":"store","page":"p1","type":"shape.geo","index":"z","semantic":{"geo":"cylinder","label":"Save result"},"visual":{"x":778,"y":340,"width":144,"height":96}}
+{"kind":"element","id":"valid","page":"p1","type":"shape.geo","index":"g","semantic":{"geo":"diamond","label":"Valid?"},"visual":{"x":500,"y":136,"width":160,"height":120}}

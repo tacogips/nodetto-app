@@ -44,6 +44,7 @@ export const Tool = {
   PopupFrame: "frame:popup",
   BottomSheetFrame: "frame:bottom-sheet",
   PopoverFrame: "frame:popover",
+  Relation: "erd.relation",
   ForeignKey: "erd.foreign-key",
   Association: "uml.association",
   SequenceMessage: "sequence.message",
@@ -65,6 +66,12 @@ export const Tool = {
   Function: "erd.function",
   Procedure: "erd.procedure",
   Class: "uml.class",
+  FlowStart: "flowchart:start",
+  FlowEnd: "flowchart:end",
+  FlowProcess: "flowchart:process",
+  FlowDecision: "flowchart:decision",
+  FlowInputOutput: "flowchart:input-output",
+  FlowDatabase: "flowchart:database",
   State: "state:state",
   InitialState: "state:initial",
   FinalState: "state:final",
@@ -314,6 +321,40 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.BpmnGroup:
       return BPMN_CREATIONS[tool];
 
+    case Tool.FlowStart:
+    case Tool.FlowEnd:
+      return {
+        type: "shape.geo",
+        semantic: {
+          geo: "ellipse",
+          label: tool === Tool.FlowStart ? "Start" : "End",
+        },
+        visual: { width: 128, height: 56 },
+      };
+    case Tool.FlowProcess:
+      return {
+        type: "shape.geo",
+        semantic: { geo: "rect", label: "Process" },
+        visual: { width: 180, height: 80 },
+      };
+    case Tool.FlowDecision:
+      return {
+        type: "shape.geo",
+        semantic: { geo: "diamond", label: "Condition?" },
+        visual: { width: 160, height: 120 },
+      };
+    case Tool.FlowInputOutput:
+      return {
+        type: "shape.geo",
+        semantic: { geo: "parallelogram", label: "Input / Output" },
+        visual: { width: 180, height: 80 },
+      };
+    case Tool.FlowDatabase:
+      return {
+        type: "shape.geo",
+        semantic: { geo: "cylinder", label: "Database" },
+        visual: { width: 144, height: 96 },
+      };
     case Tool.State:
     case Tool.InitialState:
     case Tool.FinalState:
@@ -467,6 +508,7 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.Comment:
     case Tool.Connector:
     case Tool.ScreenTransition:
+    case Tool.Relation:
     case Tool.ForeignKey:
     case Tool.Association:
     case Tool.StateTransition:
@@ -512,7 +554,7 @@ export function isConnectorTool(tool: ToolKind): boolean {
 
 export function typedConnectorFor(tool: ToolKind): string | undefined {
   if (tool === Tool.StateTransition) return "state.transition";
-  if (tool === Tool.ForeignKey) return "erd.relation";
+  if (tool === Tool.Relation || tool === Tool.ForeignKey) return "erd.relation";
   if (tool === Tool.Association) return "uml.association";
   if (tool === Tool.SequenceMessage) return "sequence.message";
   return undefined;

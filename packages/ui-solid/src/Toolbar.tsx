@@ -125,6 +125,12 @@ export const TOOL_MENUS: readonly Readonly<{
     tools: tools([
       ["erd.table", "Table", "ERD table"],
       ["uml.class", "Class", "UML class"],
+      [Tool.FlowStart, "Start", "Flowchart start"],
+      [Tool.FlowEnd, "End", "Flowchart end"],
+      [Tool.FlowProcess, "Process", "Flowchart process"],
+      [Tool.FlowDecision, "Decision", "Flowchart decision"],
+      [Tool.FlowInputOutput, "Input / Output", "Flowchart input or output"],
+      [Tool.FlowDatabase, "Database", "Flowchart database"],
       [Tool.State, "State", "State"],
       [Tool.InitialState, "Initial state", "Initial state"],
       [Tool.FinalState, "Final state", "Final state"],

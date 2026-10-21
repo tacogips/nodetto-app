@@ -113,7 +113,7 @@ class ElementBuilder {
 }
 
 function sourceLines(input: string): {
-  kind: Exclude<MermaidDiagramKind, "stateDiagram-v2">;
+  kind: Exclude<MermaidDiagramKind, "stateDiagram-v2" | "flowchart">;
   lines: SourceLine[];
 } {
   if (new TextEncoder().encode(input).byteLength > MAX_MERMAID_BYTES)
@@ -777,7 +777,10 @@ export function importMermaid(
     parseClass(source.lines, builder, warnings);
   else parseSequence(source.lines, builder, warnings);
   const pageKind: Readonly<
-    Record<Exclude<MermaidDiagramKind, "stateDiagram-v2">, PageKind>
+    Record<
+      Exclude<MermaidDiagramKind, "stateDiagram-v2" | "flowchart">,
+      PageKind
+    >
   > = {
     erDiagram: "erd",
     classDiagram: "uml",
