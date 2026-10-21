@@ -382,6 +382,12 @@ export function updateErdColumn(
       if (patch.autoIncrement !== undefined) {
         next = withOptionalFlag(next, "autoIncrement", patch.autoIncrement);
       }
+      if (patch.identityGeneration !== undefined)
+        next = { ...next, identityGeneration: patch.identityGeneration };
+      if (!next.autoIncrement) {
+        const { identityGeneration: _identityGeneration, ...rest } = next;
+        next = rest;
+      }
       if (patch.defaultExpression !== undefined) {
         next = withOptionalString(
           next,

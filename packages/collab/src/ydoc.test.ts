@@ -54,6 +54,7 @@ test("portable column identity survives Yjs wire round trips", () => {
                   dataType: "integer",
                   pk: true,
                   autoIncrement: true,
+                  identityGeneration: "always",
                 },
               ],
             },

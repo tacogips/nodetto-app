@@ -248,7 +248,7 @@ Render one page exactly as the app's page export does.
   --padding      Space around the content in canvas units, 0-256 (default 16).
   --background   Six-digit hex color, or transparent. Default: #ffffff for PNG
                  and PDF, transparent for SVG.
-  --scale        Raster density: 0.5, 0.75, 1, 1.5, 2, 3 or 4 (default 1 for
+  --scale        Raster density: 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3 or 4 (default 1 for
                  PNG, 2 for the image embedded in a PDF). Limited to 8192 pixels
                  per side and 32 megapixels; without --scale a drawing that is
                  too large is rendered at the largest scale that fits.

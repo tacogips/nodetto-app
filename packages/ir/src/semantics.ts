@@ -190,6 +190,8 @@ export interface ErdColumn {
   readonly nullable?: boolean;
   /** Portable, single integer primary-key identity. */
   readonly autoIncrement?: boolean;
+  /** PostgreSQL identity policy; omitted means by-default. Requires autoIncrement. */
+  readonly identityGeneration?: "always" | "by-default";
   /** Portable SQL expression emitted after DEFAULT when it is safe. */
   readonly defaultExpression?: string;
   /** Portable computed expression emitted as a stored generated column. */

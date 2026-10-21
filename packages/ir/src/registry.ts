@@ -421,6 +421,7 @@ const ERD_TABLE: ElementTypeDefinition = {
           "pk",
           "nullable",
           "autoIncrement",
+          "identityGeneration",
           "defaultExpression",
           "generatedExpression",
         ],
@@ -465,10 +466,28 @@ const ERD_TABLE: ElementTypeDefinition = {
       checkBoolean(out, column["autoIncrement"], `${at}.autoIncrement`, {
         optional: true,
       });
+      checkEnum(
+        out,
+        column["identityGeneration"],
+        `${at}.identityGeneration`,
+        ["always", "by-default"],
+        { optional: true },
+      );
+      if (
+        column["identityGeneration"] !== undefined &&
+        column["autoIncrement"] !== true
+      )
+        out.push(
+          error(
+            "erd.identity",
+            at,
+            "identityGeneration requires autoIncrement",
+          ),
+        );
       if (
         column["autoIncrement"] === true &&
         (column["pk"] !== true ||
-          !/^(?:int|integer|smallint|bigint)$/i.test(
+          !/^(?:int|integer|smallint|bigint|int2|int4|int8)$/i.test(
             String(column["dataType"]).trim(),
           ) ||
           columns.filter(

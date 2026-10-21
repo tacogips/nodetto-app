@@ -180,7 +180,7 @@ export function ErdTableSection(props: ErdTableSectionProps): JSX.Element {
                     disabled={
                       !column().autoIncrement &&
                       (!column().pk ||
-                        !/^(int|integer|smallint|bigint)$/i.test(
+                        !/^(int|integer|smallint|bigint|int2|int4|int8)$/i.test(
                           column().dataType,
                         ) ||
                         semantic().columns.filter((item) => item.pk).length !==
@@ -197,6 +197,27 @@ export function ErdTableSection(props: ErdTableSectionProps): JSX.Element {
                       )
                     }
                   />
+                  <Show when={column().autoIncrement}>
+                    <Field label="Identity generation">
+                      <SelectInput
+                        label="Identity generation"
+                        value={column().identityGeneration ?? "by-default"}
+                        options={[
+                          { value: "by-default", label: "By default" },
+                          { value: "always", label: "Always" },
+                        ]}
+                        onCommit={(value) =>
+                          write(
+                            updateErdColumn(semantic(), column().id, {
+                              identityGeneration: value as
+                                | "always"
+                                | "by-default",
+                            }),
+                          )
+                        }
+                      />
+                    </Field>
+                  </Show>
                   <Checkbox
                     label="Primary key"
                     checked={column().pk === true}

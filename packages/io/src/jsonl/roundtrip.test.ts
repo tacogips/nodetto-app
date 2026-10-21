@@ -49,6 +49,7 @@ test("portable auto-increment metadata round-trips through JSONL", () => {
               dataType: "integer",
               pk: true,
               autoIncrement: true,
+              identityGeneration: "always",
             },
           ],
         },

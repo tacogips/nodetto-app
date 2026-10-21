@@ -799,7 +799,7 @@ subsequent point edits and open/close changes preserve that mode. Auto-layout
 parents may reflow after the frame changes. These are centerline bounds, not
 full stroked-outline measurements; rotated path bounds remain approximate.
 The Export artwork settings offer PNG for a whole page, selected layer, group or multi-selection
-at 0.5×, 0.75×, 1×, 1.5×, 2×, 3× or 4×. Single artboards use their exact exported
+at 0.1×, 0.25×, 0.5×, 0.75×, 1×, 1.5×, 2×, 3× or 4×. Single artboards use their exact exported
 envelope by default; the scope selector can use selected artwork or the whole
 page instead. Page/selection export supports 0-256 units of padding; all scopes
 offer transparency or a solid background color without editing artwork. Raster dimensions
@@ -1427,3 +1427,10 @@ that cross the scope produce a warning and no foreign key. Database objects
 whose authored dependencies are excluded are omitted with a warning. Review
 raw SQL definitions for unauthored external dependencies. Whole-page export
 remains the default; `--strict`, `--output` and `--check` also work with frames.
+
+ERD columns with `autoIncrement: true` accept `identityGeneration: "always"` or
+`"by-default"` (the default). PostgreSQL exports the matching IDENTITY clause;
+MySQL and SQLite retain their portable auto-increment behavior. The column
+inspector and PostgreSQL definition editor preserve this policy. PostgreSQL
+built-in type aliases, including integer, floating-point, character, bit, serial
+and time-zone aliases, share canonical type handling across dialects.

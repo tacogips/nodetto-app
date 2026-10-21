@@ -737,6 +737,8 @@ test("frame DDL isolates nested databases and diagnoses cross-scope dependencies
   for (const dialect of ["postgresql", "mysql", "sqlite"] as const) {
     const a = generateDatabaseDdl(editor, pageId, dialect, { frameId: "db-a" });
     const b = generateDatabaseDdl(editor, pageId, dialect, { frameId: "db-b" });
+    expect(b.warnings).toEqual([]);
+    expect(b.sql).not.toContain("FOREIGN KEY");
     expect(a.tableCount).toBe(1);
     expect(b.tableCount).toBe(1);
     expect(a.sql).toContain(
@@ -970,5 +972,153 @@ test("session-user defaults are emitted for PostgreSQL and omitted elsewhere", (
       `widgets.session_name: default session_user is PostgreSQL-only; ${label} does not support it as a column default, so it was omitted.`,
     ]);
     expect(result.sql).not.toMatch(/DEFAULT (?:CURRENT_USER|session_user)/);
+  }
+});
+
+test("PostgreSQL aliases use canonical types without custom-type warnings", () => {
+  const pairs = [
+    ["int2", "smallint"],
+    ["int4", "integer"],
+    ["int8", "bigint"],
+    ["float4", "real"],
+    ["float8", "double precision"],
+    ["float", "double precision"],
+    ["bool", "boolean"],
+    ["varchar", "character varying"],
+    ["char", "character"],
+    ["varbit", "bit varying"],
+    ["timestamptz", "timestamp with time zone"],
+    ["timetz", "time with time zone"],
+    ["serial2", "smallserial"],
+    ["serial4", "serial"],
+    ["serial8", "bigserial"],
+    ["decimal", "numeric"],
+    ["varchar(19)", "character varying(19)"],
+    ["char(7)", "character(7)"],
+    ["varbit(11)", "bit varying(11)"],
+    ["timestamptz(3)", "timestamp(3) with time zone"],
+    ["timetz(2)", "time(2) with time zone"],
+    ["int8[]", "bigint[]"],
+    ["varchar(19)[]", "character varying(19)[]"],
+  ];
+  function report(
+    dataType: string,
+    dialect: "postgresql" | "mysql" | "sqlite",
+  ) {
+    const editor = makeEditor();
+    editor.apply([
+      {
+        type: "createElement",
+        element: editor.buildElement("erd.table", {
+          semantic: {
+            tableName: "alias_probe",
+            columns: [{ id: "value", name: "value", dataType }],
+          },
+        }),
+      },
+    ]);
+    return generateDatabaseDdl(editor, editor.currentPageId, dialect);
+  }
+  for (const [alias, canonical] of pairs) {
+    for (const dialect of ["postgresql", "mysql", "sqlite"] as const) {
+      const actual = report(alias!, dialect);
+      const expected = report(canonical!, dialect);
+      if (dialect === "postgresql") expect(actual.warnings).toEqual([]);
+      expect(actual.sql).toEqual(expected.sql);
+    }
+  }
+  for (const type of [
+    "bytea",
+    "inet",
+    "cidr",
+    "macaddr",
+    "macaddr8",
+    "money",
+    "xml",
+    "point",
+    "box",
+    "circle",
+    "line",
+    "lseg",
+    "path",
+    "polygon",
+    "tsvector",
+    "tsquery",
+    "pg_lsn",
+    "pg_snapshot",
+    "interval",
+    "int4range",
+    "tstzmultirange",
+  ])
+    expect(report(type, "postgresql").warnings).toEqual([]);
+  expect(report("custom_domain", "postgresql").warnings.join(" ")).toContain(
+    "custom type",
+  );
+});
+
+test("identity policy emits ALWAYS for PostgreSQL and portable identity elsewhere", () => {
+  const editor = makeEditor();
+  editor.apply([
+    {
+      type: "createElement",
+      element: editor.buildElement("erd.table", {
+        semantic: {
+          tableName: "identity_probe",
+          columns: [
+            {
+              id: "id",
+              name: "id",
+              dataType: "bigint",
+              pk: true,
+              autoIncrement: true,
+              identityGeneration: "always",
+            },
+          ],
+        },
+      }),
+    },
+  ]);
+  for (const dialect of ["postgresql", "mysql", "sqlite"] as const) {
+    const report = generateDatabaseDdl(editor, editor.currentPageId, dialect);
+    expect(report.warnings).toEqual([]);
+    expect(report.sql).toContain(
+      dialect === "postgresql"
+        ? "GENERATED ALWAYS AS IDENTITY"
+        : dialect === "mysql"
+          ? "AUTO_INCREMENT"
+          : "INTEGER PRIMARY KEY AUTOINCREMENT",
+    );
+    if (dialect === "sqlite") {
+      const db = new Database(":memory:");
+      db.exec(report.sql);
+      db.close();
+    }
+  }
+});
+
+test("frame foreign-key scope follows the owner for both relation directions", () => {
+  for (const cardinality of ["*:1", "1:*", "1:1"] as const) {
+    const { editor, relation } = databaseFixture(cardinality);
+    const semantic = relation.semantic as unknown as ErdRelationSemantic;
+    const owner =
+      cardinality === "*:1" ? semantic.from.table : semantic.to.table;
+    const target =
+      cardinality === "*:1" ? semantic.to.table : semantic.from.table;
+    for (const member of [owner, target]) {
+      const frame = editor.createElement("frame", {
+        semantic: { name: member, memberIds: [member] },
+      });
+      const report = generateDatabaseDdl(
+        editor,
+        editor.currentPageId,
+        "postgresql",
+        { frameId: frame },
+      );
+      expect(
+        report.warnings.some((warning) =>
+          warning.includes("outside the selected frame"),
+        ),
+      ).toBe(member === owner);
+    }
   }
 });
