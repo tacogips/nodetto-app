@@ -199,7 +199,7 @@ export function Layers(props: {
           text={`Shift-click selects a range; Ctrl/Cmd-click toggles a layer. ${readOnly() ? "" : "Double-click a name or press F2 to rename. "}Use Up/Down or Home/End to select, Shift to extend, and Left/Right to navigate the hierarchy.`}
         />
       </h2>
-      <label>
+      <label class="nodetto-layers-all-pages">
         <Switch
           checked={allPages()}
           onChange={(event) => setAllPages(event.currentTarget.checked)}
