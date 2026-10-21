@@ -52,7 +52,7 @@ needed for the remaining gesture checks.
 | 11 | Pick Rect/Ellipse/Diamond/Cylinder, click the canvas | The shape is placed centred on the click, selected, and the tool returns to Select. |
 | 12 | Pick Table/Class/Node, click the canvas | Same, with the registry's default semantic payload rendered (a `table` with an `id` column, a `Class` with empty compartments). |
 | 13 | Edge tool, drag from one shape to another | A dashed rubber band follows the cursor; releasing over a second shape creates an arrow that stops at both borders. |
-| 14 | Edge tool, release over empty canvas or the source shape | Nothing is created. |
+| 14 | Edge tool, drag onto empty canvas or back onto the source shape | Empty canvas creates a free line end; returning to the source cancels. |
 | 15 | Move a connected shape | Both connectors re-route and stay attached to the borders. |
 | 16 | Select a shape, press Delete or Backspace | The shape and any connector that referenced it go together. |
 | 17 | Ctrl/Cmd + Z | Undoes the last edit. A drag or resize undoes in one step, not pixel by pixel. |
