@@ -3,7 +3,7 @@
 
 export const RASTER_LIMITS = { maxSide: 8192, maxPixels: 32_000_000 } as const;
 
-export const RASTER_SCALES = [0.5, 0.75, 1, 1.5, 2, 3, 4] as const;
+export const RASTER_SCALES = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4] as const;
 
 /** Read only the root viewport of an SVG produced by our deterministic serializer.
  * This is not an external SVG parser or sanitizer. */
@@ -45,7 +45,7 @@ export function rasterDimensions(width: number, height: number, scale: number) {
     pixels.width * pixels.height > RASTER_LIMITS.maxPixels
   )
     throw new Error(
-      `PNG export is limited to ${RASTER_LIMITS.maxSide} pixels per side and ${RASTER_LIMITS.maxPixels / 1_000_000} megapixels. Choose a smaller scale or use SVG.`,
+      `PNG export is limited to ${RASTER_LIMITS.maxSide} pixels per side and ${RASTER_LIMITS.maxPixels / 1_000_000} megapixels. Minimum scale is ${RASTER_SCALES[0]}. Choose a smaller scale or use SVG.`,
     );
   return pixels;
 }

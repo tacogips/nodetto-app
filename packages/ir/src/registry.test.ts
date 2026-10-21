@@ -504,6 +504,15 @@ describe("semantic validation", () => {
     expect(
       hasErrors(validate("erd.table", { tableName: "t", columns: [column] })),
     ).toBe(false);
+    for (const identityGeneration of ["always", "by-default"])
+      expect(
+        hasErrors(
+          validate("erd.table", {
+            tableName: "t",
+            columns: [{ ...column, identityGeneration }],
+          }),
+        ),
+      ).toBe(false);
     for (const patch of [
       { dataType: "uuid" },
       { pk: false },
@@ -511,6 +520,8 @@ describe("semantic validation", () => {
       { defaultExpression: "1" },
       { generatedExpression: "1 + 1" },
       { autoIncrement: "yes" },
+      { identityGeneration: "sometimes" },
+      { identityGeneration: "always", autoIncrement: false },
     ]) {
       expect(
         hasErrors(

@@ -255,3 +255,30 @@ test("HTML export includes only artboards from the chosen page", async () => {
   expect(archive).toContain("Submit");
   expect(archive).not.toContain("Excluded website");
 });
+
+test("large-page PNG fits below half scale and explicit overview scales render", async () => {
+  const { editor, io, bytes } = fixture();
+  editor.createElement("text.note", {
+    semantic: { text: "Distant marker" },
+    visual: { x: 38000, y: 9000, width: 120, height: 60 },
+  });
+  for (const scale of [undefined, "0.1"]) {
+    const result = await exportCommand(io, [
+      "large.jsonl",
+      "--page",
+      "Design",
+      "--format",
+      "png",
+      "--output",
+      "overview.png",
+      ...(scale ? ["--scale", scale] : []),
+    ]);
+    expect(result.exitCode).toBe(0);
+    if (!scale) expect(result.stderr).toContain("scaled to 0.1");
+    const png = bytes.get("overview.png")!;
+    expect([...png.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    const header = new DataView(png.buffer, png.byteOffset, png.byteLength);
+    expect(header.getUint32(16)).toBeLessThanOrEqual(8192);
+    expect(header.getUint32(20)).toBeLessThanOrEqual(8192);
+  }
+});

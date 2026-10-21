@@ -107,3 +107,22 @@ test("PostgreSQL definitions accept session-user defaults", () => {
     parseErdDefinition("created_by text DEFAULT CURRENT_USER", "sqlite").error,
   ).toBe("Column 1: Use a literal or CURRENT_TIMESTAMP/DATE/TIME default.");
 });
+
+test("PostgreSQL ALWAYS identity survives definition editing", () => {
+  const parsed = parseErdDefinition(
+    '"id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY',
+    "postgresql",
+  );
+  expect(parsed.error).toBeUndefined();
+  expect(parsed.columns?.[0]).toMatchObject({
+    autoIncrement: true,
+    identityGeneration: "always",
+  });
+  const columns = (parsed.columns ?? []).map((column, index) => ({
+    ...column,
+    id: String(index),
+  }));
+  expect(formatErdDefinition(columns, "postgresql")).toContain(
+    "GENERATED ALWAYS AS IDENTITY",
+  );
+});

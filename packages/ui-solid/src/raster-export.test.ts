@@ -18,6 +18,14 @@ test("PNG density scales web and mobile artboards with integer allocations", () 
   expect(rasterDimensions(24, 24, 0.75)).toEqual({ width: 18, height: 18 });
   expect(rasterDimensions(24, 24, 1.5)).toEqual({ width: 36, height: 36 });
   expect(rasterDimensions(24, 24, 4)).toEqual({ width: 96, height: 96 });
+  expect(rasterDimensions(24000, 18000, 0.25)).toEqual({
+    width: 6000,
+    height: 4500,
+  });
+  expect(rasterDimensions(45000, 12000, 0.1)).toEqual({
+    width: 4500,
+    height: 1200,
+  });
   expect(rasterDimensions(24, 24, 0.5)).toEqual({ width: 12, height: 12 });
 });
 

@@ -324,7 +324,7 @@ export async function exportCommand(
         });
       if (fitting === undefined)
         throw new Error(
-          "The drawing is too large to rasterize even at the smallest scale. Export one frame with --element, or use SVG.",
+          "The drawing is too large to rasterize at the minimum scale of 0.1 (8192 pixels per side, 32 megapixels). Export one frame with --element, or use SVG.",
         );
       if (fitting !== requestedScale) {
         scale = fitting;

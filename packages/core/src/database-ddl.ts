@@ -54,8 +54,121 @@ function typeFor(
   warnings: string[],
   tableName: string,
 ): string {
-  const raw = column.dataType.trim();
-  const normalized = raw.toLowerCase().replace(/\s+/g, " ");
+  let raw = column.dataType.trim();
+  let normalized = raw.toLowerCase().replace(/\s+/g, " ");
+  // PostgreSQL's documented alternative spellings share canonical mappings.
+  const aliases: Readonly<Record<string, string>> = {
+    int2: "smallint",
+    int4: "integer",
+    int8: "bigint",
+    float4: "real",
+    float8: "double precision",
+    bool: "boolean",
+    varchar: "character varying",
+    char: "character",
+    varbit: "bit varying",
+    timestamptz: "timestamp with time zone",
+    timetz: "time with time zone",
+    serial2: "smallserial",
+    serial4: "serial",
+    serial8: "bigserial",
+  };
+  normalized = normalized.replace(
+    /^(time|timestamp)(\([^)]*\))( with(?:out)? time zone)$/,
+    "$1$3$2",
+  );
+  const spelling =
+    /^([a-z][a-z0-9_ ]*?)(\(\s*\d+(?:\s*,\s*\d+)?\s*\))?(\[\])?$/.exec(
+      normalized,
+    );
+  if (spelling) {
+    const base = aliases[spelling[1] ?? ""] ?? spelling[1] ?? "";
+    const parameters = (spelling[2] ?? "").replace(/\s+/g, "");
+    const array = spelling[3] ?? "";
+    if (aliases[spelling[1] ?? ""]) raw = `${base}${parameters}${array}`;
+    // Native PostgreSQL types (including arrays) are not user-defined types.
+    const builtins = new Set([
+      "smallint",
+      "integer",
+      "bigint",
+      "real",
+      "double precision",
+      "float",
+      "numeric",
+      "decimal",
+      "boolean",
+      "character",
+      "character varying",
+      "text",
+      "bit",
+      "bit varying",
+      "date",
+      "time",
+      "time with time zone",
+      "time without time zone",
+      "timestamp",
+      "timestamp with time zone",
+      "timestamp without time zone",
+      "interval",
+      "smallserial",
+      "serial",
+      "bigserial",
+      "bytea",
+      "uuid",
+      "json",
+      "jsonb",
+      "xml",
+      "box",
+      "circle",
+      "line",
+      "lseg",
+      "path",
+      "point",
+      "polygon",
+      "cidr",
+      "inet",
+      "macaddr",
+      "macaddr8",
+      "money",
+      "pg_lsn",
+      "pg_snapshot",
+      "tsquery",
+      "tsvector",
+      "int4range",
+      "int8range",
+      "numrange",
+      "tsrange",
+      "tstzrange",
+      "daterange",
+      "int4multirange",
+      "int8multirange",
+      "nummultirange",
+      "tsmultirange",
+      "tstzmultirange",
+      "datemultirange",
+    ]);
+    if (dialect === "postgresql" && builtins.has(base)) {
+      if (!parameters && !array && base === "timestamp with time zone")
+        return "TIMESTAMPTZ";
+      if (base === "character varying") return `VARCHAR${parameters}${array}`;
+      if (base === "character") return `CHAR${parameters}${array}`;
+      if (!parameters && base === "float") return `DOUBLE PRECISION${array}`;
+      if (!parameters && !array && base === "json") return "JSONB";
+      if (base === "numeric" || base === "decimal")
+        return `DECIMAL${parameters}${array}`;
+      const temporal =
+        /^(time|timestamp)( with time zone| without time zone)$/.exec(base);
+      return temporal
+        ? `${temporal[1]}${parameters}${temporal[2]}${array}`.toUpperCase()
+        : `${base}${parameters}${array}`.toUpperCase();
+    }
+    normalized = `${base}${parameters}${array}`;
+    if (
+      !array &&
+      /^(time|timestamp)( with time zone| without time zone)?$/.test(base)
+    )
+      normalized = base;
+  }
   const portable: Record<string, readonly [string, string, string]> = {
     uuid: ["UUID", "CHAR(36)", "TEXT"],
     int: ["INTEGER", "INTEGER", "INTEGER"],
@@ -76,6 +189,12 @@ function typeFor(
     double: ["DOUBLE PRECISION", "DOUBLE", "REAL"],
     "double precision": ["DOUBLE PRECISION", "DOUBLE", "REAL"],
     "character varying": ["VARCHAR", "VARCHAR(255)", "TEXT"],
+    character: ["CHAR", "CHAR", "TEXT"],
+    bit: ["BIT", "BIT", "TEXT"],
+    "bit varying": ["VARBIT", "VARBINARY(255)", "TEXT"],
+    time: ["TIME", "TIME", "TEXT"],
+    "time with time zone": ["TIMETZ", "TIME", "TEXT"],
+    "time without time zone": ["TIME", "TIME", "TEXT"],
     "timestamp with time zone": ["TIMESTAMPTZ", "TIMESTAMP", "TEXT"],
     "timestamp without time zone": ["TIMESTAMP", "TIMESTAMP", "TEXT"],
     decimal: ["DECIMAL", "DECIMAL", "NUMERIC"],
@@ -87,14 +206,14 @@ function typeFor(
   if (mapped)
     return mapped[dialect === "postgresql" ? 0 : dialect === "mysql" ? 1 : 2];
   const parameterized =
-    /^(varchar|char|character varying|decimal|numeric)\((\d+)(?:\s*,\s*(\d+))?\)$/.exec(
+    /^(varchar|char|character|character varying|bit|bit varying|decimal|numeric)\((\d+)(?:\s*,\s*(\d+))?\)$/.exec(
       normalized,
     );
   if (parameterized) {
     const numeric =
       parameterized[1] === "decimal" || parameterized[1] === "numeric";
     if (dialect === "sqlite") return numeric ? "NUMERIC" : "TEXT";
-    return `${numeric ? "DECIMAL" : parameterized[1] === "char" ? "CHAR" : "VARCHAR"}(${parameterized[2]}${parameterized[3] ? `,${parameterized[3]}` : ""})`;
+    return `${numeric ? "DECIMAL" : parameterized[1] === "char" || parameterized[1] === "character" ? "CHAR" : parameterized[1] === "bit" ? "BIT" : parameterized[1] === "bit varying" ? "VARBINARY" : "VARCHAR"}(${parameterized[2]}${parameterized[3] ? `,${parameterized[3]}` : ""})`;
   }
   if (
     /^[a-z][a-z0-9_]*(?:\(\s*\d+(?:\s*,\s*\d+)?\s*\))?(?:\[\])?$/i.test(raw)
@@ -686,6 +805,8 @@ export function generateDatabaseDdl(
       semantic.cardinality === "*:1" ? semantic.to : semantic.from;
     const local = tablesById.get(localEnd.table);
     const remote = tablesById.get(remoteEnd.table);
+    // The constraint belongs to the referencing table, not its target.
+    if (options.frameId !== undefined && !local) continue;
     if (!local || !remote) {
       warnings.push(
         `${relation.id}: relation references a table outside ${options.frameId === undefined ? "this page" : "the selected frame"}; constraint omitted.`,
@@ -782,7 +903,9 @@ export function generateDatabaseDdl(
           parts.push(
             dialect === "mysql"
               ? "AUTO_INCREMENT"
-              : "GENERATED BY DEFAULT AS IDENTITY",
+              : column.identityGeneration === "always"
+                ? "GENERATED ALWAYS AS IDENTITY"
+                : "GENERATED BY DEFAULT AS IDENTITY",
           );
       }
       if (!column.nullable || column.pk) parts.push("NOT NULL");
