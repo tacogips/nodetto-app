@@ -977,6 +977,17 @@ test("session-user defaults are emitted for PostgreSQL and omitted elsewhere", (
 
 test("PostgreSQL aliases use canonical types without custom-type warnings", () => {
   const pairs = [
+    ["dec", "decimal"],
+    ["dec(8,2)", "decimal(8,2)"],
+    ["bpchar(6)", "character(6)"],
+    ["char varying(17)", "character varying(17)"],
+    ["nchar", "character"],
+    ["national char(9)", "character(9)"],
+    ["national character(9)", "character(9)"],
+    ["nchar varying(16)", "character varying(16)"],
+    ["national char varying(12)", "character varying(12)"],
+    ["national character varying(12)", "character varying(12)"],
+    ["int8[][]", "bigint[][]"],
     ["int2", "smallint"],
     ["int4", "integer"],
     ["int8", "bigint"],
@@ -1028,6 +1039,7 @@ test("PostgreSQL aliases use canonical types without custom-type warnings", () =
     }
   }
   for (const type of [
+    "bpchar",
     "bytea",
     "inet",
     "cidr",
