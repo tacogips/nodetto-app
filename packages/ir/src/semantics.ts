@@ -153,7 +153,14 @@ export interface ConnectorWaypoint {
   readonly v: number;
 }
 
-export interface ConnectorRoutingSemantic {
+export const CONNECTOR_PORTS = ["top", "right", "bottom", "left"] as const;
+export type ConnectorPort = (typeof CONNECTOR_PORTS)[number];
+export interface ConnectorPorts {
+  readonly fromPort?: ConnectorPort;
+  readonly toPort?: ConnectorPort;
+}
+
+export interface ConnectorRoutingSemantic extends ConnectorPorts {
   readonly routing?: ConnectorRouting;
   readonly routingAxis?: ConnectorRoutingAxis;
   /** Position of the middle channel between endpoints; 0–1, default 0.5. */
@@ -165,8 +172,11 @@ export interface ConnectorRoutingSemantic {
 }
 
 export interface GenericEdgeSemantic extends ConnectorRoutingSemantic {
-  readonly from: ElementId;
-  readonly to: ElementId;
+  readonly from?: ElementId;
+  readonly to?: ElementId;
+  /** Page-space positions only for endpoints detached from shapes. */
+  readonly fromPoint?: { readonly x: number; readonly y: number };
+  readonly toPoint?: { readonly x: number; readonly y: number };
   readonly label?: string;
   readonly arrowheads?: Arrowheads;
   readonly prototype?: boolean;

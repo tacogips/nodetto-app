@@ -405,6 +405,62 @@ describe("semantic validation", () => {
     ).toEqual([{ code: "value.max", path: "semantic.routingWaypoints" }]);
   });
 
+  test("validates fixed connector attachment sides", () => {
+    expectValid("edge.generic", {
+      from: "a",
+      to: "b",
+      fromPort: "bottom",
+      toPort: "left",
+    });
+    expect(
+      validate("edge.generic", {
+        from: "a",
+        to: "b",
+        fromPort: "center",
+        toPort: 2,
+      }).map(({ path }) => path),
+    ).toEqual(["semantic.fromPort", "semantic.toPort"]);
+  });
+
+  test("generic ends choose either a shape reference or a free point", () => {
+    expectValid("edge.generic", {
+      fromPoint: { x: 0, y: 0 },
+      toPoint: { x: 100, y: 200 },
+    });
+    expectValid("edge.generic", {
+      from: "shape",
+      fromPort: "right",
+      toPoint: { x: 100, y: 200 },
+    });
+    expect(
+      validate("edge.generic", {
+        from: "shape",
+        fromPoint: { x: 0, y: 0 },
+        to: "other",
+      }).map(({ code }) => code),
+    ).toContain("connector.endpointConflict");
+    expect(
+      validate("edge.generic", {
+        fromPoint: { x: 0, y: 0 },
+        fromPort: "top",
+        to: "other",
+      }).map(({ code }) => code),
+    ).toContain("connector.detachedPort");
+    expect(
+      validate("edge.generic", {
+        fromPoint: { x: Number.NaN, y: 0 },
+        to: "other",
+      }).map(({ path }) => path),
+    ).toContain("semantic.fromPoint.x");
+    expect(
+      validate("edge.generic", {
+        from: "shape",
+        toPoint: { x: 0, y: 0 },
+        prototype: true,
+      }).map(({ code }) => code),
+    ).toContain("connector.prototypeEndpoint");
+  });
+
   test("validates prototype interaction triggers and bounded delays", () => {
     for (const prototypeAction of [
       "navigate",

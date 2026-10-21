@@ -1,3 +1,4 @@
+import type { ConnectorPorts } from "@nodetto/ir";
 import { getElementTypeDefinition } from "@nodetto/ir";
 import type {
   ElementId,
@@ -46,6 +47,7 @@ export function connectScreenTransition(
   from: ElementId,
   target: ElementId,
   action?: PrototypeAction,
+  ports: ConnectorPorts = {},
 ): ElementId | null {
   const source = editor.store.get(from);
   const to = screenFrame(editor, target);
@@ -66,6 +68,7 @@ export function connectScreenTransition(
   const resolvedAction =
     action ?? (kind === "screen" ? "navigate" : "open-overlay");
   const semantic: GenericEdgeSemantic = {
+    ...ports,
     from,
     to: destination.id,
     prototype: true,

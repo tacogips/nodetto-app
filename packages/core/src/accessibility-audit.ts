@@ -111,7 +111,7 @@ export function auditAccessibility(
   for (const element of editor.store.getPageElements(root.page)) {
     if (element.type !== "edge.generic") continue;
     const semantic = element.semantic as GenericEdgeSemantic;
-    if (semantic.prototype && includedIds.has(semantic.from))
+    if (semantic.prototype && semantic.from && includedIds.has(semantic.from))
       prototypeSources.add(semantic.from);
   }
 

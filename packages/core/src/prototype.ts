@@ -253,6 +253,8 @@ export function prototypeScreen(editor: Editor, frameId: ElementId) {
     const action = semantic.prototypeAction ?? "navigate";
     if (
       !semantic.prototype ||
+      !semantic.from ||
+      !semantic.to ||
       !ids.has(semantic.from) ||
       context.isHidden?.(semantic.from)
     )

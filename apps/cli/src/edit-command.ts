@@ -237,7 +237,13 @@ class Batch {
         const edge: Record<string, Json> = { ...resolved };
         for (const field of ["from", "to"] as const) {
           const value = edge[field];
-          if (typeof value === "string")
+          if (
+            type === "edge.generic" &&
+            edge[`${field}Point`] !== undefined &&
+            value === ""
+          )
+            delete edge[field];
+          else if (typeof value === "string")
             edge[field] = this.element(value, index).id;
         }
         resolved = edge;

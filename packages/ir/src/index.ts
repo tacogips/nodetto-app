@@ -1,3 +1,8 @@
+export {
+  CONNECTOR_PORTS,
+  type ConnectorPort,
+  type ConnectorPorts,
+} from "./semantics.ts";
 export { stateTransitionLabel } from "./state.ts";
 // Diagram IR: canonical semantic + visual data model.
 // See the product design (nodetto-cloud repo), section 5.

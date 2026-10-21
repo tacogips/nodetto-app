@@ -1,3 +1,4 @@
+import { runCliAsync } from "./cli.ts";
 import { expect, test } from "bun:test";
 import {
   type CommandIo,
@@ -263,4 +264,38 @@ test("DDL frame scopes validate page ownership and retain check/strict behavior"
     runCli(["ddl", "doc.jsonl", "--frame", "empty", "--strict"], io, "test")
       .exitCode,
   ).toBe(EXIT_WARNINGS);
+});
+
+test("CLI adds a standalone line with free ends and authored intermediate points", async () => {
+  const source =
+    '{"kind":"document","schemaVersion":1,"id":"free-lines","title":"Free lines"}\n{"kind":"page","id":"p1","name":"Lines","pageKind":"flowchart"}\n';
+  const io = memoryIo({
+    "doc.jsonl": source,
+    "ops.json": JSON.stringify([
+      {
+        op: "add",
+        type: "edge.generic",
+        page: "p1",
+        id: "line",
+        semantic: {
+          fromPoint: { x: 100, y: 100 },
+          toPoint: { x: 400, y: 100 },
+          routing: "manual",
+          routingWaypoints: [{ u: 0.5, v: 100 }],
+        },
+      },
+    ]),
+  });
+  const added = runCli(["edit", "doc.jsonl", "--ops", "ops.json"], io, "test");
+  expect(added.exitCode).toBe(EXIT_OK);
+  const written = io.files.get("doc.jsonl")!;
+  expect(written).toContain('"fromPoint":{"x":100,"y":100}');
+  expect(written).not.toContain('"from":""');
+  const exported = await runCliAsync(
+    ["export", "doc.jsonl", "--format", "svg"],
+    io,
+    "test",
+  );
+  expect(exported.exitCode).toBe(EXIT_OK);
+  expect(exported.stdout).toContain('points="100,100 250,200 400,100"');
 });

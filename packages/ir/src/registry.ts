@@ -37,6 +37,7 @@ import {
   BPMN_TIMER_TYPES,
   CARDINALITIES,
   CONNECTOR_ROUTINGS,
+  CONNECTOR_PORTS,
   CONNECTOR_ROUTING_AXES,
   type ElementType,
   GEO_KINDS,
@@ -146,6 +147,10 @@ function validateConnectorRouting(
   semantic: Record<string, unknown>,
   path: string,
 ): void {
+  for (const key of ["fromPort", "toPort"])
+    checkEnum(out, semantic[key], `${path}.${key}`, CONNECTOR_PORTS, {
+      optional: true,
+    });
   checkEnum(out, semantic["routing"], `${path}.routing`, CONNECTOR_ROUTINGS, {
     optional: true,
   });
@@ -287,6 +292,8 @@ const GENERIC_EDGE: ElementTypeDefinition = {
     keys: [
       "from",
       "to",
+      "fromPoint",
+      "toPoint",
       "label",
       "arrowheads",
       "routing",
@@ -294,6 +301,8 @@ const GENERIC_EDGE: ElementTypeDefinition = {
       "routingBend",
       "routingAvoidObstacles",
       "routingWaypoints",
+      "fromPort",
+      "toPort",
       "prototype",
       "prototypeAction",
       "prototypeTrigger",
@@ -307,6 +316,8 @@ const GENERIC_EDGE: ElementTypeDefinition = {
       "prototypeOverlayDismiss",
     ],
     children: {
+      fromPoint: { keys: ["x", "y"] },
+      toPoint: { keys: ["x", "y"] },
       arrowheads: { keys: ["start", "end"] },
       routingWaypoints: { keys: ["u", "v"] },
     },
@@ -316,8 +327,41 @@ const GENERIC_EDGE: ElementTypeDefinition = {
   validateSemantic(semantic, path) {
     const out: ValidationIssue[] = [];
     if (checkObject(out, semantic, path)) {
-      checkString(out, semantic["from"], `${path}.from`);
-      checkString(out, semantic["to"], `${path}.to`);
+      for (const end of ["from", "to"] as const) {
+        const point = semantic[`${end}Point`];
+        if (point !== undefined && semantic["prototype"] !== true) {
+          if (semantic[end] !== undefined)
+            out.push(
+              error(
+                "connector.endpointConflict",
+                `${path}.${end}`,
+                "choose a shape reference or a free endpoint, not both",
+              ),
+            );
+          if (semantic[`${end}Port`] !== undefined)
+            out.push(
+              error(
+                "connector.detachedPort",
+                `${path}.${end}Port`,
+                "a free endpoint cannot have a shape port",
+              ),
+            );
+          if (checkObject(out, point, `${path}.${end}Point`)) {
+            checkNumber(out, point["x"], `${path}.${end}Point.x`);
+            checkNumber(out, point["y"], `${path}.${end}Point.y`);
+          }
+        } else {
+          checkString(out, semantic[end], `${path}.${end}`);
+          if (point !== undefined)
+            out.push(
+              error(
+                "connector.prototypeEndpoint",
+                `${path}.${end}Point`,
+                "prototype interactions require shape endpoints",
+              ),
+            );
+        }
+      }
       checkBoolean(out, semantic["prototype"], `${path}.prototype`, {
         optional: true,
       });
@@ -635,6 +679,8 @@ const ERD_RELATION: ElementTypeDefinition = {
       "routingBend",
       "routingAvoidObstacles",
       "routingWaypoints",
+      "fromPort",
+      "toPort",
     ],
     children: {
       routingWaypoints: { keys: ["u", "v"] },
@@ -825,6 +871,8 @@ const UML_ASSOCIATION: ElementTypeDefinition = {
       "routingBend",
       "routingAvoidObstacles",
       "routingWaypoints",
+      "fromPort",
+      "toPort",
     ],
     children: {
       cardinalities: { keys: ["from", "to"] },
@@ -914,6 +962,8 @@ const UML_COMPONENT_TYPES: readonly ElementTypeDefinition[] = [
         "routingBend",
         "routingAvoidObstacles",
         "routingWaypoints",
+        "fromPort",
+        "toPort",
       ],
       children: { routingWaypoints: { keys: ["u", "v"] } },
     },
@@ -2170,6 +2220,8 @@ const BPMN_SEQUENCE_FLOW = bpmnDefinition(
     "routingBend",
     "routingAvoidObstacles",
     "routingWaypoints",
+    "fromPort",
+    "toPort",
   ],
   ["from", "to"],
   {
@@ -2195,6 +2247,8 @@ const BPMN_MESSAGE_FLOW = bpmnDefinition(
     "routingBend",
     "routingAvoidObstacles",
     "routingWaypoints",
+    "fromPort",
+    "toPort",
   ],
   ["from", "to"],
   {
@@ -2219,6 +2273,8 @@ const BPMN_ASSOCIATION = bpmnDefinition(
     "routingBend",
     "routingAvoidObstacles",
     "routingWaypoints",
+    "fromPort",
+    "toPort",
   ],
   ["from", "to"],
   {
@@ -2243,6 +2299,8 @@ const BPMN_DATA_ASSOCIATION = bpmnDefinition(
     "routingBend",
     "routingAvoidObstacles",
     "routingWaypoints",
+    "fromPort",
+    "toPort",
   ],
   ["from", "to"],
   { requiredStrings: ["from", "to"], routing: true },
@@ -2523,6 +2581,8 @@ const DEFINITIONS: readonly ElementTypeDefinition[] = [
         "routingBend",
         "routingAvoidObstacles",
         "routingWaypoints",
+        "fromPort",
+        "toPort",
       ],
       children: { routingWaypoints: { keys: ["u", "v"] } },
     },

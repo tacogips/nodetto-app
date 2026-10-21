@@ -1,3 +1,8 @@
+import type {
+  ConnectorPorts,
+  ConnectorPort,
+  GenericEdgeSemantic,
+} from "@nodetto/ir";
 import { sequenceMessageY } from "./sequence-layout.ts";
 import { AssetCache } from "./asset-cache.ts";
 import {
@@ -1326,6 +1331,7 @@ export class Editor {
     to: ElementId,
     page: PageId = this.pageId,
     applyOptions: ApplyOptions = {},
+    ports: ConnectorPorts = {},
   ): ElementId | null {
     if (from === to || !this.store.has(from) || !this.store.has(to)) {
       return null;
@@ -1335,6 +1341,7 @@ export class Editor {
       {
         page,
         semantic: {
+          ...ports,
           from,
           to,
           arrowheads: { end: "arrow" },
@@ -1368,13 +1375,38 @@ export class Editor {
       })
     )
       return;
-    const commands: Command[] = moves
-      .filter((move) => this.store.has(move.id))
-      .map((move) => ({
-        type: "updateVisual" as const,
+    const commands: Command[] = [];
+    for (const move of moves) {
+      const element = this.store.get(move.id);
+      if (!element) continue;
+      if (element.type === "edge.generic") {
+        const semantic = element.semantic as GenericEdgeSemantic;
+        if (semantic.fromPoint && semantic.toPoint) {
+          const dx = move.x - (element.visual.x ?? 0);
+          const dy = move.y - (element.visual.y ?? 0);
+          commands.push({
+            type: "updateSemantic",
+            id: element.id,
+            semantic: {
+              ...semantic,
+              fromPoint: {
+                x: semantic.fromPoint.x + dx,
+                y: semantic.fromPoint.y + dy,
+              },
+              toPoint: {
+                x: semantic.toPoint.x + dx,
+                y: semantic.toPoint.y + dy,
+              },
+            },
+          });
+        }
+      }
+      commands.push({
+        type: "updateVisual",
         id: move.id,
         visual: { x: move.x, y: move.y },
-      }));
+      });
+    }
     if (commands.length > 0) {
       this.apply(commands, applyOptions);
     }
@@ -1776,7 +1808,14 @@ export class Editor {
     const out: { id: ElementId; x: number; y: number }[] = [];
     for (const leaf of leafElements(this.store, this.expandedSelection())) {
       const { x, y } = leaf.visual;
-      if (x !== undefined && y !== undefined) {
+      const semantic = leaf.semantic as GenericEdgeSemantic;
+      if (
+        leaf.type === "edge.generic" &&
+        semantic.fromPoint &&
+        semantic.toPoint
+      ) {
+        out.push({ id: leaf.id, x: x ?? 0, y: y ?? 0 });
+      } else if (x !== undefined && y !== undefined) {
         out.push({ id: leaf.id, x, y });
       }
     }
@@ -2683,6 +2722,7 @@ export class Editor {
     from: ElementId,
     to: ElementId,
     applyOptions: ApplyOptions = {},
+    ports: ConnectorPorts = {},
   ): ElementId | null {
     const source = this.store.get(from);
     const target = this.store.get(to);
@@ -2700,12 +2740,12 @@ export class Editor {
         return null;
       return this.createElement(
         "state.transition",
-        { page: source.page, semantic: { from, to } },
+        { page: source.page, semantic: { from, to, ...ports } },
         applyOptions,
       );
     }
     if (source.type.startsWith("bpmn.") && target.type.startsWith("bpmn.")) {
-      const result = this.connectBpmn(from, to, undefined, applyOptions);
+      const result = this.connectBpmn(from, to, undefined, applyOptions, ports);
       return result.ok ? result.id : null;
     }
     if (
@@ -2752,12 +2792,12 @@ export class Editor {
       return message.id;
     }
     if (source.type === "erd.table" && target.type === "erd.table") {
-      return this.connectErdRelation(from, to, false, applyOptions);
+      return this.connectErdRelation(from, to, false, applyOptions, ports);
     }
     if (source.type === "uml.class" && target.type === "uml.class") {
       return this.createElement(
         "uml.association",
-        { page: source.page, semantic: { from, to, kind: "assoc" } },
+        { page: source.page, semantic: { from, to, kind: "assoc", ...ports } },
         applyOptions,
       );
     }
@@ -2770,8 +2810,9 @@ export class Editor {
         to,
         UmlComponentRelationship.Connector,
         applyOptions,
+        ports,
       );
-    return this.connect(from, to, source.page, applyOptions);
+    return this.connect(from, to, source.page, applyOptions, ports);
   }
 
   /** Logical relations and enforced foreign keys share endpoint mappings. */
@@ -2780,6 +2821,7 @@ export class Editor {
     to: ElementId,
     logical: boolean,
     options: ApplyOptions = {},
+    ports: ConnectorPorts = {},
   ): ElementId | null {
     const source = this.store.get(from);
     const target = this.store.get(to);
@@ -2802,6 +2844,7 @@ export class Editor {
         semantic: {
           from: { table: from },
           to: { table: to },
+          ...ports,
           cardinality: "1:*",
           ...(logical ? { logical: true } : {}),
         },
@@ -2816,6 +2859,7 @@ export class Editor {
     to: ElementId,
     kind: UmlComponentRelationshipKind,
     options: ApplyOptions = {},
+    ports: ConnectorPorts = {},
   ): ElementId | null {
     const source = this.store.get(from);
     const target = this.store.get(to);
@@ -2834,7 +2878,7 @@ export class Editor {
       return null;
     return this.createElement(
       UmlComponentType.Relationship,
-      { page: source.page, semantic: { from, to, kind } },
+      { page: source.page, semantic: { from, to, kind, ...ports } },
       options,
     );
   }
@@ -2863,6 +2907,7 @@ export class Editor {
     to: ElementId,
     requested?: BpmnFlowType,
     applyOptions: ApplyOptions = {},
+    ports: ConnectorPorts = {},
   ): BpmnEditResult {
     const source = this.store.get(from);
     const target = this.store.get(to);
@@ -2890,6 +2935,7 @@ export class Editor {
       from,
       to,
       routing: "orthogonal",
+      ...ports,
       ...(result.type === "bpmn.association" ? { direction: "none" } : {}),
     };
     const id = this.createElement(
@@ -2905,6 +2951,7 @@ export class Editor {
     end: "from" | "to",
     target: ElementId,
     applyOptions: ApplyOptions = {},
+    port?: ConnectorPort,
   ): BpmnEditResult {
     const flow = this.store.get(id);
     const endpoint = this.store.get(target);
@@ -2919,7 +2966,9 @@ export class Editor {
         code: "bpmn.connection.invalidEndpoint",
         message: "Choose a BPMN flow and an endpoint on the same page.",
       });
-    const payload = flow.semantic as Record<string, unknown>;
+    const payload = { ...(flow.semantic as Record<string, unknown>) };
+    delete payload[end === "from" ? "fromPort" : "toPort"];
+    if (port) payload[end === "from" ? "fromPort" : "toPort"] = port;
     const from = end === "from" ? target : String(payload.from);
     const to = end === "to" ? target : String(payload.to);
     const result = resolveBpmnConnection(
@@ -2963,6 +3012,8 @@ export class Editor {
           "routingBend",
           "routingAvoidObstacles",
           "routingWaypoints",
+          "fromPort",
+          "toPort",
         ].includes(key),
       ),
     );

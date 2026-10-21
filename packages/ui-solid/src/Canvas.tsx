@@ -1,3 +1,4 @@
+import { connectionPorts, insideClip } from "@nodetto/core";
 import { shapeAuthoringWarnings } from "@nodetto/core";
 import {
   removeConnectorWaypoint,
@@ -36,8 +37,8 @@ import {
   createSelectionResizeSnapshot,
   canRotateElement,
   canRotateSelection,
-  rotatePoint,
   rotatedBox,
+  rotatePoint,
   boxCenter,
   clipCss,
   effectsCss,
@@ -52,6 +53,7 @@ import {
 import {
   type Element,
   type ElementId,
+  type ConnectorPort,
   getElementTypeDefinition,
 } from "@nodetto/ir";
 import {
@@ -104,7 +106,6 @@ const ENDPOINT_HANDLE_RADIUS = 6;
 /** Radius of a quick-connect handle, in CSS pixels. */
 const CONNECT_HANDLE_RADIUS = 5;
 /** Quick-connect handles sit this far outside the bounds (design 3.4). */
-const CONNECT_HANDLE_OFFSET = 14;
 const GRID_SPACING = 24;
 
 export interface NodettoCanvasProps {
@@ -184,9 +185,6 @@ function InlineConnector(props: {
   );
 }
 
-type ConnectSide = "n" | "e" | "s" | "w";
-const CONNECT_SIDES: readonly ConnectSide[] = ["n", "e", "s", "w"];
-
 function isConnector(element: Element): boolean {
   return getElementTypeDefinition(element.type)?.category === "edge";
 }
@@ -206,20 +204,6 @@ function handleCenter(
       ? box.y + box.height
       : box.y + box.height / 2;
   return { x, y };
-}
-
-/** The edge midpoint pushed `offset` page units outward. */
-function connectHandleCenter(box: Box, side: ConnectSide, offset: number): Vec {
-  switch (side) {
-    case "n":
-      return { x: box.x + box.width / 2, y: box.y - offset };
-    case "s":
-      return { x: box.x + box.width / 2, y: box.y + box.height + offset };
-    case "w":
-      return { x: box.x - offset, y: box.y + box.height / 2 };
-    default:
-      return { x: box.x + box.width + offset, y: box.y + box.height / 2 };
-  }
 }
 
 export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
@@ -528,23 +512,80 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     };
   });
 
-  /** Quick-connect handles for a single selected solid element. */
-  const connectTarget = createMemo<{
-    id: ElementId;
-    box: Box;
-    rotation: number;
-  } | null>(() => {
-    if (props.tool !== Tool.Select && !isConnectorTool(props.tool)) return null;
-    const element = single();
-    if (!element || isConnector(element) || isGroup(element)) {
-      return null;
-    }
-    const box = props.editor
-      .getShapeUtil(element.type)
-      .getBounds(element, context());
-    return box
-      ? { id: element.id, box, rotation: element.visual.rotation ?? 0 }
-      : null;
+  /** One geometry source for painted points, hit testing and saved connectors. */
+  const connectionTargets = createMemo<
+    readonly { id?: ConnectorPort; point: Vec; elementId: ElementId }[]
+  >(() => {
+    signals.rev();
+    if (
+      readOnly() ||
+      (props.tool !== Tool.Select && !isConnectorTool(props.tool))
+    )
+      return [];
+    const selected = single();
+    const ids = new Set([selected?.id, interaction.hoverTarget()]);
+    return [...ids].flatMap<{
+      id?: ConnectorPort;
+      point: Vec;
+      elementId: ElementId;
+    }>((id) => {
+      const element = id ? props.editor.store.get(id) : undefined;
+      if (
+        !element ||
+        context().isHidden?.(element.id) ||
+        context().isLocked?.(element.id)
+      )
+        return [];
+      if (
+        element.type === "sequence.participant" &&
+        selected?.id === element.id
+      ) {
+        // Sequence quick-connect controls create the next timeline row, rather
+        // than pinning messages to the participant header or bounding box.
+        const box = context().boundsOf(element.id);
+        if (!box) return [];
+        const offset = 14 / zoom();
+        const outer = {
+          x: box.x - offset,
+          y: box.y - offset,
+          width: box.width + offset * 2,
+          height: box.height + offset * 2,
+        };
+        return (["n", "e", "s", "w"] as const).map((side) => ({
+          elementId: element.id,
+          point: rotatePoint(
+            handleCenter(outer, side),
+            boxCenter(box),
+            element.visual.rotation ?? 0,
+          ),
+        }));
+      }
+      return connectionPorts(element, context())
+        .filter((port) => insideClip(context(), element.id, port.point))
+        .map((port) => {
+          // Keep quick-connect controls outside the resize handles in Select.
+          // The connection gesture itself starts at the actual outline point.
+          const box = context().boundsOf(element.id);
+          const center = box ? boxCenter(box) : port.point;
+          const dx = port.point.x - center.x;
+          const dy = port.point.y - center.y;
+          const length = Math.hypot(dx, dy) || 1;
+          const offset =
+            props.tool === Tool.Select &&
+            !interaction.pending() &&
+            selected?.id === element.id
+              ? 14 / zoom()
+              : 0;
+          return {
+            ...port,
+            point: {
+              x: port.point.x + (dx / length) * offset,
+              y: port.point.y + (dy / length) * offset,
+            },
+            elementId: element.id,
+          };
+        });
+    });
   });
 
   const hoverBox = createMemo<(Box & { rotation: number }) | null>(() => {
@@ -637,15 +678,27 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     end: ConnectorEnd,
     at: Vec,
   ): JSX.Element => (
-    <circle
-      class="nodetto-endpoint-handle"
-      cx={at.x}
-      cy={at.y}
-      r={ENDPOINT_HANDLE_RADIUS / zoom()}
-      vector-effect="non-scaling-stroke"
+    <g
       onPointerDown={(event) => interaction.startReconnect(id, end, event)}
       onDblClick={(event) => event.stopPropagation()}
-    />
+    >
+      <circle
+        cx={at.x}
+        cy={at.y}
+        r={12 / zoom()}
+        fill="transparent"
+        style={{ "pointer-events": "all", cursor: "crosshair" }}
+      />
+      <circle
+        class="nodetto-endpoint-handle"
+        cx={at.x}
+        cy={at.y}
+        r={ENDPOINT_HANDLE_RADIUS / zoom()}
+        vector-effect="non-scaling-stroke"
+        style={{ "pointer-events": "none" }}
+      />
+      <title>Drag endpoint to a shape point or empty canvas</title>
+    </g>
   );
 
   // Keep visual units mounted through immutable position/style updates.
@@ -1088,36 +1141,26 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
               </circle>
             )}
           </Show>
-          <Show when={connectTarget()}>
-            {(target) => (
-              <For each={CONNECT_SIDES}>
-                {(side) => {
-                  const at = () =>
-                    rotatePoint(
-                      connectHandleCenter(
-                        target().box,
-                        side,
-                        CONNECT_HANDLE_OFFSET / zoom(),
-                      ),
-                      boxCenter(target().box),
-                      target().rotation,
-                    );
-                  return (
-                    <circle
-                      class="nodetto-connect-handle"
-                      cx={at().x}
-                      cy={at().y}
-                      r={CONNECT_HANDLE_RADIUS / zoom()}
-                      vector-effect="non-scaling-stroke"
-                      onPointerDown={(event) =>
-                        interaction.startConnect(target().id, event)
-                      }
-                    />
-                  );
-                }}
-              </For>
+          <For each={connectionTargets()}>
+            {(port) => (
+              <circle
+                class="nodetto-connect-handle"
+                cx={port.point.x}
+                cy={port.point.y}
+                r={CONNECT_HANDLE_RADIUS / zoom()}
+                vector-effect="non-scaling-stroke"
+                onPointerDown={(event) =>
+                  interaction.startConnect(port.elementId, event, port.id)
+                }
+              >
+                <title>
+                  {port.id
+                    ? `Connect from ${port.id}`
+                    : "Create timeline message"}
+                </title>
+              </circle>
             )}
-          </Show>
+          </For>
           <Show when={connectorHandles()}>
             {(handles) => (
               <>

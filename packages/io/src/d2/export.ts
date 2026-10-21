@@ -620,8 +620,8 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
   for (const element of visible) {
     if (element.type === "edge.generic") {
       const semantic = element.semantic as GenericEdgeSemantic;
-      const from = path(semantic.from);
-      const to = path(semantic.to);
+      const from = semantic.from ? path(semantic.from) : undefined;
+      const to = semantic.to ? path(semantic.to) : undefined;
       if (!from || !to) {
         warnings.push({
           elementId: element.id,

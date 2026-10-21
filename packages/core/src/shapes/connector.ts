@@ -1,3 +1,4 @@
+import { CONNECTOR_PORTS, type ConnectorPort } from "@nodetto/ir";
 import { stateTransitionLabel } from "@nodetto/ir";
 import { sequenceMessageY } from "../sequence-layout.ts";
 import { UmlComponentType, UmlComponentRelationship } from "@nodetto/ir";
@@ -363,6 +364,51 @@ function resolvedBoundary(
   );
 }
 
+/** Stable, local-side attachment points on the actual rendered outline. */
+export function connectionPorts(
+  element: Element,
+  context: ShapeContext,
+): readonly { id: ConnectorPort; point: Vec }[] {
+  const box = context.boundsOf(element.id);
+  if (
+    !box ||
+    getElementTypeDefinition(element.type)?.category === "edge" ||
+    element.type === "group" ||
+    element.type === "sequence.participant"
+  )
+    return [];
+  const center = boxCenter(box);
+  const directions = [
+    { x: 0, y: -1 },
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+  ];
+  return CONNECTOR_PORTS.map((id, index) => {
+    const direction = directions[index] as Vec;
+    const target = rotatePoint(
+      {
+        x: center.x + direction.x * (box.width + 1),
+        y: center.y + direction.y * (box.height + 1),
+      },
+      center,
+      endpointRotation(element),
+    );
+    return { id, point: resolvedBoundary(element, box, target, context) };
+  });
+}
+
+function pinnedPort(
+  element: Element,
+  context: ShapeContext,
+  port: unknown,
+): Vec | undefined {
+  if (!CONNECTOR_PORTS.includes(port as ConnectorPort)) return undefined;
+  return connectionPorts(element, context).find(
+    (candidate) => candidate.id === port,
+  )?.point;
+}
+
 function erdTableRowAnchor(
   element: Element,
   box: Box,
@@ -527,6 +573,25 @@ export function resolveConnector(
   return result;
 }
 
+/** A free endpoint has no reference; its zero-size box participates in routing. */
+function freeConnectorEndpoint(
+  element: Element,
+  end: "from" | "to",
+): Element | undefined {
+  if (element.type !== "edge.generic") return undefined;
+  const semantic = element.semantic as Record<string, unknown>;
+  const point = semantic[`${end}Point`] as Vec | undefined;
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y))
+    return undefined;
+  return {
+    ...element,
+    id: "",
+    type: "node.generic",
+    semantic: { label: "" },
+    visual: { x: point.x, y: point.y, width: 0, height: 0 },
+  };
+}
+
 function computeConnector(
   element: Element,
   context: ShapeContext,
@@ -536,17 +601,41 @@ function computeConnector(
   if (!ids) {
     return null;
   }
-  const fromBox = context.boundsOf(ids.from);
-  const toBox = context.boundsOf(ids.to);
-  if (!fromBox || !toBox) {
-    return null;
-  }
-  const from = context.resolve(ids.from);
-  const to = context.resolve(ids.to);
-  if (!from || !to) return null;
+  const from =
+    context.resolve(ids.from) ?? freeConnectorEndpoint(element, "from");
+  const to = context.resolve(ids.to) ?? freeConnectorEndpoint(element, "to");
+  const fromBox =
+    context.boundsOf(ids.from) ??
+    (from?.id === ""
+      ? { x: from.visual.x ?? 0, y: from.visual.y ?? 0, width: 0, height: 0 }
+      : null);
+  const toBox =
+    context.boundsOf(ids.to) ??
+    (to?.id === ""
+      ? { x: to.visual.x ?? 0, y: to.visual.y ?? 0, width: 0, height: 0 }
+      : null);
+  if (!from || !to || !fromBox || !toBox) return null;
   const fromCenter = boxCenter(fromBox);
   const toCenter = boxCenter(toBox);
-  if (element.type === "state.transition" && ids.from === ids.to) {
+  const semantic =
+    typeof element.semantic === "object" && element.semantic !== null
+      ? (element.semantic as Record<string, unknown>)
+      : {};
+  const hasColumns = (end: string): boolean =>
+    element.type === "erd.relation" &&
+    erdEndpointColumnIds(semantic[end] as ErdEndpoint).length > 0;
+  const fromPin = hasColumns("from")
+    ? undefined
+    : pinnedPort(from, context, semantic["fromPort"]);
+  const toPin = hasColumns("to")
+    ? undefined
+    : pinnedPort(to, context, semantic["toPort"]);
+  if (
+    element.type === "state.transition" &&
+    ids.from === ids.to &&
+    !fromPin &&
+    !toPin
+  ) {
     const right = fromBox.x + fromBox.width + 40;
     const top = fromBox.y - 40;
     const start = resolvedBoundary(
@@ -589,29 +678,29 @@ function computeConnector(
       toBox,
     );
   }
-  const semantic =
-    typeof element.semantic === "object" && element.semantic !== null
-      ? (element.semantic as Record<string, unknown>)
-      : {};
   if (semantic["routing"] === "manual") {
     const stored = manualWaypoints(semantic);
     const waypointPoints = stored.map((waypoint) =>
       connectorWaypointToPage(waypoint, fromCenter, toCenter),
     );
-    const start = resolvedBoundary(
-      from,
-      fromBox,
-      waypointPoints[0] ?? toCenter,
-      context,
-      fromAnchor,
-    );
-    const end = resolvedBoundary(
-      to,
-      toBox,
-      waypointPoints.at(-1) ?? fromCenter,
-      context,
-      toAnchor,
-    );
+    const start =
+      fromPin ??
+      resolvedBoundary(
+        from,
+        fromBox,
+        waypointPoints[0] ?? toCenter,
+        context,
+        fromAnchor,
+      );
+    const end =
+      toPin ??
+      resolvedBoundary(
+        to,
+        toBox,
+        waypointPoints.at(-1) ?? fromCenter,
+        context,
+        toAnchor,
+      );
     return withRoute(
       start,
       end,
@@ -622,7 +711,10 @@ function computeConnector(
       waypointPoints,
     );
   }
-  if (semantic["routing"] === "orthogonal") {
+  if (
+    semantic["routing"] === "orthogonal" ||
+    (ids.from === ids.to && (fromPin || toPin))
+  ) {
     const requested = semantic["routingAxis"];
     const horizontal =
       requested === "horizontal" ||
@@ -632,24 +724,70 @@ function computeConnector(
     const direction = horizontal
       ? Math.sign(toAnchor.x - fromAnchor.x) || 1
       : Math.sign(toAnchor.y - fromAnchor.y) || 1;
-    const start = resolvedBoundary(
+    const start =
+      fromPin ??
+      resolvedBoundary(
+        from,
+        fromBox,
+        horizontal
+          ? { x: fromAnchor.x + direction, y: fromAnchor.y }
+          : { x: fromAnchor.x, y: fromAnchor.y + direction },
+        context,
+        fromAnchor,
+      );
+    const end =
+      toPin ??
+      resolvedBoundary(
+        to,
+        toBox,
+        horizontal
+          ? { x: toAnchor.x - direction, y: toAnchor.y }
+          : { x: toAnchor.x, y: toAnchor.y - direction },
+        context,
+        toAnchor,
+      );
+    // Leave pinned sides outward before finding a channel. Include endpoint
+    // boxes so a branch pinned to the far side cannot run through its node.
+    const portEscape = (
+      point: Vec,
+      pin: Vec | undefined,
+      node: Element,
+      box: Box,
+      port: unknown,
+    ): Vec => {
+      if (!pin) return point;
+      const direction =
+        port === "top"
+          ? { x: 0, y: -1 }
+          : port === "right"
+            ? { x: 1, y: 0 }
+            : port === "bottom"
+              ? { x: 0, y: 1 }
+              : { x: -1, y: 0 };
+      const normal = rotatePoint(
+        direction,
+        { x: 0, y: 0 },
+        endpointRotation(node),
+      );
+      const outer = rotatedBox(box, endpointRotation(node));
+      return Math.abs(normal.x) >= Math.abs(normal.y)
+        ? {
+            x: normal.x >= 0 ? outer.x + outer.width + 24 : outer.x - 24,
+            y: point.y,
+          }
+        : {
+            x: point.x,
+            y: normal.y >= 0 ? outer.y + outer.height + 24 : outer.y - 24,
+          };
+    };
+    const routeStart = portEscape(
+      start,
+      fromPin,
       from,
       fromBox,
-      horizontal
-        ? { x: fromAnchor.x + direction, y: fromAnchor.y }
-        : { x: fromAnchor.x, y: fromAnchor.y + direction },
-      context,
-      fromAnchor,
+      semantic["fromPort"],
     );
-    const end = resolvedBoundary(
-      to,
-      toBox,
-      horizontal
-        ? { x: toAnchor.x - direction, y: toAnchor.y }
-        : { x: toAnchor.x, y: toAnchor.y - direction },
-      context,
-      toAnchor,
-    );
+    const routeEnd = portEscape(end, toPin, to, toBox, semantic["toPort"]);
     const rawBend = semantic["routingBend"];
     const bend =
       typeof rawBend === "number" && Number.isFinite(rawBend)
@@ -657,32 +795,62 @@ function computeConnector(
         : 0.5;
     const preferred: readonly Vec[] = horizontal
       ? [
-          start,
-          { x: start.x + (end.x - start.x) * bend, y: start.y },
-          { x: start.x + (end.x - start.x) * bend, y: end.y },
-          end,
+          routeStart,
+          {
+            x: routeStart.x + (routeEnd.x - routeStart.x) * bend,
+            y: routeStart.y,
+          },
+          {
+            x: routeStart.x + (routeEnd.x - routeStart.x) * bend,
+            y: routeEnd.y,
+          },
+          routeEnd,
         ]
       : [
-          start,
-          { x: start.x, y: start.y + (end.y - start.y) * bend },
-          { x: end.x, y: start.y + (end.y - start.y) * bend },
-          end,
+          routeStart,
+          {
+            x: routeStart.x,
+            y: routeStart.y + (routeEnd.y - routeStart.y) * bend,
+          },
+          {
+            x: routeEnd.x,
+            y: routeStart.y + (routeEnd.y - routeStart.y) * bend,
+          },
+          routeEnd,
         ];
-    let points = preferred;
-    if (semantic["routingAvoidObstacles"] !== false) {
-      points = avoidOrthogonalObstacles(
-        points,
-        obstacleBoxes(
-          element,
-          new Set([ids.from, ids.to]),
-          start,
-          end,
-          context,
-        ),
-        horizontal ? "h" : "v",
-        element,
-      );
-    }
+    const endpointObstacles =
+      fromPin || toPin
+        ? [fromBox, toBox].map((box, index) => {
+            const node = index === 0 ? from : to;
+            const bounds = rotatedBox(box, endpointRotation(node));
+            return {
+              x: bounds.x - 12,
+              y: bounds.y - 12,
+              width: bounds.width + 24,
+              height: bounds.height + 24,
+            };
+          })
+        : [];
+    const obstacles =
+      semantic["routingAvoidObstacles"] === false
+        ? endpointObstacles
+        : [
+            ...endpointObstacles,
+            ...obstacleBoxes(
+              element,
+              new Set([ids.from, ids.to]),
+              routeStart,
+              routeEnd,
+              context,
+            ),
+          ];
+    const middle = avoidOrthogonalObstacles(
+      preferred,
+      obstacles,
+      horizontal ? "h" : "v",
+      element,
+    );
+    const points = [start, ...middle, end];
     const firstBend = preferred[1] as Vec;
     const secondBend = preferred[2] as Vec;
     const hasMovableChannel = horizontal
@@ -705,8 +873,10 @@ function computeConnector(
         : undefined,
     );
   }
-  const start = resolvedBoundary(from, fromBox, toAnchor, context, fromAnchor);
-  const end = resolvedBoundary(to, toBox, fromAnchor, context, toAnchor);
+  const start =
+    fromPin ?? resolvedBoundary(from, fromBox, toAnchor, context, fromAnchor);
+  const end =
+    toPin ?? resolvedBoundary(to, toBox, fromAnchor, context, toAnchor);
   return withRoute(start, end, fromBox, toBox);
 }
 
@@ -774,10 +944,15 @@ export const readDirectEndpoints: EndpointReader = (semantic) => {
   const record = semantic as Record<string, unknown>;
   const from = record["from"];
   const to = record["to"];
-  if (typeof from !== "string" || typeof to !== "string") {
+  if (
+    (typeof from !== "string" && !record["fromPoint"]) ||
+    (typeof to !== "string" && !record["toPoint"])
+  )
     return null;
-  }
-  return { from, to };
+  return {
+    from: typeof from === "string" ? from : "",
+    to: typeof to === "string" ? to : "",
+  };
 };
 
 /** Reads `{ from: { table }, to: { table } }` as used by `erd.relation`. */

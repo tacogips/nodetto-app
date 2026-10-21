@@ -114,24 +114,40 @@
   {
     "op": "connect",
     "from": "@start",
-    "to": "@read"
+    "to": "@read",
+    "semantic": {
+      "fromPort": "right",
+      "toPort": "left"
+    }
   },
   {
     "op": "connect",
     "from": "@read",
-    "to": "@valid"
+    "to": "@valid",
+    "semantic": {
+      "fromPort": "right",
+      "toPort": "left"
+    }
   },
   {
     "op": "connect",
     "from": "@valid",
     "to": "@process",
-    "label": "Yes"
+    "label": "Yes",
+    "semantic": {
+      "fromPort": "right",
+      "toPort": "left"
+    }
   },
   {
     "op": "connect",
     "from": "@valid",
     "to": "@error",
-    "label": "No"
+    "label": "No",
+    "semantic": {
+      "fromPort": "bottom",
+      "toPort": "top"
+    }
   },
   {
     "op": "connect",
@@ -149,17 +165,27 @@
           "u": 0.419486,
           "v": -244.84
         }
-      ]
+      ],
+      "fromPort": "left",
+      "toPort": "bottom"
     }
   },
   {
     "op": "connect",
     "from": "@process",
-    "to": "@store"
+    "to": "@store",
+    "semantic": {
+      "fromPort": "bottom",
+      "toPort": "top"
+    }
   },
   {
     "op": "connect",
     "from": "@store",
-    "to": "@end"
+    "to": "@end",
+    "semantic": {
+      "fromPort": "right",
+      "toPort": "left"
+    }
   }
 ]

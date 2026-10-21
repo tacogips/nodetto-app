@@ -196,6 +196,17 @@ export function planPaste(
     // A second paste of the same payload must not share structure with the
     // first, so the source is cloned before anything is rewritten.
     const source = structuredClone(element) as Element;
+    if (source.type === "edge.generic") {
+      const semantic = source.semantic as Record<string, unknown>;
+      for (const end of ["fromPoint", "toPoint"]) {
+        const point = semantic[end] as Vec | undefined;
+        if (point)
+          semantic[end] = {
+            x: point.x + options.offset.x,
+            y: point.y + options.offset.y,
+          };
+      }
+    }
     const created: Element = {
       ...source,
       id,

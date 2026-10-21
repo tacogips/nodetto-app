@@ -1,3 +1,5 @@
+import { connectionPorts, setGenericConnectorEndpoint } from "@nodetto/core";
+import type { ConnectorPort } from "@nodetto/ir";
 import { connectScreenTransition, screenFrame } from "@nodetto/core";
 import { isDatabaseObjectType } from "@nodetto/ir";
 import { CONNECTOR_ENDPOINT_TYPES, connectorEndpointIssues } from "@nodetto/ir";
@@ -350,6 +352,9 @@ type Gesture =
     }
   | {
       readonly kind: "connecting";
+      readonly startPage: Vec;
+      readonly fromPoint?: Vec;
+      readonly fromPort?: ConnectorPort;
       readonly from: ElementId;
       readonly componentKind?: UmlComponentRelationshipKind;
       readonly connectorType?: string;
@@ -420,7 +425,11 @@ export interface Interaction {
   /** Drag one end of a connector to another element. */
   startReconnect(id: ElementId, end: ConnectorEnd, event: PointerEvent): void;
   /** Drag a new connector out of `from`, as the edge tool would. */
-  startConnect(from: ElementId, event: PointerEvent): void;
+  startConnect(
+    from: ElementId,
+    event: PointerEvent,
+    port?: ConnectorPort,
+  ): void;
   /** Close a pending nudge batch now rather than when its timer fires. */
   flushNudge(): void;
   /** Cancel pending drag work and release subscriptions when the canvas unmounts. */
@@ -803,6 +812,23 @@ export function createInteraction(
     return out;
   };
 
+  const nearestPort = (id: ElementId, point: Vec) => {
+    const element = editor.store.get(id);
+    const context = editor.createShapeContext();
+    if (!element || context.isHidden?.(id) || context.isLocked?.(id))
+      return undefined;
+    let nearest: ReturnType<typeof connectionPorts>[number] | undefined;
+    let distance = 12 / editor.camera.get().z;
+    for (const port of connectionPorts(element, context)) {
+      const gap = Math.hypot(point.x - port.point.x, point.y - port.point.y);
+      if (gap <= distance && insideClip(context, id, port.point)) {
+        nearest = port;
+        distance = gap;
+      }
+    }
+    return nearest;
+  };
+
   /**
    * The topmost solid element under `point`, skipping `excluded`. Unlike
    * `editor.hitTest` this looks past a connector lying over a shape, which
@@ -821,6 +847,12 @@ export function createInteraction(
       if (excluded.includes(element.id) || !isSolid(element)) {
         continue;
       }
+      const type =
+        gesture.kind === "reconnecting"
+          ? editor.store.get(gesture.id)?.type
+          : typedConnectorFor(options.tool());
+      if (!acceptsEndpoint(type, element.id)) continue;
+      if (nearestPort(element.id, point)) return element.id;
       if (!insideClip(context, element.id, point)) continue;
       const box = context.boundsOf(element.id);
       const local =
@@ -1271,7 +1303,11 @@ export function createInteraction(
       ),
     );
 
-  const beginConnect = (from: ElementId, point: Vec): void => {
+  const beginConnect = (
+    from: ElementId,
+    point: Vec,
+    port?: ConnectorPort,
+  ): void => {
     const connectorType = typedConnectorFor(options.tool());
     const screenTransition = options.tool() === Tool.ScreenTransition;
     if (screenTransition && !screenFrame(editor, from)) return;
@@ -1284,6 +1320,8 @@ export function createInteraction(
       return;
     gesture = {
       kind: "connecting",
+      startPage: point,
+      fromPort: port ?? nearestPort(from, point)?.id,
       from,
       componentKind: componentRelationshipFor(options.tool()),
       screenTransition,
@@ -1291,7 +1329,17 @@ export function createInteraction(
       logicalRelation: options.tool() === Tool.Relation,
     };
     const bounds = editor.getBounds(from);
-    setPending({ from: bounds ? boxCentre(bounds) : point, to: point });
+    const element = editor.store.get(from);
+    const start = element
+      ? connectionPorts(element, editor.createShapeContext()).find(
+          (candidate) =>
+            candidate.id === (port ?? nearestPort(from, point)?.id),
+        )?.point
+      : undefined;
+    setPending({
+      from: start ?? (bounds ? boxCentre(bounds) : point),
+      to: point,
+    });
   };
 
   const placeShape = (point: Vec, tool: ToolKind): void => {
@@ -1484,8 +1532,16 @@ export function createInteraction(
 
     if (isConnectorTool(tool)) {
       const source = targetUnder(point, []);
-      if (source) {
-        beginConnect(source, point);
+      if (source) beginConnect(source, point);
+      else if (tool === Tool.Connector) {
+        gesture = {
+          kind: "connecting",
+          from: "",
+          fromPoint: point,
+          startPage: point,
+          connectorType: "edge.generic",
+        };
+        setPending({ from: point, to: point });
       }
       return;
     }
@@ -1803,8 +1859,21 @@ export function createInteraction(
       case "connecting": {
         const from = editor.getBounds(gesture.from);
         const point = pagePoint(event);
-        setPending({ from: from ? boxCentre(from) : point, to: point });
-        const target = targetUnder(point, [gesture.from]);
+        const target = targetUnder(
+          point,
+          gesture.connectorType === "state.transition" ? [] : [gesture.from],
+        );
+        const source = editor.store.get(gesture.from);
+        const fromPort = gesture.fromPort;
+        const start = source
+          ? connectionPorts(source, editor.createShapeContext()).find(
+              (port) => port.id === fromPort,
+            )?.point
+          : undefined;
+        setPending({
+          from: start ?? gesture.fromPoint ?? (from ? boxCentre(from) : point),
+          to: target ? (nearestPort(target, point)?.point ?? point) : point,
+        });
         setHoverTarget(
           target &&
             acceptsEndpoint(gesture.connectorType, target) &&
@@ -1816,8 +1885,11 @@ export function createInteraction(
       }
       case "reconnecting": {
         const point = pagePoint(event);
-        setPending({ from: gesture.anchor, to: point });
         const target = targetUnder(point, [gesture.id, gesture.other]);
+        setPending({
+          from: gesture.anchor,
+          to: target ? (nearestPort(target, point)?.point ?? point) : point,
+        });
         setHoverTarget(
           target && acceptsEndpoint(editor.store.get(gesture.id)?.type, target)
             ? target
@@ -1854,6 +1926,12 @@ export function createInteraction(
   };
 
   const onPointerMove = (event: PointerEvent): void => {
+    if (gesture.kind === "idle")
+      setHoverTarget(
+        !editor.readOnly && isConnectorTool(options.tool())
+          ? targetUnder(pagePoint(event), [])
+          : null,
+      );
     if (
       options.scheduleDragFrame &&
       framePacedGesture() &&
@@ -1907,6 +1985,7 @@ export function createInteraction(
     id: ElementId,
     end: ConnectorEnd,
     target: ElementId,
+    port?: ConnectorPort,
   ): void => {
     let endpoint = target;
     const element = editor.store.get(id);
@@ -1918,8 +1997,18 @@ export function createInteraction(
       !isUmlComponentEndpoint(editor.store.get(target)?.type ?? "")
     )
       return;
+    if (
+      element.type === "edge.generic" &&
+      !(element.semantic as { prototype?: boolean }).prototype
+    ) {
+      setGenericConnectorEndpoint(editor, id, end, {
+        shape: target,
+        ...(port ? { port } : {}),
+      });
+      return;
+    }
     if (element.type.startsWith("bpmn.")) {
-      editor.reconnectBpmnFlow(id, end, target);
+      editor.reconnectBpmnFlow(id, end, target, {}, port);
       return;
     }
     if (
@@ -1932,7 +2021,12 @@ export function createInteraction(
       endpoint = frame;
     }
     const current = endpointReaderFor(element.type)(element.semantic);
-    if (current && current[end] === endpoint) {
+    const portKey = end === "from" ? "fromPort" : "toPort";
+    if (
+      current &&
+      current[end] === endpoint &&
+      (element.semantic as Record<string, unknown>)[portKey] === port
+    ) {
       return;
     }
     const base: Record<string, unknown> =
@@ -1941,8 +2035,11 @@ export function createInteraction(
         : {};
     // An ERD relation names a table (and optionally a column); the column
     // belonged to the old table, so the new endpoint carries none.
-    base[end] =
-      element.type === "erd.relation" ? { table: endpoint } : endpoint;
+    if (current?.[end] !== endpoint)
+      base[end] =
+        element.type === "erd.relation" ? { table: endpoint } : endpoint;
+    delete base[portKey];
+    if (port && endpoint === target) base[portKey] = port;
     if (
       connectorEndpointIssues(element.type, base, element.page, (id) =>
         editor.store.get(id),
@@ -2001,26 +2098,90 @@ export function createInteraction(
         pagePoint(event),
         gesture.connectorType === "state.transition" ? [] : [gesture.from],
       );
+      const point = pagePoint(event);
+      const sourceType = editor.store.get(gesture.from)?.type ?? "";
+      const canDrawFree =
+        options.tool() === Tool.Connector ||
+        gesture.fromPoint ||
+        !["erd.", "uml.", "state.", "sequence.", "bpmn."].some((prefix) =>
+          sourceType.startsWith(prefix),
+        );
+      const sourceUnder =
+        !target &&
+        !gesture.fromPoint &&
+        targetUnder(point, []) === gesture.from;
+      const freeLine =
+        canDrawFree &&
+        !sourceUnder &&
+        (gesture.fromPoint || !target) &&
+        !gesture.screenTransition &&
+        !gesture.componentKind &&
+        (!gesture.connectorType || gesture.connectorType === "edge.generic");
       if (
+        freeLine &&
+        Math.hypot(
+          point.x - gesture.startPage.x,
+          point.y - gesture.startPage.y,
+        ) *
+          editor.camera.get().z >=
+          4
+      ) {
+        const toPort = target ? nearestPort(target, point)?.id : undefined;
+        const semantic = {
+          ...(gesture.fromPoint
+            ? { fromPoint: gesture.fromPoint }
+            : {
+                from: gesture.from,
+                ...(gesture.fromPort ? { fromPort: gesture.fromPort } : {}),
+              }),
+          ...(target
+            ? { to: target, ...(toPort ? { toPort } : {}) }
+            : { toPoint: point }),
+          ...(editor.store.getPage(editor.currentPageId)?.kind === "flowchart"
+            ? { routing: "orthogonal" }
+            : {}),
+          arrowheads: { end: "arrow" },
+        };
+        const created = editor.createElement("edge.generic", { semantic });
+        editor.selection.set([created]);
+      } else if (
         target &&
         acceptsEndpoint(gesture.connectorType, gesture.from) &&
         acceptsEndpoint(gesture.connectorType, target)
       ) {
+        const targetPort =
+          !gesture.screenTransition || screenFrame(editor, target) === target
+            ? nearestPort(target, pagePoint(event))?.id
+            : undefined;
+        const ports = {
+          ...(gesture.fromPort ? { fromPort: gesture.fromPort } : {}),
+          ...(targetPort ? { toPort: targetPort } : {}),
+        };
         const created = gesture.screenTransition
-          ? connectScreenTransition(editor, gesture.from, target)
+          ? connectScreenTransition(
+              editor,
+              gesture.from,
+              target,
+              undefined,
+              ports,
+            )
           : gesture.componentKind
             ? editor.connectComponent(
                 gesture.from,
                 target,
                 gesture.componentKind,
+                {},
+                ports,
               )
             : gesture.connectorType === "erd.relation"
               ? editor.connectErdRelation(
                   gesture.from,
                   target,
                   gesture.logicalRelation === true,
+                  {},
+                  ports,
                 )
-              : editor.connectSmart(gesture.from, target);
+              : editor.connectSmart(gesture.from, target, {}, ports);
         if (created) {
           editor.selection.set([created]);
         }
@@ -2028,7 +2189,18 @@ export function createInteraction(
     } else if (gesture.kind === "reconnecting") {
       const target = targetUnder(pagePoint(event), [gesture.id, gesture.other]);
       if (target) {
-        reconnect(gesture.id, gesture.end, target);
+        reconnect(
+          gesture.id,
+          gesture.end,
+          target,
+          nearestPort(target, pagePoint(event))?.id,
+        );
+      } else if (
+        targetUnder(pagePoint(event), [gesture.id]) !== gesture.other
+      ) {
+        setGenericConnectorEndpoint(editor, gesture.id, gesture.end, {
+          point: pagePoint(event),
+        });
       }
     } else if (
       (gesture.kind === "translating" || gesture.kind === "sequence-reorder") &&
@@ -2591,14 +2763,12 @@ export function createInteraction(
     const element = editor.store.get(id);
     const context = editor.createShapeContext();
     const readEndpoints = element ? endpointReaderFor(element.type) : null;
-    const ids =
-      element && readEndpoints ? readEndpoints(element.semantic) : null;
-    const fromBox = ids ? context.boundsOf(ids.from) : null;
-    const toBox = ids ? context.boundsOf(ids.to) : null;
     const resolved =
       element && readEndpoints
         ? resolveConnector(element, context, readEndpoints)
         : null;
+    const fromBox = resolved?.fromBox;
+    const toBox = resolved?.toBox;
     if (
       !owns(event) ||
       event.button !== 0 ||
@@ -2660,13 +2830,17 @@ export function createInteraction(
     setPending({ from: anchor, to: point });
   };
 
-  const startConnect = (from: ElementId, event: PointerEvent): void => {
+  const startConnect = (
+    from: ElementId,
+    event: PointerEvent,
+    port?: ConnectorPort,
+  ): void => {
     if (!owns(event) || !editor.store.has(from)) {
       return;
     }
     event.stopPropagation();
     claim(event);
-    beginConnect(from, pagePoint(event));
+    beginConnect(from, pagePoint(event), port);
   };
 
   const editableGesture =

@@ -262,13 +262,13 @@ function computeAuthoringWarnings(
   if (element.type === "edge.generic") {
     const edge = element.semantic as GenericEdgeSemantic;
     if (edge.prototype && edge.prototypeAction !== "close-overlay") {
-      const target = context.resolve(edge.to);
+      const target = edge.to ? context.resolve(edge.to) : undefined;
       if (target && target.type !== "frame")
         warnings.push(
           "Prototype target must be an artboard or component frame.",
         );
       if (edge.prototypeAction === "change-to") {
-        const source = context.resolve(edge.from);
+        const source = edge.from ? context.resolve(edge.from) : undefined;
         if (
           source?.type !== "frame" ||
           !(source.semantic as FrameSemantic).instanceOf

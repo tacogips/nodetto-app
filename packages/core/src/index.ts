@@ -1,4 +1,9 @@
 export {
+  setGenericConnectorEndpoint,
+  type GenericConnectorEndpoint,
+} from "./connector-endpoints.ts";
+export { connectionPorts } from "./shapes/connector.ts";
+export {
   stateNodeNotation,
   stateNodeBounds,
 } from "./shapes/state.ts";
