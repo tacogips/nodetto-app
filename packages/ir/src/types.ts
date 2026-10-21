@@ -27,6 +27,7 @@ export const PAGE_KINDS = [
   "erd",
   "uml",
   "sequence",
+  "state",
   "architecture",
   "bpmn",
 ] as const;

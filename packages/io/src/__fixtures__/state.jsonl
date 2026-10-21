@@ -1,0 +1,13 @@
+{"kind":"document","schemaVersion":1,"id":"state-flow-example","title":"State transition flow"}
+{"kind":"page","id":"p1","name":"Flow","pageKind":"state"}
+{"kind":"element","id":"check","page":"p1","type":"state.node","index":"z","semantic":{"name":"","kind":"choice"},"visual":{"x":780,"y":144,"width":32,"height":32}}
+{"kind":"element","id":"done","page":"p1","type":"state.node","index":"zy","semantic":{"name":"","kind":"final"},"visual":{"x":960,"y":144,"width":32,"height":32}}
+{"kind":"element","id":"idle","page":"p1","type":"state.node","index":"o","semantic":{"name":"Idle","kind":"state"},"visual":{"x":150,"y":124,"width":160,"height":72}}
+{"kind":"element","id":"running","page":"p1","type":"state.node","index":"w","semantic":{"name":"Running","kind":"state"},"visual":{"x":490,"y":124,"width":160,"height":72}}
+{"kind":"element","id":"start","page":"p1","type":"state.node","index":"D","semantic":{"name":"","kind":"initial"},"visual":{"x":40,"y":144,"width":32,"height":32}}
+{"kind":"element","id":"transition-1","page":"p1","type":"state.transition","index":"zz","semantic":{"from":"start","to":"idle"}}
+{"kind":"element","id":"transition-2","page":"p1","type":"state.transition","index":"zzg","semantic":{"from":"idle","to":"running","trigger":"start","guard":"ready","effect":"begin()"}}
+{"kind":"element","id":"transition-3","page":"p1","type":"state.transition","index":"zzt","semantic":{"from":"running","to":"running","trigger":"tick","effect":"advance()"}}
+{"kind":"element","id":"transition-4","page":"p1","type":"state.transition","index":"zzx","semantic":{"from":"running","to":"check","trigger":"complete"}}
+{"kind":"element","id":"transition-5","page":"p1","type":"state.transition","index":"zzy","semantic":{"from":"check","to":"done","guard":"success"}}
+{"kind":"element","id":"transition-6","page":"p1","type":"state.transition","index":"zzz","semantic":{"from":"check","to":"idle","guard":"retry","routing":"manual","routingWaypoints":[{"u":0,"v":-120},{"u":1,"v":-120}]}}

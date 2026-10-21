@@ -712,6 +712,7 @@ const MANUAL_ROUTE_TYPES: ReadonlySet<string> = new Set([
   "edge.generic",
   "erd.relation",
   "uml.association",
+  "state.transition",
   UmlComponentType.Relationship,
 ]);
 
@@ -1994,7 +1995,10 @@ export function createInteraction(
       return;
     }
     if (gesture.kind === "connecting") {
-      const target = targetUnder(pagePoint(event), [gesture.from]);
+      const target = targetUnder(
+        pagePoint(event),
+        gesture.connectorType === "state.transition" ? [] : [gesture.from],
+      );
       if (
         target &&
         acceptsEndpoint(gesture.connectorType, gesture.from) &&

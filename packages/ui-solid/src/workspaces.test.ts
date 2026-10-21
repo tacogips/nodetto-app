@@ -171,3 +171,20 @@ test("ERD foreign keys stay beside tables and General provides a separate Note t
   expect(note?.type).toBe("text.note");
   expect(note?.visual?.style?.fill).toBe("#fff1c9");
 });
+
+test("state tools are reachable in focused and general palettes", () => {
+  const expected = [
+    Tool.State,
+    Tool.InitialState,
+    Tool.FinalState,
+    Tool.ChoiceState,
+    Tool.StateTransition,
+  ];
+  expect(workspaceShapes("state").map((item) => item.tool)).toEqual([
+    ...expected,
+    Tool.Text,
+  ]);
+  for (const tool of expected)
+    expect(workspaceShapes("all").map((item) => item.tool)).toContain(tool);
+  expect(isConnectorTool(Tool.StateTransition)).toBe(true);
+});

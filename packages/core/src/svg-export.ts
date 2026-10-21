@@ -6,6 +6,7 @@ import {
   type DatabaseObjectType,
 } from "@nodetto/ir";
 import { databaseObjectRows } from "./shapes/databaseObject.ts";
+import { stateNodeNotation } from "./shapes/state.ts";
 import { umlComponentPaintBounds } from "./shapes/umlComponent.ts";
 import { UmlComponentType } from "@nodetto/ir";
 // Deterministic SVG export of a page or a selection.
@@ -1461,6 +1462,10 @@ function renderShape(
     case UmlComponentType.Interface:
     case UmlComponentType.Port:
       return renderUmlComponent(element, box, theme);
+    case "state.node":
+      return stateNodeNotation(element, box)
+        .map(renderNotationPrimitive)
+        .join("");
     case "uml.class":
       return renderUmlClass(element, box, theme);
     case "ui.control": {

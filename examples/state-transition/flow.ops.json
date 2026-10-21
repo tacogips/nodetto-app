@@ -1,0 +1,133 @@
+[
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "state.node",
+    "ref": "start",
+    "semantic": {
+      "name": "",
+      "kind": "initial"
+    },
+    "visual": {
+      "x": 40,
+      "y": 144,
+      "width": 32,
+      "height": 32
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "state.node",
+    "ref": "idle",
+    "semantic": {
+      "name": "Idle"
+    },
+    "visual": {
+      "x": 150,
+      "y": 124
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "state.node",
+    "ref": "running",
+    "semantic": {
+      "name": "Running"
+    },
+    "visual": {
+      "x": 490,
+      "y": 124
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "state.node",
+    "ref": "check",
+    "semantic": {
+      "name": "",
+      "kind": "choice"
+    },
+    "visual": {
+      "x": 780,
+      "y": 144,
+      "width": 32,
+      "height": 32
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "state.node",
+    "ref": "done",
+    "semantic": {
+      "name": "",
+      "kind": "final"
+    },
+    "visual": {
+      "x": 960,
+      "y": 144,
+      "width": 32,
+      "height": 32
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@start",
+    "to": "@idle"
+  },
+  {
+    "op": "connect",
+    "from": "@idle",
+    "to": "@running",
+    "label": "start",
+    "semantic": {
+      "guard": "ready",
+      "effect": "begin()"
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@running",
+    "to": "@running",
+    "label": "tick",
+    "semantic": {
+      "effect": "advance()"
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@running",
+    "to": "@check",
+    "label": "complete"
+  },
+  {
+    "op": "connect",
+    "from": "@check",
+    "to": "@done",
+    "semantic": {
+      "guard": "success"
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@check",
+    "to": "@idle",
+    "semantic": {
+      "guard": "retry",
+      "routing": "manual",
+      "routingWaypoints": [
+        {
+          "u": 0,
+          "v": -120
+        },
+        {
+          "u": 1,
+          "v": -120
+        }
+      ]
+    }
+  }
+]

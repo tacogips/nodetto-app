@@ -23,6 +23,7 @@ const GOLDEN = [
   "uml-class",
   "uml-component",
   "sequence",
+  "state",
   "freeform",
   "image",
   "ui-controls",

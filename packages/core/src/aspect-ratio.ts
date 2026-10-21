@@ -17,6 +17,7 @@ export function supportsAspectRatio(element: Element): boolean {
       "erd.relation",
       "erd.table",
       "uml.association",
+      "state.transition",
       UmlComponentType.Relationship,
       "uml.class",
       UmlComponentType.Port,

@@ -67,6 +67,9 @@ function searchTerms(element: Element): string[] {
       "text",
       "alt",
       "stereotype",
+      "trigger",
+      "guard",
+      "effect",
     ]),
   ];
   if (element.type === "erd.table") {
@@ -86,6 +89,8 @@ function searchTerms(element: Element): string[] {
       terms.push(
         `Parameter: ${fields(parameter, ["name", "dataType", "mode"])}`,
       );
+  } else if (element.type === "state.node") {
+    terms.push(fields(semantic, ["kind"]));
   } else if (element.type === "uml.class") {
     for (const attribute of records(semantic.attributes))
       terms.push(`Attribute: ${fields(attribute, ["name", "type"])}`);

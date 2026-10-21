@@ -58,6 +58,7 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "text.note",
     "frame",
   ],
+  state: ["state.node", "state.transition", "text.note"],
   sequence: [
     "sequence.participant",
     "sequence.message",

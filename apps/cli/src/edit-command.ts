@@ -457,7 +457,13 @@ class Batch {
     }
     const label = operation["label"];
     if (typeof label === "string")
-      patch[created.type.startsWith("bpmn.") ? "name" : "label"] = label;
+      patch[
+        created.type === "state.transition"
+          ? "trigger"
+          : created.type.startsWith("bpmn.")
+            ? "name"
+            : "label"
+      ] = label;
     if (isPlainObject(operation["semantic"]))
       patch = deepMerge(patch, operation["semantic"]) as Record<string, Json>;
     if (Object.keys(patch).length)

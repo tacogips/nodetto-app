@@ -90,6 +90,7 @@ export function createSelectionResizeSnapshot(
         "edge.generic",
         "erd.relation",
         "uml.association",
+        "state.transition",
         UmlComponentType.Relationship,
         "sequence.message",
         "sequence.activation",

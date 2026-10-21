@@ -1,3 +1,4 @@
+import { stateNodeShapeUtil, stateTransitionShapeUtil } from "./state.ts";
 import { uiControlShapeUtil } from "./uiControl.ts";
 import { databaseObjectShapeUtils } from "./databaseObject.ts";
 // The default ShapeUtil registry: every element type this build renders.
@@ -100,6 +101,8 @@ export function createDefaultRegistry(): ShapeUtilRegistry {
     .register(frameShapeUtil)
     .register(uiControlShapeUtil)
     .register(nodeShapeUtil)
+    .register(stateNodeShapeUtil)
+    .register(stateTransitionShapeUtil)
     .register({
       ...nodeShapeUtil,
       type: "image.raster",

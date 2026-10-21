@@ -125,6 +125,11 @@ export const TOOL_MENUS: readonly Readonly<{
     tools: tools([
       ["erd.table", "Table", "ERD table"],
       ["uml.class", "Class", "UML class"],
+      [Tool.State, "State", "State"],
+      [Tool.InitialState, "Initial state", "Initial state"],
+      [Tool.FinalState, "Final state", "Final state"],
+      [Tool.ChoiceState, "Choice", "Choice"],
+      [Tool.StateTransition, "Transition", "State transition"],
       ["sequence.actor", "Actor", "Sequence actor"],
       ["sequence.service", "Service", "Sequence service participant"],
       [

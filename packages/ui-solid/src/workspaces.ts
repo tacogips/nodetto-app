@@ -7,6 +7,7 @@ export type WorkspaceId =
   | "class"
   | "component"
   | "sequence"
+  | "state"
   | "flow"
   | "bpmn"
   | "all";
@@ -91,6 +92,19 @@ export const WORKSPACES = [
       { tool: Tool.BpmnEndEvent, label: "End event" },
       { tool: Tool.BpmnExclusiveGateway, label: "Exclusive gateway" },
       { tool: Tool.Connector, label: "Connector" },
+    ],
+  },
+  {
+    id: "state",
+    label: "State transition",
+    design: false,
+    shapes: false,
+    tools: [
+      { tool: Tool.State, label: "State" },
+      { tool: Tool.InitialState, label: "Initial" },
+      { tool: Tool.FinalState, label: "Final" },
+      { tool: Tool.ChoiceState, label: "Choice" },
+      { tool: Tool.StateTransition, label: "Transition" },
     ],
   },
   { id: "all", label: "All tools", design: true, shapes: true, tools: [] },

@@ -11,6 +11,7 @@ const OMITTED_INTERFACE_TYPES = new Set([
   "edge.generic",
   "erd.relation",
   "uml.association",
+  "state.transition",
   UmlComponentType.Relationship,
   "sequence.message",
 ]);

@@ -182,9 +182,10 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     and align "start" (default) or "center".
   - connect: picks the connector the app's connect tool would: ERD relation
     (fromColumn/toColumn by name or id, cardinality default *:1), UML
-    association or component connector, sequence message on the next timeline
-    row, BPMN flow (BPMN rules apply), otherwise a generic edge with an arrow.
-    "label" sets the label (name for BPMN); "type" and "semantic" override.
+    association or component connector, state transition, sequence message on
+    the next timeline row, BPMN flow (BPMN rules apply), otherwise a generic edge with an arrow.
+    "label" sets the label (trigger for states, name for BPMN); "type" and
+    "semantic" override.
   - update deep-merges objects; arrays are replaced whole (use append and
     remove-item for single list items); null removes a key.
   - List items that need ids (columns, indexes, attributes) get generated ids.
@@ -221,7 +222,7 @@ ${EXIT_CODES}`,
                           [--background <#rrggbb|transparent>] [--scale <n>]
                           [--pdf-page artwork|a4|letter]
                           [--orientation portrait|landscape] [--margin <mm>]
-                          [--mermaid-kind erDiagram|classDiagram|sequenceDiagram]
+                          [--mermaid-kind erDiagram|classDiagram|sequenceDiagram|stateDiagram-v2]
                           [--code-format <output>]
 
 Render one page exactly as the app's page export does.

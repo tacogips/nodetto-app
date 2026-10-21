@@ -9,6 +9,7 @@ import { createMemo, createSignal, For, type JSX, Show } from "solid-js";
 import { createEditorSignals } from "../adapter.ts";
 
 const LABELS: Readonly<Record<MermaidDiagramKind, string>> = {
+  "stateDiagram-v2": "State transition diagram",
   erDiagram: "Entity relationship diagram",
   classDiagram: "UML class diagram",
   sequenceDiagram: "Sequence diagram",
@@ -99,8 +100,8 @@ export function MermaidExportSection(props: {
         when={kinds().length > 0}
         fallback={
           <p>
-            Add an ER table, UML class or sequence participant to this page to
-            enable Mermaid export.
+            Add a state, ER table, UML class or sequence participant to this
+            page to enable Mermaid export.
           </p>
         }
       >

@@ -25,6 +25,7 @@ import { isRasterDataUrl } from "./image.ts";
 import { isRasterAttachmentPath } from "./attachments.ts";
 import type { KeyOrder } from "./keyOrder.ts";
 import {
+  STATE_NODE_KINDS,
   ARROWHEADS,
   BPMN_ASSOCIATION_DIRECTIONS,
   BPMN_DATA_OBJECT_ROLES,
@@ -2490,6 +2491,58 @@ const DEFINITIONS: readonly ElementTypeDefinition[] = [
   UML_CLASS,
   UML_ASSOCIATION,
   ...UML_COMPONENT_TYPES,
+  {
+    type: "state.node",
+    category: "node",
+    keyOrder: { keys: ["name", "kind"] },
+    onReferenceDeleted: "detach",
+    references: noReferences,
+    validateSemantic(semantic, path) {
+      const out: ValidationIssue[] = [];
+      if (checkObject(out, semantic, path)) {
+        checkString(out, semantic["name"], `${path}.name`, {
+          allowEmpty: true,
+        });
+        checkEnum(out, semantic["kind"], `${path}.kind`, STATE_NODE_KINDS);
+      }
+      return out;
+    },
+  },
+  {
+    type: "state.transition",
+    category: "edge",
+    keyOrder: {
+      keys: [
+        "from",
+        "to",
+        "trigger",
+        "guard",
+        "effect",
+        "routing",
+        "routingAxis",
+        "routingBend",
+        "routingAvoidObstacles",
+        "routingWaypoints",
+      ],
+      children: { routingWaypoints: { keys: ["u", "v"] } },
+    },
+    onReferenceDeleted: "cascade",
+    references: (semantic) => refFields(semantic, ["from", "to"]),
+    validateSemantic(semantic, path) {
+      const out: ValidationIssue[] = [];
+      if (checkObject(out, semantic, path)) {
+        checkString(out, semantic["from"], `${path}.from`);
+        checkString(out, semantic["to"], `${path}.to`);
+        for (const field of ["trigger", "guard", "effect"])
+          checkString(out, semantic[field], `${path}.${field}`, {
+            optional: true,
+            allowEmpty: true,
+          });
+        validateConnectorRouting(out, semantic, path);
+      }
+      return out;
+    },
+  },
   SEQUENCE_PARTICIPANT,
   SEQUENCE_MESSAGE,
   SEQUENCE_ACTIVATION,

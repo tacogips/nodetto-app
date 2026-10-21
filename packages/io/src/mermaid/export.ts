@@ -10,13 +10,16 @@ import type {
   SequenceParticipantSemantic,
   UmlAssociationSemantic,
   UmlClassSemantic,
+  StateNodeSemantic,
+  StateTransitionSemantic,
 } from "@nodetto/ir";
-import { erdEndpointColumnIds } from "@nodetto/ir";
+import { stateTransitionLabel, erdEndpointColumnIds } from "@nodetto/ir";
 
 export const MERMAID_DIAGRAM_KINDS = [
   "erDiagram",
   "classDiagram",
   "sequenceDiagram",
+  "stateDiagram-v2",
 ] as const;
 
 export type MermaidDiagramKind = (typeof MERMAID_DIAGRAM_KINDS)[number];
@@ -380,6 +383,54 @@ function sequenceDiagram(elements: readonly Element[]): MermaidExportReport {
   };
 }
 
+function stateDiagram(elements: readonly Element[]): MermaidExportReport {
+  const nodes = elements.filter((element) => element.type === "state.node");
+  const aliases = aliasMap(nodes, "S");
+  const warnings: MermaidExportWarning[] = [];
+  const lines = ["stateDiagram-v2"];
+  for (const node of nodes) {
+    const semantic = node.semantic as StateNodeSemantic;
+    if (semantic.kind === "initial" || semantic.kind === "final") continue;
+    const alias = aliases.get(node.id) as string;
+    lines.push(
+      semantic.kind === "choice"
+        ? `  state ${alias} <<choice>>`
+        : `  state "${text(semantic.name, "State")}" as ${alias}`,
+    );
+  }
+  let relationCount = 0;
+  const endpoint = (id: string): string | undefined => {
+    const node = nodes.find((node) => node.id === id);
+    return (
+      node &&
+      (["initial", "final"].includes((node.semantic as StateNodeSemantic).kind)
+        ? "[*]"
+        : aliases.get(id))
+    );
+  };
+  for (const edge of elements.filter(
+    (element) => element.type === "state.transition",
+  )) {
+    const semantic = edge.semantic as StateTransitionSemantic;
+    const from = endpoint(semantic.from);
+    const to = endpoint(semantic.to);
+    if (!from || !to) {
+      relationWarning(warnings, edge, "State transition");
+      continue;
+    }
+    const label = stateTransitionLabel(semantic);
+    lines.push(`  ${from} --> ${to}${label ? `: ${text(label, "")}` : ""}`);
+    relationCount++;
+  }
+  return {
+    kind: "stateDiagram-v2",
+    code: `${lines.join("\n")}\n`,
+    elementCount: nodes.length,
+    relationCount,
+    warnings,
+  };
+}
+
 export function availableMermaidKinds(
   document: Document,
   pageId: PageId,
@@ -390,7 +441,9 @@ export function availableMermaidKinds(
       ? elements.some((element) => element.type === "erd.table")
       : kind === "classDiagram"
         ? elements.some((element) => element.type === "uml.class")
-        : elements.some((element) => element.type === "sequence.participant"),
+        : kind === "stateDiagram-v2"
+          ? elements.some((element) => element.type === "state.node")
+          : elements.some((element) => element.type === "sequence.participant"),
   );
 }
 
@@ -405,6 +458,8 @@ export function exportMermaid(
       return erDiagram(elements);
     case "classDiagram":
       return classDiagram(elements);
+    case "stateDiagram-v2":
+      return stateDiagram(elements);
     case "sequenceDiagram":
       return sequenceDiagram(elements);
   }

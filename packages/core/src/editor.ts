@@ -20,6 +20,7 @@ import { planUmlPorts } from "./uml-ports.ts";
 
 import {
   comparePageOrder,
+  isPlainObject,
   type AccessibilityMetadata,
   type BooleanOperation,
   type Document,
@@ -162,7 +163,7 @@ export interface CreateElementOptions {
 export type EditorListener = (diff: StoreDiff) => void;
 
 /** The one text field a double-click edits on an element, by type. */
-export type EditableField = "label" | "text" | "tableName" | "name";
+export type EditableField = "label" | "text" | "tableName" | "name" | "trigger";
 
 /** A style change; `null` clears a field back to the stylesheet default. */
 export type StylePatch = {
@@ -187,6 +188,8 @@ const EDITABLE_FIELDS: Readonly<Record<string, EditableField>> = {
   "erd.function": "name",
   "erd.procedure": "name",
   "uml.class": "name",
+  "state.node": "name",
+  "state.transition": "trigger",
   [UmlComponentType.Component]: "name",
   [UmlComponentType.Interface]: "name",
   [UmlComponentType.Port]: "name",
@@ -1277,7 +1280,13 @@ export class Editor {
   buildElement(type: string, options: CreateElementOptions = {}): Element {
     const util = this.registry.getOrFallback(type);
     const page = options.page ?? this.pageId;
-    const defaultVisual = util.defaultVisual();
+    const compactState =
+      type === "state.node" &&
+      isPlainObject(options.semantic) &&
+      options.semantic["kind"] !== "state";
+    const defaultVisual = compactState
+      ? { ...util.defaultVisual(), width: 32, height: 32 }
+      : util.defaultVisual();
     const visual: Visual = { ...defaultVisual, ...(options.visual ?? {}) };
     const semantic =
       options.semantic === undefined
@@ -2109,6 +2118,11 @@ export class Editor {
   /** The text field a double-click on `id` edits, or `null`. */
   editableField(id: ElementId): EditableField | null {
     const element = this.store.get(id);
+    if (
+      element?.type === "state.node" &&
+      (element.semantic as { kind: string }).kind !== "state"
+    )
+      return null;
     return element ? (EDITABLE_FIELDS[element.type] ?? null) : null;
   }
 
@@ -2662,8 +2676,23 @@ export class Editor {
   ): ElementId | null {
     const source = this.store.get(from);
     const target = this.store.get(to);
-    if (from === to || !source || !target || source.page !== target.page) {
+    if (
+      (from === to && source?.type !== "state.node") ||
+      !source ||
+      !target ||
+      source.page !== target.page
+    ) {
       return null;
+    }
+    if (source.type === "state.node" && target.type === "state.node") {
+      const context = this.createShapeContext();
+      if (this.readOnly || context.isLocked?.(from) || context.isLocked?.(to))
+        return null;
+      return this.createElement(
+        "state.transition",
+        { page: source.page, semantic: { from, to } },
+        applyOptions,
+      );
     }
     if (source.type.startsWith("bpmn.") && target.type.startsWith("bpmn.")) {
       const result = this.connectBpmn(from, to, undefined, applyOptions);

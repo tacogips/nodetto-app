@@ -206,6 +206,16 @@ same resolved geometry without rewriting the imported document on open.
 
 See [the design](design-docs/specs/design-cli-ai-drawing.md).
 
+## State transition diagrams
+
+Select **State transition** mode to draw states, initial/final markers, choices,
+and directed transitions, including self-transitions. Transition properties edit
+`trigger [guard] / effect`. The same types work through CLI `edit` and MCP;
+SVG, PNG, PDF and Mermaid exports include the notation.
+
+See the [CLI state flow example](examples/state-transition/README.md) for a
+reproducible drawing batch and the supported notation.
+
 ## MCP server
 
 Run `nodetto-cli mcp` to expose every CLI operation to an MCP client over

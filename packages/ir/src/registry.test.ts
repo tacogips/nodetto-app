@@ -49,6 +49,8 @@ describe("registry contents", () => {
     expect(Array.from<string>(ELEMENT_TYPES).sort()).toEqual(
       [
         ...DESIGN_TABLE_TYPES,
+        "state.node",
+        "state.transition",
         ...Object.values(UmlComponentType),
         "erd.view",
         "erd.materialized-view",

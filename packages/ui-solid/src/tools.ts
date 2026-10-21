@@ -65,6 +65,11 @@ export const Tool = {
   Function: "erd.function",
   Procedure: "erd.procedure",
   Class: "uml.class",
+  State: "state:state",
+  InitialState: "state:initial",
+  FinalState: "state:final",
+  ChoiceState: "state:choice",
+  StateTransition: "state.transition",
   Component: UmlComponentType.Component,
   ProvidedInterface: "uml.interface:provided",
   RequiredInterface: "uml.interface:required",
@@ -309,6 +314,20 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.BpmnGroup:
       return BPMN_CREATIONS[tool];
 
+    case Tool.State:
+    case Tool.InitialState:
+    case Tool.FinalState:
+    case Tool.ChoiceState: {
+      const kind = tool.slice(6);
+      return {
+        type: "state.node",
+        semantic: { kind, name: kind === "state" ? "State" : "" },
+        visual: {
+          width: kind === "state" ? 160 : 32,
+          height: kind === "state" ? 72 : 32,
+        },
+      };
+    }
     case Tool.Component:
       return { type: UmlComponentType.Component };
     case Tool.ProvidedInterface:
@@ -450,6 +469,7 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.ScreenTransition:
     case Tool.ForeignKey:
     case Tool.Association:
+    case Tool.StateTransition:
     case Tool.SequenceMessage:
     case Tool.Dependency:
     case Tool.Realization:
@@ -491,6 +511,7 @@ export function isConnectorTool(tool: ToolKind): boolean {
 }
 
 export function typedConnectorFor(tool: ToolKind): string | undefined {
+  if (tool === Tool.StateTransition) return "state.transition";
   if (tool === Tool.ForeignKey) return "erd.relation";
   if (tool === Tool.Association) return "uml.association";
   if (tool === Tool.SequenceMessage) return "sequence.message";

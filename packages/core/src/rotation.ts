@@ -14,6 +14,7 @@ const ROTATABLE_LEAF_TYPES = new Set([
   "draw.freehand",
   "erd.table",
   "uml.class",
+  "state.node",
   UmlComponentType.Component,
   UmlComponentType.Interface,
   UmlComponentType.Port,
@@ -142,6 +143,7 @@ function selectionRotationTarget(
       element.type !== "edge.generic" &&
       element.type !== "erd.relation" &&
       element.type !== "uml.association" &&
+      element.type !== "state.transition" &&
       element.type !== UmlComponentType.Relationship &&
       element.type !== "sequence.message" &&
       !ROTATABLE_LEAF_TYPES.has(element.type)
@@ -153,6 +155,7 @@ function selectionRotationTarget(
         "edge.generic",
         "erd.relation",
         "uml.association",
+        "state.transition",
         UmlComponentType.Relationship,
         "sequence.message",
       ].includes(element.type) &&
@@ -179,6 +182,7 @@ function selectionRotationTarget(
           "edge.generic",
           "erd.relation",
           "uml.association",
+          "state.transition",
           UmlComponentType.Relationship,
           "sequence.message",
         ].includes(element.type)
@@ -307,6 +311,7 @@ function rotateContainer(
       element.type !== "edge.generic" &&
       element.type !== "erd.relation" &&
       element.type !== "uml.association" &&
+      element.type !== "state.transition" &&
       element.type !== UmlComponentType.Relationship &&
       element.type !== "sequence.message" &&
       !ROTATABLE_LEAF_TYPES.has(element.type)

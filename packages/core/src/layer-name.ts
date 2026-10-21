@@ -8,6 +8,10 @@ export function layerName(element: Element): string {
     const value = data?.[field];
     if (typeof value === "string" && value.trim()) return value;
   }
+  if (element.type === "state.node")
+    return `${String(data?.["kind"] ?? "State")} node`;
+  if (element.type === "state.transition")
+    return String(data?.["trigger"] || "Transition");
   if (element.type === "edge.generic" && data?.["prototype"] === true)
     return "Screen transition";
   return element.type === "frame" ? "Artboard" : element.type;

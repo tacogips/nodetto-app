@@ -1,8 +1,15 @@
+export { stateTransitionLabel } from "./state.ts";
 // Diagram IR: canonical semantic + visual data model.
 // See the product design (nodetto-cloud repo), section 5.
 //
 // Runtime-agnostic by contract: this package must run in a browser, the
 // Tauri webview, Node/Bun, and Cloudflare Workers. No DOM, no framework.
+export {
+  STATE_NODE_KINDS,
+  type StateNodeKind,
+  type StateNodeSemantic,
+  type StateTransitionSemantic,
+} from "./semantics.ts";
 export { comparePageOrder } from "./page-order.ts";
 
 export {

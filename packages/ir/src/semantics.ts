@@ -770,7 +770,28 @@ export function isBpmnElementType(type: string): boolean {
 }
 
 /** Maps every registered element type to its semantic payload type. */
+export const STATE_NODE_KINDS = [
+  "state",
+  "initial",
+  "final",
+  "choice",
+] as const;
+export type StateNodeKind = (typeof STATE_NODE_KINDS)[number];
+export interface StateNodeSemantic {
+  readonly name: string;
+  readonly kind: StateNodeKind;
+}
+export interface StateTransitionSemantic extends ConnectorRoutingSemantic {
+  readonly from: ElementId;
+  readonly to: ElementId;
+  readonly trigger?: string;
+  readonly guard?: string;
+  readonly effect?: string;
+}
+
 export interface SemanticByType {
+  "state.node": StateNodeSemantic;
+  "state.transition": StateTransitionSemantic;
   readonly "ui.control": UiControlSemantic;
   "design.token": DesignTokenSemantic;
   "design.guide": PageGuideSemantic;

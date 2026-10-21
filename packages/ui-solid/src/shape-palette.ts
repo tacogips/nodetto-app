@@ -2,6 +2,9 @@ import { Tool, type ToolKind } from "./tools.ts";
 import { workspaceById, type WorkspaceId } from "./workspaces.ts";
 
 export const PALETTE_ICONS = {
+  initial:
+    "M16 6a10 10 0 110 20 10 10 0 010-20zM16 10a6 6 0 110 12 6 6 0 010-12z",
+  final: "M16 3a13 13 0 110 26 13 13 0 010-26zM16 9a7 7 0 110 14 7 7 0 010-14z",
   draw: "M4 25l3-8L22 2l8 8-15 15-8 3zM19 5l8 8",
   component: "M7 5h22v23H7zM3 10h8v5H3zM3 20h8v5H3z",
   provided: "M2 16h10m16 0a8 8 0 11-16 0 8 8 0 0116 0z",
@@ -61,6 +64,11 @@ export const COMMON_SHAPES: readonly ShapePaletteItem[] = [
 ];
 
 export const DIAGRAM_SHAPES: readonly ShapePaletteItem[] = [
+  { tool: Tool.State, label: "State", icon: "node" },
+  { tool: Tool.InitialState, label: "Initial", icon: "initial" },
+  { tool: Tool.FinalState, label: "Final", icon: "final" },
+  { tool: Tool.ChoiceState, label: "Choice", icon: "diamond" },
+  { tool: Tool.StateTransition, label: "Transition", icon: "edge" },
   { tool: Tool.Component, label: "Component", icon: "component" },
   {
     tool: Tool.ProvidedInterface,
@@ -174,6 +182,14 @@ const PRIMARY_TOOLS = {
     Tool.Text,
     Tool.Frame,
   ],
+  state: [
+    Tool.State,
+    Tool.InitialState,
+    Tool.FinalState,
+    Tool.ChoiceState,
+    Tool.StateTransition,
+    Tool.Text,
+  ],
   class: [Tool.Class, Tool.Association, Tool.Text, Tool.Frame],
   sequence: [
     Tool.Actor,
@@ -274,6 +290,7 @@ export function shapePaletteGroups(
       tool === Tool.SequenceMessage
     )
       return "Sequence";
+    if (tool.startsWith("state")) return "State transition";
     if (DIAGRAM_SHAPES.some((item) => item.tool === tool)) return "UML";
     if (BPMN_SHAPES.some((item) => item.tool === tool)) return "BPMN";
     if (ARTBOARD_SHAPES.some((item) => item.tool === tool)) return "Artboards";

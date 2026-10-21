@@ -1,3 +1,7 @@
+export {
+  stateNodeNotation,
+  stateNodeBounds,
+} from "./shapes/state.ts";
 // Editor core: framework-agnostic store, camera, selection, history,
 // shape utils, and commands. Must not touch the DOM.
 export {

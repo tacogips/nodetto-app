@@ -1113,6 +1113,7 @@ describe("creationFor", () => {
       Tool.ForeignKey,
       Tool.Association,
       Tool.SequenceMessage,
+      Tool.StateTransition,
     ]);
     for (const tool of TOOLS) {
       expect(creationFor(tool) === null).toBe(gestures.has(tool));
@@ -3453,5 +3454,37 @@ test("double-clicking a selected orthogonal channel straightens it", () => {
     from,
     to,
     routing: "straight",
+  });
+});
+
+describe("state transition authoring gestures", () => {
+  test("palette creation, transition drawing, self-loops and undo", () => {
+    const editor = new Editor();
+    const { interaction, setTool } = interactionFor(editor, Tool.State);
+    interaction.onPointerDown(pointer({ clientX: 100, clientY: 100 }));
+    interaction.onPointerUp(pointer({ clientX: 100, clientY: 100 }));
+    const a = [...editor.selection.ids()][0]!;
+    expect(editor.store.get(a)?.type).toBe("state.node");
+    setTool(Tool.State);
+    interaction.onPointerDown(pointer({ clientX: 400, clientY: 100 }));
+    interaction.onPointerUp(pointer({ clientX: 400, clientY: 100 }));
+    const b = [...editor.selection.ids()][0]!;
+    setTool(Tool.StateTransition);
+    interaction.onPointerDown(pointer({ clientX: 100, clientY: 100 }));
+    interaction.onPointerMove(pointer({ clientX: 400, clientY: 100 }));
+    interaction.onPointerUp(pointer({ clientX: 400, clientY: 100 }));
+    const edge = editor.store.get([...editor.selection.ids()][0]!)!;
+    expect(edge.type).toBe("state.transition");
+    expect(edge.semantic).toMatchObject({ from: a, to: b });
+    editor.undo();
+    expect(editor.store.get(edge.id)).toBeUndefined();
+    editor.redo();
+    setTool(Tool.StateTransition);
+    interaction.onPointerDown(pointer({ clientX: 100, clientY: 100 }));
+    interaction.onPointerMove(pointer({ clientX: 100, clientY: 20 }));
+    interaction.onPointerUp(pointer({ clientX: 100, clientY: 100 }));
+    expect(
+      editor.store.get([...editor.selection.ids()][0]!)?.semantic,
+    ).toMatchObject({ from: a, to: a });
   });
 });

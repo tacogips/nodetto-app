@@ -1,3 +1,4 @@
+import { stateTransitionLabel } from "@nodetto/ir";
 import { sequenceMessageY } from "../sequence-layout.ts";
 import { UmlComponentType, UmlComponentRelationship } from "@nodetto/ir";
 // Shared geometry for every edge-like element type.
@@ -273,6 +274,21 @@ function elementBoundary(
   target: Vec,
   context: ShapeContext,
 ): Vec {
+  if (element.type === "state.node") {
+    const kind = (element.semantic as { kind: string }).kind;
+    if (kind === "initial" || kind === "final")
+      return ellipseBoundaryIntersection(origin, target, box);
+    if (kind === "choice") {
+      return (
+        outlineBoundary(origin, target, [
+          { x: box.x + box.width / 2, y: box.y },
+          { x: box.x + box.width, y: box.y + box.height / 2 },
+          { x: box.x + box.width / 2, y: box.y + box.height },
+          { x: box.x, y: box.y + box.height / 2 },
+        ]) ?? origin
+      );
+    }
+  }
   if (element.type === UmlComponentType.Interface) {
     return ellipseBoundaryIntersection(origin, target, {
       x: box.x + 2,
@@ -530,6 +546,29 @@ function computeConnector(
   if (!from || !to) return null;
   const fromCenter = boxCenter(fromBox);
   const toCenter = boxCenter(toBox);
+  if (element.type === "state.transition" && ids.from === ids.to) {
+    const right = fromBox.x + fromBox.width + 40;
+    const top = fromBox.y - 40;
+    const start = resolvedBoundary(
+      from,
+      fromBox,
+      { x: right, y: fromCenter.y },
+      context,
+    );
+    const end = resolvedBoundary(
+      to,
+      toBox,
+      { x: fromCenter.x, y: top },
+      context,
+    );
+    return withRoute(start, end, fromBox, toBox, [
+      start,
+      { x: right, y: start.y },
+      { x: right, y: top },
+      { x: end.x, y: top },
+      end,
+    ]);
+  }
   const relationAnchors = erdRelationAnchors(element, from, to, fromBox, toBox);
   const fromAnchor = relationAnchors?.[0] ?? fromCenter;
   const toAnchor = relationAnchors?.[1] ?? toCenter;
@@ -826,6 +865,15 @@ export function connectorDecoration(element: Element): ConnectorDecoration {
     return { start: null, end: null, label: "" };
   }
   const semantic = element.semantic;
+  if (element.type === "state.transition") {
+    return {
+      start: null,
+      end: "arrow",
+      label: stateTransitionLabel(
+        semantic as import("@nodetto/ir").StateTransitionSemantic,
+      ),
+    };
+  }
   if (element.type === "erd.relation") {
     return {
       start: "dot",

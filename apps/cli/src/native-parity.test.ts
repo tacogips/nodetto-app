@@ -446,3 +446,84 @@ nativeTest(
   },
   60000,
 );
+
+nativeTest(
+  "native CLI draws and exports a state flow",
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "nodetto-state-"));
+    try {
+      const file = join(dir, "flow.jsonl");
+      writeFileSync(
+        file,
+        '{"kind":"document","schemaVersion":1,"id":"state-flow","title":"Flow"}\n{"kind":"page","id":"p1","name":"Flow","pageKind":"state"}\n',
+      );
+      const ops = join(
+        import.meta.dir,
+        "../../../examples/state-transition/flow.ops.json",
+      );
+      const edit = Bun.spawnSync([
+        binary!,
+        "edit",
+        file,
+        "--ops",
+        ops,
+        "--format",
+        "json",
+      ]);
+      expect(edit.exitCode).toBe(0);
+      const document = parseDocument(readFileSync(file, "utf8"));
+      expect(
+        document.elements.filter((element) => element.type === "state.node"),
+      ).toHaveLength(5);
+      const transitions = document.elements.filter(
+        (element) => element.type === "state.transition",
+      );
+      expect(transitions).toHaveLength(6);
+      expect(
+        transitions.some(
+          (element) =>
+            (element.semantic as { from: string; to: string }).from ===
+            (element.semantic as { from: string; to: string }).to,
+        ),
+      ).toBe(true);
+      expect(transitions.map((element) => element.semantic)).toContainEqual(
+        expect.objectContaining({
+          trigger: "start",
+          guard: "ready",
+          effect: "begin()",
+        }),
+      );
+      compare(["validate", file]);
+      compare(["inspect", file, "--format", "json"]);
+      for (const format of ["svg", "png", "pdf", "mermaid"]) {
+        const output = join(dir, `flow.${format}`);
+        const args = ["export", file, "--format", format, "--output", output];
+        if (format === "mermaid")
+          args.push("--mermaid-kind", "stateDiagram-v2");
+        const result = Bun.spawnSync([binary!, ...args]);
+        expect(result.exitCode).toBe(0);
+        const bytes = readFileSync(output);
+        expect(bytes.byteLength).toBeGreaterThan(100);
+        if (format === "svg") {
+          expect(bytes.toString()).toContain("start [ready] / begin()");
+          expect(bytes.toString()).not.toContain("unsupported");
+        } else if (format === "png")
+          expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+        else if (format === "pdf")
+          expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+        else expect(bytes.toString()).toContain("stateDiagram-v2");
+      }
+      compare([
+        "export",
+        file,
+        "--format",
+        "mermaid",
+        "--mermaid-kind",
+        "stateDiagram-v2",
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  60000,
+);
