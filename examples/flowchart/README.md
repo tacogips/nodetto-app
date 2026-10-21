@@ -6,6 +6,10 @@ Draw Flow arrows between shapes and edit their labels to show conditions such as
 Yes and No. On flowchart pages, new arrows use orthogonal routing by default;
 routing, waypoints and labels remain editable in the existing connector inspector.
 
+Drag a shape from the left palette to carry a translucent preview under the
+pointer. Release over the canvas to create it; releasing over panes, controls
+or outside the window cancels. Clicking a tile still selects the placement tool.
+
 With Flow or Connector selected, hovering a shape reveals four connection points
 on its outline. Drag from a point and release near another to snap (12 screen
 pixels). The chosen sides stay attached through moves, resizing and rotation.
@@ -53,7 +57,8 @@ drag it near a shape point to reattach. Endpoint handles have a 24-pixel grab
 area. With Connector selected, dragging from empty canvas creates a standalone
 line. Double-click a line segment to insert an intermediate point; drag the point
 to reshape the line. Existing manual intermediate points retain their page
-positions while detaching or reconnecting an end. Fully detached lines also
+positions while detaching or reconnecting an end, or moving just one connected
+shape. Moving both endpoint shapes together carries the manual route with them. Fully detached lines also
 support dragging, nudging and copy/paste.
 
 Each end has exactly one representation: a shape ID (`from` / `to`, optionally

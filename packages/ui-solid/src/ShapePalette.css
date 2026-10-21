@@ -113,3 +113,18 @@
 .nodetto-palette-section:first-child > summary {
   padding-right: 48px;
 }
+
+.nodetto-palette-drag-preview {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10000;
+  opacity: 0.5;
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.nodetto-palette-drag-preview * {
+  pointer-events: none !important;
+}

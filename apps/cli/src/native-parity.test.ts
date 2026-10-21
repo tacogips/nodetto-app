@@ -8,7 +8,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Editor, HANDOFF_FORMATS } from "@nodetto/core";
+import {
+  Editor,
+  HANDOFF_FORMATS,
+  resolveConnector,
+  endpointReaderFor,
+} from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
 
 const binary = process.env.NODETTO_CLI_TEST_BINARY;
@@ -585,6 +590,54 @@ nativeTest(
         if (format === "pdf")
           expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
       }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  60000,
+);
+
+nativeTest(
+  "native CLI keeps manual bends fixed when moving the attached shape",
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "nodetto-manual-bends-"));
+    try {
+      const editor = new Editor();
+      const shape = editor.createElement("node.generic", {
+        id: "shape",
+        visual: { x: 0, y: 0, width: 100, height: 100 },
+      });
+      editor.createElement("edge.generic", {
+        id: "arrow",
+        semantic: {
+          from: shape,
+          toPoint: { x: 450, y: 50 },
+          routing: "manual",
+          routingWaypoints: [{ u: 0.5, v: 150 }],
+        },
+      });
+      const file = join(dir, "bends.jsonl");
+      const ops = join(dir, "move.json");
+      writeFileSync(file, serializeDocument(editor.getSnapshot()));
+      writeFileSync(
+        ops,
+        JSON.stringify([{ op: "move", id: shape, x: 100, y: 100 }]),
+      );
+      const result = Bun.spawnSync([binary!, "edit", file, "--ops", ops]);
+      expect(result.exitCode).toBe(0);
+      const moved = new Editor({
+        document: parseDocument(readFileSync(file, "utf8")),
+      });
+      const arrow = moved.store.get("arrow")!;
+      const resolved = resolveConnector(
+        arrow,
+        moved.createShapeContext(),
+        endpointReaderFor(arrow.type),
+      )!;
+      expect(resolved.waypointPoints![0]!.x).toBeCloseTo(250);
+      expect(resolved.waypointPoints![0]!.y).toBeCloseTo(200);
+      compare(["validate", file]);
+      compare(["export", file, "--format", "svg"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

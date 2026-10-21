@@ -1,5 +1,8 @@
+import { Portal } from "solid-js/web";
+import { paletteDragPreview } from "./palette-drag.ts";
+import { ShapeView } from "./shapes/ShapeView.tsx";
 import type { Editor, Vec } from "@nodetto/core";
-import { For, type JSX, onCleanup } from "solid-js";
+import { For, Show, createSignal, type JSX, onCleanup } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
 import {
   PALETTE_ICONS,
@@ -32,12 +35,37 @@ export function ShapePalette(props: {
   readonly onShapeDrop?: (tool: ToolKind, client: Vec) => void;
 }): JSX.Element {
   let drag:
-    | { id: number; tool: ToolKind; x: number; y: number; moved: boolean }
+    | {
+        id: number;
+        tool: ToolKind;
+        x: number;
+        y: number;
+        moved: boolean;
+        target: HTMLButtonElement;
+        page: string;
+        documentRevision: number;
+      }
     | undefined;
   let suppressClick = false;
+  const [preview, setPreview] = createSignal<
+    | (NonNullable<ReturnType<typeof paletteDragPreview>> & { client: Vec })
+    | null
+  >(null);
   const cancelDrag = () => {
+    const ended = drag;
     drag = undefined;
+    setPreview(null);
+    if (ended) {
+      suppressClick = ended.moved;
+      if (ended.target.hasPointerCapture(ended.id))
+        ended.target.releasePointerCapture(ended.id);
+    }
   };
+  const currentDrag = () =>
+    drag &&
+    !props.editor.readOnly &&
+    drag.page === props.editor.currentPageId &&
+    drag.documentRevision === props.editor.documentOpenRevision;
   window.addEventListener("blur", cancelDrag);
   const cancelKey = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
@@ -46,30 +74,44 @@ export function ShapePalette(props: {
     }
   };
   const move = (event: PointerEvent) => {
-    if (
-      drag?.id === event.pointerId &&
-      Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 4
-    )
+    if (drag?.id !== event.pointerId) return;
+    if (!currentDrag()) {
+      cancelDrag();
+      return;
+    }
+    if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 4)
       drag.moved = true;
+    if (drag.moved) {
+      const model = preview() ?? paletteDragPreview(props.editor, drag.tool);
+      if (model)
+        setPreview({
+          ...model,
+          client: { x: event.clientX, y: event.clientY },
+        });
+    }
   };
   const end = (event: PointerEvent) => {
     if (drag?.id !== event.pointerId) return;
     const ended = drag;
-    drag = undefined;
-    suppressClick = ended.moved;
-    if (ended.moved && !props.editor.readOnly)
+    const valid = currentDrag();
+    cancelDrag();
+    if (ended.moved && valid)
       props.onShapeDrop?.(ended.tool, { x: event.clientX, y: event.clientY });
   };
   window.addEventListener("pointermove", move, true);
   window.addEventListener("pointerup", end, true);
-  window.addEventListener("pointercancel", cancelDrag, true);
+  const cancelPointer = (event: PointerEvent) => {
+    if (drag?.id === event.pointerId) cancelDrag();
+  };
+  window.addEventListener("pointercancel", cancelPointer, true);
   window.addEventListener("keydown", cancelKey, true);
   onCleanup(() => {
     window.removeEventListener("blur", cancelDrag);
     window.removeEventListener("keydown", cancelKey, true);
     window.removeEventListener("pointermove", move, true);
     window.removeEventListener("pointerup", end, true);
-    window.removeEventListener("pointercancel", cancelDrag, true);
+    window.removeEventListener("pointercancel", cancelPointer, true);
+    cancelDrag();
   });
   const signals = createEditorSignals(props.editor);
   const readOnly = () => {
@@ -122,8 +164,16 @@ export function ShapePalette(props: {
                 x: event.clientX,
                 y: event.clientY,
                 moved: false,
+                target: event.currentTarget,
+                page: props.editor.currentPageId,
+                documentRevision: props.editor.documentOpenRevision,
               };
+              event.currentTarget.setPointerCapture(event.pointerId);
             }}
+            onLostPointerCapture={(event) => {
+              if (drag?.id === event.pointerId) cancelDrag();
+            }}
+            onDragStart={(event) => event.preventDefault()}
             disabled={!canUseTool(item.tool, readOnly())}
             onClick={() => {
               if (suppressClick) {
@@ -166,6 +216,27 @@ export function ShapePalette(props: {
         }
       }}
     >
+      <Show when={!readOnly() && preview()}>
+        {(model) => (
+          <Portal>
+            <div
+              class="nodetto-palette-drag-preview"
+              aria-hidden="true"
+              style={{
+                width: `${model().box.width}px`,
+                height: `${model().box.height}px`,
+                transform: `translate3d(${model().client.x - (model().box.width * signals.camera().z) / 2}px, ${model().client.y - (model().box.height * signals.camera().z) / 2}px, 0) scale(${signals.camera().z})`,
+              }}
+            >
+              <ShapeView
+                element={model().element}
+                box={model().box}
+                selected={false}
+              />
+            </div>
+          </Portal>
+        )}
+      </Show>
       <For each={shapePaletteGroups(props.workspace)}>
         {(group, index) => (
           <details class="nodetto-palette-section" open={index() === 0}>

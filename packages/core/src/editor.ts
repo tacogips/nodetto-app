@@ -1,3 +1,4 @@
+import { planManualRoutePreservation } from "./manual-route-preservation.ts";
 import type {
   ConnectorPorts,
   ConnectorPort,
@@ -1120,6 +1121,17 @@ export class Editor {
       );
       derived.push(...planConstraints(beforeLayout, draft, this.registry));
       derived.push(...planUmlPorts(this.store, draft));
+      derived.push(
+        ...planManualRoutePreservation(this.store, draft, context, () =>
+          createShapeContext(
+            draft,
+            this.registry,
+            context.zoom,
+            this.rasterMaskSampler,
+            this.assets.resolve,
+          ),
+        ),
+      );
     }
     const result = applyCommands(this.store, [...permitted, ...derived]);
     if (options.history !== "ignore") {

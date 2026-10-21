@@ -1,3 +1,4 @@
+import { paletteDropInsideCanvas } from "./palette-drag.ts";
 import { connectionPorts, insideClip } from "@nodetto/core";
 import { shapeAuthoringWarnings } from "@nodetto/core";
 import {
@@ -269,15 +270,12 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   createEffect(() => {
     const drop = props.shapeDrop;
     const bounds = container?.getBoundingClientRect();
-    if (
-      !drop ||
-      !bounds ||
-      drop.client.x < bounds.left ||
-      drop.client.x > bounds.right ||
-      drop.client.y < bounds.top ||
-      drop.client.y > bounds.bottom
-    )
-      return;
+    if (!drop || !bounds || !container) return;
+    const hit = document.elementFromPoint(drop.client.x, drop.client.y);
+    const uncovered =
+      hit?.closest(".nodetto-canvas") === container &&
+      !hit?.closest(`.${SLOT_LAYER_CLASS}`);
+    if (!paletteDropInsideCanvas(bounds, drop.client, uncovered)) return;
     untrack(() =>
       interaction.placeTool(
         drop.tool,
