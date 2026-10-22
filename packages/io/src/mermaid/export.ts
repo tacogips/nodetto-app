@@ -389,24 +389,30 @@ function stateDiagram(elements: readonly Element[]): MermaidExportReport {
   const aliases = aliasMap(nodes, "S");
   const warnings: MermaidExportWarning[] = [];
   const lines = ["stateDiagram-v2"];
+  // Mermaid's [*] cannot carry a name, so a named initial/final node becomes
+  // a named state linked to the anonymous start/end marker.
+  const anonymous = (semantic: StateNodeSemantic): boolean =>
+    (semantic.kind === "initial" || semantic.kind === "final") &&
+    !(typeof semantic.name === "string" && semantic.name.trim());
+  const endings: string[] = [];
   for (const node of nodes) {
     const semantic = node.semantic as StateNodeSemantic;
-    if (semantic.kind === "initial" || semantic.kind === "final") continue;
+    if (anonymous(semantic)) continue;
     const alias = aliases.get(node.id) as string;
     lines.push(
       semantic.kind === "choice"
         ? `  state ${alias} <<choice>>`
         : `  state "${text(semantic.name, "State")}" as ${alias}`,
     );
+    if (semantic.kind === "initial") lines.push(`  [*] --> ${alias}`);
+    if (semantic.kind === "final") endings.push(`  ${alias} --> [*]`);
   }
   let relationCount = 0;
   const endpoint = (id: string): string | undefined => {
     const node = nodes.find((node) => node.id === id);
     return (
       node &&
-      (["initial", "final"].includes((node.semantic as StateNodeSemantic).kind)
-        ? "[*]"
-        : aliases.get(id))
+      (anonymous(node.semantic as StateNodeSemantic) ? "[*]" : aliases.get(id))
     );
   };
   for (const edge of elements.filter(
@@ -423,6 +429,7 @@ function stateDiagram(elements: readonly Element[]): MermaidExportReport {
     lines.push(`  ${from} --> ${to}${label ? `: ${text(label, "")}` : ""}`);
     relationCount++;
   }
+  lines.push(...endings);
   return {
     kind: "stateDiagram-v2",
     code: `${lines.join("\n")}\n`,

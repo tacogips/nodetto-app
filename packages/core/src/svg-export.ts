@@ -6,7 +6,7 @@ import {
   type DatabaseObjectType,
 } from "@nodetto/ir";
 import { databaseObjectRows } from "./shapes/databaseObject.ts";
-import { stateNodeNotation } from "./shapes/state.ts";
+import { stateNodeLabelBox, stateNodeNotation } from "./shapes/state.ts";
 import { umlComponentPaintBounds } from "./shapes/umlComponent.ts";
 import { UmlComponentType } from "@nodetto/ir";
 // Deterministic SVG export of a page or a selection.
@@ -1952,6 +1952,10 @@ export function renderElementsSvg(
     }
     if (box && isBpmnShapeType(element.type)) {
       const label = bpmnLabelBox(element, box);
+      if (label) boxes.push(label);
+    }
+    if (box && element.type === "state.node") {
+      const label = stateNodeLabelBox(element, box);
       if (label) boxes.push(label);
     }
     if (isEdge(element.type) && element.type.startsWith("bpmn.")) {

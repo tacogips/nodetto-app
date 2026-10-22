@@ -46,6 +46,40 @@ export const stateTransitionShapeUtil = createConnectorUtil({
   }),
 });
 
+const PSEUDO_STATE_LABEL_WIDTH = 120;
+const PSEUDO_STATE_LABEL_GAP = 6;
+
+/** Name text placed below a named initial, final or choice node. */
+function pseudoStateLabel(
+  element: Element,
+  box: Box,
+): {
+  readonly box: Box;
+  readonly lines: readonly string[];
+  readonly fontSize: number;
+} | null {
+  const { kind, name } = element.semantic as StateNodeSemantic;
+  if (kind === "state" || typeof name !== "string" || !name.trim()) return null;
+  const fontSize = element.visual.style?.fontSize ?? 13;
+  const width = Math.max(box.width, PSEUDO_STATE_LABEL_WIDTH);
+  const lines = wrapTextLines(name.trim(), width, fontSize);
+  return {
+    box: {
+      x: box.x + box.width / 2 - width / 2,
+      y: box.y + box.height + PSEUDO_STATE_LABEL_GAP,
+      width,
+      height: lines.length * (fontSize + 2) + fontSize * 0.3,
+    },
+    lines,
+    fontSize,
+  };
+}
+
+/** Page-space bounds of a pseudo-state name drawn outside the node. */
+export function stateNodeLabelBox(element: Element, box: Box): Box | null {
+  return pseudoStateLabel(element, box)?.box ?? null;
+}
+
 /** Shared notation for the canvas and vector/raster exports. */
 export function stateNodeNotation(
   element: Element,
@@ -117,5 +151,19 @@ export function stateNodeNotation(
       stroke: "none",
     });
   }
+  const label = pseudoStateLabel(element, box);
+  if (label)
+    parts.push({
+      kind: "text",
+      role: "state-name",
+      x: x + w / 2,
+      y: label.box.y + label.fontSize,
+      lines: label.lines,
+      anchor: "middle",
+      fontSize: label.fontSize,
+      lineHeight: label.fontSize + 2,
+      fill: style?.color ?? ink,
+      stroke: "none",
+    });
   return parts;
 }

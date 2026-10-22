@@ -169,3 +169,76 @@ test("initial, final and choice nodes default to compact geometry", () => {
     expect(editor.getBounds(id)).toMatchObject({ width: 32, height: 32 });
   }
 });
+
+test("named initial and final nodes keep their names in SVG and Mermaid exports", () => {
+  const editor = makeEditor();
+  editor.setPageKind(editor.currentPageId, "state");
+  const begin = editor.createElement("state.node", {
+    semantic: { kind: "initial", name: "Begin" },
+    visual: { x: 0, y: 20, width: 32, height: 32 },
+  });
+  const review = editor.createElement("state.node", {
+    semantic: { kind: "state", name: "Review" },
+    visual: { x: 120, y: 0, width: 160, height: 72 },
+  });
+  const archived = editor.createElement("state.node", {
+    semantic: { kind: "final", name: "Archived" },
+    visual: { x: 360, y: 20, width: 32, height: 32 },
+  });
+  editor.connectSmart(begin, review);
+  const close = editor.connectSmart(review, archived)!;
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: close,
+      semantic: { from: review, to: archived, trigger: "close" },
+    },
+  ]);
+
+  const box = editor.getBounds(archived)!;
+  const notation = stateNodeNotation(editor.store.get(archived)!, box);
+  const label = notation.find((part) => part.kind === "text");
+  expect(label).toMatchObject({ lines: ["Archived"], anchor: "middle" });
+  expect(label && label.kind === "text" && label.y).toBeGreaterThan(
+    box.y + box.height,
+  );
+
+  const svg = editor.exportPageSvg()!;
+  expect(svg).toContain("Begin");
+  expect(svg).toContain("Archived");
+  // The viewport grows to fit the names drawn below the 32px circles.
+  const [, , , height] = svg
+    .match(/viewBox="([^"]+)"/)![1]!
+    .split(" ")
+    .map(Number);
+  expect(height).toBeGreaterThan(72 + 16 * 2);
+
+  const mermaid = exportMermaid(
+    editor.getSnapshot(),
+    editor.currentPageId,
+    "stateDiagram-v2",
+  );
+  const alias = (id: string) => `S_${id.replace(/[^\p{L}\p{N}_-]+/gu, "_")}`;
+  expect(mermaid.code.split("\n")).toEqual(
+    expect.arrayContaining([
+      `  state "Begin" as ${alias(begin)}`,
+      `  state "Archived" as ${alias(archived)}`,
+      `  [*] --> ${alias(begin)}`,
+      `  ${alias(begin)} --> ${alias(review)}`,
+      `  ${alias(review)} --> ${alias(archived)}: close`,
+      `  ${alias(archived)} --> [*]`,
+    ]),
+  );
+  expect(mermaid.relationCount).toBe(2);
+});
+
+test("named choice nodes show their name below the diamond", () => {
+  const editor = makeEditor();
+  const id = editor.createElement("state.node", {
+    semantic: { kind: "choice", name: "Approved?" },
+    visual: { x: 0, y: 0, width: 32, height: 32 },
+  });
+  const parts = stateNodeNotation(editor.store.get(id)!, editor.getBounds(id)!);
+  expect(parts.map((part) => part.kind)).toEqual(["polygon", "text"]);
+  expect(editor.exportPageSvg()).toContain("Approved?");
+});

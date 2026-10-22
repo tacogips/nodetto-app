@@ -6,6 +6,7 @@ export { connectionPorts } from "./shapes/connector.ts";
 export {
   stateNodeNotation,
   stateNodeBounds,
+  stateNodeLabelBox,
 } from "./shapes/state.ts";
 // Editor core: framework-agnostic store, camera, selection, history,
 // shape utils, and commands. Must not touch the DOM.
