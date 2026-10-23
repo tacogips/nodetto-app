@@ -168,7 +168,8 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"remove-item","id":"@orders","field":"columns","item":"total"}
   {"op":"move","id":"t-users","x":40,"y":80}
   {"op":"delete","id":"01M4WD"}
-  {"op":"add-page","name":"Flow","kind":"bpmn","ref":"flow"}
+  {"op":"add-page","name":"Flow","kind":"bpmn","ref":"flow","after":"p1"}
+  {"op":"move-page","id":"p3","before":"p2"}
   {"op":"rename-page","id":"p1","name":"Shop schema"}
   {"op":"delete-page","id":"p2"}
 
@@ -189,6 +190,9 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   - update deep-merges objects; arrays are replaced whole (use append and
     remove-item for single list items); null removes a key.
   - List items that need ids (columns, indexes, attributes) get generated ids.
+  - add-page appends the page unless it gives "before" or "after" (a page) or
+    "order" (a base62 fractional key, compared with the pages' "order"
+    fields); move-page takes the same fields to reorder an existing page.
 
   --arrange   Run Tidy layout on every page the batch touched.
   --dry-run   Validate and report without writing.

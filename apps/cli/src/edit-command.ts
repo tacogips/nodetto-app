@@ -12,6 +12,7 @@ import {
   type Box,
   CommandError,
   Editor,
+  isFractionalKey,
   newElementId,
   planArrangement,
 } from "@nodetto/core";
@@ -162,12 +163,22 @@ class Batch {
   }
 
   element(query: Json, index: number): Element {
-    const resolved = resolveId(
-      text(query, "id", index),
-      this.elementIds(),
-      this.refs,
-    );
-    if (!resolved.ok) throw new OperationError(index, resolved.message);
+    const value = text(query, "id", index);
+    const resolved = resolveId(value, this.elementIds(), this.refs);
+    if (!resolved.ok) {
+      const page = resolvePageQuery(
+        this.editor.store.listPages(),
+        value.startsWith("@")
+          ? (this.refs.get(value.slice(1)) ?? value)
+          : value,
+      );
+      throw new OperationError(
+        index,
+        page.ok
+          ? `"${value}" is a page, not an element; use rename-page, move-page or delete-page for pages.`
+          : resolved.message,
+      );
+    }
     const element = this.editor.store.get(resolved.id);
     if (!element) throw new OperationError(index, `No element ${resolved.id}.`);
     return element;
@@ -182,6 +193,53 @@ class Batch {
     const resolved = resolvePageQuery(pages, byRef ?? value);
     if (resolved.ok) return resolved.page;
     throw new OperationError(index, resolved.message);
+  }
+
+  /**
+   * Put a page before or after another page, or at an explicit fractional
+   * order key. Returns false when the operation names no placement.
+   */
+  placePage(id: string, operation: JsonObject, index: number): boolean {
+    const fields = (["before", "after", "order"] as const).filter(
+      (field) => operation[field] !== undefined,
+    );
+    if (fields.length > 1)
+      throw new OperationError(
+        index,
+        `use only one of "before", "after" and "order"`,
+      );
+    const field = fields[0];
+    if (field === undefined) return false;
+    if (field === "order") {
+      const order = text(operation["order"], "order", index);
+      if (!isFractionalKey(order))
+        throw new OperationError(
+          index,
+          `"order" must be a base62 fractional key without a trailing zero (for example "a0" or "b1V").`,
+        );
+      const taken = this.editor.store
+        .listPages()
+        .find((page) => page.id !== id && page.order === order);
+      if (taken)
+        throw new OperationError(
+          index,
+          `order "${order}" is already used by page ${taken.id}; use "before" or "after" instead.`,
+        );
+      this.editor.apply([{ type: "updatePage", id, page: { order } }]);
+      return true;
+    }
+    const anchor = this.page(operation[field], index);
+    if (anchor.id === id)
+      throw new OperationError(
+        index,
+        `a page cannot be placed ${field} itself.`,
+      );
+    const remaining = this.editor.store
+      .listPages()
+      .filter((page) => page.id !== id);
+    const at = remaining.findIndex((page) => page.id === anchor.id);
+    this.editor.reorderPageTo(id, field === "before" ? at : at + 1);
+    return true;
   }
 
   /** Replace "@ref" strings and id prefixes in reference fields with ids. */
@@ -515,7 +573,17 @@ class Batch {
         });
         if (typeof operation["ref"] === "string")
           this.refs.set(operation["ref"], id);
+        this.placePage(id, operation, index);
         this.touchedPages.add(id);
+        return;
+      }
+      case "move-page": {
+        const page = this.page(operation["id"], index);
+        if (!this.placePage(page.id, operation, index))
+          throw new OperationError(
+            index,
+            `move-page needs "before" or "after" (a page) or "order" (a fractional key)`,
+          );
         return;
       }
       case "rename-page": {
@@ -648,7 +716,7 @@ class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, rename-page, delete-page, add, connect, update, append, remove-item, move or delete.`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, delete-page, add, connect, update, append, remove-item, move or delete.`,
         );
     }
   }

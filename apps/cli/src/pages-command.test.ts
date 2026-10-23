@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Editor } from "@nodetto/core";
+import { Editor, keyBetween } from "@nodetto/core";
 import { shortPageId } from "@nodetto/ir";
 import { parseDocument, serializeDocument } from "@nodetto/io";
 import { runCli, type CommandIo } from "./commands.ts";
@@ -147,4 +147,100 @@ test("BPMN export and lint accept short page IDs in mixed files", () => {
     expect(byAlias).toEqual(byId);
     expect(byAlias.exitCode).not.toBe(2);
   }
+});
+
+function orderedPages(initial: readonly string[]) {
+  const editor = new Editor();
+  const first = editor.store.listPages()[0]!.id;
+  editor.renamePage(first, initial[0]!);
+  for (const name of initial.slice(1)) editor.createPage({ name });
+  let saved = serializeDocument(editor.getSnapshot());
+  let ops = "[]";
+  const io: CommandIo = {
+    readText: () => saved,
+    writeText: (_path, value) => {
+      saved = value;
+    },
+    readStdin: () => ops,
+  };
+  const edit = (operations: readonly object[]) => {
+    ops = JSON.stringify(operations);
+    return runCli(["edit", "doc.jsonl", "--ops", "-"], io, "test");
+  };
+  const names = () =>
+    new Editor({ document: parseDocument(saved) }).store
+      .listPages()
+      .map((page) => page.name);
+  const pages = () => parseDocument(saved).pages;
+  return { edit, names, pages };
+}
+
+test("edit add-page places the new page before or after another page", () => {
+  const f = orderedPages(["Alpha", "Beta", "Gamma"]);
+  expect(
+    f.edit([
+      { op: "add-page", name: "Inserted", kind: "erd", after: "Alpha" },
+      { op: "add-page", name: "Front", before: "Alpha", ref: "front" },
+      { op: "add-page", name: "Tail" },
+    ]).exitCode,
+  ).toBe(0);
+  expect(f.names()).toEqual([
+    "Front",
+    "Alpha",
+    "Inserted",
+    "Beta",
+    "Gamma",
+    "Tail",
+  ]);
+});
+
+test("edit add-page honours an explicit order key between two pages", () => {
+  const f = orderedPages(["Alpha", "Beta"]);
+  const [alpha, beta] = f.pages().map((page) => page.order!);
+  const between = keyBetween(alpha!, beta!, () => 0.5);
+  expect(
+    f.edit([{ op: "add-page", name: "Middle", order: between }]).exitCode,
+  ).toBe(0);
+  expect(f.names()).toEqual(["Alpha", "Middle", "Beta"]);
+  expect(f.pages().find((page) => page.name === "Middle")?.order).toBe(between);
+});
+
+test("edit move-page reorders existing pages and rejects bad placements", () => {
+  const f = orderedPages(["Alpha", "Beta", "Gamma"]);
+  expect(
+    f.edit([{ op: "move-page", id: "Gamma", before: "Alpha" }]).exitCode,
+  ).toBe(0);
+  expect(f.names()).toEqual(["Gamma", "Alpha", "Beta"]);
+  expect(
+    f.edit([{ op: "move-page", id: "Gamma", after: "Beta" }]).exitCode,
+  ).toBe(0);
+  expect(f.names()).toEqual(["Alpha", "Beta", "Gamma"]);
+  const taken = f.pages().find((page) => page.name === "Alpha")!.order!;
+  for (const [operation, message] of [
+    [{ op: "move-page", id: "Beta" }, "move-page needs"],
+    [
+      { op: "move-page", id: "Beta", before: "Alpha", after: "Gamma" },
+      "only one of",
+    ],
+    [
+      { op: "move-page", id: "Beta", after: "Beta" },
+      "cannot be placed after itself",
+    ],
+    [{ op: "move-page", id: "Beta", order: "a0" }, "fractional key"],
+    [{ op: "move-page", id: "Beta", order: taken }, "already used"],
+  ] as const) {
+    const result = f.edit([operation]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain(message);
+  }
+  expect(f.names()).toEqual(["Alpha", "Beta", "Gamma"]);
+});
+
+test("edit points element operations given a page id to the page operations", () => {
+  const f = orderedPages(["Alpha", "Beta"]);
+  const beta = f.pages().find((page) => page.name === "Beta")!.id;
+  const result = f.edit([{ op: "update", id: beta, semantic: { label: "x" } }]);
+  expect(result.exitCode).toBe(2);
+  expect(result.stderr).toContain("is a page, not an element");
+  expect(result.stderr).toContain("move-page");
 });

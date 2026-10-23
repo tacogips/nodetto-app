@@ -79,7 +79,8 @@ Operations (a JSON array; JSON Lines is also accepted):
 
 | op | fields | effect |
 | --- | --- | --- |
-| `add-page` | `name`, `kind`, `id?` | add a page |
+| `add-page` | `name`, `kind`, `id?`, `ref?`, one of `before?` / `after?` / `order?` | add a page; appended last unless placed before/after a page or at an explicit fractional `order` key |
+| `move-page` | `id`, one of `before` / `after` / `order` | reorder an existing page |
 | `add` | `page`, `type`, `semantic`, `visual?`, `id?`, `ref?` | add an element; `ref` names it for later operations in the same batch |
 | `update` | `id`, `semantic?`, `visual?` | deep-merge objects; arrays replace |
 | `move` | `id`, `x`, `y` | set position |
