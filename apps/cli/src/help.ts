@@ -291,8 +291,10 @@ ERD tables.
   --strict   Exit 3 when the export reports warnings.
 
 CHECK and generated-column expressions must be one row-local SQL expression of
-at most 8192 characters; line breaks are exported as spaces. Unsafe or longer
-expressions are omitted with a warning that names the reason. Expressions that
+at most 65536 characters; line breaks are exported as spaces. PostgreSQL output
+also accepts "::" casts, the "~" regular-expression operators and ARRAY[...].
+Unsafe or longer expressions are omitted with a warning that names the reason
+(for MySQL and SQLite this includes PostgreSQL-only syntax). Expressions that
 call functions or operators the target dialect lacks (for example
 num_nonnulls() or ILIKE on SQLite) are kept and reported as warnings.
 

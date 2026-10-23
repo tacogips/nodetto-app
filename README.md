@@ -442,10 +442,12 @@ expression; the editor marks them with a function (f-hook) glyph, keeps them
 mutually exclusive with defaults and primary keys, and emits `GENERATED ALWAYS AS (...) STORED` for all
 three targets after a conservative row-local expression safety check. Stable-ID
 table check constraints accept portable,
-single-expression SQL predicates of up to 8,192 characters; line breaks are
+single-expression SQL predicates of up to 65,536 characters; line breaks are
 exported as spaces and string literals may contain any printable text except
-backslashes. Expressions are omitted with a warning naming the reason if they
-are longer or contain unsafe syntax. Check and generated expressions that call functions or operators the target dialect
+backslashes. PostgreSQL output also accepts `::` casts, the `~` / `~*` / `!~` /
+`!~*` regular-expression operators and `ARRAY[...]`; MySQL and SQLite omit
+expressions that use them. Expressions are omitted with a warning naming the
+reason if they are longer or contain unsafe syntax. Check and generated expressions that call functions or operators the target dialect
 lacks (for example PostgreSQL's `num_nonnulls()` or `ILIKE` on SQLite) are kept
 and reported as warnings, so `--strict` fails before the migration does.
 Column defaults accept literals and `CURRENT_DATE/TIME/TIMESTAMP`; PostgreSQL

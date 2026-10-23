@@ -828,15 +828,15 @@ test("long CHECK expressions are emitted and enforced", () => {
 
 test("omitted CHECK expressions report the specific reason, including the length limit", () => {
   const editor = checkTable([
-    { id: "huge", expression: `a IN (${"'x', ".repeat(2000)}'y')` },
+    { id: "huge", expression: `a IN (${"'x', ".repeat(14000)}'y')` },
     { id: "cast", expression: "a::int > 0" },
     { id: "empty", expression: "  " },
   ]);
   const result = generateDatabaseDdl(editor, editor.currentPageId, "sqlite");
   expect(result.warnings).toEqual([
     "widgets: check empty was omitted because its expression is empty.",
-    "widgets: check huge was omitted because its expression is 10010 characters long, over the 8192-character limit.",
-    'widgets: check cast was omitted because its expression contains ":"; write casts as CAST(value AS type).',
+    "widgets: check huge was omitted because its expression is 70010 characters long, over the 65536-character limit.",
+    'widgets: check cast was omitted because its expression contains ":"; "::" casts are PostgreSQL-only, so write CAST(value AS type) for SQLite.',
   ]);
   expect(result.sql).not.toContain("CHECK");
 });
@@ -1234,4 +1234,60 @@ test("partial indexes that cannot keep their condition are omitted with warnings
   ]);
   expect(postgresql.sql).not.toContain("DROP TABLE");
   expect(postgresql.sql).toContain("WHERE archived_at IS NULL;");
+});
+
+test("PostgreSQL keeps casts, regular expressions, arrays and long CHECK expressions", () => {
+  const long = `(${Array.from({ length: 400 }, (_, index) => `a <> 'value-${index}'`).join(" AND ")})`;
+  expect(long.length).toBeGreaterThan(8192);
+  const checks = [
+    { id: "cast", name: "ck_cast", expression: "a::text <> ''" },
+    {
+      id: "regex",
+      name: "ck_regex",
+      expression: "b ~ '^[a-z]+$' AND b !~* 'x'",
+    },
+    {
+      id: "array",
+      name: "ck_array",
+      expression: "a = ANY (ARRAY['p'::text, 'q'::text])",
+    },
+    { id: "long", name: "ck_long", expression: long },
+  ];
+  const editor = checkTable(checks);
+  const postgresql = generateDatabaseDdl(
+    editor,
+    editor.currentPageId,
+    "postgresql",
+  );
+  expect(postgresql.warnings).toEqual([]);
+  for (const check of checks)
+    expect(postgresql.sql).toContain(`CHECK (${check.expression})`);
+  const sqlite = generateDatabaseDdl(editor, editor.currentPageId, "sqlite");
+  expect(sqlite.warnings).toEqual([
+    'widgets: check ck_array was omitted because its expression contains "["; arrays and subscripts are PostgreSQL-only.',
+    'widgets: check ck_cast was omitted because its expression contains ":"; "::" casts are PostgreSQL-only, so write CAST(value AS type) for SQLite.',
+    'widgets: check ck_regex was omitted because its expression contains "~"; regular-expression operators are PostgreSQL-only.',
+  ]);
+  expect(sqlite.sql).toContain('CONSTRAINT "ck_long" CHECK');
+});
+
+test("PostgreSQL syntax stays inside the safety checks", () => {
+  const editor = checkTable([
+    { id: "colon", expression: "a : b" },
+    { id: "bracket", expression: "a = ANY (ARRAY['p')" },
+    { id: "close", expression: "a] = b" },
+    { id: "comment", expression: "a::text -- x" },
+  ]);
+  const result = generateDatabaseDdl(
+    editor,
+    editor.currentPageId,
+    "postgresql",
+  );
+  expect(result.warnings).toEqual([
+    'widgets: check colon was omitted because its expression contains ":" outside a "::" cast.',
+    "widgets: check bracket was omitted because its expression has unbalanced brackets.",
+    "widgets: check comment was omitted because its expression contains a statement separator or SQL comment.",
+    "widgets: check close was omitted because its expression has unbalanced brackets.",
+  ]);
+  expect(result.sql).not.toContain("CHECK");
 });

@@ -369,7 +369,7 @@ function generatedFor(
   const raw = column.generatedExpression?.trim();
   if (!raw) return undefined;
   const subject = `${tableName}.${column.name}: generated expression`;
-  const problem = expressionProblem(raw);
+  const problem = expressionProblem(raw, dialect);
   if (problem) {
     warnings.push(
       `${subject} "${raw}" was omitted because it ${problem}. Use one portable row-local SQL expression.`,
@@ -386,7 +386,7 @@ function generatedFor(
  * bounds the safety scan only; every supported database accepts far longer
  * expressions.
  */
-export const MAX_SQL_EXPRESSION_LENGTH = 8192;
+export const MAX_SQL_EXPRESSION_LENGTH = 65536;
 
 interface ScannedExpression {
   /** The expression with each string literal replaced by one space. */
@@ -453,8 +453,13 @@ function hasControlCharacter(text: string, allowWhitespace: boolean): boolean {
  * follow "it", or undefined when it is one row-local expression. Only text
  * outside string literals is restricted to the portable character set;
  * literal contents are free apart from backslashes and control characters.
+ * PostgreSQL additionally accepts "::" casts, the "~" regular-expression
+ * operators and balanced "[ ]" (ARRAY[...] and subscripts).
  */
-function expressionProblem(raw: string): string | undefined {
+function expressionProblem(
+  raw: string,
+  dialect: DatabaseDialect,
+): string | undefined {
   if (!raw) return "is empty";
   if (raw.length > MAX_SQL_EXPRESSION_LENGTH)
     return `is ${raw.length} characters long, over the ${MAX_SQL_EXPRESSION_LENGTH}-character limit`;
@@ -464,7 +469,12 @@ function expressionProblem(raw: string): string | undefined {
     return 'contains "\\"; backslash escapes differ between dialects';
   const scanned = scanExpression(raw);
   if (scanned === undefined) return "has an unterminated string literal";
-  const { outside, literals } = scanned;
+  const { literals } = scanned;
+  const postgresql = dialect === "postgresql";
+  // "::" is only ever a cast, so blanking it keeps a lone ":" rejected.
+  const outside = postgresql
+    ? scanned.outside.replaceAll("::", "  ")
+    : scanned.outside;
   if (literals.some((literal) => hasControlCharacter(literal, false)))
     return "contains a line break or control character inside a string literal";
   if (hasControlCharacter(outside, true)) return "contains a control character";
@@ -475,17 +485,32 @@ function expressionProblem(raw: string): string | undefined {
     outside.includes("*/")
   )
     return "contains a statement separator or SQL comment";
-  const unsupported = /[^A-Za-z0-9_ \t\n\r(),.+\-*/%<>=!|&]/.exec(outside)?.[0];
+  const unsupported = (
+    postgresql
+      ? /[^A-Za-z0-9_ \t\n\r(),.+\-*/%<>=!|&~[\]]/
+      : /[^A-Za-z0-9_ \t\n\r(),.+\-*/%<>=!|&]/
+  ).exec(outside)?.[0];
   if (unsupported)
     return unsupported === ":"
-      ? 'contains ":"; write casts as CAST(value AS type)'
-      : `contains the unsupported character "${unsupported}"`;
-  let depth = 0;
-  for (const character of outside) {
-    if (character === "(") depth += 1;
-    if (character === ")" && --depth < 0) return "has unbalanced parentheses";
+      ? postgresql
+        ? 'contains ":" outside a "::" cast'
+        : `contains ":"; "::" casts are PostgreSQL-only, so write CAST(value AS type) for ${DIALECT_LABEL[dialect]}`
+      : unsupported === "~"
+        ? `contains "~"; regular-expression operators are PostgreSQL-only`
+        : unsupported === "[" || unsupported === "]"
+          ? `contains "${unsupported}"; arrays and subscripts are PostgreSQL-only`
+          : `contains the unsupported character "${unsupported}"`;
+  for (const [open, close, name] of [
+    ["(", ")", "parentheses"],
+    ["[", "]", "brackets"],
+  ] as const) {
+    let depth = 0;
+    for (const character of outside) {
+      if (character === open) depth += 1;
+      if (character === close && --depth < 0) return `has unbalanced ${name}`;
+    }
+    if (depth !== 0) return `has unbalanced ${name}`;
   }
-  if (depth !== 0) return "has unbalanced parentheses";
   const statement =
     /\b(?:select|insert|update|delete|drop|alter|create|attach|detach|pragma|union|with)\b/i.exec(
       outside,
@@ -781,7 +806,7 @@ export function generateDatabaseDdl(
     )) {
       const expression = check.expression.trim();
       const subject = `${table.semantic.tableName}: check ${check.name?.trim() || check.id}`;
-      const problem = expressionProblem(expression);
+      const problem = expressionProblem(expression, dialect);
       if (problem) {
         warnings.push(
           `${subject} was omitted because its expression ${problem}.`,
@@ -1061,7 +1086,7 @@ export function generateDatabaseDdl(
             );
             return [];
           }
-          const problem = expressionProblem(condition);
+          const problem = expressionProblem(condition, dialect);
           if (problem) {
             warnings.push(
               `${subject} was omitted because its WHERE condition ${problem}.`,
