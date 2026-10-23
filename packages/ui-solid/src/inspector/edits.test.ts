@@ -207,6 +207,13 @@ describe("erd table edits", () => {
     expect(removeErdColumn(composite, "c2").indexes?.[0]?.columns).toEqual([
       "c3",
     ]);
+    const partial = updateErdIndex(composite, "i1", {
+      where: "c3 IS NOT NULL",
+    });
+    expect(partial.indexes?.[0]?.where).toBe("c3 IS NOT NULL");
+    expect(
+      updateErdIndex(partial, "i1", { where: "" }).indexes?.[0],
+    ).not.toHaveProperty("where");
     expect(removeErdIndex(composite, "i1").indexes).toBeUndefined();
     expect(removeErdIndex(table, "missing")).toBe(table);
   });

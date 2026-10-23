@@ -129,7 +129,9 @@ function erDiagram(elements: readonly Element[]): MermaidExportReport {
     lines.push(`  ${alias}["${text(semantic.tableName, "Entity")}"] {`);
     const unique = new Set(
       (semantic.indexes ?? []).flatMap((index) =>
-        index.unique && index.columns.length === 1 ? index.columns : [],
+        index.unique && index.columns.length === 1 && !index.where?.trim()
+          ? index.columns
+          : [],
       ),
     );
     for (const index of semantic.indexes ?? []) {
@@ -137,6 +139,11 @@ function erDiagram(elements: readonly Element[]): MermaidExportReport {
         warnings.push({
           elementId: table.id,
           message: `Composite unique index "${index.name ?? index.id}" is not expressible as an ER attribute key.`,
+        });
+      else if (index.unique && index.where?.trim())
+        warnings.push({
+          elementId: table.id,
+          message: `Partial unique index "${index.name ?? index.id}" is not expressible as an ER attribute key.`,
         });
     }
     if ((semantic.checks?.length ?? 0) > 0)

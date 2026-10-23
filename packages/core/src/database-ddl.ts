@@ -1007,6 +1007,7 @@ export function generateDatabaseDdl(
                   ?.name ?? id,
             ),
             !!index.unique,
+            index.where?.trim() ?? "",
           ]);
         return compare(key(a), key(b));
       })
@@ -1047,6 +1048,34 @@ export function generateDatabaseDdl(
           );
           return [];
         }
+        // A partial unique index without its condition would reject rows the
+        // model allows, so an index whose condition cannot be emitted is
+        // omitted rather than widened.
+        const condition = index.where?.trim() ?? "";
+        const subject = `${table.semantic.tableName}: index ${index.name?.trim() || index.id}`;
+        let where = "";
+        if (condition) {
+          if (dialect === "mysql") {
+            warnings.push(
+              `${subject} was omitted because MySQL does not support partial indexes (WHERE ${condition}).`,
+            );
+            return [];
+          }
+          const problem = expressionProblem(condition);
+          if (problem) {
+            warnings.push(
+              `${subject} was omitted because its WHERE condition ${problem}.`,
+            );
+            return [];
+          }
+          const incompatibility = dialectIncompatibility(
+            condition,
+            dialect,
+            subject,
+          );
+          if (incompatibility) warnings.push(incompatibility);
+          where = ` WHERE ${scanExpression(condition)?.normalized ?? condition}`;
+        }
         const explicitName = index.name?.trim() || undefined;
         const preferred =
           explicitName ||
@@ -1055,7 +1084,7 @@ export function generateDatabaseDdl(
             .join("_")}`;
         const name = allocateIndexName(preferred, explicitName !== undefined);
         return [
-          `CREATE ${index.unique ? "UNIQUE " : ""}INDEX ${quoteIdentifier(name, dialect)} ON ${quoteIdentifier(table.semantic.tableName, dialect)} (${columns.map((column) => quoteIdentifier(column.name, dialect)).join(", ")});`,
+          `CREATE ${index.unique ? "UNIQUE " : ""}INDEX ${quoteIdentifier(name, dialect)} ON ${quoteIdentifier(table.semantic.tableName, dialect)} (${columns.map((column) => quoteIdentifier(column.name, dialect)).join(", ")})${where};`,
         ];
       }),
   );

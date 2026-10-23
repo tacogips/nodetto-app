@@ -290,3 +290,27 @@ test("logical references export as dotted, non-identifying relationships", () =>
   expect(report.code).toContain("E_orders }o..|| E_users : relates to");
   expect(report.warnings).toEqual([]);
 });
+
+test("a partial unique index does not mark its column as an ER key", () => {
+  const slots = element("slots", "a1", "erd.table", {
+    tableName: "slots",
+    columns: [
+      { id: "id", name: "id", dataType: "integer", pk: true },
+      { id: "code", name: "code", dataType: "text" },
+    ],
+    indexes: [
+      {
+        id: "live-code",
+        columns: ["code"],
+        unique: true,
+        where: "code IS NOT NULL",
+      },
+    ],
+  });
+  const report = exportMermaid(document([slots]), "page", "erDiagram");
+  expect(report.code).toContain("    text code\n");
+  expect(report.code).not.toContain("code UK");
+  expect(report.warnings.map((warning) => warning.message)).toEqual([
+    'Partial unique index "live-code" is not expressible as an ER attribute key.',
+  ]);
+});

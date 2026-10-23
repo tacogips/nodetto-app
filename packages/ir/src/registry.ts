@@ -471,7 +471,7 @@ const ERD_TABLE: ElementTypeDefinition = {
           "generatedExpression",
         ],
       },
-      indexes: { keys: ["id", "name", "columns", "unique"] },
+      indexes: { keys: ["id", "name", "columns", "unique", "where"] },
       checks: { keys: ["id", "name", "expression"] },
     },
   },
@@ -637,6 +637,7 @@ const ERD_TABLE: ElementTypeDefinition = {
         checkBoolean(out, index["unique"], `${at}.unique`, {
           optional: true,
         });
+        checkString(out, index["where"], `${at}.where`, { optional: true });
       }
     }
     const checks = semantic["checks"];

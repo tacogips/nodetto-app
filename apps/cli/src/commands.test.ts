@@ -87,6 +87,41 @@ test("ddl --strict fails when the export warns", () => {
   expect(result.stderr).toContain("unsafe or empty type");
 });
 
+test("ddl keeps a partial index condition, and --strict fails where it cannot", () => {
+  const partial = ERD.replace(
+    '"columns":["c-email"],"unique":true}',
+    '"columns":["c-email"],"unique":true,"where":"active = true"}',
+  );
+  const io = memoryIo({ "doc.jsonl": partial });
+  const postgresql = runCli(
+    ["ddl", "doc.jsonl", "--dialect", "postgresql", "--strict"],
+    io,
+    "test",
+  );
+  expect(postgresql.exitCode).toBe(EXIT_OK);
+  expect(postgresql.stdout).toContain(
+    'CREATE UNIQUE INDEX "ix_users_email" ON "users" ("email") WHERE active = true;',
+  );
+  const mysql = runCli(
+    ["ddl", "doc.jsonl", "--dialect", "mysql", "--strict"],
+    io,
+    "test",
+  );
+  expect(mysql.exitCode).toBe(EXIT_WARNINGS);
+  expect(mysql.stderr).toContain("does not support partial indexes");
+  expect(runCli(["inspect", "doc.jsonl"], io, "test").stdout).toContain(
+    "index ix_users_email unique where active = true",
+  );
+  const invalid = partial.replace('"where":"active = true"', '"where":1');
+  const validated = runCli(
+    ["validate", "doc.jsonl"],
+    memoryIo({ "doc.jsonl": invalid }),
+    "test",
+  );
+  expect(validated.exitCode).toBe(EXIT_ERROR);
+  expect(validated.stdout + validated.stderr).toContain(".where");
+});
+
 test("ddl requires --page when several pages contain tables", () => {
   const twoPages = [
     ERD.trimEnd(),

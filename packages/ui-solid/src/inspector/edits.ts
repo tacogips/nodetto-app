@@ -469,6 +469,8 @@ export function updateErdIndex(
         };
       if (patch.unique !== undefined)
         next = withOptionalFlag(next, "unique", patch.unique);
+      if (patch.where !== undefined)
+        next = withOptionalString(next, "where", patch.where);
       return next;
     }),
   };

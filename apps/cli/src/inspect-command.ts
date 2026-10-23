@@ -183,7 +183,7 @@ function detailLines(element: Element): string[] {
     }
     for (const index of list("indexes"))
       lines.push(
-        `index ${String(index["name"] ?? "")}${index["unique"] === true ? " unique" : ""}`.trim(),
+        `index ${String(index["name"] ?? "")}${index["unique"] === true ? " unique" : ""}${typeof index["where"] === "string" && index["where"].trim() ? ` where ${index["where"].trim()}` : ""}`.trim(),
       );
   } else if (isDatabaseObjectType(element.type)) {
     for (const column of list("columns"))

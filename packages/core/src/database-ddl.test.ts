@@ -1134,3 +1134,104 @@ test("frame foreign-key scope follows the owner for both relation directions", (
     }
   }
 });
+
+function partialIndexTable(
+  indexes: readonly {
+    id: string;
+    name?: string;
+    columns: string[];
+    unique?: boolean;
+    where?: string;
+  }[],
+) {
+  const editor = makeEditor();
+  editor.createElement("erd.table", {
+    id: "slots-table",
+    semantic: {
+      tableName: "slots",
+      columns: [
+        { id: "id", name: "id", dataType: "integer", pk: true },
+        { id: "owner", name: "owner_id", dataType: "integer" },
+        { id: "code", name: "code", dataType: "text" },
+        {
+          id: "archived",
+          name: "archived_at",
+          dataType: "timestamp",
+          nullable: true,
+        },
+      ],
+      indexes,
+    },
+    visual: { x: 0, y: 0, width: 200 },
+  });
+  return editor;
+}
+
+test("partial indexes emit their WHERE condition and SQLite enforces it", () => {
+  const editor = partialIndexTable([
+    {
+      id: "live-code",
+      name: "uq_slots_live_code",
+      columns: ["owner", "code"],
+      unique: true,
+      where: "  archived_at IS NULL ",
+    },
+  ]);
+  for (const dialect of ["postgresql", "sqlite"] as const) {
+    const result = generateDatabaseDdl(editor, editor.currentPageId, dialect);
+    expect(result.warnings).toEqual([]);
+    expect(result.sql).toContain(
+      'CREATE UNIQUE INDEX "uq_slots_live_code" ON "slots" ("owner_id", "code") WHERE archived_at IS NULL;',
+    );
+  }
+  const database = new Database(":memory:");
+  try {
+    database.exec(
+      generateDatabaseDdl(editor, editor.currentPageId, "sqlite").sql,
+    );
+    database.exec(
+      "INSERT INTO slots (id, owner_id, code, archived_at) VALUES (1, 7, 'k', '2026-01-01')",
+    );
+    database.exec("INSERT INTO slots (id, owner_id, code) VALUES (2, 7, 'k')");
+    expect(() =>
+      database.exec(
+        "INSERT INTO slots (id, owner_id, code) VALUES (3, 7, 'k')",
+      ),
+    ).toThrow();
+  } finally {
+    database.close();
+  }
+});
+
+test("partial indexes that cannot keep their condition are omitted with warnings", () => {
+  const editor = partialIndexTable([
+    {
+      id: "live-code",
+      name: "uq_slots_live_code",
+      columns: ["owner", "code"],
+      unique: true,
+      where: "archived_at IS NULL",
+    },
+    { id: "unsafe", columns: ["code"], where: "1 = 1; DROP TABLE slots" },
+    { id: "plain", columns: ["code"] },
+  ]);
+  const mysql = generateDatabaseDdl(editor, editor.currentPageId, "mysql");
+  expect(mysql.warnings).toEqual([
+    "slots: index unsafe was omitted because MySQL does not support partial indexes (WHERE 1 = 1; DROP TABLE slots).",
+    "slots: index uq_slots_live_code was omitted because MySQL does not support partial indexes (WHERE archived_at IS NULL).",
+  ]);
+  expect(mysql.sql).not.toContain("uq_slots_live_code`");
+  expect(mysql.sql).toContain(
+    "CREATE INDEX `idx_slots_code` ON `slots` (`code`);",
+  );
+  const postgresql = generateDatabaseDdl(
+    editor,
+    editor.currentPageId,
+    "postgresql",
+  );
+  expect(postgresql.warnings).toEqual([
+    "slots: index unsafe was omitted because its WHERE condition contains a statement separator or SQL comment.",
+  ]);
+  expect(postgresql.sql).not.toContain("DROP TABLE");
+  expect(postgresql.sql).toContain("WHERE archived_at IS NULL;");
+});

@@ -214,6 +214,8 @@ export interface ErdIndex {
   /** Stable column ids, in index-key order. */
   readonly columns: readonly string[];
   readonly unique?: boolean;
+  /** Portable SQL predicate of a partial index, without the WHERE keyword. */
+  readonly where?: string;
 }
 
 export interface ErdCheckConstraint {

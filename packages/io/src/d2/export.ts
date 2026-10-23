@@ -171,7 +171,10 @@ function dimensionLines(element: Element, indent: string): string[] {
 function uniqueColumnIds(table: ErdTableSemantic): Set<string> {
   return new Set(
     (table.indexes ?? [])
-      .filter((index) => index.unique && index.columns.length === 1)
+      .filter(
+        (index) =>
+          index.unique && index.columns.length === 1 && !index.where?.trim(),
+      )
       .map((index) => index.columns[0] as string),
   );
 }
@@ -259,6 +262,12 @@ function regularShapeLines(
         elementId: element.id,
         message:
           "Composite indexes are not expressible on D2 SQL-table rows and were omitted.",
+      });
+    if ((table.indexes ?? []).some((index) => index.where?.trim()))
+      warnings.push({
+        elementId: element.id,
+        message:
+          "Partial index conditions are not expressible on D2 SQL-table rows; those indexes were omitted.",
       });
     if ((table.checks?.length ?? 0) > 0)
       warnings.push({

@@ -352,3 +352,31 @@ test("logical ER references export as dashed D2 connections", () => {
   expect(report.code).toContain("style.stroke-dash: 4");
   expect(report.warnings).toEqual([]);
 });
+
+test("D2 omits partial indexes instead of marking columns unique", () => {
+  const slots = element("slots", "a1", "erd.table", {
+    tableName: "slots",
+    columns: [
+      { id: "id", name: "id", dataType: "integer", pk: true },
+      { id: "code", name: "code", dataType: "text" },
+    ],
+    indexes: [
+      {
+        id: "live-code",
+        columns: ["code"],
+        unique: true,
+        where: "code IS NOT NULL",
+      },
+    ],
+  });
+  const report = exportD2(document([slots]), "page");
+  expect(report.code).toContain('  c_code: "text"\n');
+  expect(report.code).not.toContain("unique");
+  expect(report.warnings).toEqual([
+    {
+      elementId: "slots",
+      message:
+        "Partial index conditions are not expressible on D2 SQL-table rows; those indexes were omitted.",
+    },
+  ]);
+});

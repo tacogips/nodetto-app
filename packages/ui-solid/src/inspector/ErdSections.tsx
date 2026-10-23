@@ -394,6 +394,16 @@ export function ErdTableSection(props: ErdTableSectionProps): JSX.Element {
                   write(updateErdIndex(semantic(), index().id, { unique }))
                 }
               />
+              <Field label="Where">
+                <TextInput
+                  label={`Index ${position + 1} condition`}
+                  placeholder="Partial index condition, e.g. deleted_at IS NULL"
+                  value={index().where ?? ""}
+                  onCommit={(where) =>
+                    write(updateErdIndex(semantic(), index().id, { where }))
+                  }
+                />
+              </Field>
             </div>
           )}
         </Index>
