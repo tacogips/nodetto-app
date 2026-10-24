@@ -329,6 +329,12 @@ export {
   readTableEndpoints,
   resolveConnector,
 } from "./shapes/connector.ts";
+export {
+  connectorPath,
+  connectorPathData,
+  connectorRoutesBeneath,
+  LINE_JUMP_RADIUS,
+} from "./shapes/connector-path.ts";
 export { edgeShapeUtil } from "./shapes/edge.ts";
 export { erdRelationShapeUtil } from "./shapes/erdRelation.ts";
 export {

@@ -87,6 +87,7 @@ import {
   ERD_TABLE_ROW_HEIGHT,
   erdColumnKey,
 } from "./shapes/erdTable.ts";
+import { connectorPath } from "./shapes/connector-path.ts";
 import { geoOutline } from "./shapes/geo-outline.ts";
 import { geoFlipOf } from "./shapes/outline.ts";
 import { textNoteText } from "./shapes/textNote.ts";
@@ -1691,35 +1692,41 @@ function renderConnector(
     "marker-end": markerUrl(decoration.end, "end"),
     "stroke-dasharray": connectorDefaultDash(element),
   };
+  const pathData = connectorPath(element, resolved.points, context);
   const line =
-    resolved.points.length > 2
-      ? tag("polyline", {
-          ...styled(
-            {
-              points: resolved.points
-                .map((point) => `${fmt(point.x)},${fmt(point.y)}`)
-                .join(" "),
-              ...common,
-            },
-            element.visual,
-            element.id,
-          ),
+    pathData !== null
+      ? tag("path", {
+          ...styled({ d: pathData, ...common }, element.visual, element.id),
           fill: "none",
         })
-      : tag(
-          "line",
-          styled(
-            {
-              x1: resolved.start.x,
-              y1: resolved.start.y,
-              x2: resolved.end.x,
-              y2: resolved.end.y,
-              ...common,
-            },
-            element.visual,
-            element.id,
-          ),
-        );
+      : resolved.points.length > 2
+        ? tag("polyline", {
+            ...styled(
+              {
+                points: resolved.points
+                  .map((point) => `${fmt(point.x)},${fmt(point.y)}`)
+                  .join(" "),
+                ...common,
+              },
+              element.visual,
+              element.id,
+            ),
+            fill: "none",
+          })
+        : tag(
+            "line",
+            styled(
+              {
+                x1: resolved.start.x,
+                y1: resolved.start.y,
+                x2: resolved.end.x,
+                y2: resolved.end.y,
+                ...common,
+              },
+              element.visual,
+              element.id,
+            ),
+          );
   if (element.type.startsWith("bpmn.")) {
     return (
       line +

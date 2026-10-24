@@ -39,6 +39,7 @@ export const VISUAL_STYLE_KEY_ORDER: KeyOrder = {
     "cornerRadius",
     "cornerRadii",
     "dash",
+    "lineJumps",
     "opacity",
     "blendMode",
     "color",

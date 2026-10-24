@@ -185,10 +185,16 @@ export interface VisualStyle {
   readonly strokeDashArray?: readonly number[];
   /** Phase within the resolved dash cycle, in design pixels. */
   readonly strokeDashOffset?: number;
+  /** Box corners, or the bends of a connector's route. */
   readonly cornerRadius?: number;
   /** Independent circular corner radii; supersedes `cornerRadius`. */
   readonly cornerRadii?: CornerRadii;
   readonly dash?: "solid" | "dashed" | "dotted";
+  /**
+   * Connectors only: how this line crosses connectors painted beneath it,
+   * with a small arc over them or a gap in the line. Omitted crosses flat.
+   */
+  readonly lineJumps?: "arc" | "gap";
   readonly opacity?: number;
   /** Composites this layer with the already-painted backdrop. */
   readonly blendMode?: BlendMode;

@@ -9,6 +9,7 @@ import {
   bpmnFlowDecoration,
   connectorDefaultDash,
   connectorDecoration,
+  connectorPath,
   diamondGradientPatches,
   endpointReaderFor,
   shapeAuthoringWarnings,
@@ -58,6 +59,14 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
     { equals: sameConnectorGeometry },
   );
   const decoration = () => connectorDecoration(props.element);
+  // Rounded bends and line jumps; other connectors' moves re-run this only
+  // for connectors whose style asks for jumps.
+  const pathData = createMemo(() => {
+    const resolved = geometry();
+    return resolved
+      ? connectorPath(props.element, resolved.points, props.context)
+      : null;
+  });
   const warning = createMemo(() =>
     shapeAuthoringWarnings(props.element, props.context).join("\n"),
   );
@@ -230,13 +239,57 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
             }}
           </Show>
           <Show
-            when={resolved().points.length > 2}
+            when={pathData()}
             fallback={
-              <line
-                x1={resolved().start.x}
-                y1={resolved().start.y}
-                x2={resolved().end.x}
-                y2={resolved().end.y}
+              <Show
+                when={resolved().points.length > 2}
+                fallback={
+                  <line
+                    x1={resolved().start.x}
+                    y1={resolved().start.y}
+                    x2={resolved().end.x}
+                    y2={resolved().end.y}
+                    marker-start={markerUrl(
+                      decoration().start,
+                      "start",
+                      props.markerPrefix,
+                    )}
+                    marker-end={markerUrl(
+                      decoration().end,
+                      "end",
+                      props.markerPrefix,
+                    )}
+                    stroke-dasharray={connectorDefaultDash(props.element)}
+                    {...svgStyle(props.element.visual, props.element.id)}
+                    style={warningStyle()}
+                  />
+                }
+              >
+                <polyline
+                  points={resolved()
+                    .points.map((point) => `${point.x},${point.y}`)
+                    .join(" ")}
+                  marker-start={markerUrl(
+                    decoration().start,
+                    "start",
+                    props.markerPrefix,
+                  )}
+                  marker-end={markerUrl(
+                    decoration().end,
+                    "end",
+                    props.markerPrefix,
+                  )}
+                  stroke-dasharray={connectorDefaultDash(props.element)}
+                  {...svgStyle(props.element.visual, props.element.id)}
+                  style={warningStyle()}
+                  fill="none"
+                />
+              </Show>
+            }
+          >
+            {(d) => (
+              <path
+                d={d()}
                 marker-start={markerUrl(
                   decoration().start,
                   "start",
@@ -250,28 +303,9 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                 stroke-dasharray={connectorDefaultDash(props.element)}
                 {...svgStyle(props.element.visual, props.element.id)}
                 style={warningStyle()}
+                fill="none"
               />
-            }
-          >
-            <polyline
-              points={resolved()
-                .points.map((point) => `${point.x},${point.y}`)
-                .join(" ")}
-              marker-start={markerUrl(
-                decoration().start,
-                "start",
-                props.markerPrefix,
-              )}
-              marker-end={markerUrl(
-                decoration().end,
-                "end",
-                props.markerPrefix,
-              )}
-              stroke-dasharray={connectorDefaultDash(props.element)}
-              {...svgStyle(props.element.visual, props.element.id)}
-              style={warningStyle()}
-              fill="none"
-            />
+            )}
           </Show>
           <For
             each={bpmnFlowDecoration(props.element, resolved().points, (id) =>

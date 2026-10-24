@@ -16,7 +16,7 @@ import type {
   LayerEffect,
   VisualStyle,
 } from "@nodetto/ir";
-import { BLEND_MODES } from "@nodetto/ir";
+import { BLEND_MODES, getElementTypeDefinition } from "@nodetto/ir";
 import { For, type JSX, Show } from "solid-js";
 import {
   Field,
@@ -420,6 +420,39 @@ export function StyleSection(props: StyleSectionProps): JSX.Element {
           onChange={(event) => write({ color: event.currentTarget.value })}
         />
       </Field>
+      <Show
+        when={props.leaves.some(
+          (leaf) => getElementTypeDefinition(leaf.type)?.category === "edge",
+        )}
+      >
+        <Field label="Bends">
+          <NumberInput
+            label="Connector bend radius"
+            min={0}
+            value={style().cornerRadius ?? 0}
+            onCommit={(cornerRadius) =>
+              write({ cornerRadius: cornerRadius > 0 ? cornerRadius : null })
+            }
+          />
+        </Field>
+        <Field label="Crossings">
+          <SelectInput
+            label="Line jumps where this connector crosses lower ones"
+            value={style().lineJumps ?? ""}
+            options={[
+              { value: "", label: "Flat" },
+              { value: "arc", label: "Arc jump" },
+              { value: "gap", label: "Gap" },
+            ]}
+            onCommit={(lineJumps) =>
+              write({
+                lineJumps:
+                  lineJumps === "arc" || lineJumps === "gap" ? lineJumps : null,
+              })
+            }
+          />
+        </Field>
+      </Show>
       <Show
         when={props.leaves.some(
           (leaf) =>

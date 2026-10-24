@@ -67,6 +67,7 @@ const SIZE_LIMIT_FIELDS = [
 ] as const;
 
 const DASH_VALUES = ["solid", "dashed", "dotted"] as const;
+const LINE_JUMPS = ["arc", "gap"] as const;
 const STROKE_CAP_VALUES = ["butt", "round", "square"] as const;
 const STROKE_JOIN_VALUES = ["miter", "round", "bevel"] as const;
 const TEXT_ALIGN_VALUES = ["start", "middle", "end"] as const;
@@ -381,6 +382,9 @@ function validateVisual(
       optional: true,
     });
   }
+  checkEnum(out, style["lineJumps"], `${path}.style.lineJumps`, LINE_JUMPS, {
+    optional: true,
+  });
   checkEnum(out, style["dash"], `${path}.style.dash`, DASH_VALUES, {
     optional: true,
   });
