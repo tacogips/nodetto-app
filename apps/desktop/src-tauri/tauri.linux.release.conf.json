@@ -11,7 +11,8 @@
     "fileAssociations": [
       { "ext": ["jsonl"], "name": "Nodetto document", "role": "Editor", "mimeType": "application/jsonl" },
       { "ext": ["mmd", "mermaid"], "name": "Mermaid diagram", "role": "Viewer" },
-      { "ext": ["bpmn"], "name": "BPMN diagram", "role": "Viewer" }
+      { "ext": ["bpmn"], "name": "BPMN diagram", "role": "Viewer" },
+      { "ext": ["drawio", "dio"], "name": "draw.io diagram", "role": "Viewer" }
     ]
   }
 }

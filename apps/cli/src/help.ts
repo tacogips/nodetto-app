@@ -26,6 +26,7 @@ Convert and check
   nodetto-cli format <doc>        Canonical JSONL formatting
   nodetto-cli lint <doc|bpmn>     Lint BPMN pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
+  nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
 
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
@@ -232,12 +233,14 @@ ${EXIT_CODES}`,
 
 Render one page exactly as the app's page export does.
 
-  --format       svg, png, pdf, html, mermaid, d2 or code (required).
-                 html writes a website ZIP; code uses --element and --code-format.
+  --format       svg, png, pdf, html, mermaid, d2, drawio or code (required).
+                 html writes a website ZIP; code uses --element and --code-format;
+                 drawio writes an editable draw.io file of every page.
                  SQL: use nodetto-cli ddl. BPMN XML: use nodetto-cli bpmn export.
   --page         Export only this page by short ID, full ID or exact name.
                  Required when the document has several pages (unless --element
-                 implies one). Use pages to list short IDs, full IDs, names and kinds.
+                 implies one; drawio exports all pages without it). Use pages to
+                 list short IDs, full IDs, names and kinds.
   --element      Render only this element's area (a frame renders everything
                  inside it). Accepts a unique id prefix; implies its page.
                  Use it to check one part of a large diagram.
@@ -271,6 +274,7 @@ Example (check a drawing):
   nodetto-cli export flow.jsonl --page Flow --format png --output /tmp/flow.png
   nodetto-cli export mixed.jsonl --page Schema --format svg --output schema.svg
   nodetto-cli export mixed.jsonl --page Schema --format mermaid --output schema.mmd
+  nodetto-cli export mixed.jsonl --format drawio --output mixed.drawio
   nodetto-cli export design.jsonl --element artboard-id --format code --code-format swiftui
 
 ${EXIT_CODES}`,
@@ -347,6 +351,17 @@ Import or export BPMN 2.0 XML.
 
   --strict  Exit 3 when import or export reports warnings.
   --check   (export) Exit 1 when the file is out of date.
+
+${EXIT_CODES}`,
+
+  drawio: `Usage: nodetto-cli drawio import <file.drawio> [--output <doc.jsonl>] [--strict]
+
+Convert a draw.io (diagrams.net) file, compressed or not, into a nodetto
+document with one freeform page per diagram. Shapes without a nodetto
+equivalent are imported as rectangles and reported as warnings; images are
+skipped. Export with: nodetto-cli export <doc> --format drawio.
+
+  --strict  Exit 3 when the import reports warnings.
 
 ${EXIT_CODES}`,
 };

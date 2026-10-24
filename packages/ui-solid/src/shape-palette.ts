@@ -36,7 +36,7 @@ export const PALETTE_ICONS = {
   cloud: "M9 26a6 6 0 01-1-12 8 8 0 0115-3 6 6 0 012 15z",
   callout: "M3 4h26v17H15l-7 7v-7H3z",
   foldedNote: "M4 3h17l7 7v19H4zM21 3v7h7",
-  cube: "M9 3h20v20l-6 6H3V9zM3 9h20v20M23 9l6-6",
+  cube: "M3 3h20l6 6v20H9l-6-6zM3 3l6 6h20M9 9v20",
   document: "M3 4h26v19c-5-3-9 0-13 2s-8 1-13-1z",
   manualInput: "M3 12l26-6v20H3z",
   delay: "M3 6h15a10 10 0 010 20H3z",

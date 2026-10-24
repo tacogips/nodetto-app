@@ -52,6 +52,16 @@
         "description": "BPMN 2.0 process diagram",
         "role": "Viewer",
         "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "drawio",
+          "dio"
+        ],
+        "name": "draw.io diagram",
+        "description": "draw.io (diagrams.net) diagram",
+        "role": "Viewer",
+        "rank": "Alternate"
       }
     ]
   }

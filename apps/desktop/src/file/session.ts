@@ -135,6 +135,14 @@ function mermaidTitle(path: string): string {
   return baseName(path).replace(/\.(?:mmd|mermaid)$/i, "");
 }
 
+function isDrawioPath(path: string): boolean {
+  return /\.(?:drawio|dio)$/i.test(path);
+}
+
+function drawioTitle(path: string): string {
+  return baseName(path).replace(/\.(?:drawio|dio)$/i, "");
+}
+
 function isBpmnPath(path: string): boolean {
   return /\.bpmn$/i.test(path);
 }
@@ -402,6 +410,31 @@ export class DocumentSession {
         return await this.importDocument(imported.document, baseName(path));
       } catch (error) {
         this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
+        return false;
+      }
+    }
+
+    if (isDrawioPath(path)) {
+      try {
+        const { importDrawio } = await import("@nodetto/io/drawio");
+        if (stale()) {
+          return false;
+        }
+        const report = importDrawio(diskText, { title: drawioTitle(path) });
+        // draw.io files are an interchange source, not our persistence
+        // format. Keep them detached so autosave never rewrites the source.
+        return await this.importDocument(
+          report.document,
+          baseName(path),
+          report.warnings.map((warning) => ({
+            element: warning.cell ?? warning.page,
+            message: `${warning.page}: ${warning.message}`,
+          })),
+        );
+      } catch (error) {
+        if (!stale()) {
+          this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
+        }
         return false;
       }
     }

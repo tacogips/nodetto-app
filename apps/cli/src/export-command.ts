@@ -2,6 +2,7 @@ import {
   availableMermaidKinds,
   exportMermaid,
   exportD2,
+  exportDrawio,
   type MermaidDiagramKind,
 } from "@nodetto/io";
 import { encodeRasterDataUrl, isRasterAttachmentPath } from "@nodetto/ir";
@@ -62,6 +63,7 @@ const EXPORT_FORMATS = [
   "html",
   "mermaid",
   "d2",
+  "drawio",
   "code",
 ] as const;
 type ExportFormat = (typeof EXPORT_FORMATS)[number];
@@ -175,6 +177,37 @@ export async function exportCommand(
       (element) => element.id === resolved.id,
     );
     if (pageQuery === undefined) pageQuery = owner?.page;
+  }
+  if (exportFormat === "drawio") {
+    // A draw.io file holds every page unless one is asked for.
+    if (elementId) return fail("drawio exports whole pages; omit --element.");
+    let pageIds: readonly string[] | undefined;
+    if (pageQuery !== undefined) {
+      const only = selectPage(
+        loaded.document,
+        pageQuery,
+        loaded.document.pages,
+        "The document has no pages.",
+        "pages",
+      );
+      if (typeof only === "string") return fail(only);
+      pageIds = [only.id];
+    }
+    try {
+      const report = exportDrawio(loaded.document, pageIds ? { pageIds } : {});
+      const warnings =
+        loaded.warnings +
+        report.warnings
+          .map((warning) => `warning: ${warning.message}\n`)
+          .join("");
+      if (outputPath === undefined) return ok(report.xml, warnings);
+      const failure = writeOutput(io, outputPath, report.xml);
+      return failure
+        ? fail(`${warnings}${failure}`)
+        : ok("", `${warnings}Wrote ${outputPath}.\n`);
+    } catch (error) {
+      return fail(`Cannot export drawio: ${describe(error)}`);
+    }
   }
   const page = selectPage(
     loaded.document,

@@ -25,7 +25,7 @@ The full product design lives in the private `nodetto-cloud` repository (`design
 packages/
   ir/        Diagram IR: types, element type registry, validation, migrations
   core/      Editor core (no framework dependencies)
-  io/        JSONL persistence, SVG/Mermaid/D2 adapters
+  io/        JSONL persistence, Mermaid/D2/BPMN/draw.io adapters
   collab/    Yjs client binding (sync server is private)
   ui-solid/  Solid renderer
 apps/
@@ -81,8 +81,8 @@ The cask installs the local-only `Nodetto.app` and links the bundled
 show cloud/account controls; cloud workspaces belong to the hosted web edition.
 Open a document from a terminal with `nodetto-cli open path/to/file.jsonl`
 (or `open -a nodetto path/to/file.jsonl` on macOS);
-Finder "Open With" also lists nodetto for `.jsonl`, `.mmd` and `.mermaid`
-files without becoming their default application. A path passed while the app
+Finder "Open With" also lists nodetto for `.jsonl`, `.mmd`, `.mermaid`, `.bpmn`,
+`.drawio` and `.dio` files without becoming their default application. A path passed while the app
 is running opens in the existing window (after the usual unsaved-changes
 prompt).
 
@@ -159,9 +159,11 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   after that check can still race the atomic replacement.
 - `export` renders SVG with the editor's serializer, PNG with resvg using system
   fonts (embedded in the compiled sidecar), and PDF with the app's page layout.
-  It also exports HTML website ZIPs, Mermaid, D2, and every output in the Code
-  panel (`--format code --element <id> --code-format <output>`). SQL uses `ddl`,
-  and BPMN XML uses `bpmn export`; both accept `--page`.
+  It also exports HTML website ZIPs, Mermaid, D2, draw.io files (every page
+  unless `--page` is given), and every output in the Code panel
+  (`--format code --element <id> --code-format <output>`). SQL uses `ddl`,
+  and BPMN XML uses `bpmn export`; both accept `--page`. `drawio import` and
+  `bpmn import` convert those files to JSONL.
 - The desktop app applies outside changes to an open file live, keeping the
   camera and selection. With unsaved local edits it merges three ways at element
   and field level (a move and a rename of the same table both survive) and
@@ -212,7 +214,8 @@ See [the design](design-docs/specs/design-cli-ai-drawing.md).
 ## Flowcharts and ERD relations
 
 The **Flowchart** mode and shape category provide Start, End, Process, Decision,
-Input / Output, Database and labeled Flow arrows. See the
+Input / Output, Database, Document, Manual input, Delay, Predefined process,
+Internal storage, Off-page connector, Card and labeled Flow arrows. See the
 [CLI flowchart example](examples/flowchart/README.md) for a decision and retry
 flow and Mermaid export.
 
@@ -551,6 +554,39 @@ both endpoints carries the authored path while moving one endpoint reshapes it
 predictably. Manual edits are atomic, cancellable, JSONL/Yjs portable, pickable
 and exported through the same polyline geometry. Browser pointer QA remains
 unfinished.
+
+## Shapes, arrowheads and connector styles
+
+The **General** shape category has the draw.io basics: rectangle, ellipse,
+diamond, cylinder, triangle, hexagon, parallelogram, star, trapezoid, pentagon,
+octagon, cross, block arrow, chevron, cloud, callout, folded note and cube. Any
+geometric shape keeps a centred, styled label and fill/gradient paint, and can
+be flipped horizontally or vertically (**Shift+H** / **Shift+V**, the context
+menu's Arrange submenu, or the inspector) without mirroring its label.
+
+Connector ends can be None, Arrow, Triangle, Dot, Open arrow, Diamond, Open
+diamond, Circle, Bar or Crow's foot. In the Style section, **Bends** rounds the
+corners of a route and **Crossings** makes a connector hop over (Arc jump) or
+break around (Gap) connectors painted beneath it. Both are paint-only, so they
+are copied by Copy style and exported to SVG, PNG, PDF and draw.io.
+
+## draw.io import and export
+
+Open a `.drawio` or `.dio` file (compressed or not) in the desktop app, the
+hosted file picker, or with `nodetto-cli drawio import`. Each draw.io page
+becomes a freeform page: shapes, text, containers (as frames), labels, colours,
+gradients, fonts, rotation, flips, connectors with their endpoints, waypoints,
+orthogonal routing, arrowheads, rounded bends and line jumps carry over. Shapes
+from other draw.io libraries become labelled rectangles and images are skipped,
+both reported as import notes. Imports are detached, so autosave never rewrites
+the draw.io file.
+
+**Export → draw.io** (or `nodetto-cli export <doc> --format drawio`) writes an
+editable `.drawio` file of every page, or only the current one. Geometric shapes
+use draw.io's own shapes with matching proportions and round-trip exactly; ERD
+tables and UML classes become draw.io lists with one row per column or member.
+Types without a draw.io counterpart are written as labelled rectangles and
+listed in the export panel.
 
 ## D2 export
 

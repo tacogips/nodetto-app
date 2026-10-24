@@ -530,6 +530,34 @@ describe("opening", () => {
     expect(harness.backend.files.get(path)).toBe(BPMN_FIXTURE);
   });
 
+  test("opening a draw.io file imports a detached document with its warnings", async () => {
+    const harness = createHarness();
+    const path = "/docs/whiteboard.drawio";
+    const source = `<mxfile><diagram name="Board"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="a" value="Plan" style="shape=cloud;html=1;" vertex="1" parent="1"><mxGeometry x="10" y="20" width="120" height="80" as="geometry"/></mxCell><mxCell id="b" value="" style="shape=image;" vertex="1" parent="1"><mxGeometry width="10" height="10" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>`;
+    harness.backend.files.set(path, source);
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state()).toMatchObject({
+      filePath: null,
+      fileName: "whiteboard.drawio",
+      dirty: true,
+      error: null,
+    });
+    expect(harness.session.state().importWarnings).toEqual([
+      { element: "Board", message: "Board: Images were skipped." },
+    ]);
+    expect(harness.editor.getSnapshot().title).toBe("whiteboard");
+    expect(harness.editor.store.listElements()).toMatchObject([
+      { type: "shape.geo", semantic: { geo: "cloud", label: "Plan" } },
+    ]);
+    expect(harness.backend.watched).toEqual([]);
+    addShape(harness.editor, "local edit");
+    harness.timers.fire();
+    await harness.settle();
+    expect(harness.backend.writes).toEqual([]);
+    expect(harness.backend.files.get(path)).toBe(source);
+  });
+
   test("a malformed BPMN file leaves the current document and association intact", async () => {
     const source = await savedFile("original");
     const harness = createHarness();

@@ -32,6 +32,7 @@ const Artwork = lazy(() =>
 );
 const Mermaid = lazy(() => import("./inspector/MermaidExportSection.tsx"));
 const D2 = lazy(() => import("./inspector/D2ExportSection.tsx"));
+const Drawio = lazy(() => import("./inspector/DrawioExportSection.tsx"));
 const Database = lazy(() => import("./inspector/DatabaseExportSection.tsx"));
 const Code = lazy(() =>
   import("./inspector/HandoffSection.tsx").then((m) => ({
@@ -42,6 +43,7 @@ type Format =
   | ExportFormat
   | "mermaid"
   | "d2"
+  | "drawio"
   | "sql"
   | "bpmn"
   | "code"
@@ -91,6 +93,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       },
       { id: "html", label: "HTML", enabled: true },
       { id: "d2", label: "D2", enabled: true },
+      { id: "drawio", label: "draw.io", enabled: true },
       {
         id: "sql",
         label: "SQL",
@@ -107,7 +110,10 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     formats().find((t) => t.id === format())?.enabled ? format() : "svg";
   const formatGroups: readonly { label: string; ids: readonly Format[] }[] = [
     { label: "Artwork", ids: ["svg", "png", "pdf"] },
-    { label: "Diagram source", ids: ["mermaid", "d2", "sql", "bpmn"] },
+    {
+      label: "Diagram source",
+      ids: ["mermaid", "d2", "drawio", "sql", "bpmn"],
+    },
     { label: "Web & developer", ids: ["html", "code"] },
   ];
   const descriptions: Record<Format, string> = {
@@ -116,6 +122,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     pdf: "A document sized to your artwork or a printed page.",
     mermaid: "Editable Mermaid source for ER, UML and sequence diagrams.",
     d2: "Editable D2 diagram source.",
+    drawio: "An editable .drawio file for draw.io (diagrams.net).",
     sql: "Database schema SQL in your preferred dialect.",
     bpmn: "BPMN 2.0 XML for other process modeling tools.",
     html: "A website ZIP containing artboard HTML, CSS and assets.",
@@ -239,6 +246,12 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
             </Match>
             <Match when={active() === "d2"}>
               <D2 editor={props.editor} pageId={props.editor.currentPageId} />
+            </Match>
+            <Match when={active() === "drawio"}>
+              <Drawio
+                editor={props.editor}
+                pageId={props.editor.currentPageId}
+              />
             </Match>
             <Match when={active() === "sql"}>
               <Database

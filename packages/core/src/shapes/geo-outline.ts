@@ -378,25 +378,26 @@ export function geoOutline(
       );
     }
     case "cube": {
+      // draw.io's cube: the front face sits bottom-right, depth up-left.
       const depth = round(Math.min(short * 0.2, 24));
       return polygon(
         [
-          [left + depth, top],
-          [right, top],
-          [right, bottom - depth],
-          [right - depth, bottom],
-          [left, bottom],
-          [left, top + depth],
+          [left, top],
+          [right - depth, top],
+          [right, top + depth],
+          [right, bottom],
+          [left + depth, bottom],
+          [left, bottom - depth],
         ],
         [
           [
-            [left, top + depth],
-            [right - depth, top + depth],
-            [right - depth, bottom],
+            [left, top],
+            [left + depth, top + depth],
+            [right, top + depth],
           ],
           [
-            [right - depth, top + depth],
-            [right, top],
+            [left + depth, top + depth],
+            [left + depth, bottom],
           ],
         ],
       );

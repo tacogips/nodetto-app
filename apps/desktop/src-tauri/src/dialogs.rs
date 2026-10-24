@@ -13,7 +13,9 @@ use tauri::Manager;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 const FILTER_NAME: &str = "nodetto document";
-const OPEN_FILTER_EXTENSIONS: &[&str] = &["jsonl", "mmd", "mermaid", "bpmn", "html", "htm"];
+const OPEN_FILTER_EXTENSIONS: &[&str] = &[
+    "jsonl", "mmd", "mermaid", "bpmn", "drawio", "dio", "html", "htm",
+];
 const SAVE_FILTER_EXTENSIONS: &[&str] = &["jsonl"];
 const DEFAULT_FILE_NAME: &str = "untitled.jsonl";
 
@@ -197,6 +199,12 @@ mod tests {
     #[test]
     fn open_filter_includes_bpmn() {
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"bpmn"));
+    }
+
+    #[test]
+    fn open_filter_includes_drawio() {
+        assert!(OPEN_FILTER_EXTENSIONS.contains(&"drawio"));
+        assert!(OPEN_FILTER_EXTENSIONS.contains(&"dio"));
     }
 
     #[test]

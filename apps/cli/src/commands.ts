@@ -15,6 +15,8 @@ import {
 import {
   exportBpmnXml,
   importBpmnXml,
+  importDrawio,
+  type DrawioImportReport,
   parseDocumentResult,
   serializeDocument,
   type BpmnExportReport,
@@ -77,6 +79,7 @@ const VALUE_OPTIONS = new Set(["--dialect", "--page", "--output", "--check"]);
 const ARRANGE_OPTIONS = new Set(["--mode", "--direction", "--page"]);
 const LINT_OPTIONS = new Set(["--page", "--config", "--format"]);
 const BPMN_IMPORT_OPTIONS = new Set(["--output"]);
+const DRAWIO_IMPORT_OPTIONS = new Set(["--output"]);
 const BPMN_EXPORT_OPTIONS = new Set(["--page", "--output", "--check"]);
 
 export function ok(stdout: string, stderr = ""): CommandResult {
@@ -465,6 +468,54 @@ function bpmnCommand(io: CommandIo, args: readonly string[]): CommandResult {
   );
 }
 
+function drawioCommand(io: CommandIo, args: readonly string[]): CommandResult {
+  const [subcommand, ...rest] = args;
+  if (subcommand !== "import")
+    return fail(
+      `drawio expects the import subcommand.\n\n${helpFor("drawio")}`,
+    );
+  const parsed = parseArgs(rest, DRAWIO_IMPORT_OPTIONS, new Set(["--strict"]));
+  if (typeof parsed === "string")
+    return fail(`${parsed}\n\n${helpFor("drawio")}`);
+  if (parsed.positional.length !== 1)
+    return fail(
+      `drawio import expects exactly one draw.io file path.\n\n${helpFor("drawio")}`,
+    );
+  const path = parsed.positional[0] as string;
+  let report: DrawioImportReport;
+  try {
+    const basename = path
+      .split(/[\\/]/)
+      .at(-1)
+      ?.replace(/\.(?:drawio|dio|xml)$/i, "");
+    report = importDrawio(io.readText(path), { title: basename });
+  } catch (cause) {
+    return fail(
+      `Cannot import ${path}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  const warnings = report.warnings
+    .map(
+      (warning) =>
+        `warning: ${warning.page}${warning.cell ? ` (${warning.cell})` : ""}: ${warning.message}\n`,
+    )
+    .join("");
+  if (parsed.flags.has("--strict") && report.warnings.length)
+    return {
+      exitCode: EXIT_WARNINGS,
+      stdout: "",
+      stderr: `${warnings}${report.warnings.length} draw.io import warning(s) with --strict.\n`,
+    };
+  const jsonl = serializeDocument(report.document);
+  const outputPath = parsed.options.get("--output");
+  if (outputPath !== undefined) {
+    const failure = writeOutput(io, outputPath, jsonl);
+    if (failure) return fail(`${warnings}${failure}`);
+    return ok("", `${warnings}Wrote draw.io document to ${outputPath}.\n`);
+  }
+  return ok(jsonl, warnings);
+}
+
 function isDialect(value: string): value is DatabaseDialect {
   return (DATABASE_DIALECTS as readonly string[]).includes(value);
 }
@@ -709,6 +760,8 @@ export function runCli(
       return lintCommand(io, rest);
     case "bpmn":
       return bpmnCommand(io, rest);
+    case "drawio":
+      return drawioCommand(io, rest);
     case "diff":
       return diffCommand(io, rest);
     case "edit":

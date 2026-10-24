@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./mermaid/import": "./src/mermaid/import.ts",
-    "./bpmn": "./src/bpmn/index.ts"
+    "./bpmn": "./src/bpmn/index.ts",
+    "./drawio": "./src/drawio/index.ts"
   },
   "dependencies": {
     "@nodetto/ir": "workspace:*"

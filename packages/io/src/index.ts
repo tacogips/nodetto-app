@@ -1,4 +1,5 @@
-// IO adapters: JSONL persistence and import/export (SVG, PNG, Mermaid, D2).
+// IO adapters: JSONL persistence and import/export (SVG, PNG, Mermaid, D2,
+// BPMN XML and draw.io).
 // Adapters consume and produce the Diagram IR only — no editor, no Yjs, no
 // DOM, no framework.
 //
@@ -46,6 +47,17 @@ export {
   MermaidParseError,
   importMermaid,
 } from "./mermaid/import.ts";
+export {
+  type DrawioExportOptions,
+  type DrawioExportReport,
+  type DrawioExportWarning,
+  type DrawioImportOptions,
+  type DrawioImportReport,
+  type DrawioImportWarning,
+  DrawioParseError,
+  exportDrawio,
+  importDrawio,
+} from "./drawio/index.ts";
 export {
   type D2ExportReport,
   type D2ExportWarning,
