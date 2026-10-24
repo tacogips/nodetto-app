@@ -91,7 +91,10 @@ tagging and pushing `v<version>`; the tag must match the versions in
 `apps/desktop/src-tauri/tauri.conf.json` and `apps/cli/package.json`. The
 script reads `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` and
 `APPLE_TEAM_ID` from the environment, notarizes and staples the DMG, and
-uploads the DMG and a zipped app. `mise run bundle-macos` builds the same
+uploads the DMG, a version-free `Nodetto_aarch64.dmg` copy and a zipped app.
+The copy keeps
+`https://github.com/tacogips/nodetto-app/releases/latest/download/Nodetto_aarch64.dmg`
+on the newest release. `mise run bundle-macos` builds the same
 bundle locally.
 
 ## Command line (`nodetto-cli`)

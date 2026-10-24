@@ -184,7 +184,15 @@ if ! gh release view "$release_tag" >/dev/null 2>&1; then
     --notes "$release_notes"
 fi
 
-gh release upload "$release_tag" "$dmg_path" "$app_zip_path" --clobber
+# A version-free copy of the same DMG keeps
+# releases/latest/download/Nodetto_aarch64.dmg (the nodetto.app download link)
+# pointing at the newest published release.
+latest_dmg_path="target/release/bundle/latest/Nodetto_aarch64.dmg"
+mkdir -p "$(dirname "$latest_dmg_path")"
+cp "$dmg_path" "$latest_dmg_path"
+
+gh release upload "$release_tag" "$dmg_path" "$latest_dmg_path" "$app_zip_path" --clobber
 
 shasum -a 256 "$dmg_path"
+shasum -a 256 "$latest_dmg_path"
 shasum -a 256 "$app_zip_path"
