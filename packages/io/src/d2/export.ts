@@ -207,6 +207,11 @@ function shapeKind(element: Element): string | null {
           parallelogram: "parallelogram",
           cylinder: "cylinder",
           star: "star",
+          cloud: "cloud",
+          callout: "callout",
+          chevron: "step",
+          document: "document",
+          note: "page",
         } as Record<string, string>
       )[kind] ?? "rectangle"
     );
@@ -363,14 +368,27 @@ function genericArrow(semantic: GenericEdgeSemantic): string {
   return start && end ? "<->" : start ? "<-" : end ? "->" : "--";
 }
 
+/** D2 arrowhead shape and fill for each nodetto arrowhead that is renamed. */
+const D2_ARROWHEADS: Partial<
+  Record<Arrowhead, readonly [string, boolean | undefined]>
+> = {
+  dot: ["circle", true],
+  circle: ["circle", false],
+  open: ["arrow", undefined],
+  diamond: ["diamond", true],
+  "diamond-open": ["diamond", false],
+  bar: ["cf-one", undefined],
+  "crow-foot": ["cf-many", undefined],
+};
+
 function arrowheadFields(semantic: GenericEdgeSemantic): readonly string[] {
   const fields: string[] = [];
   const add = (end: "source" | "target", head: Arrowhead | undefined) => {
     if (!head || head === "none") return;
-    if (head === "dot") {
-      fields.push(`${end}-arrowhead.shape: circle`);
-      fields.push(`${end}-arrowhead.style.filled: true`);
-    } else fields.push(`${end}-arrowhead.shape: ${head}`);
+    const [shape, filled] = D2_ARROWHEADS[head] ?? [head, undefined];
+    fields.push(`${end}-arrowhead.shape: ${shape}`);
+    if (filled !== undefined)
+      fields.push(`${end}-arrowhead.style.filled: ${filled}`);
   };
   add("source", semantic.arrowheads?.start);
   if (semantic.arrowheads?.end !== undefined)

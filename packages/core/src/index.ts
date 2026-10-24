@@ -317,7 +317,14 @@ export {
   createConnectorUtil,
   type EndpointReader,
   endpointReaderFor,
+  MARKER_GEOMETRY,
+  MARKER_IDS,
+  type MarkerEnd,
+  markerVariant,
+  type MarkerVariant,
+  type MarkerGeometry,
   type MarkerKind,
+  type MarkerPaint,
   readDirectEndpoints,
   readTableEndpoints,
   resolveConnector,
@@ -334,9 +341,11 @@ export {
   erdTableShapeUtil,
 } from "./shapes/erdTable.ts";
 export {
+  type GeoFlip,
   type GeoOutline,
   geoOutline,
 } from "./shapes/geo-outline.ts";
+export { geoFlipOf } from "./shapes/outline.ts";
 export {
   GEO_DEFAULT_HEIGHT,
   GEO_DEFAULT_WIDTH,
@@ -542,6 +551,13 @@ export {
   rotateElement,
   rotateSelectionBy,
 } from "./rotation.ts";
+export {
+  canFlipElement,
+  canFlipSelection,
+  type FlipAxis,
+  flipCommands,
+  flipElements,
+} from "./flip.ts";
 export {
   canResizeSelection,
   createSelectionResizeSnapshot,

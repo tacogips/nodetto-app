@@ -306,6 +306,12 @@ export interface Visual {
    * degrees) and so the file stays readable in a diff. Renderers convert.
    */
   readonly rotation?: number;
+  /**
+   * Mirror a geometric shape's outline left-right or top-bottom about its own
+   * centre, before rotation. Labels stay readable and are never mirrored.
+   */
+  readonly flipX?: boolean;
+  readonly flipY?: boolean;
   readonly style?: VisualStyle;
   readonly extensions?: Extensions;
 }

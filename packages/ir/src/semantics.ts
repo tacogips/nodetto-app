@@ -10,7 +10,18 @@ import type {
   FractionalIndex,
 } from "./types.ts";
 
-export const ARROWHEADS = ["none", "arrow", "triangle", "dot"] as const;
+export const ARROWHEADS = [
+  "none",
+  "arrow",
+  "triangle",
+  "dot",
+  "open",
+  "diamond",
+  "diamond-open",
+  "circle",
+  "bar",
+  "crow-foot",
+] as const;
 export type Arrowhead = (typeof ARROWHEADS)[number];
 
 export const CARDINALITIES = ["1:1", "1:*", "*:1", "*:*"] as const;
@@ -71,6 +82,23 @@ export const GEO_KINDS = [
   "parallelogram",
   "cylinder",
   "star",
+  "trapezoid",
+  "pentagon",
+  "octagon",
+  "cross",
+  "arrow",
+  "chevron",
+  "cloud",
+  "callout",
+  "note",
+  "cube",
+  "document",
+  "manual-input",
+  "delay",
+  "predefined-process",
+  "internal-storage",
+  "off-page",
+  "card",
 ] as const;
 export type GeoKind = (typeof GEO_KINDS)[number];
 

@@ -13,7 +13,11 @@ import {
   endpointReaderFor,
   shapeAuthoringWarnings,
   linearGradientVector,
+  MARKER_GEOMETRY,
+  type MarkerEnd,
   type MarkerKind,
+  type MarkerPaint,
+  markerVariant,
   resolveConnector,
   sampleGradient,
   strokeGradientId,
@@ -25,12 +29,6 @@ import { BpmnNotationPrimitiveView } from "./BpmnShapeView.tsx";
 import { sameConnectorGeometry } from "../connector-geometry.ts";
 import { svgStyle } from "./visual.ts";
 
-export const MARKER_ARROW = "nodetto-arrow";
-export const MARKER_TRIANGLE = "nodetto-triangle";
-export const MARKER_DIAMOND_OPEN = "nodetto-diamond-open";
-export const MARKER_DIAMOND_FILLED = "nodetto-diamond-filled";
-export const MARKER_DOT = "nodetto-dot";
-
 export interface ConnectorViewProps {
   readonly element: Element;
   readonly context: ShapeContext;
@@ -38,17 +36,14 @@ export interface ConnectorViewProps {
   readonly markerPrefix?: string;
 }
 
-/** The core's notation vocabulary, mapped onto this layer's marker ids. */
-const MARKER_ELEMENTS: Record<MarkerKind, string> = {
-  arrow: MARKER_ARROW,
-  triangle: MARKER_TRIANGLE,
-  diamondOpen: MARKER_DIAMOND_OPEN,
-  diamondFilled: MARKER_DIAMOND_FILLED,
-  dot: MARKER_DOT,
-};
-
-function markerUrl(kind: MarkerKind | null, prefix = ""): string | undefined {
-  return kind === null ? undefined : `url(#${prefix}${MARKER_ELEMENTS[kind]})`;
+function markerUrl(
+  kind: MarkerKind | null,
+  end: MarkerEnd,
+  prefix = "",
+): string | undefined {
+  return kind === null
+    ? undefined
+    : `url(#${prefix}${markerVariant(kind, end).id})`;
 }
 
 export function ConnectorView(props: ConnectorViewProps): JSX.Element {
@@ -242,8 +237,16 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                 y1={resolved().start.y}
                 x2={resolved().end.x}
                 y2={resolved().end.y}
-                marker-start={markerUrl(decoration().start, props.markerPrefix)}
-                marker-end={markerUrl(decoration().end, props.markerPrefix)}
+                marker-start={markerUrl(
+                  decoration().start,
+                  "start",
+                  props.markerPrefix,
+                )}
+                marker-end={markerUrl(
+                  decoration().end,
+                  "end",
+                  props.markerPrefix,
+                )}
                 stroke-dasharray={connectorDefaultDash(props.element)}
                 {...svgStyle(props.element.visual, props.element.id)}
                 style={warningStyle()}
@@ -254,8 +257,16 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
               points={resolved()
                 .points.map((point) => `${point.x},${point.y}`)
                 .join(" ")}
-              marker-start={markerUrl(decoration().start, props.markerPrefix)}
-              marker-end={markerUrl(decoration().end, props.markerPrefix)}
+              marker-start={markerUrl(
+                decoration().start,
+                "start",
+                props.markerPrefix,
+              )}
+              marker-end={markerUrl(
+                decoration().end,
+                "end",
+                props.markerPrefix,
+              )}
               stroke-dasharray={connectorDefaultDash(props.element)}
               {...svgStyle(props.element.visual, props.element.id)}
               style={warningStyle()}
@@ -318,70 +329,56 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
   );
 }
 
+const MARKER_PAINT_CLASS: Record<MarkerPaint, string> = {
+  filled: "nodetto-marker-filled",
+  hollow: "nodetto-marker-hollow",
+  line: "nodetto-marker-line",
+};
+
 /** Marker definitions every connector layer needs exactly one copy of. */
 export function ConnectorMarkers(props: { prefix?: string } = {}): JSX.Element {
   return (
     <defs>
-      <marker
-        id={`${props.prefix ?? ""}${MARKER_ARROW}`}
-        viewBox="0 0 10 10"
-        refX="9"
-        refY="5"
-        markerWidth="8"
-        markerHeight="8"
-        markerUnits="userSpaceOnUse"
-        orient="auto-start-reverse"
+      <For
+        each={(Object.keys(MARKER_GEOMETRY) as MarkerKind[]).flatMap((kind) =>
+          (["start", "end"] as const).map((end) => ({ kind, end })),
+        )}
       >
-        <path d="M 0 1 L 10 5 L 0 9 z" class="nodetto-marker-filled" />
-      </marker>
-      <marker
-        id={`${props.prefix ?? ""}${MARKER_TRIANGLE}`}
-        viewBox="0 0 12 12"
-        refX="11"
-        refY="6"
-        markerWidth="14"
-        markerHeight="14"
-        markerUnits="userSpaceOnUse"
-        orient="auto-start-reverse"
-      >
-        <path d="M 0 0 L 12 6 L 0 12 z" class="nodetto-marker-hollow" />
-      </marker>
-      <marker
-        id={`${props.prefix ?? ""}${MARKER_DIAMOND_OPEN}`}
-        viewBox="0 0 16 10"
-        refX="1"
-        refY="5"
-        markerWidth="16"
-        markerHeight="10"
-        markerUnits="userSpaceOnUse"
-        orient="auto-start-reverse"
-      >
-        <path d="M 0 5 L 8 0 L 16 5 L 8 10 z" class="nodetto-marker-hollow" />
-      </marker>
-      <marker
-        id={`${props.prefix ?? ""}${MARKER_DIAMOND_FILLED}`}
-        viewBox="0 0 16 10"
-        refX="1"
-        refY="5"
-        markerWidth="16"
-        markerHeight="10"
-        markerUnits="userSpaceOnUse"
-        orient="auto-start-reverse"
-      >
-        <path d="M 0 5 L 8 0 L 16 5 L 8 10 z" class="nodetto-marker-filled" />
-      </marker>
-      <marker
-        id={`${props.prefix ?? ""}${MARKER_DOT}`}
-        viewBox="0 0 8 8"
-        refX="4"
-        refY="4"
-        markerWidth="7"
-        markerHeight="7"
-        markerUnits="userSpaceOnUse"
-        orient="auto-start-reverse"
-      >
-        <circle cx="4" cy="4" r="3" class="nodetto-marker-filled" />
-      </marker>
+        {({ kind, end }) => {
+          const geometry = MARKER_GEOMETRY[kind];
+          const variant = markerVariant(kind, end);
+          return (
+            <marker
+              id={`${props.prefix ?? ""}${variant.id}`}
+              viewBox={geometry.viewBox}
+              refX={variant.refX}
+              refY={geometry.refY}
+              markerWidth={geometry.width}
+              markerHeight={geometry.height}
+              markerUnits="userSpaceOnUse"
+              orient="auto"
+            >
+              <g transform={variant.transform}>
+                <For each={geometry.parts}>
+                  {(part) =>
+                    part.element === "circle" ? (
+                      <circle
+                        {...part.attributes}
+                        class={MARKER_PAINT_CLASS[part.paint]}
+                      />
+                    ) : (
+                      <path
+                        {...part.attributes}
+                        class={MARKER_PAINT_CLASS[part.paint]}
+                      />
+                    )
+                  }
+                </For>
+              </g>
+            </marker>
+          );
+        }}
+      </For>
     </defs>
   );
 }

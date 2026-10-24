@@ -1,4 +1,8 @@
-import { connectionPorts, setGenericConnectorEndpoint } from "@nodetto/core";
+import {
+  connectionPorts,
+  flipElements,
+  setGenericConnectorEndpoint,
+} from "@nodetto/core";
 import type { ConnectorPort } from "@nodetto/ir";
 import { connectScreenTransition, screenFrame } from "@nodetto/core";
 import { isDatabaseObjectType } from "@nodetto/ir";
@@ -2510,6 +2514,20 @@ export function createInteraction(
       if (key === "2" || key === "@" || event.code === "Digit2") {
         event.preventDefault();
         editor.zoomToSelection(viewportSize());
+        return;
+      }
+      if (
+        (key === "h" || key === "v") &&
+        !event.altKey &&
+        editor.selection.size > 0
+      ) {
+        event.preventDefault();
+        if (editor.readOnly) return;
+        flipElements(
+          editor,
+          editor.selection.ids(),
+          key === "h" ? "horizontal" : "vertical",
+        );
       }
       return;
     }

@@ -209,7 +209,13 @@ function validateVisual(
   for (const field of VISUAL_NUMBER_FIELDS) {
     checkNumber(out, raw[field], `${path}.${field}`, { optional: true });
   }
-  for (const field of ["hidden", "locked", "prototypeFixed"]) {
+  for (const field of [
+    "hidden",
+    "locked",
+    "prototypeFixed",
+    "flipX",
+    "flipY",
+  ]) {
     checkBoolean(out, raw[field], `${path}.${field}`, { optional: true });
   }
   checkString(out, raw["componentKey"], `${path}.componentKey`, {

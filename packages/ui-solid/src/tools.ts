@@ -101,6 +101,23 @@ export const Tool = {
   Parallelogram: "geo:parallelogram",
   Cylinder: "geo:cylinder",
   Star: "geo:star",
+  Trapezoid: "geo:trapezoid",
+  Pentagon: "geo:pentagon",
+  Octagon: "geo:octagon",
+  Cross: "geo:cross",
+  BlockArrow: "geo:arrow",
+  Chevron: "geo:chevron",
+  Cloud: "geo:cloud",
+  Callout: "geo:callout",
+  FoldedNote: "geo:note",
+  Cube: "geo:cube",
+  Document: "geo:document",
+  ManualInput: "geo:manual-input",
+  Delay: "geo:delay",
+  PredefinedProcess: "geo:predefined-process",
+  InternalStorage: "geo:internal-storage",
+  OffPage: "geo:off-page",
+  Card: "geo:card",
 } as const;
 
 /** A closed union: only values declared in Tool are valid tools. */
@@ -115,6 +132,23 @@ export const GEO_TOOLS = [
   Tool.Parallelogram,
   Tool.Cylinder,
   Tool.Star,
+  Tool.Trapezoid,
+  Tool.Pentagon,
+  Tool.Octagon,
+  Tool.Cross,
+  Tool.BlockArrow,
+  Tool.Chevron,
+  Tool.Cloud,
+  Tool.Callout,
+  Tool.FoldedNote,
+  Tool.Cube,
+  Tool.Document,
+  Tool.ManualInput,
+  Tool.Delay,
+  Tool.PredefinedProcess,
+  Tool.InternalStorage,
+  Tool.OffPage,
+  Tool.Card,
 ] as const;
 
 export const BPMN_TOOLS = [
@@ -260,6 +294,23 @@ const GEO_KINDS = {
   [Tool.Parallelogram]: "parallelogram",
   [Tool.Cylinder]: "cylinder",
   [Tool.Star]: "star",
+  [Tool.Trapezoid]: "trapezoid",
+  [Tool.Pentagon]: "pentagon",
+  [Tool.Octagon]: "octagon",
+  [Tool.Cross]: "cross",
+  [Tool.BlockArrow]: "arrow",
+  [Tool.Chevron]: "chevron",
+  [Tool.Cloud]: "cloud",
+  [Tool.Callout]: "callout",
+  [Tool.FoldedNote]: "note",
+  [Tool.Cube]: "cube",
+  [Tool.Document]: "document",
+  [Tool.ManualInput]: "manual-input",
+  [Tool.Delay]: "delay",
+  [Tool.PredefinedProcess]: "predefined-process",
+  [Tool.InternalStorage]: "internal-storage",
+  [Tool.OffPage]: "off-page",
+  [Tool.Card]: "card",
 } as const satisfies Record<(typeof GEO_TOOLS)[number], GeoKind>;
 
 const FRAME_KINDS = {
@@ -441,6 +492,23 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.Parallelogram:
     case Tool.Cylinder:
     case Tool.Star:
+    case Tool.Trapezoid:
+    case Tool.Pentagon:
+    case Tool.Octagon:
+    case Tool.Cross:
+    case Tool.BlockArrow:
+    case Tool.Chevron:
+    case Tool.Cloud:
+    case Tool.Callout:
+    case Tool.FoldedNote:
+    case Tool.Cube:
+    case Tool.Document:
+    case Tool.ManualInput:
+    case Tool.Delay:
+    case Tool.PredefinedProcess:
+    case Tool.InternalStorage:
+    case Tool.OffPage:
+    case Tool.Card:
       return {
         type: "shape.geo",
         semantic: { geo: GEO_KINDS[tool], label: "" },

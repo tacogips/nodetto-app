@@ -12,6 +12,7 @@ import {
   componentVariantAxes,
   componentVariants,
   compareFractional,
+  flipCommands,
   frameParents,
   FRAME_PRESETS,
   type FramePresetKey,
@@ -91,14 +92,37 @@ function stringOf(semantic: unknown, field: string): string {
   return typeof value === "string" ? value : "";
 }
 
+/** Names that read better than the stored kind in the shape picker. */
+const GEO_LABELS: Partial<Record<(typeof GEO_KINDS)[number], string>> = {
+  rect: "Rectangle",
+  arrow: "Block arrow",
+  note: "Folded note",
+  "off-page": "Off-page connector",
+};
+
 const GEO_OPTIONS: readonly SelectOption[] = GEO_KINDS.map((kind) => ({
   value: kind,
-  label: kind.charAt(0).toUpperCase() + kind.slice(1),
+  label:
+    GEO_LABELS[kind] ??
+    kind.charAt(0).toUpperCase() + kind.slice(1).replaceAll("-", " "),
 }));
+
+const ARROWHEAD_LABELS: Record<(typeof ARROWHEADS)[number], string> = {
+  none: "None",
+  arrow: "Arrow",
+  triangle: "Triangle",
+  dot: "Dot",
+  open: "Open arrow",
+  diamond: "Diamond",
+  "diamond-open": "Open diamond",
+  circle: "Circle",
+  bar: "Bar",
+  "crow-foot": "Crow's foot",
+};
 
 const ARROWHEAD_OPTIONS: readonly SelectOption[] = ARROWHEADS.map((head) => ({
   value: head,
-  label: head.charAt(0).toUpperCase() + head.slice(1),
+  label: ARROWHEAD_LABELS[head],
 }));
 
 const ASSOCIATION_OPTIONS: readonly SelectOption[] = UML_ASSOCIATION_KINDS.map(
@@ -165,6 +189,29 @@ export function GeoSection(props: ElementSectionProps): JSX.Element {
           }
         />
       </Field>
+      <For
+        each={
+          [
+            { axis: "horizontal", field: "flipX", label: "Flip horizontally" },
+            { axis: "vertical", field: "flipY", label: "Flip vertically" },
+          ] as const
+        }
+      >
+        {(flip) => (
+          <label>
+            <Switch
+              checked={props.element.visual[flip.field] === true}
+              onChange={(event) => {
+                const checked = event.currentTarget.checked;
+                props.editor.apply(
+                  flipCommands([props.element], flip.axis, () => checked),
+                );
+              }}
+            />
+            {flip.label}
+          </label>
+        )}
+      </For>
     </Section>
   );
 }

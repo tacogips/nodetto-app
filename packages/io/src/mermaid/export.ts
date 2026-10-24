@@ -446,6 +446,21 @@ function stateDiagram(elements: readonly Element[]): MermaidExportReport {
   };
 }
 
+/** Classic flowchart node delimiters, understood by every Mermaid release. */
+const MERMAID_FLOWCHART_SHAPES: Readonly<
+  Record<string, readonly [string, string]>
+> = {
+  ellipse: ["([", "])"],
+  diamond: ["{", "}"],
+  parallelogram: ["[/", "/]"],
+  cylinder: ["[(", ")]"],
+  hexagon: ["{{", "}}"],
+  trapezoid: ["[/", "\\]"],
+  "trapezoid-flipped": ["[\\", "/]"],
+  "parallelogram-flipped": ["[\\", "\\]"],
+  "predefined-process": ["[[", "]]"],
+};
+
 function flowchart(elements: readonly Element[]): MermaidExportReport {
   const nodes = elements.filter(
     (element) =>
@@ -459,15 +474,17 @@ function flowchart(elements: readonly Element[]): MermaidExportReport {
     const alias = aliases.get(node.id) as string;
     const label = `"${text(semantic.label, " ")}"`;
     const shape = semantic.geo;
+    // Mirrored trapezoids and parallelograms have their own delimiters.
+    const mirrored =
+      (shape === "trapezoid" && node.visual.flipY === true) ||
+      (shape === "parallelogram" && node.visual.flipX === true);
+    const bracket = shape
+      ? MERMAID_FLOWCHART_SHAPES[mirrored ? `${shape}-flipped` : shape]
+      : undefined;
     lines.push(
-      `  ${alias}${shape === "ellipse" ? `([${label}])` : shape === "diamond" ? `{${label}}` : shape === "parallelogram" ? `[/${label}/]` : shape === "cylinder" ? `[(${label})]` : `[${label}]`}`,
+      `  ${alias}${bracket ? `${bracket[0]}${label}${bracket[1]}` : `[${label}]`}`,
     );
-    if (
-      shape &&
-      !["rect", "ellipse", "diamond", "parallelogram", "cylinder"].includes(
-        shape,
-      )
-    )
+    if (shape && shape !== "rect" && !bracket)
       warnings.push({
         elementId: node.id,
         message: `Shape ${shape} exported as a process rectangle.`,

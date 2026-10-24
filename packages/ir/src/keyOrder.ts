@@ -94,6 +94,8 @@ export const VISUAL_KEY_ORDER: KeyOrder = {
     "textResize",
     "textPadding",
     "rotation",
+    "flipX",
+    "flipY",
     "hidden",
     "locked",
     "prototypeFixed",

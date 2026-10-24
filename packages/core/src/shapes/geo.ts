@@ -17,7 +17,7 @@ import {
 } from "../geometry.ts";
 import { polygonContains } from "../clipping.ts";
 import type { ShapeUtil } from "../shape-util.ts";
-import { geoOutlinePolygon } from "./outline.ts";
+import { geoFlipOf, geoOutlinePolygon } from "./outline.ts";
 
 export const GEO_DEFAULT_WIDTH = 160;
 export const GEO_DEFAULT_HEIGHT = 100;
@@ -75,22 +75,20 @@ export const geoShapeUtil: ShapeUtil = {
           },
           point,
         );
-      case "diamond":
-      case "triangle":
-      case "hexagon":
-      case "parallelogram":
-      case "cylinder":
-      case "star": {
+      case undefined:
+        return boxContains(box, point);
+      default: {
+        // Every other kind, including unknown ones that draw as a
+        // rectangle, is picked by the outline it is drawn with.
         const polygon = geoOutlinePolygon(
           geoKindOf(element.semantic) ?? "rect",
           box,
+          geoFlipOf(element),
         );
         return polygon
           ? polygonContains(polygon, point)
           : boxContains(box, point);
       }
-      default:
-        return boxContains(box, point);
     }
   },
   resize(_element, box) {

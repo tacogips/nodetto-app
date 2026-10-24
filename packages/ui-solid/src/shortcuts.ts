@@ -16,6 +16,8 @@ import {
 import {
   canCopySelectionStyle,
   canFlattenBooleanGroup,
+  canFlipSelection,
+  flipElements,
   canPasteSelectionStyle,
   booleanSourceGeometry,
   copySelectionStyle,
@@ -85,6 +87,8 @@ export type ActionId =
   | "matchHeight"
   | "matchBoth"
   | "tidyLayout"
+  | "flipHorizontal"
+  | "flipVertical"
   | "straightenConnector"
   | "removeOverlaps"
   | "editText"
@@ -507,6 +511,26 @@ const ACTION_DEFINITIONS: readonly EditorAction[] = [
     enabled: arrangeablePage,
     run: ({ editor }) => {
       editor.arrangeLayout({ mode: "overlaps" });
+    },
+  },
+  {
+    id: "flipHorizontal",
+    label: "Flip horizontal",
+    shortcut: "Shift+H",
+    group: "layout",
+    enabled: ({ editor }) => canFlipSelection(editor, editor.selection.ids()),
+    run: ({ editor }) => {
+      flipElements(editor, editor.selection.ids(), "horizontal");
+    },
+  },
+  {
+    id: "flipVertical",
+    label: "Flip vertical",
+    shortcut: "Shift+V",
+    group: "layout",
+    enabled: ({ editor }) => canFlipSelection(editor, editor.selection.ids()),
+    run: ({ editor }) => {
+      flipElements(editor, editor.selection.ids(), "vertical");
     },
   },
   {

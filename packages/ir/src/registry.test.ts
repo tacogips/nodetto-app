@@ -271,7 +271,7 @@ describe("semantic validation", () => {
   });
 
   test("rejects a value outside an enum", () => {
-    expect(codes(validate("shape.geo", { geo: "octagon" }))).toEqual([
+    expect(codes(validate("shape.geo", { geo: "dodecagon" }))).toEqual([
       "value.enum",
     ]);
     expect(

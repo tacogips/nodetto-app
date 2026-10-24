@@ -75,7 +75,11 @@ import {
   connectorDefaultDash,
   connectorDecoration,
   endpointReaderFor,
+  MARKER_GEOMETRY,
+  type MarkerEnd,
   type MarkerKind,
+  type MarkerPaint,
+  markerVariant,
   resolveConnector,
 } from "./shapes/connector.ts";
 import {
@@ -84,6 +88,7 @@ import {
   erdColumnKey,
 } from "./shapes/erdTable.ts";
 import { geoOutline } from "./shapes/geo-outline.ts";
+import { geoFlipOf } from "./shapes/outline.ts";
 import { textNoteText } from "./shapes/textNote.ts";
 import { compoundPathGeometry } from "./shapes/compound-path.ts";
 import {
@@ -150,14 +155,6 @@ const DASH_PATTERNS: Record<string, string> = {
   solid: "",
   dashed: "6 4",
   dotted: "1 4",
-};
-
-const MARKER_IDS: Record<MarkerKind, string> = {
-  arrow: "nodetto-arrow",
-  triangle: "nodetto-triangle",
-  diamondOpen: "nodetto-diamond-open",
-  diamondFilled: "nodetto-diamond-filled",
-  dot: "nodetto-dot",
 };
 
 export function escapeXml(text: string): string {
@@ -469,85 +466,65 @@ function centredLabel(
   );
 }
 
-function markerDefs(theme: SvgTheme): string {
-  const filled: Attrs = { fill: theme.ink, stroke: "none" };
-  const hollow: Attrs = {
-    fill: theme.surface,
-    stroke: theme.ink,
-    "stroke-width": 1.2,
+/** Definitions for exactly the markers `content` references, if any. */
+function markerDefs(theme: SvgTheme, content: string): string {
+  const paints: Record<MarkerPaint, Attrs> = {
+    filled: { fill: theme.ink, stroke: "none" },
+    hollow: { fill: theme.surface, stroke: theme.ink, "stroke-width": 1.2 },
+    line: {
+      fill: "none",
+      stroke: theme.ink,
+      "stroke-width": 1.5,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+    },
   };
-  const marker = (
-    id: string,
-    viewBox: string,
-    refX: number,
-    refY: number,
-    size: readonly [number, number],
-    body: string,
-  ): string =>
-    wrap(
-      "marker",
-      {
-        id,
-        viewBox,
-        refX,
-        refY,
-        markerWidth: size[0],
-        markerHeight: size[1],
-        markerUnits: "userSpaceOnUse",
-        orient: "auto-start-reverse",
-      },
-      body,
+  const markers = (Object.keys(MARKER_GEOMETRY) as MarkerKind[])
+    .flatMap((kind) =>
+      (["start", "end"] as const).map((end) => ({ kind, end })),
+    )
+    .filter(({ kind, end }) =>
+      content.includes(`url(#${markerVariant(kind, end).id})`),
     );
+  if (markers.length === 0) return "";
   return wrap(
     "defs",
     {},
-    [
-      marker(
-        MARKER_IDS.arrow,
-        "0 0 10 10",
-        9,
-        5,
-        [8, 8],
-        tag("path", { d: "M 0 1 L 10 5 L 0 9 z", ...filled }),
-      ),
-      marker(
-        MARKER_IDS.triangle,
-        "0 0 12 12",
-        11,
-        6,
-        [14, 14],
-        tag("path", { d: "M 0 0 L 12 6 L 0 12 z", ...hollow }),
-      ),
-      marker(
-        MARKER_IDS.diamondOpen,
-        "0 0 16 10",
-        1,
-        5,
-        [16, 10],
-        tag("path", { d: "M 0 5 L 8 0 L 16 5 L 8 10 z", ...hollow }),
-      ),
-      marker(
-        MARKER_IDS.diamondFilled,
-        "0 0 16 10",
-        1,
-        5,
-        [16, 10],
-        tag("path", { d: "M 0 5 L 8 0 L 16 5 L 8 10 z", ...filled }),
-      ),
-      marker(
-        MARKER_IDS.dot,
-        "0 0 8 8",
-        4,
-        4,
-        [7, 7],
-        tag("circle", { cx: 4, cy: 4, r: 3, ...filled }),
-      ),
-    ].join(""),
+    markers
+      .map(({ kind, end }) => {
+        const geometry = MARKER_GEOMETRY[kind];
+        const variant = markerVariant(kind, end);
+        const parts = geometry.parts
+          .map((part) =>
+            tag(part.element, { ...part.attributes, ...paints[part.paint] }),
+          )
+          .join("");
+        return wrap(
+          "marker",
+          {
+            id: variant.id,
+            viewBox: geometry.viewBox,
+            refX: variant.refX,
+            refY: geometry.refY,
+            markerWidth: geometry.width,
+            markerHeight: geometry.height,
+            markerUnits: "userSpaceOnUse",
+            orient: "auto",
+          },
+          variant.transform
+            ? wrap("g", { transform: variant.transform }, parts)
+            : parts,
+        );
+      })
+      .join(""),
   );
 }
 
-function markerUrl(kind: MarkerKind | null): string | undefined {
-  return kind === null ? undefined : `url(#${MARKER_IDS[kind]})`;
+function markerUrl(
+  kind: MarkerKind | null,
+  end: MarkerEnd,
+): string | undefined {
+  return kind === null ? undefined : `url(#${markerVariant(kind, end).id})`;
 }
 
 function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
@@ -555,6 +532,7 @@ function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
     readString(element.semantic, "geo") || "rect",
     box.width,
     box.height,
+    geoFlipOf(element),
   );
   const shape = styled(
     { fill: theme.surface, stroke: theme.ink, "stroke-width": STROKE_WIDTH },
@@ -573,7 +551,11 @@ function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
       });
       break;
     case "polygon":
-      body = tag("polygon", { points: outline.points, ...shape });
+      body =
+        tag("polygon", { points: outline.points, ...shape }) +
+        (outline.detail
+          ? tag("path", { d: outline.detail, ...shape, fill: "none" })
+          : "");
       break;
     case "cylinder":
       body =
@@ -1705,8 +1687,8 @@ function renderConnector(
     fill: "none",
     stroke: theme.ink,
     "stroke-width": STROKE_WIDTH,
-    "marker-start": markerUrl(decoration.start),
-    "marker-end": markerUrl(decoration.end),
+    "marker-start": markerUrl(decoration.start, "start"),
+    "marker-end": markerUrl(decoration.end, "end"),
     "stroke-dasharray": connectorDefaultDash(element),
   };
   const line =
@@ -2132,8 +2114,9 @@ export function renderElementsSvg(
   const width = bounds.width + margin * 2;
   const height = bounds.height + margin * 2;
 
+  const markerContent = [...backdrops, ...connectors, ...shapes].join("");
   const body = [
-    markerDefs(theme),
+    markerDefs(theme, markerContent),
     gradients.length ? wrap("defs", {}, gradients.join("")) : "",
     clips.length ? wrap("defs", {}, clips.join("")) : "",
     effects.length ? wrap("defs", {}, effects.join("")) : "",

@@ -200,6 +200,13 @@ test("flowchart mode exposes standard notation and a directed flow tool", () => 
     Tool.FlowDecision,
     Tool.FlowInputOutput,
     Tool.FlowDatabase,
+    Tool.Document,
+    Tool.ManualInput,
+    Tool.Delay,
+    Tool.PredefinedProcess,
+    Tool.InternalStorage,
+    Tool.OffPage,
+    Tool.Card,
     Tool.Connector,
     Tool.Text,
   ]);

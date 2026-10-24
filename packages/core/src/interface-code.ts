@@ -14,6 +14,8 @@ import { inspectDesign } from "./handoff.ts";
 import { collectInterfaceTree } from "./interface-tree.ts";
 import { layoutHandoff } from "./layout-handoff.ts";
 import { richTextSegments, safeTextLinkHref } from "./rich-text.ts";
+import { type GeoFlip, geoOutline } from "./shapes/geo-outline.ts";
+import { geoFlipOf } from "./shapes/outline.ts";
 
 export interface InterfaceCode {
   readonly rootId: ElementId;
@@ -217,9 +219,30 @@ function declarationBody(
                 : geo === "star"
                   ? "clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 93%, 50% 71%, 21% 93%, 32% 57%, 2% 35%, 39% 35%);"
                   : null;
-    if (shape) geometry.push(shape);
+    const flipped =
+      element.visual.flipX === true || element.visual.flipY === true;
+    if (shape && !(flipped && shape.startsWith("clip-path")))
+      geometry.push(shape);
+    else if (geo !== "rect" && geo !== "ellipse" && geo !== "cylinder") {
+      const traced = outlineClipPath(geo, geoFlipOf(element));
+      if (traced) geometry.push(traced);
+    }
   }
   return [...geometry, ...declarations];
+}
+
+/** A percentage clip-path traced from the drawn outline of a geo kind. */
+function outlineClipPath(geo: string, flip: GeoFlip): string | null {
+  const outline = geoOutline(geo, 100, 100, flip);
+  if (outline.kind !== "polygon") return null;
+  const points = outline.points
+    .split(" ")
+    .map((pair) => {
+      const [x, y] = pair.split(",").map(Number);
+      return `${Math.round(x ?? 0)}% ${Math.round(y ?? 0)}%`;
+    })
+    .join(", ");
+  return `clip-path: polygon(${points});`;
 }
 
 function styleRule(className: string, declarations: readonly string[]): string {

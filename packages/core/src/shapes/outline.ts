@@ -11,7 +11,7 @@ import type { ShapeContext } from "../shape-util.ts";
 import { flattenStroke } from "../stroke-path.ts";
 import { freehandGeometry } from "./freehand.ts";
 import { compoundPathGeometry } from "./compound-path.ts";
-import { geoOutline } from "./geo-outline.ts";
+import { type GeoFlip, geoOutline } from "./geo-outline.ts";
 
 function parsePoints(source: string, box: Box): readonly Vec[] | null {
   const points: Vec[] = [];
@@ -45,8 +45,9 @@ function ellipsePoints(
 export function geoOutlinePolygon(
   kind: GeoKind | string,
   box: Box,
+  flip?: GeoFlip,
 ): readonly Vec[] | null {
-  const outline = geoOutline(kind, box.width, box.height);
+  const outline = geoOutline(kind, box.width, box.height, flip);
   if (outline.kind === "polygon") return parsePoints(outline.points, box);
   if (outline.kind === "ellipse")
     return ellipsePoints(
@@ -80,6 +81,11 @@ export function geoOutlinePolygon(
   return null;
 }
 
+/** The mirror axes a shape's visual asks for. */
+export function geoFlipOf(element: Element): GeoFlip {
+  return { x: element.visual.flipX === true, y: element.visual.flipY === true };
+}
+
 /**
  * Unrotated page-space outline used by picking, hotspots and connectors.
  * `null` means the ordinary rectangular bounds remain the interaction region.
@@ -97,7 +103,7 @@ export function elementOutlinePolygon(
       (element.visual.style?.cornerRadii || element.visual.style?.cornerRadius)
     )
       return roundedRectPolygon(box, resolvedCornerRadii(element.visual.style));
-    return geoOutlinePolygon(kind, box);
+    return geoOutlinePolygon(kind, box, geoFlipOf(element));
   }
   if (element.type === "draw.freehand") {
     if ((element.semantic as FreehandSemantic).closed !== true) return null;

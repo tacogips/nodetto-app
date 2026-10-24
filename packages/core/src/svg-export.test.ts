@@ -119,17 +119,37 @@ describe("document shape", () => {
     expect(svg).toContain('<g data-id="rel" data-type="erd.relation">');
   });
 
-  test("every marker is defined exactly once", () => {
+  test("each referenced marker is defined exactly once, unused ones not at all", () => {
     const svg = pageSvg([...erdFixture()]);
-    for (const id of [
-      "nodetto-arrow",
-      "nodetto-triangle",
-      "nodetto-diamond-open",
-      "nodetto-diamond-filled",
-      "nodetto-dot",
-    ]) {
+    for (const id of ["nodetto-dot-start", "nodetto-dot"]) {
       expect(occurrences(svg, `<marker id="${id}"`)).toBe(1);
     }
+    for (const id of ["nodetto-arrow", "nodetto-triangle", "nodetto-bar"]) {
+      expect(svg).not.toContain(`<marker id="${id}"`);
+    }
+    expect(pageSvg([geo("g", "rect")])).not.toContain("<marker");
+  });
+
+  test("start-side markers are pre-mirrored instead of relying on auto-start-reverse", () => {
+    const svg = pageSvg([
+      element({
+        id: "line",
+        type: "edge.generic",
+        index: "a1",
+        semantic: {
+          fromPoint: { x: 0, y: 0 },
+          toPoint: { x: 200, y: 0 },
+          arrowheads: { start: "diamond", end: "crow-foot" },
+        },
+        visual: {},
+      }),
+    ]);
+    expect(svg).not.toContain("auto-start-reverse");
+    expect(svg).toContain('marker-start="url(#nodetto-diamond-filled-start)"');
+    expect(svg).toContain('marker-end="url(#nodetto-crow-foot)"');
+    expect(svg).toMatch(
+      /<marker id="nodetto-diamond-filled-start"[^>]*refX="0.5"[^>]*orient="auto"><g transform="translate\(16 0\) scale\(-1 1\)">/,
+    );
   });
 
   test("an empty page exports nothing at all", () => {
@@ -161,8 +181,21 @@ describe("elements", () => {
     for (const kind of GEO_KINDS) {
       const svg = pageSvg([geo("g", kind)]);
       const body = svg.slice(svg.indexOf('data-layer="shapes"'));
-      expect(body).toContain(expected[kind] as string);
+      expect(body).toContain(expected[kind] ?? "<polygon");
     }
+  });
+
+  test("interior detail strokes stay unfilled and flips mirror the outline", () => {
+    const note = pageSvg([geo("g", "note")]);
+    expect(note).toMatch(/<path d="M [^"]+" [^>]*fill="none"/);
+    const points = (svg: string) => /<polygon points="([^"]+)"/.exec(svg)?.[1];
+    expect(points(pageSvg([geo("g", "triangle")]))).toBe("80,1 159,99 1,99");
+    expect(points(pageSvg([geo("g", "triangle", { flipY: true })]))).toBe(
+      "80,99 159,1 1,1",
+    );
+    expect(points(pageSvg([geo("g", "arrow", { flipX: true })]))).toStartWith(
+      "159,30",
+    );
   });
 
   test("a geo label is drawn centred and escaped", () => {
@@ -241,7 +274,7 @@ describe("elements", () => {
 
   test("a relation carries its dot markers and cardinality", () => {
     const svg = pageSvg([...erdFixture()]);
-    expect(svg).toContain('marker-start="url(#nodetto-dot)"');
+    expect(svg).toContain('marker-start="url(#nodetto-dot-start)"');
     expect(svg).toContain('marker-end="url(#nodetto-dot)"');
     expect(svg).toContain(">1:*</text>");
   });

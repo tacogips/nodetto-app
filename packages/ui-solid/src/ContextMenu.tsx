@@ -73,6 +73,8 @@ const ARRANGE_ITEMS: readonly ActionId[] = [
   "matchWidth",
   "matchHeight",
   "matchBoth",
+  "flipHorizontal",
+  "flipVertical",
 ];
 
 function actions(ids: readonly ActionId[]): MenuEntry[] {

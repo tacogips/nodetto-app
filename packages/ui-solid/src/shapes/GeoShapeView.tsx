@@ -8,12 +8,13 @@
 import {
   type Box,
   type GeoOutline,
+  geoFlipOf,
   geoOutline,
   resolvedCornerRadii,
   roundedRectPath,
 } from "@nodetto/core";
 import type { Element, GeoKind, GeoShapeSemantic } from "@nodetto/ir";
-import { type JSX, Match, Switch } from "solid-js";
+import { type JSX, Match, Show, Switch } from "solid-js";
 import { SvgFillGradient } from "./SvgFillGradient.tsx";
 import { labelStyle, svgStyle } from "./visual.ts";
 
@@ -44,7 +45,8 @@ export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
   const semantic = () => semanticOf(props.element);
   const width = () => props.box.width;
   const height = () => props.box.height;
-  const outline = () => geoOutline(semantic().geo, width(), height());
+  const outline = () =>
+    geoOutline(semantic().geo, width(), height(), geoFlipOf(props.element));
   const attrs = () => svgStyle(props.element.visual, props.element.id);
 
   return (
@@ -77,11 +79,20 @@ export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
           </Match>
           <Match when={asKind(outline(), "polygon")}>
             {(shape) => (
-              <polygon
-                data-smart-paint="svg"
-                points={shape().points}
-                {...attrs()}
-              />
+              <>
+                <polygon
+                  data-smart-paint="svg"
+                  points={shape().points}
+                  {...attrs()}
+                />
+                <Show when={shape().detail}>
+                  {(detail) => (
+                    // Inline so the stylesheet's default geo fill cannot
+                    // paint the open interior strokes.
+                    <path d={detail()} {...attrs()} style={{ fill: "none" }} />
+                  )}
+                </Show>
+              </>
             )}
           </Match>
           <Match when={asKind(outline(), "cylinder")}>

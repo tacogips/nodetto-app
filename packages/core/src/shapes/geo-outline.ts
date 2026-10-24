@@ -24,7 +24,12 @@ export type GeoOutline =
       readonly rx: number;
       readonly ry: number;
     }
-  | { readonly kind: "polygon"; readonly points: string }
+  | {
+      readonly kind: "polygon";
+      readonly points: string;
+      /** Unfilled interior strokes, such as a folded corner or inner bars. */
+      readonly detail?: string;
+    }
   | {
       readonly kind: "cylinder";
       readonly path: string;
@@ -36,16 +41,122 @@ export type GeoOutline =
       };
     };
 
-function polygonPoints(points: readonly (readonly [number, number])[]): string {
+/** Mirror axes of a geometric shape; its label is never mirrored. */
+export interface GeoFlip {
+  readonly x?: boolean;
+  readonly y?: boolean;
+}
+
+type Point = readonly [number, number];
+
+function polygonPoints(points: readonly Point[]): string {
   return points.map(([x, y]) => `${x},${y}`).join(" ");
 }
 
-function starPoints(width: number, height: number): string {
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** Open polylines as one SVG path, each starting with its own move-to. */
+function detailPath(lines: readonly (readonly Point[])[]): string {
+  return lines
+    .map((line) =>
+      line
+        .map(([x, y], index) => `${index === 0 ? "M" : "L"} ${x} ${y}`)
+        .join(" "),
+    )
+    .join(" ");
+}
+
+function polygonOutline(
+  points: readonly Point[],
+  detail?: readonly (readonly Point[])[],
+): GeoOutline {
+  return {
+    kind: "polygon",
+    points: polygonPoints(points),
+    ...(detail ? { detail: detailPath(detail) } : {}),
+  };
+}
+
+/** Points of a half sine bump bulging to the left of each chord a -> b. */
+function bump(a: Point, b: Point, height: number, segments: number): Point[] {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = dy / length;
+  const ny = -dx / length;
+  return Array.from({ length: segments }, (_, index) => {
+    const t = index / segments;
+    const lift = Math.sin(Math.PI * t) * height;
+    return [a[0] + dx * t + nx * lift, a[1] + dy * t + ny * lift] as const;
+  });
+}
+
+/** Scallops around an ellipse, rescaled so the result fills the inset box. */
+function cloudPoints(width: number, height: number): Point[] {
+  const lobes = [1.1, 0.8, 1, 0.9, 1.15, 0.85, 1, 0.95];
+  const anchors = lobes.map((_, index): Point => {
+    const angle = (index / lobes.length) * Math.PI * 2 + Math.PI / 8;
+    return [Math.cos(angle) * 0.38, Math.sin(angle) * 0.3];
+  });
+  const raw: Point[] = [];
+  anchors.forEach((anchor, index) => {
+    const next = anchors[(index + 1) % anchors.length] as Point;
+    const chord = Math.hypot(next[0] - anchor[0], next[1] - anchor[1]);
+    // Clockwise chords on a y-down plane bulge outward on their left.
+    raw.push(...bump(anchor, next, chord * 0.42 * (lobes[index] ?? 1), 10));
+  });
+  const xs = raw.map(([x]) => x);
+  const ys = raw.map(([, y]) => y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const spanX = Math.max(...xs) - minX || 1;
+  const spanY = Math.max(...ys) - minY || 1;
+  const innerWidth = Math.max(0, width - 2);
+  const innerHeight = Math.max(0, height - 2);
+  return raw.map(([x, y]) => [
+    round(1 + ((x - minX) / spanX) * innerWidth),
+    round(1 + ((y - minY) / spanY) * innerHeight),
+  ]);
+}
+
+function documentPoints(width: number, height: number): Point[] {
+  const right = width - 1;
+  const bottom = height - 1;
+  const wave = Math.min(height * 0.1, 12);
+  const base = bottom - wave;
+  const segments = 24;
+  const curve = Array.from({ length: segments + 1 }, (_, index): Point => {
+    const t = index / segments;
+    // Right to left: the wave rises on the right and dips on the left.
+    return [
+      round(right - (right - 1) * t),
+      round(base - wave * Math.sin(Math.PI * 2 * t)),
+    ];
+  });
+  return [[1, 1], [right, 1], ...curve];
+}
+
+function delayPoints(width: number, height: number): Point[] {
+  const ry = Math.max(0, height / 2 - 1);
+  const rx = Math.max(0, Math.min(width / 2, height / 2) - 1);
+  const cx = width - 1 - rx;
+  const cy = height / 2;
+  const segments = 16;
+  const arc = Array.from({ length: segments + 1 }, (_, index): Point => {
+    const angle = -Math.PI / 2 + (Math.PI * index) / segments;
+    return [round(cx + Math.cos(angle) * rx), round(cy + Math.sin(angle) * ry)];
+  });
+  return [[1, 1], ...arc, [1, height - 1]];
+}
+
+function starPoints(width: number, height: number): Point[] {
   const cx = width / 2;
   const cy = height / 2;
   const outerX = cx - 1;
   const outerY = cy - 1;
-  const points: [number, number][] = [];
+  const points: Point[] = [];
   for (let i = 0; i < 10; i += 1) {
     // Start at the top point and alternate outer/inner radius.
     const angle = (Math.PI / 5) * i - Math.PI / 2;
@@ -55,7 +166,7 @@ function starPoints(width: number, height: number): string {
       cy + Math.sin(angle) * outerY * scale,
     ]);
   }
-  return polygonPoints(points);
+  return points;
 }
 
 /** Height of a cylinder's elliptical rim, capped so tall ones stay round. */
@@ -90,70 +201,277 @@ export function geoOutline(
   kind: GeoKind | string,
   width: number,
   height: number,
+  flip: GeoFlip = {},
 ): GeoOutline {
+  const at = ([x, y]: Point): Point => [
+    flip.x ? round(width - x) : x,
+    flip.y ? round(height - y) : y,
+  ];
+  const polygon = (
+    points: readonly Point[],
+    detail?: readonly (readonly Point[])[],
+  ): GeoOutline =>
+    polygonOutline(
+      points.map(at),
+      detail?.map((line) => line.map(at)),
+    );
+  const left = 1;
+  const top = 1;
+  const right = width - 1;
+  const bottom = height - 1;
+  const middleX = width / 2;
+  const middleY = height / 2;
+  const short = Math.min(width, height);
   switch (kind) {
     case "ellipse":
       return {
         kind: "ellipse",
-        cx: width / 2,
-        cy: height / 2,
+        cx: middleX,
+        cy: middleY,
         rx: Math.max(0, width / 2 - 1),
         ry: Math.max(0, height / 2 - 1),
       };
     case "diamond":
-      return {
-        kind: "polygon",
-        points: polygonPoints([
-          [width / 2, 1],
-          [width - 1, height / 2],
-          [width / 2, height - 1],
-          [1, height / 2],
-        ]),
-      };
+      return polygon([
+        [middleX, top],
+        [right, middleY],
+        [middleX, bottom],
+        [left, middleY],
+      ]);
     case "triangle":
-      return {
-        kind: "polygon",
-        points: polygonPoints([
-          [width / 2, 1],
-          [width - 1, height - 1],
-          [1, height - 1],
-        ]),
-      };
+      return polygon([
+        [middleX, top],
+        [right, bottom],
+        [left, bottom],
+      ]);
     case "hexagon":
-      return {
-        kind: "polygon",
-        points: polygonPoints([
-          [width * 0.25, 1],
-          [width * 0.75, 1],
-          [width - 1, height / 2],
-          [width * 0.75, height - 1],
-          [width * 0.25, height - 1],
-          [1, height / 2],
-        ]),
-      };
+      return polygon([
+        [width * 0.25, top],
+        [width * 0.75, top],
+        [right, middleY],
+        [width * 0.75, bottom],
+        [width * 0.25, bottom],
+        [left, middleY],
+      ]);
     case "parallelogram":
-      return {
-        kind: "polygon",
-        points: polygonPoints([
-          [width * 0.25, 1],
-          [width - 1, 1],
-          [width * 0.75, height - 1],
-          [1, height - 1],
-        ]),
-      };
+      return polygon([
+        [width * 0.25, top],
+        [right, top],
+        [width * 0.75, bottom],
+        [left, bottom],
+      ]);
     case "cylinder":
+      // Rotationally symmetric about its vertical axis; a flipped database
+      // would read as a different symbol, so flipping leaves it unchanged.
       return {
         kind: "cylinder",
         path: cylinderPath(width, height),
         cap: {
-          cx: width / 2,
+          cx: middleX,
           cy: cylinderRim(height),
           rx: Math.max(0, width / 2 - 1),
           ry: cylinderRim(height),
         },
       };
     case "star":
-      return { kind: "polygon", points: starPoints(width, height) };
+      return polygon(starPoints(width, height));
+    case "trapezoid":
+      return polygon([
+        [width * 0.2, top],
+        [width * 0.8, top],
+        [right, bottom],
+        [left, bottom],
+      ]);
+    case "pentagon":
+      return polygon([
+        [middleX, top],
+        [right, height * 0.38],
+        [width * 0.81, bottom],
+        [width * 0.19, bottom],
+        [left, height * 0.38],
+      ]);
+    case "octagon": {
+      const corner = round(short * 0.29);
+      return polygon([
+        [left + corner, top],
+        [right - corner, top],
+        [right, top + corner],
+        [right, bottom - corner],
+        [right - corner, bottom],
+        [left + corner, bottom],
+        [left, bottom - corner],
+        [left, top + corner],
+      ]);
+    }
+    case "cross": {
+      const armX = round(width * 0.33);
+      const armY = round(height * 0.33);
+      return polygon([
+        [armX, top],
+        [width - armX, top],
+        [width - armX, armY],
+        [right, armY],
+        [right, height - armY],
+        [width - armX, height - armY],
+        [width - armX, bottom],
+        [armX, bottom],
+        [armX, height - armY],
+        [left, height - armY],
+        [left, armY],
+        [armX, armY],
+      ]);
+    }
+    case "arrow": {
+      const head = round(Math.max(left, width - Math.min(width * 0.4, height)));
+      return polygon([
+        [left, height * 0.3],
+        [head, height * 0.3],
+        [head, top],
+        [right, middleY],
+        [head, bottom],
+        [head, height * 0.7],
+        [left, height * 0.7],
+      ]);
+    }
+    case "chevron": {
+      const point = round(Math.min(width * 0.25, height / 2));
+      return polygon([
+        [left, top],
+        [right - point, top],
+        [right, middleY],
+        [right - point, bottom],
+        [left, bottom],
+        [left + point, middleY],
+      ]);
+    }
+    case "cloud":
+      return polygon(cloudPoints(width, height));
+    case "callout": {
+      const body = round(height * 0.75);
+      return polygon([
+        [left, top],
+        [right, top],
+        [right, body],
+        [width * 0.45, body],
+        [width * 0.25, bottom],
+        [width * 0.3, body],
+        [left, body],
+      ]);
+    }
+    case "note": {
+      const fold = round(Math.min(short * 0.2, 24));
+      return polygon(
+        [
+          [left, top],
+          [right - fold, top],
+          [right, top + fold],
+          [right, bottom],
+          [left, bottom],
+        ],
+        [
+          [
+            [right - fold, top],
+            [right - fold, top + fold],
+            [right, top + fold],
+          ],
+        ],
+      );
+    }
+    case "cube": {
+      const depth = round(Math.min(short * 0.2, 24));
+      return polygon(
+        [
+          [left + depth, top],
+          [right, top],
+          [right, bottom - depth],
+          [right - depth, bottom],
+          [left, bottom],
+          [left, top + depth],
+        ],
+        [
+          [
+            [left, top + depth],
+            [right - depth, top + depth],
+            [right - depth, bottom],
+          ],
+          [
+            [right - depth, top + depth],
+            [right, top],
+          ],
+        ],
+      );
+    }
+    case "document":
+      return polygon(documentPoints(width, height));
+    case "manual-input":
+      return polygon([
+        [left, height * 0.3],
+        [right, top],
+        [right, bottom],
+        [left, bottom],
+      ]);
+    case "delay":
+      return polygon(delayPoints(width, height));
+    case "predefined-process": {
+      const inset = round(Math.min(width * 0.1, 14));
+      return polygon(
+        [
+          [left, top],
+          [right, top],
+          [right, bottom],
+          [left, bottom],
+        ],
+        [
+          [
+            [left + inset, top],
+            [left + inset, bottom],
+          ],
+          [
+            [right - inset, top],
+            [right - inset, bottom],
+          ],
+        ],
+      );
+    }
+    case "internal-storage": {
+      const inset = round(Math.min(short * 0.2, 16));
+      return polygon(
+        [
+          [left, top],
+          [right, top],
+          [right, bottom],
+          [left, bottom],
+        ],
+        [
+          [
+            [left + inset, top],
+            [left + inset, bottom],
+          ],
+          [
+            [left, top + inset],
+            [right, top + inset],
+          ],
+        ],
+      );
+    }
+    case "off-page":
+      return polygon([
+        [left, top],
+        [right, top],
+        [right, height * 0.6],
+        [middleX, bottom],
+        [left, height * 0.6],
+      ]);
+    case "card": {
+      const corner = round(Math.min(short * 0.25, 24));
+      return polygon([
+        [left + corner, top],
+        [right, top],
+        [right, bottom],
+        [left, bottom],
+        [left, top + corner],
+      ]);
+    }
     default:
       return rectOutline(width, height);
   }
