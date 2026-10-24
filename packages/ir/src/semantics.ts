@@ -206,6 +206,8 @@ export interface ErdColumn {
   readonly defaultExpression?: string;
   /** Portable computed expression emitted as a stored generated column. */
   readonly generatedExpression?: string;
+  /** Free-form documentation, exported as a DDL column comment. */
+  readonly comment?: string;
 }
 
 export interface ErdIndex {
@@ -225,11 +227,22 @@ export interface ErdCheckConstraint {
   readonly expression: string;
 }
 
+/** SQLite-only table options; other dialects ignore them. */
+export interface ErdSqliteTableOptions {
+  /** `STRICT`: column types are enforced (INT, INTEGER, REAL, TEXT, BLOB, ANY). */
+  readonly strict?: boolean;
+  /** `WITHOUT ROWID`: the primary key is the storage key. */
+  readonly withoutRowid?: boolean;
+}
+
 export interface ErdTableSemantic {
   readonly tableName: string;
+  /** Free-form documentation, exported as a DDL table comment. */
+  readonly comment?: string;
   readonly columns: readonly ErdColumn[];
   readonly indexes?: readonly ErdIndex[];
   readonly checks?: readonly ErdCheckConstraint[];
+  readonly sqlite?: ErdSqliteTableOptions;
 }
 
 /** Column-anchored endpoint; `column` omitted means "the table as a whole". */

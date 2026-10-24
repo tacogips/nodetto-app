@@ -189,3 +189,44 @@ test("index and check declaration order does not affect SQL", () => {
     expect(sql.indexOf("a_check")).toBeLessThan(sql.indexOf("z_check"));
   }
 });
+
+test("text apply keeps column comments, including across a rename", () => {
+  const editor = makeEditor();
+  editor.createElement("erd.table", {
+    id: "notes",
+    semantic: {
+      tableName: "notes",
+      comment: "Notes.",
+      columns: [
+        {
+          id: "id",
+          name: "id",
+          dataType: "integer",
+          pk: true,
+          comment: "Key.",
+        },
+        { id: "body", name: "body", dataType: "text", comment: "Markdown." },
+      ],
+      sqlite: { strict: true },
+    },
+  });
+  const baseline = JSON.stringify(editor.store.get("notes")?.semantic);
+  expect(
+    applyErdDefinition(
+      editor,
+      "notes",
+      "id integer PRIMARY KEY, content text NOT NULL",
+      "postgresql",
+      baseline,
+    ),
+  ).toBeUndefined();
+  const semantic = editor.store.get("notes")?.semantic as ErdTableSemantic;
+  expect(semantic.comment).toBe("Notes.");
+  expect(semantic.sqlite).toEqual({ strict: true });
+  expect(
+    semantic.columns.map((column) => [column.name, column.comment]),
+  ).toEqual([
+    ["id", "Key."],
+    ["content", "Markdown."],
+  ]);
+});

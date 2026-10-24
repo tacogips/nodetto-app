@@ -726,6 +726,13 @@ const MANUAL_ROUTE_TYPES: ReadonlySet<string> = new Set([
   UmlComponentType.Relationship,
 ]);
 
+/** Connectors a drag may end on the element it started from. */
+function selfConnects(connectorType: string | undefined): boolean {
+  return (
+    connectorType === "state.transition" || connectorType === "erd.relation"
+  );
+}
+
 /** Something a connector may end on and a drag may snap to. */
 function isSolid(element: Element): boolean {
   return !isConnector(element) && !isGroup(element);
@@ -1861,7 +1868,7 @@ export function createInteraction(
         const point = pagePoint(event);
         const target = targetUnder(
           point,
-          gesture.connectorType === "state.transition" ? [] : [gesture.from],
+          selfConnects(gesture.connectorType) ? [] : [gesture.from],
         );
         const source = editor.store.get(gesture.from);
         const fromPort = gesture.fromPort;
@@ -2094,11 +2101,24 @@ export function createInteraction(
       return;
     }
     if (gesture.kind === "connecting") {
-      const target = targetUnder(
-        pagePoint(event),
-        gesture.connectorType === "state.transition" ? [] : [gesture.from],
-      );
       const point = pagePoint(event);
+      const dropped = targetUnder(
+        point,
+        selfConnects(gesture.connectorType) ? [] : [gesture.from],
+      );
+      // A click on a table with the relation tool is not a self-reference;
+      // ending on the source needs a drag.
+      const target =
+        dropped === gesture.from &&
+        gesture.connectorType === "erd.relation" &&
+        Math.hypot(
+          point.x - gesture.startPage.x,
+          point.y - gesture.startPage.y,
+        ) *
+          editor.camera.get().z <
+          4
+          ? null
+          : dropped;
       const sourceType = editor.store.get(gesture.from)?.type ?? "";
       const canDrawFree =
         options.tool() === Tool.Connector ||

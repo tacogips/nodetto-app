@@ -287,6 +287,43 @@ test("connect between ERD tables resolves column names", () => {
   });
 });
 
+test("connect draws a self-referencing foreign key between named columns", () => {
+  const { document } = edit("erd", [
+    {
+      op: "add",
+      page: "p1",
+      type: "erd.table",
+      ref: "tags",
+      semantic: {
+        tableName: "tags",
+        columns: [
+          { name: "tag_id", dataType: "INTEGER", pk: true },
+          { name: "parent_tag_id", dataType: "INTEGER", nullable: true },
+        ],
+      },
+    },
+    {
+      op: "connect",
+      from: "@tags",
+      to: "@tags",
+      fromColumn: "parent_tag_id",
+      toColumn: "tag_id",
+      cardinality: "*:1",
+    },
+  ]);
+  const tags = document.elements.find((e) => e.type === "erd.table");
+  const columns = (
+    tags?.semantic as { columns: { id: string; name: string }[] }
+  ).columns;
+  expect(
+    document.elements.find((e) => e.type === "erd.relation")?.semantic,
+  ).toMatchObject({
+    from: { table: tags?.id, column: columns[1]?.id },
+    to: { table: tags?.id, column: columns[0]?.id },
+    cardinality: "*:1",
+  });
+});
+
 test("connect refuses a link the diagram rules forbid and writes nothing", () => {
   const io = memoryIo({
     "doc.jsonl": DOC("bpmn"),

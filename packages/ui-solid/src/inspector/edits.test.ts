@@ -35,6 +35,7 @@ import {
   setErdEndpointColumn,
   setErdColumnPair,
   setErdReferentialAction,
+  setErdSqliteOption,
   updateErdColumn,
   updateErdCheck,
   updateErdIndex,
@@ -152,6 +153,32 @@ describe("erd table edits", () => {
       pk: true,
     });
     expect(next.columns[1]).toBe(table.columns[1] as never);
+  });
+
+  test("a column comment is stored, and cleared when emptied", () => {
+    const noted = updateErdColumn(table, "c1", { comment: "Line 1\nLine 2" });
+    expect(noted.columns[0]?.comment).toBe("Line 1\nLine 2");
+    expect(
+      "comment" in
+        (updateErdColumn(noted, "c1", { comment: "" }).columns[0] as object),
+    ).toBe(false);
+  });
+
+  test("SQLite table options are stored as true and the object goes when empty", () => {
+    const strict = setErdSqliteOption(table, "strict", true);
+    expect(strict.sqlite).toEqual({ strict: true });
+    const both = setErdSqliteOption(strict, "withoutRowid", true);
+    expect(both.sqlite).toEqual({ strict: true, withoutRowid: true });
+    expect(setErdSqliteOption(both, "strict", false).sqlite).toEqual({
+      withoutRowid: true,
+    });
+    const cleared = setErdSqliteOption(
+      setErdSqliteOption(both, "strict", false),
+      "withoutRowid",
+      false,
+    );
+    expect("sqlite" in cleared).toBe(false);
+    expect(cleared.columns).toBe(table.columns);
   });
 
   test("flags are stored as true or dropped, never false", () => {

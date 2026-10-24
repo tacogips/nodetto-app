@@ -62,13 +62,15 @@ export function applyErdDefinition(
       previous.columns.some((column) => column.generatedExpression))
   )
     return "Review check and generated expressions before renaming or removing columns.";
-  const columns = parsed.columns.map((column) => ({
-    ...column,
-    id:
-      existing.get(column.name.toLowerCase())?.id ??
-      renamed?.id ??
-      newElementId(),
-  }));
+  const columns = parsed.columns.map((column) => {
+    const kept = existing.get(column.name.toLowerCase()) ?? renamed;
+    // Comments are not part of the text syntax, so they stay with the column.
+    return {
+      ...column,
+      ...(kept?.comment !== undefined ? { comment: kept.comment } : {}),
+      id: kept?.id ?? newElementId(),
+    };
+  });
   const ids = new Set(columns.map((column) => column.id));
   if (
     previous.indexes?.some((index) =>

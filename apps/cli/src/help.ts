@@ -186,7 +186,8 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     association or component connector, state transition, sequence message on
     the next timeline row, BPMN flow (BPMN rules apply), otherwise a generic edge with an arrow.
     "label" sets the label (trigger for states, name for BPMN); "type" and
-    "semantic" override.
+    "semantic" override. A table or state may connect to itself (a
+    self-referencing foreign key or a self-transition).
   - update deep-merges objects; arrays are replaced whole (use append and
     remove-item for single list items); null removes a key.
   - List items that need ids (columns, indexes, attributes) get generated ids.

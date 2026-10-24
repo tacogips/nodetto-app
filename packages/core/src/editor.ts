@@ -2738,8 +2738,12 @@ export class Editor {
   ): ElementId | null {
     const source = this.store.get(from);
     const target = this.store.get(to);
+    // Self-transitions and self-referencing foreign keys are the only
+    // connections an element may make to itself.
     if (
-      (from === to && source?.type !== "state.node") ||
+      (from === to &&
+        source?.type !== "state.node" &&
+        source?.type !== "erd.table") ||
       !source ||
       !target ||
       source.page !== target.page

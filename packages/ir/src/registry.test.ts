@@ -671,6 +671,30 @@ describe("semantic validation", () => {
     ]);
   });
 
+  test("validates table and column comments and SQLite table options", () => {
+    expectValid("erd.table", {
+      tableName: "t",
+      comment: "Line 1\nLine 2",
+      columns: [{ id: "c1", name: "id", dataType: "int", comment: "" }],
+      sqlite: { strict: true, withoutRowid: false },
+    });
+    const issues = validate("erd.table", {
+      tableName: "t",
+      comment: 1,
+      columns: [{ id: "c1", name: "id", dataType: "int", comment: false }],
+      sqlite: { strict: "yes", withoutRowid: 1 },
+    });
+    expect(issues.map(({ code, path }) => ({ code, path }))).toEqual([
+      { code: "type.string", path: "semantic.comment" },
+      { code: "type.boolean", path: "semantic.sqlite.strict" },
+      { code: "type.boolean", path: "semantic.sqlite.withoutRowid" },
+      { code: "type.string", path: "semantic.columns[0].comment" },
+    ]);
+    expect(
+      codes(validate("erd.table", { tableName: "t", columns: [], sqlite: [] })),
+    ).toEqual(["type.object"]);
+  });
+
   test("rejects an index reference to an unknown table column", () => {
     const issues = validate("erd.table", {
       tableName: "t",

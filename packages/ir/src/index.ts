@@ -94,6 +94,7 @@ export {
   erdEndpointColumnIds,
   type ErdIndex,
   type ErdRelationSemantic,
+  type ErdSqliteTableOptions,
   type ErdTableSemantic,
   type PageGuideSemantic,
   type FrameSemantic,

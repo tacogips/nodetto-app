@@ -13,6 +13,7 @@ import type {
   ErdEndpoint,
   ErdIndex,
   ErdRelationSemantic,
+  ErdSqliteTableOptions,
   ErdTableSemantic,
   ForeignKeyDeferrability,
   ReferentialAction,
@@ -348,6 +349,17 @@ export function moveErdColumn(
   return columns === semantic.columns ? semantic : { ...semantic, columns };
 }
 
+/** Set one SQLite table option; the options object goes when it empties. */
+export function setErdSqliteOption(
+  semantic: ErdTableSemantic,
+  option: keyof ErdSqliteTableOptions,
+  value: boolean,
+): ErdTableSemantic {
+  const { sqlite, ...rest } = semantic;
+  const options = withOptionalFlag(sqlite ?? {}, option, value);
+  return Object.keys(options).length ? { ...rest, sqlite: options } : rest;
+}
+
 export type ErdColumnPatch = Partial<Omit<ErdColumn, "id">>;
 
 /** Apply a field change to one column; the id and the order stay put. */
@@ -399,6 +411,8 @@ export function updateErdColumn(
           next = rest;
         }
       }
+      if (patch.comment !== undefined)
+        next = withOptionalString(next, "comment", patch.comment);
       if (patch.generatedExpression !== undefined) {
         next = withOptionalString(
           next,

@@ -34,6 +34,7 @@ import {
   Section,
   SelectInput,
   type SelectOption,
+  TextArea,
   TextInput,
 } from "./controls.tsx";
 import {
@@ -52,6 +53,7 @@ import {
   removeErdCheck,
   removeErdIndex,
   setErdDeferrability,
+  setErdSqliteOption,
   setErdLogical,
   setErdColumnPair,
   setErdReferentialAction,
@@ -100,6 +102,34 @@ export function ErdTableSection(props: ErdTableSectionProps): JSX.Element {
           onCommit={(tableName) => write({ ...semantic(), tableName })}
         />
       </Field>
+      <Field label="Comment">
+        <TextArea
+          label="Table comment"
+          rows={2}
+          value={semantic().comment ?? ""}
+          onCommit={(comment) =>
+            write(withOptionalString(semantic(), "comment", comment))
+          }
+        />
+      </Field>
+      <div class="nodetto-erd-column-flags" aria-label="SQLite table options">
+        <Checkbox
+          label="SQLite STRICT"
+          title="Enforce column types in SQLite DDL. Other dialects ignore it."
+          checked={semantic().sqlite?.strict === true}
+          onCommit={(value) =>
+            write(setErdSqliteOption(semantic(), "strict", value))
+          }
+        />
+        <Checkbox
+          label="SQLite WITHOUT ROWID"
+          title="Store rows by primary key in SQLite DDL. Other dialects ignore it."
+          checked={semantic().sqlite?.withoutRowid === true}
+          onCommit={(value) =>
+            write(setErdSqliteOption(semantic(), "withoutRowid", value))
+          }
+        />
+      </div>
       <div
         class="nodetto-inspector-actions"
         role="group"
@@ -273,6 +303,20 @@ export function ErdTableSection(props: ErdTableSectionProps): JSX.Element {
                           write(
                             updateErdColumn(semantic(), column().id, {
                               generatedExpression,
+                            }),
+                          )
+                        }
+                      />
+                    </Field>
+                    <Field label="Comment">
+                      <TextArea
+                        label="Column comment"
+                        rows={2}
+                        value={column().comment ?? ""}
+                        onCommit={(comment) =>
+                          write(
+                            updateErdColumn(semantic(), column().id, {
+                              comment,
                             }),
                           )
                         }

@@ -247,6 +247,64 @@ function comment(value: string): string {
   return value.replace(/[\n\r\v\f\u0085\u2028\u2029]+/g, " ");
 }
 
+/** Replace control characters other than tab and line feed with spaces. */
+function withoutControlCharacters(text: string): string {
+  let out = "";
+  for (const character of text) {
+    const code = character.charCodeAt(0);
+    out +=
+      code === 9 || code === 10 || (code >= 32 && code !== 127)
+        ? character
+        : " ";
+  }
+  return out;
+}
+
+/**
+ * Authored documentation as `--` lines, one per authored line, so no line
+ * break can end a comment early. Blank text yields no lines.
+ */
+function commentLines(value: string | undefined, indent: string): string[] {
+  const text = value?.trim();
+  if (!text) return [];
+  return text.split(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/).map((line) => {
+    const clean = withoutControlCharacters(line).trimEnd();
+    return clean ? `${indent}-- ${clean}` : `${indent}--`;
+  });
+}
+
+/** Trimmed text with LF line breaks and no control characters but tab. */
+function commentText(value: string): string {
+  return withoutControlCharacters(
+    value.trim().replace(/\r\n?|[\v\f\u0085\u2028\u2029]/g, "\n"),
+  );
+}
+
+/**
+ * A PostgreSQL string literal. Text with a backslash or line break uses an
+ * escape string, whose meaning does not depend on standard_conforming_strings.
+ */
+function postgresqlString(value: string): string {
+  const text = commentText(value).replaceAll("'", "''");
+  return /[\\\n]/.test(text)
+    ? `E'${text.replaceAll("\\", "\\\\").replaceAll("\n", "\\n")}'`
+    : `'${text}'`;
+}
+
+/**
+ * A MySQL string literal. Escaping the backslash keeps the literal closed
+ * whether or not NO_BACKSLASH_ESCAPES is set.
+ */
+function mysqlString(value: string): string {
+  return `'${commentText(value).replaceAll("\\", "\\\\").replaceAll("'", "''").replaceAll("\n", "\\n")}'`;
+}
+
+/** MySQL's documented comment length limits, in characters. */
+const MYSQL_COMMENT_LIMIT = { table: 2048, column: 1024 } as const;
+
+/** Column types a SQLite STRICT table accepts. */
+const SQLITE_STRICT_TYPES = /^(?:int|integer|real|text|blob|any)$/i;
+
 const ACTION_SQL: Readonly<Record<ReferentialAction, string>> = {
   "no-action": "NO ACTION",
   restrict: "RESTRICT",
@@ -928,11 +986,15 @@ export function generateDatabaseDdl(
       warnings.push(`${table.semantic.tableName}: table has no columns.`);
       return `-- Skipped empty table ${comment(quoteIdentifier(table.semantic.tableName, dialect))}.`;
     }
+    const tableName = table.semantic.tableName;
+    const sqlite = dialect === "sqlite" ? table.semantic.sqlite : undefined;
     const definitions = table.semantic.columns.map((column) => {
-      const parts = [
-        quoteIdentifier(column.name, dialect),
-        typeFor(column, dialect, warnings, table.semantic.tableName),
-      ];
+      const type = typeFor(column, dialect, warnings, tableName);
+      if (sqlite?.strict && !SQLITE_STRICT_TYPES.test(type))
+        warnings.push(
+          `${tableName}.${column.name}: SQLite STRICT tables accept only INT, INTEGER, REAL, TEXT, BLOB or ANY columns, not ${type}; the database will reject this table.`,
+        );
+      const parts = [quoteIdentifier(column.name, dialect), type];
       if (column.autoIncrement) {
         if (dialect === "sqlite")
           parts.splice(1, 1, "INTEGER PRIMARY KEY AUTOINCREMENT");
@@ -967,7 +1029,20 @@ export function generateDatabaseDdl(
         );
         if (defaultExpression) parts.push("DEFAULT", defaultExpression);
       }
-      return `  ${parts.join(" ")}`;
+      const note = column.comment?.trim();
+      if (note && dialect === "mysql") {
+        parts.push("COMMENT", mysqlString(note));
+        if ([...commentText(note)].length > MYSQL_COMMENT_LIMIT.column)
+          warnings.push(
+            `${tableName}.${column.name}: the comment is longer than MySQL's ${MYSQL_COMMENT_LIMIT.column}-character column comment limit.`,
+          );
+      }
+      // A comment line ends at the line break, before the next definition's
+      // comma separator.
+      return [
+        ...(dialect === "sqlite" ? commentLines(note, "  ") : []),
+        `  ${parts.join(" ")}`,
+      ].join("\n");
     });
     const primary = table.semantic.columns.filter((column) => column.pk);
     if (
@@ -982,8 +1057,57 @@ export function generateDatabaseDdl(
       definitions.push(
         ...table.foreignConstraints.map((value) => `  ${value}`),
       );
-    const suffix = dialect === "mysql" ? " ENGINE=InnoDB" : "";
-    return `CREATE TABLE ${quoteIdentifier(table.semantic.tableName, dialect)} (\n${definitions.join(",\n")}\n)${suffix};`;
+    if (sqlite?.withoutRowid) {
+      if (!primary.length)
+        warnings.push(
+          `${tableName}: SQLite WITHOUT ROWID tables need a primary key; the database will reject this table.`,
+        );
+      for (const column of primary.filter((item) => item.autoIncrement))
+        warnings.push(
+          `${tableName}.${column.name}: SQLite does not allow AUTOINCREMENT in WITHOUT ROWID tables; the database will reject this table.`,
+        );
+    }
+    const note = table.semantic.comment?.trim();
+    // SQLite separates table options with commas: ") STRICT, WITHOUT ROWID".
+    const suffix =
+      dialect === "mysql"
+        ? ` ENGINE=InnoDB${note ? ` COMMENT=${mysqlString(note)}` : ""}`
+        : [
+            ...(sqlite?.strict ? [" STRICT"] : []),
+            ...(sqlite?.withoutRowid ? [" WITHOUT ROWID"] : []),
+          ].join(",");
+    if (
+      dialect === "mysql" &&
+      note &&
+      [...commentText(note)].length > MYSQL_COMMENT_LIMIT.table
+    )
+      warnings.push(
+        `${tableName}: the comment is longer than MySQL's ${MYSQL_COMMENT_LIMIT.table}-character table comment limit.`,
+      );
+    const quotedTable = quoteIdentifier(tableName, dialect);
+    const postgresqlComments =
+      dialect === "postgresql"
+        ? [
+            ...(note
+              ? [
+                  `COMMENT ON TABLE ${quotedTable} IS ${postgresqlString(note)};`,
+                ]
+              : []),
+            ...table.semantic.columns.flatMap((column) => {
+              const text = column.comment?.trim();
+              return text
+                ? [
+                    `COMMENT ON COLUMN ${quotedTable}.${quoteIdentifier(column.name, dialect)} IS ${postgresqlString(text)};`,
+                  ]
+                : [];
+            }),
+          ]
+        : [];
+    return [
+      ...(dialect === "sqlite" ? commentLines(note, "") : []),
+      `CREATE TABLE ${quotedTable} (\n${definitions.join(",\n")}\n)${suffix};`,
+      ...postgresqlComments,
+    ].join("\n");
   });
   const foreignKeys =
     dialect === "sqlite"

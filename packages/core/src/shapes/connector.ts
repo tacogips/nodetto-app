@@ -661,6 +661,40 @@ function computeConnector(
   const relationAnchors = erdRelationAnchors(element, from, to, fromBox, toBox);
   const fromAnchor = relationAnchors?.[0] ?? fromCenter;
   const toAnchor = relationAnchors?.[1] ?? toCenter;
+  if (
+    element.type === "erd.relation" &&
+    ids.from === ids.to &&
+    !fromPin &&
+    !toPin &&
+    semantic["routing"] !== "manual"
+  ) {
+    // A self-referencing key loops out of the right side between its rows;
+    // a table-level self relation spreads its ends around the centre.
+    const right = fromBox.x + fromBox.width + 32;
+    const sameRow = Math.abs(fromAnchor.y - toAnchor.y) < 1;
+    const fromRow = { x: fromAnchor.x, y: fromAnchor.y - (sameRow ? 12 : 0) };
+    const toRow = { x: toAnchor.x, y: toAnchor.y + (sameRow ? 12 : 0) };
+    const start = resolvedBoundary(
+      from,
+      fromBox,
+      { x: right, y: fromRow.y },
+      context,
+      fromRow,
+    );
+    const end = resolvedBoundary(
+      to,
+      toBox,
+      { x: right, y: toRow.y },
+      context,
+      toRow,
+    );
+    return withRoute(start, end, fromBox, toBox, [
+      start,
+      { x: right, y: start.y },
+      { x: right, y: end.y },
+      end,
+    ]);
+  }
   if (element.type === "sequence.message") {
     const y = sequenceMessageY(element, context);
     if (fromCenter.x === toCenter.x) {

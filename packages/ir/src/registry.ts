@@ -456,7 +456,7 @@ const ERD_TABLE: ElementTypeDefinition = {
   type: "erd.table",
   category: "node",
   keyOrder: {
-    keys: ["tableName", "columns", "indexes", "checks"],
+    keys: ["tableName", "comment", "columns", "indexes", "checks", "sqlite"],
     children: {
       columns: {
         keys: [
@@ -469,10 +469,12 @@ const ERD_TABLE: ElementTypeDefinition = {
           "identityGeneration",
           "defaultExpression",
           "generatedExpression",
+          "comment",
         ],
       },
       indexes: { keys: ["id", "name", "columns", "unique", "where"] },
       checks: { keys: ["id", "name", "expression"] },
+      sqlite: { keys: ["strict", "withoutRowid"] },
     },
   },
   onReferenceDeleted: "detach",
@@ -483,6 +485,16 @@ const ERD_TABLE: ElementTypeDefinition = {
       return out;
     }
     checkString(out, semantic["tableName"], `${path}.tableName`);
+    checkString(out, semantic["comment"], `${path}.comment`, {
+      optional: true,
+      allowEmpty: true,
+    });
+    const sqlite = semantic["sqlite"];
+    if (sqlite !== undefined && checkObject(out, sqlite, `${path}.sqlite`))
+      for (const option of ["strict", "withoutRowid"])
+        checkBoolean(out, sqlite[option], `${path}.sqlite.${option}`, {
+          optional: true,
+        });
     const columns = semantic["columns"];
     if (!checkArray(out, columns, `${path}.columns`)) {
       return out;
@@ -565,6 +577,10 @@ const ERD_TABLE: ElementTypeDefinition = {
         `${at}.generatedExpression`,
         { optional: true },
       );
+      checkString(out, column["comment"], `${at}.comment`, {
+        optional: true,
+        allowEmpty: true,
+      });
       if (
         typeof column["defaultExpression"] === "string" &&
         column["defaultExpression"].trim() !== "" &&

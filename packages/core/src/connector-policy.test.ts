@@ -5,6 +5,8 @@ import {
   type Element,
 } from "@nodetto/ir";
 import { Editor } from "./editor.ts";
+import { readTableEndpoints, resolveConnector } from "./shapes/connector.ts";
+import { makeEditor } from "./test-helpers.ts";
 
 test("typed connectors reject wrong endpoint types atomically through command writes", () => {
   for (const [connector, endpoint] of [
@@ -114,4 +116,49 @@ test("policy limits typed links to one page and leaves generic connectors unrest
   expect(
     connectorEndpointIssues("toString", {}, "p1", () => undefined),
   ).toEqual([]);
+});
+
+test("an ERD table connects to itself with a relation that loops outside it", () => {
+  const editor = makeEditor();
+  const table = editor.createElement("erd.table", {
+    semantic: {
+      tableName: "tags",
+      columns: [
+        { id: "id", name: "tag_id", dataType: "integer", pk: true },
+        { id: "name", name: "name", dataType: "text" },
+        { id: "parent", name: "parent_tag_id", dataType: "integer" },
+      ],
+    },
+    visual: { x: 100, y: 100, width: 240 },
+  });
+  const id = editor.connectSmart(table, table) as string;
+  expect(editor.store.get(id)?.type).toBe("erd.relation");
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id,
+      semantic: {
+        from: { table, column: "parent" },
+        to: { table, column: "id" },
+        cardinality: "*:1",
+      },
+    },
+  ]);
+  const route = resolveConnector(
+    editor.store.get(id) as Element,
+    editor.createShapeContext(),
+    readTableEndpoints,
+  );
+  const box = editor.getBounds(table);
+  expect(route?.points.length).toBe(4);
+  expect(route?.start.x).toBe((box?.x ?? 0) + (box?.width ?? 0));
+  expect(route?.end.x).toBe(route?.start.x);
+  // The source row (parent_tag_id) sits below the referenced key row.
+  expect(route?.start.y).toBeGreaterThan(route?.end.y ?? 0);
+  expect(
+    Math.max(...(route?.points ?? []).map((point) => point.x)),
+  ).toBeGreaterThan((box?.x ?? 0) + (box?.width ?? 0));
+  // Other notations still refuse self-connections.
+  const umlClass = editor.createElement("uml.class");
+  expect(editor.connectSmart(umlClass, umlClass)).toBeNull();
 });
