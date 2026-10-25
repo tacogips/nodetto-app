@@ -1,0 +1,1025 @@
+{
+  "taskId": "breadboard-mode-s485",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-485",
+  "implementationBranch": "feat/breadboard-mode",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "907897f76543f73bd1f5b0a9fcb18ffb89b2a912",
+  "designDocPaths": [
+    "design-docs/specs/design-breadboard.md",
+    "design-docs/user-qa/breadboard-mode.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/breadboard-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/breadboard-mode-s485",
+  "evidenceLayout": "tmp/breadboard-mode-s485/<planId>/<command-name>.log per plan, edit intent snapshots at tmp/breadboard-mode-s485/<planId>/edit-<nnn>-intent.md, and per-attempt dispatcher output under tmp/breadboard-mode-s485/<planId>/attempt-<n>/. Untracked: tmp/ is git-ignored. tmp/breadboard-mode-s485/plan-create/ holds the plan author's pre-revision scratch list and is superseded by this manifest.",
+  "historicalManifests": {
+    "paths": [
+      "impl-plans/active/bpmn-operation-flow-s356-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s357-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s359-dispatch.json",
+      "impl-plans/active/bpmn-render-fix-s360-dispatch.json"
+    ],
+    "note": "Historical BPMN manifests. Not dispatched and not changed by this checkpoint. This manifest is the only new dispatch manifest."
+  },
+  "reviewContext": {
+    "issueReference": "No GitHub issue. Workflow input 'Circuit breadboard drawing mode (KiCad/Fritzing-inspired)'; intake comm-008852, resumed comm-008865 (user accepted user-QA Q1-Q6 defaults); design revision 2 accepted comm-008869; plan review comm-008871 (needs_revision PR5-1, PR5-2), revision comm-008872, plan review accepted comm-008873. Execution opus-luna-design-and-implement-review-loop-session-485.",
+    "userProblem": "nodetto has no way to lay out solderless-breadboard prototypes: no breadboard page kind, no part catalogue on a 0.1 inch hole grid, no connectivity or electrical rules check, no BOM or netlist export, and no way to build a board against a KiCad schematic or netlist with a ratsnest and parity check.",
+    "requiredOutcomes": [
+      "A 'breadboard' page kind and 13 typed breadboard.* element types (board, wire, resistor, LED, capacitor, diode, transistor, push button, potentiometer, DIP IC, pin header, battery, target netlist card) in packages/ir with validation and a JSONL golden fixture; SCHEMA_VERSION stays 1 (design 3, plan 01).",
+      "A fixed original part catalogue with pin tables on BREADBOARD_PITCH = 10, board layouts (full/half/mini, strips a-e/f-j, continuous rails) and pinned core types (design 3.3, 3.4, 4.1, plan 02).",
+      "Hole-grid snapping on place/move, 90-degree part rotation (r / Shift+R on breadboard pages only), board carry and automatic reference annotation with duplicate fixing (design 4.2-4.4, 7.4, plan 06).",
+      "A connectivity engine deriving nets from strips, rails, wires and pins; net highlight; eight ERC rules (pin-not-in-hole, shorted-part, rail-short, reversed-polarity, led-no-series-resistor, unconnected-pin, duplicate-reference, wire-end-off-hole) in lintBreadboardPage (design 5.1, 5.2, 6, plan 07).",
+      "Live ratsnest for unrouted target connections and five schematic-parity rules (parity-missing-connection, parity-extra-connection, parity-missing-part, parity-extra-part, parity-value-mismatch) (design 5.3, 6.1, plan 10).",
+      "One shared original notation module for canvas and SVG export, resistor colour bands from value (E-series, 4-band and 5-band, tolerance), LED colours and flat-side mark, IC notch and pin-1 dot (design 7.1, 7.3, plans 08 and 11).",
+      "BOM CSV, KiCad-style S-expression netlist and SPICE netlist formatters in packages/io; D2 and Mermaid skip breadboard types gracefully (design 8.1-8.5, plan 03).",
+      "Own S-expression reader and KiCad 6+ .kicad_sch and .net importers with symbol mapping and diagnostics, self-authored fixtures under test-fixtures/kicad, @nodetto/io ./kicad subpath export (design 8.6.1-8.6.4, plan 04); staged off-board import layout (design 8.6.5, plan 09).",
+      "Collab round trip of a breadboard fixture (plan 05).",
+      "UI: breadboard workspace and palette, wire tool, keys, net-highlight and ratsnest overlays (plan 12); inspector reference/value/parameter fields, rotation and net highlight (plan 13); breadboard problems panel with cross-probing (plan 14); BOM/KiCad/SPICE in the ExportDialog (plan 15).",
+      "nodetto-cli lint for breadboard pages plus 'breadboard bom|netlist|import' commands (design 9, plan 16).",
+      "Desktop: workspace follows page kind, problems panel mount, export dialog wiring, .kicad_sch/.net open as detached imports through the open-dialog filter (design 10, plan 17).",
+      "Example examples/breadboard/led-button.jsonl with golden BOM/KiCad/SPICE outputs, KiCad round-trip golden test, docs/breadboard and README section (design 11, plan 18).",
+      "Final gate: bun run typecheck, bun test packages, mise run lint and CARGO_TERM_QUIET=true mise run verify pass; ASCII gates over everything the feature added."
+    ],
+    "nonGoals": [
+      "Schematic or PCB views; Fritzing file import.",
+      "KiCad legacy (KiCad 5 and older) .sch, hierarchical sheets, buses, .kicad_pcb, writing .kicad_sch, back-annotation to KiCad.",
+      "Re-import merge into an existing page; editing the stored target netlist in the editor.",
+      "OS file associations for .kicad_sch or .net (user-QA Q10).",
+      "Simulation; the SPICE file is an export only.",
+      "User-defined parts or a part library editor.",
+      "Split power rails and board rotation (user-QA Q2).",
+      "An ERC config file or per-rule severity overrides.",
+      "PNG/PDF-specific changes; native (Rust) awareness of breadboard types.",
+      "No SCHEMA_VERSION change or migration; no new npm or cargo dependencies; bun.lock unchanged.",
+      "No edits to the stale impl-plans/active/export-*.md or web-app-roundtrip.md plans."
+    ],
+    "constraints": [
+      "Follow AGENTS.md; no emojis; ASCII only in new files and added lines (perl gates in the overview).",
+      "Public repository: no server code, auth, secrets, endpoints, deployment config or nodetto-cloud content.",
+      "License boundary: no code, comments, keyword tables beyond required format tokens, symbols, footprints, demos, QA files, artwork, rule wording or samples from KiCad, Fritzing or any GPL/CC-BY-SA source; .reference/kicad is read-only behaviour reference and never committed; KiCad fixtures are small and hand-written.",
+      "Follow the BPMN page-kind precedent for registry, semantics, lint, SVG export, palette, inspector, problems panel and CLI wiring.",
+      "Additive only: existing page kinds, element types, fixtures and tests stay unchanged and passing; pinned-list tests are edited only by their owning plan (overview test ownership table).",
+      "Strict TypeScript: no any, no @ts-ignore, no non-null assertions on untrusted data; Biome style.",
+      "Cargo commands use CARGO_TERM_QUIET=true; Rust is formatted only by plan 17.",
+      "Branch feat/breadboard-mode only; gitPush=false. Workers perform no git write operations, no worktrees, no stash; the orchestrator commits serially with explicit paths after each wave join and never stages .reference/ or tmp/.",
+      "Each worker edits only its writePaths, its sharedPaths per sharedPathNotes, and its own impl-plans/progress/<planId>.md; fresh read plus pre/post sha256 per edit; intent snapshot before first edit; foreground commands only; format only its own files.",
+      "Gates G1 (owner-scoped typecheck by ownTypecheckRegex) and G2 (focused owned bun test must pass) are blocking per plan; sibling diagnostics and sibling test failures are recorded as non-blocking; whole-repo gates run at orchestrator reconciliation and are strictly blocking."
+    ],
+    "designDecisionsAndRationale": [
+      "Breadboard parts are category node elements, never edges, so connector routing, ports and backdrops never see them; connectivity is derived geometrically from holes and pins (design 3.2, 5.1).",
+      "One pitch = 10 page units on a lattice independent of the UI SNAP_GRID = 24 (design 3.1).",
+      "Shared pure models needed by both io and core (value parsing, netlist model, import plan and diagnostics) live in packages/ir/src/breadboard.ts because io cannot import core (design 1, plan 01).",
+      "The target netlist is a visible, undoable, synced breadboard.netlist card element rather than a typed page field (user-QA Q7).",
+      "One shared notation module feeds both the SVG export and the canvas so they cannot diverge (design 7.1, plans 08 and 11).",
+      "Plan 08 depends on plan 06 because SVG export bounds come from registry shape utils; wires without visual.width/height need the breadboard shape utils from plan 06 (plan review PR5-1).",
+      "Cross-package golden and KiCad round-trip tests live in packages/core, which dev-depends on @nodetto/io, following packages/core/src/bpmn/docs-example.test.ts (overview).",
+      "KiCad LED/diode pins are mapped by A/K names so schematic numbering does not matter (user-QA Q1).",
+      "Parity severities: merged target nets are errors, others warnings; staged parts are reported by pin-not-in-hole as the work queue (user-QA Q8, Q9).",
+      "Desktop opens KiCad files as detached imports through the open-dialog filter (draw.io precedent, user-QA Q10)."
+    ],
+    "intentionalTradeoffs": [
+      "Power rails are continuous along every board size and boards cannot rotate (user-QA Q2).",
+      "On breadboard pages with a part selected, r rotates instead of selecting the rectangle tool (user-QA Q3).",
+      "BOM lists components only (user-QA Q4).",
+      "The push button is open in netlists; SPICE writes it as a comment and IC subcircuits as undefined placeholders (user-QA Q5).",
+      "Older builds reject documents with a breadboard page (user-QA Q6).",
+      "A freshly imported page fails nodetto-cli lint until every staged part is placed (user-QA Q8, Q9).",
+      "Accepted low residuals: PR5-L1 (plan 17 relies on wave order for plan 03 formatters), PR5-L2 (BreadboardExportKind not exported; plan 17 uses an inline union), PR5-L3 (plans 03 and 04 biome-check the shared io index concurrently), PR5-L4 / DR-2 (design 8.3 round-trip wording broader than plan 18 tests)."
+    ],
+    "supportedEdgeCases": [
+      "Full, half and mini boards; parts with spans and DIP ICs with configurable even pin counts.",
+      "Reference designators with trailing ? are unannotated; pasted and new parts are annotated; duplicates are reported and fixable.",
+      "Two-pin parts with both legs on one strip, rail +/- short, reversed polarity when determinable, LED without series resistor.",
+      "Wires with bend points; wire ends off any hole are reported.",
+      "Unknown KiCad tokens are tolerated; malformed, legacy and unknown-symbol inputs yield diagnostics; unsupported symbols become a generic DIP/header part or are skipped with a warning.",
+      "Deleting the target netlist card turns parity and the ratsnest off.",
+      "Ratsnest and highlights update live during drags because they derive from the store revision.",
+      "Mermaid and D2 exports skip breadboard types gracefully."
+    ],
+    "outOfScopeEdgeCases": [
+      "Split rails on full-size boards.",
+      "Hierarchical KiCad sheets, buses and KiCad 5 legacy .sch (reported as diagnostics, not imported).",
+      "Re-importing into an existing page.",
+      "Simulatable SPICE switch models.",
+      "Per-rule severity overrides."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-breadboard.md",
+      "design-docs/user-qa/breadboard-mode.md",
+      "design-docs/specs/design-bpmn.md",
+      "impl-plans/README.md",
+      "impl-plans/active/breadboard-00-overview.md",
+      "impl-plans/active/breadboard-01-ir-contract.md",
+      "impl-plans/active/breadboard-02-core-foundation.md",
+      "impl-plans/active/breadboard-03-io-formatters.md",
+      "impl-plans/active/breadboard-04-io-kicad.md",
+      "impl-plans/active/breadboard-05-collab.md",
+      "impl-plans/active/breadboard-06-core-editing.md",
+      "impl-plans/active/breadboard-07-core-connectivity-erc.md",
+      "impl-plans/active/breadboard-08-core-notation-svg.md",
+      "impl-plans/active/breadboard-09-core-import-layout.md",
+      "impl-plans/active/breadboard-10-core-ratsnest-parity.md",
+      "impl-plans/active/breadboard-11-ui-shape-views.md",
+      "impl-plans/active/breadboard-12-ui-canvas-interaction.md",
+      "impl-plans/active/breadboard-13-ui-inspector.md",
+      "impl-plans/active/breadboard-14-ui-problems.md",
+      "impl-plans/active/breadboard-15-ui-export-dialog.md",
+      "impl-plans/active/breadboard-16-cli.md",
+      "impl-plans/active/breadboard-17-desktop.md",
+      "impl-plans/active/breadboard-18-example-docs.md"
+    ],
+    "reviewFindingsCarried": [
+      {
+        "path": "impl-plans/active/breadboard-17-desktop.md",
+        "note": "PR5-L1 (low): plan 17 lazily imports plan 03 formatters without listing breadboard-03 in dependsOn; covered by wave order (03 in wave 2, 17 in wave 7)."
+      },
+      {
+        "path": "impl-plans/active/breadboard-15-ui-export-dialog.md",
+        "note": "PR5-L2 (low): BreadboardExportKind is not exported from the @nodetto/ui-solid index; plan 17 types the handler with an inline union."
+      },
+      {
+        "path": "impl-plans/active/breadboard-03-io-formatters.md",
+        "note": "PR5-L3 (low): plans 03 and 04 run biome check on the shared packages/io/src/index.ts concurrently; G2 sibling rules and serial reconciliation cover it."
+      },
+      {
+        "path": "design-docs/specs/design-breadboard.md",
+        "note": "PR5-L4 / DR-2 (low): section 8.3 round-trip wording is broader than what plan 18 tests."
+      },
+      {
+        "path": "impl-plans/active/breadboard-00-overview.md",
+        "note": "Plan 18's example and plan 04's fixtures must both match the fixed example topology in the overview; a mismatch is routed as an Open issue. Plan 12 is the broadest ui slice."
+      }
+    ]
+  },
+  "acceptedDependencies": [],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "afterWave": [
+      "bun run typecheck",
+      "bunx biome check .",
+      "bun test"
+    ],
+    "barrelChecks": [
+      "After wave 2: test \"$(grep -c 'export \\* from \"./breadboard/index.ts\";' packages/core/src/index.ts)\" -eq 1",
+      "After wave 2: grep -n '\"./kicad\"' packages/io/package.json",
+      "After wave 2: grep -n 'breadboard/index.ts' packages/io/src/index.ts and grep -n 'kicad/index.ts' packages/io/src/index.ts each print the 03 and 04 blocks exactly once",
+      "After waves 3 and 4: packages/core/src/breadboard/index.ts has each expected export line exactly once (02 lines, 06 snap/rotate/annotate, 07 connectivity/erc, 09 import-layout, 08 notation/resistor-bands, 10 ratsnest/parity) and no board-carry or test-builder export",
+      "After wave 5: bun apps/cli/src/main.ts breadboard import test-fixtures/kicad/led-button.net > /dev/null exits 0"
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test file to the owning plan, or to the plan that caused it, using each plan's 'Sibling diagnostics (non-blocking)' and 'Sibling test failures (non-blocking)' lists. A diagnostic on an export * line of a shared barrel belongs to the plan that appended it.",
+    "commitPolicy": "Commit each wave on feat/breadboard-mode staging explicit paths only; never git add -A; never stage .reference/ or tmp/; never push.",
+    "finalVerification": [
+      "bun run typecheck",
+      "bun test packages",
+      "mise run lint",
+      "bun apps/cli/src/main.ts lint examples/breadboard/led-button.jsonl > tmp/breadboard-mode-s485/final/lint-stdout.txt && test ! -s tmp/breadboard-mode-s485/final/lint-stdout.txt",
+      "bun apps/cli/src/main.ts breadboard bom examples/breadboard/led-button.jsonl --check examples/breadboard/led-button.bom.csv",
+      "bun apps/cli/src/main.ts breadboard netlist examples/breadboard/led-button.jsonl --format kicad --check examples/breadboard/led-button.net",
+      "bun apps/cli/src/main.ts breadboard netlist examples/breadboard/led-button.jsonl --format spice --check examples/breadboard/led-button.cir",
+      "bun apps/cli/src/main.ts breadboard import test-fixtures/kicad/legacy.sch > tmp/breadboard-mode-s485/final/legacy-import.log 2>&1; test $? -eq 1",
+      "CARGO_TERM_QUIET=true mise run verify",
+      "git diff -U0 main -- packages apps docs examples test-fixtures design-docs impl-plans README.md | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+      "git ls-files --others --exclude-standard -z -- packages apps docs examples test-fixtures design-docs impl-plans | xargs -0 perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }'",
+      "test \"$(git status --short | grep -c '.reference')\" -eq 0"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "breadboard-01-ir-contract",
+      "planPath": "impl-plans/active/breadboard-01-ir-contract.md",
+      "progressPath": "impl-plans/progress/breadboard-01-ir-contract.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/types.ts",
+        "packages/ir/src/semantics.ts",
+        "packages/ir/src/registry.ts",
+        "packages/ir/src/breadboard.ts",
+        "packages/ir/src/breadboard.test.ts",
+        "packages/ir/src/index.ts",
+        "packages/ir/src/registry.test.ts",
+        "packages/io/src/jsonl/golden.test.ts",
+        "packages/io/src/__fixtures__/breadboard.jsonl",
+        "impl-plans/progress/breadboard-01-ir-contract.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/ir/src/(types|semantics|registry|breadboard|index)\\.ts|^packages/ir/src/breadboard\\.test\\.ts|^packages/io/src/jsonl/golden\\.test\\.ts",
+      "acceptanceCriteria": [
+        "PAGE_KINDS gains 'breadboard'; semantics.ts has the 13 breadboard.* types with semantic interfaces, BREADBOARD_ELEMENT_TYPES, BREADBOARD_PART_TYPES, isBreadboardElementType, isBreadboardPartType, BREADBOARD_REFERENCE_PREFIX, enum arrays and BREADBOARD_PITCH = 10, registered in registry.ts with structural validation and key order.",
+        "packages/ir/src/breadboard.ts exports parseComponentValue, BreadboardNetlist, BreadboardImportDiagnostic, BreadboardImportPlan and BreadboardImportResult as pinned in the plan.",
+        "registry.test.ts lists the 13 new types; golden.test.ts GOLDEN includes 'breadboard' and packages/io/src/__fixtures__/breadboard.jsonl contains every one of the 13 type strings.",
+        "SCHEMA_VERSION stays 1; packages/ir/src/migrations.ts is unchanged; no electrical checks in validateSemantic.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0.",
+        "The progress log records commands, exit codes, counts and log paths under tmp/breadboard-mode-s485/breadboard-01-ir-contract/."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-01-ir-contract",
+        "bun test packages/ir/src/breadboard.test.ts packages/ir/src/registry.test.ts packages/io/src/jsonl/golden.test.ts",
+        "bun test packages/ir packages/io/src/jsonl > tmp/breadboard-mode-s485/breadboard-01-ir-contract/ir-io.log 2>&1; echo \"ir-io exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-01-ir-contract/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ir/src/(types|semantics|registry|breadboard|index)\\.ts|^packages/ir/src/breadboard\\.test\\.ts|^packages/io/src/jsonl/golden\\.test\\.ts' tmp/breadboard-mode-s485/breadboard-01-ir-contract/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-01-ir-contract/typecheck.log",
+        "bunx biome check packages/ir/src packages/io/src/jsonl/golden.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ir/src/breadboard.ts packages/ir/src/breadboard.test.ts packages/io/src/__fixtures__/breadboard.jsonl impl-plans/progress/breadboard-01-ir-contract.md",
+        "git diff -U0 -- packages/ir/src/types.ts packages/ir/src/semantics.ts packages/ir/src/registry.ts packages/ir/src/index.ts packages/ir/src/registry.test.ts packages/io/src/jsonl/golden.test.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test -z \"$(git diff --stat -- packages/ir/src/migrations.ts)\"",
+        "test \"$(grep -c '\"breadboard\\.' packages/io/src/__fixtures__/breadboard.jsonl)\" -ge 13",
+        "grep -n '\"breadboard\"' packages/io/src/jsonl/golden.test.ts",
+        "test -s impl-plans/progress/breadboard-01-ir-contract.md"
+      ]
+    },
+    {
+      "planId": "breadboard-02-core-foundation",
+      "planPath": "impl-plans/active/breadboard-02-core-foundation.md",
+      "progressPath": "impl-plans/progress/breadboard-02-core-foundation.md",
+      "wave": 2,
+      "dependsOn": ["breadboard-01-ir-contract"],
+      "writePaths": [
+        "packages/core/src/breadboard/catalogue.ts",
+        "packages/core/src/breadboard/catalogue.test.ts",
+        "packages/core/src/breadboard/board.ts",
+        "packages/core/src/breadboard/board.test.ts",
+        "packages/core/src/breadboard/types.ts",
+        "packages/core/src/breadboard/index.ts",
+        "impl-plans/progress/breadboard-02-core-foundation.md"
+      ],
+      "sharedPaths": ["packages/core/src/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "Append exactly one line, export * from \"./breadboard/index.ts\";, next to the existing export * from \"./bpmn/index.ts\"; line. Fresh read and pre/post sha256."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(catalogue|board|types|index)(\\.test)?\\.ts",
+      "acceptanceCriteria": [
+        "catalogue.ts exports breadboardCatalogue, breadboardPins, breadboardBox, breadboardBondGroups, breadboardPartName, breadboardDescription and breadboardFootprint with original pin tables on the 0.1 inch grid.",
+        "board.ts exports boardLayout and boardHoles for full, half and mini boards with a-e / f-j strips, centre channel and continuous rails.",
+        "types.ts pins BreadboardPinRef, BreadboardConnectivity, BreadboardErcRuleId, BREADBOARD_ERC_RULE_IDS (13), BreadboardErcFinding, RatsnestLine, BreadboardProbe and breadboardTargetNetlist.",
+        "packages/core/src/breadboard/index.ts contains exactly the three pinned lines; packages/core/src/index.ts has the breadboard barrel line exactly once.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-02-core-foundation",
+        "bun test packages/core/src/breadboard/catalogue.test.ts packages/core/src/breadboard/board.test.ts",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-02-core-foundation/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-02-core-foundation/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/(catalogue|board|types|index)(\\.test)?\\.ts' tmp/breadboard-mode-s485/breadboard-02-core-foundation/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-02-core-foundation/typecheck.log",
+        "bunx biome check packages/core/src/breadboard packages/core/src/index.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "find packages/core/src/breadboard/catalogue.ts packages/core/src/breadboard/catalogue.test.ts packages/core/src/breadboard/board.ts packages/core/src/breadboard/board.test.ts packages/core/src/breadboard/types.ts packages/core/src/breadboard/index.ts impl-plans/progress/breadboard-02-core-foundation.md -type f -print0 | xargs -0 perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }'",
+        "git diff -U0 -- packages/core/src/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(grep -c 'export \\* from \"./breadboard/index.ts\";' packages/core/src/index.ts)\" -eq 1",
+        "test -s impl-plans/progress/breadboard-02-core-foundation.md"
+      ]
+    },
+    {
+      "planId": "breadboard-03-io-formatters",
+      "planPath": "impl-plans/active/breadboard-03-io-formatters.md",
+      "progressPath": "impl-plans/progress/breadboard-03-io-formatters.md",
+      "wave": 2,
+      "dependsOn": ["breadboard-01-ir-contract"],
+      "writePaths": [
+        "packages/io/src/breadboard/bom.ts",
+        "packages/io/src/breadboard/kicad-netlist.ts",
+        "packages/io/src/breadboard/spice-netlist.ts",
+        "packages/io/src/breadboard/index.ts",
+        "packages/io/src/breadboard/formatters.test.ts",
+        "packages/io/src/breadboard/skip.test.ts",
+        "packages/io/src/d2/export.ts",
+        "impl-plans/progress/breadboard-03-io-formatters.md"
+      ],
+      "sharedPaths": ["packages/io/src/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/io/src/index.ts",
+          "intendedEdit": "Append one export block for exportBreadboardBomCsv, exportBreadboardKicadNetlist, exportBreadboardSpiceNetlist and type BreadboardFormatterResult from ./breadboard/index.ts after the drawio block. Plan 04 appends its own block in the same wave; fresh read, pre/post sha256, never touch its lines."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/io/src/breadboard/|^packages/io/src/d2/export\\.ts",
+      "acceptanceCriteria": [
+        "exportBreadboardBomCsv, exportBreadboardKicadNetlist and exportBreadboardSpiceNetlist, each (netlist) => {text, warnings}, are exported from @nodetto/io (index.ts block present once).",
+        "BOM is CSV grouped by value with components only (Q4); KiCad netlist is an original S-expression writer; SPICE writes the push button as a comment and IC subcircuits as placeholders (Q5).",
+        "D2 export skips breadboard types with exactly the pinned warning text; Mermaid skips them; existing d2/mermaid tests stay green.",
+        "packages/io/src/breadboard does not import @nodetto/core.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-03-io-formatters",
+        "bun test packages/io/src/breadboard",
+        "bun test packages/io > tmp/breadboard-mode-s485/breadboard-03-io-formatters/io.log 2>&1; echo \"io exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-03-io-formatters/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/io/src/breadboard/|^packages/io/src/d2/export\\.ts' tmp/breadboard-mode-s485/breadboard-03-io-formatters/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-03-io-formatters/typecheck.log",
+        "bunx biome check packages/io/src/breadboard packages/io/src/d2/export.ts packages/io/src/index.ts",
+        "! grep -rn '@nodetto/core' packages/io/src/breadboard",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "find packages/io/src/breadboard impl-plans/progress/breadboard-03-io-formatters.md -type f -print0 | xargs -0 perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }'",
+        "git diff -U0 -- packages/io/src/d2/export.ts packages/io/src/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(grep -c 'breadboard/index.ts' packages/io/src/index.ts)\" -ge 1",
+        "test -s impl-plans/progress/breadboard-03-io-formatters.md"
+      ]
+    },
+    {
+      "planId": "breadboard-04-io-kicad",
+      "planPath": "impl-plans/active/breadboard-04-io-kicad.md",
+      "progressPath": "impl-plans/progress/breadboard-04-io-kicad.md",
+      "wave": 2,
+      "dependsOn": ["breadboard-01-ir-contract"],
+      "writePaths": [
+        "packages/io/src/kicad/sexpr.ts",
+        "packages/io/src/kicad/schematic.ts",
+        "packages/io/src/kicad/netlist.ts",
+        "packages/io/src/kicad/symbol-map.ts",
+        "packages/io/src/kicad/index.ts",
+        "packages/io/src/kicad/sexpr.test.ts",
+        "packages/io/src/kicad/schematic.test.ts",
+        "packages/io/src/kicad/netlist.test.ts",
+        "packages/io/src/kicad/symbol-map.test.ts",
+        "packages/io/package.json",
+        "test-fixtures/kicad",
+        "impl-plans/progress/breadboard-04-io-kicad.md"
+      ],
+      "sharedPaths": ["packages/io/src/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/io/src/index.ts",
+          "intendedEdit": "Append one export block for importKicad, readSexpr and the types SexprNode, SexprList and SexprAtom from ./kicad/index.ts. Plan 03 appends its own block in the same wave; fresh read, pre/post sha256, never touch its lines."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/io/src/kicad/",
+      "acceptanceCriteria": [
+        "An original S-expression reader and importKicad(text, {fileName}) => BreadboardImportResult for KiCad 6+ .kicad_sch and .net, exported from @nodetto/io and the new @nodetto/io/kicad subpath.",
+        "Symbols map to catalogue parts by lib_id / reference prefix (R, C, C_Polarized/CP, LED, D, Q NPN/PNP, SW_Push, R_Potentiometer, DIP/U with pin count, Conn_01xNN, Battery); LED/diode pins mapped by A/K name; unsupported symbols become a generic part or are skipped with a warning; unknown tokens are tolerated; malformed and legacy input yield diagnostics.",
+        "test-fixtures/kicad holds only hand-written fixtures (README.md, led-button.kicad_sch, led-button.net, unknown-symbols.net, malformed.kicad_sch, legacy.sch), each under 150 lines, matching the overview's fixed example topology.",
+        "Every diagnostic code string appears in at least one test; packages/io/src/kicad does not import @nodetto/core; bun.lock unchanged.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-04-io-kicad",
+        "bun test packages/io/src/kicad",
+        "bun test packages/io > tmp/breadboard-mode-s485/breadboard-04-io-kicad/io.log 2>&1; echo \"io exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-04-io-kicad/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/io/src/kicad/' tmp/breadboard-mode-s485/breadboard-04-io-kicad/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-04-io-kicad/typecheck.log",
+        "bunx biome check packages/io/src/kicad packages/io/src/index.ts packages/io/package.json",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "find packages/io/src/kicad test-fixtures/kicad impl-plans/progress/breadboard-04-io-kicad.md -type f -print0 | xargs -0 perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }'",
+        "git diff -U0 -- packages/io/package.json packages/io/src/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test -z \"$(for f in test-fixtures/kicad/*; do [ \"$(wc -l < \"$f\")\" -lt 150 ] || echo \"$f\"; done)\"",
+        "! grep -rn '@nodetto/core' packages/io/src/kicad",
+        "git diff --quiet -- bun.lock",
+        "test \"$(grep -c '\"./kicad\"' packages/io/package.json)\" -eq 1",
+        "test -s impl-plans/progress/breadboard-04-io-kicad.md"
+      ]
+    },
+    {
+      "planId": "breadboard-05-collab",
+      "planPath": "impl-plans/active/breadboard-05-collab.md",
+      "progressPath": "impl-plans/progress/breadboard-05-collab.md",
+      "wave": 2,
+      "dependsOn": ["breadboard-01-ir-contract"],
+      "writePaths": [
+        "packages/collab/src/test-fixtures.ts",
+        "packages/collab/src/breadboard.test.ts",
+        "impl-plans/progress/breadboard-05-collab.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/collab/src/(test-fixtures|breadboard\\.test)\\.ts",
+      "acceptanceCriteria": [
+        "allFixtures() returns 6 documents, the last one being a breadboard document; the Yjs round trip of every breadboard type is tested in breadboard.test.ts.",
+        "packages/collab/src/ydoc.ts, binding.ts and ydoc.test.ts are unchanged.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-05-collab",
+        "bun test packages/collab/src/breadboard.test.ts packages/collab/src/ydoc.test.ts",
+        "bun test packages/collab > tmp/breadboard-mode-s485/breadboard-05-collab/collab.log 2>&1; echo \"collab exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-05-collab/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/collab/src/(test-fixtures|breadboard\\.test)\\.ts' tmp/breadboard-mode-s485/breadboard-05-collab/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-05-collab/typecheck.log",
+        "bunx biome check packages/collab/src/test-fixtures.ts packages/collab/src/breadboard.test.ts",
+        "git diff --quiet -- packages/collab/src/ydoc.ts packages/collab/src/binding.ts packages/collab/src/ydoc.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/collab/src/breadboard.test.ts impl-plans/progress/breadboard-05-collab.md",
+        "git diff -U0 -- packages/collab/src/test-fixtures.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test -s impl-plans/progress/breadboard-05-collab.md"
+      ]
+    },
+    {
+      "planId": "breadboard-15-ui-export-dialog",
+      "planPath": "impl-plans/active/breadboard-15-ui-export-dialog.md",
+      "progressPath": "impl-plans/progress/breadboard-15-ui-export-dialog.md",
+      "wave": 2,
+      "dependsOn": ["breadboard-01-ir-contract"],
+      "writePaths": [
+        "packages/ui-solid/src/ExportDialog.tsx",
+        "packages/ui-solid/src/breadboard-export.ts",
+        "packages/ui-solid/src/breadboard-export.test.ts",
+        "impl-plans/progress/breadboard-15-ui-export-dialog.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/ui-solid/src/(ExportDialog\\.tsx|breadboard-export(\\.test)?\\.ts)",
+      "acceptanceCriteria": [
+        "ExportDialogProps.exportBreadboard?: (kind: BreadboardExportKind) => Promise<void> exists; BOM, KiCad netlist and SPICE entries are enabled only on breadboard pages.",
+        "grep -c '\"breadboard\"' ExportDialog.tsx is at least 3 (Format, formats entry, group) and 'exportBreadboard?:' appears once; App.tsx still compiles.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog",
+        "bun test packages/ui-solid/src/breadboard-export.test.ts",
+        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/ui.log 2>&1; echo \"ui exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ui-solid/src/(ExportDialog\\.tsx|breadboard-export(\\.test)?\\.ts)' tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/typecheck.log",
+        "bunx biome check packages/ui-solid/src/ExportDialog.tsx packages/ui-solid/src/breadboard-export.ts packages/ui-solid/src/breadboard-export.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ui-solid/src/breadboard-export.ts packages/ui-solid/src/breadboard-export.test.ts impl-plans/progress/breadboard-15-ui-export-dialog.md",
+        "git diff -U0 -- packages/ui-solid/src/ExportDialog.tsx | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(grep -c '\"breadboard\"' packages/ui-solid/src/ExportDialog.tsx)\" -ge 3",
+        "test \"$(grep -c 'exportBreadboard?:' packages/ui-solid/src/ExportDialog.tsx)\" -eq 1",
+        "test -s impl-plans/progress/breadboard-15-ui-export-dialog.md"
+      ]
+    },
+    {
+      "planId": "breadboard-06-core-editing",
+      "planPath": "impl-plans/active/breadboard-06-core-editing.md",
+      "progressPath": "impl-plans/progress/breadboard-06-core-editing.md",
+      "wave": 3,
+      "dependsOn": ["breadboard-02-core-foundation"],
+      "writePaths": [
+        "packages/core/src/breadboard/snap.ts",
+        "packages/core/src/breadboard/rotate.ts",
+        "packages/core/src/breadboard/annotate.ts",
+        "packages/core/src/breadboard/board-carry.ts",
+        "packages/core/src/breadboard/snap.test.ts",
+        "packages/core/src/breadboard/annotate.test.ts",
+        "packages/core/src/breadboard/editor-breadboard.test.ts",
+        "packages/core/src/shapes/breadboard.ts",
+        "packages/core/src/shapes/breadboard.test.ts",
+        "packages/core/src/shapes/index.ts",
+        "packages/core/src/editor.ts",
+        "impl-plans/progress/breadboard-06-core-editing.md"
+      ],
+      "sharedPaths": ["packages/core/src/breadboard/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/breadboard/index.ts",
+          "intendedEdit": "Append exactly export * from \"./snap.ts\";, export * from \"./rotate.ts\"; and export * from \"./annotate.ts\";. Do not export board-carry.ts. Wave-3 co-appenders are plans 07 and 09; append-only, fresh read, pre/post sha256."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(snap|rotate|annotate|board-carry|editor-breadboard\\.test|snap\\.test|annotate\\.test)|^packages/core/src/shapes/breadboard|^packages/core/src/editor\\.ts|^packages/core/src/shapes/index\\.ts",
+      "acceptanceCriteria": [
+        "Editor methods createBreadboardPart, rotateBreadboardParts, updateBreadboardSemantic, annotateBreadboard, breadboardProbe()/setBreadboardProbe(), plus snapBreadboardDelta, snapBreadboardPoint and breadboardPinAt as pinned.",
+        "Part pins and wire ends snap to the hole lattice on place/move; parts rotate in 90-degree steps; parts carry with a moved board; new and pasted parts are annotated and duplicates fixable.",
+        "Breadboard shape utils (including wire bounds derived from points) are registered in shapes/index.ts; breadboard behaviour in Editor.apply/paste/move runs only behind breadboard guards; packages/core/src/rotation.ts and snap.ts are unchanged; editor.test.ts and BPMN tests stay green.",
+        "The breadboard barrel has the three appended lines exactly once and no board-carry export.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-06-core-editing",
+        "bun test packages/core/src/breadboard/snap.test.ts packages/core/src/breadboard/annotate.test.ts packages/core/src/breadboard/editor-breadboard.test.ts packages/core/src/shapes/breadboard.test.ts",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-06-core-editing/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-06-core-editing/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/(snap|rotate|annotate|board-carry|editor-breadboard\\.test|snap\\.test|annotate\\.test)|^packages/core/src/shapes/breadboard|^packages/core/src/editor\\.ts|^packages/core/src/shapes/index\\.ts' tmp/breadboard-mode-s485/breadboard-06-core-editing/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-06-core-editing/typecheck.log",
+        "bunx biome check packages/core/src/breadboard/snap.ts packages/core/src/breadboard/rotate.ts packages/core/src/breadboard/annotate.ts packages/core/src/breadboard/board-carry.ts packages/core/src/breadboard/snap.test.ts packages/core/src/breadboard/annotate.test.ts packages/core/src/breadboard/editor-breadboard.test.ts packages/core/src/shapes/breadboard.ts packages/core/src/shapes/breadboard.test.ts packages/core/src/shapes/index.ts packages/core/src/editor.ts",
+        "git diff --quiet -- packages/core/src/rotation.ts packages/core/src/snap.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/core/src/breadboard/snap.ts packages/core/src/breadboard/rotate.ts packages/core/src/breadboard/annotate.ts packages/core/src/breadboard/board-carry.ts packages/core/src/breadboard/snap.test.ts packages/core/src/breadboard/annotate.test.ts packages/core/src/breadboard/editor-breadboard.test.ts packages/core/src/shapes/breadboard.ts packages/core/src/shapes/breadboard.test.ts impl-plans/progress/breadboard-06-core-editing.md",
+        "git diff -U0 -- packages/core/src/shapes/index.ts packages/core/src/editor.ts packages/core/src/breadboard/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(grep -c -E '^export \\* from \"\\./(snap|rotate|annotate)\\.ts\";$' packages/core/src/breadboard/index.ts)\" -eq 3",
+        "! grep -n 'board-carry' packages/core/src/breadboard/index.ts",
+        "test -s impl-plans/progress/breadboard-06-core-editing.md"
+      ]
+    },
+    {
+      "planId": "breadboard-07-core-connectivity-erc",
+      "planPath": "impl-plans/active/breadboard-07-core-connectivity-erc.md",
+      "progressPath": "impl-plans/progress/breadboard-07-core-connectivity-erc.md",
+      "wave": 3,
+      "dependsOn": ["breadboard-02-core-foundation"],
+      "writePaths": [
+        "packages/core/src/breadboard/connectivity.ts",
+        "packages/core/src/breadboard/connectivity.test.ts",
+        "packages/core/src/breadboard/erc.ts",
+        "packages/core/src/breadboard/erc.test.ts",
+        "packages/core/src/breadboard/test-builder.ts",
+        "impl-plans/progress/breadboard-07-core-connectivity-erc.md"
+      ],
+      "sharedPaths": ["packages/core/src/breadboard/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/breadboard/index.ts",
+          "intendedEdit": "Append exactly export * from \"./connectivity.ts\"; and export * from \"./erc.ts\";. Never export test-builder.ts. Wave-3 co-appenders are plans 06 and 09; append-only, fresh read, pre/post sha256."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(connectivity|erc|test-builder)(\\.test)?\\.ts",
+      "acceptanceCriteria": [
+        "computeBreadboardConnectivity, toBreadboardNetlist, breadboardNetHighlight, breadboardNetMembers and lintBreadboardPage exist as pinned; nets are derived from strips, rails, wires and pins with deterministic net names (GND, VCC, N_<ref>_<pin>).",
+        "The eight ERC rules (pin-not-in-hole, shorted-part, rail-short, reversed-polarity, led-no-series-resistor, unconnected-pin, duplicate-reference, wire-end-off-hole) each appear in erc.test.ts, with at least 16 ERC tests.",
+        "erc.ts contains the marker comment 'parity findings (plan 10)' exactly once for plan 10's single insertion.",
+        "test-builder.ts is core-internal and not exported from the barrel.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-07-core-connectivity-erc",
+        "bun test packages/core/src/breadboard/connectivity.test.ts packages/core/src/breadboard/erc.test.ts",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-07-core-connectivity-erc/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-07-core-connectivity-erc/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/(connectivity|erc|test-builder)(\\.test)?\\.ts' tmp/breadboard-mode-s485/breadboard-07-core-connectivity-erc/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-07-core-connectivity-erc/typecheck.log",
+        "bunx biome check packages/core/src/breadboard/connectivity.ts packages/core/src/breadboard/connectivity.test.ts packages/core/src/breadboard/erc.ts packages/core/src/breadboard/erc.test.ts packages/core/src/breadboard/test-builder.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/core/src/breadboard/connectivity.ts packages/core/src/breadboard/connectivity.test.ts packages/core/src/breadboard/erc.ts packages/core/src/breadboard/erc.test.ts packages/core/src/breadboard/test-builder.ts impl-plans/progress/breadboard-07-core-connectivity-erc.md",
+        "git diff -U0 -- packages/core/src/breadboard/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test -z \"$(for r in pin-not-in-hole shorted-part rail-short reversed-polarity led-no-series-resistor unconnected-pin duplicate-reference wire-end-off-hole; do grep -q \"\\\"$r\\\"\" packages/core/src/breadboard/erc.test.ts || echo missing $r; done)\"",
+        "test \"$(grep -c 'parity findings (plan 10)' packages/core/src/breadboard/erc.ts)\" -eq 1",
+        "! grep -n 'test-builder' packages/core/src/breadboard/index.ts",
+        "test -s impl-plans/progress/breadboard-07-core-connectivity-erc.md"
+      ]
+    },
+    {
+      "planId": "breadboard-09-core-import-layout",
+      "planPath": "impl-plans/active/breadboard-09-core-import-layout.md",
+      "progressPath": "impl-plans/progress/breadboard-09-core-import-layout.md",
+      "wave": 3,
+      "dependsOn": ["breadboard-02-core-foundation"],
+      "writePaths": [
+        "packages/core/src/breadboard/import-layout.ts",
+        "packages/core/src/breadboard/import-layout.test.ts",
+        "impl-plans/progress/breadboard-09-core-import-layout.md"
+      ],
+      "sharedPaths": ["packages/core/src/breadboard/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/breadboard/index.ts",
+          "intendedEdit": "Append exactly export * from \"./import-layout.ts\";. Wave-3 co-appenders are plans 06 and 07; append-only, fresh read, pre/post sha256."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/import-layout(\\.test)?\\.ts",
+      "acceptanceCriteria": [
+        "layoutBreadboardImport places imported parts in an off-board staging area beside a new board and stores the imported nets as a breadboard.netlist target element (design 8.6.5).",
+        "The barrel line export * from \"./import-layout.ts\"; is present once.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-09-core-import-layout",
+        "bun test packages/core/src/breadboard/import-layout.test.ts",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-09-core-import-layout/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-09-core-import-layout/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/import-layout(\\.test)?\\.ts' tmp/breadboard-mode-s485/breadboard-09-core-import-layout/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-09-core-import-layout/typecheck.log",
+        "bunx biome check packages/core/src/breadboard/import-layout.ts packages/core/src/breadboard/import-layout.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/core/src/breadboard/import-layout.ts packages/core/src/breadboard/import-layout.test.ts impl-plans/progress/breadboard-09-core-import-layout.md",
+        "git diff -U0 -- packages/core/src/breadboard/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(grep -c 'export \\* from \"./import-layout.ts\";' packages/core/src/breadboard/index.ts)\" -eq 1",
+        "test -s impl-plans/progress/breadboard-09-core-import-layout.md"
+      ]
+    },
+    {
+      "planId": "breadboard-08-core-notation-svg",
+      "planPath": "impl-plans/active/breadboard-08-core-notation-svg.md",
+      "progressPath": "impl-plans/progress/breadboard-08-core-notation-svg.md",
+      "wave": 4,
+      "dependsOn": ["breadboard-02-core-foundation", "breadboard-06-core-editing"],
+      "writePaths": [
+        "packages/core/src/breadboard/notation.ts",
+        "packages/core/src/breadboard/notation.test.ts",
+        "packages/core/src/breadboard/resistor-bands.ts",
+        "packages/core/src/breadboard/resistor-bands.test.ts",
+        "packages/core/src/breadboard/svg-export-breadboard.test.ts",
+        "packages/core/src/svg-export.ts",
+        "impl-plans/progress/breadboard-08-core-notation-svg.md"
+      ],
+      "sharedPaths": ["packages/core/src/breadboard/index.ts"],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/breadboard/index.ts",
+          "intendedEdit": "Append exactly export * from \"./notation.ts\"; and export * from \"./resistor-bands.ts\";. The wave-4 co-appender is plan 10; append-only, fresh read, pre/post sha256, never touch plan 10's lines."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(notation|resistor-bands|svg-export-breadboard)(\\.test)?\\.ts|^packages/core/src/svg-export\\.ts",
+      "acceptanceCriteria": [
+        "breadboardNotation turns every breadboard element into NotationPrimitives with stable roles; all artwork is original (holes, strip groupings, red/blue rail lines, labels, LED colours and flat-side mark, IC notch and pin-1 dot, wire colours, netlist card).",
+        "resistorBands derives 4-band and 5-band colour codes from the value (E-series, tolerance) with unit tests.",
+        "svg-export.ts renders breadboard pages through the notation module behind isBreadboardElementType; a wire without visual.width/height has export bounds enclosing all its points through the default registry (no test workaround); net highlight and ratsnest are never exported.",
+        "packages/core/src/bpmn/notation.ts unchanged; svg-export.test.ts and BPMN svg tests stay green.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-08-core-notation-svg",
+        "bun test packages/core/src/breadboard/notation.test.ts packages/core/src/breadboard/resistor-bands.test.ts packages/core/src/breadboard/svg-export-breadboard.test.ts",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-08-core-notation-svg/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-08-core-notation-svg/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/(notation|resistor-bands|svg-export-breadboard)(\\.test)?\\.ts|^packages/core/src/svg-export\\.ts' tmp/breadboard-mode-s485/breadboard-08-core-notation-svg/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-08-core-notation-svg/typecheck.log",
+        "bunx biome check packages/core/src/breadboard/notation.ts packages/core/src/breadboard/notation.test.ts packages/core/src/breadboard/resistor-bands.ts packages/core/src/breadboard/resistor-bands.test.ts packages/core/src/breadboard/svg-export-breadboard.test.ts packages/core/src/svg-export.ts",
+        "git diff --quiet -- packages/core/src/bpmn/notation.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "find packages/core/src/breadboard/notation.ts packages/core/src/breadboard/notation.test.ts packages/core/src/breadboard/resistor-bands.ts packages/core/src/breadboard/resistor-bands.test.ts packages/core/src/breadboard/svg-export-breadboard.test.ts impl-plans/progress/breadboard-08-core-notation-svg.md -type f -print0 | xargs -0 perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }'",
+        "git diff -U0 -- packages/core/src/svg-export.ts packages/core/src/breadboard/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "grep -q 'isBreadboardElementType' packages/core/src/svg-export.ts",
+        "test -s impl-plans/progress/breadboard-08-core-notation-svg.md"
+      ]
+    },
+    {
+      "planId": "breadboard-10-core-ratsnest-parity",
+      "planPath": "impl-plans/active/breadboard-10-core-ratsnest-parity.md",
+      "progressPath": "impl-plans/progress/breadboard-10-core-ratsnest-parity.md",
+      "wave": 4,
+      "dependsOn": ["breadboard-07-core-connectivity-erc"],
+      "writePaths": [
+        "packages/core/src/breadboard/ratsnest.ts",
+        "packages/core/src/breadboard/ratsnest.test.ts",
+        "packages/core/src/breadboard/parity.ts",
+        "packages/core/src/breadboard/parity.test.ts",
+        "impl-plans/progress/breadboard-10-core-ratsnest-parity.md"
+      ],
+      "sharedPaths": [
+        "packages/core/src/breadboard/index.ts",
+        "packages/core/src/breadboard/erc.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/breadboard/index.ts",
+          "intendedEdit": "Append exactly export * from \"./ratsnest.ts\"; and export * from \"./parity.ts\";. The wave-4 co-appender is plan 08; append-only, fresh read, pre/post sha256, never touch plan 08's lines."
+        },
+        {
+          "path": "packages/core/src/breadboard/erc.ts",
+          "intendedEdit": "Owned by plan 07 (joined in wave 3). Add only the import of breadboardParityFindings and one statement on the line after the marker comment // parity findings (plan 10) that pushes parity findings into the local findings array before the existing final sort. Change nothing else; fresh read, pre/post sha256; record the diff in the progress log."
+        }
+      ],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(ratsnest|parity)(\\.test)?\\.ts",
+      "acceptanceCriteria": [
+        "computeBreadboardRatsnest returns lines between pins the target netlist connects but the breadboard does not, updating from the store revision; lines disappear once connected.",
+        "breadboardParityFindings implements parity-missing-connection, parity-extra-connection (error), parity-missing-part, parity-extra-part and parity-value-mismatch (warnings), called from lintBreadboardPage; breadboardTargetStatus exists; deleting the netlist card disables parity and ratsnest.",
+        "Each of the five parity rule ids appears in parity.test.ts; erc.test.ts stays green.",
+        "The erc.ts diff shows only the import and the one statement (recorded in the progress log).",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-10-core-ratsnest-parity",
+        "bun test packages/core/src/breadboard/ratsnest.test.ts packages/core/src/breadboard/parity.test.ts packages/core/src/breadboard/erc.test.ts",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-10-core-ratsnest-parity/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-10-core-ratsnest-parity/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/(ratsnest|parity)(\\.test)?\\.ts' tmp/breadboard-mode-s485/breadboard-10-core-ratsnest-parity/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-10-core-ratsnest-parity/typecheck.log",
+        "bunx biome check packages/core/src/breadboard/ratsnest.ts packages/core/src/breadboard/ratsnest.test.ts packages/core/src/breadboard/parity.ts packages/core/src/breadboard/parity.test.ts packages/core/src/breadboard/erc.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/core/src/breadboard/ratsnest.ts packages/core/src/breadboard/ratsnest.test.ts packages/core/src/breadboard/parity.ts packages/core/src/breadboard/parity.test.ts impl-plans/progress/breadboard-10-core-ratsnest-parity.md",
+        "git diff -U0 -- packages/core/src/breadboard/index.ts packages/core/src/breadboard/erc.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test -z \"$(for r in parity-missing-connection parity-extra-connection parity-missing-part parity-extra-part parity-value-mismatch; do grep -q \"\\\"$r\\\"\" packages/core/src/breadboard/parity.test.ts || echo missing $r; done)\"",
+        "git diff -- packages/core/src/breadboard/erc.ts > tmp/breadboard-mode-s485/breadboard-10-core-ratsnest-parity/erc-diff.log",
+        "test \"$(grep -c -E '^export \\* from \"\\./(ratsnest|parity)\\.ts\";$' packages/core/src/breadboard/index.ts)\" -eq 2",
+        "test -s impl-plans/progress/breadboard-10-core-ratsnest-parity.md"
+      ]
+    },
+    {
+      "planId": "breadboard-11-ui-shape-views",
+      "planPath": "impl-plans/active/breadboard-11-ui-shape-views.md",
+      "progressPath": "impl-plans/progress/breadboard-11-ui-shape-views.md",
+      "wave": 5,
+      "dependsOn": ["breadboard-08-core-notation-svg"],
+      "writePaths": [
+        "packages/ui-solid/src/shapes/BreadboardShapeView.tsx",
+        "packages/ui-solid/src/shapes/breadboard-view.ts",
+        "packages/ui-solid/src/shapes/breadboard-view.test.ts",
+        "packages/ui-solid/src/shapes/ShapeView.tsx",
+        "impl-plans/progress/breadboard-11-ui-shape-views.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/ui-solid/src/shapes/(BreadboardShapeView\\.tsx|breadboard-view(\\.test)?\\.ts|ShapeView\\.tsx)",
+      "acceptanceCriteria": [
+        "BreadboardShapeView draws every breadboard element from the shared breadboardNotation primitives so canvas and SVG export match; ShapeView.tsx dispatches breadboard types via isBreadboardElementType.",
+        "Pure view-model helpers in breadboard-view.ts are unit tested; no core source file is imported by relative path.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-11-ui-shape-views",
+        "bun test packages/ui-solid/src/shapes/breadboard-view.test.ts",
+        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-11-ui-shape-views/ui.log 2>&1; echo \"ui exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-11-ui-shape-views/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ui-solid/src/shapes/(BreadboardShapeView\\.tsx|breadboard-view(\\.test)?\\.ts|ShapeView\\.tsx)' tmp/breadboard-mode-s485/breadboard-11-ui-shape-views/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-11-ui-shape-views/typecheck.log",
+        "bunx biome check packages/ui-solid/src/shapes/BreadboardShapeView.tsx packages/ui-solid/src/shapes/breadboard-view.ts packages/ui-solid/src/shapes/breadboard-view.test.ts packages/ui-solid/src/shapes/ShapeView.tsx",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ui-solid/src/shapes/BreadboardShapeView.tsx packages/ui-solid/src/shapes/breadboard-view.ts packages/ui-solid/src/shapes/breadboard-view.test.ts impl-plans/progress/breadboard-11-ui-shape-views.md",
+        "git diff -U0 -- packages/ui-solid/src/shapes/ShapeView.tsx | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "grep -n 'isBreadboardElementType' packages/ui-solid/src/shapes/ShapeView.tsx",
+        "test -s impl-plans/progress/breadboard-11-ui-shape-views.md"
+      ]
+    },
+    {
+      "planId": "breadboard-12-ui-canvas-interaction",
+      "planPath": "impl-plans/active/breadboard-12-ui-canvas-interaction.md",
+      "progressPath": "impl-plans/progress/breadboard-12-ui-canvas-interaction.md",
+      "wave": 5,
+      "dependsOn": [
+        "breadboard-06-core-editing",
+        "breadboard-07-core-connectivity-erc",
+        "breadboard-10-core-ratsnest-parity"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/tools.ts",
+        "packages/ui-solid/src/workspaces.ts",
+        "packages/ui-solid/src/shape-palette.ts",
+        "packages/ui-solid/src/interaction.ts",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/BreadboardOverlay.tsx",
+        "packages/ui-solid/src/breadboard-overlay.ts",
+        "packages/ui-solid/src/breadboard-palette.test.ts",
+        "packages/ui-solid/src/breadboard-interaction.test.ts",
+        "impl-plans/progress/breadboard-12-ui-canvas-interaction.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/ui-solid/src/(tools|workspaces|shape-palette|interaction|Canvas|BreadboardOverlay|breadboard-overlay|breadboard-palette\\.test|breadboard-interaction\\.test)",
+      "acceptanceCriteria": [
+        "WorkspaceId gains 'breadboard'; a breadboard palette with board, part and wire tools is selected by page kind.",
+        "Interaction: hole snapping on place/move, wire tool with bend points, r / Shift+R rotate only on breadboard pages with a part selected (TOOL_KEYS r: geo:rect line unchanged), net highlight and ratsnest overlays updating live during drags.",
+        "interaction.test.ts, workspaces.test.ts and Toolbar.test.ts are unedited and green.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction",
+        "bun test packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
+        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/ui.log 2>&1; echo \"ui exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ui-solid/src/(tools|workspaces|shape-palette|interaction|Canvas|BreadboardOverlay|breadboard-overlay|breadboard-palette\\.test|breadboard-interaction\\.test)' tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/typecheck.log",
+        "bunx biome check packages/ui-solid/src/tools.ts packages/ui-solid/src/workspaces.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/BreadboardOverlay.tsx packages/ui-solid/src/breadboard-overlay.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
+        "git diff --quiet -- packages/ui-solid/src/interaction.test.ts packages/ui-solid/src/workspaces.test.ts packages/ui-solid/src/Toolbar.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ui-solid/src/BreadboardOverlay.tsx packages/ui-solid/src/breadboard-overlay.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/breadboard-interaction.test.ts impl-plans/progress/breadboard-12-ui-canvas-interaction.md",
+        "git diff -U0 -- packages/ui-solid/src/tools.ts packages/ui-solid/src/workspaces.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/Canvas.tsx | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "grep -n 'r: \"geo:rect\"' packages/ui-solid/src/interaction.ts",
+        "test -s impl-plans/progress/breadboard-12-ui-canvas-interaction.md"
+      ]
+    },
+    {
+      "planId": "breadboard-14-ui-problems",
+      "planPath": "impl-plans/active/breadboard-14-ui-problems.md",
+      "progressPath": "impl-plans/progress/breadboard-14-ui-problems.md",
+      "wave": 5,
+      "dependsOn": [
+        "breadboard-06-core-editing",
+        "breadboard-07-core-connectivity-erc",
+        "breadboard-10-core-ratsnest-parity"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/BreadboardProblemsPanel.tsx",
+        "packages/ui-solid/src/BreadboardProblemsPanel.css",
+        "packages/ui-solid/src/breadboard-problems.ts",
+        "packages/ui-solid/src/breadboard-problems.test.ts",
+        "packages/ui-solid/src/index.ts",
+        "impl-plans/progress/breadboard-14-ui-problems.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/ui-solid/src/(BreadboardProblemsPanel|breadboard-problems)|^packages/ui-solid/src/index\\.ts",
+      "acceptanceCriteria": [
+        "focusBreadboardProbe, breadboardProblemRows and BreadboardProblemsPanel exist and BreadboardProblemsPanel is exported from @nodetto/ui-solid.",
+        "ERC and parity findings are listed; selecting a problem, net or part reference cross-probes (selects and highlights) the matching parts, wires or net in the canvas.",
+        "BpmnProblemsPanel.tsx and bpmn-problems.ts are unchanged.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-14-ui-problems",
+        "bun test packages/ui-solid/src/breadboard-problems.test.ts",
+        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-14-ui-problems/ui.log 2>&1; echo \"ui exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-14-ui-problems/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ui-solid/src/(BreadboardProblemsPanel|breadboard-problems)|^packages/ui-solid/src/index\\.ts' tmp/breadboard-mode-s485/breadboard-14-ui-problems/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-14-ui-problems/typecheck.log",
+        "bunx biome check packages/ui-solid/src/BreadboardProblemsPanel.tsx packages/ui-solid/src/BreadboardProblemsPanel.css packages/ui-solid/src/breadboard-problems.ts packages/ui-solid/src/breadboard-problems.test.ts packages/ui-solid/src/index.ts",
+        "git diff --quiet -- packages/ui-solid/src/BpmnProblemsPanel.tsx packages/ui-solid/src/bpmn-problems.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ui-solid/src/BreadboardProblemsPanel.tsx packages/ui-solid/src/BreadboardProblemsPanel.css packages/ui-solid/src/breadboard-problems.ts packages/ui-solid/src/breadboard-problems.test.ts impl-plans/progress/breadboard-14-ui-problems.md",
+        "git diff -U0 -- packages/ui-solid/src/index.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "grep -n 'BreadboardProblemsPanel' packages/ui-solid/src/index.ts",
+        "test -s impl-plans/progress/breadboard-14-ui-problems.md"
+      ]
+    },
+    {
+      "planId": "breadboard-16-cli",
+      "planPath": "impl-plans/active/breadboard-16-cli.md",
+      "progressPath": "impl-plans/progress/breadboard-16-cli.md",
+      "wave": 5,
+      "dependsOn": [
+        "breadboard-03-io-formatters",
+        "breadboard-04-io-kicad",
+        "breadboard-07-core-connectivity-erc",
+        "breadboard-09-core-import-layout",
+        "breadboard-10-core-ratsnest-parity"
+      ],
+      "writePaths": [
+        "apps/cli/src/breadboard-command.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/help.ts",
+        "impl-plans/progress/breadboard-16-cli.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^apps/cli/src/(commands|help|breadboard-command|breadboard-commands\\.test)\\.ts",
+      "acceptanceCriteria": [
+        "nodetto-cli lint covers breadboard pages (ERC and parity) alongside BPMN, with the message 'The document contains no BPMN or breadboard pages.' when neither exists.",
+        "'breadboard bom|netlist (--format kicad|spice)|import' commands exist with --check support; import of test-fixtures/kicad/led-button.net exits 0 and legacy.sch exits 1; warnings follow the drawio import precedent.",
+        "commands.test.ts, bpmn-commands.test.ts and MCP tests are unedited and green; a single case \"breadboard\" dispatch in commands.ts.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-16-cli",
+        "bun test apps/cli/src/breadboard-commands.test.ts",
+        "bun test apps/cli > tmp/breadboard-mode-s485/breadboard-16-cli/cli.log 2>&1; echo \"cli exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-16-cli/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^apps/cli/src/(commands|help|breadboard-command|breadboard-commands\\.test)\\.ts' tmp/breadboard-mode-s485/breadboard-16-cli/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-16-cli/typecheck.log",
+        "bunx biome check apps/cli/src/breadboard-command.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/commands.ts apps/cli/src/help.ts",
+        "bun apps/cli/src/main.ts breadboard import test-fixtures/kicad/led-button.net > tmp/breadboard-mode-s485/breadboard-16-cli/import.jsonl",
+        "bun apps/cli/src/main.ts breadboard import test-fixtures/kicad/legacy.sch > tmp/breadboard-mode-s485/breadboard-16-cli/legacy-import.log 2>&1; test $? -eq 1",
+        "git diff --quiet -- apps/cli/src/commands.test.ts apps/cli/src/bpmn-commands.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' apps/cli/src/breadboard-command.ts apps/cli/src/breadboard-commands.test.ts impl-plans/progress/breadboard-16-cli.md",
+        "git diff -U0 -- apps/cli/src/commands.ts apps/cli/src/help.ts | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(grep -c 'case \"breadboard\"' apps/cli/src/commands.ts)\" -eq 1",
+        "test \"$(grep -c 'The document contains no BPMN or breadboard pages.' apps/cli/src/commands.ts)\" -eq 1",
+        "test -s impl-plans/progress/breadboard-16-cli.md"
+      ]
+    },
+    {
+      "planId": "breadboard-13-ui-inspector",
+      "planPath": "impl-plans/active/breadboard-13-ui-inspector.md",
+      "progressPath": "impl-plans/progress/breadboard-13-ui-inspector.md",
+      "wave": 6,
+      "dependsOn": [
+        "breadboard-06-core-editing",
+        "breadboard-07-core-connectivity-erc",
+        "breadboard-10-core-ratsnest-parity",
+        "breadboard-14-ui-problems"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/inspector/BreadboardSection.tsx",
+        "packages/ui-solid/src/inspector/breadboard-edits.ts",
+        "packages/ui-solid/src/inspector/breadboard-edits.test.ts",
+        "packages/ui-solid/src/Inspector.tsx",
+        "impl-plans/progress/breadboard-13-ui-inspector.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/ui-solid/src/inspector/(BreadboardSection\\.tsx|breadboard-edits(\\.test)?\\.ts)|^packages/ui-solid/src/Inspector\\.tsx",
+      "acceptanceCriteria": [
+        "InspectorProps.viewport?: () => ViewportSize is added; the inspector matches breadboard.* with reference, value and part parameter fields, rotation and net highlight, and reference/net cross-probing via focusBreadboardProbe.",
+        "BpmnSection.tsx unchanged.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-13-ui-inspector",
+        "bun test packages/ui-solid/src/inspector/breadboard-edits.test.ts",
+        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-13-ui-inspector/ui.log 2>&1; echo \"ui exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-13-ui-inspector/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ui-solid/src/inspector/(BreadboardSection\\.tsx|breadboard-edits(\\.test)?\\.ts)|^packages/ui-solid/src/Inspector\\.tsx' tmp/breadboard-mode-s485/breadboard-13-ui-inspector/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-13-ui-inspector/typecheck.log",
+        "bunx biome check packages/ui-solid/src/inspector/BreadboardSection.tsx packages/ui-solid/src/inspector/breadboard-edits.ts packages/ui-solid/src/inspector/breadboard-edits.test.ts packages/ui-solid/src/Inspector.tsx",
+        "git diff --quiet -- packages/ui-solid/src/inspector/BpmnSection.tsx",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ui-solid/src/inspector/BreadboardSection.tsx packages/ui-solid/src/inspector/breadboard-edits.ts packages/ui-solid/src/inspector/breadboard-edits.test.ts impl-plans/progress/breadboard-13-ui-inspector.md",
+        "git diff -U0 -- packages/ui-solid/src/Inspector.tsx | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "grep -n 'breadboard\\.' packages/ui-solid/src/Inspector.tsx",
+        "test -s impl-plans/progress/breadboard-13-ui-inspector.md"
+      ]
+    },
+    {
+      "planId": "breadboard-18-example-docs",
+      "planPath": "impl-plans/active/breadboard-18-example-docs.md",
+      "progressPath": "impl-plans/progress/breadboard-18-example-docs.md",
+      "wave": 6,
+      "dependsOn": [
+        "breadboard-03-io-formatters",
+        "breadboard-04-io-kicad",
+        "breadboard-07-core-connectivity-erc",
+        "breadboard-08-core-notation-svg",
+        "breadboard-09-core-import-layout",
+        "breadboard-10-core-ratsnest-parity",
+        "breadboard-16-cli"
+      ],
+      "writePaths": [
+        "examples/breadboard",
+        "packages/core/src/breadboard/export-golden.test.ts",
+        "packages/core/src/breadboard/kicad-golden.test.ts",
+        "packages/core/src/breadboard/docs.test.ts",
+        "docs/breadboard",
+        "README.md",
+        "impl-plans/progress/breadboard-18-example-docs.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(export-golden|kicad-golden|docs)\\.test\\.ts",
+      "acceptanceCriteria": [
+        "examples/breadboard/led-button.jsonl (BT1 5V, SW1 PUSH, R1 220, D1 red on a half board) matches the overview's fixed topology with nets GND, VCC, N_D1_1, N_R1_1 and lints clean (exit 0, empty stdout).",
+        "Golden led-button.bom.csv (5 lines), led-button.net (4 nets) and led-button.cir match CLI output via --check; export-golden, kicad-golden (KiCad fixture import matches the example's parts, references, values and target nets) and docs tests pass with at least 7 tests.",
+        "docs/breadboard (format.md, erc-rules.md, kicad-import.md) and a README section are added; README edits add only ASCII lines.",
+        "Focused bun test passes with 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-18-example-docs",
+        "bun test packages/core/src/breadboard/export-golden.test.ts packages/core/src/breadboard/kicad-golden.test.ts packages/core/src/breadboard/docs.test.ts",
+        "bun apps/cli/src/main.ts lint examples/breadboard/led-button.jsonl > tmp/breadboard-mode-s485/breadboard-18-example-docs/lint-stdout.txt && test ! -s tmp/breadboard-mode-s485/breadboard-18-example-docs/lint-stdout.txt",
+        "bun apps/cli/src/main.ts breadboard bom examples/breadboard/led-button.jsonl --check examples/breadboard/led-button.bom.csv",
+        "bun apps/cli/src/main.ts breadboard netlist examples/breadboard/led-button.jsonl --format kicad --check examples/breadboard/led-button.net",
+        "bun apps/cli/src/main.ts breadboard netlist examples/breadboard/led-button.jsonl --format spice --check examples/breadboard/led-button.cir",
+        "bun test packages/core > tmp/breadboard-mode-s485/breadboard-18-example-docs/core.log 2>&1; echo \"core exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-18-example-docs/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/(export-golden|kicad-golden|docs)\\.test\\.ts' tmp/breadboard-mode-s485/breadboard-18-example-docs/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-18-example-docs/typecheck.log",
+        "bunx biome check packages/core/src/breadboard/export-golden.test.ts packages/core/src/breadboard/kicad-golden.test.ts packages/core/src/breadboard/docs.test.ts",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "find examples/breadboard docs/breadboard packages/core/src/breadboard/export-golden.test.ts packages/core/src/breadboard/kicad-golden.test.ts packages/core/src/breadboard/docs.test.ts impl-plans/progress/breadboard-18-example-docs.md -type f -print0 | xargs -0 perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }'",
+        "git diff -U0 -- README.md | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "test \"$(wc -l < examples/breadboard/led-button.bom.csv)\" -eq 5",
+        "test \"$(grep -c '(net ' examples/breadboard/led-button.net)\" -eq 4",
+        "test -s impl-plans/progress/breadboard-18-example-docs.md"
+      ]
+    },
+    {
+      "planId": "breadboard-17-desktop",
+      "planPath": "impl-plans/active/breadboard-17-desktop.md",
+      "progressPath": "impl-plans/progress/breadboard-17-desktop.md",
+      "wave": 7,
+      "dependsOn": [
+        "breadboard-04-io-kicad",
+        "breadboard-09-core-import-layout",
+        "breadboard-12-ui-canvas-interaction",
+        "breadboard-13-ui-inspector",
+        "breadboard-14-ui-problems",
+        "breadboard-15-ui-export-dialog"
+      ],
+      "writePaths": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/page-workspace.ts",
+        "apps/desktop/src/page-workspace.test.ts",
+        "apps/desktop/src/file/session.ts",
+        "apps/desktop/src/file/session.test.ts",
+        "apps/desktop/src-tauri/src/dialogs.rs",
+        "impl-plans/progress/breadboard-17-desktop.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^apps/desktop/src/(App\\.tsx|page-workspace(\\.test)?\\.ts|file/session(\\.test)?\\.ts)",
+      "acceptanceCriteria": [
+        "The page kind selects and follows the breadboard workspace; choosing Breadboard in Mode opens or creates a 'Breadboard' page; the breadboard problems panel is mounted with import warnings; the Inspector receives the viewport prop.",
+        "The export dialog's BOM, KiCad and SPICE buttons write files through the export backend (lazily importing plan 03 formatters).",
+        ".kicad_sch and .net open as detached imports with notes through OPEN_FILTER_EXTENSIONS in dialogs.rs, with Rust test open_filter_includes_kicad and session.test.ts KiCad open cases; no tauri.*.conf.json change and no other Rust change.",
+        "cargo fmt check and cargo test dialogs pass with CARGO_TERM_QUIET=true.",
+        "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-mode-s485/breadboard-17-desktop",
+        "bun test apps/desktop/src/page-workspace.test.ts apps/desktop/src/file/session.test.ts",
+        "bun test apps/desktop > tmp/breadboard-mode-s485/breadboard-17-desktop/desktop.log 2>&1; echo \"desktop exit=$?\"",
+        "bun run typecheck > tmp/breadboard-mode-s485/breadboard-17-desktop/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^apps/desktop/src/(App\\.tsx|page-workspace(\\.test)?\\.ts|file/session(\\.test)?\\.ts)' tmp/breadboard-mode-s485/breadboard-17-desktop/typecheck.log",
+        "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-17-desktop/typecheck.log",
+        "bunx biome check apps/desktop/src/App.tsx apps/desktop/src/page-workspace.ts apps/desktop/src/page-workspace.test.ts apps/desktop/src/file/session.ts apps/desktop/src/file/session.test.ts",
+        "CARGO_TERM_QUIET=true cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
+        "CARGO_TERM_QUIET=true cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml dialogs > tmp/breadboard-mode-s485/breadboard-17-desktop/cargo-test.log 2>&1",
+        "grep -q 'open_filter_includes_kicad' tmp/breadboard-mode-s485/breadboard-17-desktop/cargo-test.log",
+        "git diff --quiet -- apps/desktop/src-tauri/tauri.conf.json apps/desktop/src-tauri/tauri.macos.release.conf.json apps/desktop/src-tauri/tauri.linux.release.conf.json",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' apps/desktop/src/page-workspace.ts apps/desktop/src/page-workspace.test.ts impl-plans/progress/breadboard-17-desktop.md",
+        "git diff -U0 -- apps/desktop/src/App.tsx apps/desktop/src/file/session.ts apps/desktop/src/file/session.test.ts apps/desktop/src-tauri/src/dialogs.rs | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
+        "grep -n '\"kicad_sch\"' apps/desktop/src-tauri/src/dialogs.rs",
+        "grep -n 'isBreadboardPage' apps/desktop/src/App.tsx",
+        "test -s impl-plans/progress/breadboard-17-desktop.md"
+      ]
+    }
+  ]
+}

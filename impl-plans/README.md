@@ -7,8 +7,15 @@
 
 ## Active
 
-No implementation plans are active. `active/` holds only the historical
-BPMN dispatch manifests (`bpmn-operation-flow-s356-dispatch.json`,
+Breadboard circuit pages (session-485; design:
+`design-docs/specs/design-breadboard.md` revision 2, user QA:
+`design-docs/user-qa/breadboard-mode.md`). Start with
+[breadboard-00-overview](active/breadboard-00-overview.md), which lists
+waves 1-7, ownership, gates and final verification. There are 18 plans,
+`breadboard-01-ir-contract` .. `breadboard-18-example-docs`.
+
+`active/` also holds the historical BPMN dispatch manifests
+(`bpmn-operation-flow-s356-dispatch.json`,
 `bpmn-operation-flow-s357-dispatch.json`,
 `bpmn-operation-flow-s359-dispatch.json`,
 `bpmn-render-fix-s360-dispatch.json`). Of the first three, only s359 was
