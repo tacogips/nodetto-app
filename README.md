@@ -1539,8 +1539,12 @@ To export one database frame from an ERD page, choose its frame in the Database
 DDL panel's scope selector, or run:
 
 ```bash
-nodetto-cli ddl diagram.jsonl --page Schema --frame database-frame-id --dialect postgresql
+nodetto-cli ddl diagram.jsonl --page Schema --frame "Orders" --dialect postgresql
 ```
+
+`--frame` accepts the frame's name, full id or unique id prefix of at least six
+characters, matched only among frames on the selected page. Ids are generated
+and never change, so prefer names in scripts.
 
 The scope follows frame ownership, including nested frames and groups. Relations
 that cross the scope produce a warning and no foreign key. Database objects

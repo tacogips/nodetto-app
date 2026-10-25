@@ -301,6 +301,143 @@ test("DDL frame scopes validate page ownership and retain check/strict behavior"
   ).toBe(EXIT_WARNINGS);
 });
 
+test("ddl resolves frame names and prefixes only on the selected page", () => {
+  let nextIndex = 0;
+  const element = (
+    id: string,
+    page: string,
+    type: string,
+    semantic: Record<string, unknown>,
+  ) => ({
+    kind: "element",
+    id,
+    page,
+    type,
+    index: `a${(nextIndex++).toString(36)}`,
+    semantic,
+  });
+  const table = (id: string, page: string, tableName: string) =>
+    element(id, page, "erd.table", {
+      tableName,
+      columns: [{ id: "c-id", name: "id", dataType: "integer", pk: true }],
+    });
+  const frame = (id: string, page: string, name: string, memberId: string) =>
+    element(id, page, "frame", { name, memberIds: [memberId] });
+  const fixture = [
+    {
+      kind: "document",
+      schemaVersion: 1,
+      id: "01JCLI0000000000000000002",
+      title: "Shop",
+    },
+    { kind: "page", id: "p-shop", name: "Shop schema", pageKind: "erd" },
+    { kind: "page", id: "p-other", name: "Other schema", pageKind: "erd" },
+    table("t-orders", "p-shop", "orders"),
+    table("t-billing", "p-shop", "billing"),
+    table("t-shared-a", "p-shop", "shared_a"),
+    table("t-shared-b", "p-shop", "shared_b"),
+    table("t-other", "p-other", "other_orders"),
+    frame("fr-orders-0001", "p-shop", "orders store", "t-orders"),
+    frame("fr-billing-0001", "p-shop", "billing store", "t-billing"),
+    frame("fr-dup-aaaa1", "p-shop", "shared store", "t-shared-a"),
+    frame("fr-dup-bbbb2", "p-shop", "shared store", "t-shared-b"),
+    frame("fr-empty-0001", "p-shop", "", "t-orders"),
+    frame("fr-other-0001", "p-other", "orders store", "t-other"),
+    "",
+  ]
+    .map((line) => (typeof line === "string" ? line : JSON.stringify(line)))
+    .join("\n");
+  const io = memoryIo({ "doc.jsonl": fixture });
+  const runFrame = (page: string, query: string) =>
+    runCli(["ddl", "doc.jsonl", "--page", page, "--frame", query], io, "test");
+
+  const byName = runFrame("Shop schema", "orders store");
+  const byId = runFrame("Shop schema", "fr-orders-0001");
+  expect(byName.exitCode).toBe(EXIT_OK);
+  expect(byName.stdout).toBe(byId.stdout);
+  expect(byId.stdout).toContain('CREATE TABLE "orders"');
+  expect(byId.stdout).not.toContain('CREATE TABLE "billing"');
+  expect(runFrame("Shop schema", "fr-ord").stdout).toBe(byId.stdout);
+  const shortPrefix = runFrame("Shop schema", "fr-or");
+  expect(shortPrefix.exitCode).toBe(EXIT_ERROR);
+  expect(shortPrefix.stdout).toBe("");
+
+  const noMatch = runFrame("Shop schema", "no such store");
+  expect(noMatch.exitCode).toBe(EXIT_ERROR);
+  expect(noMatch.stdout).toBe("");
+  expect(noMatch.stderr.split("\n")[0]).toBe(
+    "--frame must identify a frame on the selected --page.",
+  );
+  expect(noMatch.stderr).toContain("orders store");
+  expect(noMatch.stderr).toContain("billing store");
+  expect(noMatch.stderr).toContain("(full id: fr-orders-0001)");
+  expect(noMatch.stderr).toContain("(unnamed)");
+
+  const ambiguous = runFrame("Shop schema", "shared store");
+  expect(ambiguous.exitCode).toBe(EXIT_ERROR);
+  expect(ambiguous.stdout).toBe("");
+  expect(ambiguous.stderr).toContain("matches 2 frames");
+  expect(ambiguous.stderr).toContain("(full id: fr-dup-aaaa1)");
+  expect(ambiguous.stderr).toContain("(full id: fr-dup-bbbb2)");
+  expect(ambiguous.stderr).not.toContain("fr-orders-0001");
+
+  expect(runFrame("Shop schema", "fr-other-0001").exitCode).toBe(EXIT_ERROR);
+  expect(runFrame("Other schema", "billing store").exitCode).toBe(EXIT_ERROR);
+  const otherPage = runFrame("Other schema", "orders store");
+  expect(otherPage.exitCode).toBe(EXIT_OK);
+  expect(otherPage.stdout).toContain('CREATE TABLE "other_orders"');
+  expect(otherPage.stdout).not.toContain('CREATE TABLE "orders"');
+
+  const outputFailure = runCli(
+    [
+      "ddl",
+      "doc.jsonl",
+      "--page",
+      "Shop schema",
+      "--frame",
+      "no such store",
+      "--output",
+      "out.sql",
+    ],
+    io,
+    "test",
+  );
+  expect(outputFailure.exitCode).toBe(EXIT_ERROR);
+  expect(outputFailure.stderr).toContain("frame on the selected --page");
+  expect(io.files.has("out.sql")).toBe(false);
+
+  const namePrefixFixture = [
+    { kind: "document", schemaVersion: 1, id: "name-prefix", title: "Shop" },
+    { kind: "page", id: "p-shop", name: "Shop schema", pageKind: "erd" },
+    table("t-orders", "p-shop", "orders"),
+    table("t-named", "p-shop", "named"),
+    frame("fr-orders-0001", "p-shop", "orders store", "t-orders"),
+    frame("fr-name-0001", "p-shop", "fr-ord", "t-named"),
+    "",
+  ]
+    .map((line) => (typeof line === "string" ? line : JSON.stringify(line)))
+    .join("\n");
+  const namePrefixIo = memoryIo({ "doc.jsonl": namePrefixFixture });
+  const byNamePrefix = runCli(
+    ["ddl", "doc.jsonl", "--page", "Shop schema", "--frame", "fr-ord"],
+    namePrefixIo,
+    "test",
+  );
+  const byNamedFrameId = runCli(
+    ["ddl", "doc.jsonl", "--page", "Shop schema", "--frame", "fr-name-0001"],
+    namePrefixIo,
+    "test",
+  );
+  const byOrdersFrameId = runCli(
+    ["ddl", "doc.jsonl", "--page", "Shop schema", "--frame", "fr-orders-0001"],
+    namePrefixIo,
+    "test",
+  );
+  expect(byNamePrefix.exitCode).toBe(EXIT_OK);
+  expect(byNamePrefix.stdout).toBe(byNamedFrameId.stdout);
+  expect(byNamePrefix.stdout).not.toBe(byOrdersFrameId.stdout);
+});
+
 test("CLI adds a standalone line with free ends and authored intermediate points", async () => {
   const source =
     '{"kind":"document","schemaVersion":1,"id":"free-lines","title":"Free lines"}\n{"kind":"page","id":"p1","name":"Lines","pageKind":"flowchart"}\n';

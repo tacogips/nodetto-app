@@ -103,6 +103,19 @@ test("top-level help is a short overview and each command has its own page", () 
   expect(runCli(["help"], memoryIo({}), "t").stdout).toBe(`${OVERVIEW}\n`);
 });
 
+test("ddl and pages help explain frame names and opaque ids", () => {
+  expect(COMMAND_HELP.ddl).toContain("--frame <id|short-id|name>");
+  expect(COMMAND_HELP.ddl).not.toContain("[--frame <id>]");
+  for (const help of [COMMAND_HELP.ddl, COMMAND_HELP.pages]) {
+    expect(help).toContain("opaque");
+    expect(help).toContain("rename-page");
+  }
+
+  const page = runCli(["ddl", "--help"], memoryIo({}), "t");
+  expect(page.exitCode).toBe(EXIT_OK);
+  expect(page.stdout).toBe(`${COMMAND_HELP.ddl}\n`);
+});
+
 test("edit applies a batch with refs, generated column ids and name-based relation columns", () => {
   const io = drawn();
   const document = parseDocument(io.files.get("doc.jsonl") ?? "");
