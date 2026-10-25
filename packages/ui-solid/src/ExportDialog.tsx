@@ -6,6 +6,11 @@ import { isDatabaseObjectType, shortPageId } from "@nodetto/ir";
 import type { Editor } from "@nodetto/core";
 import { availableMermaidKinds } from "@nodetto/io";
 import {
+  BREADBOARD_EXPORTS,
+  breadboardExportEnabled,
+  type BreadboardExportKind,
+} from "./breadboard-export.ts";
+import {
   createMemo,
   createSignal,
   For,
@@ -46,6 +51,7 @@ type Format =
   | "drawio"
   | "sql"
   | "bpmn"
+  | "breadboard"
   | "code"
   | "html";
 
@@ -54,6 +60,7 @@ export interface ExportDialogProps {
   readonly saveArtwork?: SaveArtwork;
   readonly saveHtmlBundle?: SaveHtmlBundle;
   readonly exportBpmn: () => Promise<void>;
+  readonly exportBreadboard?: (kind: BreadboardExportKind) => Promise<void>;
   readonly error?: string | null;
   readonly onClose: () => void;
 }
@@ -102,6 +109,14 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
           .some((e) => e.type === "erd.table" || isDatabaseObjectType(e.type)),
       },
       { id: "bpmn", label: "BPMN", enabled: page()?.kind === "bpmn" },
+      {
+        id: "breadboard",
+        label: "Breadboard",
+        enabled: breadboardExportEnabled(
+          page()?.kind,
+          props.exportBreadboard !== undefined,
+        ),
+      },
       { id: "code", label: "Code", enabled: selected() !== undefined },
     ] satisfies readonly { id: Format; label: string; enabled: boolean }[];
   });
@@ -112,7 +127,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     { label: "Artwork", ids: ["svg", "png", "pdf"] },
     {
       label: "Diagram source",
-      ids: ["mermaid", "d2", "drawio", "sql", "bpmn"],
+      ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard"],
     },
     { label: "Web & developer", ids: ["html", "code"] },
   ];
@@ -125,6 +140,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     drawio: "An editable .drawio file for draw.io (diagrams.net).",
     sql: "Database schema SQL in your preferred dialect.",
     bpmn: "BPMN 2.0 XML for other process modeling tools.",
+    breadboard: "BOM and netlists for other circuit tools.",
     html: "A website ZIP containing artboard HTML, CSS and assets.",
     code: "Design details, web code and native code for the selected element.",
   };
@@ -263,6 +279,18 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
               <button type="button" onClick={() => void props.exportBpmn()}>
                 Export .bpmn
               </button>
+            </Match>
+            <Match when={active() === "breadboard"}>
+              <For each={BREADBOARD_EXPORTS}>
+                {(item) => (
+                  <button
+                    type="button"
+                    onClick={() => void props.exportBreadboard?.(item.kind)}
+                  >
+                    {item.label}
+                  </button>
+                )}
+              </For>
             </Match>
             <Match when={active() === "code" && selected()}>
               {(element) => <Code editor={props.editor} id={element().id} />}

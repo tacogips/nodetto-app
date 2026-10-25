@@ -59,6 +59,12 @@ export {
   importDrawio,
 } from "./drawio/index.ts";
 export {
+  type BreadboardFormatterResult,
+  exportBreadboardBomCsv,
+  exportBreadboardKicadNetlist,
+  exportBreadboardSpiceNetlist,
+} from "./breadboard/index.ts";
+export {
   type D2ExportReport,
   type D2ExportWarning,
   exportD2,
@@ -81,3 +87,10 @@ export {
   type XmlElement,
   type XmlNode,
 } from "./bpmn/index.ts";
+export {
+  importKicad,
+  readSexpr,
+  type SexprAtom,
+  type SexprList,
+  type SexprNode,
+} from "./kicad/index.ts";

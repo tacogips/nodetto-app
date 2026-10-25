@@ -147,6 +147,10 @@ function isBpmnPath(path: string): boolean {
   return /\.bpmn$/i.test(path);
 }
 
+function isKicadPath(path: string): boolean {
+  return /\.(?:kicad_sch|net)$/i.test(path);
+}
+
 function bpmnTitle(path: string): string {
   return baseName(path).replace(/\.bpmn$/i, "");
 }
@@ -429,6 +433,42 @@ export class DocumentSession {
           report.warnings.map((warning) => ({
             element: warning.cell ?? warning.page,
             message: `${warning.page}: ${warning.message}`,
+          })),
+        );
+      } catch (error) {
+        if (!stale()) {
+          this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
+        }
+        return false;
+      }
+    }
+
+    if (isKicadPath(path)) {
+      try {
+        const { importKicad } = await import("@nodetto/io/kicad");
+        if (stale()) return false;
+        const result = importKicad(diskText, { fileName: baseName(path) });
+        if (!result.plan) {
+          const diagnostic = result.diagnostics.find(
+            (item) => item.severity === "error",
+          );
+          this.fail(
+            `could not import ${baseName(path)}: ${diagnostic?.message ?? "no import plan was produced"}`,
+          );
+          return false;
+        }
+        const { layoutBreadboardImport } = await import("@nodetto/core");
+        if (stale()) return false;
+        return await this.importDocument(
+          layoutBreadboardImport(result.plan),
+          baseName(path),
+          result.diagnostics.map((diagnostic) => ({
+            element:
+              diagnostic.reference ??
+              (diagnostic.line !== undefined && diagnostic.column !== undefined
+                ? `${diagnostic.line}:${diagnostic.column}`
+                : baseName(path)),
+            message: `${diagnostic.code}: ${diagnostic.message}`,
           })),
         );
       } catch (error) {

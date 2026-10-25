@@ -67,6 +67,22 @@ for round-trip checks. The adapter has no XML package dependency; its parser
 rejects `DOCTYPE`. Unsupported BPMN constructs and foreign XML content are
 preserved as interchange metadata and reported with warnings.
 
+## Breadboard BOM, netlists and KiCad import
+
+`exportBreadboardBomCsv`, `exportBreadboardKicadNetlist` and
+`exportBreadboardSpiceNetlist` format a breadboard page as a component BOM
+CSV, a KiCad-style S-expression netlist, or a SPICE netlist. Each returns
+`{ text, warnings }`. Mermaid and D2 exports skip breadboard types.
+
+`importKicad(text, { fileName })` (also on the `@nodetto/io/kicad` subpath)
+reads KiCad 6+ `.kicad_sch` schematics and S-expression `.net` netlists with
+a reader written from scratch. It returns `{ plan?, diagnostics }`; the plan
+holds the mapped parts with references and values, and the target netlist.
+Legacy (KiCad 5 and older) files, malformed input and unknown symbols yield
+diagnostics instead of throwing. `layoutBreadboardImport` in `@nodetto/core`
+lays a plan out as a staged breadboard page. See
+[`docs/breadboard/`](../../docs/breadboard/kicad-import.md).
+
 ## JSONL
 
 ```ts

@@ -31,6 +31,7 @@ export const PAGE_KINDS = [
   "flowchart",
   "architecture",
   "bpmn",
+  "breadboard",
 ] as const;
 
 export type PageKind = (typeof PAGE_KINDS)[number];

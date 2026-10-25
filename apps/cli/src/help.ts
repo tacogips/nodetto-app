@@ -24,9 +24,10 @@ Render
 Convert and check
   nodetto-cli ddl <doc>           Database DDL from an ERD page
   nodetto-cli format <doc>        Canonical JSONL formatting
-  nodetto-cli lint <doc|bpmn>     Lint BPMN pages
+  nodetto-cli lint <doc|bpmn>     Lint BPMN and breadboard pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
+  nodetto-cli breadboard ...      BOM, netlist and KiCad import
 
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
@@ -337,11 +338,34 @@ ${EXIT_CODES}`,
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
                         [--config <file>] [--format text|json]
 
-Lint BPMN pages from a nodetto document or BPMN XML. Text output is empty when
-clean; --format json always prints a report. A .bpmnlintrc in the working
-directory is used when --config is not given.
+Lint BPMN and breadboard pages from a nodetto document or BPMN XML. Text output
+is empty when clean; --format json always prints a report. A .bpmnlintrc in the
+working directory is used when --config is not given and a BPMN page is linted.
 
 Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
+
+  breadboard: `Usage: nodetto-cli breadboard bom <document.jsonl> [--page <short-id|id|name>]
+                                  [--output <file.csv> | --check <file.csv>] [--strict]
+       nodetto-cli breadboard netlist <document.jsonl> --format kicad|spice
+                                      [--page <short-id|id|name>]
+                                      [--output <file> | --check <file>] [--strict]
+       nodetto-cli breadboard import <file.kicad_sch|file.net> [--output <file.jsonl>] [--strict]
+
+Export a breadboard bill of materials or netlist, or import a KiCad 6+
+schematic/netlist into a new breadboard document.
+
+  --page    Select one breadboard page by short ID, full ID or exact name.
+  --format  Required for netlist: kicad or spice.
+  --output  Write generated output to a file.
+  --check   Compare generated output with a file; exit 1 when out of date.
+  --strict  Exit 3 when warnings are reported.
+
+Examples:
+  nodetto-cli breadboard bom prototype.jsonl --output bom.csv
+  nodetto-cli breadboard netlist prototype.jsonl --format kicad
+  nodetto-cli breadboard import circuit.net --output staged.jsonl
+
+${EXIT_CODES}`,
 
   bpmn: `Usage: nodetto-cli bpmn import <file.bpmn> [--output <doc.jsonl>] [--strict]
        nodetto-cli bpmn export <document.jsonl> [--page <short-id|id|name>]

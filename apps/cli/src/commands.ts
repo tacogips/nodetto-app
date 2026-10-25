@@ -6,6 +6,7 @@ import {
   bpmnRouteResolver,
   generateDatabaseDdl,
   lintBpmnPage,
+  lintBreadboardPage,
   parseLintConfig,
   recommendedLintConfig,
   type ArrangeMode,
@@ -36,6 +37,7 @@ import { inspectCommand } from "./inspect-command.ts";
 import { typesCommand } from "./types-command.ts";
 import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
+import { breadboardCommand } from "./breadboard-command.ts";
 
 /** Result of one command: text for stdout/stderr plus a process exit code. */
 export interface CommandResult {
@@ -78,6 +80,7 @@ interface ParsedArgs {
 const VALUE_OPTIONS = new Set(["--dialect", "--page", "--output", "--check"]);
 const ARRANGE_OPTIONS = new Set(["--mode", "--direction", "--page"]);
 const LINT_OPTIONS = new Set(["--page", "--config", "--format"]);
+const LINT_NO_PAGES = "The document contains no BPMN or breadboard pages.";
 const BPMN_IMPORT_OPTIONS = new Set(["--output"]);
 const DRAWIO_IMPORT_OPTIONS = new Set(["--output"]);
 const BPMN_EXPORT_OPTIONS = new Set(["--page", "--output", "--check"]);
@@ -190,6 +193,14 @@ function bpmnPages(document: Document): readonly Page[] {
   return document.pages.filter((page) => page.kind === "bpmn");
 }
 
+interface LintFindingRow {
+  readonly elementId: string;
+  readonly severity: "error" | "warning";
+  readonly message: string;
+  readonly ruleId: string;
+  readonly pin?: number;
+}
+
 function warningLines(
   warnings: readonly {
     readonly message: string;
@@ -252,28 +263,27 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     stderr = loaded.warnings;
   }
 
-  const pages = bpmnPages(document);
+  const pages = document.pages.filter(
+    (page) => page.kind === "bpmn" || page.kind === "breadboard",
+  );
+  if (!pages.length) return fail(LINT_NO_PAGES);
   const query = parsed.options.get("--page");
   let selectedPages: readonly Page[];
   if (query !== undefined) {
-    const selected = selectPage(
-      document,
-      query,
-      pages,
-      "The document contains no BPMN pages.",
-    );
+    const selected = selectPage(document, query, pages, LINT_NO_PAGES);
     if (typeof selected === "string") return fail(selected);
     selectedPages = [selected];
   } else {
     selectedPages = pages;
   }
-  if (!selectedPages.length)
-    return fail("The document contains no BPMN pages.");
+  if (!selectedPages.length) return fail(LINT_NO_PAGES);
 
   let config = recommendedLintConfig();
+  const hasBpmn = selectedPages.some((page) => page.kind === "bpmn");
   const configPath = parsed.options.get("--config");
-  const discoveredPath =
-    configPath ?? (io.exists?.(".bpmnlintrc") ? ".bpmnlintrc" : undefined);
+  const discoveredPath = hasBpmn
+    ? (configPath ?? (io.exists?.(".bpmnlintrc") ? ".bpmnlintrc" : undefined))
+    : undefined;
   if (discoveredPath !== undefined) {
     let source: string;
     try {
@@ -293,9 +303,30 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     }
   }
 
-  const reports = selectedPages.map((page) => ({
+  const reports: {
+    readonly page: Page;
+    readonly findings: readonly LintFindingRow[];
+  }[] = selectedPages.map((page) => ({
     page,
-    findings: lintBpmnPage(document, page.id, config, context),
+    findings:
+      page.kind === "bpmn"
+        ? lintBpmnPage(document, page.id, config, context).map(
+            ({ elementId, severity, message, ruleId }) => ({
+              elementId,
+              severity,
+              message,
+              ruleId,
+            }),
+          )
+        : lintBreadboardPage(document, page.id).map(
+            ({ elementId, severity, message, ruleId, pin }) => ({
+              elementId,
+              severity,
+              message,
+              ruleId,
+              ...(pin === undefined ? {} : { pin }),
+            }),
+          ),
   }));
   const allFindings = reports.flatMap((report) => report.findings);
   const errors = allFindings.filter(
@@ -308,11 +339,14 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       pages: reports.map(({ page, findings }) => ({
         pageId: page.id,
         pageName: page.name,
-        findings: findings.map(({ elementId, severity, message, ruleId }) => ({
-          elementId,
-          severity,
-          message,
-          ruleId,
+        findings: findings.map((finding) => ({
+          elementId: finding.elementId,
+          severity: finding.severity,
+          message: finding.message,
+          ruleId: finding.ruleId,
+          ...(page.kind === "breadboard" && finding.pin !== undefined
+            ? { pin: finding.pin }
+            : {}),
         })),
       })),
       summary: { problems: allFindings.length, errors, warnings },
@@ -762,6 +796,8 @@ export function runCli(
       return bpmnCommand(io, rest);
     case "drawio":
       return drawioCommand(io, rest);
+    case "breadboard":
+      return breadboardCommand(io, rest);
     case "diff":
       return diffCommand(io, rest);
     case "edit":

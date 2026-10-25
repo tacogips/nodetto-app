@@ -96,6 +96,7 @@ import {
 } from "./interaction.ts";
 import { ConnectorMarkers, ConnectorView } from "./shapes/ConnectorView.tsx";
 import { ShapeView } from "./shapes/ShapeView.tsx";
+import { BreadboardOverlay } from "./BreadboardOverlay.tsx";
 import { Tool, isConnectorTool, type ToolKind } from "./tools.ts";
 
 const CanvasRulers = lazy(() => import("./CanvasRulers.tsx"));
@@ -209,6 +210,12 @@ function handleCenter(
 
 export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
+  const [probeRevision, setProbeRevision] = createSignal(0);
+  onCleanup(
+    props.editor.onBreadboardProbeChange(() =>
+      setProbeRevision((value) => value + 1),
+    ),
+  );
   const readOnly = () => {
     signals.rev();
     return props.editor.readOnly;
@@ -356,6 +363,13 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   onCleanup(() => interaction.dispose());
 
   const cameraZoom = createMemo(() => signals.camera().z);
+  const isBreadboardPage = createMemo(() => {
+    signals.rev();
+    return (
+      props.editor.store.getPage(props.editor.currentPageId)?.kind ===
+      "breadboard"
+    );
+  });
   const context = createMemo(() => {
     signals.rev();
     return props.editor.createShapeContext(cameraZoom());
@@ -1004,6 +1018,17 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
 
         <svg class="nodetto-layer nodetto-overlay-layer">
           <title>Selection</title>
+          <Show when={isBreadboardPage()}>
+            <BreadboardOverlay
+              editor={props.editor}
+              revision={signals.rev}
+              selection={signals.selection}
+              hover={interaction.breadboardHover}
+              probeRevision={probeRevision}
+              wireDraft={interaction.wireDraft}
+              startWirePoint={interaction.startBreadboardWirePoint}
+            />
+          </Show>
           <Show when={interaction.marquee()}>
             {(rect) => (
               <rect

@@ -11,6 +11,7 @@ export type WorkspaceId =
   | "flowchart"
   | "flow"
   | "bpmn"
+  | "breadboard"
   | "all";
 export interface Workspace {
   readonly id: WorkspaceId;
@@ -94,6 +95,19 @@ export const WORKSPACES = [
       { tool: Tool.BpmnEndEvent, label: "End event" },
       { tool: Tool.BpmnExclusiveGateway, label: "Exclusive gateway" },
       { tool: Tool.Connector, label: "Connector" },
+    ],
+  },
+  {
+    id: "breadboard",
+    label: "Breadboard",
+    design: false,
+    shapes: false,
+    tools: [
+      { tool: Tool.BreadboardHalf, label: "Half board" },
+      { tool: Tool.BreadboardResistor, label: "Resistor" },
+      { tool: Tool.BreadboardLed, label: "LED" },
+      { tool: Tool.BreadboardButton, label: "Push button" },
+      { tool: Tool.BreadboardWire, label: "Wire" },
     ],
   },
   {

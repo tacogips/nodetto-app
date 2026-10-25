@@ -1,0 +1,5 @@
+Item,Qty,References,Value,Part,Footprint
+1,1,BT1,5V,Battery,nodetto:Battery_P2.54
+2,1,D1,red,LED red,nodetto:LED_P1
+3,1,R1,220,Resistor 5%,nodetto:Resistor_P4
+4,1,SW1,PUSH,Push button,nodetto:PushButton_P2.54x5.08

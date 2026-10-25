@@ -14,7 +14,16 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 
 const FILTER_NAME: &str = "nodetto document";
 const OPEN_FILTER_EXTENSIONS: &[&str] = &[
-    "jsonl", "mmd", "mermaid", "bpmn", "drawio", "dio", "html", "htm",
+    "jsonl",
+    "mmd",
+    "mermaid",
+    "bpmn",
+    "drawio",
+    "dio",
+    "html",
+    "htm",
+    "kicad_sch",
+    "net",
 ];
 const SAVE_FILTER_EXTENSIONS: &[&str] = &["jsonl"];
 const DEFAULT_FILE_NAME: &str = "untitled.jsonl";
@@ -205,6 +214,12 @@ mod tests {
     fn open_filter_includes_drawio() {
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"drawio"));
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"dio"));
+    }
+
+    #[test]
+    fn open_filter_includes_kicad() {
+        assert!(OPEN_FILTER_EXTENSIONS.contains(&"kicad_sch"));
+        assert!(OPEN_FILTER_EXTENSIONS.contains(&"net"));
     }
 
     #[test]

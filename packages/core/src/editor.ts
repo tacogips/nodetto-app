@@ -25,9 +25,15 @@ import { planUmlPorts } from "./uml-ports.ts";
 // document without validation and undo.
 
 import {
+  BREADBOARD_PITCH,
   comparePageOrder,
+  isBreadboardElementType,
   isPlainObject,
   type AccessibilityMetadata,
+  isBreadboardPartType,
+  type BreadboardElementType,
+  type BreadboardPartSemantic,
+  type BreadboardPartType,
   type BooleanOperation,
   type Document,
   type Element,
@@ -137,6 +143,21 @@ import {
   planBpmnTranslations,
 } from "./bpmn/containment.ts";
 import { buildBpmnModel } from "./bpmn/model.ts";
+import type { BreadboardProbe } from "./breadboard/types.ts";
+import {
+  NETLIST_CARD_SIZE,
+  breadboardDefaultSemantic,
+  breadboardLocalBox,
+  breadboardPins,
+} from "./breadboard/catalogue.ts";
+import { boardLayout } from "./breadboard/board.ts";
+import {
+  annotateBreadboardParts,
+  planBreadboardAnnotation,
+} from "./breadboard/annotate.ts";
+import { planBreadboardTranslations } from "./breadboard/board-carry.ts";
+import { planBreadboardRotation } from "./breadboard/rotate.ts";
+import { snapBreadboardPoint } from "./breadboard/snap.ts";
 
 export interface EditorOptions {
   /** Document to open. A single empty freeform page is created otherwise. */
@@ -180,6 +201,21 @@ export interface CreatePageOptions {
   readonly id?: PageId;
   readonly name?: string;
   readonly kind?: PageKind;
+}
+
+function sameBreadboardProbe(
+  left: BreadboardProbe | null,
+  right: BreadboardProbe | null,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right || left.pageId !== right.pageId) return false;
+  if (left.elementIds.length !== right.elementIds.length) return false;
+  if (left.elementIds.some((id, index) => id !== right.elementIds[index]))
+    return false;
+  return (
+    left.pin?.elementId === right.pin?.elementId &&
+    left.pin?.pin === right.pin?.pin
+  );
 }
 
 const EDITABLE_FIELDS: Readonly<Record<string, EditableField>> = {
@@ -354,6 +390,10 @@ export class Editor {
   private readonly bpmnRejectionListeners = new Set<
     (rejection: BpmnRejection) => void
   >();
+  private readonly breadboardProbeListeners = new Set<
+    (probe: BreadboardProbe | null) => void
+  >();
+  private probe: BreadboardProbe | null = null;
   /** Highest index handed out per page, so a batch of builds stays ordered. */
   private readonly pendingTop = new Map<PageId, FractionalIndex>();
   private pageId: PageId;
@@ -432,6 +472,23 @@ export class Editor {
     return () => this.bpmnRejectionListeners.delete(listener);
   }
 
+  breadboardProbe(): BreadboardProbe | null {
+    return this.probe;
+  }
+
+  setBreadboardProbe(probe: BreadboardProbe | null): void {
+    if (sameBreadboardProbe(this.probe, probe)) return;
+    this.probe = probe;
+    for (const listener of [...this.breadboardProbeListeners]) listener(probe);
+  }
+
+  onBreadboardProbeChange(
+    listener: (probe: BreadboardProbe | null) => void,
+  ): () => void {
+    this.breadboardProbeListeners.add(listener);
+    return () => this.breadboardProbeListeners.delete(listener);
+  }
+
   private rejectBpmn(
     result: Extract<BpmnConnectionResult, { ok: false }>,
   ): BpmnEditResult {
@@ -454,6 +511,7 @@ export class Editor {
     }
     this.pageViews.set(this.pageId, this.camera.get());
     this.pageId = pageId;
+    this.setBreadboardProbe(null);
     this.selection.clear();
     this.camera.set(this.pageViews.get(pageId) ?? { x: 0, y: 0, z: 1 });
     this.notify(PAGE_SWITCH_DIFF);
@@ -1101,6 +1159,18 @@ export class Editor {
         derived.push(...planBpmnTranslations(this.store, draft));
         derived.push(...planBpmnMembership(this.store, draft));
       }
+      if (
+        this.store.listPages().some((page) => page.kind === "breadboard") ||
+        draft.listPages().some((page) => page.kind === "breadboard") ||
+        this.store
+          .listElements()
+          .some((element) => element.type.startsWith("breadboard.")) ||
+        draft
+          .listElements()
+          .some((element) => element.type.startsWith("breadboard."))
+      ) {
+        derived.push(...planBreadboardTranslations(this.store, draft));
+      }
       const beforeLayout = new Store(draft.getSnapshot());
       derived.push(...planAutoLayout(draft, this.registry));
       const resizedText = planTextResize(draft, this.registry);
@@ -1331,6 +1401,183 @@ export class Editor {
     const element = this.buildElement(type, options);
     this.apply([{ type: "createElement", element }], applyOptions);
     return element.id;
+  }
+
+  createBreadboardPart(
+    type: BreadboardElementType,
+    at: Vec,
+    semantic?: Readonly<Record<string, unknown>>,
+    applyOptions: ApplyOptions = {},
+  ): ElementId | null {
+    const page = this.store.getPage(this.pageId);
+    if (!page || page.kind !== "breadboard") return null;
+    const merged = {
+      ...(breadboardDefaultSemantic(type) as Record<string, unknown>),
+      ...(semantic ?? {}),
+    };
+    if (type === "breadboard.netlist" && merged["source"] === "") {
+      merged["source"] = "manual";
+    }
+    const point = snapBreadboardPoint(at);
+    let x = point.x;
+    let y = point.y;
+    if (isBreadboardPartType(type)) {
+      const initial = merged as unknown as BreadboardPartSemantic;
+      const local = breadboardLocalBox(type, initial);
+      x += local.x * BREADBOARD_PITCH;
+      y += local.y * BREADBOARD_PITCH;
+      const refs = this.store
+        .getPageElements(page.id)
+        .filter((element) => isBreadboardPartType(element.type))
+        .map(
+          (element) => (element.semantic as { reference: string }).reference,
+        );
+      const [reference] = annotateBreadboardParts(refs, [
+        { type, reference: String(merged["reference"] ?? "") },
+      ]);
+      if (reference) merged["reference"] = reference;
+    } else if (type === "breadboard.board") {
+      x -= 3 * BREADBOARD_PITCH;
+      y -= 5 * BREADBOARD_PITCH;
+    } else if (type === "breadboard.wire") {
+      const points = merged["points"] as readonly Vec[];
+      const first = points[0];
+      if (first) {
+        x -= first.x;
+        y -= first.y;
+      }
+    }
+    let index = this.nextIndex(page.id);
+    if (type === "breadboard.board") {
+      const first = this.store.getPageElements(page.id)[0];
+      if (first) index = keyBetween(null, first.index, this.rng);
+    }
+    const size =
+      type === "breadboard.board"
+        ? boardLayout(
+            merged["size"] === "full" || merged["size"] === "mini"
+              ? merged["size"]
+              : "half",
+          ).width * BREADBOARD_PITCH
+        : undefined;
+    const dimensions = isBreadboardPartType(type)
+      ? breadboardLocalBox(type, merged as unknown as BreadboardPartSemantic)
+      : undefined;
+    const element = this.buildElement(type, {
+      page: page.id,
+      index,
+      semantic: merged,
+      visual: {
+        x,
+        y,
+        ...(dimensions
+          ? {
+              width: dimensions.width * BREADBOARD_PITCH,
+              height: dimensions.height * BREADBOARD_PITCH,
+            }
+          : {}),
+        ...(size !== undefined
+          ? {
+              width: size,
+              height:
+                boardLayout(
+                  merged["size"] === "full" || merged["size"] === "mini"
+                    ? merged["size"]
+                    : "half",
+                ).height * BREADBOARD_PITCH,
+            }
+          : {}),
+        ...(type === "breadboard.netlist"
+          ? {
+              width: NETLIST_CARD_SIZE.width * BREADBOARD_PITCH,
+              height: NETLIST_CARD_SIZE.height * BREADBOARD_PITCH,
+            }
+          : {}),
+      },
+    });
+    this.apply([{ type: "createElement", element }], applyOptions);
+    return element.id;
+  }
+
+  rotateBreadboardParts(
+    ids: readonly ElementId[],
+    quarterTurns: 1 | -1,
+    applyOptions: ApplyOptions = {},
+  ): boolean {
+    const commands = planBreadboardRotation(this.store, ids, quarterTurns);
+    if (commands.length === 0) return false;
+    this.apply(commands, applyOptions);
+    return true;
+  }
+
+  updateBreadboardSemantic(
+    id: ElementId,
+    patch: Readonly<Record<string, unknown>>,
+    applyOptions: ApplyOptions = {},
+  ): boolean {
+    const element = this.store.get(id);
+    if (!element || !isBreadboardElementType(element.type)) return false;
+    const semantic = {
+      ...(element.semantic as object),
+      ...patch,
+    } as unknown as BreadboardPartSemantic;
+    if (!isBreadboardPartType(element.type)) {
+      const commands: Command[] = [{ type: "updateSemantic", id, semantic }];
+      const semanticRecord = semantic as unknown as Record<string, unknown>;
+      if (
+        element.type === "breadboard.board" &&
+        semanticRecord["size"] !==
+          (element.semantic as Record<string, unknown>)["size"]
+      ) {
+        const requestedSize = semanticRecord["size"];
+        const size =
+          requestedSize === "full" || requestedSize === "mini"
+            ? requestedSize
+            : "half";
+        const layout = boardLayout(size);
+        commands.push({
+          type: "updateVisual",
+          id,
+          visual: {
+            width: layout.width * BREADBOARD_PITCH,
+            height: layout.height * BREADBOARD_PITCH,
+          },
+        });
+      }
+      this.apply(commands, applyOptions);
+      return true;
+    }
+    const first = breadboardPins(element)[0];
+    if (!first) return false;
+    const local = breadboardLocalBox(element.type, semantic);
+    const baseVisual = {
+      ...element.visual,
+      width: local.width * BREADBOARD_PITCH,
+      height: local.height * BREADBOARD_PITCH,
+    };
+    const candidate = { ...element, semantic, visual: baseVisual };
+    const nextPin = breadboardPins(candidate)[0];
+    if (!nextPin) return false;
+    const visual = {
+      ...baseVisual,
+      x: (element.visual.x ?? 0) + first.x - nextPin.x,
+      y: (element.visual.y ?? 0) + first.y - nextPin.y,
+    };
+    this.apply(
+      [
+        { type: "updateSemantic", id, semantic },
+        { type: "replaceVisual", id, visual },
+      ],
+      applyOptions,
+    );
+    return true;
+  }
+
+  annotateBreadboard(pageId: PageId, applyOptions: ApplyOptions = {}): boolean {
+    const commands = planBreadboardAnnotation(this.store, pageId);
+    if (!commands.length) return false;
+    this.apply(commands, applyOptions);
+    return true;
   }
 
   /**
@@ -3157,6 +3404,42 @@ export class Editor {
       nextIndex: () => this.nextIndex(),
       offset,
     });
+    const annotation: Command[] = [];
+    if (this.store.getPage(this.pageId)?.kind === "breadboard") {
+      const copied = plan.commands.flatMap((command) =>
+        command.type === "createElement" &&
+        isBreadboardPartType(command.element.type)
+          ? [
+              {
+                element: command.element,
+                type: command.element.type as BreadboardPartType,
+                reference: (command.element.semantic as { reference: string })
+                  .reference,
+              },
+            ]
+          : [],
+      );
+      const existing = this.store
+        .getPageElements(this.pageId)
+        .filter((element) => isBreadboardPartType(element.type))
+        .map(
+          (element) => (element.semantic as { reference: string }).reference,
+        );
+      const refs = annotateBreadboardParts(existing, copied);
+      copied.forEach(({ element }, index) => {
+        const reference = refs[index];
+        if (
+          reference &&
+          reference !== (element.semantic as { reference: string }).reference
+        ) {
+          annotation.push({
+            type: "updateSemantic",
+            id: element.id,
+            semantic: { ...(element.semantic as object), reference },
+          });
+        }
+      });
+    }
     const membership: Command[] = [];
     if (preserveParents) {
       const context = this.createShapeContext();
@@ -3198,7 +3481,7 @@ export class Editor {
         });
       }
     }
-    this.apply([...plan.commands, ...membership], applyOptions);
+    this.apply([...plan.commands, ...annotation, ...membership], applyOptions);
     this.selection.set(topLevelAmong(this.store, plan.ids));
     return plan.ids;
   }

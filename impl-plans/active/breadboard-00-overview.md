@@ -15,6 +15,28 @@ branches and no concurrent git operations by workers. The orchestrator
 commits the design and all plans serially before the implementation fanout
 starts. `gitPush=false`: never push.
 
+## Status (session-490)
+
+- Plans breadboard-01 .. breadboard-18 are COMPLETE. The session-490 serial
+  integration review (comm-009184) accepted all 18 on the combined tree.
+  In Step 8 they are requested for archival to
+  `impl-plans/completed/<planId>.md`; see `impl-plans/README.md`.
+- This overview stays in `impl-plans/active/` because its "Final
+  verification" block is not fully green. On the combined tree:
+  `mise exec -- bun run typecheck` exit 0;
+  `mise exec -- bun test --path-ignore-patterns 'tmp/**'` exit 0 (2501 pass,
+  18 skip, 0 fail); `CARGO_TERM_QUIET=true mise run lint` exit 0;
+  `CARGO_TERM_QUIET=true mise exec -- cargo test --workspace` exit 0;
+  `CARGO_TERM_QUIET=true mise run verify` exit 1
+  (`tmp/breadboard-mode-s485/reconcile-s490/mise-verify.log`).
+- Remaining evidence (RECON-S490-W1-VERIFY-TMP-SCRATCH): the verify failure
+  comes from the git-ignored scratch copies
+  `tmp/breadboard-mode-s485/breadboard-05-collab/pre-edit-03.breadboard.test.ts`
+  and `pre-edit-06.breadboard.test.ts`, which `bun test` collects. The
+  orchestrator relocates them outside the test roots, reruns
+  `CARGO_TERM_QUIET=true mise run verify` to exit 0 and the CLI example and
+  ASCII gates below, and then archives this overview.
+
 ## User intent (one paragraph)
 
 nodetto users lay out solderless-breadboard prototypes on a `breadboard`
@@ -52,7 +74,8 @@ Fritzing or any GPL or CC-BY-SA source.
 Plan 17 is alone in wave 7 because it passes the Inspector `viewport`
 prop that plan 13 adds in wave 6.
 
-Plan files are `impl-plans/active/<planId>.md`. The workflow's
+Plan files were `impl-plans/active/<planId>.md` at dispatch; plans 01-18
+are now archived as `impl-plans/completed/<planId>.md`. The workflow's
 `plan-archive` node moves them after final verification. Workers never move
 plan files.
 

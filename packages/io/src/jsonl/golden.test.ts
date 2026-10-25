@@ -32,6 +32,7 @@ const GOLDEN = [
   "comments",
   "forward-compat",
   "bpmn",
+  "breadboard",
 ] as const;
 
 describe("golden files", () => {

@@ -44,6 +44,7 @@ import {
 } from "./connector-routing.ts";
 import type {
   Box,
+  BreadboardPinRef,
   Editor,
   ResizeEdges,
   SelectionResizeSnapshot,
@@ -90,10 +91,18 @@ import {
   umlNameHeight,
   unionBoxes,
   visibleBounds,
+  isBreadboardSnapTarget,
+  snapBreadboardDelta,
+  snapBreadboardPoint,
+  breadboardPins,
+  breadboardWirePoints,
+  distanceToSegment,
 } from "@nodetto/core";
 import {
+  isBreadboardPartType,
   type Element,
   type ElementId,
+  type BreadboardElementType,
   type FrameSemantic,
   getElementTypeDefinition,
 } from "@nodetto/ir";
@@ -355,6 +364,15 @@ type Gesture =
       readonly toCenter: Vec;
     }
   | {
+      readonly kind: "breadboard-wire-point";
+      readonly id: ElementId;
+      readonly index: number;
+      readonly origin: Vec;
+      readonly points: readonly Vec[];
+      moved: boolean;
+      readonly startScreen: Vec;
+    }
+  | {
       readonly kind: "connecting";
       readonly startPage: Vec;
       readonly fromPoint?: Vec;
@@ -426,6 +444,11 @@ export interface Interaction {
   /** Drag the middle channel of a selected orthogonal connector. */
   startRouteBend(id: ElementId, event: PointerEvent): void;
   startRouteWaypoint(id: ElementId, index: number, event: PointerEvent): void;
+  startBreadboardWirePoint(
+    id: ElementId,
+    index: number,
+    event: PointerEvent,
+  ): void;
   /** Drag one end of a connector to another element. */
   startReconnect(id: ElementId, end: ConnectorEnd, event: PointerEvent): void;
   /** Drag a new connector out of `from`, as the edge tool would. */
@@ -449,6 +472,10 @@ export interface Interaction {
   readonly temporaryHand: Accessor<boolean>;
   /** True for an active hand, space, middle-button or right-button pan. */
   readonly panning: Accessor<boolean>;
+  readonly wireDraft: Accessor<readonly Vec[] | null>;
+  readonly breadboardHover: Accessor<
+    BreadboardPinRef | { wireId: ElementId } | null
+  >;
 }
 
 /** True when two boxes overlap at all (touching edges count). */
@@ -763,7 +790,8 @@ export function createInteraction(
     gesture.kind === "rotating" ||
     gesture.kind === "rotating-selection" ||
     gesture.kind === "routing-bend" ||
-    gesture.kind === "routing-waypoint";
+    gesture.kind === "routing-waypoint" ||
+    gesture.kind === "breadboard-wire-point";
   let queuedDrag: PointerEvent | null = null;
   let queuedDragRevision = 0;
   let dragAppliedRevision: number | null = null;
@@ -788,6 +816,62 @@ export function createInteraction(
   const [hoverTarget, setHoverTarget] = createSignal<ElementId | null>(null);
   const [temporaryHand, setTemporaryHand] = createSignal(false);
   const [panning, setPanning] = createSignal(false);
+  const [wireDraft, setWireDraft] = createSignal<readonly Vec[] | null>(null);
+  const [breadboardHover, setBreadboardHover] = createSignal<
+    BreadboardPinRef | { wireId: ElementId } | null
+  >(null);
+  let wirePoints: Vec[] = [];
+
+  const isBreadboardPage = (): boolean =>
+    editor.store.getPage(editor.currentPageId)?.kind === "breadboard";
+
+  const finishWireDraft = (): void => {
+    if (wirePoints.length >= 2 && isBreadboardPage() && !editor.readOnly) {
+      const first = wirePoints[0];
+      if (first) {
+        const points = wirePoints.map((point) => ({
+          x: point.x - first.x,
+          y: point.y - first.y,
+        }));
+        const id = editor.createBreadboardPart("breadboard.wire", first, {
+          points,
+        });
+        if (id) editor.selection.set([id]);
+      }
+    }
+    wirePoints = [];
+    setWireDraft(null);
+    options.setTool(Tool.Select);
+  };
+
+  const updateBreadboardHover = (point: Vec): void => {
+    if (!isBreadboardPage()) {
+      setBreadboardHover(null);
+      return;
+    }
+    const pageElements = editor.store.getPageElements(editor.currentPageId);
+    for (let index = pageElements.length - 1; index >= 0; index -= 1) {
+      const element = pageElements[index];
+      if (!element || element.visual.hidden === true) continue;
+      if (isBreadboardPartType(element.type)) {
+        const pin = breadboardPins(element).find(
+          (candidate) =>
+            Math.hypot(candidate.x - point.x, candidate.y - point.y) <= 4,
+        );
+        if (pin) {
+          setBreadboardHover({ elementId: element.id, pin: pin.number });
+          return;
+        }
+      } else if (
+        element.type === "breadboard.wire" &&
+        editor.hitTest(point) === element.id
+      ) {
+        setBreadboardHover({ wireId: element.id });
+        return;
+      }
+    }
+    setBreadboardHover(null);
+  };
 
   const setMarquee = (rect: Box | null): void => {
     if (rect === null && marquee() === null) {
@@ -1107,6 +1191,7 @@ export function createInteraction(
       gesture.kind === "resizing-selection" ||
       gesture.kind === "routing-bend" ||
       gesture.kind === "routing-waypoint" ||
+      gesture.kind === "breadboard-wire-point" ||
       gesture.kind === "rotating" ||
       gesture.kind === "rotating-selection"
     ) {
@@ -1131,6 +1216,7 @@ export function createInteraction(
       gesture.kind === "resizing-selection" ||
       gesture.kind === "routing-bend" ||
       gesture.kind === "routing-waypoint" ||
+      gesture.kind === "breadboard-wire-point" ||
       gesture.kind === "rotating" ||
       gesture.kind === "rotating-selection"
     ) {
@@ -1358,6 +1444,30 @@ export function createInteraction(
     if (!creation) {
       return;
     }
+    if (tool === Tool.BreadboardWire) {
+      if (!isBreadboardPage()) return;
+      const snapped = snapBreadboardPoint(point);
+      const previous = wirePoints.at(-1);
+      if (!previous || previous.x !== snapped.x || previous.y !== snapped.y) {
+        wirePoints = [...wirePoints, snapped];
+      }
+      setWireDraft(wirePoints);
+      return;
+    }
+    if (creation.type.startsWith("breadboard.")) {
+      const id = editor.createBreadboardPart(
+        creation.type as BreadboardElementType,
+        point,
+        typeof creation.semantic === "object" && creation.semantic !== null
+          ? (creation.semantic as Readonly<Record<string, unknown>>)
+          : undefined,
+      );
+      if (id) {
+        editor.selection.set([id]);
+        options.setTool(Tool.Select);
+      }
+      return;
+    }
     if (tool === Tool.Port) {
       const owner = editor.hitTest(point);
       if (owner) {
@@ -1510,6 +1620,9 @@ export function createInteraction(
       editor.readOnly && requestedTool !== "hand" ? "select" : requestedTool;
     const point = pagePoint(event);
     lastPointer = { screen: screenPoint(event), page: point };
+    if (isBreadboardPage() && requestedTool !== Tool.BreadboardWire) {
+      editor.setBreadboardProbe(null);
+    }
 
     // Middle/right buttons, the hand tool and held space always pan, whatever else
     // is active.
@@ -1691,7 +1804,20 @@ export function createInteraction(
         let dx = point.x - gesture.startPage.x;
         let dy = point.y - gesture.startPage.y;
         const snap = snapFor(event, gesture.layoutGrid);
-        if (snap && gesture.startBounds) {
+        if (
+          snap &&
+          isBreadboardSnapTarget(editor.store, [...gesture.origins.keys()])
+        ) {
+          const delta = snapBreadboardDelta(
+            editor.store,
+            editor.currentPageId,
+            [...gesture.origins.keys()],
+            { x: dx, y: dy },
+          );
+          dx = delta.x;
+          dy = delta.y;
+          clearGuides();
+        } else if (snap && gesture.startBounds) {
           // The union box of everything moving is what lines up with the
           // neighbours; the same correction then applies to every element.
           const moving: Box = {
@@ -1831,6 +1957,33 @@ export function createInteraction(
         ]);
         return;
       }
+      case "breadboard-wire-point": {
+        const wireGesture = gesture as Extract<
+          Gesture,
+          { readonly kind: "breadboard-wire-point" }
+        >;
+        const screen = screenPoint(event);
+        if (
+          !wireGesture.moved &&
+          Math.hypot(
+            screen.x - wireGesture.startScreen.x,
+            screen.y - wireGesture.startScreen.y,
+          ) <= CLICK_SLOP_PX
+        )
+          return;
+        wireGesture.moved = true;
+        const point = snapBreadboardPoint(pagePoint(event));
+        const points = wireGesture.points.map((entry, index) =>
+          index === wireGesture.index
+            ? {
+                x: point.x - wireGesture.origin.x,
+                y: point.y - wireGesture.origin.y,
+              }
+            : entry,
+        );
+        editor.updateBreadboardSemantic(wireGesture.id, { points });
+        return;
+      }
       case "rotating": {
         const point = pagePoint(event);
         if (
@@ -1937,12 +2090,28 @@ export function createInteraction(
   };
 
   const onPointerMove = (event: PointerEvent): void => {
-    if (gesture.kind === "idle")
+    if (gesture.kind === "idle") {
       setHoverTarget(
         !editor.readOnly && isConnectorTool(options.tool())
           ? targetUnder(pagePoint(event), [])
           : null,
       );
+      if (isBreadboardPage()) {
+        const point = pagePoint(event);
+        updateBreadboardHover(point);
+        if (options.tool() === Tool.BreadboardWire && wirePoints.length > 0) {
+          const cursor = snapBreadboardPoint(point);
+          const last = wirePoints.at(-1);
+          setWireDraft(
+            last && last.x === cursor.x && last.y === cursor.y
+              ? wirePoints
+              : [...wirePoints, cursor],
+          );
+        }
+      } else {
+        setBreadboardHover(null);
+      }
+    }
     if (
       options.scheduleDragFrame &&
       framePacedGesture() &&
@@ -2280,6 +2449,13 @@ export function createInteraction(
 
   /** Escape, in order: cancel, drill out of a group, deselect (design 5). */
   const pressEscape = (): void => {
+    if (isBreadboardPage()) editor.setBreadboardProbe(null);
+    if (wirePoints.length > 0) {
+      wirePoints = [];
+      setWireDraft(null);
+      options.setTool(Tool.Select);
+      return;
+    }
     if (gesture.kind !== "idle") {
       // Abandon the gesture: a half-dragged shape goes back where it
       // started rather than being committed wherever the pointer happens to
@@ -2297,6 +2473,7 @@ export function createInteraction(
       }
     }
     editor.selection.clear();
+    editor.setBreadboardProbe(null);
     options.setTool("select");
   };
 
@@ -2461,6 +2638,28 @@ export function createInteraction(
       return;
     }
 
+    if (
+      isBreadboardPage() &&
+      (key === "r" || (event.shiftKey && key === "r"))
+    ) {
+      const ids = [...editor.selection.ids()].filter((id) => {
+        const element = editor.store.get(id);
+        return element !== undefined && isBreadboardPartType(element.type);
+      });
+      if (ids.length > 0) {
+        event.preventDefault();
+        if (!editor.readOnly)
+          editor.rotateBreadboardParts(ids, event.shiftKey ? -1 : 1);
+        return;
+      }
+    }
+
+    if (key === "enter" && wirePoints.length > 0) {
+      event.preventDefault();
+      finishWireDraft();
+      return;
+    }
+
     switch (key) {
       case "escape":
         event.preventDefault();
@@ -2560,6 +2759,58 @@ export function createInteraction(
       return;
     }
     const point = pagePoint(event);
+    if (wirePoints.length > 0 && options.tool() === Tool.BreadboardWire) {
+      event.preventDefault();
+      finishWireDraft();
+      return;
+    }
+    if (editor.selection.size === 1) {
+      const selectedId = [...editor.selection.ids()][0];
+      const selected = selectedId ? editor.store.get(selectedId) : undefined;
+      if (selected?.type === "breadboard.wire") {
+        const points = breadboardWirePoints(selected);
+        const tolerance = 8 / editor.camera.get().z;
+        const handleIndex = points.findIndex(
+          (at) => Math.hypot(at.x - point.x, at.y - point.y) <= tolerance,
+        );
+        const origin = { x: selected.visual.x ?? 0, y: selected.visual.y ?? 0 };
+        const relative = (values: readonly Vec[]) =>
+          values.map((at) => ({ x: at.x - origin.x, y: at.y - origin.y }));
+        if (handleIndex > 0 && handleIndex < points.length - 1) {
+          event.preventDefault();
+          editor.updateBreadboardSemantic(selected.id, {
+            points: relative(
+              points.filter((_, index) => index !== handleIndex),
+            ),
+          });
+          return;
+        }
+        if (handleIndex < 0) {
+          let nearest = -1;
+          let distance = Number.POSITIVE_INFINITY;
+          for (let index = 1; index < points.length; index += 1) {
+            const from = points[index - 1];
+            const to = points[index];
+            if (!from || !to) continue;
+            const next = distanceToSegment(point, from, to);
+            if (next < distance) {
+              nearest = index;
+              distance = next;
+            }
+          }
+          if (nearest > 0 && distance <= tolerance) {
+            const snapped = snapBreadboardPoint(point);
+            const inserted = [...points];
+            inserted.splice(nearest, 0, snapped);
+            event.preventDefault();
+            editor.updateBreadboardSemantic(selected.id, {
+              points: relative(inserted),
+            });
+            return;
+          }
+        }
+      }
+    }
     // Pointer capture belongs to the canvas, so a handle's double-click can
     // be retargeted here. Resolve the selected handle before inserting a point.
     if (editor.selection.size === 1) {
@@ -2831,6 +3082,36 @@ export function createInteraction(
     };
   };
 
+  const startBreadboardWirePoint = (
+    id: ElementId,
+    index: number,
+    event: PointerEvent,
+  ): void => {
+    const element = editor.store.get(id);
+    if (
+      !owns(event) ||
+      event.button !== 0 ||
+      element?.type !== "breadboard.wire" ||
+      !editor.selection.has(id) ||
+      editor.readOnly
+    )
+      return;
+    const semantic = element.semantic as { points: readonly Vec[] };
+    if (index < 0 || index >= semantic.points.length) return;
+    event.stopPropagation();
+    claim(event);
+    editor.beginBatch();
+    gesture = {
+      kind: "breadboard-wire-point",
+      id,
+      index,
+      points: semantic.points.map((point) => ({ ...point })),
+      origin: { x: element.visual.x ?? 0, y: element.visual.y ?? 0 },
+      startScreen: screenPoint(event),
+      moved: false,
+    };
+  };
+
   const startReconnect = (
     id: ElementId,
     end: ConnectorEnd,
@@ -2919,6 +3200,7 @@ export function createInteraction(
     startRotateSelection: editableGesture(startRotateSelection),
     startRouteBend: editableGesture(startRouteBend),
     startRouteWaypoint: editableGesture(startRouteWaypoint),
+    startBreadboardWirePoint: editableGesture(startBreadboardWirePoint),
     startReconnect: editableGesture(startReconnect),
     startConnect: editableGesture(startConnect),
     flushNudge,
@@ -2928,5 +3210,7 @@ export function createInteraction(
     hoverTarget,
     temporaryHand,
     panning,
+    wireDraft,
+    breadboardHover,
   };
 }

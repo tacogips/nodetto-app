@@ -120,6 +120,16 @@ export {
   focusBpmnProblem,
   type BpmnProblemRow,
 } from "./bpmn-problems.ts";
+export {
+  BreadboardProblemsPanel,
+  type BreadboardProblemsPanelProps,
+} from "./BreadboardProblemsPanel.tsx";
+export {
+  breadboardProblemRows,
+  canFixBreadboardReferences,
+  focusBreadboardProbe,
+  type BreadboardProblemRow,
+} from "./breadboard-problems.ts";
 
 export { ExportDialog } from "./LazyExportDialog.tsx";
 

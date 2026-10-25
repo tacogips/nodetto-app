@@ -10,6 +10,11 @@ import type { Document, Element, Page } from "@nodetto/ir";
 
 export const ERD_PAGE: Page = { id: "p1", name: "Domain model", kind: "erd" };
 export const BPMN_PAGE: Page = { id: "p-bpmn", name: "Purchase", kind: "bpmn" };
+export const BREADBOARD_PAGE: Page = {
+  id: "p-bb",
+  name: "Breadboard",
+  kind: "breadboard",
+};
 
 /** Two tables and the relation between them; columns carry ids. */
 export function erdDocument(): Document {
@@ -313,6 +318,155 @@ export function bpmnDocument(): Document {
   };
 }
 
+/** Breadboard fixture covering every registered breadboard element type. */
+export function breadboardDocument(): Document {
+  return {
+    schemaVersion: 1,
+    id: "01JBRD00000000000000000000",
+    title: "LED breadboard",
+    pages: [BREADBOARD_PAGE],
+    elements: [
+      {
+        id: "bb-board",
+        page: "p-bb",
+        type: "breadboard.board",
+        index: "a0",
+        semantic: { size: "half" },
+        visual: { x: 0, y: 0, width: 500, height: 300 },
+      },
+      {
+        id: "bb-resistor",
+        page: "p-bb",
+        type: "breadboard.resistor",
+        index: "a1",
+        semantic: { reference: "R1", value: "220", span: 4, bands: 4 },
+        visual: { x: 100, y: 80, width: 40, height: 10 },
+      },
+      {
+        id: "bb-led",
+        page: "p-bb",
+        type: "breadboard.led",
+        index: "a2",
+        semantic: { reference: "D1", value: "red", color: "red" },
+        visual: { x: 180, y: 80, width: 20, height: 20 },
+      },
+      {
+        id: "bb-wire",
+        page: "p-bb",
+        type: "breadboard.wire",
+        index: "a3",
+        semantic: {
+          color: "red",
+          points: [
+            { x: 50, y: 50 },
+            { x: 80, y: 50 },
+            { x: 80, y: 100 },
+          ],
+        },
+        visual: {},
+      },
+      {
+        id: "bb-capacitor",
+        page: "p-bb",
+        type: "breadboard.capacitor",
+        index: "a4",
+        semantic: {
+          reference: "C1",
+          value: "100n",
+          style: "ceramic",
+          span: 1,
+        },
+        visual: { x: 240, y: 80, width: 20, height: 20 },
+      },
+      {
+        id: "bb-diode",
+        page: "p-bb",
+        type: "breadboard.diode",
+        index: "a5",
+        semantic: { reference: "D2", value: "1N4148", span: 4 },
+        visual: { x: 280, y: 80, width: 40, height: 10 },
+      },
+      {
+        id: "bb-transistor",
+        page: "p-bb",
+        type: "breadboard.transistor",
+        index: "a6",
+        semantic: {
+          reference: "Q1",
+          value: "NPN",
+          polarity: "npn",
+          pinout: "EBC",
+        },
+        visual: { x: 340, y: 80, width: 30, height: 30 },
+      },
+      {
+        id: "bb-button",
+        page: "p-bb",
+        type: "breadboard.button",
+        index: "a7",
+        semantic: { reference: "SW1", value: "PUSH" },
+        visual: { x: 390, y: 80, width: 30, height: 30 },
+      },
+      {
+        id: "bb-potentiometer",
+        page: "p-bb",
+        type: "breadboard.potentiometer",
+        index: "a8",
+        semantic: { reference: "RV1", value: "10k" },
+        visual: { x: 440, y: 80, width: 30, height: 30 },
+      },
+      {
+        id: "bb-ic",
+        page: "p-bb",
+        type: "breadboard.ic",
+        index: "a9",
+        semantic: { reference: "U1", value: "IC", pinCount: 8 },
+        visual: { x: 100, y: 160, width: 80, height: 40 },
+      },
+      {
+        id: "bb-header",
+        page: "p-bb",
+        type: "breadboard.header",
+        index: "aa",
+        semantic: { reference: "J1", value: "HEADER", pinCount: 4 },
+        visual: { x: 220, y: 160, width: 40, height: 10 },
+      },
+      {
+        id: "bb-battery",
+        page: "p-bb",
+        type: "breadboard.battery",
+        index: "ab",
+        semantic: { reference: "BT1", value: "5V" },
+        visual: { x: 300, y: 160, width: 40, height: 30 },
+      },
+      {
+        id: "bb-netlist",
+        page: "p-bb",
+        type: "breadboard.netlist",
+        index: "ac",
+        semantic: {
+          source: "led-button.net",
+          format: "kicad_net",
+          parts: [
+            { reference: "D1", value: "red", type: "breadboard.led" },
+            { reference: "R1", value: "220", type: "breadboard.resistor" },
+          ],
+          nets: [
+            {
+              name: "N_LED",
+              nodes: [
+                { reference: "D1", pin: 1 },
+                { reference: "R1", pin: 1 },
+              ],
+            },
+          ],
+        },
+        visual: { x: 380, y: 160, width: 100, height: 60 },
+      },
+    ],
+  };
+}
+
 /**
  * Freeform: an id-less point list, a scalar array, deep style nesting, an
  * extension bag and an unknown record — everything the mapping has to carry
@@ -394,6 +548,7 @@ export function allFixtures(): readonly Document[] {
     sequenceDocument(),
     freeformDocument(),
     bpmnDocument(),
+    breadboardDocument(),
   ];
 }
 

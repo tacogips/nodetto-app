@@ -84,6 +84,22 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "bpmn.association",
     "bpmn.dataAssociation",
   ],
+  breadboard: [
+    "breadboard.board",
+    "breadboard.wire",
+    "breadboard.resistor",
+    "breadboard.led",
+    "breadboard.capacitor",
+    "breadboard.diode",
+    "breadboard.transistor",
+    "breadboard.button",
+    "breadboard.potentiometer",
+    "breadboard.ic",
+    "breadboard.header",
+    "breadboard.battery",
+    "breadboard.netlist",
+    "text.note",
+  ],
 };
 
 function isPageKind(value: string): value is PageKind {

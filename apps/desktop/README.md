@@ -137,7 +137,7 @@ for ownership, editing, persistence, and current notation scope.
 ## Artwork export settings
 
 Use **Export** or **Cmd/Ctrl+Shift+E** to open the Export popup. Choose SVG,
-PNG, PDF, Mermaid, D2, SQL, BPMN, or Code in its tabs. Formats that require
+PNG, PDF, Mermaid, D2, SQL, BPMN, Breadboard, or Code in its tabs. Formats that require
 specific content or a selection are enabled when available.
 
 - All formats offer current-page, selected-artwork, or selected-artboard scope,
@@ -160,3 +160,5 @@ rail when folded. Buttons expose expanded state and support keyboard activation;
 restoring a pane retains its width and restores keyboard focus.
 
 BPMN mode opens or creates a BPMN process page. Its left palette prioritizes start/end events, tasks, gateways, pools, lanes, connectors, text and frames; further BPMN templates are under More shapes. Switching back to another mode returns to a general diagram page.
+
+Breadboard mode opens the existing "Breadboard" page or creates one, and selecting a breadboard page tab switches to Breadboard mode. The breadboard problems panel lists electrical, parity and import findings. The Breadboard export tab writes a BOM CSV, a KiCad-style netlist or a SPICE netlist through the native save dialog (browser previews download the file). The Open dialog also accepts KiCad 6+ `.kicad_sch` and `.net` files. They open as detached imports into a new breadboard document with import notes. A file that cannot be imported leaves the current document unchanged. These extensions have no OS file association.

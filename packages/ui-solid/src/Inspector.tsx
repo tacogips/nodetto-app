@@ -14,16 +14,22 @@ import { UmlComponentSection } from "./inspector/UmlComponentSection.tsx";
 // typed into a field must never reach a canvas or window shortcut. History
 // chords from non-editable controls may bubble to the shell's history owner.
 
-import { type Editor, shapeAuthoringWarnings } from "@nodetto/core";
+import {
+  type Editor,
+  type ViewportSize,
+  shapeAuthoringWarnings,
+} from "@nodetto/core";
 import "./ShapeWarnings.css";
 import { leafElements, layerName, renameLayer } from "@nodetto/core";
 import { BatchRenameSection } from "./inspector/BatchRenameSection.tsx";
 import { ReplaceNoteTextSection } from "./inspector/ReplaceNoteTextSection.tsx";
 import { BpmnSection } from "./inspector/BpmnSection.tsx";
+import { BreadboardSection } from "./inspector/BreadboardSection.tsx";
 import {
   type Element,
   type ElementId,
   getElementTypeDefinition,
+  isBreadboardPartType,
 } from "@nodetto/ir";
 import {
   createMemo,
@@ -98,6 +104,7 @@ export interface InspectorProps {
   readonly simple?: boolean;
   readonly editor: Editor;
   readonly focus?: InspectorFocus;
+  readonly viewport?: () => ViewportSize;
 }
 
 function stop(event: Event): void {
@@ -171,6 +178,9 @@ export function Inspector(props: InspectorProps): JSX.Element {
     if (Object.values(UmlComponentType).some((candidate) => candidate === type))
       return "Component";
     if (type.startsWith("bpmn.")) return "BPMN";
+    if (type === "breadboard.netlist") return "Target netlist";
+    if (type.startsWith("breadboard."))
+      return isBreadboardPartType(type) ? "Part" : "Breadboard";
     const labels: Record<string, string> = {
       "ui.control": "Control",
       "erd.table": "Table",
@@ -287,6 +297,13 @@ export function Inspector(props: InspectorProps): JSX.Element {
           </Match>
           <Match when={element().type.startsWith("bpmn.")}>
             <BpmnSection editor={props.editor} element={element()} />
+          </Match>
+          <Match when={element().type.startsWith("breadboard.")}>
+            <BreadboardSection
+              editor={props.editor}
+              element={element()}
+              viewport={props.viewport}
+            />
           </Match>
           <Match when={element().type === "group"}>
             <GroupSection editor={props.editor} element={element()} />

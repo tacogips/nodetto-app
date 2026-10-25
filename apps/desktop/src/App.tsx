@@ -1,11 +1,21 @@
 import { TemplateDialog } from "./TemplateDialog.tsx";
-import { createDesignTemplate, type DesignTemplateId } from "@nodetto/core";
+import {
+  computeBreadboardConnectivity,
+  createDesignTemplate,
+  toBreadboardNetlist,
+  type DesignTemplateId,
+} from "@nodetto/core";
 import { SettingsDialog } from "./settings/SettingsDialog.tsx";
 import {
   loadEditorPreferences,
   storeEditorPreferences,
 } from "./settings/preferences.ts";
 import { watchNativeFileMenu } from "./file/native-menu.ts";
+import {
+  dedicatedPageKindFor,
+  dedicatedWorkspaceFor,
+  DEDICATED_PAGE_NAMES,
+} from "./page-workspace.ts";
 // App shell: file controls, cloud controls, the toolbar, page tabs, the
 // canvas with its floating chrome, and the Inspector column.
 //
@@ -38,6 +48,7 @@ import {
   type ActionContext,
   ContextMenu,
   BpmnProblemsPanel,
+  BreadboardProblemsPanel,
   createEditorSignals,
   NodettoCanvas,
   getAction,
@@ -152,18 +163,23 @@ export function App(props: AppProps): JSX.Element {
   const simpleWorkspace = () => !workspaceById(workspace()).design;
   const changeWorkspace = (id: WorkspaceId) => {
     const page = props.editor.store.getPage(props.editor.currentPageId);
-    if ((id === "bpmn") !== (page?.kind === "bpmn")) {
+    const targetKind = dedicatedPageKindFor(id);
+    if (targetKind && page?.kind !== targetKind) {
       const existing = props.editor.store
         .listPages()
-        .find((candidate) =>
-          id === "bpmn" ? candidate.kind === "bpmn" : candidate.kind !== "bpmn",
-        );
+        .find((candidate) => candidate.kind === targetKind);
       if (existing) props.editor.setCurrentPage(existing.id);
       else
         props.editor.createPage({
-          kind: id === "bpmn" ? "bpmn" : "freeform",
-          name: id === "bpmn" ? "Process" : "Page",
+          kind: targetKind,
+          name: DEDICATED_PAGE_NAMES[targetKind] ?? "Page",
         });
+    } else if (!targetKind && page && dedicatedWorkspaceFor(page.kind)) {
+      const existing = props.editor.store
+        .listPages()
+        .find((candidate) => !dedicatedWorkspaceFor(candidate.kind));
+      if (existing) props.editor.setCurrentPage(existing.id);
+      else props.editor.createPage({ kind: "freeform", name: "Page" });
     }
     setActiveTool("select");
     setContextMenu(null);
@@ -369,9 +385,20 @@ export function App(props: AppProps): JSX.Element {
     );
   };
 
+  const isBreadboardPage = (): boolean => {
+    editorSignals.rev();
+    return (
+      props.editor.store.getPage(props.editor.currentPageId)?.kind ===
+      "breadboard"
+    );
+  };
+
   createEffect(() => {
-    if (isBpmnPage()) setWorkspace("bpmn");
-    else if (workspace() === "bpmn") setWorkspace("flow");
+    editorSignals.rev();
+    const kind = props.editor.store.getPage(props.editor.currentPageId)?.kind;
+    const dedicatedWorkspace = dedicatedWorkspaceFor(kind);
+    if (dedicatedWorkspace) setWorkspace(dedicatedWorkspace);
+    else if (dedicatedPageKindFor(workspace())) setWorkspace("flow");
   });
 
   onMount(() => {
@@ -651,6 +678,58 @@ export function App(props: AppProps): JSX.Element {
     }
   };
 
+  const exportBreadboard = async (
+    kind: "bom" | "kicad" | "spice",
+  ): Promise<void> => {
+    setExportError(null);
+    const page = props.editor.store.getPage(props.editor.currentPageId);
+    if (page?.kind !== "breadboard") return;
+    try {
+      const snapshot = props.editor.getSnapshot();
+      const connectivity = computeBreadboardConnectivity(
+        snapshot,
+        props.editor.currentPageId,
+      );
+      const netlist = toBreadboardNetlist(
+        snapshot,
+        props.editor.currentPageId,
+        connectivity,
+      );
+      const io = await import("@nodetto/io");
+      const report =
+        kind === "bom"
+          ? io.exportBreadboardBomCsv(netlist)
+          : kind === "kicad"
+            ? io.exportBreadboardKicadNetlist(netlist)
+            : io.exportBreadboardSpiceNetlist(netlist);
+      const extension =
+        kind === "bom" ? "csv" : kind === "kicad" ? "net" : "cir";
+      const name = `${exportBaseName(page.name)}.${extension}`;
+      if (!props.exportBackend.available) {
+        const url = URL.createObjectURL(
+          new Blob([report.text], { type: "text/plain" }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        const path = await props.exportBackend.pickExportPath(name, extension);
+        if (path === null) return;
+        await props.exportBackend.writeText(path, report.text);
+      }
+      if (report.warnings.length > 0)
+        setExportError(`Export notes: ${report.warnings.join("; ")}`);
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   /** Everything the shared action table needs from the shell. */
   const actionContext = (): ActionContext => ({
     editor: props.editor,
@@ -864,6 +943,7 @@ export function App(props: AppProps): JSX.Element {
             props.exportBackend.available ? saveArtwork : undefined
           }
           exportBpmn={exportBpmn}
+          exportBreadboard={exportBreadboard}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />
@@ -896,7 +976,13 @@ export function App(props: AppProps): JSX.Element {
       </Show>
       {/* A cloud failure is reported wherever it happens: a refused connect
           leaves the app in file mode, and its message still has to be read. */}
-      <Show when={!isBpmnPage() && file().importWarnings.length > 0}>
+      <Show
+        when={
+          !isBpmnPage() &&
+          !isBreadboardPage() &&
+          file().importWarnings.length > 0
+        }
+      >
         <details class="app-import-notes">
           <summary>Import notes ({file().importWarnings.length})</summary>
           <ul>
@@ -1475,10 +1561,18 @@ export function App(props: AppProps): JSX.Element {
                 editor={props.editor}
                 focus={inspectorFocus()}
                 simple={simpleWorkspace()}
+                viewport={viewport}
               />
             </div>
             <Show when={isBpmnPage()}>
               <BpmnProblemsPanel
+                editor={props.editor}
+                viewport={viewport}
+                importWarnings={file().importWarnings}
+              />
+            </Show>
+            <Show when={isBreadboardPage()}>
+              <BreadboardProblemsPanel
                 editor={props.editor}
                 viewport={viewport}
                 importWarnings={file().importWarnings}

@@ -25,7 +25,8 @@ The full product design lives in the private `nodetto-cloud` repository (`design
 packages/
   ir/        Diagram IR: types, element type registry, validation, migrations
   core/      Editor core (no framework dependencies)
-  io/        JSONL persistence, Mermaid/D2/BPMN/draw.io adapters
+  io/        JSONL persistence, Mermaid/D2/BPMN/draw.io/KiCad adapters,
+             breadboard BOM and netlist formatters
   collab/    Yjs client binding (sync server is private)
   ui-solid/  Solid renderer
 apps/
@@ -82,7 +83,9 @@ show cloud/account controls; cloud workspaces belong to the hosted web edition.
 Open a document from a terminal with `nodetto-cli open path/to/file.jsonl`
 (or `open -a nodetto path/to/file.jsonl` on macOS);
 Finder "Open With" also lists nodetto for `.jsonl`, `.mmd`, `.mermaid`, `.bpmn`,
-`.drawio` and `.dio` files without becoming their default application. A path passed while the app
+`.drawio` and `.dio` files without becoming their default application. KiCad
+`.kicad_sch` and `.net` files are not associated; open them from the Open
+dialog. A path passed while the app
 is running opens in the existing window (after the usual unsaved-changes
 prompt).
 
@@ -112,6 +115,10 @@ nodetto-cli validate schema.jsonl
 nodetto-cli lint process.jsonl --format text
 nodetto-cli bpmn import process.bpmn --output process.jsonl
 nodetto-cli bpmn export process.jsonl --page process --check process.bpmn
+nodetto-cli breadboard bom board.jsonl --check board.bom.csv
+nodetto-cli breadboard netlist board.jsonl --format kicad --output board.net
+nodetto-cli breadboard netlist board.jsonl --format spice --output board.cir
+nodetto-cli breadboard import circuit.kicad_sch --output board.jsonl
 ```
 
 `ddl` emits exactly what the inspector's Database DDL panel generates for one
@@ -123,11 +130,15 @@ reports warnings, and usage or parse errors exit 2. In a checkout, run it with
 The executable embeds the shared diagram engine in Boa, a JavaScript interpreter written in Rust.
 The JS interpreter uses no QuickJS C runtime or FFI bindings.
 It needs no Node.js or Bun installation and uses no JIT. Bun bundles the shared
-engine at build time; the TypeScript CLI remains a reference for parity tests. `lint` exits 0 when there are no
+engine at build time; the TypeScript CLI remains a reference for parity tests. `lint` checks BPMN
+and breadboard pages. It exits 0 when there are no
 error-level findings (warnings may still be printed), 1 when error-level
 findings exist, and 2 for usage, parse, or config errors; it has no `--strict`
 option. `bpmn import` and `bpmn export` exit 3 with `--strict` when they report
 warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
+`breadboard bom --check` and `breadboard netlist --check` exit 1 on drift;
+`breadboard bom`, `netlist` and `import` exit 3 with `--strict` when they
+report warnings, and 2 for usage or input errors.
 
 ### Drawing with AI agents and live co-editing
 
@@ -162,8 +173,9 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   It also exports HTML website ZIPs, Mermaid, D2, draw.io files (every page
   unless `--page` is given), and every output in the Code panel
   (`--format code --element <id> --code-format <output>`). SQL uses `ddl`,
-  and BPMN XML uses `bpmn export`; both accept `--page`. `drawio import` and
-  `bpmn import` convert those files to JSONL.
+  and BPMN XML uses `bpmn export`; both accept `--page`. Breadboard BOMs and
+  netlists use `breadboard bom` and `breadboard netlist`. `drawio import`,
+  `bpmn import` and `breadboard import` convert those files to JSONL.
 - The desktop app applies outside changes to an open file live, keeping the
   camera and selection. With unsaved local edits it merges three ways at element
   and field level (a move and a rename of the same table both survive) and
@@ -587,6 +599,35 @@ use draw.io's own shapes with matching proportions and round-trip exactly; ERD
 tables and UML classes become draw.io lists with one row per column or member.
 Types without a draw.io counterpart are written as labelled rectangles and
 listed in the export panel.
+
+## Breadboard circuit pages
+
+Choose **Breadboard** in **Mode** to open or create a Breadboard page. Use its
+palette to place a full, half, or mini solderless board and add parts. Part pins
+and jumper wire ends snap to the 0.1 inch hole lattice. On a breadboard page,
+select a part and press `r` or `Shift+R` to rotate it in 90 degree steps. Wires
+can include bend points. New and pasted parts get reference designators
+automatically. The inspector edits reference, value and part parameters, and it
+can highlight a net.
+
+The editor derives nets from board strips, rails, wires, and pins. It highlights
+the selected net, checks electrical rules, and compares a built board with an
+optional KiCad target. The ratsnest shows target connections that still need
+wiring. Findings appear in the breadboard problems panel and can cross-probe the
+canvas. `nodetto-cli lint` runs the same checks.
+
+Export a component BOM, a KiCad-style netlist, or a SPICE netlist with
+`nodetto-cli breadboard bom|netlist` or the **Breadboard** tab of the
+**Export** dialog. Import KiCad 6+ `.kicad_sch` or `.net` files with
+`nodetto-cli breadboard import` or the desktop Open dialog. The import is
+detached and creates a new page with a target netlist card. Its parts are staged beside the board, so the page fails
+lint until every part is placed. Builds older than breadboard support reject
+documents that contain a breadboard page.
+
+See the [breadboard format](docs/breadboard/format.md),
+[electrical rule reference](docs/breadboard/erc-rules.md),
+[KiCad import details](docs/breadboard/kicad-import.md), and the
+[LED/button example and golden exports](examples/breadboard/).
 
 ## D2 export
 

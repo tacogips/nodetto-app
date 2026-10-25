@@ -53,6 +53,12 @@ export const PALETTE_ICONS = {
   class: "M3 3h26v26H3zM3 11h26M3 20h26M9 7h14M8 16h9M8 25h12",
   actor: "M20 6a4 4 0 11-8 0 4 4 0 018 0zM16 10v12M7 15h18M16 22l-8 8m8-8l8 8",
   service: "M4 5h24v15H4zM16 20v10M11 25h10",
+  board: "M3 4h26v24H3zM7 8h18M7 13h18M7 18h18M7 23h18",
+  resistor: "M2 16h5l3-7 5 14 5-14 3 7h5",
+  led: "M7 8l16 8-16 8zM25 8v16M24 6l4-4m-4 9l4-4",
+  capacitor: "M3 16h10m0-10v20m5-20v20m0-10h11",
+  transistor: "M9 7v18m0-9h8m-3-5l7-7m-7 17l7 7M18 11l-1-6 6 2m-6 11l-1 6 6-2",
+  wire: "M3 25h9V8h14",
 } as const;
 
 export interface ShapePaletteItem {
@@ -203,6 +209,37 @@ export const BPMN_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.BpmnGroup, label: "Group", icon: "frame" },
 ];
 
+export const BREADBOARD_SHAPES: readonly ShapePaletteItem[] = [
+  { tool: Tool.BreadboardFull, label: "Full board", icon: "board" },
+  { tool: Tool.BreadboardHalf, label: "Half board", icon: "board" },
+  { tool: Tool.BreadboardMini, label: "Mini board", icon: "board" },
+  { tool: Tool.BreadboardResistor, label: "Resistor", icon: "resistor" },
+  { tool: Tool.BreadboardLed, label: "LED", icon: "led" },
+  {
+    tool: Tool.BreadboardCapacitorCeramic,
+    label: "Ceramic capacitor",
+    icon: "capacitor",
+  },
+  {
+    tool: Tool.BreadboardCapacitorElectrolytic,
+    label: "Electrolytic capacitor",
+    icon: "capacitor",
+  },
+  { tool: Tool.BreadboardDiode, label: "Diode", icon: "led" },
+  { tool: Tool.BreadboardNpn, label: "NPN transistor", icon: "transistor" },
+  { tool: Tool.BreadboardPnp, label: "PNP transistor", icon: "transistor" },
+  { tool: Tool.BreadboardButton, label: "Push button", icon: "node" },
+  {
+    tool: Tool.BreadboardPotentiometer,
+    label: "Potentiometer",
+    icon: "resistor",
+  },
+  { tool: Tool.BreadboardIc, label: "DIP IC", icon: "node" },
+  { tool: Tool.BreadboardHeader, label: "Pin header", icon: "node" },
+  { tool: Tool.BreadboardBattery, label: "Battery", icon: "node" },
+  { tool: Tool.BreadboardWire, label: "Wire", icon: "wire" },
+];
+
 export const INTERACTION_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.ScreenTransition, label: "Screen transition", icon: "edge" },
   { tool: Tool.PopupFrame, label: "Popup / dialog", icon: "frame" },
@@ -230,6 +267,13 @@ const PRIMARY_TOOLS = {
     Tool.Connector,
     Tool.Text,
     Tool.Frame,
+  ],
+  breadboard: [
+    Tool.BreadboardHalf,
+    Tool.BreadboardResistor,
+    Tool.BreadboardLed,
+    Tool.BreadboardButton,
+    Tool.BreadboardWire,
   ],
   component: [
     Tool.Component,
@@ -296,6 +340,7 @@ const PALETTE_SHAPES = [
   ...DIAGRAM_SHAPES,
   ...ARTBOARD_SHAPES,
   ...BPMN_SHAPES,
+  ...BREADBOARD_SHAPES,
 ];
 
 /** Preserve semantic workspace labels, such as Relationship or Message. */
@@ -313,7 +358,11 @@ export function workspaceShapes(id: WorkspaceId): readonly ShapePaletteItem[] {
 export function additionalShapes(id: WorkspaceId): readonly ShapePaletteItem[] {
   const primary = new Set<ToolKind>(PRIMARY_TOOLS[id]);
   return (
-    id === "bpmn" ? [...BPMN_SHAPES, ...COMMON_SHAPES] : COMMON_SHAPES
+    id === "bpmn"
+      ? [...BPMN_SHAPES, ...COMMON_SHAPES]
+      : id === "breadboard"
+        ? [...BREADBOARD_SHAPES, ...COMMON_SHAPES]
+        : COMMON_SHAPES
   ).filter((item) => !primary.has(item.tool));
 }
 
@@ -375,6 +424,8 @@ export function shapePaletteGroups(
     if (tool.startsWith("state")) return "State transition";
     if (DIAGRAM_SHAPES.some((item) => item.tool === tool)) return "UML";
     if (BPMN_SHAPES.some((item) => item.tool === tool)) return "BPMN";
+    if (BREADBOARD_SHAPES.some((item) => item.tool === tool))
+      return "Breadboard";
     if (ARTBOARD_SHAPES.some((item) => item.tool === tool)) return "Artboards";
     return "General";
   };

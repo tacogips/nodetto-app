@@ -20,6 +20,18 @@ const BPMN_FIXTURE = readFileSync(
   `${import.meta.dir}/../../../../packages/io/src/__fixtures__/bpmn/purchase-request.bpmn`,
   "utf8",
 );
+const KICAD_NET_FIXTURE = readFileSync(
+  `${import.meta.dir}/../../../../test-fixtures/kicad/led-button.net`,
+  "utf8",
+);
+const KICAD_SCHEMATIC_FIXTURE = readFileSync(
+  `${import.meta.dir}/../../../../test-fixtures/kicad/led-button.kicad_sch`,
+  "utf8",
+);
+const KICAD_UNKNOWN_FIXTURE = readFileSync(
+  `${import.meta.dir}/../../../../test-fixtures/kicad/unknown-symbols.net`,
+  "utf8",
+);
 
 interface MockBackend extends FileBackend {
   readonly files: Map<string, string>;
@@ -556,6 +568,83 @@ describe("opening", () => {
     await harness.settle();
     expect(harness.backend.writes).toEqual([]);
     expect(harness.backend.files.get(path)).toBe(source);
+  });
+
+  test("opening a KiCad netlist imports a detached breadboard document", async () => {
+    const harness = createHarness();
+    const path = "/docs/led-button.net";
+    harness.backend.files.set(path, KICAD_NET_FIXTURE);
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state()).toMatchObject({
+      filePath: null,
+      fileName: "led-button.net",
+      dirty: true,
+      error: null,
+    });
+    expect(harness.editor.getSnapshot().pages[0]?.kind).toBe("breadboard");
+    expect(
+      harness.editor.store
+        .listElements()
+        .filter((element) => element.type.startsWith("breadboard.")),
+    ).toHaveLength(6);
+    expect(
+      harness.editor.store
+        .listElements()
+        .some((element) => element.type === "breadboard.netlist"),
+    ).toBe(true);
+    expect(harness.backend.watched).toEqual([]);
+  });
+
+  test("opening a KiCad schematic imports a detached breadboard document", async () => {
+    const harness = createHarness();
+    const path = "/docs/led-button.kicad_sch";
+    harness.backend.files.set(path, KICAD_SCHEMATIC_FIXTURE);
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state().filePath).toBeNull();
+    expect(harness.editor.getSnapshot().pages[0]?.kind).toBe("breadboard");
+    expect(
+      harness.editor.store
+        .listElements()
+        .filter((element) => element.type.startsWith("breadboard.")),
+    ).toHaveLength(6);
+    expect(
+      harness.editor.store
+        .listElements()
+        .some((element) => element.type === "breadboard.netlist"),
+    ).toBe(true);
+    expect(harness.backend.watched).toEqual([]);
+  });
+
+  test("a malformed KiCad file leaves the current document intact", async () => {
+    const source = await savedFile("original");
+    const harness = createHarness();
+    harness.backend.files.set(source.path, source.text);
+    await harness.session.openPath(source.path);
+    const before = serializeDocument(harness.editor.getSnapshot());
+    harness.backend.files.set("/docs/bad.net", "(foo)");
+
+    expect(await harness.session.openPath("/docs/bad.net")).toBe(false);
+    expect(serializeDocument(harness.editor.getSnapshot())).toBe(before);
+    expect(harness.session.state().filePath).toBe(source.path);
+    expect(harness.session.state().error).toContain("could not import bad.net");
+    expect(harness.backend.watched).toEqual([source.path]);
+  });
+
+  test("unknown KiCad symbols are surfaced as import warnings", async () => {
+    const harness = createHarness();
+    const path = "/docs/unknown-symbols.net";
+    harness.backend.files.set(path, KICAD_UNKNOWN_FIXTURE);
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state().importWarnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("kicad.skippedSymbol"),
+        }),
+      ]),
+    );
   });
 
   test("a malformed BPMN file leaves the current document and association intact", async () => {

@@ -14,7 +14,7 @@ import type {
   UmlAssociationSemantic,
   UmlClassSemantic,
 } from "@nodetto/ir";
-import { erdEndpointColumnIds } from "@nodetto/ir";
+import { erdEndpointColumnIds, isBreadboardElementType } from "@nodetto/ir";
 
 export interface D2ExportWarning {
   readonly elementId?: string;
@@ -547,7 +547,17 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
       }
     }
   }
-  const visible = pageElements.filter((element) => !hidden.has(element.id));
+  const visibleBeforeBreadboard = pageElements.filter(
+    (element) => !hidden.has(element.id),
+  );
+  const hasSkippedBreadboard = visibleBeforeBreadboard.some((element) =>
+    isBreadboardElementType(element.type),
+  );
+  if (hasSkippedBreadboard)
+    warnings.push({ message: "Breadboard elements are not exported to D2." });
+  const visible = visibleBeforeBreadboard.filter(
+    (element) => !isBreadboardElementType(element.type),
+  );
   const alias = aliases(visible);
   const byId = new Map(visible.map((element) => [element.id, element]));
   const sequenceIds = new Set(
@@ -793,7 +803,7 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
     relationCount += sequence.relations;
   }
   const elementCount = exportable.length + (sequence?.elements ?? 0);
-  if (elementCount === 0)
+  if (elementCount === 0 && !hasSkippedBreadboard)
     warnings.push({
       message: "The page contains no layers that D2 export can represent.",
     });

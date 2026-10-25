@@ -34,6 +34,7 @@ import {
   type GroupSemantic,
   type TextMark,
   getElementTypeDefinition,
+  isBreadboardElementType,
   type PageId,
   type Visual,
 } from "@nodetto/ir";
@@ -64,6 +65,12 @@ import { memberIdsOf } from "./group.ts";
 import { richTextSegments, safeTextLinkHref } from "./rich-text.ts";
 import { expandContainers } from "./frame-tree.ts";
 import type { ShapeContext, ShapeUtilRegistry } from "./shape-util.ts";
+import { compareFractional } from "./fractional.ts";
+import {
+  breadboardLabelBounds,
+  breadboardNotation,
+  type BreadboardNotation,
+} from "./breadboard/notation.ts";
 import {
   bpmnFlowDecoration,
   bpmnLabelBox,
@@ -1164,13 +1171,17 @@ function renderUnsupported(
   );
 }
 
-function renderNotationPrimitive(primitive: NotationPrimitive): string {
+function renderNotationPrimitive(
+  primitive: NotationPrimitive & { readonly opacity?: number },
+  classPrefix = "bpmn",
+): string {
   const common = {
-    class: `bpmn-${primitive.role}`,
+    class: `${classPrefix}-${primitive.role}`,
     fill: primitive.fill,
     stroke: primitive.stroke,
     "stroke-width": primitive.strokeWidth,
     "stroke-dasharray": primitive.dash,
+    opacity: primitive.opacity,
   };
   switch (primitive.kind) {
     case "rect":
@@ -1231,12 +1242,26 @@ function renderNotationPrimitive(primitive: NotationPrimitive): string {
   }
 }
 
+function renderBreadboardShape(
+  element: Element,
+  box: Box,
+  notation = breadboardNotation(element, box),
+): string {
+  return wrap(
+    "g",
+    { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` },
+    notation.body
+      .map((primitive) => renderNotationPrimitive(primitive, "breadboard"))
+      .join(""),
+  );
+}
+
 function renderBpmnShape(element: Element, box: Box): string {
   const primitives = bpmnNotation(element, box);
   return wrap(
     "g",
     { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` },
-    primitives.map(renderNotationPrimitive).join(""),
+    primitives.map((primitive) => renderNotationPrimitive(primitive)).join(""),
   );
 }
 
@@ -1245,7 +1270,10 @@ function renderShape(
   box: Box,
   theme: SvgTheme,
   resolveAsset?: (source: string) => string,
+  breadboard?: BreadboardNotation,
 ): string {
+  if (isBreadboardElementType(element.type))
+    return renderBreadboardShape(element, box, breadboard);
   if (isBpmnShapeType(element.type)) return renderBpmnShape(element, box);
   switch (element.type) {
     case "draw.path": {
@@ -1447,7 +1475,7 @@ function renderShape(
       return renderUmlComponent(element, box, theme);
     case "state.node":
       return stateNodeNotation(element, box)
-        .map(renderNotationPrimitive)
+        .map((primitive) => renderNotationPrimitive(primitive))
         .join("");
     case "uml.class":
       return renderUmlClass(element, box, theme);
@@ -1731,7 +1759,7 @@ function renderConnector(
     return (
       line +
       bpmnFlowDecoration(element, resolved.points, (id) => context.resolve(id))
-        .map(renderNotationPrimitive)
+        .map((primitive) => renderNotationPrimitive(primitive))
         .join("")
     );
   }
@@ -1814,6 +1842,20 @@ export function renderElementsSvg(
   const gradients: string[] = [];
   const booleanMasks: string[] = [];
   const rasterMasks: string[] = [];
+  const activeNetlists = new Map<PageId, ElementId>();
+  for (const element of [...elements]
+    .filter(
+      (item) =>
+        item.type === "breadboard.netlist" && item.visual.hidden !== true,
+    )
+    .sort(
+      (left, right) =>
+        compareFractional(left.index, right.index) ||
+        compareFractional(left.id, right.id),
+    )) {
+    if (!activeNetlists.has(element.page))
+      activeNetlists.set(element.page, element.id);
+  }
   for (const element of elements) {
     if (
       element.visual.hidden ||
@@ -1923,15 +1965,33 @@ export function renderElementsSvg(
       if (box === null) {
         continue;
       }
+      const breadboard = isBreadboardElementType(element.type)
+        ? breadboardNotation(element, box, {
+            inert:
+              element.type === "breadboard.netlist" &&
+              activeNetlists.get(element.page) !== element.id,
+          })
+        : undefined;
+      const uprightLabels = breadboard?.labels.length
+        ? wrap(
+            "g",
+            { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` },
+            breadboard.labels
+              .map((primitive) =>
+                renderNotationPrimitive(primitive, "breadboard"),
+              )
+              .join(""),
+          )
+        : "";
       rendered.set(
         element.id,
         clipped(
           elementGroup(
             element,
             box,
-            renderShape(element, box, theme, options.resolveAsset),
+            renderShape(element, box, theme, options.resolveAsset, breadboard),
             filter,
-          ),
+          ) + uprightLabels,
         ),
       );
       renderedKinds.set(element.id, "shape");
@@ -1942,6 +2002,10 @@ export function renderElementsSvg(
     if (box && isBpmnShapeType(element.type)) {
       const label = bpmnLabelBox(element, box);
       if (label) boxes.push(label);
+    }
+    if (box && isBreadboardElementType(element.type)) {
+      const notation = breadboardNotation(element, box);
+      boxes.push(...breadboardLabelBounds(notation, box));
     }
     if (box && element.type === "state.node") {
       const label = stateNodeLabelBox(element, box);

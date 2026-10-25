@@ -360,6 +360,7 @@ export {
 } from "./shapes/geo.ts";
 export { createDefaultRegistry } from "./shapes/index.ts";
 export * from "./bpmn/index.ts";
+export * from "./breadboard/index.ts";
 export {
   NODE_DEFAULT_HEIGHT,
   NODE_DEFAULT_WIDTH,

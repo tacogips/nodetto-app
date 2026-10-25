@@ -1,0 +1,9 @@
+{"kind":"document","schemaVersion":1,"id":"breadboard-test-document","title":"LED and button"}
+{"kind":"page","id":"breadboard-page","name":"LED and button","pageKind":"breadboard"}
+{"kind":"element","id":"battery-1","page":"breadboard-page","type":"breadboard.battery","index":"a002","semantic":{"reference":"BT1","value":"5V"},"visual":{"x":30,"y":5,"rotation":0}}
+{"kind":"element","id":"board-1","page":"breadboard-page","type":"breadboard.board","index":"a001","semantic":{"size":"half"},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"button-1","page":"breadboard-page","type":"breadboard.button","index":"a003","semantic":{"reference":"SW1","value":"PUSH"},"visual":{"x":55,"y":85,"rotation":0}}
+{"kind":"element","id":"led-1","page":"breadboard-page","type":"breadboard.led","index":"a005","semantic":{"reference":"D1","value":"red","color":"red"},"visual":{"x":115,"y":80,"rotation":0}}
+{"kind":"element","id":"resistor-1","page":"breadboard-page","type":"breadboard.resistor","index":"a004","semantic":{"reference":"R1","value":"220","span":4,"bands":4},"visual":{"x":75,"y":85,"rotation":0}}
+{"kind":"element","id":"wire-gnd","page":"breadboard-page","type":"breadboard.wire","index":"a007","semantic":{"color":"blue","points":[{"x":0,"y":0},{"x":10,"y":-80}]},"visual":{"x":130,"y":90}}
+{"kind":"element","id":"wire-vcc","page":"breadboard-page","type":"breadboard.wire","index":"a006","semantic":{"color":"red","points":[{"x":0,"y":0},{"x":0,"y":70}]},"visual":{"x":60,"y":20}}

@@ -31,6 +31,23 @@ export const Tool = {
   BpmnTextAnnotation: "bpmn:text-annotation",
   BpmnGroup: "bpmn:group",
 
+  BreadboardFull: "breadboard:board-full",
+  BreadboardHalf: "breadboard:board-half",
+  BreadboardMini: "breadboard:board-mini",
+  BreadboardResistor: "breadboard:resistor",
+  BreadboardLed: "breadboard:led",
+  BreadboardCapacitorCeramic: "breadboard:capacitor-ceramic",
+  BreadboardCapacitorElectrolytic: "breadboard:capacitor-electrolytic",
+  BreadboardDiode: "breadboard:diode",
+  BreadboardNpn: "breadboard:npn",
+  BreadboardPnp: "breadboard:pnp",
+  BreadboardButton: "breadboard:button",
+  BreadboardPotentiometer: "breadboard:potentiometer",
+  BreadboardIc: "breadboard:ic",
+  BreadboardHeader: "breadboard:header",
+  BreadboardBattery: "breadboard:battery",
+  BreadboardWire: "breadboard:wire",
+
   Select: "select",
   Hand: "hand",
   Comment: "comment",
@@ -174,6 +191,67 @@ export const BPMN_TOOLS = [
   Tool.BpmnGroup,
 ] as const;
 export type BpmnToolKind = (typeof BPMN_TOOLS)[number];
+
+export const BREADBOARD_TOOLS = [
+  Tool.BreadboardFull,
+  Tool.BreadboardHalf,
+  Tool.BreadboardMini,
+  Tool.BreadboardResistor,
+  Tool.BreadboardLed,
+  Tool.BreadboardCapacitorCeramic,
+  Tool.BreadboardCapacitorElectrolytic,
+  Tool.BreadboardDiode,
+  Tool.BreadboardNpn,
+  Tool.BreadboardPnp,
+  Tool.BreadboardButton,
+  Tool.BreadboardPotentiometer,
+  Tool.BreadboardIc,
+  Tool.BreadboardHeader,
+  Tool.BreadboardBattery,
+  Tool.BreadboardWire,
+] as const;
+export type BreadboardToolKind = (typeof BREADBOARD_TOOLS)[number];
+
+const BREADBOARD_CREATIONS: Readonly<Record<BreadboardToolKind, CreationTool>> =
+  {
+    [Tool.BreadboardFull]: {
+      type: "breadboard.board",
+      semantic: { size: "full" },
+    },
+    [Tool.BreadboardHalf]: {
+      type: "breadboard.board",
+      semantic: { size: "half" },
+    },
+    [Tool.BreadboardMini]: {
+      type: "breadboard.board",
+      semantic: { size: "mini" },
+    },
+    [Tool.BreadboardResistor]: { type: "breadboard.resistor" },
+    [Tool.BreadboardLed]: { type: "breadboard.led" },
+    [Tool.BreadboardCapacitorCeramic]: {
+      type: "breadboard.capacitor",
+      semantic: { style: "ceramic" },
+    },
+    [Tool.BreadboardCapacitorElectrolytic]: {
+      type: "breadboard.capacitor",
+      semantic: { style: "electrolytic" },
+    },
+    [Tool.BreadboardDiode]: { type: "breadboard.diode" },
+    [Tool.BreadboardNpn]: {
+      type: "breadboard.transistor",
+      semantic: { polarity: "NPN" },
+    },
+    [Tool.BreadboardPnp]: {
+      type: "breadboard.transistor",
+      semantic: { polarity: "PNP" },
+    },
+    [Tool.BreadboardButton]: { type: "breadboard.button" },
+    [Tool.BreadboardPotentiometer]: { type: "breadboard.potentiometer" },
+    [Tool.BreadboardIc]: { type: "breadboard.ic" },
+    [Tool.BreadboardHeader]: { type: "breadboard.header" },
+    [Tool.BreadboardBattery]: { type: "breadboard.battery" },
+    [Tool.BreadboardWire]: { type: "breadboard.wire" },
+  };
 
 const BPMN_CREATIONS: Readonly<Record<BpmnToolKind, CreationTool>> = {
   [Tool.BpmnPool]: {
@@ -350,6 +428,23 @@ export interface CreationTool {
 /** Exhaustive so adding a tool requires deciding its placement behavior. */
 export function creationFor(tool: ToolKind): CreationTool | null {
   switch (tool) {
+    case Tool.BreadboardFull:
+    case Tool.BreadboardHalf:
+    case Tool.BreadboardMini:
+    case Tool.BreadboardResistor:
+    case Tool.BreadboardLed:
+    case Tool.BreadboardCapacitorCeramic:
+    case Tool.BreadboardCapacitorElectrolytic:
+    case Tool.BreadboardDiode:
+    case Tool.BreadboardNpn:
+    case Tool.BreadboardPnp:
+    case Tool.BreadboardButton:
+    case Tool.BreadboardPotentiometer:
+    case Tool.BreadboardIc:
+    case Tool.BreadboardHeader:
+    case Tool.BreadboardBattery:
+    case Tool.BreadboardWire:
+      return BREADBOARD_CREATIONS[tool];
     case Tool.BpmnPool:
     case Tool.BpmnPoolCollapsed:
     case Tool.BpmnLane:

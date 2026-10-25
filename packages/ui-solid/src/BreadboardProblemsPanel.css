@@ -1,0 +1,81 @@
+.nodetto-breadboard-problems {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  color: var(--nodetto-ink, #20252a);
+  font: inherit;
+  font-size: .85rem;
+}
+
+.nodetto-breadboard-problems-summary,
+.nodetto-breadboard-problems-import-warnings h3 {
+  margin: 0;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.nodetto-breadboard-problems-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nodetto-breadboard-problems-list,
+.nodetto-breadboard-problems-import-warnings ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nodetto-breadboard-problem {
+  display: grid;
+  grid-template-columns: auto minmax(70px, max-content) minmax(0, 1fr) auto;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #dfe3e6;
+  border-radius: 0;
+  color: inherit;
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nodetto-breadboard-problem-rule {
+  color: #5d6872;
+  font-family: ui-monospace, monospace;
+}
+
+.nodetto-breadboard-problem-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 2px;
+}
+
+.nodetto-breadboard-problem-chip {
+  padding: 2px 6px;
+  border: 1px solid #dfe3e6;
+  border-radius: 999px;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+
+.nodetto-breadboard-problems-import-warnings {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dfe3e6;
+}
+
+.nodetto-breadboard-problems-import-warnings li {
+  overflow-wrap: anywhere;
+}

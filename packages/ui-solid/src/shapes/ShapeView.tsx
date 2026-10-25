@@ -16,6 +16,7 @@ import { UmlComponentView } from "./UmlComponentView.tsx";
 // selection and transformation only, and its members draw themselves.
 
 import { isBpmnShapeType, type Box } from "@nodetto/core";
+import { isBreadboardElementType } from "@nodetto/ir";
 import type { AccessibilityRole, Element } from "@nodetto/ir";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { ErdTableView } from "./ErdTableView.tsx";
@@ -29,12 +30,15 @@ import { SequenceParticipantView } from "./SequenceParticipantView.tsx";
 import { TextNoteView } from "./TextNoteView.tsx";
 import { UmlClassView } from "./UmlClassView.tsx";
 import { BpmnShapeView } from "./BpmnShapeView.tsx";
+import { BreadboardShapeView } from "./BreadboardShapeView.tsx";
 import { layerAppearanceStyle } from "./visual.ts";
 
 export interface ShapeViewProps {
   readonly element: Element;
   readonly box: Box;
   readonly selected: boolean;
+  /** True when a target netlist card is not the active page target. */
+  readonly breadboardInert?: boolean;
   readonly warnings?: readonly string[];
   readonly resolveAsset?: (source: string) => string | undefined;
   /** Construction guides are canvas-only and excluded from preview/export. */
@@ -172,6 +176,13 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
         >
           <Match when={isBpmnShapeType(props.element.type)}>
             <BpmnShapeView element={props.element} box={props.box} />
+          </Match>
+          <Match when={isBreadboardElementType(props.element.type)}>
+            <BreadboardShapeView
+              element={props.element}
+              box={props.box}
+              inert={props.breadboardInert}
+            />
           </Match>
           <Match when={props.element.type === "state.node"}>
             <StateNodeView element={props.element} box={props.box} />
