@@ -7,7 +7,17 @@
 
 ## Active
 
-No implementation plans are active. `active/` holds only the historical
+`ddl --frame` name and prefix resolution (design:
+`design-docs/specs/design-cli-ai-drawing.md`, "Ids and names" and
+"ddl --frame resolution"). One wave; both plans run in parallel with
+disjoint writePaths.
+
+| Plan | Scope |
+|---|---|
+| [ddl-frame-01-resolver](active/ddl-frame-01-resolver.md) | Page-scoped frame resolver in `ddlCommand` and its regression tests |
+| [ddl-frame-02-help-docs](active/ddl-frame-02-help-docs.md) | `ddl` and `pages` help text, README example, help test |
+
+Apart from these, `active/` holds only the historical
 BPMN dispatch manifests (`bpmn-operation-flow-s356-dispatch.json`,
 `bpmn-operation-flow-s357-dispatch.json`,
 `bpmn-operation-flow-s359-dispatch.json`,

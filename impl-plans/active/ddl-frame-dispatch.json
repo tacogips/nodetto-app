@@ -1,0 +1,193 @@
+{
+  "taskId": "ddl-frame",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-496",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "f705c0943abd06b9b3330559ff9dd9b59a675ee0",
+  "gitPush": false,
+  "designDocPaths": ["design-docs/specs/design-cli-ai-drawing.md"],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/ddl-frame",
+  "evidenceLayout": "tmp/ddl-frame/<planId>/ (red.log, green.log and per-command logs) per plan, with per-attempt dispatcher output under tmp/ddl-frame/<planId>/attempt-<n>/. Untracked: tmp/ is git-ignored (.gitignore:41).",
+  "historicalManifests": {
+    "paths": [
+      "impl-plans/active/bpmn-operation-flow-s356-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s357-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s359-dispatch.json",
+      "impl-plans/active/bpmn-render-fix-s360-dispatch.json"
+    ],
+    "note": "Historical and complete. Not dispatched and not changed by this checkpoint."
+  },
+  "reviewContext": {
+    "issueReference": "none (no issue URL or number; the request comes only from workflowInput.requestedOutcome). Execution opus-luna-design-and-implement-review-loop-session-496; design accepted by step3-design-review comm-009209; plan input comm-009210; plan review comm-009211 (step5-impl-plan-review, reviewDecision accept). Design and plans reused from the previous run, session-495, which stopped at the git commit step.",
+    "userProblem": "nodetto-cli ddl --page already accepts a page id, short id or exact page name (resolvePageQuery), but --frame only accepts the exact full frame id (apps/cli/src/commands.ts ddlCommand: editor.store.get(frameId)), so scripts that keep human-readable configuration must map frame names to auto-assigned opaque ids themselves.",
+    "requiredOutcomes": [
+      "ddl --page <page> --frame <exact frame name> emits the same DDL as passing that frame's full id.",
+      "A unique short-id prefix (at least MIN_PREFIX = 6 characters) of a frame id works for --frame.",
+      "Resolution is scoped to the selected --page in the order: exact full id, exact frame name (semantic.name), unique id prefix; frames on other pages never match.",
+      "A value that matches no frame, or a name/prefix that matches two or more frames, exits EXIT_ERROR (2) with empty stdout, no --output write, and stderr starting with '--frame must identify a frame on the selected --page.' followed by candidate lines '  <short>\\t<name> (full id: <id>)'.",
+      "ddl help documents --frame <id|short-id|name>; pages and ddl help state that page and element ids are auto-assigned, opaque and unchanging, rename-page changes only the display name, and names are the human-facing key; the README scoped schema export example uses a frame name.",
+      "New regression tests fail on f705c09 and pass after the change; bun run lint, bun run typecheck, bun test apps/cli/src and CARGO_TERM_QUIET=true mise run test-cli pass at reconciliation."
+    ],
+    "nonGoals": [
+      "No change to generateDatabaseDdl or its options, resolveId, shortIds or selectPage / --page resolution order.",
+      "No native Rust source changes: the native CLI hosts the bundled TypeScript commands and does not parse ddl options.",
+      "No edits under docs/ (only docs/bpmn exists; it does not document ddl --frame).",
+      "No version bumps, release tags or pushes (gitPush=false).",
+      "No Examples block added to the ddl help; OVERVIEW is not edited."
+    ],
+    "constraints": [
+      "Public repository: no server code, auth, secrets or deployment config.",
+      "Exact full frame id behavior must stay byte-identical (stdout, stderr, --output, --check, --strict) to f705c09.",
+      "Fixtures use only neutral names (page 'Shop schema', frames 'orders store', 'billing store', 'shared store'); no external issue numbers, project, product or reporter names in code, tests, docs, plans or commit messages.",
+      "Strict TypeScript (no any, no non-null assertions on lookups), Biome style, ASCII only, no emojis.",
+      "Workers edit only their writePaths and their own impl-plans/progress/<planId>.md, perform no git write operations, no worktrees, foreground commands only, and record pre/post sha256 per edit.",
+      "Workspace-wide lint, bun test apps/cli/src and CARGO_TERM_QUIET=true mise run test-cli run at the serial reconciliation gate."
+    ],
+    "designDecisionsAndRationale": [
+      "One private resolveFrameQuery(document, page, query): Resolution placed directly above ddlCommand in apps/cli/src/commands.ts, mirroring resolvePageQuery precedence and selectPage candidate format (design 'ddl --frame resolution').",
+      "Short ids are shortIds over all document element ids so candidate listings match inspect output; MIN_PREFIX is reused from apps/cli/src/ids.ts.",
+      "Name matching is exact and case-sensitive like page names; an ambiguous name fails and does not fall through to prefix matching, so the CLI never silently picks a frame.",
+      "The first failure line keeps the current wording, which the existing 'DDL frame scopes ...' test asserts.",
+      "Help/docs text and its test are a separate plan with disjoint files so both plans run in one parallel wave."
+    ],
+    "intentionalTradeoffs": [
+      "Name-before-prefix precedence: a frame named like another frame's id prefix resolves by name; the full id always resolves (covered by a separate fixture).",
+      "Prefixes shorter than 6 characters never match, even if unique on the page."
+    ],
+    "supportedEdgeCases": [
+      "Two frames sharing a name on the page (ambiguous, lists only matching frames).",
+      "Same-name frame on another page is never matched; a full id from another page fails.",
+      "Non-frame element ids (for example t-users) are never candidates.",
+      "Page with no frames reports 'Page \"<name>\" has no frames.'.",
+      "Missing or empty frame names display as (unnamed); non-string names are guarded.",
+      "--output is not written on resolution failure."
+    ],
+    "outOfScopeEdgeCases": [
+      "Case-insensitive or trimmed name matching.",
+      "Frame name resolution for commands other than ddl.",
+      "Native CLI option parsing changes."
+    ],
+    "reviewFindingsCarried": [
+      {
+        "path": "impl-plans/active/ddl-frame-01-resolver.md",
+        "line": 157,
+        "severity": "low",
+        "note": "The --output failure case must pass --page \"Shop schema\" (the fixture has two ERD pages; without --page, selectPage fails first) and must assert stderr contains 'frame on the selected --page' (manifest acceptance criterion), in addition to EXIT_ERROR and out.sql being absent."
+      },
+      {
+        "path": "impl-plans/active/ddl-frame-01-resolver.md",
+        "severity": "low",
+        "note": "No new test asserts the 'Page \"<name>\" has no frames.' wording; the existing '--page p2 --frame db-frame' case covers only the exit code (commands.test.ts:280-286). Residual, not blocking."
+      },
+      {
+        "path": "impl-plans/active/ddl-frame-dispatch.json",
+        "severity": "low",
+        "note": "Both wave-1 plans run workspace-wide bun run typecheck concurrently in one working directory. A transient cross-plan typecheck error is non-authoritative; the serial reconciliation gate is authoritative."
+      }
+    ],
+    "residualRisks": [
+      "Native parity tests depend on mise run test-cli rebuilding the git-ignored apps/cli/native/engine/diagram.js bundle at reconcile.",
+      "Both workers run bun run typecheck concurrently in one working directory and may briefly see each other's partial edits; the serial reconcile gate re-runs every check.",
+      "An untrusted mise.toml in the sandbox may block CARGO_TERM_QUIET=true mise run test-cli at reconciliation; that is an environment issue and must not be reported as a pass.",
+      "No new assertion covers the 'has no frames' message text (low)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-cli-ai-drawing.md",
+      "impl-plans/README.md",
+      "impl-plans/active/ddl-frame-01-resolver.md",
+      "impl-plans/active/ddl-frame-02-help-docs.md",
+      "apps/cli/src/commands.ts",
+      "apps/cli/src/ids.ts",
+      "apps/cli/src/help.ts",
+      "apps/cli/src/inspect-command.ts",
+      "packages/ir/src/page-id.ts",
+      "packages/ir/src/semantics.ts",
+      "README.md"
+    ]
+  },
+  "acceptedDependencies": [],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "afterWave": [
+      "bun run lint",
+      "bun run typecheck",
+      "bun test apps/cli/src",
+      "CARGO_TERM_QUIET=true mise run test-cli"
+    ],
+    "routing": "Strictly blocking. Route failures in commands.ts/commands.test.ts to ddl-frame-01-resolver and failures in help.ts/ai-commands.test.ts/README.md to ddl-frame-02-help-docs."
+  },
+  "plans": [
+    {
+      "planId": "ddl-frame-01-resolver",
+      "planPath": "impl-plans/active/ddl-frame-01-resolver.md",
+      "progressPath": "impl-plans/progress/ddl-frame-01-resolver.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/commands.test.ts",
+        "impl-plans/progress/ddl-frame-01-resolver.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "A private (not exported) resolveFrameQuery(document: Document, page: Page, query: string): Resolution exists directly above ddlCommand, and editor.store.get(frameId) is no longer used in commands.ts.",
+        "--frame resolves among frames on the selected page only: exact full id, then exact case-sensitive semantic.name (ambiguous names fail without falling through), then a unique id prefix of at least MIN_PREFIX (6) characters.",
+        "--frame \"orders store\" and a 6+ character unique prefix give stdout byte-identical (toBe) to --frame fr-orders-0001; a 5-character prefix fails.",
+        "No-match and ambiguous cases exit EXIT_ERROR with empty stdout, no --output file, the first stderr line '--frame must identify a frame on the selected --page.' and candidate lines '  <short>\\t<name> (full id: <id>)'; (unnamed) for empty names.",
+        "Frames on another page never match by id, name or prefix; a frame named like another frame's id prefix resolves by name (separate fixture).",
+        "Every Shop-page case, including the --output failure case, passes --page \"Shop schema\" (the fixture has two ERD pages). The --output case asserts that stderr contains 'frame on the selected --page' (carried review finding).",
+        "The existing 'DDL frame scopes validate page ownership ...' test passes unchanged; exact full id output is byte-identical to f705c09.",
+        "red.log shows the new test failing on f705c09 and green.log shows 0 fail under tmp/ddl-frame/ddl-frame-01-resolver/; the progress log records pre/post sha256, commands, exit codes and log paths."
+      ],
+      "verification": [
+        "mkdir -p tmp/ddl-frame/ddl-frame-01-resolver",
+        "bun test apps/cli/src/commands.test.ts 2>&1 | tee tmp/ddl-frame/ddl-frame-01-resolver/green.log",
+        "bun run typecheck 2>&1 | tee tmp/ddl-frame/ddl-frame-01-resolver/typecheck.log",
+        "bunx biome check apps/cli/src/commands.ts apps/cli/src/commands.test.ts 2>&1 | tee tmp/ddl-frame/ddl-frame-01-resolver/biome.log",
+        "test \"$(grep -c 'function resolveFrameQuery' apps/cli/src/commands.ts)\" -eq 1",
+        "! grep -n 'export function resolveFrameQuery' apps/cli/src/commands.ts",
+        "! grep -n 'editor.store.get(frameId)' apps/cli/src/commands.ts",
+        "git diff --stat"
+      ]
+    },
+    {
+      "planId": "ddl-frame-02-help-docs",
+      "planPath": "impl-plans/active/ddl-frame-02-help-docs.md",
+      "progressPath": "impl-plans/progress/ddl-frame-02-help-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "README.md",
+        "apps/cli/src/ai-commands.test.ts",
+        "impl-plans/progress/ddl-frame-02-help-docs.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "COMMAND_HELP.ddl usage shows [--frame <id|short-id|name>] and no longer contains [--frame <id>]; the --frame description explains page scope, the id/name/prefix order (prefix at least 6 characters) and that unknown or ambiguous values exit 2 and list candidate frames (short id, name, full id).",
+        "COMMAND_HELP.ddl and COMMAND_HELP.pages each state that page and element ids are auto-assigned, opaque and unchanging, that rename-page changes only the display name, and that names are the human-facing key; both mention rename-page and the word opaque.",
+        "README.md scoped schema export example uses a quoted frame name instead of database-frame-id and adds one sentence on --frame resolution; no other README edits.",
+        "The new help test in ai-commands.test.ts fails on f705c09 and passes after the change; runCli ddl --help stdout equals COMMAND_HELP.ddl plus a newline; OVERVIEW stays under 40 lines; pages-command.test.ts still passes.",
+        "red.log, green.log and help-ddl.txt are saved under tmp/ddl-frame/ddl-frame-02-help-docs/; the progress log records hashes, commands, exit codes and log paths."
+      ],
+      "verification": [
+        "mkdir -p tmp/ddl-frame/ddl-frame-02-help-docs",
+        "bun test apps/cli/src/ai-commands.test.ts apps/cli/src/pages-command.test.ts 2>&1 | tee tmp/ddl-frame/ddl-frame-02-help-docs/green.log",
+        "bun run typecheck 2>&1 | tee tmp/ddl-frame/ddl-frame-02-help-docs/typecheck.log",
+        "bunx biome check apps/cli/src/help.ts apps/cli/src/ai-commands.test.ts 2>&1 | tee tmp/ddl-frame/ddl-frame-02-help-docs/biome.log",
+        "bun apps/cli/src/main.ts help ddl > tmp/ddl-frame/ddl-frame-02-help-docs/help-ddl.txt 2>&1",
+        "grep -q -- '--frame <id|short-id|name>' apps/cli/src/help.ts",
+        "! grep -n -- '\\[--frame <id>\\]' apps/cli/src/help.ts",
+        "! grep -n 'database-frame-id' README.md",
+        "git diff --stat README.md"
+      ]
+    }
+  ]
+}
