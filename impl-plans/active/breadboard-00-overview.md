@@ -35,15 +35,15 @@ Fritzing or any GPL or CC-BY-SA source.
 | 2 | breadboard-03-io-formatters | 01 | 8.1-8.5 |
 | 2 | breadboard-04-io-kicad | 01 | 8.6.1-8.6.4, 11 (fixtures) |
 | 2 | breadboard-05-collab | 01 | 8.5 (collab) |
-| 2 | breadboard-15-ui-export-dialog | 01 | 10 (ExportDialog) |
+| 2 | breadboard-15-ui-export-dialog | 01 | 10 (ExportDialog); checkpoint amendment 2: owns the mise.toml bun pin |
 | 3 | breadboard-06-core-editing | 02 | 4.2-4.4, 7.4, 5.2 (probe state) |
 | 3 | breadboard-07-core-connectivity-erc | 02 | 5.1, 5.2, 6 |
 | 3 | breadboard-09-core-import-layout | 02 | 8.6.5 |
 | 4 | breadboard-08-core-notation-svg | 02, 06 | 7.1, 7.3 |
 | 4 | breadboard-10-core-ratsnest-parity | 07 | 5.3, 6.1 |
-| 5 | breadboard-11-ui-shape-views | 08 | 7.1 (canvas) |
-| 5 | breadboard-12-ui-canvas-interaction | 06, 07, 10 | 7.2 (workspace, palette, wire tool, keys), 5.2, 5.3 (overlays) |
-| 5 | breadboard-14-ui-problems | 06, 07, 10 | 7.2 (problems panel), 7.5 |
+| 5 | breadboard-11-ui-shape-views | 08, 15 | 7.1 (canvas) |
+| 5 | breadboard-12-ui-canvas-interaction | 06, 07, 10, 15 | 7.2 (workspace, palette, wire tool, keys), 5.2, 5.3 (overlays) |
+| 5 | breadboard-14-ui-problems | 06, 07, 10, 15 | 7.2 (problems panel), 7.5 |
 | 5 | breadboard-16-cli | 03, 04, 07, 09, 10 | 9 |
 | 6 | breadboard-13-ui-inspector | 06, 07, 10, 14 | 7.2 (inspector), 7.5 |
 | 6 | breadboard-18-example-docs | 03, 04, 07, 08, 09, 10, 16 | 11 (example, golden, docs), README |

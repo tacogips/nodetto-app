@@ -8,14 +8,35 @@
   "gitPush": false,
   "originalHead": "907897f76543f73bd1f5b0a9fcb18ffb89b2a912",
   "checkpointAmendment": {
-    "amendmentOrdinal": 1,
-    "previousCheckpointCommit": "9dad2a918cac6003a25073ddc397f17c1fdd31d8",
-    "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-487",
-    "planReviewCommunication": "comm-008905",
-    "reason": "Session 486 wave 1 blocked breadboard-01-ir-contract: adding 'breadboard' to PAGE_KINDS breaks the exhaustive TYPICAL record in apps/cli/src/types-command.ts (TS2741), a file no plan owned. Plan 01 now owns that file (only the TYPICAL breadboard entry) and its ownTypecheckRegex covers it. No other plan, wave, dependency or path changed.",
-    "blockedEvidence": "tmp/opus-luna-waves/opus-luna-design-and-implement-review-loop-session-486/wave-001/wave-summary.json",
-    "acceptedPlanIdsUnchanged": true
+    "amendmentOrdinal": 2,
+    "previousCheckpointCommit": "ee0529a3c0c98ec4718ad86d165adef41a30c6bd",
+    "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-489",
+    "triggerCommunication": "comm-009055",
+    "findingId": "IR-S489-W6-TOOLCHAIN-01",
+    "reason": "Integration review found that the 'jsxDEV not found' module-load failure blocking plans 11, 12, 14 and 15 is a bun 1.4.3/1.4.4 regression reached through mise.toml 'bun = \"latest\"', not a source defect. Bisection: bun 1.3.14 and 1.4.0 pass Toolbar.test.ts, 1.4.3 and 1.4.4 fail; under bun 1.4.0 the combined tree gives ui-solid 499 pass / 0 fail and 'bun test packages apps/cli' 2321 pass / 18 skip / 0 fail. Disposition chosen: pin, not a baseline exception. Plan 15 (smallest, longest-blocked) now owns mise.toml, limited to changing the [tools] bun line to \"1.4.0\". No other plan, wave, dependency or path ownership changed.",
+    "chosenDisposition": "pin-toolchain",
+    "ownerPlanId": "breadboard-15-ui-export-dialog",
+    "addedWritePaths": ["mise.toml"],
+    "blockedEvidence": "tmp/breadboard-mode-s485/reconcile-s489-wave-006/ui-solid.log",
+    "acceptedPlanIdsUnchanged": true,
+    "addedDependencies": [
+      {"planId": "breadboard-11-ui-shape-views", "dependsOn": "breadboard-15-ui-export-dialog"},
+      {"planId": "breadboard-12-ui-canvas-interaction", "dependsOn": "breadboard-15-ui-export-dialog"},
+      {"planId": "breadboard-14-ui-problems", "dependsOn": "breadboard-15-ui-export-dialog"}
+    ],
+    "redispatchOrder": "Plan 15 (wave 2) lands the pin first. Plans 11, 12 and 14 now also depend on plan 15, so they rerun only after the pin is on disk; each first asserts 'bun --version' is 1.4.0, then reruns its own verification including 'bun test packages/ui-solid', followed by the progress gate, test-integrity and adversarial review. Plan 12 also runs Toolbar.test.ts directly and regenerates tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/ascii-sentinel.log (RECON-S489-W6-02). DAG stays acyclic: plan 15 is wave 2, plans 11/12/14 are wave 5."
   },
+  "previousCheckpointAmendments": [
+    {
+      "amendmentOrdinal": 1,
+      "previousCheckpointCommit": "9dad2a918cac6003a25073ddc397f17c1fdd31d8",
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-487",
+      "planReviewCommunication": "comm-008905",
+      "reason": "Session 486 wave 1 blocked breadboard-01-ir-contract: adding 'breadboard' to PAGE_KINDS breaks the exhaustive TYPICAL record in apps/cli/src/types-command.ts (TS2741), a file no plan owned. Plan 01 now owns that file (only the TYPICAL breadboard entry) and its ownTypecheckRegex covers it. No other plan, wave, dependency or path changed.",
+      "blockedEvidence": "tmp/opus-luna-waves/opus-luna-design-and-implement-review-loop-session-486/wave-001/wave-summary.json",
+      "acceptedPlanIdsUnchanged": true
+    }
+  ],
   "designDocPaths": [
     "design-docs/specs/design-breadboard.md",
     "design-docs/user-qa/breadboard-mode.md"
@@ -34,7 +55,7 @@
     "note": "Historical BPMN manifests. Not dispatched and not changed by this checkpoint. This manifest is the only new dispatch manifest."
   },
   "reviewContext": {
-    "issueReference": "No GitHub issue. Workflow input 'Circuit breadboard drawing mode (KiCad/Fritzing-inspired)'; intake comm-008852, resumed comm-008865 (user accepted user-QA Q1-Q6 defaults); design revision 2 accepted comm-008869; plan review comm-008871 (needs_revision PR5-1, PR5-2), revision comm-008872, plan review accepted comm-008873. Execution opus-luna-design-and-implement-review-loop-session-485. Checkpoint amendment 1 (session 487, plan review accepted comm-008905): plan 01 owns apps/cli/src/types-command.ts after the session 486 wave-1 typecheck blocker.",
+    "issueReference": "No GitHub issue. Workflow input 'Circuit breadboard drawing mode (KiCad/Fritzing-inspired)'; intake comm-008852, resumed comm-008865 (user accepted user-QA Q1-Q6 defaults); design revision 2 accepted comm-008869; plan review comm-008871 (needs_revision PR5-1, PR5-2), revision comm-008872, plan review accepted comm-008873. Execution opus-luna-design-and-implement-review-loop-session-485. Checkpoint amendment 1 (session 487, plan review accepted comm-008905): plan 01 owns apps/cli/src/types-command.ts after the session 486 wave-1 typecheck blocker. Checkpoint amendment 2 (session 489, comm-009055, IR-S489-W6-TOOLCHAIN-01): plan 15 owns mise.toml and pins bun to 1.4.0 after the bun 1.4.3/1.4.4 jsxDEV regression blocked the ui-solid gate.",
     "userProblem": "nodetto has no way to lay out solderless-breadboard prototypes: no breadboard page kind, no part catalogue on a 0.1 inch hole grid, no connectivity or electrical rules check, no BOM or netlist export, and no way to build a board against a KiCad schematic or netlist with a ratsnest and parity check.",
     "requiredOutcomes": [
       "A 'breadboard' page kind and 13 typed breadboard.* element types (board, wire, resistor, LED, capacitor, diode, transistor, push button, potentiometer, DIP IC, pin header, battery, target netlist card) in packages/ir with validation and a JSONL golden fixture; SCHEMA_VERSION stays 1 (design 3, plan 01).",
@@ -437,6 +458,7 @@
         "packages/ui-solid/src/ExportDialog.tsx",
         "packages/ui-solid/src/breadboard-export.ts",
         "packages/ui-solid/src/breadboard-export.test.ts",
+        "mise.toml",
         "impl-plans/progress/breadboard-15-ui-export-dialog.md"
       ],
       "sharedPaths": [],
@@ -446,12 +468,21 @@
       "acceptanceCriteria": [
         "ExportDialogProps.exportBreadboard?: (kind: BreadboardExportKind) => Promise<void> exists; BOM, KiCad netlist and SPICE entries are enabled only on breadboard pages.",
         "grep -c '\"breadboard\"' ExportDialog.tsx is at least 3 (Format, formats entry, group) and 'exportBreadboard?:' appears once; App.tsx still compiles.",
+        "Checkpoint amendment 2: mise.toml [tools] has 'bun = \"1.4.0\"' instead of 'bun = \"latest\"' and no other change; bun --version in the repo prints 1.4.0; bun test packages/ui-solid exits 0 with 0 fail and no jsxDEV error; bun.lock and the 5 previously failing ui-solid suites (Toolbar.test.ts among them) are unedited.",
         "Focused bun test passes with >0 pass and 0 fail; G1 ownRegex prints nothing; ASCII gates exit 0; progress log complete."
       ],
       "verification": [
         "mkdir -p tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog",
+        "mise install",
+        "test \"$(bun --version)\" = \"1.4.0\"",
+        "test \"$(grep -c '^bun = \"1.4.0\"$' mise.toml)\" -eq 1",
+        "test \"$(grep -c 'bun = \"latest\"' mise.toml)\" -eq 0",
+        "test \"$(git diff -U0 -- mise.toml | grep -cE '^[-+][^-+]')\" -eq 2",
+        "git diff --quiet -- bun.lock packages/ui-solid/src/Toolbar.test.ts apps/desktop/src/history-shortcuts.test.ts",
+        "bun test apps/desktop/src/history-shortcuts.test.ts",
         "bun test packages/ui-solid/src/breadboard-export.test.ts",
-        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/ui.log 2>&1; echo \"ui exit=$?\"",
+        "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/ui.log 2>&1",
+        "! grep -n 'jsxDEV' tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/ui.log",
         "bun run typecheck > tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
         "! grep -E '^packages/ui-solid/src/(ExportDialog\\.tsx|breadboard-export(\\.test)?\\.ts)' tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/typecheck.log",
         "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-15-ui-export-dialog/typecheck.log",
@@ -709,7 +740,7 @@
       "planPath": "impl-plans/active/breadboard-11-ui-shape-views.md",
       "progressPath": "impl-plans/progress/breadboard-11-ui-shape-views.md",
       "wave": 5,
-      "dependsOn": ["breadboard-08-core-notation-svg"],
+      "dependsOn": ["breadboard-08-core-notation-svg", "breadboard-15-ui-export-dialog"],
       "writePaths": [
         "packages/ui-solid/src/shapes/BreadboardShapeView.tsx",
         "packages/ui-solid/src/shapes/breadboard-view.ts",
@@ -728,6 +759,7 @@
       ],
       "verification": [
         "mkdir -p tmp/breadboard-mode-s485/breadboard-11-ui-shape-views",
+        "test \"$(bun --version)\" = \"1.4.0\"",
         "bun test packages/ui-solid/src/shapes/breadboard-view.test.ts",
         "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-11-ui-shape-views/ui.log 2>&1; echo \"ui exit=$?\"",
         "bun run typecheck > tmp/breadboard-mode-s485/breadboard-11-ui-shape-views/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
@@ -749,7 +781,8 @@
       "dependsOn": [
         "breadboard-06-core-editing",
         "breadboard-07-core-connectivity-erc",
-        "breadboard-10-core-ratsnest-parity"
+        "breadboard-10-core-ratsnest-parity",
+        "breadboard-15-ui-export-dialog"
       ],
       "writePaths": [
         "packages/ui-solid/src/tools.ts",
@@ -775,6 +808,8 @@
       ],
       "verification": [
         "mkdir -p tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction",
+        "test \"$(bun --version)\" = \"1.4.0\"",
+        "bun test packages/ui-solid/src/Toolbar.test.ts",
         "bun test packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
         "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/ui.log 2>&1; echo \"ui exit=$?\"",
         "bun run typecheck > tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
@@ -782,7 +817,7 @@
         "! grep -E '^error TS' tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/typecheck.log",
         "bunx biome check packages/ui-solid/src/tools.ts packages/ui-solid/src/workspaces.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/BreadboardOverlay.tsx packages/ui-solid/src/breadboard-overlay.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
         "git diff --quiet -- packages/ui-solid/src/interaction.test.ts packages/ui-solid/src/workspaces.test.ts packages/ui-solid/src/Toolbar.test.ts",
-        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'; test $? -eq 1",
+        "printf '+a\\xc2\\xb5\\n' | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }' > tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/ascii-sentinel.log 2>&1; test $? -eq 1",
         "perl -ne 'if (/[^\\x00-\\x7F]/) { print \"$ARGV:$.\\n\"; $bad = 1 } close ARGV if eof; END { exit($bad ? 1 : 0) }' packages/ui-solid/src/BreadboardOverlay.tsx packages/ui-solid/src/breadboard-overlay.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/breadboard-interaction.test.ts impl-plans/progress/breadboard-12-ui-canvas-interaction.md",
         "git diff -U0 -- packages/ui-solid/src/tools.ts packages/ui-solid/src/workspaces.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/Canvas.tsx | perl -ne 'if (/^\\+(?!\\+\\+)/ && /[^\\x00-\\x7F]/) { print; $bad = 1 } END { exit($bad ? 1 : 0) }'",
         "grep -n 'r: \"geo:rect\"' packages/ui-solid/src/interaction.ts",
@@ -797,7 +832,8 @@
       "dependsOn": [
         "breadboard-06-core-editing",
         "breadboard-07-core-connectivity-erc",
-        "breadboard-10-core-ratsnest-parity"
+        "breadboard-10-core-ratsnest-parity",
+        "breadboard-15-ui-export-dialog"
       ],
       "writePaths": [
         "packages/ui-solid/src/BreadboardProblemsPanel.tsx",
@@ -819,6 +855,7 @@
       ],
       "verification": [
         "mkdir -p tmp/breadboard-mode-s485/breadboard-14-ui-problems",
+        "test \"$(bun --version)\" = \"1.4.0\"",
         "bun test packages/ui-solid/src/breadboard-problems.test.ts",
         "bun test packages/ui-solid > tmp/breadboard-mode-s485/breadboard-14-ui-problems/ui.log 2>&1; echo \"ui exit=$?\"",
         "bun run typecheck > tmp/breadboard-mode-s485/breadboard-14-ui-problems/typecheck.log 2>&1; echo \"typecheck exit=$?\"",

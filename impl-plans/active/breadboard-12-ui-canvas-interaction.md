@@ -2,7 +2,12 @@
 
 - planId: breadboard-12-ui-canvas-interaction
 - planPath: impl-plans/active/breadboard-12-ui-canvas-interaction.md
-- wave: 5; dependsOn: breadboard-06-core-editing, breadboard-07-core-connectivity-erc, breadboard-10-core-ratsnest-parity
+- wave: 5; dependsOn: breadboard-06-core-editing, breadboard-07-core-connectivity-erc, breadboard-10-core-ratsnest-parity,
+  breadboard-15-ui-export-dialog (checkpoint amendment 2: plan 15 pins bun
+  to 1.4.0 in mise.toml; run `test "$(bun --version)" = "1.4.0"` before any
+  gate, then `bun test packages/ui-solid/src/Toolbar.test.ts` must pass
+  unedited; write the ASCII sentinel output to
+  tmp/breadboard-mode-s485/breadboard-12-ui-canvas-interaction/ascii-sentinel.log)
 - design: design-docs/specs/design-breadboard.md sections 7.2
   (workspace, palette, wire tool, keys), 4.2 (move snapping), 5.2 (net
   highlight target order, probe clearing), 5.3 (ratsnest overlay);

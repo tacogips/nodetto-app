@@ -2,7 +2,10 @@
 
 - planId: breadboard-11-ui-shape-views
 - planPath: impl-plans/active/breadboard-11-ui-shape-views.md
-- wave: 5; dependsOn: breadboard-08-core-notation-svg (wave 4)
+- wave: 5; dependsOn: breadboard-08-core-notation-svg (wave 4),
+  breadboard-15-ui-export-dialog (checkpoint amendment 2: plan 15 pins bun
+  to 1.4.0 in mise.toml; run `test "$(bun --version)" = "1.4.0"` before any
+  gate and report a blocker instead of running gates if it fails)
 - design: design-docs/specs/design-breadboard.md section 7.1 (canvas
   renders the same primitives as SVG export)
 - progress log: impl-plans/progress/breadboard-11-ui-shape-views.md

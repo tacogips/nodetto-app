@@ -2,7 +2,10 @@
 
 - planId: breadboard-14-ui-problems
 - planPath: impl-plans/active/breadboard-14-ui-problems.md
-- wave: 5; dependsOn: breadboard-06-core-editing, breadboard-07-core-connectivity-erc, breadboard-10-core-ratsnest-parity
+- wave: 5; dependsOn: breadboard-06-core-editing, breadboard-07-core-connectivity-erc, breadboard-10-core-ratsnest-parity,
+  breadboard-15-ui-export-dialog (checkpoint amendment 2: plan 15 pins bun
+  to 1.4.0 in mise.toml; run `test "$(bun --version)" = "1.4.0"` before any
+  gate and report a blocker instead of running gates if it fails)
 - design: design-docs/specs/design-breadboard.md sections 7.2 (problems
   panel), 7.5 (cross-probing, `focusBreadboardProbe`), 10 (importWarnings)
 - progress log: impl-plans/progress/breadboard-14-ui-problems.md
