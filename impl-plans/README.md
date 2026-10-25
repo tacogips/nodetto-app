@@ -18,13 +18,14 @@ copies under `tmp/breadboard-mode-s485/breadboard-05-collab/`
 `breadboard-mode-s485-dispatch.json` stays in `active/`, and its `planPath`
 values name the pre-archive `active/` locations.
 
-`active/` also holds the historical BPMN dispatch manifests
+`active/` also holds the historical dispatch manifests
+`ddl-frame-dispatch.json` and the BPMN manifests
 (`bpmn-operation-flow-s356-dispatch.json`,
 `bpmn-operation-flow-s357-dispatch.json`,
 `bpmn-operation-flow-s359-dispatch.json`,
-`bpmn-render-fix-s360-dispatch.json`). Of the first three, only s359 was
-the final dispatch. Their `planPath` values name the pre-archive
-`active/` locations.
+`bpmn-render-fix-s360-dispatch.json`). Of the BPMN operation-flow
+manifests, only s359 was the final dispatch. Their `planPath` values name
+the pre-archive `active/` locations.
 
 ## Completed
 
@@ -56,6 +57,18 @@ see above). Evidence: `tmp/breadboard-mode-s485/<planId>/` and
 | [breadboard-16-cli](completed/breadboard-16-cli.md) | `nodetto-cli lint` and `breadboard bom/netlist/import` |
 | [breadboard-17-desktop](completed/breadboard-17-desktop.md) | Workspace following, panel mount, export wiring, KiCad open filter |
 | [breadboard-18-example-docs](completed/breadboard-18-example-docs.md) | LED/button example, golden outputs, `docs/breadboard/`, README |
+
+`ddl --frame` name and prefix resolution (design:
+`design-docs/specs/design-cli-ai-drawing.md`, "Ids and names" and
+"ddl --frame resolution"). One wave; both plans ran in parallel with
+disjoint writePaths. Accepted by the integration review on the combined
+tree. Evidence: `tmp/ddl-frame/<planId>/` and
+`tmp/ddl-frame/reconciliation/wave-001/`.
+
+| Plan | Scope |
+|---|---|
+| [ddl-frame-01-resolver](completed/ddl-frame-01-resolver.md) | Page-scoped frame resolver in `ddlCommand` and its regression tests |
+| [ddl-frame-02-help-docs](completed/ddl-frame-02-help-docs.md) | `ddl` and `pages` help text, README example, help test |
 
 BPMN rendering-defect fix (session-360; design: `design-docs/specs/design-bpmn.md`
 6.1, 6.2, 6.4, 11, 13). One wave; both plans ran in parallel with

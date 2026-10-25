@@ -118,6 +118,62 @@ Operations (a JSON array; JSON Lines is also accepted):
 - The app shows "updated from disk +a ~u -r" after an outside change until the next
   local edit.
 
+### Ids and names
+
+Page and element ids are assigned automatically, are opaque and never change;
+`rename-page` changes only the display name. Scripts and configuration that people
+read should refer to pages and frames by name. `--page` already accepts a page id,
+11-character page short id or exact page name (`resolvePageQuery`).
+
+### ddl --frame resolution (designed 2026-10-25)
+
+`nodetto-cli ddl <doc.jsonl> [--page <short-id|id|name>] [--frame <id|short-id|name>]`
+
+`--page` is resolved first, as before. `--frame` is then resolved only among
+elements of type `frame` whose `page` is the selected page, in this order:
+
+1. Exact full id. Behavior and output stay byte-identical to today.
+2. Exact frame name: `semantic.name`, compared as an exact, case-sensitive string,
+   like page names. One match resolves. Two or more matches fail as ambiguous and do
+   not fall through to step 3.
+3. Id prefix of at least `MIN_PREFIX` (6) characters that matches exactly one frame
+   on the page. Shorter queries never match by prefix. Prefix matching considers only
+   frames on the page, not other elements.
+
+A frame on another page never matches, even by full id, name or prefix. The resolved
+full id goes to `generateDatabaseDdl` unchanged, so the generated SQL depends only on
+which frame was chosen.
+
+Failure exits with `EXIT_ERROR`, writes nothing to stdout and nothing to `--output`,
+and the stderr message starts with "--frame must identify a frame on the selected
+--page." (the current wording, which existing tests assert). It then lists
+candidates, one per line, in the style of the `--page` listing:
+
+```text
+  <short id>\t<name> (full id: <id>)
+```
+
+- No match: name the query and the page, then list every frame on the page. If the
+  page has no frames, say so instead.
+- Ambiguous name or prefix: list only the matching frames and tell the user to pass
+  a full id or short id.
+- Short ids are `shortIds` over all document element ids, the same values `inspect`
+  prints. A missing or empty name is shown as `(unnamed)`.
+- Candidates appear in document element order.
+
+The resolver is one small private function next to `ddlCommand` in
+`apps/cli/src/commands.ts`. It reuses `shortIds` and `MIN_PREFIX` from
+`apps/cli/src/ids.ts` and does not change `resolveId`. The Rust native CLI hosts the
+bundled TypeScript commands and does not parse `ddl` options, so no native source
+changes are needed. The parity tests (`mise run test-cli`) rebuild the bundle.
+
+Help and docs: the `ddl` usage shows `--frame <id|short-id|name>` and explains the
+order and page scope. The `pages` and `ddl` help both state the ids-and-names rule
+above. The README's scoped schema export example uses a frame name.
+
+Known edge: because names come before prefixes, a frame named like another frame's
+id prefix resolves by name. Tests cover this. The full id always resolves.
+
 ## Live co-editing in the desktop app
 
 The app already watches the open file (`watch.rs`, `document-file-changed`) and today
@@ -148,6 +204,14 @@ reads a partial file.
 - CLI unit tests for each command (fixtures, golden outline, ops validation, prefix
   ids, concurrent re-apply), PNG/PDF smoke tests (dimensions, magic bytes), compiled
   sidecar smoke test (export PNG without node_modules).
+- `ddl --frame` tests in `apps/cli/src/commands.test.ts`, using a page "Shop schema"
+  with frames "orders store" and "billing store": a name gives the same stdout as the
+  full id; a unique prefix of 6 or more characters resolves; a 5-character prefix does
+  not; a missing name and a name shared by two frames fail with empty stdout and list
+  candidates; a same-name frame on another page is never matched; a name that equals
+  another frame's id prefix resolves by name. A help test in
+  `apps/cli/src/ai-commands.test.ts` checks that `ddl` help shows
+  `--frame <id|short-id|name>`. These tests fail on f705c09.
 - Session tests for clean apply, dirty disjoint merge, field conflict, delete vs modify,
   invalid disk content and autosave after merge.
 - Live end-to-end (done 2026-10-16 with the dev app and the compiled CLI): a CLI edit

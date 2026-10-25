@@ -28,6 +28,7 @@ import {
   resolvePageQuery,
   shortPageId,
   type Document,
+  type FrameSemantic,
   type Page,
   type ValidationIssue,
 } from "@nodetto/ir";
@@ -38,6 +39,7 @@ import { typesCommand } from "./types-command.ts";
 import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
+import { MIN_PREFIX, shortIds, type Resolution } from "./ids.ts";
 
 /** Result of one command: text for stdout/stderr plus a process exit code. */
 export interface CommandResult {
@@ -572,6 +574,65 @@ function normalizeNewlines(text: string): string {
   return text.replace(/\r\n/g, "\n");
 }
 
+function resolveFrameQuery(
+  document: Document,
+  page: Page,
+  query: string,
+): Resolution {
+  const frames = document.elements.filter(
+    (element) => element.type === "frame" && element.page === page.id,
+  );
+  const names = new Map(
+    frames.map((frame) => {
+      const name = (frame.semantic as FrameSemantic).name;
+      return [frame.id, typeof name === "string" ? name : ""] as const;
+    }),
+  );
+  const displayName = (id: string) => {
+    const name = names.get(id);
+    return name ? name : "(unnamed)";
+  };
+  const short = shortIds(document.elements.map((element) => element.id));
+  const candidateLines = (candidates: typeof frames) =>
+    candidates
+      .map(
+        (frame) =>
+          `  ${short.get(frame.id) ?? frame.id}\t${displayName(frame.id)} (full id: ${frame.id})`,
+      )
+      .join("\n");
+  const failure = (detail: string): Resolution => ({
+    ok: false,
+    message: `--frame must identify a frame on the selected --page.\n${detail}`,
+  });
+
+  const exactId = frames.find((frame) => frame.id === query);
+  if (exactId) return { ok: true, id: exactId.id };
+
+  const nameMatches = frames.filter((frame) => names.get(frame.id) === query);
+  if (nameMatches.length === 1)
+    return { ok: true, id: nameMatches[0]?.id ?? "" };
+  if (nameMatches.length > 1)
+    return failure(
+      `"${query}" matches ${nameMatches.length} frames on page "${page.name}"; pass a full id or short id:\n${candidateLines(nameMatches)}`,
+    );
+
+  const prefixMatches =
+    query.length >= MIN_PREFIX
+      ? frames.filter((frame) => frame.id.startsWith(query))
+      : [];
+  if (prefixMatches.length === 1)
+    return { ok: true, id: prefixMatches[0]?.id ?? "" };
+  if (prefixMatches.length > 1)
+    return failure(
+      `"${query}" matches ${prefixMatches.length} frames on page "${page.name}"; pass a full id or short id:\n${candidateLines(prefixMatches)}`,
+    );
+
+  const detail = frames.length
+    ? `No frame on page "${page.name}" has the id, name or id prefix "${query}". Frames on this page:\n${candidateLines(frames)}`
+    : `Page "${page.name}" has no frames.`;
+  return failure(detail);
+}
+
 function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const parsed = parseArgs(
     args,
@@ -594,11 +655,12 @@ function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const page = selectPage(loaded.document, parsed.options.get("--page"));
   if (typeof page === "string") return fail(page);
   const editor = new Editor({ document: loaded.document });
-  const frameId = parsed.options.get("--frame");
-  if (frameId !== undefined) {
-    const frame = editor.store.get(frameId);
-    if (frame?.type !== "frame" || frame.page !== page.id)
-      return fail("--frame must identify a frame on the selected --page.");
+  const frameQuery = parsed.options.get("--frame");
+  let frameId: string | undefined;
+  if (frameQuery !== undefined) {
+    const resolved = resolveFrameQuery(loaded.document, page, frameQuery);
+    if (!resolved.ok) return fail(resolved.message);
+    frameId = resolved.id;
   }
   const ddl = generateDatabaseDdl(editor, page.id, dialect, { frameId });
   const warningText = ddl.warnings

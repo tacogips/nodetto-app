@@ -571,7 +571,12 @@ unfinished.
 
 The **General** shape category has the draw.io basics: rectangle, ellipse,
 diamond, cylinder, triangle, hexagon, parallelogram, star, trapezoid, pentagon,
-octagon, cross, block arrow, chevron, cloud, callout, folded note and cube. Any
+octagon, cross, block arrow, chevron, cloud, callout, folded note, cube, double
+arrow, right triangle and person. The **Flowchart** category has the standard
+flowchart symbols: start/end, process, decision, input/output, database,
+document, manual input, delay, predefined process, internal storage, off-page
+connector, card, paper tape, stored data, display, loop limit, collate, sort,
+summing junction, or, multi-document, direct data and sequential data. Any
 geometric shape keeps a centred, styled label and fill/gradient paint, and can
 be flipped horizontally or vertically (**Shift+H** / **Shift+V**, the context
 menu's Arrange submenu, or the inspector) without mirroring its label.
@@ -599,6 +604,51 @@ use draw.io's own shapes with matching proportions and round-trip exactly; ERD
 tables and UML classes become draw.io lists with one row per column or member.
 Types without a draw.io counterpart are written as labelled rectangles and
 listed in the export panel.
+
+Shape kinds map onto draw.io shape names (the `shape=` style value, or a named
+style such as `ellipse`) in both directions; the exporter writes the first name
+in each row. Shapes nodetto can only approximate (the UML stick-figure actor,
+draw.io's double rectangle and its 4/6/8-point stars) import as the listed kind
+with an import note.
+
+| nodetto kind | draw.io shape names |
+| --- | --- |
+| rect | `rounded=0`/`rounded=1`, `label`, `mxgraph.flowchart.process`, `mxgraph.flowchart.terminator` (as a stadium) |
+| ellipse | `ellipse`, `doubleEllipse`, `mxgraph.flowchart.start_1`, `start_2`, `on-page_reference` |
+| diamond | `rhombus`, `mxgraph.flowchart.decision` |
+| triangle | `triangle`, `mxgraph.flowchart.extract_or_measurement`, `merge_or_storage` (flipped) |
+| hexagon | `hexagon`, `mxgraph.flowchart.preparation` |
+| parallelogram | `parallelogram`, `mxgraph.flowchart.data` |
+| cylinder | `cylinder3`, `cylinder`, `cylinder2`, `datastore`, `mxgraph.flowchart.database` |
+| star, pentagon, octagon, cross | `mxgraph.basic.polygon` on export; `mxgraph.basic.star`, `pentagon`, `octagon2` on import |
+| trapezoid | `trapezoid`, `mxgraph.flowchart.manual_operation` (flipped) |
+| arrow | `singleArrow`, `mxgraph.arrows2.arrow` |
+| double-arrow | `doubleArrow` |
+| chevron | `step` |
+| cloud | `cloud` |
+| callout | `callout`, `wedgeCallout` |
+| note | `note`, `note2` |
+| cube | `cube` |
+| document | `document`, `mxgraph.flowchart.document`, `document2` |
+| multi-document | `mxgraph.flowchart.multi-document` |
+| manual-input | `manualInput`, `mxgraph.flowchart.manual_input` |
+| delay | `delay`, `or` (draw.io's AND gate), `mxgraph.flowchart.delay` |
+| predefined-process | `process`, `process2`, `mxgraph.flowchart.predefined_process` |
+| internal-storage | `internalStorage`, `mxgraph.flowchart.internal_storage` |
+| off-page | `offPageConnector`, `mxgraph.flowchart.off-page_reference` |
+| card | `card`, `mxgraph.flowchart.card` |
+| tape | `tape`, `mxgraph.flowchart.paper_tape` |
+| stored-data | `dataStorage`, `mxgraph.flowchart.stored_data` |
+| display | `display`, `mxgraph.flowchart.display` |
+| loop-limit | `loopLimit`, `mxgraph.flowchart.loop_limit` |
+| collate | `collate`, `mxgraph.flowchart.collate` |
+| sort | `sortShape`, `mxgraph.flowchart.sort` |
+| summing-junction | `sumEllipse`, `mxgraph.flowchart.summing_junction` |
+| or | `orEllipse`, `mxgraph.flowchart.or_2` |
+| direct-data | `mxgraph.flowchart.direct_data` |
+| sequential-data | `tapeData`, `mxgraph.flowchart.sequential_data` |
+| right-triangle | `mxgraph.basic.orthogonal_triangle` |
+| person | `actor`, `mermaidPerson`, `umlActor` (approximated) |
 
 ## Breadboard circuit pages
 
@@ -1530,8 +1580,12 @@ To export one database frame from an ERD page, choose its frame in the Database
 DDL panel's scope selector, or run:
 
 ```bash
-nodetto-cli ddl diagram.jsonl --page Schema --frame database-frame-id --dialect postgresql
+nodetto-cli ddl diagram.jsonl --page Schema --frame "Orders" --dialect postgresql
 ```
+
+`--frame` accepts the frame's name, full id or unique id prefix of at least six
+characters, matched only among frames on the selected page. Ids are generated
+and never change, so prefer names in scripts.
 
 The scope follows frame ownership, including nested frames and groups. Relations
 that cross the scope produce a warning and no foreign key. Database objects

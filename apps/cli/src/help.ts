@@ -96,6 +96,9 @@ IDs. They survive renaming, reordering, saving and reopening. Full IDs and
 existing references stay unchanged; listing a document never rewrites it.
 Every --page option and edit page reference accepts a short ID, full ID or
 exact name. Ambiguous aliases/names require a full ID.
+Page and element ids are auto-assigned, opaque and never change. rename-page
+changes only the display name; names are the human-facing key for --page and
+--frame in ddl.
 
 Examples:
   nodetto-cli pages mixed.jsonl
@@ -282,13 +285,17 @@ ${EXIT_CODES}`,
 
   ddl: `Usage: nodetto-cli ddl <document.jsonl> [--dialect postgresql|mysql|sqlite]
                        [--page <short-id|id|name>] [--output <file.sql>]
-                       [--check <file.sql>] [--strict] [--frame <id>]
+                       [--check <file.sql>] [--strict]
+                       [--frame <id|short-id|name>]
 
 Print the deterministic schema DDL the editor's Database DDL panel generates for
 one ERD page. Without --page, the document must contain exactly one page with
 ERD tables.
 
   --frame    Export only this frame and its nested contents on the selected page.
+             Matches an exact id, then an exact name, then a unique id prefix
+             of at least 6 characters. Unknown or ambiguous values exit 2 and
+             list candidate frames (short id, name, full id).
              Cross-scope references produce warnings and are omitted.
   --dialect  postgresql (default), mysql or sqlite.
   --output   Write the SQL to a file instead of stdout.
@@ -303,6 +310,10 @@ Unsafe or longer expressions are omitted with a warning that names the reason
 (for MySQL and SQLite this includes PostgreSQL-only syntax). Expressions that
 call functions or operators the target dialect lacks (for example
 num_nonnulls() or ILIKE on SQLite) are kept and reported as warnings.
+
+Page and element ids are auto-assigned, opaque and never change. rename-page
+changes only the display name; names are the human-facing key (for example,
+--page "Shop schema" --frame "orders store").
 
 ${EXIT_CODES}`,
 

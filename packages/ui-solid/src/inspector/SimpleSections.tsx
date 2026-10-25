@@ -98,6 +98,8 @@ const GEO_LABELS: Partial<Record<(typeof GEO_KINDS)[number], string>> = {
   arrow: "Block arrow",
   note: "Folded note",
   "off-page": "Off-page connector",
+  tape: "Paper tape",
+  "multi-document": "Multi-document",
 };
 
 const GEO_OPTIONS: readonly SelectOption[] = GEO_KINDS.map((kind) => ({

@@ -135,6 +135,20 @@ export const Tool = {
   InternalStorage: "geo:internal-storage",
   OffPage: "geo:off-page",
   Card: "geo:card",
+  Tape: "geo:tape",
+  StoredData: "geo:stored-data",
+  Display: "geo:display",
+  LoopLimit: "geo:loop-limit",
+  Collate: "geo:collate",
+  Sort: "geo:sort",
+  SummingJunction: "geo:summing-junction",
+  OrJunction: "geo:or",
+  MultiDocument: "geo:multi-document",
+  DirectData: "geo:direct-data",
+  SequentialData: "geo:sequential-data",
+  DoubleArrow: "geo:double-arrow",
+  RightTriangle: "geo:right-triangle",
+  Person: "geo:person",
 } as const;
 
 /** A closed union: only values declared in Tool are valid tools. */
@@ -166,6 +180,20 @@ export const GEO_TOOLS = [
   Tool.InternalStorage,
   Tool.OffPage,
   Tool.Card,
+  Tool.Tape,
+  Tool.StoredData,
+  Tool.Display,
+  Tool.LoopLimit,
+  Tool.Collate,
+  Tool.Sort,
+  Tool.SummingJunction,
+  Tool.OrJunction,
+  Tool.MultiDocument,
+  Tool.DirectData,
+  Tool.SequentialData,
+  Tool.DoubleArrow,
+  Tool.RightTriangle,
+  Tool.Person,
 ] as const;
 
 export const BPMN_TOOLS = [
@@ -389,6 +417,20 @@ const GEO_KINDS = {
   [Tool.InternalStorage]: "internal-storage",
   [Tool.OffPage]: "off-page",
   [Tool.Card]: "card",
+  [Tool.Tape]: "tape",
+  [Tool.StoredData]: "stored-data",
+  [Tool.Display]: "display",
+  [Tool.LoopLimit]: "loop-limit",
+  [Tool.Collate]: "collate",
+  [Tool.Sort]: "sort",
+  [Tool.SummingJunction]: "summing-junction",
+  [Tool.OrJunction]: "or",
+  [Tool.MultiDocument]: "multi-document",
+  [Tool.DirectData]: "direct-data",
+  [Tool.SequentialData]: "sequential-data",
+  [Tool.DoubleArrow]: "double-arrow",
+  [Tool.RightTriangle]: "right-triangle",
+  [Tool.Person]: "person",
 } as const satisfies Record<(typeof GEO_TOOLS)[number], GeoKind>;
 
 const FRAME_KINDS = {
@@ -604,6 +646,20 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.InternalStorage:
     case Tool.OffPage:
     case Tool.Card:
+    case Tool.Tape:
+    case Tool.StoredData:
+    case Tool.Display:
+    case Tool.LoopLimit:
+    case Tool.Collate:
+    case Tool.Sort:
+    case Tool.SummingJunction:
+    case Tool.OrJunction:
+    case Tool.MultiDocument:
+    case Tool.DirectData:
+    case Tool.SequentialData:
+    case Tool.DoubleArrow:
+    case Tool.RightTriangle:
+    case Tool.Person:
       return {
         type: "shape.geo",
         semantic: { geo: GEO_KINDS[tool], label: "" },

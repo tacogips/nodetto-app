@@ -99,6 +99,20 @@ export const GEO_KINDS = [
   "internal-storage",
   "off-page",
   "card",
+  "tape",
+  "stored-data",
+  "display",
+  "loop-limit",
+  "collate",
+  "sort",
+  "summing-junction",
+  "or",
+  "multi-document",
+  "direct-data",
+  "sequential-data",
+  "double-arrow",
+  "right-triangle",
+  "person",
 ] as const;
 export type GeoKind = (typeof GEO_KINDS)[number];
 
