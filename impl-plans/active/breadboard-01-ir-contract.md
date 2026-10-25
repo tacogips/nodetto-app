@@ -40,6 +40,7 @@ import core, so these shared models must live in ir.
 - packages/ir/src/registry.test.ts
 - packages/io/src/jsonl/golden.test.ts
 - packages/io/src/__fixtures__/breadboard.jsonl (new)
+- apps/cli/src/types-command.ts (checkpoint amendment: only the TYPICAL entry)
 - impl-plans/progress/breadboard-01-ir-contract.md
 
 ## sharedPaths
@@ -171,6 +172,15 @@ Error codes must follow the existing `error(code, path, message)` pattern.
 
 Export every symbol listed under Contracts from `semantics.ts` and
 `breadboard.ts`, in one block next to the BPMN exports.
+
+### apps/cli/src/types-command.ts (checkpoint amendment)
+
+Adding `breadboard` to `PAGE_KINDS` makes the exhaustive
+`TYPICAL: Readonly<Record<PageKind, readonly string[]>>` record fail to
+typecheck (TS2741 at line 38). No other plan owned this file. Add exactly one
+`breadboard` entry after `bpmn`, listing the 13 `breadboard.*` type strings
+in registry order followed by `"text.note"`. Change nothing else in the file;
+plan 16 adds the breadboard CLI command in its own files.
 
 ### packages/io/src/__fixtures__/breadboard.jsonl
 
