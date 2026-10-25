@@ -276,6 +276,13 @@ const TURNS: Readonly<Record<DrawioDirection, number>> = {
   west: 3,
 };
 
+/** Where nodetto's directional kinds point; everything else points east. */
+const NODETTO_DIRECTIONS: Partial<Record<GeoKind, DrawioDirection>> = {
+  triangle: "north",
+  trapezoid: "north",
+  "off-page": "south",
+};
+
 class Builder {
   readonly elements: Element[] = [];
   readonly warnings: DrawioImportWarning[] = [];
@@ -461,6 +468,11 @@ function importPage(
         pageName,
         `Shape "${shape}" has no nodetto equivalent and was imported as a rectangle.`,
       );
+    else if (mapped?.approximate && !override)
+      builder.warnOnce(
+        pageName,
+        `Shape "${shape}" was approximated as a ${mapped.geo} shape.`,
+      );
     const geo = (override ?? mapped?.geo ?? "rect") as GeoKind;
     const visualStyle: Record<string, unknown> = { ...paint(style, false) };
     if (geo === "rect" && shape === "mxgraph.flowchart.terminator")
@@ -481,13 +493,13 @@ function importPage(
     // The drawn shape's direction applies when it is the one nodetto draws.
     const natural = mapped?.geo === geo ? mapped.direction : undefined;
     if (natural) {
-      const wanted =
-        (style.values.get("direction") as DrawioDirection | undefined) ??
-        natural;
-      const nodettoNatural: DrawioDirection =
-        geo === "triangle" ? "north" : geo === "off-page" ? "south" : "east";
-      const delta =
-        ((TURNS[wanted] ?? TURNS[natural]) - TURNS[nodettoNatural] + 4) % 4;
+      // draw.io's `direction` turns the drawn shape away from east, so a
+      // stencil drawn pointing south with direction=south points west.
+      const styleTurn =
+        TURNS[style.values.get("direction") as DrawioDirection] ?? TURNS.east;
+      const pointing = (TURNS[natural] + styleTurn - TURNS.east + 4) % 4;
+      const nodettoNatural = NODETTO_DIRECTIONS[geo] ?? "east";
+      const delta = (pointing - TURNS[nodettoNatural] + 4) % 4;
       if (delta === 2) {
         if (nodettoNatural === "east") flipX = !flipX;
         else flipY = !flipY;

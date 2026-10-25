@@ -169,6 +169,91 @@ function starPoints(width: number, height: number): Point[] {
   return points;
 }
 
+/** Points along an elliptical arc from `from` to `to` (radians, y down). */
+function arcPoints(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  from: number,
+  to: number,
+  segments = 16,
+): Point[] {
+  return Array.from({ length: segments + 1 }, (_, index): Point => {
+    const angle = from + ((to - from) * index) / segments;
+    return [round(cx + Math.cos(angle) * rx), round(cy + Math.sin(angle) * ry)];
+  });
+}
+
+/** A closed ellipse inscribed in the inset box, as polygon points. */
+function ellipseRing(width: number, height: number): Point[] {
+  return arcPoints(
+    width / 2,
+    height / 2,
+    Math.max(0, width / 2 - 1),
+    Math.max(0, height / 2 - 1),
+    -Math.PI / 2,
+    (Math.PI * 3) / 2,
+    48,
+  ).slice(0, -1);
+}
+
+/** Points along one cubic Bezier segment, excluding its start point. */
+function cubicPoints(
+  p0: Point,
+  p1: Point,
+  p2: Point,
+  p3: Point,
+  segments = 10,
+): Point[] {
+  return Array.from({ length: segments }, (_, index): Point => {
+    const t = (index + 1) / segments;
+    const u = 1 - t;
+    const blend = (axis: 0 | 1) =>
+      u * u * u * p0[axis] +
+      3 * u * u * t * p1[axis] +
+      3 * u * t * t * p2[axis] +
+      t * t * t * p3[axis];
+    return [round(blend(0)), round(blend(1))];
+  });
+}
+
+/** A wavy edge from x0 to x1 around `base`, dipping first like draw.io's tape. */
+function wavePoints(
+  x0: number,
+  x1: number,
+  base: number,
+  amplitude: number,
+): Point[] {
+  const segments = 24;
+  return Array.from({ length: segments + 1 }, (_, index): Point => {
+    const t = index / segments;
+    // Phase follows x rather than travel, so both edges of a tape run parallel.
+    const along = x1 >= x0 ? t : 1 - t;
+    return [
+      round(x0 + (x1 - x0) * t),
+      round(base + amplitude * Math.sin(Math.PI * 2 * along)),
+    ];
+  });
+}
+
+/** draw.io's user (actor) outline: a head resting on rounded shoulders. */
+function personPoints(width: number, height: number): Point[] {
+  const left = 1;
+  const top = 1;
+  const w = Math.max(0, width - 2);
+  const h = Math.max(0, height - 2);
+  const at = (x: number, y: number): Point => [left + x * w, top + y * h];
+  const neck = at(0.5, 0.4);
+  return [
+    at(0, 1),
+    ...cubicPoints(at(0, 1), at(0, 0.6), at(0, 0.4), neck),
+    ...cubicPoints(neck, at(0.25, 0.4), at(0.25, 0), at(0.5, 0)),
+    ...cubicPoints(at(0.5, 0), at(0.75, 0), at(0.75, 0.4), neck),
+    ...cubicPoints(neck, at(1, 0.4), at(1, 0.6), at(1, 1)),
+  ];
+}
+
 /** Height of a cylinder's elliptical rim, capped so tall ones stay round. */
 function cylinderRim(height: number): number {
   return Math.min(height * 0.15, 18);
@@ -473,6 +558,197 @@ export function geoOutline(
         [left, top + corner],
       ]);
     }
+    case "tape": {
+      const amplitude = round(Math.min(height * 0.09, 10));
+      return polygon([
+        ...wavePoints(left, right, top + amplitude, amplitude),
+        ...wavePoints(right, left, bottom - amplitude, amplitude),
+      ]);
+    }
+    case "stored-data": {
+      const depth = round(Math.min(width * 0.15, 20));
+      const ry = Math.max(0, middleY - 1);
+      return polygon([
+        [left + depth, top],
+        // Concave right side, convex left side.
+        ...arcPoints(right, middleY, depth, ry, -Math.PI / 2, -Math.PI * 1.5),
+        ...arcPoints(
+          left + depth,
+          middleY,
+          depth,
+          ry,
+          Math.PI / 2,
+          Math.PI * 1.5,
+        ).slice(0, -1),
+      ]);
+    }
+    case "display": {
+      const point = round(Math.min(width * 0.25, height));
+      return polygon([
+        [left, middleY],
+        [left + point, top],
+        ...arcPoints(
+          right - point,
+          middleY,
+          point,
+          Math.max(0, middleY - 1),
+          -Math.PI / 2,
+          Math.PI / 2,
+        ),
+        [left + point, bottom],
+      ]);
+    }
+    case "loop-limit": {
+      const corner = round(Math.min(short * 0.25, 20));
+      return polygon([
+        [left + corner, top],
+        [right - corner, top],
+        [right, top + corner],
+        [right, bottom],
+        [left, bottom],
+        [left, top + corner],
+      ]);
+    }
+    case "collate":
+      return polygon([
+        [left, top],
+        [right, top],
+        [middleX, middleY],
+        [right, bottom],
+        [left, bottom],
+        [middleX, middleY],
+      ]);
+    case "sort":
+      return polygon(
+        [
+          [middleX, top],
+          [right, middleY],
+          [middleX, bottom],
+          [left, middleY],
+        ],
+        [
+          [
+            [left, middleY],
+            [right, middleY],
+          ],
+        ],
+      );
+    case "summing-junction": {
+      const dx = round((middleX - 1) * Math.SQRT1_2);
+      const dy = round((middleY - 1) * Math.SQRT1_2);
+      return polygon(ellipseRing(width, height), [
+        [
+          [middleX - dx, middleY - dy],
+          [middleX + dx, middleY + dy],
+        ],
+        [
+          [middleX + dx, middleY - dy],
+          [middleX - dx, middleY + dy],
+        ],
+      ]);
+    }
+    case "or":
+      return polygon(ellipseRing(width, height), [
+        [
+          [middleX, top],
+          [middleX, bottom],
+        ],
+        [
+          [left, middleY],
+          [right, middleY],
+        ],
+      ]);
+    case "multi-document": {
+      // Three stacked pages: the filled union, with the hidden pages' top and
+      // right edges drawn as interior strokes over the front page.
+      const offset = round(Math.min(width * 0.06, height * 0.1, 8));
+      const wave = Math.min((height - offset * 2) * 0.1, 12);
+      const base = bottom - wave;
+      const front = Array.from({ length: 25 }, (_, index): Point => {
+        const t = index / 24;
+        return [
+          round(right - offset * 2 - (right - offset * 2 - left) * t),
+          round(base - wave * Math.sin(Math.PI * 2 * t)),
+        ];
+      });
+      return polygon(
+        [
+          [left, top + offset * 2],
+          [left + offset, top + offset * 2],
+          [left + offset, top + offset],
+          [left + offset * 2, top + offset],
+          [left + offset * 2, top],
+          [right, top],
+          [right, round(base - offset * 2)],
+          [right - offset, round(base - offset * 2)],
+          [right - offset, round(base - offset)],
+          [right - offset * 2, round(base - offset)],
+          ...front,
+        ],
+        [
+          [
+            [left + offset, top + offset * 2],
+            [right - offset * 2, top + offset * 2],
+            [right - offset * 2, round(base - offset)],
+          ],
+          [
+            [left + offset * 2, top + offset],
+            [right - offset, top + offset],
+            [right - offset, round(base - offset * 2)],
+          ],
+        ],
+      );
+    }
+    case "direct-data": {
+      // A cylinder on its side: the right end shows its full face.
+      const rx = round(Math.min(width * 0.15, height * 0.4));
+      const ry = Math.max(0, middleY - 1);
+      return polygon(
+        [
+          [left + rx, top],
+          ...arcPoints(right - rx, middleY, rx, ry, -Math.PI / 2, Math.PI / 2),
+          ...arcPoints(
+            left + rx,
+            middleY,
+            rx,
+            ry,
+            Math.PI / 2,
+            Math.PI * 1.5,
+          ).slice(0, -1),
+        ],
+        [arcPoints(right - rx, middleY, rx, ry, -Math.PI / 2, -Math.PI * 1.5)],
+      );
+    }
+    case "sequential-data":
+      return polygon(ellipseRing(width, height), [
+        [
+          [middleX, bottom],
+          [right, bottom],
+        ],
+      ]);
+    case "double-arrow": {
+      const head = round(Math.min(width * 0.3, height, (width - 2) / 2));
+      return polygon([
+        [left, middleY],
+        [left + head, top],
+        [left + head, height * 0.3],
+        [right - head, height * 0.3],
+        [right - head, top],
+        [right, middleY],
+        [right - head, bottom],
+        [right - head, height * 0.7],
+        [left + head, height * 0.7],
+        [left + head, bottom],
+      ]);
+    }
+    case "right-triangle":
+      return polygon([
+        [left, top],
+        [right, bottom],
+        [left, bottom],
+      ]);
+    case "person":
+      return polygon(personPoints(width, height));
     default:
       return rectOutline(width, height);
   }

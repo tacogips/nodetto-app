@@ -96,6 +96,8 @@ export interface DrawioShape {
   readonly geo: GeoKind;
   /** draw.io's default direction for this shape, when it is directional. */
   readonly direction?: DrawioDirection;
+  /** The nodetto kind is the closest match rather than the same symbol. */
+  readonly approximate?: boolean;
 }
 
 /**
@@ -119,6 +121,21 @@ export const DRAWIO_SHAPES: Readonly<Record<string, DrawioShape>> = {
   datastore: { geo: "cylinder" },
   cloud: { geo: "cloud" },
   document: { geo: "document" },
+  tape: { geo: "tape" },
+  dataStorage: { geo: "stored-data" },
+  display: { geo: "display" },
+  loopLimit: { geo: "loop-limit" },
+  collate: { geo: "collate" },
+  sortShape: { geo: "sort" },
+  sumEllipse: { geo: "summing-junction" },
+  orEllipse: { geo: "or" },
+  tapeData: { geo: "sequential-data" },
+  doubleArrow: { geo: "double-arrow", direction: "east" },
+  actor: { geo: "person" },
+  umlActor: { geo: "person", approximate: true },
+  mermaidPerson: { geo: "person" },
+  wedgeCallout: { geo: "callout" },
+  ext: { geo: "rect", approximate: true },
   note: { geo: "note" },
   note2: { geo: "note" },
   cube: { geo: "cube" },
@@ -128,6 +145,8 @@ export const DRAWIO_SHAPES: Readonly<Record<string, DrawioShape>> = {
   internalStorage: { geo: "internal-storage" },
   manualInput: { geo: "manual-input" },
   delay: { geo: "delay" },
+  // draw.io's "And" gate is drawn with the same D outline as a delay.
+  or: { geo: "delay" },
   offPageConnector: { geo: "off-page", direction: "south" },
   step: { geo: "chevron", direction: "east" },
   singleArrow: { geo: "arrow", direction: "east" },
@@ -137,11 +156,37 @@ export const DRAWIO_SHAPES: Readonly<Record<string, DrawioShape>> = {
   "mxgraph.basic.pentagon": { geo: "pentagon" },
   "mxgraph.basic.octagon2": { geo: "octagon" },
   "mxgraph.basic.octagon": { geo: "octagon" },
+  "mxgraph.basic.orthogonal_triangle": { geo: "right-triangle" },
+  "mxgraph.basic.4_point_star_2": { geo: "star", approximate: true },
+  "mxgraph.basic.6_point_star": { geo: "star", approximate: true },
+  "mxgraph.basic.8_point_star": { geo: "star", approximate: true },
+  "mxgraph.arrows2.arrow": { geo: "arrow", direction: "east" },
   "mxgraph.flowchart.process": { geo: "rect" },
   "mxgraph.flowchart.decision": { geo: "diamond" },
   "mxgraph.flowchart.data": { geo: "parallelogram" },
   "mxgraph.flowchart.database": { geo: "cylinder" },
   "mxgraph.flowchart.document": { geo: "document" },
+  "mxgraph.flowchart.document2": { geo: "document" },
+  "mxgraph.flowchart.multi-document": { geo: "multi-document" },
+  "mxgraph.flowchart.stored_data": { geo: "stored-data" },
+  "mxgraph.flowchart.display": { geo: "display" },
+  "mxgraph.flowchart.loop_limit": { geo: "loop-limit" },
+  "mxgraph.flowchart.collate": { geo: "collate" },
+  "mxgraph.flowchart.sort": { geo: "sort" },
+  "mxgraph.flowchart.summing_junction": { geo: "summing-junction" },
+  "mxgraph.flowchart.or_2": { geo: "or" },
+  "mxgraph.flowchart.direct_data": { geo: "direct-data" },
+  "mxgraph.flowchart.sequential_data": { geo: "sequential-data" },
+  "mxgraph.flowchart.paper_tape": { geo: "tape" },
+  "mxgraph.flowchart.extract_or_measurement": {
+    geo: "triangle",
+    direction: "north",
+  },
+  "mxgraph.flowchart.merge_or_storage": { geo: "triangle", direction: "south" },
+  "mxgraph.flowchart.manual_operation": {
+    geo: "trapezoid",
+    direction: "south",
+  },
   "mxgraph.flowchart.delay": { geo: "delay" },
   "mxgraph.flowchart.manual_input": { geo: "manual-input" },
   "mxgraph.flowchart.predefined_process": { geo: "predefined-process" },

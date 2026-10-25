@@ -401,6 +401,50 @@ function geoStyle(
       return shape("offPageConnector", [["size", 0.4]]);
     case "card":
       return shape("card", [["size", round(Math.min(short * 0.25, 24))]]);
+    case "tape":
+      // draw.io's quadratic wave peaks at 0.45 of its `size` band.
+      return shape("tape", [
+        ["size", round(Math.min(box.height * 0.09, 10) / 0.45 / box.height)],
+      ]);
+    case "stored-data":
+      return shape("dataStorage", [
+        ["fixedSize", 1],
+        ["size", round(Math.min(box.width * 0.15, 20))],
+      ]);
+    case "display":
+      return shape("display", [
+        ["size", round(Math.min(box.width * 0.25, box.height) / box.width)],
+      ]);
+    case "loop-limit":
+      return shape("loopLimit", [["size", round(Math.min(short * 0.25, 20))]]);
+    case "collate":
+      return shape("collate");
+    case "sort":
+      return shape("sortShape", [["perimeter", "rhombusPerimeter"]]);
+    case "summing-junction":
+      return shape("sumEllipse", [["perimeter", "ellipsePerimeter"]]);
+    case "or":
+      return shape("orEllipse", [["perimeter", "ellipsePerimeter"]]);
+    case "multi-document":
+      return shape("mxgraph.flowchart.multi-document", [["boundedLbl", 1]]);
+    case "direct-data":
+      return shape("mxgraph.flowchart.direct_data");
+    case "sequential-data":
+      return shape("tapeData", [["perimeter", "ellipsePerimeter"]]);
+    case "double-arrow":
+      return shape("doubleArrow", [
+        ["arrowWidth", 0.4],
+        [
+          "arrowSize",
+          round(
+            Math.min(box.width * 0.3, box.height, box.width / 2) / box.width,
+          ),
+        ],
+      ]);
+    case "right-triangle":
+      return shape("mxgraph.basic.orthogonal_triangle");
+    case "person":
+      return shape("actor");
   }
   return { names: [], entries: [["rounded", 0]] };
 }

@@ -125,7 +125,20 @@ describe("draw.io-style shape library", () => {
   });
 
   test("curved kinds touch all four inset edges", () => {
-    for (const kind of ["cloud", "document", "delay"]) {
+    for (const kind of [
+      "cloud",
+      "document",
+      "delay",
+      "tape",
+      "stored-data",
+      "display",
+      "summing-junction",
+      "or",
+      "multi-document",
+      "direct-data",
+      "sequential-data",
+      "person",
+    ]) {
       const outline = geoOutline(kind, WIDTH, HEIGHT);
       if (outline.kind !== "polygon")
         throw new Error(`${kind} is not a polygon`);
@@ -145,6 +158,12 @@ describe("draw.io-style shape library", () => {
       "cube",
       "predefined-process",
       "internal-storage",
+      "sort",
+      "summing-junction",
+      "or",
+      "multi-document",
+      "direct-data",
+      "sequential-data",
     ]) {
       const outline = geoOutline(kind, WIDTH, HEIGHT);
       expect(outline).toMatchObject({ kind: "polygon" });
@@ -152,6 +171,28 @@ describe("draw.io-style shape library", () => {
     }
     expect(geoOutline("predefined-process", WIDTH, HEIGHT)).toMatchObject({
       detail: "M 15 1 L 15 99 M 145 1 L 145 99",
+    });
+  });
+
+  test("flowchart symbols with straight edges are pinned", () => {
+    expect(geoOutline("loop-limit", WIDTH, HEIGHT)).toEqual({
+      kind: "polygon",
+      points: "21,1 139,1 159,21 159,99 1,99 1,21",
+    });
+    expect(geoOutline("collate", WIDTH, HEIGHT)).toEqual({
+      kind: "polygon",
+      points: "1,1 159,1 80,50 159,99 1,99 80,50",
+    });
+    expect(geoOutline("double-arrow", WIDTH, HEIGHT)).toEqual({
+      kind: "polygon",
+      points: "1,50 49,1 49,30 111,30 111,1 159,50 111,99 111,70 49,70 49,99",
+    });
+    expect(geoOutline("right-triangle", WIDTH, HEIGHT)).toEqual({
+      kind: "polygon",
+      points: "1,1 159,99 1,99",
+    });
+    expect(geoOutline("or", WIDTH, HEIGHT)).toMatchObject({
+      detail: "M 80 1 L 80 99 M 1 50 L 159 50",
     });
   });
 

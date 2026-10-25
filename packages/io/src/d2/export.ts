@@ -211,7 +211,11 @@ function shapeKind(element: Element): string | null {
           callout: "callout",
           chevron: "step",
           document: "document",
+          "multi-document": "document",
           note: "page",
+          "stored-data": "stored_data",
+          "direct-data": "queue",
+          person: "person",
         } as Record<string, string>
       )[kind] ?? "rectangle"
     );

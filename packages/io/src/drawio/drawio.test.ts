@@ -259,6 +259,224 @@ describe("importDrawio", () => {
   });
 });
 
+/** Geo kinds on one page, in cell order, with any flip or turn noted. */
+function pageShapes(
+  document: { pages: readonly { id: string; name: string }[] } & {
+    elements: readonly Element[];
+  },
+  name: string,
+): string[] {
+  const page = document.pages.find((candidate) => candidate.name === name);
+  return document.elements
+    .filter((element) => element.page === page?.id)
+    .filter((element) => element.type === "shape.geo")
+    .map((element) => {
+      const { geo } = element.semantic as { geo: string };
+      const visual = element.visual;
+      return `${geo}${visual.flipX ? "+flipX" : ""}${visual.flipY ? "+flipY" : ""}${visual.rotation ? `@${visual.rotation}` : ""}`;
+    });
+}
+
+// Built in app.diagrams.net through its UI: page 1 holds the General
+// palette, page 2 the Flowchart palette, page 3 Advanced, page 4 Basic, and
+// page 5 a flowchart connected with Alt+click, labelled and recoloured.
+describe("a compressed file saved by app.diagrams.net", async () => {
+  const text = await Bun.file(
+    new URL(
+      "../__fixtures__/drawio/diagrams-net-palettes.drawio",
+      import.meta.url,
+    ),
+  ).text();
+  const { document, warnings } = importDrawio(text);
+
+  test("every page imports as a valid document", () => {
+    expect(validateDocument(document)).toEqual([]);
+    expect(document.pages.map((page) => page.name)).toEqual([
+      "Page-1",
+      "Page-2",
+      "Page-3",
+      "Page-4",
+      "Page-5",
+    ]);
+  });
+
+  test("the Flowchart palette maps symbol by symbol", () => {
+    expect(pageShapes(document, "Page-2")).toEqual([
+      "rect", // Annotation: no nodetto bracket
+      "card",
+      "collate",
+      "parallelogram", // Data
+      "cylinder", // Database
+      "diamond", // Decision
+      "delay",
+      "direct-data",
+      "display",
+      "document",
+      "triangle", // Extract or measurement
+      "internal-storage",
+      "loop-limit",
+      "manual-input",
+      "trapezoid+flipY", // Manual operation
+      "triangle+flipY", // Merge or storage
+      "multi-document",
+      "off-page",
+      "ellipse", // On-page reference
+      "or",
+      "tape",
+      "rect", // Parallel mode
+      "predefined-process",
+      "hexagon", // Preparation
+      "rect", // Process
+      "sequential-data",
+      "sort",
+      "ellipse", // Start
+      "stored-data",
+      "summing-junction",
+      "rect", // Terminator, drawn as a stadium
+      "arrow", // Transfer
+    ]);
+    const page = document.pages.find(
+      (candidate) => candidate.name === "Page-2",
+    );
+    expect(
+      warnings
+        .filter((warning) => warning.page === page?.name)
+        .map((warning) => warning.message),
+    ).toEqual([
+      'Shape "mxgraph.flowchart.annotation_1" has no nodetto equivalent and was imported as a rectangle.',
+      'Shape "mxgraph.flowchart.parallel_mode" has no nodetto equivalent and was imported as a rectangle.',
+    ]);
+  });
+
+  test("General and Advanced shapes keep their kind and direction", () => {
+    expect(pageShapes(document, "Page-1")).toEqual([
+      "rect",
+      "rect", // Rounded rectangle
+      "ellipse",
+      "rect", // Square
+      "ellipse", // Circle
+      "predefined-process", // Process
+      "diamond",
+      "parallelogram",
+      "hexagon",
+      "triangle@90", // draw.io's triangle points east
+      "cylinder",
+      "cloud",
+      "document",
+      "internal-storage",
+      "cube",
+      "chevron", // Step
+      "trapezoid",
+      "tape",
+      "note",
+      "card",
+      "callout",
+      "callout", // Wedge callout
+      "person", // UML actor, approximated
+      "rect", // Or gate
+      "delay", // And gate
+      "stored-data", // Data storage
+    ]);
+    expect(pageShapes(document, "Page-3")).toEqual([
+      "rect", // Double rectangle, approximated
+      "ellipse",
+      "ellipse",
+      "sequential-data", // Tape data
+      "manual-input",
+      "loop-limit",
+      "off-page",
+      "delay",
+      "display",
+      "arrow+flipX",
+      "arrow",
+      "arrow@-90",
+      "arrow@90",
+      "double-arrow",
+      "double-arrow@90",
+      "person", // User
+      "cross",
+      "cylinder", // Data store
+      "or",
+      "summing-junction", // Sum
+      "sort",
+      "collate",
+      "rect", // Switch
+      "rect", // Corner
+    ]);
+    expect(warnings.map((warning) => warning.message)).toContain(
+      'Shape "umlActor" was approximated as a person shape.',
+    );
+  });
+
+  test("an Alt+click flowchart keeps labels, paint and bound connectors", () => {
+    const page = document.pages.find(
+      (candidate) => candidate.name === "Page-5",
+    );
+    const onPage = document.elements.filter(
+      (element) => element.page === page?.id,
+    );
+    const shapes = onPage.filter((element) => element.type === "shape.geo");
+    expect(
+      shapes.map((shape) => (shape.semantic as { label: string }).label),
+    ).toEqual([
+      "Begin",
+      "Load order",
+      "In stock?",
+      "Invoice",
+      "Orders DB",
+      "Done",
+    ]);
+    const [begin, load, , , orders, done] = shapes;
+    expect(begin?.visual.style).toMatchObject({
+      fill: "#d5e8d4",
+      stroke: "#82b366",
+    });
+    expect(load?.visual.style).toMatchObject({
+      fill: "#dae8fc",
+      color: "#1a3d6d",
+      fontWeight: 700,
+    });
+    expect(orders?.visual.style?.fillGradient?.stops).toEqual([
+      { offset: 0, color: "#f8cecc" },
+      { offset: 1, color: "#ea6b66" },
+    ]);
+    expect(done?.visual.style).toMatchObject({
+      dash: "dashed",
+      cornerRadius: 30,
+    });
+    const edges = onPage.filter((element) => element.type === "edge.generic");
+    expect(
+      edges.map((edge) => {
+        const semantic = edge.semantic as { from: string; to: string };
+        return [semantic.from, semantic.to];
+      }),
+    ).toEqual(
+      shapes
+        .slice(0, -1)
+        .map((shape, index) => [shape.id, shapes[index + 1]?.id]),
+    );
+  });
+});
+
+describe("draw.io directions", () => {
+  test("direction turns the drawn stencil rather than naming where it points", () => {
+    const model = `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>
+      <mxCell id="down" style="shape=offPageConnector;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="60" height="60" as="geometry"/></mxCell>
+      <mxCell id="west" style="shape=offPageConnector;direction=south;" vertex="1" parent="1"><mxGeometry x="100" y="0" width="60" height="60" as="geometry"/></mxCell>
+      <mxCell id="manual" style="shape=mxgraph.flowchart.manual_operation;" vertex="1" parent="1"><mxGeometry x="200" y="0" width="100" height="60" as="geometry"/></mxCell>
+    </root></mxGraphModel>`;
+    const { document } = importDrawio(model);
+    expect(
+      byId(document.elements, "drawio-down").visual.rotation,
+    ).toBeUndefined();
+    expect(byId(document.elements, "drawio-west").visual.rotation).toBe(90);
+    expect(byId(document.elements, "drawio-manual")).toMatchObject({
+      semantic: { geo: "trapezoid" },
+      visual: { flipY: true },
+    });
+  });
+});
+
 describe("exportDrawio", () => {
   test("every geo kind, flip and arrowhead survives a round trip", () => {
     const kinds = GEO_KINDS.map(
@@ -363,6 +581,61 @@ describe("exportDrawio", () => {
       lineJumps: "gap",
       cornerRadius: 10,
     });
+  });
+
+  test("draw.io's own shape names bring the flowchart kinds back", () => {
+    // Without the nodetto key, only draw.io's native shape names remain.
+    const native = [
+      "tape",
+      "stored-data",
+      "display",
+      "loop-limit",
+      "collate",
+      "sort",
+      "summing-junction",
+      "or",
+      "multi-document",
+      "direct-data",
+      "sequential-data",
+      "double-arrow",
+      "right-triangle",
+      "person",
+      "document",
+      "delay",
+      "card",
+      "off-page",
+    ] as const;
+    const shapes = native.map(
+      (geo, index): Element => ({
+        id: `native-${geo}`,
+        page: "p",
+        type: "shape.geo",
+        index: `a${String(index).padStart(3, "0")}`,
+        semantic: { geo, label: geo },
+        visual: {
+          x: index * 200,
+          y: 0,
+          width: 160,
+          height: 100,
+          ...(index % 2 === 1 ? { flipX: true } : {}),
+        },
+      }),
+    );
+    const { xml } = exportDrawio({
+      schemaVersion: 1,
+      id: "doc",
+      title: "Native",
+      pages: [{ id: "p", name: "Native", kind: "freeform" as const }],
+      elements: shapes,
+    });
+    const report = importDrawio(xml.replace(/nodettoGeo=[^;"]*;/g, ""));
+    expect(report.warnings).toEqual([]);
+    for (const shape of shapes) {
+      const imported = byId(report.document.elements, `drawio-${shape.id}`);
+      expect(imported.semantic).toEqual(shape.semantic);
+      expect(imported.visual.flipX === true).toBe(shape.visual.flipX === true);
+      expect(imported.visual.rotation).toBeUndefined();
+    }
   });
 
   test("ERD tables and UML classes become stacked lists; the rest is reported", async () => {
