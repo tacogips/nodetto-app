@@ -188,9 +188,9 @@ export function importNetlist(
       const an = a.nodes[0];
       const bn = b.nodes[0];
       return (
-        (partOrder.get(an.reference) ?? 0) -
-          (partOrder.get(bn.reference) ?? 0) ||
-        an.pin - bn.pin ||
+        (an ? (partOrder.get(an.reference) ?? 0) : 0) -
+          (bn ? (partOrder.get(bn.reference) ?? 0) : 0) ||
+        (an?.pin ?? 0) - (bn?.pin ?? 0) ||
         a.order - b.order
       );
     });

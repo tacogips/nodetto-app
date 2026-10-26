@@ -247,10 +247,17 @@ export function mapKicadSymbol(input: KicadSymbolInput): KicadSymbolMapping {
       .filter((pin) => pin.name)
       .map((pin) => [pin.name as string, pin.number]),
   );
-  if (type === "breadboard.button" && name.startsWith("SW_Push") && count === 2)
+  const [firstPin, secondPin] = pins;
+  if (
+    type === "breadboard.button" &&
+    name.startsWith("SW_Push") &&
+    count === 2 &&
+    firstPin !== undefined &&
+    secondPin !== undefined
+  )
     pinMap = new Map([
-      [pins[0], 1],
-      [pins[1], 3],
+      [firstPin, 1],
+      [secondPin, 3],
     ]);
   if (type === "breadboard.led" || type === "breadboard.diode") {
     const a = named.get("A");

@@ -16,15 +16,16 @@ export function parseComponentValue(text: string): number | undefined {
   }
   const rkm = numeric.match(/^(\d+)([RKkMmGPpNnUu\u00b5])([0-9]*)$/);
   if (rkm) {
-    const prefix = rkm[2] === "R" ? "" : rkm[2];
-    const number = Number(`${rkm[1]}.${rkm[3]}`);
+    const [, whole = "", unit = "", fraction = ""] = rkm;
+    const prefix = unit === "R" ? "" : unit;
+    const number = Number(`${whole}.${fraction}`);
     return scale(number, prefix);
   }
   const match = numeric.match(
     /^((?:\d+(?:\.\d*)?)|(?:\.\d+))([pnu\u00b5umkKMG]?)$/,
   );
   if (!match) return undefined;
-  return scale(Number(match[1]), match[2]);
+  return scale(Number(match[1]), match[2] ?? "");
 }
 
 function scale(value: number, prefix: string): number | undefined {
@@ -112,7 +113,7 @@ export function compareReferences(a: string, b: string): number {
       const delta = Number(left[2]) - Number(right[2]);
       if (delta !== 0) return delta;
     }
-    const suffix = left[3].localeCompare(right[3]);
+    const suffix = (left[3] ?? "").localeCompare(right[3] ?? "");
     if (suffix !== 0) return suffix;
   }
   return a.localeCompare(b);

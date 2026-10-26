@@ -341,12 +341,13 @@ export function importSchematic(
     ...anchors.map((a) => a.point),
   ];
   const parent = points.map((_, i) => i);
+  const up = (i: number): number => parent[i] ?? i;
   const find = (i: number): number => {
     let p = i;
-    while (parent[p] !== p) p = parent[p];
+    while (up(p) !== p) p = up(p);
     let current = i;
-    while (parent[current] !== current) {
-      const next = parent[current];
+    while (up(current) !== current) {
+      const next = up(current);
       parent[current] = p;
       current = next;
     }
@@ -361,13 +362,14 @@ export function importSchematic(
   points.forEach((p, i) =>
     pointIndex.set(key(p), [...(pointIndex.get(key(p)) ?? []), i]),
   );
-  for (const indices of pointIndex.values())
-    for (let i = 1; i < indices.length; i += 1) join(indices[0], indices[i]);
+  const joinAll = ([first, ...rest]: readonly number[]) => {
+    if (first !== undefined) for (const other of rest) join(first, other);
+  };
+  for (const indices of pointIndex.values()) joinAll(indices);
   const segmentPointIndices: number[][] = segments.map(([a, b]) =>
     points.map((p, i) => (onSegment(p, a, b) ? i : -1)).filter((i) => i >= 0),
   );
-  for (const ids of segmentPointIndices)
-    for (let i = 1; i < ids.length; i += 1) join(ids[0], ids[i]);
+  for (const ids of segmentPointIndices) joinAll(ids);
   const labelRoots = new Map<string, number>();
   const powerRoots = new Map<string, string>();
   for (const anchor of anchors) {
@@ -416,12 +418,15 @@ export function importSchematic(
           a.pin - b.pin,
       ),
     }))
-    .sort(
-      (a, b) =>
-        (order.get(a.nodes[0].reference) ?? 0) -
-          (order.get(b.nodes[0].reference) ?? 0) ||
-        a.nodes[0].pin - b.nodes[0].pin,
-    );
+    .sort((a, b) => {
+      const an = a.nodes[0];
+      const bn = b.nodes[0];
+      return (
+        (an ? (order.get(an.reference) ?? 0) : 0) -
+          (bn ? (order.get(bn.reference) ?? 0) : 0) ||
+        (an?.pin ?? 0) - (bn?.pin ?? 0)
+      );
+    });
   const usedNames = new Set<string>();
   const nets = netData.map(({ rootIndex, nodes }) => {
     const power = powerRoots.get(String(find(rootIndex)));
@@ -435,7 +440,11 @@ export function importSchematic(
       )
       .map((a) => a.label as string)
       .sort();
-    const raw = power || labels[0] || `N_${nodes[0].reference}_${nodes[0].pin}`;
+    const first = nodes[0];
+    const raw =
+      power ||
+      labels[0] ||
+      (first ? `N_${first.reference}_${first.pin}` : `N_${rootIndex}`);
     let name = raw;
     let suffix = 2;
     while (usedNames.has(name)) name = `${raw}_${suffix++}`;

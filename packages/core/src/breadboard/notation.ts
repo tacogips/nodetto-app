@@ -26,7 +26,7 @@ export interface BreadboardNotation {
   readonly labels: readonly BreadboardPrimitive[];
 }
 
-export const BREADBOARD_COLORS: Readonly<Record<string, string>> = {
+const breadboardColors = {
   board: "#d9cba5",
   boardEdge: "#a38d5d",
   hole: "#4a4335",
@@ -60,7 +60,18 @@ export const BREADBOARD_COLORS: Readonly<Record<string, string>> = {
   orange: "#dd873e",
   white: "#f5f3ec",
   gray: "#858c8d",
-};
+} satisfies Record<string, string>;
+
+export const BREADBOARD_COLORS: Readonly<typeof breadboardColors> =
+  breadboardColors;
+
+type BreadboardColorName = keyof typeof breadboardColors;
+
+function namedColor(name: string): string | undefined {
+  return Object.hasOwn(BREADBOARD_COLORS, name)
+    ? BREADBOARD_COLORS[name as BreadboardColorName]
+    : undefined;
+}
 
 function rect(
   role: string,
@@ -280,7 +291,7 @@ function partNotation(element: Element, box: Box): BreadboardPrimitive[] {
             centerY - 5,
             2.2,
             10,
-            BREADBOARD_COLORS[color] ?? color,
+            namedColor(color) ?? color,
             "none",
             0,
           ),
@@ -305,7 +316,7 @@ function partNotation(element: Element, box: Box): BreadboardPrimitive[] {
           centerX,
           centerY,
           Math.max(6, Math.min(width, height) * 0.32),
-          BREADBOARD_COLORS[led.color] ?? BREADBOARD_COLORS.led,
+          namedColor(led.color) ?? BREADBOARD_COLORS.led,
           "#853b38",
           1,
         ),
@@ -604,7 +615,7 @@ function wireNotation(
   const d = points
     .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
     .join(" ");
-  const color = BREADBOARD_COLORS[semantic.color] ?? BREADBOARD_COLORS.red;
+  const color = namedColor(semantic.color) ?? BREADBOARD_COLORS.red;
   const opacity = inert ? 0.5 : undefined;
   return [
     {

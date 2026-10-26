@@ -43,7 +43,7 @@ function tokenize(
   let line = 1;
   let column = 1;
   const advance = () => {
-    const char = text[i];
+    const char = text.charAt(i);
     i += 1;
     if (char === "\n") {
       line += 1;
@@ -52,7 +52,7 @@ function tokenize(
     return char;
   };
   while (i < text.length) {
-    const char = text[i];
+    const char = text.charAt(i);
     if (/\s/.test(char)) {
       advance();
       continue;
@@ -102,7 +102,8 @@ function tokenize(
       continue;
     }
     let value = "";
-    while (i < text.length && !/[\s()"]/.test(text[i])) value += advance();
+    while (i < text.length && !/[\s()"]/.test(text.charAt(i)))
+      value += advance();
     if (value)
       tokens.push({ kind: "atom", text: value, quoted: false, ...start });
   }
@@ -180,12 +181,13 @@ export function readSexpr(text: string): {
       if (parent && !parent.drop) parent.items.push(atom);
     }
   }
-  if (stack.length > 0) {
+  const outermost = stack[0];
+  if (outermost) {
     diagnostics.push(
       diagnostic(
         "sexpr.unclosedList",
         "Open lists were closed at end of input.",
-        stack[0].token,
+        outermost.token,
       ),
     );
     while (stack.length > 0) {
