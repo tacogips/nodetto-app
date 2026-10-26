@@ -27,7 +27,7 @@ Convert and check
   nodetto-cli lint <doc|bpmn>     Lint BPMN and breadboard pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
-  nodetto-cli breadboard ...      BOM, netlist and KiCad import
+  nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
@@ -360,20 +360,31 @@ Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
        nodetto-cli breadboard netlist <document.jsonl> --format kicad|spice
                                       [--page <short-id|id|name>]
                                       [--output <file> | --check <file>] [--strict]
+       nodetto-cli breadboard gerber <document.jsonl> --output <file.zip>
+                                     [--page <short-id|id|name>] [--board <id>] [--strict]
        nodetto-cli breadboard import <file.kicad_sch|file.net> [--output <file.jsonl>] [--strict]
 
-Export a breadboard bill of materials or netlist, or import a KiCad 6+
-schematic/netlist into a new breadboard document.
+Export a breadboard bill of materials or netlist, export a board as PCB
+fabrication files, or import a KiCad 6+ schematic/netlist into a new
+breadboard document.
+
+gerber writes a ZIP of Gerber (RS-274X, X2) and Excellon drill files that
+board houses such as JLCPCB, PCBWay and Elecrow accept as an upload. The PCB
+keeps the breadboard layout: used holes become plated holes, strips become
+bottom-layer traces, wires become top-layer traces where their path is clear
+and jumper wires drawn on the silkscreen otherwise.
 
   --page    Select one breadboard page by short ID, full ID or exact name.
+  --board   Select a board by element id or unique id prefix (gerber only).
   --format  Required for netlist: kicad or spice.
-  --output  Write generated output to a file.
+  --output  Write generated output to a file; required for gerber.
   --check   Compare generated output with a file; exit 1 when out of date.
   --strict  Exit 3 when warnings are reported.
 
 Examples:
   nodetto-cli breadboard bom prototype.jsonl --output bom.csv
   nodetto-cli breadboard netlist prototype.jsonl --format kicad
+  nodetto-cli breadboard gerber prototype.jsonl --output prototype-pcb.zip
   nodetto-cli breadboard import circuit.net --output staged.jsonl
 
 ${EXIT_CODES}`,

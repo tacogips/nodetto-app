@@ -25,6 +25,11 @@ describe("breadboard export options", () => {
         label: "SPICE netlist (.cir)",
         extension: "cir",
       },
+      {
+        kind: "gerber",
+        label: "PCB Gerber and drill (.zip)",
+        extension: "zip",
+      },
     ]);
   });
 });

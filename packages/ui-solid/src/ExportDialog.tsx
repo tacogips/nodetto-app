@@ -140,7 +140,8 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     drawio: "An editable .drawio file for draw.io (diagrams.net).",
     sql: "Database schema SQL in your preferred dialect.",
     bpmn: "BPMN 2.0 XML for other process modeling tools.",
-    breadboard: "BOM and netlists for other circuit tools.",
+    breadboard:
+      "BOM and netlists for other circuit tools, and PCB files for board houses such as JLCPCB.",
     html: "A website ZIP containing artboard HTML, CSS and assets.",
     code: "Design details, web code and native code for the selected element.",
   };

@@ -1,5 +1,7 @@
 import {
   computeBreadboardConnectivity,
+  encodeBreadboardPcbZip,
+  exportBreadboardPcb,
   toBreadboardNetlist,
   layoutBreadboardImport,
 } from "@nodetto/core";
@@ -241,6 +243,60 @@ function importCommand(io: CommandIo, args: readonly string[]): CommandResult {
   return ok(jsonl, diagnostics);
 }
 
+function gerberCommand(io: CommandIo, args: readonly string[]): CommandResult {
+  const parsed = parseArgs(
+    args,
+    new Set(["--page", "--board", "--output"]),
+    new Set(["--strict"]),
+  );
+  if (typeof parsed === "string")
+    return fail(`${parsed}\n\n${helpFor("breadboard")}`);
+  if (parsed.positional.length !== 1)
+    return fail(
+      `breadboard gerber expects exactly one document path.\n\n${helpFor("breadboard")}`,
+    );
+  const outputPath = parsed.options.get("--output");
+  if (outputPath === undefined)
+    return fail(
+      `breadboard gerber writes a ZIP archive and requires --output <file.zip>.\n\n${helpFor("breadboard")}`,
+    );
+  if (!io.writeBytes) return fail("This host cannot write binary files.");
+
+  const [path = ""] = parsed.positional;
+  const document = readDocument(io, path);
+  if (typeof document === "string") return fail(document);
+  const selected = selectBreadboardPage(document, parsed.options.get("--page"));
+  if (typeof selected === "string") return fail(selected);
+  const board = parsed.options.get("--board");
+  const pcb = exportBreadboardPcb(document, selected.id, {
+    name: (outputPath.split(/[\\/]/).at(-1) ?? "").replace(/\.zip$/i, ""),
+    ...(board === undefined ? {} : { board }),
+  });
+  if (typeof pcb === "string")
+    return fail(pcb.replace("choose one:", "choose one with --board:"));
+  const warnings = pcb.warnings
+    .map((warning) => `warning: ${warning}\n`)
+    .join("");
+  if (parsed.flags.has("--strict") && pcb.warnings.length)
+    return {
+      exitCode: EXIT_WARNINGS,
+      stdout: "",
+      stderr: `${warnings}${pcb.warnings.length} PCB export warning(s) with --strict.\n`,
+    };
+  try {
+    io.writeBytes(outputPath, encodeBreadboardPcbZip(pcb));
+  } catch (cause) {
+    return fail(
+      `${warnings}Cannot write ${outputPath}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  const notes = pcb.notes.map((note) => `${note}\n`).join("");
+  return ok(
+    "",
+    `${warnings}${notes}Wrote Gerber and drill files to ${outputPath}.\n`,
+  );
+}
+
 export function breadboardCommand(
   io: CommandIo,
   args: readonly string[],
@@ -248,8 +304,9 @@ export function breadboardCommand(
   const [subcommand, ...rest] = args;
   if (subcommand === "bom") return exportCommand(io, "bom", rest);
   if (subcommand === "netlist") return exportCommand(io, "netlist", rest);
+  if (subcommand === "gerber") return gerberCommand(io, rest);
   if (subcommand === "import") return importCommand(io, rest);
   return fail(
-    `breadboard expects the bom, netlist or import subcommand.\n\n${helpFor("breadboard")}`,
+    `breadboard expects the bom, netlist, gerber or import subcommand.\n\n${helpFor("breadboard")}`,
   );
 }

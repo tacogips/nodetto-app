@@ -267,3 +267,75 @@ test("breadboard import reads fixtures, stages a valid document and handles diag
   expect(strict.exitCode).toBe(EXIT_WARNINGS);
   expect(strict.stdout).toBe("");
 });
+
+test("breadboard gerber writes a ZIP of fabrication files", () => {
+  const example = readFileSync(
+    join(import.meta.dir, "../../../examples/breadboard/led-button.jsonl"),
+    "utf8",
+  );
+  const written = new Map<string, Uint8Array>();
+  const io = {
+    ...memoryIo({ "doc.jsonl": example }),
+    writeBytes(path: string, bytes: Uint8Array) {
+      written.set(path, bytes);
+    },
+  };
+  const result = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "out/led-pcb.zip"],
+    io,
+  );
+  expect(result.exitCode).toBe(EXIT_OK);
+  expect(result.stdout).toBe("");
+  expect(result.stderr).toContain(
+    "warning: Hole e7 holds SW1 pin 3 and R1 pin 1; a PCB hole takes one lead",
+  );
+  expect(result.stderr).toContain("All 2 wire(s) are top-layer traces.");
+  expect(
+    result.stderr.endsWith(
+      "Wrote Gerber and drill files to out/led-pcb.zip.\n",
+    ),
+  ).toBe(true);
+  const zip = written.get("out/led-pcb.zip");
+  if (!zip) throw new Error("no archive written");
+  expect([...zip.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+  const listing = new TextDecoder().decode(zip);
+  for (const extension of ["GTL", "GBL", "GTS", "GBS", "GTO", "GKO", "DRL"])
+    expect(listing).toContain(`led-pcb.${extension}`);
+
+  const strict = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "strict.zip", "--strict"],
+    io,
+  );
+  expect(strict.exitCode).toBe(EXIT_WARNINGS);
+  expect(written.has("strict.zip")).toBe(false);
+});
+
+test("breadboard gerber usage errors", () => {
+  const io = {
+    ...memoryIo({ "doc.jsonl": breadboardDocument() }),
+    writeBytes() {},
+  };
+  const noOutput = cli(["breadboard", "gerber", "doc.jsonl"], io);
+  expect(noOutput.exitCode).toBe(EXIT_ERROR);
+  expect(noOutput.stderr).toContain("requires --output <file.zip>");
+  const empty = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "x.zip"],
+    io,
+  );
+  expect(empty.exitCode).toBe(EXIT_ERROR);
+  expect(empty.stderr).toContain(
+    "Nothing is seated on this board, so there is no PCB to make.",
+  );
+  const wrongBoard = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "x.zip", "--board", "zz"],
+    io,
+  );
+  expect(wrongBoard.stderr).toContain(
+    "No board on this page has an id starting with zz.",
+  );
+  const textOnly = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "x.zip"],
+    memoryIo({ "doc.jsonl": breadboardDocument() }),
+  );
+  expect(textOnly.stderr).toContain("This host cannot write binary files.");
+});

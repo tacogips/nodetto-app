@@ -1,6 +1,8 @@
 import { TemplateDialog } from "./TemplateDialog.tsx";
 import {
   computeBreadboardConnectivity,
+  encodeBreadboardPcbZip,
+  exportBreadboardPcb,
   createDesignTemplate,
   toBreadboardNetlist,
   type DesignTemplateId,
@@ -681,14 +683,66 @@ export function App(props: AppProps): JSX.Element {
     }
   };
 
+  /** Gerber and drill ZIP for the selected board, or the page's only board. */
+  const exportBreadboardGerber = async (
+    snapshot: ReturnType<typeof props.editor.getSnapshot>,
+    pageName: string,
+  ): Promise<void> => {
+    const pageId = props.editor.currentPageId;
+    const selected = new Set(props.editor.selection.ids());
+    const board = snapshot.elements.find(
+      (element) =>
+        element.page === pageId &&
+        element.type === "breadboard.board" &&
+        selected.has(element.id),
+    );
+    const pcb = exportBreadboardPcb(snapshot, pageId, {
+      name: exportBaseName(pageName),
+      ...(board ? { board: board.id } : {}),
+    });
+    if (typeof pcb === "string") {
+      setExportError(
+        pcb.startsWith("The page has")
+          ? "This page has several boards; select the board to export and try again."
+          : pcb,
+      );
+      return;
+    }
+    const bytes = encodeBreadboardPcbZip(pcb);
+    const name = `${exportBaseName(pageName)}-pcb.zip`;
+    if (!props.exportBackend.available) {
+      const url = URL.createObjectURL(
+        new Blob([bytes], { type: "application/zip" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else {
+      const path = await props.exportBackend.pickExportPath(name, "zip");
+      if (path === null) return;
+      await props.exportBackend.writeBytes(path, bytes);
+    }
+    setExportError(
+      `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
+    );
+  };
+
   const exportBreadboard = async (
-    kind: "bom" | "kicad" | "spice",
+    kind: "bom" | "kicad" | "spice" | "gerber",
   ): Promise<void> => {
     setExportError(null);
     const page = props.editor.store.getPage(props.editor.currentPageId);
     if (page?.kind !== "breadboard") return;
     try {
       const snapshot = props.editor.getSnapshot();
+      if (kind === "gerber") {
+        await exportBreadboardGerber(snapshot, page.name);
+        return;
+      }
       const connectivity = computeBreadboardConnectivity(
         snapshot,
         props.editor.currentPageId,
