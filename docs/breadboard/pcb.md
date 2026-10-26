@@ -8,6 +8,7 @@ Elecrow recognise. Upload the ZIP as it is.
 
 ```sh
 nodetto-cli breadboard gerber prototype.jsonl --output prototype-pcb.zip
+nodetto-cli breadboard gerber prototype.jsonl --outline used --output prototype-pcb.zip
 ```
 
 ## What the PCB contains
@@ -15,8 +16,13 @@ nodetto-cli breadboard gerber prototype.jsonl --output prototype-pcb.zip
 The PCB keeps the breadboard layout, so parts go into the same rows and
 columns as on the breadboard and the nets are the breadboard's nets.
 
-- **Outline**: the breadboard's size. A half board is 83.82 x 55.88 mm, a full
-  board 167.64 x 55.88 mm and a mini board 50.8 x 40.64 mm.
+- **Outline**: by default, the breadboard's size. A half board is 83.82 x
+  55.88 mm, a full board 167.64 x 55.88 mm and a mini board 50.8 x 40.64 mm.
+  `--outline used` trims the outline to the used area plus a 1.0 mm margin,
+  never beyond the breadboard. Row and column labels outside the trimmed
+  outline are dropped, and the origin stays at the bottom-left. This can fit a
+  small circuit into the 100 x 100 mm price tier. The desktop export always
+  uses the full board.
 - **Holes**: every hole a part lead or jumper wire end uses becomes a 1.0 mm
   plated hole with a 1.8 mm pad on both layers. Unused holes are left out.
   Pin 1 of ICs and pin headers has a square pad.
@@ -29,7 +35,11 @@ columns as on the breadboard and the nets are the breadboard's nets.
   polarity, an outline and reference for each part (transistors also show
   their pinout, for example `Q1 EBC`), `+` beside LED anodes and the positive
   lead of electrolytic capacitors and batteries, `K` beside diode cathodes,
-  and the path of every wire left as a jumper.
+  and the path of every wire left as a jumper. Silkscreen ink stays 0.15 mm
+  from every solder mask opening and 0.2 mm from the board edge. Lines and text
+  that would print on a pad are cut back around it; a reference with no free
+  spot may be partly cut. Polarity marks are placed beside their pin clear of
+  pads, or left off with a warning.
 
 | File | Layer |
 | --- | --- |
@@ -38,7 +48,7 @@ columns as on the breadboard and the nets are the breadboard's nets.
 | `<name>.GTS` / `<name>.GBS` | Top and bottom solder mask (negative) |
 | `<name>.GTO` | Top silkscreen |
 | `<name>.GKO` | Board outline |
-| `<name>.DRL` | Plated through holes (Excellon, millimetres) |
+| `<name>.DRL` | Plated through holes (Excellon, millimetres; three decimals) |
 
 `<name>` is the output file name without `.zip` in the CLI and the page name in
 the desktop app. Coordinates are millimetres with the origin at the board's
@@ -49,7 +59,8 @@ change the files.
 
 Choose 2 layers, 1.6 mm thickness and the board size above; the other defaults
 of a standard order fit these files. Line widths and text are within common
-minimums (0.18 mm silkscreen lines, 1.0 mm text, 0.3 mm copper clearance).
+minimums (0.18 mm silkscreen lines, 1.0 mm text, 0.15 mm silkscreen-to-pad
+clearance, 0.3 mm copper clearance).
 
 The export makes a bare board. Solder the parts into the holes shown by their
 outlines, then solder a wire along each silkscreen jumper line. The CLI and the
@@ -68,6 +79,12 @@ desktop app lists them in the export notes.
   its own.
 - Reference characters other than letters, digits, `+`, `-` and spaces are not
   drawn on the silkscreen.
+- The `<mark>` mark at `<ref>` pin `<pin>` has no room clear of the pads and is
+  left off the silkscreen. Move the part or the neighbouring parts by one
+  hole.
+
+See [examples/breadboard](../../examples/breadboard/) for the example's Gerber
+and drill files.
 
 ## Choosing a board
 

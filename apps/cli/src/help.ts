@@ -361,7 +361,8 @@ Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
                                       [--page <short-id|id|name>]
                                       [--output <file> | --check <file>] [--strict]
        nodetto-cli breadboard gerber <document.jsonl> --output <file.zip>
-                                     [--page <short-id|id|name>] [--board <id>] [--strict]
+                                     [--page <short-id|id|name>] [--board <id>]
+                                     [--outline board|used] [--strict]
        nodetto-cli breadboard import <file.kicad_sch|file.net> [--output <file.jsonl>] [--strict]
 
 Export a breadboard bill of materials or netlist, export a board as PCB
@@ -376,6 +377,8 @@ and jumper wires drawn on the silkscreen otherwise.
 
   --page    Select one breadboard page by short ID, full ID or exact name.
   --board   Select a board by element id or unique id prefix (gerber only).
+  --outline Board outline for gerber: board (default) or used, trimmed to the
+            used area plus a margin.
   --format  Required for netlist: kicad or spice.
   --output  Write generated output to a file; required for gerber.
   --check   Compare generated output with a file; exit 1 when out of date.
@@ -385,6 +388,7 @@ Examples:
   nodetto-cli breadboard bom prototype.jsonl --output bom.csv
   nodetto-cli breadboard netlist prototype.jsonl --format kicad
   nodetto-cli breadboard gerber prototype.jsonl --output prototype-pcb.zip
+  nodetto-cli breadboard gerber prototype.jsonl --outline used --output prototype-pcb.zip
   nodetto-cli breadboard import circuit.net --output staged.jsonl
 
 ${EXIT_CODES}`,

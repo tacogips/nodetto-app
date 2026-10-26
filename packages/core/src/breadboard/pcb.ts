@@ -30,12 +30,22 @@ import {
 } from "./catalogue.ts";
 import { computeBreadboardConnectivity } from "./connectivity.ts";
 import {
-  excellonDrill,
-  GerberLayer,
+  boxClearOfKeepouts,
+  clipLegendStroke,
+  type LegendKeepout,
+  type LegendRect,
+  PCB_LAYER_COUNT,
   type PadShape,
+  type PcbDesign,
+  type PcbFile,
   type PcbPoint,
-} from "./gerber.ts";
-import { strokeFontSupports, strokeText, strokeTextWidth } from "./pcb-font.ts";
+  type PcbTrace,
+  pcbFabricationFiles,
+  strokeFontSupports,
+  strokeText,
+  strokeTextWidth,
+  trimPcbToUsed,
+} from "../pcb/index.ts";
 
 /** Design rules in millimetres, within common board-house minimums. */
 export const BREADBOARD_PCB_RULES = {
@@ -52,16 +62,18 @@ export const BREADBOARD_PCB_RULES = {
   edgeLine: 0.1,
   /** Keeps routed traces this far inside the board edge. */
   edgeKeepout: 0.5,
+  /** Minimum distance from legend ink to a solder mask opening. */
+  legendPadClearance: 0.15,
+  /** Minimum distance from legend ink to the board edge. */
+  legendEdgeClearance: 0.2,
+  /** Extra board-house margin around the used geometry. */
+  usedMargin: 1.0,
 } satisfies Record<string, number>;
 
 const rules = BREADBOARD_PCB_RULES;
 const GENERATOR = "Nodetto,Breadboard PCB";
-const LAYER_COUNT = 2;
 
-export interface BreadboardPcbFile {
-  readonly path: string;
-  readonly text: string;
-}
+export type BreadboardPcbFile = PcbFile;
 
 export interface BreadboardPcb {
   readonly boardId: ElementId;
@@ -78,6 +90,8 @@ export interface BreadboardPcbOptions {
   readonly board?: string;
   /** Base name of the files in the archive. */
   readonly name?: string;
+  /** Emit the full board or trim the outline around the used geometry. */
+  readonly outline?: "board" | "used";
 }
 
 interface UsedHole {
@@ -239,22 +253,18 @@ function padRadius(shape: PadShape): number {
   return shape === "circle" ? rules.pad / 2 : (rules.pad / 2) * Math.SQRT2;
 }
 
-/** Where a polarity or pinout mark goes: beside the pin, away from the part. */
-function markBeside(pin: PcbPoint, others: readonly PcbPoint[]): PcbPoint {
+/** Direction away from the other pins, using deterministic arithmetic. */
+function markDirection(pin: PcbPoint, others: readonly PcbPoint[]): PcbPoint {
   const centre = others.length
     ? {
         x: others.reduce((sum, point) => sum + point.x, 0) / others.length,
         y: others.reduce((sum, point) => sum + point.y, 0) / others.length,
       }
     : { x: pin.x + 1, y: pin.y };
-  const dx = pin.x - centre.x;
-  const dy = pin.y - centre.y;
-  const length = Math.hypot(dx, dy) || 1;
-  const offset = rules.pad / 2 + rules.legendText * 0.7;
-  return {
-    x: pin.x + (dx / length) * offset,
-    y: pin.y + (dy / length) * offset,
-  };
+  const dx = others.length ? pin.x - centre.x : -1;
+  const dy = others.length ? pin.y - centre.y : 0;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  return length === 0 ? { x: 1, y: 0 } : { x: dx / length, y: dy / length };
 }
 
 function polarityMark(
@@ -384,14 +394,14 @@ export function exportBreadboardPcb(
     return entry;
   };
 
-  const legend = new GerberLayer("Legend,Top");
-  const drawText = (text: string, at: PcbPoint) => {
-    for (const stroke of strokeText(text, at.x, at.y, rules.legendText))
-      legend.stroke(rules.legendLine, stroke);
-  };
-
   const partLegends: { outline: readonly PcbPoint[]; label: string }[] = [];
-  const marks: { text: string; at: PcbPoint }[] = [];
+  const marks: {
+    text: string;
+    pinAt: PcbPoint;
+    othersAt: readonly PcbPoint[];
+    ref: string;
+    pinName: string;
+  }[] = [];
   const parts = elements.filter(isPart);
   let placed = 0;
   for (const part of parts) {
@@ -450,10 +460,12 @@ export function exportBreadboardPcb(
       if (!mark || !pad) return;
       marks.push({
         text: mark,
-        at: markBeside(
-          pad.at,
-          pads.filter((_, other) => other !== index).map((entry) => entry.at),
-        ),
+        pinAt: pad.at,
+        othersAt: pads
+          .filter((_, other) => other !== index)
+          .map((entry) => entry.at),
+        ref: reference(part),
+        pinName: pin.name,
       });
     });
   }
@@ -545,55 +557,109 @@ export function exportBreadboardPcb(
         `Hole ${hole} holds ${through.join(" and ")}; a PCB hole takes one lead, so move one of them to another hole in the same strip.`,
       );
 
-  const top = new GerberLayer("Copper,L1,Top");
-  const bottom = new GerberLayer("Copper,L2,Bot");
-  const maskTop = new GerberLayer("Soldermask,Top", "Negative");
-  const maskBottom = new GerberLayer("Soldermask,Bot", "Negative");
-  for (const pad of usedHoles) {
-    top.flash(pad.shape, rules.pad, pad.at);
-    bottom.flash(pad.shape, rules.pad, pad.at);
-    maskTop.flash(pad.shape, rules.maskOpening, pad.at);
-    maskBottom.flash(pad.shape, rules.maskOpening, pad.at);
-  }
-  for (const trace of routed) top.stroke(rules.wireTrace, trace.points);
-
   const strips = new Map<string, PcbPoint[]>();
   for (const pad of usedHoles) {
     const members = strips.get(pad.hole.strip) ?? [];
     members.push(pad.at);
     strips.set(pad.hole.strip, members);
   }
+  const bottomTraces: PcbTrace[] = [];
   for (const members of strips.values()) {
     if (members.length < 2) continue;
     members.sort((left, right) => left.x - right.x || left.y - right.y);
     const first = members.at(0);
     const last = members.at(-1);
-    if (first && last) bottom.stroke(rules.stripTrace, [first, last]);
+    if (first && last)
+      bottomTraces.push({ width: rules.stripTrace, points: [first, last] });
   }
 
-  // Legend: fixed text first, then each reference in the first free spot
-  // beside its part, so references do not run into labels, marks or pads.
-  const taken: Bounds[] = usedHoles.map((pad) =>
-    around(pad.at, rules.pad + 0.2, rules.pad + 0.2),
-  );
-  const write = (text: string, at: PcbPoint) => {
-    drawText(text, at);
-    taken.push(textBounds(text, at));
+  const keepouts: LegendKeepout[] = usedHoles.map((pad) => ({
+    x: pad.at.x,
+    y: pad.at.y,
+    radius:
+      rules.maskOpening / 2 +
+      rules.legendPadClearance +
+      rules.legendLine / 2 +
+      (pad.shape === "square" ? (rules.maskOpening / 2) * (Math.SQRT2 - 1) : 0),
+  }));
+  const legendRect: LegendRect = {
+    minX: rules.legendEdgeClearance + rules.legendLine / 2,
+    minY: rules.legendEdgeClearance + rules.legendLine / 2,
+    maxX: width - rules.legendEdgeClearance - rules.legendLine / 2,
+    maxY: height - rules.legendEdgeClearance - rules.legendLine / 2,
   };
-  for (const label of layout.labels)
-    write(label.text, {
+  const legendStrokes: {
+    points: readonly PcbPoint[];
+    kind: "label" | "other";
+    group?: number;
+  }[] = [];
+  const textStrokes = (text: string, at: PcbPoint) =>
+    strokeText(text, at.x, at.y, rules.legendText);
+  const taken: Bounds[] = [];
+  for (const [group, label] of layout.labels.entries()) {
+    const at = {
       x: roundMm(label.x * rules.pitch),
       y: roundMm((layout.height - label.y) * rules.pitch),
-    });
-  for (const mark of marks) write(mark.text, mark.at);
+    };
+    for (const points of textStrokes(label.text, at))
+      legendStrokes.push({ points, kind: "label", group });
+    taken.push(textBounds(label.text, at));
+  }
   const edge: Bounds = {
-    minX: 0.2,
-    minY: 0.2,
-    maxX: width - 0.2,
-    maxY: height - 0.2,
+    minX: rules.legendEdgeClearance,
+    minY: rules.legendEdgeClearance,
+    maxX: width - rules.legendEdgeClearance,
+    maxY: height - rules.legendEdgeClearance,
   };
+  for (const mark of marks) {
+    const direction = markDirection(mark.pinAt, mark.othersAt);
+    const diagonal = (text: string) => {
+      const bounds = textBounds(text, { x: 0, y: 0 });
+      const textWidth = bounds.maxX - bounds.minX;
+      const textHeight = bounds.maxY - bounds.minY;
+      return Math.sqrt(textWidth * textWidth + textHeight * textHeight) / 2;
+    };
+    const padIndex = usedHoles.findIndex(
+      (pad) => pad.at.x === mark.pinAt.x && pad.at.y === mark.pinAt.y,
+    );
+    const pinKeepout = keepouts[padIndex];
+    if (!pinKeepout) continue;
+    const distance = pinKeepout.radius + diagonal(mark.text);
+    const s = Math.SQRT1_2;
+    const directions = [
+      direction,
+      {
+        x: (direction.x - direction.y) * s,
+        y: (direction.x + direction.y) * s,
+      },
+      {
+        x: (direction.x + direction.y) * s,
+        y: (-direction.x + direction.y) * s,
+      },
+      { x: -direction.y, y: direction.x },
+      { x: direction.y, y: -direction.x },
+    ];
+    const candidate = directions
+      .map((vector) => ({
+        x: mark.pinAt.x + vector.x * distance,
+        y: mark.pinAt.y + vector.y * distance,
+      }))
+      .find((at) => {
+        const bounds = textBounds(mark.text, at);
+        return contains(edge, bounds) && boxClearOfKeepouts(bounds, keepouts);
+      });
+    if (!candidate) {
+      warnings.push(
+        `The ${mark.text} mark at ${mark.ref} pin ${mark.pinName} has no room clear of the pads and is left off the silkscreen.`,
+      );
+      continue;
+    }
+    for (const points of textStrokes(mark.text, candidate))
+      legendStrokes.push({ points, kind: "other" });
+    taken.push(textBounds(mark.text, candidate));
+  }
   for (const { outline: corners, label } of partLegends) {
-    legend.stroke(rules.legendLine, corners);
+    legendStrokes.push({ points: corners, kind: "other" });
     const box = boundsOf(corners);
     const half = rules.legendText / 2;
     const gap = 0.3;
@@ -610,46 +676,61 @@ export function exportBreadboardPcb(
       const bounds = textBounds(label, candidate);
       return (
         contains(edge, bounds) &&
-        taken.every((other) => !overlaps(other, bounds))
+        taken.every((other) => !overlaps(other, bounds)) &&
+        boxClearOfKeepouts(bounds, keepouts)
       );
     });
-    write(label, free ?? candidates[0] ?? { x: centreX, y: centreY });
+    const at = free ?? candidates[0] ?? { x: centreX, y: centreY };
+    for (const points of textStrokes(label, at))
+      legendStrokes.push({ points, kind: "other" });
+    taken.push(textBounds(label, at));
   }
-  for (const points of jumpers) legend.stroke(rules.legendLine, points);
+  for (const points of jumpers) legendStrokes.push({ points, kind: "other" });
 
-  const outline = new GerberLayer("Profile,NP");
-  outline.stroke(rules.edgeLine, [
-    { x: 0, y: 0 },
-    { x: width, y: 0 },
-    { x: width, y: height },
-    { x: 0, y: height },
-    { x: 0, y: 0 },
-  ]);
+  const clippedStrokes = legendStrokes.flatMap((stroke) =>
+    clipLegendStroke(stroke.points, legendRect, keepouts, rules.legendLine).map(
+      (points) => ({ ...stroke, points }),
+    ),
+  );
 
-  const base = fileBaseName(options.name);
-  const gerber = (extension: string, layer: GerberLayer) => ({
-    path: `${base}.${extension}`,
-    text: layer.text(GENERATOR),
-  });
-  const files: BreadboardPcbFile[] = [
-    gerber("GTL", top),
-    gerber("GBL", bottom),
-    gerber("GTS", maskTop),
-    gerber("GBS", maskBottom),
-    gerber("GTO", legend),
-    gerber("GKO", outline),
-    {
-      path: `${base}.DRL`,
-      text: excellonDrill(
-        usedHoles.map((pad) => ({ diameter: rules.drill, at: pad.at })),
-        "Nodetto breadboard PCB",
-        LAYER_COUNT,
-      ),
+  const full: PcbDesign = {
+    width,
+    height,
+    rules: {
+      pad: rules.pad,
+      maskOpening: rules.maskOpening,
+      drill: rules.drill,
+      legendLine: rules.legendLine,
+      edgeLine: rules.edgeLine,
     },
-  ];
+    pads: usedHoles.map(({ at, shape }) => ({ at, shape })),
+    topTraces: routed.map((trace) => ({
+      width: rules.wireTrace,
+      points: trace.points,
+    })),
+    bottomTraces,
+    // Board labels are grouped so a trimmed outline drops a label whole.
+    legend: clippedStrokes.map((stroke) =>
+      stroke.kind === "label" && stroke.group !== undefined
+        ? { points: stroke.points, group: stroke.group }
+        : { points: stroke.points },
+    ),
+  };
+  const design =
+    options.outline === "used"
+      ? trimPcbToUsed(full, {
+          margin: rules.usedMargin,
+          legendEdgeClearance: rules.legendEdgeClearance,
+        })
+      : full;
+  const files = pcbFabricationFiles(design, {
+    name: fileBaseName(options.name),
+    generator: GENERATOR,
+    drillTitle: "Nodetto breadboard PCB",
+  });
 
   const notes = [
-    `Board ${width} x ${height} mm, ${LAYER_COUNT} layers, ${usedHoles.length} plated holes of ${rules.drill} mm, ${placed} part(s).`,
+    `Board ${design.width} x ${design.height} mm, ${PCB_LAYER_COUNT} layers, ${design.pads.length} plated holes of ${rules.drill} mm, ${placed} part(s).`,
   ];
   if (seatedWires.length)
     notes.push(
@@ -657,7 +738,14 @@ export function exportBreadboardPcb(
         ? `${routed.length} of ${seatedWires.length} wire(s) are top-layer traces; solder the other ${jumpers.length} as jumper wires along their silkscreen lines.`
         : `All ${seatedWires.length} wire(s) are top-layer traces.`,
     );
-  return { boardId: board.id, width, height, files, warnings, notes };
+  return {
+    boardId: board.id,
+    width: design.width,
+    height: design.height,
+    files,
+    warnings,
+    notes,
+  };
 }
 
 /** The Gerber and drill files as one ZIP, the upload format board houses take. */

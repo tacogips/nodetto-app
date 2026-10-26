@@ -127,6 +127,7 @@ nodetto-cli breadboard bom board.jsonl --check board.bom.csv
 nodetto-cli breadboard netlist board.jsonl --format kicad --output board.net
 nodetto-cli breadboard netlist board.jsonl --format spice --output board.cir
 nodetto-cli breadboard gerber board.jsonl --output board-pcb.zip
+nodetto-cli breadboard gerber board.jsonl --outline used --output board-pcb.zip
 nodetto-cli breadboard import circuit.kicad_sch --output board.jsonl
 ```
 
@@ -682,9 +683,11 @@ Export a component BOM, a KiCad-style netlist, or a SPICE netlist with
 ZIP with `nodetto-cli breadboard gerber` or the same tab, and upload the ZIP to
 a board house such as JLCPCB. The PCB keeps the breadboard layout: used holes
 become plated holes, strips become traces, and wires become traces or
-silkscreen jumper lines. Import KiCad 6+ `.kicad_sch` or `.net` files with
-`nodetto-cli breadboard import` or the desktop Open dialog. The import is
-detached and creates a new page with a target netlist card. Its parts are staged beside the board, so the page fails
+silkscreen jumper lines. `--outline used` trims the board to the used area so
+small circuits fit cheaper size tiers. Import KiCad 6+ `.kicad_sch` or
+`.net` files with `nodetto-cli breadboard import` or the desktop Open dialog.
+The import is detached and creates a new page with a target netlist card. Its
+parts are staged beside the board, so the page fails
 lint until every part is placed. Builds older than breadboard support reject
 documents that contain a breadboard page.
 

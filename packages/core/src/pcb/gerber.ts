@@ -1,13 +1,7 @@
-// Writers for the PCB fabrication formats board houses accept: Gerber
-// RS-274X with X2 file attributes for image layers, and Excellon for drills.
+// Gerber RS-274X writer with X2 file attributes, for PCB image layers.
 // Coordinates are millimetres with y pointing up.
 
-export interface PcbPoint {
-  readonly x: number;
-  readonly y: number;
-}
-
-export type PadShape = "circle" | "square";
+import type { PadShape, PcbPoint } from "./model.ts";
 
 /** Gerber 4.6 format: integer nanometres. */
 function coordinate(value: number): string {
@@ -86,46 +80,4 @@ export class GerberLayer {
       "",
     ].join("\n");
   }
-}
-
-export interface DrillHit {
-  readonly diameter: number;
-  readonly at: PcbPoint;
-}
-
-/** Excellon drill file for plated through holes, decimal millimetres. */
-export function excellonDrill(
-  hits: readonly DrillHit[],
-  generator: string,
-  layers: number,
-): string {
-  const diameters = [...new Set(hits.map((hit) => hit.diameter))].sort(
-    (left, right) => left - right,
-  );
-  const tools = diameters.map((diameter, index) => ({
-    code: `T${index + 1}`,
-    diameter,
-  }));
-  const lines = [
-    "M48",
-    `; DRILL file ${generator}`,
-    "; FORMAT={-:-/ absolute / metric / decimal}",
-    `; #@! TF.FileFunction,Plated,1,${layers},PTH`,
-    "FMAT,2",
-    "METRIC",
-    ...tools.map((tool) => `${tool.code}C${tool.diameter.toFixed(3)}`),
-    "%",
-    "G90",
-    "G05",
-  ];
-  for (const tool of tools) {
-    lines.push(tool.code);
-    for (const hit of hits)
-      if (hit.diameter === tool.diameter)
-        lines.push(
-          `X${Number(hit.at.x.toFixed(4))}Y${Number(hit.at.y.toFixed(4))}`,
-        );
-  }
-  lines.push("M30", "");
-  return lines.join("\n");
 }

@@ -644,3 +644,42 @@ nativeTest(
   },
   60000,
 );
+
+nativeTest(
+  "native CLI writes the same breadboard PCB archive as the TypeScript CLI",
+  () => {
+    const example = join(
+      import.meta.dir,
+      "../../../examples/breadboard/led-button.jsonl",
+    );
+    for (const extra of [[], ["--outline", "used"]]) {
+      const expectedDir = mkdtempSync(join(tmpdir(), "nodetto-pcb-ts-"));
+      const actualDir = mkdtempSync(join(tmpdir(), "nodetto-pcb-native-"));
+      try {
+        const args = [
+          "breadboard",
+          "gerber",
+          example,
+          "--output",
+          "led-button.zip",
+          ...extra,
+        ];
+        const expected = Bun.spawnSync([process.execPath, source, ...args], {
+          cwd: expectedDir,
+        });
+        const actual = Bun.spawnSync([binary!, ...args], { cwd: actualDir });
+        expect(actual.exitCode).toBe(0);
+        expect(actual.exitCode).toBe(expected.exitCode);
+        expect(actual.stdout.toString()).toBe(expected.stdout.toString());
+        expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+        expect(readFileSync(join(actualDir, "led-button.zip"))).toEqual(
+          readFileSync(join(expectedDir, "led-button.zip")),
+        );
+      } finally {
+        rmSync(expectedDir, { recursive: true, force: true });
+        rmSync(actualDir, { recursive: true, force: true });
+      }
+    }
+  },
+  60000,
+);

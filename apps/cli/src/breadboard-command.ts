@@ -246,7 +246,7 @@ function importCommand(io: CommandIo, args: readonly string[]): CommandResult {
 function gerberCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const parsed = parseArgs(
     args,
-    new Set(["--page", "--board", "--output"]),
+    new Set(["--page", "--board", "--output", "--outline"]),
     new Set(["--strict"]),
   );
   if (typeof parsed === "string")
@@ -260,6 +260,9 @@ function gerberCommand(io: CommandIo, args: readonly string[]): CommandResult {
     return fail(
       `breadboard gerber writes a ZIP archive and requires --output <file.zip>.\n\n${helpFor("breadboard")}`,
     );
+  const outline = parsed.options.get("--outline");
+  if (outline !== undefined && outline !== "board" && outline !== "used")
+    return fail(`--outline must be board or used.\n\n${helpFor("breadboard")}`);
   if (!io.writeBytes) return fail("This host cannot write binary files.");
 
   const [path = ""] = parsed.positional;
@@ -271,6 +274,7 @@ function gerberCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const pcb = exportBreadboardPcb(document, selected.id, {
     name: (outputPath.split(/[\\/]/).at(-1) ?? "").replace(/\.zip$/i, ""),
     ...(board === undefined ? {} : { board }),
+    ...(outline === undefined ? {} : { outline }),
   });
   if (typeof pcb === "string")
     return fail(pcb.replace("choose one:", "choose one with --board:"));

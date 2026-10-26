@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { encodeBreadboardPcbZip, exportBreadboardPcb } from "@nodetto/core";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
 import { importBpmnXml } from "@nodetto/io";
 import {
@@ -338,4 +339,62 @@ test("breadboard gerber usage errors", () => {
     memoryIo({ "doc.jsonl": breadboardDocument() }),
   );
   expect(textOnly.stderr).toContain("This host cannot write binary files.");
+});
+
+test("breadboard gerber --outline", () => {
+  const example = readFileSync(
+    join(import.meta.dir, "../../../examples/breadboard/led-button.jsonl"),
+    "utf8",
+  );
+  const written = new Map<string, Uint8Array>();
+  const io = {
+    ...memoryIo({ "doc.jsonl": example }),
+    writeBytes(path: string, bytes: Uint8Array) {
+      written.set(path, bytes);
+    },
+  };
+  const run = (...extra: string[]) =>
+    cli(
+      ["breadboard", "gerber", "doc.jsonl", "--output", "pcb.zip", ...extra],
+      io,
+    );
+  const document = parseDocumentResult(example);
+  if (!document.ok) throw new Error("example does not parse");
+  const page = document.document.pages.find(
+    ({ kind }) => kind === "breadboard",
+  );
+  if (!page) throw new Error("example has no breadboard page");
+  const core = (outline: "board" | "used") => {
+    const pcb = exportBreadboardPcb(document.document, page.id, {
+      name: "pcb",
+      outline,
+    });
+    if (typeof pcb === "string") throw new Error(pcb);
+    return encodeBreadboardPcbZip(pcb);
+  };
+
+  expect(run().exitCode).toBe(EXIT_OK);
+  const byDefault = written.get("pcb.zip");
+  expect(byDefault).toEqual(core("board"));
+  expect(run("--outline", "board").exitCode).toBe(EXIT_OK);
+  expect(written.get("pcb.zip")).toEqual(byDefault);
+
+  const used = run("--outline", "used");
+  expect(used.exitCode).toBe(EXIT_OK);
+  expect(written.get("pcb.zip")).toEqual(core("used"));
+  expect(written.get("pcb.zip")).not.toEqual(byDefault);
+  expect(used.stderr).toContain("Board 30.98 x 32.66 mm");
+
+  written.clear();
+  const wrong = run("--outline", "square");
+  expect(wrong.exitCode).toBe(EXIT_ERROR);
+  expect(
+    wrong.stderr.startsWith(
+      "--outline must be board or used.\n\nUsage: nodetto-cli breadboard",
+    ),
+  ).toBe(true);
+  const missing = run("--outline");
+  expect(missing.exitCode).toBe(EXIT_ERROR);
+  expect(missing.stderr).toContain("--outline requires a value.");
+  expect(written.size).toBe(0);
 });

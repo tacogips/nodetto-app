@@ -467,3 +467,61 @@ goldens and docs, which depend on (b) and are validated with (a).
   (for example a temporary tsconfig extending the root with that flag, under
   `tmp/`).
 - The one-time 7.6 byte-diff evidence against `431bfdb`.
+
+## 11. Completion notes
+
+The workflow run stopped at the plan 03 gate that asks for recorded pre-fix
+failures. Plans 04 and 05 and the changes below were then completed outside
+the workflow on the same branch.
+
+### 11.1 Module boundary
+
+The generic fabrication code lives in `packages/core/src/pcb/`, separate from
+breadboard semantics, so it can later become its own package:
+
+| File | Role |
+| --- | --- |
+| `model.ts` | `PcbDesign`: outline, rules, pads, top and bottom traces, legend strokes (mm, y up) |
+| `gerber.ts` | Gerber RS-274X / X2 layer writer |
+| `excellon.ts` | Excellon drill writer |
+| `fabrication.ts` | `PcbDesign` to the GTL/GBL/GTS/GBS/GTO/GKO/DRL file set |
+| `trim.ts` | `--outline used` trimming of a `PcbDesign` |
+| `font.ts`, `legend.ts` | Stroke font and silkscreen clipping |
+| `validate.ts`, `oracle.test-support.ts` | Test support: strict validator and independent reader |
+| `index.ts` | Public entry; test support is not exported |
+
+`boundary.test.ts` fails if a file in the folder imports anything outside
+it. Test files may also import `bun:test`, `node:fs`, `node:path` and
+`gerber-parser`. `breadboard/pcb.ts` is the adapter that turns a board into
+a `PcbDesign`: hole selection, strip traces, wire routing and legend layout.
+The restructure was checked byte for byte against the pre-restructure output
+for the example and a fixture in both outline modes.
+
+The writer stays in TypeScript rather than a Rust crate such as
+`gerber-types`, because the shared engine runs in the desktop webview, the
+hosted web app and the Boa-embedded native CLI.
+
+### 11.2 Independent reader
+
+`gerber-parser` 4.2.7 (tracespace, MIT) is a dev dependency used only by
+tests. Every generated file in the core, golden and fabrication tests is read
+back with it. A test fails on any warning other than two expected ones: the
+`%TF` X2 attributes the 2022 parser predates, and the note that the drill
+header declares no zero suppression, which decimal-point coordinates do not
+need. The tests also compare the parsed geometry with the design: pads and
+tools, traces, outline and drill hits, and copper pads against drill hits.
+
+`gerber-parser` declares `@types/node` 13 as a runtime dependency. A root
+`overrides` entry keeps `@types/node` at `^26.2.0`; without it, the CLI's
+`Buffer` types regress and typecheck fails.
+
+### 11.3 Findings after the workflow
+
+| ID | Finding | Resolution | Test |
+| --- | --- | --- | --- |
+| F2 | The R1 clearance test passed against `431bfdb`: the old rules lacked `legendPadClearance`, so the check compared against `NaN` and reported nothing | `legendClearanceErrors` throws on a non-finite clearance; the R1 test pins 0.15 and 0.2 | Validator test "rejects a missing clearance rule"; R1 now fails pre-fix |
+| F3 | Outward rounding of the used outline floored `(17.9 - 1) * 100 = 1689.999...`, so trimmed outlines grew by a spurious 0.01 mm. The example's used width was 30.99 instead of 30.98 | Round to nanometres before taking 0.01 mm steps | `trim.test.ts` exact sizes; CLI `--outline used` asserts 30.98 |
+
+Pre-fix evidence, with the plan 03 tests run against `431bfdb`'s `pcb.ts` and
+`gerber.ts`: R1, R2, R3/R4, R5 (omitted mark) and the outline test fail. F1
+and the R5 kept-mark case are guards and pass, as the plan allows.
