@@ -144,7 +144,7 @@
   color: var(--nodetto-muted);
   font-size: 12px;
 }
-.app-settings-cli-detail code {
+.app-settings-cli p code {
   display: inline;
   padding: 1px 4px;
 }
@@ -153,6 +153,16 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+}
+.app-settings-cli-actions button {
+  border-color: var(--nodetto-line);
+}
+.app-settings-cli-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.app-settings-cli-actions button:disabled:hover {
+  background: transparent;
 }
 .app-settings-cli-notice {
   display: grid;
