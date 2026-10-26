@@ -79,7 +79,7 @@ export function resistorValueSuggestions(prefix: string): readonly string[] {
     }
   }
   return [...candidates.entries()]
-    .sort((left, right) => left[1] - right[1])
+    .sort(([, leftValue], [, rightValue]) => leftValue - rightValue)
     .slice(0, 12)
     .map(([label]) => label);
 }

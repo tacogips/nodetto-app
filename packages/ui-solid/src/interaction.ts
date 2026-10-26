@@ -827,7 +827,7 @@ export function createInteraction(
 
   const finishWireDraft = (): void => {
     if (wirePoints.length >= 2 && isBreadboardPage() && !editor.readOnly) {
-      const first = wirePoints[0];
+      const [first] = wirePoints;
       if (first) {
         const points = wirePoints.map((point) => ({
           x: point.x - first.x,
@@ -2765,7 +2765,7 @@ export function createInteraction(
       return;
     }
     if (editor.selection.size === 1) {
-      const selectedId = [...editor.selection.ids()][0];
+      const [selectedId] = editor.selection.ids();
       const selected = selectedId ? editor.store.get(selectedId) : undefined;
       if (selected?.type === "breadboard.wire") {
         const points = breadboardWirePoints(selected);

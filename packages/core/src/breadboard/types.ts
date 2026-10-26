@@ -112,7 +112,7 @@ export function breadboardTargetNetlist(
 ):
   | { readonly element: Element; readonly semantic: BreadboardNetlistSemantic }
   | undefined {
-  const target = document.elements
+  const [target] = document.elements
     .filter(
       (element) =>
         element.page === pageId &&
@@ -123,7 +123,7 @@ export function breadboardTargetNetlist(
       (left, right) =>
         compareFractional(left.index, right.index) ||
         compareFractional(left.id, right.id),
-    )[0];
+    );
   if (!target) return undefined;
   return {
     element: target,

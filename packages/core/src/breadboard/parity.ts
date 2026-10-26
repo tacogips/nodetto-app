@@ -195,15 +195,14 @@ export function breadboardParityFindings(
         assigned.set(assignment, { element: part, pin: pinRef.pin });
     }
     if (assigned.size < 2) continue;
-    const entries = [...assigned.entries()];
-    const second = entries[1]?.[1];
+    const [, second] = assigned.values();
     if (!second) continue;
     findings.push(
       finding(
         "parity-extra-connection",
         second.element.id,
         [...involved],
-        `Breadboard net ${net.id} merges target nets ${entries.map(([name]) => name).join(", ")}.`,
+        `Breadboard net ${net.id} merges target nets ${[...assigned.keys()].join(", ")}.`,
         second.pin,
       ),
     );

@@ -40,7 +40,7 @@ function anchor(store: Store, id: ElementId): Vec | undefined {
     element.type !== "breadboard.wire" &&
     element.type !== "breadboard.netlist"
   ) {
-    const first = breadboardPins(element)[0];
+    const [first] = breadboardPins(element);
     return first ? { x: first.x, y: first.y } : undefined;
   }
   if (element.type === "breadboard.board") {
@@ -48,7 +48,7 @@ function anchor(store: Store, id: ElementId): Vec | undefined {
     return first ? { x: first.pageX, y: first.pageY } : { x, y };
   }
   if (element.type === "breadboard.wire") {
-    const first = breadboardWirePoints(element)[0];
+    const [first] = breadboardWirePoints(element);
     return first;
   }
   return breadboardBox(element) ? { x, y } : undefined;

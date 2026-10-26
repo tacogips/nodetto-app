@@ -37,12 +37,15 @@ export interface BreadboardHighlight {
 
 type Target = BreadboardPinRef | { readonly wireId: ElementId };
 type PointId = string;
+/** Wire ends in point order: the first and the last bend point. */
+const WIRE_END = { start: 0, end: 1 } as const;
+type WireEnd = (typeof WIRE_END)[keyof typeof WIRE_END];
 interface PointRecord {
   readonly id: PointId;
   readonly elementId: ElementId;
   readonly point: Vec;
   readonly pin?: number;
-  readonly wireEnd?: 0 | 1;
+  readonly wireEnd?: WireEnd;
 }
 interface HoleRecord {
   readonly boardId: ElementId;
@@ -117,11 +120,17 @@ export function computeBreadboardConnectivity(
     } else if (element.type === "breadboard.wire") {
       const ends = breadboardWireEnds(element);
       if (!ends) continue;
-      const first = `w:${element.id}:0`;
-      const last = `w:${element.id}:1`;
+      const [start, end] = ends;
+      const first = `w:${element.id}:${WIRE_END.start}`;
+      const last = `w:${element.id}:${WIRE_END.end}`;
       points.push(
-        { id: first, elementId: element.id, point: ends[0], wireEnd: 0 },
-        { id: last, elementId: element.id, point: ends[1], wireEnd: 1 },
+        {
+          id: first,
+          elementId: element.id,
+          point: start,
+          wireEnd: WIRE_END.start,
+        },
+        { id: last, elementId: element.id, point: end, wireEnd: WIRE_END.end },
       );
       wireEndIds.set(element.id, [first, last]);
     }
@@ -139,6 +148,9 @@ export function computeBreadboardConnectivity(
     const root = find(current);
     parent.set(item, root);
     return root;
+  };
+  const unionAll = ([first, ...rest]: readonly PointId[]): void => {
+    if (first) for (const id of rest) union(first, id);
   };
   const union = (left: PointId, right: PointId): void => {
     const a = find(left);
@@ -172,13 +184,9 @@ export function computeBreadboardConnectivity(
       stripRecords.set(stripKey, hole);
     }
   }
-  for (const ids of byLattice.values()) {
-    const first = ids[0];
-    if (first) for (const id of ids.slice(1)) union(first, id);
-  }
+  for (const ids of byLattice.values()) unionAll(ids);
   for (const [stripKey, ids] of pointsByStrip) {
-    const first = ids[0];
-    if (first) for (const id of ids.slice(1)) union(first, id);
+    unionAll(ids);
     const record = stripRecords.get(stripKey);
     if (!record) continue;
     const board = boards.find((item) => item.id === record.boardId);
@@ -188,7 +196,7 @@ export function computeBreadboardConnectivity(
       .map((hole) => ({ x: hole.pageX, y: hole.pageY }));
     holesByStrip.set(stripKey, all);
   }
-  for (const ids of wireEndIds.values()) union(ids[0], ids[1]);
+  for (const [start, end] of wireEndIds.values()) union(start, end);
   for (const element of elements) {
     if (!isPart(element)) continue;
     for (const group of breadboardBondGroups(
@@ -197,8 +205,7 @@ export function computeBreadboardConnectivity(
       const ids = group
         .map((pin) => partPointIds.get(pinKey({ elementId: element.id, pin })))
         .filter((id): id is string => id !== undefined);
-      const first = ids[0];
-      if (first) for (const id of ids.slice(1)) union(first, id);
+      unionAll(ids);
     }
   }
 
@@ -214,7 +221,8 @@ export function computeBreadboardConnectivity(
   }
   const strips = new Map<PointId, Map<string, HoleRecord>>();
   for (const [stripKey, ids] of pointsByStrip) {
-    const root = ids[0] ? find(ids[0]) : undefined;
+    const [first] = ids;
+    const root = first ? find(first) : undefined;
     const record = stripRecords.get(stripKey);
     if (!root || !record) continue;
     const current = strips.get(root) ?? new Map<string, HoleRecord>();
@@ -276,9 +284,9 @@ export function computeBreadboardConnectivity(
   }
   const validEndpoint = new Map<string, boolean>();
   for (const [wireId, ids] of wireEndIds) {
-    for (let end = 0 as 0 | 1; end <= 1; end = (end + 1) as 0 | 1) {
-      const point = pointById.get(ids[end]);
-      if (!point) continue;
+    ids.forEach((id, end) => {
+      const point = pointById.get(id);
+      if (!point) return;
       const latticeKey = pointKey(point.point);
       const touchesPin = (byLattice.get(latticeKey) ?? []).some(
         (id) => pointById.get(id)?.pin !== undefined,
@@ -287,7 +295,7 @@ export function computeBreadboardConnectivity(
         `${wireId}:${end}`,
         nearLattice(point.point) && (holeAt.has(latticeKey) || touchesPin),
       );
-    }
+    });
   }
   const result: BreadboardConnectivity = {
     nets,
@@ -302,7 +310,8 @@ export function computeBreadboardConnectivity(
     if (net === undefined) continue;
     const found = new Map<string, Vec>();
     for (const [stripKey, ids] of pointsByStrip) {
-      if (!ids[0] || find(ids[0]) !== root) continue;
+      const [first] = ids;
+      if (!first || find(first) !== root) continue;
       for (const hole of holesByStrip.get(stripKey) ?? []) {
         found.set(`${hole.x},${hole.y}`, hole);
       }
@@ -376,8 +385,8 @@ export function toBreadboardNetlist(
       ),
     }))
     .sort((a, b) => {
-      const left = a.refs[0];
-      const right = b.refs[0];
+      const [left] = a.refs;
+      const [right] = b.refs;
       return (
         (left ? (componentIndex.get(left.elementId) ?? 0) : 0) -
           (right ? (componentIndex.get(right.elementId) ?? 0) : 0) ||
@@ -395,7 +404,7 @@ export function toBreadboardNetlist(
     : undefined;
   const names = new Set<string>();
   const nets = sortedGroups.map(({ netId, refs }, index) => {
-    const first = refs[0];
+    const [first] = refs;
     const component = first
       ? components.find((item) => item.elementId === first.elementId)
       : undefined;

@@ -4,7 +4,14 @@ import {
   type BreadboardImportPart,
   type BreadboardImportPlan,
 } from "@nodetto/ir";
-import { atomAt, child, children, numberAt, type SexprList } from "./sexpr.ts";
+import {
+  atomAt,
+  child,
+  children,
+  numberAt,
+  SEXPR_SLOT,
+  type SexprList,
+} from "./sexpr.ts";
 import { mapKicadSymbol } from "./symbol-map.ts";
 
 type Point = { x: number; y: number };
@@ -25,18 +32,35 @@ type Component = {
   type: BreadboardImportPart["type"];
   parameters: Readonly<Record<string, unknown>>;
 };
+/** Atom slots of `(at x y angle)`. */
+const AT_SLOT = { x: 1, y: 2, angle: 3 } as const;
+/** Atom slots of `(property "name" "value" ...)`. */
+const PROPERTY_SLOT = { name: 1, value: 2 } as const;
+/** KiCad unit and body-style numbers: 0 is shared by all, 1 is the default. */
+const KICAD_VARIANT = { shared: 0, default: 1 } as const;
+
 const lists = (list: SexprList, head: string) => children(list, head);
 const text = (list: SexprList | undefined, head: string) => {
   const item = list ? child(list, head) : undefined;
-  return item ? atomAt(item, 1) : undefined;
+  return item ? atomAt(item, SEXPR_SLOT.value) : undefined;
 };
+const propertyValue = (symbol: SexprList, name: string) => {
+  const property = lists(symbol, "property").find(
+    (p) => atomAt(p, PROPERTY_SLOT.name) === name,
+  );
+  return property ? atomAt(property, PROPERTY_SLOT.value) : undefined;
+};
+const angleOf = (
+  list: SexprList | undefined,
+  diagnostics: BreadboardImportDiagnostic[],
+) => (list ? (numberAt(list, AT_SLOT.angle, diagnostics) ?? 0) : 0);
 function point(
   list: SexprList | undefined,
   diagnostics: BreadboardImportDiagnostic[],
 ): Point | undefined {
   if (!list) return undefined;
-  const x = numberAt(list, 1, diagnostics);
-  const y = numberAt(list, 2, diagnostics);
+  const x = numberAt(list, AT_SLOT.x, diagnostics);
+  const y = numberAt(list, AT_SLOT.y, diagnostics);
   return x === undefined || y === undefined ? undefined : { x, y };
 }
 function collectLists(
@@ -46,7 +70,7 @@ function collectLists(
 ): SexprList[] {
   for (const item of node.items)
     if (item.kind === "list") {
-      if (atomAt(item, 0) === head) out.push(item);
+      if (atomAt(item, SEXPR_SLOT.keyword) === head) out.push(item);
       collectLists(item, head, out);
     }
   return out;
@@ -92,15 +116,15 @@ export function importSchematic(
   const powerLibraries = new Set<string>();
   if (library)
     for (const libSymbol of lists(library, "symbol")) {
-      const libName = atomAt(libSymbol, 1);
+      const libName = atomAt(libSymbol, SEXPR_SLOT.name);
       if (!libName) continue;
       if (child(libSymbol, "power")) powerLibraries.add(libName);
       const pins: Pin[] = [];
       for (const subSymbol of collectLists(libSymbol, "symbol")) {
-        const subName = atomAt(subSymbol, 1) ?? "";
-        const suffix = subName.match(/_(\d+)_(\d+)$/);
-        const unit = suffix ? Number(suffix[1]) : 0;
-        const style = suffix ? Number(suffix[2]) : 0;
+        const subName = atomAt(subSymbol, SEXPR_SLOT.name) ?? "";
+        const suffix = subName.match(/_(?<unit>\d+)_(?<style>\d+)$/)?.groups;
+        const unit = suffix ? Number(suffix.unit) : KICAD_VARIANT.shared;
+        const style = suffix ? Number(suffix.style) : KICAD_VARIANT.shared;
         for (const pin of collectLists(subSymbol, "pin")) {
           const at = child(pin, "at");
           const position = point(at, diagnostics);
@@ -154,14 +178,10 @@ export function importSchematic(
     if (symbol === library) continue;
     const lib = text(symbol, "lib_name") ?? text(symbol, "lib_id") ?? "";
     const symbolName = lib.split(":").at(-1) ?? "";
-    const props = lists(symbol, "property");
-    const property = (name: string) =>
-      props.find((p) => atomAt(p, 1) === name)
-        ? atomAt(props.find((p) => atomAt(p, 1) === name) as SexprList, 2)
-        : undefined;
+    const property = (name: string) => propertyValue(symbol, name);
     const atList = child(symbol, "at");
     const at = point(atList, diagnostics) ?? { x: 0, y: 0 };
-    const angleValue = atList ? (numberAt(atList, 3, diagnostics) ?? 0) : 0;
+    const angleValue = angleOf(atList, diagnostics);
     const angle = Math.round(angleValue / 90) * 90;
     if (angleValue % 90 !== 0)
       diagnostics.push({
@@ -170,12 +190,12 @@ export function importSchematic(
         message: `Angle ${angleValue} on '${symbolName}' was rounded to ${angle}.`,
       });
     const mirror = child(symbol, "mirror")
-      ? atomAt(child(symbol, "mirror") as SexprList, 1)
+      ? atomAt(child(symbol, "mirror") as SexprList, SEXPR_SLOT.value)
       : undefined;
-    const instancePath = collectLists(
+    const [instancePath] = collectLists(
       child(symbol, "instances") ?? symbol,
       "path",
-    )[0];
+    );
     const instanceReference = instancePath
       ? text(instancePath, "reference")
       : undefined;
@@ -183,7 +203,7 @@ export function importSchematic(
     const topInstances = child(root, "symbol_instances");
     const topPath = topInstances
       ? lists(topInstances, "path").find((p) =>
-          (atomAt(p, 1) ?? "").endsWith(uuid ?? ""),
+          (atomAt(p, SEXPR_SLOT.name) ?? "").endsWith(uuid ?? ""),
         )
       : undefined;
     const reference =
@@ -205,19 +225,23 @@ export function importSchematic(
       continue;
     }
     const unit = child(symbol, "unit")
-      ? Number(atomAt(child(symbol, "unit") as SexprList, 1)) || 1
-      : 1;
+      ? Number(text(symbol, "unit")) || KICAD_VARIANT.default
+      : KICAD_VARIANT.default;
     const bodyStyle = child(symbol, "body_style")
-      ? Number(atomAt(child(symbol, "body_style") as SexprList, 1))
-      : 1;
+      ? Number(text(symbol, "body_style"))
+      : KICAD_VARIANT.default;
     const symbolPins = sourcePins.filter(
-      (pin) => pin.style === 0 || pin.style === 1 || pin.style === bodyStyle,
+      (pin) =>
+        pin.style === KICAD_VARIANT.shared ||
+        pin.style === KICAD_VARIANT.default ||
+        pin.style === bodyStyle,
     );
     const pins = symbolPins.filter(
-      (pin) => pin.unit === 0 || pin.unit === unit,
+      (pin) => pin.unit === KICAD_VARIANT.shared || pin.unit === unit,
     );
+    const [libraryName = ""] = lib.split(":");
     const mapped = mapKicadSymbol({
-      lib: lib.split(":")[0] ?? "",
+      lib: libraryName,
       name: symbolName,
       reference,
       value,
@@ -290,7 +314,7 @@ export function importSchematic(
   for (const tag of ["label", "global_label", "hierarchical_label"])
     for (const label of lists(root, tag)) {
       const p = point(child(label, "at"), diagnostics);
-      const value = atomAt(label, 1);
+      const value = atomAt(label, SEXPR_SLOT.name);
       if (p && value)
         anchors.push({
           point: { x: Math.round(p.x * 10000), y: Math.round(p.y * 10000) },
@@ -304,26 +328,17 @@ export function importSchematic(
     if (!powerLibraries.has(lib)) continue;
     const libSymbol = libs.get(lib) ?? libs.get(lib.split(":").at(-1) ?? "");
     if (!libSymbol) continue;
-    const value = lists(symbol, "property").find(
-      (p) => atomAt(p, 1) === "Value",
-    )
-      ? atomAt(
-          lists(symbol, "property").find(
-            (p) => atomAt(p, 1) === "Value",
-          ) as SexprList,
-          2,
-        )
-      : "";
+    const value = propertyValue(symbol, "Value") ?? "";
     if (value === "PWR_FLAG") continue;
     const atList = child(symbol, "at");
     const at = point(atList, diagnostics);
     if (!at) continue;
-    const pin = libSymbol[0];
+    const [pin] = libSymbol;
     if (pin) {
       const powerPoint = transformed(
         pin.point,
         at,
-        atList ? (numberAt(atList, 3, diagnostics) ?? 0) : 0,
+        angleOf(atList, diagnostics),
       );
       powerPoints.push(powerPoint);
       powerValues.set(key(powerPoint), value ?? "");
@@ -419,8 +434,8 @@ export function importSchematic(
       ),
     }))
     .sort((a, b) => {
-      const an = a.nodes[0];
-      const bn = b.nodes[0];
+      const [an] = a.nodes;
+      const [bn] = b.nodes;
       return (
         (an ? (order.get(an.reference) ?? 0) : 0) -
           (bn ? (order.get(bn.reference) ?? 0) : 0) ||
@@ -440,10 +455,11 @@ export function importSchematic(
       )
       .map((a) => a.label as string)
       .sort();
-    const first = nodes[0];
+    const [first] = nodes;
+    const [firstLabel] = labels;
     const raw =
       power ||
-      labels[0] ||
+      firstLabel ||
       (first ? `N_${first.reference}_${first.pin}` : `N_${rootIndex}`);
     let name = raw;
     let suffix = 2;

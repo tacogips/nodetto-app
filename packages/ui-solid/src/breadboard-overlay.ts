@@ -24,13 +24,15 @@ export function breadboardOverlayModel(
   },
 ): BreadboardOverlayModel {
   const connectivity = computeBreadboardConnectivity(document, pageId);
+  const [selectedId, ...otherSelected] = input.selection;
   const selectedWire =
-    input.selection.length === 1 &&
+    selectedId !== undefined &&
+    !otherSelected.length &&
     document.elements.some(
       (element) =>
-        element.id === input.selection[0] && element.type === "breadboard.wire",
+        element.id === selectedId && element.type === "breadboard.wire",
     )
-      ? { wireId: input.selection[0] as ElementId }
+      ? { wireId: selectedId as ElementId }
       : null;
   const probeTarget =
     input.probe?.pageId === pageId

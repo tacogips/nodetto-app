@@ -1440,8 +1440,7 @@ export class Editor {
       x -= 3 * BREADBOARD_PITCH;
       y -= 5 * BREADBOARD_PITCH;
     } else if (type === "breadboard.wire") {
-      const points = merged["points"] as readonly Vec[];
-      const first = points[0];
+      const [first] = merged["points"] as readonly Vec[];
       if (first) {
         x -= first.x;
         y -= first.y;
@@ -1449,7 +1448,7 @@ export class Editor {
     }
     let index = this.nextIndex(page.id);
     if (type === "breadboard.board") {
-      const first = this.store.getPageElements(page.id)[0];
+      const [first] = this.store.getPageElements(page.id);
       if (first) index = keyBetween(null, first.index, this.rng);
     }
     const size =
@@ -1547,7 +1546,7 @@ export class Editor {
       this.apply(commands, applyOptions);
       return true;
     }
-    const first = breadboardPins(element)[0];
+    const [first] = breadboardPins(element);
     if (!first) return false;
     const local = breadboardLocalBox(element.type, semantic);
     const baseVisual = {
@@ -1556,7 +1555,7 @@ export class Editor {
       height: local.height * BREADBOARD_PITCH,
     };
     const candidate = { ...element, semantic, visual: baseVisual };
-    const nextPin = breadboardPins(candidate)[0];
+    const [nextPin] = breadboardPins(candidate);
     if (!nextPin) return false;
     const visual = {
       ...baseVisual,

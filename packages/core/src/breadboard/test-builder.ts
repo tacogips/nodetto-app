@@ -101,7 +101,7 @@ export function buildBreadboardDocument(
     const candidate = element(part.id, part.type, order, semantic, {
       rotation: part.rotation ?? 0,
     });
-    const firstPin = breadboardPins(candidate)[0];
+    const [firstPin] = breadboardPins(candidate);
     order += 1;
     if (!firstPin) continue;
     elements.push({
@@ -116,7 +116,7 @@ export function buildBreadboardDocument(
     });
   }
   for (const wire of spec.wires ?? []) {
-    const first = wire.points[0] ?? { x: 0, y: 0 };
+    const [first = { x: 0, y: 0 }] = wire.points;
     elements.push(
       element(
         wire.id,

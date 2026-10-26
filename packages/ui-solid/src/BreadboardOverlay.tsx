@@ -133,7 +133,9 @@ export function BreadboardOverlay(props: BreadboardOverlayProps) {
       </Show>
       <Show
         when={
-          props.selection().size === 1 ? [...props.selection()][0] : undefined
+          props.selection().size === 1
+            ? props.selection().values().next().value
+            : undefined
         }
       >
         {(id) => {

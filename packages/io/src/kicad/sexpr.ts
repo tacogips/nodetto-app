@@ -181,7 +181,7 @@ export function readSexpr(text: string): {
       if (parent && !parent.drop) parent.items.push(atom);
     }
   }
-  const outermost = stack[0];
+  const [outermost] = stack;
   if (outermost) {
     diagnostics.push(
       diagnostic(
@@ -204,13 +204,19 @@ export function readSexpr(text: string): {
       else if (!parent) roots.push(list);
     }
   }
-  const root = roots[0];
+  const [root] = roots;
   if (!root)
     diagnostics.push(
       diagnostic("sexpr.empty", "No S-expression list was found."),
     );
   return { ...(root ? { root } : {}), diagnostics };
 }
+
+/**
+ * Atom slots shared by every list: the keyword of `(keyword ...)`, the name of
+ * `(keyword "name" ...)` and the value of `(keyword value)`.
+ */
+export const SEXPR_SLOT = { keyword: 0, name: 1, value: 1 } as const;
 
 export function atomAt(list: SexprList, index: number): string | undefined {
   const node = list.items[index];
@@ -220,14 +226,14 @@ export function atomAt(list: SexprList, index: number): string | undefined {
 export function child(list: SexprList, head: string): SexprList | undefined {
   return list.items.find(
     (node): node is SexprList =>
-      node.kind === "list" && atomAt(node, 0) === head,
+      node.kind === "list" && atomAt(node, SEXPR_SLOT.keyword) === head,
   );
 }
 
 export function children(list: SexprList, head: string): SexprList[] {
   return list.items.filter(
     (node): node is SexprList =>
-      node.kind === "list" && atomAt(node, 0) === head,
+      node.kind === "list" && atomAt(node, SEXPR_SLOT.keyword) === head,
   );
 }
 

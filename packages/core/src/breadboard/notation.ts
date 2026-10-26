@@ -609,7 +609,7 @@ function wireNotation(
     x: point.x - box.x,
     y: point.y - box.y,
   }));
-  const first = points[0];
+  const [first] = points;
   const last = points.at(-1);
   if (!first || !last || points.length < 2) return [];
   const d = points

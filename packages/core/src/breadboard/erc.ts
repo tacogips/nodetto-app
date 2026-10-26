@@ -91,29 +91,29 @@ function conductiveEdges(
         .map((number) => netOf(pinRef(part, number)))
         .filter((value): value is number => value !== undefined);
     if (part.type === "breadboard.resistor") {
-      const values = nets([1, 2]);
-      if (values.length === 2)
+      const [left, right] = nets([1, 2]);
+      if (left !== undefined && right !== undefined)
         edges.push({
-          left: values[0] as number,
-          right: values[1] as number,
+          left,
+          right,
           kind: "resistor",
           elementId: part.element.id,
         });
     } else if (part.type === "breadboard.potentiometer") {
       const values = [...new Set(nets([1, 2, 3]))];
-      for (let i = 0; i < values.length; i += 1)
-        for (let j = i + 1; j < values.length; j += 1) {
+      values.forEach((left, index) => {
+        for (const right of values.slice(index + 1))
           edges.push({
-            left: values[i] as number,
-            right: values[j] as number,
+            left,
+            right,
             kind: "potentiometer",
             elementId: part.element.id,
           });
-        }
+      });
     } else if (part.type === "breadboard.button") {
-      const groups = breadboardBondGroups(part.type);
-      const left = nets(groups[0] ?? [])[0];
-      const right = nets(groups[1] ?? [])[0];
+      const [leftGroup = [], rightGroup = []] = breadboardBondGroups(part.type);
+      const [left] = nets(leftGroup);
+      const [right] = nets(rightGroup);
       if (left !== undefined && right !== undefined && left !== right)
         edges.push({
           left,
@@ -125,11 +125,11 @@ function conductiveEdges(
       part.type === "breadboard.led" ||
       part.type === "breadboard.diode"
     ) {
-      const values = nets([1, 2]);
-      if (values.length === 2)
+      const [left, right] = nets([1, 2]);
+      if (left !== undefined && right !== undefined)
         edges.push({
-          left: values[0] as number,
-          right: values[1] as number,
+          left,
+          right,
           kind: part.type === "breadboard.led" ? "led" : "diode",
           elementId: part.element.id,
         });
@@ -305,9 +305,11 @@ export function lintBreadboardPage(
     );
     if (!positive || !negative) continue;
     const involved = netElements.get(net.id) ?? [];
+    const [firstInvolved] = involved;
+    const [firstStrip] = net.strips;
     const target =
-      involved[0] ??
-      elements.find((element) => element.id === net.strips[0]?.boardId);
+      firstInvolved ??
+      elements.find((element) => element.id === firstStrip?.boardId);
     if (!target) continue;
     const ids =
       target.type === "breadboard.board"

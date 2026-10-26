@@ -26,7 +26,7 @@ function targetPart(
   pageId: PageId,
   reference: string,
 ): Element | undefined {
-  return document.elements
+  const [first] = document.elements
     .filter(
       (element) =>
         element.page === pageId &&
@@ -36,7 +36,8 @@ function targetPart(
         ) &&
         (element.semantic as { reference?: string }).reference === reference,
     )
-    .sort(elementOrder)[0];
+    .sort(elementOrder);
+  return first;
 }
 
 export function computeBreadboardRatsnest(

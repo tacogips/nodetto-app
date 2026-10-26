@@ -4,7 +4,7 @@ import type {
 } from "@nodetto/ir";
 import { importNetlist } from "./netlist.ts";
 import { importSchematic } from "./schematic.ts";
-import { atomAt, readSexpr } from "./sexpr.ts";
+import { atomAt, readSexpr, SEXPR_SLOT } from "./sexpr.ts";
 
 export { readSexpr } from "./sexpr.ts";
 export type { SexprAtom, SexprList, SexprNode } from "./sexpr.ts";
@@ -28,7 +28,7 @@ export function importKicad(
   const diagnostics: BreadboardImportDiagnostic[] = [...parsed.diagnostics];
   const root = parsed.root;
   if (!root) return { diagnostics };
-  const rootName = atomAt(root, 0);
+  const rootName = atomAt(root, SEXPR_SLOT.keyword);
   if (rootName === "kicad_sch")
     return {
       plan: importSchematic(root, options.fileName, diagnostics),

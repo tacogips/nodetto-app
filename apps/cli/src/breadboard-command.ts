@@ -91,8 +91,9 @@ function selectBreadboardPage(
     const resolved = resolvePageQuery(pages, query);
     return resolved.ok ? resolved.page : resolved.message;
   }
-  if (pages.length === 1) return pages[0] as Page;
-  if (!pages.length) return "The document contains no breadboard pages.";
+  const [only, ...others] = pages;
+  if (!only) return "The document contains no breadboard pages.";
+  if (!others.length) return only;
   return `The document has ${pages.length} breadboard pages; choose one with --page:\n${pages
     .map((page) => `  ${page.name} (full id: ${page.id})`)
     .join("\n")}`;
@@ -150,7 +151,7 @@ function exportCommand(
   if (parsed.options.has("--output") && parsed.options.has("--check"))
     return fail("--output and --check cannot be used together.");
 
-  const path = parsed.positional[0] as string;
+  const [path = ""] = parsed.positional;
   const document = readDocument(io, path);
   if (typeof document === "string") return fail(document);
   const selected = selectBreadboardPage(document, parsed.options.get("--page"));
@@ -204,7 +205,7 @@ function importCommand(io: CommandIo, args: readonly string[]): CommandResult {
     return fail(
       `breadboard import expects exactly one input file.\n\n${helpFor("breadboard")}`,
     );
-  const path = parsed.positional[0] as string;
+  const [path = ""] = parsed.positional;
   let source: string;
   try {
     source = io.readText(path);

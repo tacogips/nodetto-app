@@ -6,6 +6,13 @@ function csv(value: string): string {
   return /[,"\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 }
 
+function firstReference(
+  components: readonly { readonly reference: string }[],
+): string {
+  const [first] = components;
+  return first?.reference ?? "";
+}
+
 export function exportBreadboardBomCsv(
   netlist: BreadboardNetlist,
 ): BreadboardFormatterResult {
@@ -23,11 +30,11 @@ export function exportBreadboardBomCsv(
     [...components].sort((a, b) => compareReferences(a.reference, b.reference)),
   );
   ordered.sort((a, b) =>
-    compareReferences(a[0]?.reference ?? "", b[0]?.reference ?? ""),
+    compareReferences(firstReference(a), firstReference(b)),
   );
   const rows = ["Item,Qty,References,Value,Part,Footprint"];
   ordered.forEach((components, index) => {
-    const first = components[0];
+    const [first] = components;
     if (!first) return;
     rows.push(
       [

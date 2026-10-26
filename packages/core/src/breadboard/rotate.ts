@@ -13,12 +13,12 @@ export function planBreadboardRotation(
   for (const id of ids) {
     const element = store.get(id);
     if (!element || !isBreadboardPartType(element.type)) continue;
-    const first = breadboardPins(element)[0];
+    const [first] = breadboardPins(element);
     if (!first) continue;
     const rotation =
       ((element.visual.rotation ?? 0) + quarterTurns * 90 + 360) % 360;
     const rotated = { ...element, visual: { ...element.visual, rotation } };
-    const nextPin = breadboardPins(rotated)[0];
+    const [nextPin] = breadboardPins(rotated);
     if (!nextPin) continue;
     const fixed = snapBreadboardPoint({ x: first.x, y: first.y });
     const x = (element.visual.x ?? 0) + fixed.x - nextPin.x;

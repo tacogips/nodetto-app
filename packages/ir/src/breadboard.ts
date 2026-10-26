@@ -14,18 +14,20 @@ export function parseComponentValue(text: string): number | undefined {
       break;
     }
   }
-  const rkm = numeric.match(/^(\d+)([RKkMmGPpNnUu\u00b5])([0-9]*)$/);
+  const rkm = numeric.match(
+    /^(?<whole>\d+)(?<unit>[RKkMmGPpNnUu\u00b5])(?<fraction>[0-9]*)$/,
+  )?.groups;
   if (rkm) {
-    const [, whole = "", unit = "", fraction = ""] = rkm;
+    const { whole = "", unit = "", fraction = "" } = rkm;
     const prefix = unit === "R" ? "" : unit;
     const number = Number(`${whole}.${fraction}`);
     return scale(number, prefix);
   }
   const match = numeric.match(
-    /^((?:\d+(?:\.\d*)?)|(?:\.\d+))([pnu\u00b5umkKMG]?)$/,
-  );
+    /^(?<mantissa>(?:\d+(?:\.\d*)?)|(?:\.\d+))(?<prefix>[pnu\u00b5umkKMG]?)$/,
+  )?.groups;
   if (!match) return undefined;
-  return scale(Number(match[1]), match[2] ?? "");
+  return scale(Number(match.mantissa), match.prefix ?? "");
 }
 
 function scale(value: number, prefix: string): number | undefined {
@@ -102,18 +104,19 @@ export interface BreadboardImportResult {
 
 export function compareReferences(a: string, b: string): number {
   const parse = (reference: string) =>
-    reference.match(/^([A-Za-z]+)(\d+|\?)(.*)$/);
+    reference.match(/^(?<prefix>[A-Za-z]+)(?<number>\d+|\?)(?<suffix>.*)$/)
+      ?.groups;
   const left = parse(a);
   const right = parse(b);
-  if (left && right && left[1] === right[1]) {
-    const leftUnannotated = left[2] === "?";
-    const rightUnannotated = right[2] === "?";
+  if (left && right && left.prefix === right.prefix) {
+    const leftUnannotated = left.number === "?";
+    const rightUnannotated = right.number === "?";
     if (leftUnannotated !== rightUnannotated) return leftUnannotated ? 1 : -1;
     if (!leftUnannotated) {
-      const delta = Number(left[2]) - Number(right[2]);
+      const delta = Number(left.number) - Number(right.number);
       if (delta !== 0) return delta;
     }
-    const suffix = (left[3] ?? "").localeCompare(right[3] ?? "");
+    const suffix = (left.suffix ?? "").localeCompare(right.suffix ?? "");
     if (suffix !== 0) return suffix;
   }
   return a.localeCompare(b);

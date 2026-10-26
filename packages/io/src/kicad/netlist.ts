@@ -4,12 +4,18 @@ import {
   type BreadboardImportPart,
   type BreadboardImportPlan,
 } from "@nodetto/ir";
-import { atomAt, child, children, type SexprList } from "./sexpr.ts";
+import {
+  atomAt,
+  child,
+  children,
+  SEXPR_SLOT,
+  type SexprList,
+} from "./sexpr.ts";
 import { mapKicadSymbol } from "./symbol-map.ts";
 
 const atom = (list: SexprList | undefined, key: string) => {
   const item = list ? child(list, key) : undefined;
-  return item ? atomAt(item, 1) : undefined;
+  return item ? atomAt(item, SEXPR_SLOT.value) : undefined;
 };
 const listHead = (list: SexprList, key: string) => children(list, key);
 type Part = BreadboardImportPart & {
@@ -185,8 +191,8 @@ export function importNetlist(
       ),
     }))
     .sort((a, b) => {
-      const an = a.nodes[0];
-      const bn = b.nodes[0];
+      const [an] = a.nodes;
+      const [bn] = b.nodes;
       return (
         (an ? (partOrder.get(an.reference) ?? 0) : 0) -
           (bn ? (partOrder.get(bn.reference) ?? 0) : 0) ||

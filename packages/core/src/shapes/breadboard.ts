@@ -125,7 +125,7 @@ export function breadboardPinAt(
       if (found) return { elementId: element.id, pin: found.number };
     } else if (element.type === "breadboard.wire") {
       const points = breadboardWirePoints(element);
-      const first = points[0];
+      const [first] = points;
       const last = points.at(-1);
       if (
         first &&
