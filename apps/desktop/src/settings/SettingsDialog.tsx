@@ -14,6 +14,8 @@ import {
 } from "@nodetto/ui-solid";
 import type { SaveMode } from "../file/save-mode.ts";
 import type { CloudSettings } from "../cloud/settings.ts";
+import type { CliInstaller } from "./cli-install.ts";
+import { CommandLineSettings } from "./CommandLineSettings.tsx";
 import "./settings.css";
 
 type Category =
@@ -22,6 +24,7 @@ type Category =
   | "snapping"
   | "files"
   | "cloud"
+  | "cli"
   | "shortcuts";
 export interface SettingsDialogProps {
   readonly workspace: WorkspaceId;
@@ -44,6 +47,8 @@ export interface SettingsDialogProps {
   readonly cloud?: CloudSettings;
   readonly onCloudChange: (settings: CloudSettings) => void;
   readonly onOpenCloud: () => void;
+  /** Installs the bundled nodetto-cli; omitted outside the desktop host. */
+  readonly cliInstaller?: CliInstaller;
   readonly onClose: () => void;
 }
 
@@ -57,6 +62,7 @@ export function SettingsDialog(props: SettingsDialogProps): JSX.Element {
       { id: "snapping", label: "Snapping" },
       ...(props.filesAvailable ? [{ id: "files", label: "Files" }] : []),
       ...(props.cloud ? [{ id: "cloud", label: "Collaboration" }] : []),
+      ...(props.cliInstaller ? [{ id: "cli", label: "Command line" }] : []),
       { id: "shortcuts", label: "Shortcuts" },
     ] as readonly { id: Category; label: string }[];
   onMount(() => {
@@ -282,6 +288,9 @@ export function SettingsDialog(props: SettingsDialogProps): JSX.Element {
                 </>
               );
             }}
+          </Show>
+          <Show when={category() === "cli" && props.cliInstaller}>
+            {(installer) => <CommandLineSettings installer={installer()} />}
           </Show>
           <Show when={category() === "shortcuts"}>
             <table class="app-settings-shortcuts">

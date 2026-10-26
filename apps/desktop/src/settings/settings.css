@@ -124,3 +124,38 @@
     max-width: 100%;
   }
 }
+.app-settings-cli {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.app-settings-cli p {
+  margin: 0;
+}
+.app-settings-cli code {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--nodetto-line);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.app-settings-cli-detail {
+  color: var(--nodetto-muted);
+  font-size: 12px;
+}
+.app-settings-cli-detail code {
+  display: inline;
+  padding: 1px 4px;
+}
+.app-settings-cli-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.app-settings-cli-notice {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}

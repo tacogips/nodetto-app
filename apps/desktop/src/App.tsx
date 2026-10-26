@@ -6,6 +6,7 @@ import {
   type DesignTemplateId,
 } from "@nodetto/core";
 import { SettingsDialog } from "./settings/SettingsDialog.tsx";
+import type { CliInstaller } from "./settings/cli-install.ts";
 import {
   loadEditorPreferences,
   storeEditorPreferences,
@@ -112,6 +113,8 @@ export interface AppProps {
   readonly exportBackend: ExportBackend;
   /** Documents the OS asked to open; omitted by shells without a host OS. */
   readonly launchBackend?: LaunchBackend;
+  /** Installs the bundled nodetto-cli from Settings; desktop only. */
+  readonly cliInstaller?: CliInstaller;
   readonly cloudSettings?: CloudSettings;
   readonly onCloudSettingsChange?: (settings: CloudSettings) => void;
   /** Opaque account lifecycle signal for invalidating cloud list pages. */
@@ -1050,6 +1053,7 @@ export function App(props: AppProps): JSX.Element {
           filePath={file().filePath}
           cloud={props.cloud ? settings() : undefined}
           onCloudChange={updateSettings}
+          cliInstaller={props.cliInstaller}
           onOpenCloud={() => {
             setSettingsOpen(false);
             setCloudPanelExpanded(true);

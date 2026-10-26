@@ -6,6 +6,7 @@
 // parses or interprets JSONL.
 
 mod attachments;
+mod cli_install;
 mod close;
 mod dialogs;
 #[cfg(target_os = "macos")]
@@ -61,6 +62,9 @@ pub fn run() {
             watch::watch_document,
             watch::unwatch_document,
             launch::take_launch_paths,
+            cli_install::cli_install_status,
+            cli_install::cli_install,
+            cli_install::cli_uninstall,
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Tauri application")

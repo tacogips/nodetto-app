@@ -14,6 +14,7 @@ import { createExportBackend, createFileBackend } from "./file/backend.ts";
 import { createLaunchBackend } from "./file/launch.ts";
 import { installCloseGuard } from "./file/close.ts";
 import { DocumentSession } from "./file/session.ts";
+import { createCliInstaller } from "./settings/cli-install.ts";
 import "./style.css";
 import "./inspector.css";
 
@@ -43,6 +44,7 @@ render(
       filesAvailable={backend.available}
       exportBackend={exportBackend}
       launchBackend={createLaunchBackend()}
+      cliInstaller={createCliInstaller()}
     />
   ),
   root,

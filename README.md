@@ -78,7 +78,15 @@ brew install --cask tacogips/tap/nodetto
 ```
 
 The cask installs the local-only `Nodetto.app` and links the bundled
-`nodetto-cli` command. The desktop client does not create a cloud session or
+`nodetto-cli` command. With the DMG instead, open **Settings > Command line**
+and choose **Install nodetto-cli**: it links `~/.local/bin/nodetto-cli` to the
+copy inside the app, so app updates update the command, and adds
+`~/.local/bin` to your login shell's PATH when it is missing (`~/.zprofile`,
+`~/.bash_profile`, or `~/.config/fish/conf.d/nodetto.fish`; the panel shows
+the file and line first). Install is disabled, and the panel shows the path,
+when your shell already finds a `nodetto-cli` (for example the Homebrew link),
+and while the app runs from the disk image. **Uninstall** removes only the
+link. The App Store build cannot install outside its sandbox. The desktop client does not create a cloud session or
 show cloud/account controls; cloud workspaces belong to the hosted web edition.
 Open a document from a terminal with `nodetto-cli open path/to/file.jsonl`
 (or `open -a nodetto path/to/file.jsonl` on macOS);
