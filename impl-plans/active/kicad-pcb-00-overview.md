@@ -1,15 +1,17 @@
 # kicad-pcb-00-overview
 
 - planId: kicad-pcb-00-overview (coordination only; no writePaths)
-- design: design-docs/specs/design-kicad-pcb.md (revision 1, accepted by
-  step3 comm-009827); user QA defaults: design-docs/user-qa/kicad-pcb.md
-  (Q1-Q5, implement the defaults)
+- design: design-docs/specs/design-kicad-pcb.md (revision 3, accepted by
+  session-536 step3 comm-009975); user QA defaults:
+  design-docs/user-qa/kicad-pcb.md (Q1-Q5, implement the defaults)
 - session: opus-luna-design-and-implement-review-loop-session-530 (plans
-  01-03, committed 6865464); session-534 implements plans 04-13 through
-  impl-plans/active/kicad-pcb-s534-dispatch.json; issue: none
+  01-03, committed 6865464); sessions 534-535 (plans 04, 05, 06, 08 in
+  cf0c4d7; plan 07 in 8181d51); session-536 implements plans 09-13
+  through impl-plans/active/kicad-pcb-s536-dispatch.json; issue: none
   (workflowInput only); branch feat/kicad-pcb; gitPush=false
-- scratch root: tmp/kicad-pcb-s534/<planId>/ for plans 04-13 (git-ignored;
-  never put `*.test.ts` files there)
+- scratch root: tmp/kicad-pcb-s536/<planId>/ for plans 09-13 (git-ignored;
+  never put `*.test.ts` files there). Older plans keep their s530 or s534
+  scratch paths.
 
 ## Intent
 

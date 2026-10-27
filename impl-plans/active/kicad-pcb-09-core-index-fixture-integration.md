@@ -6,16 +6,17 @@
   kicad-pcb-05-core-editing, kicad-pcb-06-core-connectivity,
   kicad-pcb-07-core-export, kicad-pcb-08-core-shapes
 - dependency status: plans 04, 05, 06 and 08 are accepted and committed in
-  cf0c4d7; they are listed in the dispatch manifest's `acceptedDependencies`
+  cf0c4d7, and plan 07 in 8181d51. All five are listed in
+  impl-plans/active/kicad-pcb-s536-dispatch.json `acceptedDependencies`
   and are not repeated in a fanout item's `acceptedPlanIds`, which only
-  covers plans of the current manifest. Treat them as accepted. Plan 07 is
-  accepted when its ID is in `acceptedPlanIds`.
+  covers plans of the current manifest. Treat them as accepted
+  predecessors and do not block on them.
 - design: design-docs/specs/design-kicad-pcb.md sections 3.4, 4.1, 5, 7,
   11 (test matrix rows "Import preserves every item and net", "Lossless
   JSONL", "Move/rotate follow", "Ratsnest and highlight", "Gerber
   read-back")
 - progress log: impl-plans/progress/kicad-pcb-09-core-index-fixture-integration.md
-- scratch: tmp/kicad-pcb-s534/kicad-pcb-09-core-index-fixture-integration/
+- scratch: tmp/kicad-pcb-s536/kicad-pcb-09-core-index-fixture-integration/
 - protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent

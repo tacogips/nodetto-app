@@ -1,9 +1,14 @@
 # PCB Pages from KiCad Boards
 
-Status: design record, revision 2, for branch `feat/kicad-pcb`.
+Status: design record, revision 3, for branch `feat/kicad-pcb`.
 Revision 2 (session 535) pins the pad drill offset: the anchor and shape
 centre of section 3.2, and their use in sections 6.3 and 7.3. No other
 decision changed.
+Revision 3 (session 536) syncs the text with the committed plans 01-08
+(`6865464`, `cf0c4d7`, `8181d51`) before plans 09-13: the page builder
+signature (section 4.1), the CLI summary stream (section 8), the location
+of the lossless JSONL test (section 11) and the pointer to the plans
+(section 12). No behaviour changed.
 Issue: "Add a PCB page kind: KiCad .kicad_pcb import, desktop editing,
 lossless JSONL, Gerber and drill export" (workflow input only, no GitHub
 issue number; execution `opus-luna-design-and-implement-review-loop-session-530`).
@@ -217,9 +222,13 @@ Footprint graphics carry their own `layer`, `width` and `fill` like
   so `breadboard import board.kicad_pcb` fails clearly. Its result type is
   unchanged.
 - `packages/core/src/pcb-board/page.ts`: `pcbPageFromPlan(plan,
-  {pageName, idSource})` returns a page of kind `pcb` and its elements, with
-  fractional indexes in plan order. The CLI and desktop call
-  `importKicadPcb` then `pcbPageFromPlan`.
+  {pageName, pageId?, reservedIds?})` returns a page of kind `pcb` and its
+  elements, with fractional indexes in plan order.
+  `pcbDocumentFromPlan(plan, {pageName, title?, documentId?})` wraps it in
+  a new single-page document with deterministic default ids. The CLI and
+  desktop call `importKicadPcb` then `pcbDocumentFromPlan(plan, {pageName:
+  plan.title})`. Both are published from `@nodetto/core` through the
+  `pcb-board/index.ts` barrel (plan 09).
 
 ### 4.2 Parsing rules
 
@@ -517,11 +526,13 @@ warnings, notes}`. `encodePcbBoardZip` writes the stored ZIP with
 
 - `nodetto-cli pcb import <file.kicad_pcb> [--output <doc.jsonl>]
   [--strict]`: reads the board, builds a new document with one `pcb` page
-  named after the file stem, validates it, and writes it (or prints it
-  without `--output`). Prints `Board <w> x <h> mm: <f> footprints, <p>
-  pads, <t> tracks, <v> vias, <z> zones, <n> nets.` (size from the Edge.Cuts
-  extent, or `no outline`). Diagnostics as `warning:` lines; errors exit 2;
-  `--strict` exits 3 on warnings.
+  named after the file stem, validates it, and writes it (or prints it on
+  stdout without `--output`). The summary goes to stderr, as for `gerber
+  import`: `Board <w> x <h> mm: <f> footprints, <p> pads, <t> tracks, <v>
+  vias, <z> zones, <n> nets.` (size from the Edge.Cuts extent with
+  `toFixed(2)`; `Board with no outline: ...` with the same counts when
+  there is no Edge.Cuts geometry). Diagnostics as `warning:` lines; errors
+  exit 2; `--strict` exits 3 on warnings and writes nothing.
 - `nodetto-cli pcb gerber <doc.jsonl> --output <file.zip> [--page <page>]
   [--strict]`: exports the page's board. `--page` takes a page number, id or
   unique id prefix, as other commands do; without it the document's only
@@ -581,7 +592,7 @@ Fixtures are self-authored, in `test-fixtures/kicad/`, listed in its
 | --- | --- |
 | Import preserves every item and net | `packages/io/src/kicad/pcb.test.ts`: counts and selected values per item kind, net table, angle conversion, KiCad 5 conversion, diagnostics |
 | Validation | `packages/ir/src/pcb.test.ts`: each issue code, valid fixture page passes `assertValidDocument` |
-| Lossless JSONL | `packages/io/src/jsonl/roundtrip.test.ts` (pcb case): import, serialise, parse, serialise; byte-equal and deep-equal; again after a move, a rotation, an added track and via |
+| Lossless JSONL | `packages/core/src/pcb-board/fixture.test.ts` (not `packages/io`, which cannot import `@nodetto/core`'s page builder or Editor; core has `@nodetto/io` as a devDependency): import, serialise, parse, serialise; byte-equal and deep-equal; again after a move, a rotation, an added track and via |
 | Move/rotate follow | `packages/core/src/pcb-board/follow.test.ts`: attached ends stay on pads (offset kept) after `moveElements` with repeated absolute targets and after `rotatePcbFootprints`; unattached and interior points stay; arc `mid` rule; undo restores |
 | Ratsnest and highlight | `packages/core/src/pcb-board/connectivity.test.ts`: fixture has no ratsnest lines for routed nets; deleting a track yields one line on its net between the two pads; adding it back removes it; zone-connected pads are joined; `pcbNetMembers` returns every item of GND |
 | Gerber read-back | `packages/core/src/pcb-board/export.test.ts`: `readGerber` on GTL/GBL/GTS/GBS/GTO/GBO/GKO and `readExcellon` on DRL and NPTH: flash and region count and positions per pad, draws per track, arc draw for the arc track, regions for the zone fill, holes and the slot per drill, outline extent equals `width`/`height`; Gerber layers (GTL, GBL, GTS, GBS, GTO, GBO, GKO) within 1e-6 mm; Excellon holes, slot end points and tool diameters (DRL and NPTH) within 0.0005 mm of the expected board-frame values, or exactly equal to those values rounded with `toFixed(3)`; the `oracle.test-support.ts` reader accepts every file with only its known warnings; two exports are byte-equal |
@@ -592,6 +603,13 @@ Fixtures are self-authored, in `test-fixtures/kicad/`, listed in its
 | Boundary | `packages/core/src/pcb/boundary.test.ts` passes unchanged |
 
 ## 12. Implementation slicing (for the plan)
+
+The binding split is `impl-plans/active/kicad-pcb-00-overview.md` and
+plans 01-13. Plans 01-08 are committed. Plan 09 publishes the
+`pcb-board` barrel and runs the fixture acceptance tests; plans 10 (CLI),
+11 (canvas, tools, layers, workspace), 12 (inspector, Export dialog,
+`App.tsx`) and 13 (Open dialog, `session.ts`, `dialogs.rs`) then run in
+parallel with disjoint write paths. The original slices were:
 
 1. IR: page kind, `pcb.ts`, registry entries, validation tests,
    `types-command.ts` entry, PageKind-exhaustive spots.
