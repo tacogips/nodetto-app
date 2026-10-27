@@ -23,6 +23,7 @@ import {
   padCopperOutline,
   padHasCopperLayer,
   padPrimitiveOutlines,
+  padShapeCenter,
   shapeBounds,
 } from "./geometry.ts";
 import {
@@ -48,7 +49,6 @@ const GENERATOR = "Nodetto,Breadboard PCB";
 const DRILL_TITLE = "Nodetto PCB";
 const round = (n: number): number => roundNm(n);
 const point = ([x, y]: PcbXY): PcbPoint => ({ x, y });
-const add = (a: PcbXY, b: PcbXY): PcbXY => [a[0] + b[0], a[1] + b[1]];
 const mapName = (name: string | undefined): string => {
   const cleaned = (name ?? "")
     .replace(/[^A-Za-z0-9_-]+/g, "-")
@@ -263,7 +263,7 @@ function flashPad(
   copper: readonly string[],
   grow = 0,
 ): void {
-  const at = footprintToBoard(fp, pad.at);
+  const at = padShapeCenter(fp, pad);
   const r = round(fp.rotation + pad.rotation);
   const normalized = ((r % 360) + 360) % 360;
   const dims = [pad.size[0] + grow * 2, pad.size[1] + grow * 2] as const;
@@ -481,10 +481,7 @@ export function exportPcbBoard(
       )
         continue;
       const total = fp.rotation + pad.rotation;
-      const center = add(
-        footprintToBoard(fp, pad.at),
-        pcbRotate(pad.drill.offset ?? [0, 0], total),
-      );
+      const center = footprintToBoard(fp, pad.at);
       const targetHits = pad.type === "np_thru_hole" ? npthHits : hits;
       const targetSlots = pad.type === "np_thru_hole" ? npthSlots : slots;
       if (pad.drill.slot) {

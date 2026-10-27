@@ -132,6 +132,43 @@ describe("PCB track follow", () => {
     ).toEqual([0, 0]);
   });
 
+  test("follows endpoints inside an offset pad but leaves outside endpoints", () => {
+    const offsetFootprint = footprint("R1", [10, 10], 90);
+    const shiftedPad = offsetFootprint.pads[0];
+    if (!shiftedPad) throw new Error("missing pad");
+    const { editor, ids } = makeEditor(
+      [
+        line([
+          [10, 8.7],
+          [14, 8.7],
+        ]),
+        line([
+          [10, 10.8],
+          [14, 10.8],
+        ]),
+      ],
+      [
+        {
+          ...offsetFootprint,
+          pads: [
+            {
+              ...shiftedPad,
+              shape: "oval",
+              size: [2, 1],
+              drill: { diameter: 0.6, offset: [0.5, 0] },
+            },
+          ],
+        },
+      ],
+    );
+    editor.moveElements([{ id: ids.footprint, x: 110, y: 100 }]);
+    const tracks = ids.tracks.map(
+      (id) => editor.store.get(id)?.semantic as PcbTrackSemantic,
+    );
+    expect(tracks[0]?.points[0]).toEqual([11, 8.7]);
+    expect(tracks[1]?.points[0]).toEqual([10, 10.8]);
+  });
+
   test("moves two endpoints and leaves track interior points unchanged", () => {
     const { editor, ids } = makeEditor(
       [

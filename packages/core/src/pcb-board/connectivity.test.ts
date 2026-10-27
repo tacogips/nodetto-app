@@ -13,6 +13,7 @@ import {
   pcbNetMembers,
   pcbNetNames,
 } from "./connectivity.ts";
+import { computePcbRatsnest } from "./ratsnest.ts";
 
 function pad(
   at: readonly [number, number],
@@ -131,6 +132,62 @@ describe("PCB connectivity", () => {
         { footprintId: "fp-A", pad: 0 },
       ),
     ).toBe(true);
+  });
+
+  test("connects and clears ratsnest through the shifted offset pad shape", () => {
+    const offsetFootprint = {
+      ...footprint(
+        "A",
+        [10, 10],
+        [
+          {
+            ...pad([0, 0], "GND", ["F.Cu"], [2, 1]),
+            shape: "oval" as const,
+            drill: { diameter: 0.6, offset: [0.5, 0] as const },
+          },
+        ],
+      ),
+      rotation: 90,
+    };
+    const other = footprint("B", [15, 10], [pad([0, 0], "GND")]);
+    const routed = buildPcbDocument({
+      footprints: [offsetFootprint, other],
+      tracks: [
+        track([
+          [10, 8.7],
+          [15, 10],
+        ]),
+      ],
+    });
+    const routedConnectivity = computePcbConnectivity(routed, "pcb-page-1");
+    expect(
+      routedConnectivity.component({
+        kind: "pad",
+        ref: { footprintId: "fp-A", pad: 0 },
+      }),
+    ).toBe(
+      routedConnectivity.component({
+        kind: "pad",
+        ref: { footprintId: "fp-B", pad: 0 },
+      }),
+    );
+    expect(
+      computePcbRatsnest(routed, "pcb-page-1", routedConnectivity),
+    ).toEqual([]);
+
+    const open = buildPcbDocument({
+      footprints: [offsetFootprint, other],
+      tracks: [
+        track([
+          [10, 10.8],
+          [15, 10],
+        ]),
+      ],
+    });
+    const openConnectivity = computePcbConnectivity(open, "pcb-page-1");
+    expect(
+      computePcbRatsnest(open, "pcb-page-1", openConnectivity),
+    ).toHaveLength(1);
   });
 
   test("joins a T-junction and never joins crossing copper from another net", () => {

@@ -5,10 +5,13 @@ import {
   arcCenter,
   boardToFootprint,
   expandCopperLayers,
+  footprintBounds,
   footprintToBoard,
   outlineBounds,
   outlineContains,
   padCopperOutline,
+  padPrimitiveOutlines,
+  padShapeCenter,
   pcbAnchor,
   translatePcbSemantic,
 } from "./geometry.ts";
@@ -53,6 +56,97 @@ describe("PCB geometry", () => {
       expect(outlineContains(outline, [0, 0])).toBe(true);
       expect(outlineContains(outline, [5, 5])).toBe(false);
     }
+  });
+  test("centres offset pad copper and primitives away from the drill anchor", () => {
+    const transform = { at: [10, 10] as const, rotation: 90 };
+    const offsetPad: PcbPad = {
+      ...rectPad,
+      shape: "oval",
+      size: [2, 1],
+      drill: { diameter: 0.6, offset: [0.5, 0] },
+    };
+    const center = padShapeCenter(transform, offsetPad);
+    expect(center).toEqual([10, 9.5]);
+    const outline = padCopperOutline(transform, offsetPad);
+    expect(outlineBounds(outline)).toEqual({
+      minX: 9.5,
+      minY: 8.5,
+      maxX: 10.5,
+      maxY: 10.5,
+    });
+    expect(outlineContains(outline, center)).toBe(true);
+    expect(outlineContains(outline, [10, 10])).toBe(true);
+    expect(outlineContains(outline, [10, 10.8])).toBe(false);
+    const grown = padCopperOutline(transform, offsetPad, 0.1);
+    expect(outlineBounds(grown).minX + 0.1).toBeCloseTo(9.5, 9);
+
+    const diagonal = { ...transform, rotation: 45 };
+    const diagonalCenter = padShapeCenter(diagonal, offsetPad);
+    const diagonalOutline = padCopperOutline(diagonal, offsetPad);
+    if (diagonalOutline.kind === "circle")
+      expect(diagonalOutline.center).toEqual(diagonalCenter);
+    else {
+      const arcCenters = diagonalOutline.segments.flatMap((segment) =>
+        segment.arc ? [segment.arc.center] : [],
+      );
+      expect(arcCenters).toHaveLength(2);
+      expect((arcCenters[0]?.[0] ?? 0) + (arcCenters[1]?.[0] ?? 0)).toBeCloseTo(
+        diagonalCenter[0] * 2,
+        9,
+      );
+      expect((arcCenters[0]?.[1] ?? 0) + (arcCenters[1]?.[1] ?? 0)).toBeCloseTo(
+        diagonalCenter[1] * 2,
+        9,
+      );
+    }
+    const circle = padCopperOutline(transform, {
+      ...offsetPad,
+      shape: "circle",
+    });
+    expect(circle).toEqual({ kind: "circle", center, radius: 1 });
+
+    const custom: PcbPad = {
+      ...offsetPad,
+      shape: "custom",
+      primitives: [
+        {
+          width: 0,
+          fill: true,
+          shape: {
+            kind: "polygon",
+            points: [
+              [0, 0],
+              [1, 0],
+              [0, 1],
+            ],
+          },
+        },
+      ],
+    };
+    const primitive = padPrimitiveOutlines(transform, custom)[0];
+    expect(primitive?.kind).toBe("contour");
+    if (primitive?.kind === "contour") {
+      expect(primitive.start).toEqual([10, 9.5]);
+      expect(primitive.segments[0]?.to).toEqual([10, 8.5]);
+    }
+    expect(
+      footprintBounds({
+        reference: "R1",
+        value: "",
+        library: "",
+        at: transform.at,
+        rotation: transform.rotation,
+        side: "top",
+        pads: [offsetPad],
+        graphics: [],
+      }),
+    ).toEqual(outlineBounds(outline));
+    expect(outlineBounds(padCopperOutline(fp, rectPad))).toEqual({
+      minX: 3.5,
+      minY: 2,
+      maxX: 4.5,
+      maxY: 4,
+    });
   });
   test("computes bounds and containment for a vertical oval", () => {
     const pad: PcbPad = { ...rectPad, shape: "oval", size: [1, 3] };

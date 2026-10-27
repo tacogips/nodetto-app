@@ -5,6 +5,11 @@
 - wave: 3; dependsOn: kicad-pcb-04-kicad-reader,
   kicad-pcb-05-core-editing, kicad-pcb-06-core-connectivity,
   kicad-pcb-07-core-export, kicad-pcb-08-core-shapes
+- dependency status: plans 04, 05, 06 and 08 are accepted and committed in
+  cf0c4d7; they are listed in the dispatch manifest's `acceptedDependencies`
+  and are not repeated in a fanout item's `acceptedPlanIds`, which only
+  covers plans of the current manifest. Treat them as accepted. Plan 07 is
+  accepted when its ID is in `acceptedPlanIds`.
 - design: design-docs/specs/design-kicad-pcb.md sections 3.4, 4.1, 5, 7,
   11 (test matrix rows "Import preserves every item and net", "Lossless
   JSONL", "Move/rotate follow", "Ratsnest and highlight", "Gerber

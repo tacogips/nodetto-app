@@ -54,6 +54,15 @@ const pointLineDistanceSquared = (p: PcbXY, a: PcbXY, b: PcbXY): number => {
 export function footprintToBoard(fp: Transform, local: PcbXY): PcbXY {
   return add(fp.at, pcbRotate(local, fp.rotation));
 }
+export function padShapeCenter(
+  fp: { readonly at: PcbXY; readonly rotation: number },
+  pad: PcbPad,
+): PcbXY {
+  return add(
+    footprintToBoard(fp, pad.at),
+    pcbRotate(pad.drill?.offset ?? [0, 0], fp.rotation + pad.rotation),
+  );
+}
 export function boardToFootprint(fp: Transform, board: PcbXY): PcbXY {
   return pcbRotate(sub(board, fp.at), -fp.rotation);
 }
@@ -94,7 +103,7 @@ export function padCopperOutline(
   const [w, h] = pad.size;
   const width = w + 2 * grow;
   const height = h + 2 * grow;
-  const center = footprintToBoard(fp, pad.at);
+  const center = padShapeCenter(fp, pad);
   const t = { at: center, rotation: fp.rotation + pad.rotation };
   if (pad.shape === "circle" || (pad.shape === "custom" && width === height))
     return { kind: "circle", center, radius: width / 2 };
@@ -187,14 +196,15 @@ export function padCopperOutline(
 }
 
 export function padPrimitiveOutlines(fp: Transform, pad: PcbPad): PcbOutline[] {
+  const center = padShapeCenter(fp, pad);
   return (pad.primitives ?? []).map((primitive: PcbPadPrimitive) =>
     primitive.shape.kind === "polygon"
       ? mapOutline(contour(primitive.shape.points), {
-          at: footprintToBoard(fp, pad.at),
+          at: center,
           rotation: fp.rotation + pad.rotation,
         })
       : shapeOutline(primitive.shape, {
-          at: footprintToBoard(fp, pad.at),
+          at: center,
           rotation: fp.rotation + pad.rotation,
         }),
   );

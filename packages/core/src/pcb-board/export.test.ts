@@ -227,8 +227,8 @@ describe("PCB board export", () => {
       drills.slots[0]?.from.y ?? 0,
       drills.slots[0]?.to.y ?? 0,
     ].sort((a, b) => a - b);
-    expect(slotYs[0]).toBeCloseTo(8.25, 3);
-    expect(slotYs[1]).toBeCloseTo(10.25, 3);
+    expect(slotYs[0]).toBeCloseTo(8, 3);
+    expect(slotYs[1]).toBeCloseTo(10, 3);
     expect(
       Math.abs((drills.slots[0]?.to.y ?? 0) - (drills.slots[0]?.from.y ?? 0)),
     ).toBeCloseTo(2, 3);
@@ -242,6 +242,112 @@ describe("PCB board export", () => {
     expect(npth.files.map((item) => item.path).at(-1)).toBe("pcb-NPTH.DRL");
     expect(readExcellon(file(npth, "-NPTH.DRL")).plating).toBe("nonPlated");
     expect(readExcellon(file(npth, ".DRL")).holes).toHaveLength(0);
+  });
+
+  test("exports offset pad shapes at S and holes and slots at anchor A", () => {
+    const boardOutline: PcbGraphicSemantic[] = [
+      {
+        layer: "Edge.Cuts",
+        width: 0.1,
+        fill: false,
+        shape: { kind: "rect", start: [-1, -2], end: [20, 20] },
+      },
+    ];
+    const offsetPad = pad({
+      type: "thru_hole",
+      shape: "oval",
+      at: [0, 0],
+      size: [2, 1],
+      layers: ["F.Cu", "F.Mask"],
+      drill: { diameter: 0.6, offset: [0.5, 0] },
+    });
+    const orthogonal = exported({
+      graphics: boardOutline,
+      footprints: [
+        footprint({ at: [10, 10], rotation: 90, pads: [offsetPad] }),
+      ],
+    });
+    const copper = readGerber(file(orthogonal, ".GTL"));
+    const copperFlash = copper.objects.find(
+      (item) =>
+        item.kind === "flash" &&
+        item.aperture.kind === "obround" &&
+        item.at.x === 11 &&
+        item.at.y === 10.5,
+    );
+    expect(copperFlash?.kind).toBe("flash");
+    const mask = readGerber(file(orthogonal, ".GTS"));
+    expect(
+      mask.objects.some(
+        (item) =>
+          item.kind === "flash" &&
+          item.aperture.kind === "obround" &&
+          item.at.x === 11 &&
+          item.at.y === 10.5,
+      ),
+    ).toBe(true);
+    expect(readExcellon(file(orthogonal, ".DRL")).holes).toContainEqual({
+      at: { x: 11, y: 10 },
+      diameter: 0.6,
+    });
+
+    const diagonal = exported({
+      graphics: boardOutline,
+      footprints: [
+        footprint({ at: [10, 10], rotation: 45, pads: [offsetPad] }),
+      ],
+    });
+    const diagonalCopper = readGerber(file(diagonal, ".GTL"));
+    const region = diagonalCopper.objects.find(
+      (item) => item.kind === "region",
+    );
+    expect(region?.kind).toBe("region");
+    if (region?.kind === "region") {
+      const arcCenters = region.contours.flatMap((item) =>
+        item.segments.flatMap((segment) =>
+          segment.arc ? [segment.arc.center] : [],
+        ),
+      );
+      expect(arcCenters).toHaveLength(2);
+      const shapeCenter = [
+        10 + 0.5 * Math.SQRT1_2 + 1,
+        20 - (10 - 0.5 * Math.SQRT1_2),
+      ];
+      expect((arcCenters[0]?.x ?? 0) + (arcCenters[1]?.x ?? 0)).toBeCloseTo(
+        shapeCenter[0] * 2,
+        6,
+      );
+      expect((arcCenters[0]?.y ?? 0) + (arcCenters[1]?.y ?? 0)).toBeCloseTo(
+        shapeCenter[1] * 2,
+        6,
+      );
+    }
+    expect(readExcellon(file(diagonal, ".DRL")).holes).toContainEqual({
+      at: { x: 11, y: 10 },
+      diameter: 0.6,
+    });
+
+    const slotted = exported({
+      graphics: boardOutline,
+      footprints: [
+        footprint({
+          at: [10, 10],
+          rotation: 90,
+          pads: [
+            {
+              ...offsetPad,
+              drill: { diameter: 0.6, offset: [0.5, 0], slot: [3, 1] },
+            },
+          ],
+        }),
+      ],
+    });
+    const slot = readExcellon(file(slotted, ".DRL")).slots[0];
+    expect(slot?.from.x).toBeCloseTo(11, 3);
+    expect(slot?.to.x).toBeCloseTo(11, 3);
+    const slotYs = [slot?.from.y ?? 0, slot?.to.y ?? 0].sort((a, b) => a - b);
+    expect(slotYs[0]).toBeCloseTo(9, 3);
+    expect(slotYs[1]).toBeCloseTo(11, 3);
   });
 
   test("exports bottom legend only when present, preserves warnings and notes", () => {

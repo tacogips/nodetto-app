@@ -21,7 +21,8 @@ tracks and arc tracks, vias, zones with their stored outlines and fills,
 Edge.Cuts lines, arcs, circles, rectangles and polygons, plus silkscreen and
 fabrication text and graphics. Pad support includes circle, rectangle, oval,
 round rectangle, trapezoid and custom polygon shapes. Drill holes include oval
-slots and offsets.
+slots. A pad's drill offset moves the pad's copper, mask and paste shapes; the
+hole stays at the pad position, as in KiCad.
 
 Dimensions, targets, images, text boxes, rule areas, non-polygon pad
 primitives and 3D models are skipped with a warning. Group membership is

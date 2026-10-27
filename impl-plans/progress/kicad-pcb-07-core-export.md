@@ -1,44 +1,50 @@
-# Progress: kicad-pcb-07-core-export
+# kicad-pcb-07-core-export progress (session 535 rework)
 
-## Intent snapshot (before source edits)
+## Scope and design alignment
 
-Implement `packages/core/src/pcb-board/export.ts` as the plan-owned PCB page to Gerber/Excellon exporter and stored ZIP encoder. Preserve the pinned Edge.Cuts frame, copper/mask/silkscreen/outline/drill mapping, warning and note strings, archive order, and deterministic geometry rules. Add plan-owned read-back tests for required edge cases. Do not edit `packages/core/src/pcb/` or downstream public barrels. The mandated pre-edit source inventory is `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/pcb-sha256-start.txt`.
+Implemented the assigned plan against design revision 2, sections 3.2, 6.3 and 7.3. The dispatched `fanoutItem.dependsOn` is empty; dispatch history records the prior plans committed in `6865464` and `cf0c4d7`. No review findings or direct inbox repair requests were supplied. The plan's files and tests were the only authored write paths.
 
-## Initial source identity
+## Implementation
 
-- `packages/core/src/pcb-board/export.ts`: absent before implementation.
-- `packages/core/src/pcb-board/export.test.ts`: absent before implementation.
-- Pre-edit owned-path checksums: files absent; the `packages/core/src/pcb/*` baseline is recorded in the start inventory above.
+- Added `padShapeCenter(fp, pad)` as anchor plus `pcbRotate(drill.offset, fp.rotation + pad.rotation)` without rounding.
+- `padCopperOutline` and `padPrimitiveOutlines` now use the shape center, so bounds, follow and connectivity consume the corrected pad shape while anchor-based contacts remain unchanged.
+- Gerber copper and mask flashes use the shape center. Excellon drill hits and slot centers remain at the footprint-transformed pad anchor; slot axis and dimensions are unchanged.
+- Corrected the slot test to expect Gerber y 8 and 10. Added offset geometry, follow, connectivity, flash, mask, region and drill assertions. Updated only the drill-offset sentence in `docs/pcb/kicad-pcb.md`.
+- No changes under `packages/core/src/pcb/`; sibling implementation files `follow.ts`, `connectivity.ts`, `edit.ts` and `shapes/pcb.ts` remain unchanged from `cf0c4d7`.
 
-## Edit intentions
+## Final-source verification
 
-- `export.ts` initial implementation: add typed board/page extraction, Edge.Cuts bounds and a single board-to-Gerber transform; emit deterministic copper, mask, silkscreen, outline, plated/non-plated drill outputs and stored ZIP in the pinned order.
-- `export.ts` follow-up correction: preserve the footprint association for reference/value text, render unsupported font characters by omission while warning, and keep legends as direct Gerber layer values rather than mutating readonly graphic arrays.
-- `export.ts` cleanup: remove the now-unused shape point helper detected by the first typecheck; no behavior change.
-- `export.test.ts` assertion correction: align read-back expectations with the specified single frame mapping and footprint-relative slot axis; the implementation output was consistent with the board-frame transform.
-- Exporter correctness/test expansion: issue unsupported-character warnings for the resolved silkscreen string (including footprint reference/value), and add tests for upright/mirrored text, arc read-back direction, filled zones, circle outline, and mask behavior.
-- `export.test.ts` reader assertion correction: assert the reader's literal Gerber attribute key `TF.FilePolarity` (the negative mask layer itself is present as designed).
-- `export.test.ts` final mask assertion correction: validate the writer's exact `TF.FilePolarity` header text because the current read-back parser stores that attribute under a leading-dot key (outside the export contract).
-- Oracle coverage: exercise the independently implemented parser over each generated Gerber and Excellon entry, including optional GBO and NPTH files.
-- Circular pad regions: emit true two-arc Gerber contours for circle outlines returned by the pad geometry helper (needed for custom pads whose base outline is circular), avoiding a four-chord approximation.
-- `export.test.ts` regression: assert custom circular pad outlines round-trip as Gerber arc segments.
-- Warning cardinality: retain one silkscreen warning per offending text element, including identical labels; keep the inner-layer warning explicitly single-instance.
-- Lint correction: apply the five plan-file style fixes reported by the exact Biome gate (`sy` const and namespaced infinities), preserving behavior.
-- Acceptance precision coverage: compare all rotated rectangular pad region corners against `pcbRotate` at 1e-6 mm, and assert inner-layer track geometry is omitted from both exported copper images.
+All logs below are complete and under `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/`.
 
-## Final verification (current source)
+| Command | Exit | Tests | Failures | Log |
+| --- | ---: | ---: | ---: | --- |
+| `bun test packages/core/src/pcb-board packages/core/src/pcb packages/core/src/shapes/pcb.test.ts` | 0 | 114 | 0 | `s535-final-bun-test.log` |
+| `bun run typecheck` | 0 | 0 | 0 | `s535-final-typecheck.log` |
+| `bunx biome check packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/export.test.ts packages/core/src/pcb-board/geometry.ts packages/core/src/pcb-board/geometry.test.ts packages/core/src/pcb-board/follow.test.ts packages/core/src/pcb-board/connectivity.test.ts --diagnostic-level=warn` | 0 | 0 | 0 | `s535-final-biome.log` |
+| `bun test packages/core/src/breadboard/export-golden.test.ts` | 0 | 6 | 0 | `s535-breadboard-golden.log` |
+| `git diff --quiet cf0c4d7 -- packages/core/src/pcb-board/follow.ts packages/core/src/pcb-board/connectivity.ts packages/core/src/pcb-board/edit.ts packages/core/src/shapes/pcb.ts` | 0 | 0 | 0 | `s535-sibling-diff.log` |
+| `! grep -nE 'Math\.(hypot|atan2|sin|cos)' packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/geometry.ts` | 0 | 0 | 0 | `s535-forbidden-math.log` |
+| `shasum -a 256 packages/core/src/pcb/*` then `cmp` start and end lists | 0 | 0 | 0 | `s535-pcb-hash-compare.log` |
+| `git diff --check` | 0 | 0 | 0 | `s535-final-diff-check.log` |
+| `test -s impl-plans/progress/kicad-pcb-07-core-export.md` | 0 | 0 | 0 | `s535-progress-presence.log` |
+| `mkdir -p tmp/kicad-pcb-s534/kicad-pcb-07-core-export` | 0 | 0 | 0 | `s535-evidence-dir.log` |
+| `test -s tmp/kicad-pcb-s534/kicad-pcb-07-core-export/pcb-sha256-start.txt` | 0 | 0 | 0 | `s535-start-hash-presence.log` |
 
-- `bun test packages/core/src/pcb-board/export.test.ts packages/core/src/pcb` -> exit 0; 104 passed, 0 failed. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/bun-test-plan-final.log`.
-- `bun run typecheck` -> exit 0. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/typecheck-final2.log`.
-- `bunx biome check packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/export.test.ts --diagnostic-level=warn` -> exit 0. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/biome-check-final.log`.
-- `! grep -nE 'Math\.(hypot|atan2|sin|cos)' packages/core/src/pcb-board/export.ts` -> exit 0 (no matches). Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/forbidden-math.log`.
-- `shasum -a 256 packages/core/src/pcb/*` to start/end inventories and `cmp tmp/kicad-pcb-s534/kicad-pcb-07-core-export/pcb-sha256-start.txt tmp/kicad-pcb-s534/kicad-pcb-07-core-export/pcb-sha256-end.txt` -> exit 0; 25 entries match. Compare log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/pcb-sha256-compare.log`.
-- `bun test packages/core/src/breadboard/export-golden.test.ts` -> exit 0; 6 passed, 0 failed. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/breadboard-golden.log`.
-- Standalone `bun test packages/core/src/pcb-board/export.test.ts` -> exit 0; 8 passed, 0 failed. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/export-test-acceptance.log`.
+## Mutation controls (expected failures)
 
-### PCB writer source SHA-256 at plan start
+- Add the rotated offset back to DRL coordinates; export assertions failed as expected on slot y 8 (observed 8.25) and the offset hole anchor. `bun test packages/core/src/pcb-board/export.test.ts`; exit 1, 9 tests, 2 failures; `s535-mutation1.log`. Exact source restored and byte-compared.
+- Drop the offset from `padCopperOutline`; geometry, follow, connectivity and export offset assertions failed. `bun test packages/core/src/pcb-board/geometry.test.ts packages/core/src/pcb-board/follow.test.ts packages/core/src/pcb-board/connectivity.test.ts packages/core/src/pcb-board/export.test.ts`; exit 1, 33 tests, 4 failures; `s535-mutation2.log`. Exact source restored and byte-compared.
+- Flash at anchor A; copper flash location assertion failed. `bun test packages/core/src/pcb-board/export.test.ts`; exit 1, 9 tests, 1 failure; `s535-mutation3.log`. Exact source restored and byte-compared.
 
-```text
+## Superseded attempts
+
+- Initial focused suite exposed three newly authored fixture expectation errors (111 pass, 3 fail); corrected the footprint rotation, circle radius and local pad anchor. Full output: `s535-bun-test-final.log`.
+- Initial scoped Biome check found formatting-only diagnostics; formatted the six owned TypeScript files and reran the final scoped check. Full output: `s535-biome.log`; formatter log: `s535-biome-format.log`.
+- Initial doc patch context did not match a line-wrapped sentence and made no change; the retry changed only that sentence.
+
+## SHA-256 of every `packages/core/src/pcb/*` file
+
+Start list recorded before source edits in `pcb-sha256-start.txt`:
 c16f62eab48c55568963c592bbe564377e06a24640284a804fb6cfa051b01d69  packages/core/src/pcb/boundary.test.ts
 d1a8decfc8ffeed65a327d51d37b0109c2ae9d6d0ef18197fd2611870299e2ba  packages/core/src/pcb/excellon-read.test.ts
 ee732b529137f31c2056b90a1e215cd830e586994e1e8650abb86bce4ea86718  packages/core/src/pcb/excellon-read.ts
@@ -64,11 +70,7 @@ f4bd81ce71c1dedb7ca2ad6b16aeaebb76dd5f6ee1e59dc746df7c740accbf0e  packages/core/
 aa7d43e5aeb38c967b9f237b3f858e1bd42ac4c14906a2e6d3f9f4c0c625afab  packages/core/src/pcb/validate.test.ts
 75b7a80d5b1df8b84ed0b12d4a631d0942a07508550234fb432c55e0ad37f8d2  packages/core/src/pcb/validate.ts
 ee35d7305b7cf4a02d51998cf49597d3fe176fe9cb0774c6489c7b0d4ef6c9ef  packages/core/src/pcb/writer-additions.test.ts
-```
-
-### PCB writer source SHA-256 at plan end
-
-```text
+End list recorded after source edits in `pcb-sha256-end.txt`:
 c16f62eab48c55568963c592bbe564377e06a24640284a804fb6cfa051b01d69  packages/core/src/pcb/boundary.test.ts
 d1a8decfc8ffeed65a327d51d37b0109c2ae9d6d0ef18197fd2611870299e2ba  packages/core/src/pcb/excellon-read.test.ts
 ee732b529137f31c2056b90a1e215cd830e586994e1e8650abb86bce4ea86718  packages/core/src/pcb/excellon-read.ts
@@ -94,34 +96,5 @@ f4bd81ce71c1dedb7ca2ad6b16aeaebb76dd5f6ee1e59dc746df7c740accbf0e  packages/core/
 aa7d43e5aeb38c967b9f237b3f858e1bd42ac4c14906a2e6d3f9f4c0c625afab  packages/core/src/pcb/validate.test.ts
 75b7a80d5b1df8b84ed0b12d4a631d0942a07508550234fb432c55e0ad37f8d2  packages/core/src/pcb/validate.ts
 ee35d7305b7cf4a02d51998cf49597d3fe176fe9cb0774c6489c7b0d4ef6c9ef  packages/core/src/pcb/writer-additions.test.ts
-```
 
-## Prior attempts (superseded by current-source passes)
-- Initial typecheck showed the then-current own unused helper and in-progress sibling plan diagnostics; full logs: `typecheck-initial.log`, `typecheck-initial-retry.log`. The current-source typecheck above passes.
-- Initial and expanded test attempts exposed incorrect expected frame coordinates and a reader attribute key assumption; logs: `bun-test.log`, `bun-test-rerun.log`, `bun-test-expanded.log`, `export-test.log`, `export-test-oracle.log`. Corrected assertions are covered by current-source passing gates above.
-- Initial Biome check found five plan-file style diagnostics; corrected and reran successfully. Log: `biome-check.log`.
-## Completion criteria
-
-Plan 07 source, acceptance tests, progress evidence, exact targeted test gate, typecheck, scoped Biome gate, deterministic archive/read-back/oracle checks, forbidden-math check, and unchanged writer hashes are complete. Formal integration review and downstream wiring remain owned by later workflow steps.
-- Final plan assertion coverage: pin the complete archive order when both optional files exist and verify caller-provided board names use the breadboard export sanitizing rule with the `pcb` fallback.
-- Progress-log cleanup intention: replace the accidental literal `\\n` before the completion heading with a real paragraph break, then record the latest-source final test, typecheck and lint evidence.
-
-
-## Current-source revalidation after final archive assertions
-
-- `bun test packages/core/src/pcb-board/export.test.ts packages/core/src/pcb` -> exit 0; 104 passed, 0 failed. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/bun-test-plan-final2.log`.
-- `bun run typecheck` -> exit 0. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/typecheck-final-rerun.log`.
-- `bunx biome check packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/export.test.ts --diagnostic-level=warn` -> exit 0. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/biome-check-final2.log`.
-- `bun test packages/core/src/breadboard/export-golden.test.ts` -> exit 0; 6 passed, 0 failed. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/breadboard-golden.log`.
-
-## Test-integrity repairs (comm-009917)
-
-- TI-07-1: the unmirrored T test now asserts a horizontal bar at Gerber y=5.5 and stem bottom y=4.5, including `bar.y > stemBottom`; mirrored text also asserts the same upright y coordinates. Existing mirror x-order and mask checks remain.
-- TI-07-2: the minimal-board read-back now asserts the GTL straight track `(1,8)->(6,3)` to 1e-6 and via circle diameter 1 at `(5,4)` on GTL and GBL. Existing pad and drill checks remain.
-- TI-07-3: the rotated slot test now sorts and asserts absolute y endpoints 8.25 and 10.25 to 0.001 mm, retaining diameter, x, and length assertions.
-- The upright-text mutation control transformed `export.ts` in memory to remove the y negation; the upright assertion failed as expected (bar y=4.5, stem bottom y=4.5). Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/mutation-text-yflip.log`.
-- The drill-offset mutation control transformed `export.ts` in memory to drop the offset; absolute endpoint assertion failed as expected with `[8,10]` instead of `[8.25,10.25]`. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/mutation-drill-offset.log`. Neither mutation wrote to the repository.
-- Current-source `bun test packages/core/src/pcb-board/export.test.ts packages/core/src/pcb` -> exit 0, 104 passed, 0 failed. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/review-targeted-test.log`.
-- Current-source `bun run typecheck` -> exit 0. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/review-typecheck.log`.
-- Current-source scoped Biome check -> exit 0. Log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/review-biome.log`.
-- Final `packages/core/src/pcb/*` inventory matches the start inventory. Compare log: `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/review-hash-compare.log`.
+The start and end lists compare equal. Plan implementation and required behavioral verification are complete; integration review and workflow finalization are downstream.
