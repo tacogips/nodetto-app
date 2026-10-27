@@ -2,7 +2,12 @@
 // writers, outline trimming and silkscreen helpers. Files in this folder
 // import only each other (see boundary.test.ts), so it can become a package.
 
-export { excellonDrill, type DrillHit } from "./excellon.ts";
+export {
+  excellonDrill,
+  type DrillHit,
+  type DrillSlotHit,
+  type ExcellonDrillOptions,
+} from "./excellon.ts";
 export {
   PCB_LAYER_COUNT,
   pcbFabricationFiles,
@@ -14,7 +19,12 @@ export {
   strokeTextWidth,
   type StrokePoint,
 } from "./font.ts";
-export { GerberLayer } from "./gerber.ts";
+export {
+  GerberLayer,
+  type GerberApertureShape,
+  type GerberContourSegment,
+  type GerberRegionContour,
+} from "./gerber.ts";
 export {
   boxClearOfKeepouts,
   clipLegendStroke,

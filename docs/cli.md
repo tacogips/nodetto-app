@@ -41,6 +41,18 @@ warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
 `breadboard bom`, `netlist`, `gerber` and `import`, and `gerber import`, exit 3
 with `--strict` when they report warnings, and 2 for usage or input errors.
 
+## PCB boards (KiCad)
+
+Import a board into a PCB page, then export Gerber and drill files:
+
+```bash
+nodetto-cli pcb import board.kicad_pcb --output board.jsonl
+nodetto-cli pcb gerber board.jsonl --output board.zip
+```
+
+See [KiCad PCB boards](pcb/kicad-pcb.md) for supported content, editing and
+export details.
+
 ## Drawing with AI agents and live co-editing
 
 `nodetto-cli` also lets an AI agent (or any script) draw, check its work as an

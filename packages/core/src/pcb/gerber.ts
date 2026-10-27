@@ -3,6 +3,29 @@
 
 import type { PadShape, PcbPoint } from "./model.ts";
 
+export type GerberApertureShape =
+  | { readonly kind: "circle"; readonly diameter: number }
+  | {
+      readonly kind: "rectangle";
+      readonly width: number;
+      readonly height: number;
+    }
+  | {
+      readonly kind: "obround";
+      readonly width: number;
+      readonly height: number;
+    };
+
+export interface GerberContourSegment {
+  readonly to: PcbPoint;
+  readonly arc?: { readonly center: PcbPoint; readonly clockwise: boolean };
+}
+
+export interface GerberRegionContour {
+  readonly start: PcbPoint;
+  readonly segments: readonly GerberContourSegment[];
+}
+
 /** Gerber 4.6 format: integer nanometres. */
 function coordinate(value: number): string {
   return String(Math.round(value * 1_000_000));
@@ -21,6 +44,7 @@ export class GerberLayer {
   private readonly apertures = new Map<string, number>();
   private readonly body: string[] = [];
   private selected: number | undefined;
+  private multiQuadrant = false;
 
   constructor(
     private readonly fileFunction: string,
@@ -38,6 +62,28 @@ export class GerberLayer {
     this.selected = code;
   }
 
+  private beginArc(clockwise: boolean): void {
+    if (!this.multiQuadrant) {
+      this.body.push("G75*");
+      this.multiQuadrant = true;
+    }
+    this.body.push(clockwise ? "G02*" : "G03*");
+  }
+
+  private arcBlock(
+    from: PcbPoint,
+    to: PcbPoint,
+    center: PcbPoint,
+    clockwise: boolean,
+  ): void {
+    this.beginArc(clockwise);
+    // Gerber I/J are offsets from the start point, rounded independently like X/Y.
+    this.body.push(
+      `${xy(to)}I${coordinate(center.x - from.x)}J${coordinate(center.y - from.y)}D01*`,
+      "G01*",
+    );
+  }
+
   /** A pad: a circle of `size` diameter, or a square of `size` sides. */
   flash(shape: PadShape, size: number, at: PcbPoint): void {
     this.use(
@@ -46,6 +92,52 @@ export class GerberLayer {
         : `R,${millimetres(size)}X${millimetres(size)}`,
     );
     this.body.push(`${xy(at)}D03*`);
+  }
+
+  /** Flash a standard circle, rectangle, or obround aperture. */
+  flashAperture(aperture: GerberApertureShape, at: PcbPoint): void {
+    const template =
+      aperture.kind === "circle"
+        ? `C,${millimetres(aperture.diameter)}`
+        : `${aperture.kind === "rectangle" ? "R" : "O"},${millimetres(aperture.width)}X${millimetres(aperture.height)}`;
+    this.use(template);
+    this.body.push(`${xy(at)}D03*`);
+  }
+
+  /** Fill one or more contours, optionally using circular arc segments. */
+  region(contours: readonly GerberRegionContour[]): void {
+    // Regions do not use an aperture, but independent readers expect a selection.
+    if (this.selected === undefined) this.use(`C,${millimetres(0.01)}`);
+    this.body.push("G36*");
+    for (const contour of contours) {
+      this.body.push(`${xy(contour.start)}D02*`);
+      let from = contour.start;
+      for (const segment of contour.segments) {
+        if (segment.arc)
+          this.arcBlock(
+            from,
+            segment.to,
+            segment.arc.center,
+            segment.arc.clockwise,
+          );
+        else this.body.push(`${xy(segment.to)}D01*`);
+        from = segment.to;
+      }
+    }
+    this.body.push("G37*");
+  }
+
+  /** Draw a circular arc using a round aperture `width` wide. */
+  arc(
+    width: number,
+    from: PcbPoint,
+    to: PcbPoint,
+    center: PcbPoint,
+    clockwise: boolean,
+  ): void {
+    this.use(`C,${millimetres(width)}`);
+    this.body.push(`${xy(from)}D02*`);
+    this.arcBlock(from, to, center, clockwise);
   }
 
   /** A polyline drawn with a round aperture `width` wide. */

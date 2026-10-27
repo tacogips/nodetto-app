@@ -100,6 +100,14 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "breadboard.netlist",
     "text.note",
   ],
+  pcb: [
+    "pcb.board",
+    "pcb.footprint",
+    "pcb.track",
+    "pcb.via",
+    "pcb.zone",
+    "pcb.graphic",
+  ],
 };
 
 function isPageKind(value: string): value is PageKind {

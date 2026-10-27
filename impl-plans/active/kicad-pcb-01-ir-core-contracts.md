@@ -75,6 +75,8 @@ for reconciliation.
 - packages/core/src/pcb-board/page.test.ts (new)
 - packages/core/src/pcb-board/test-builder.ts (new)
 - impl-plans/progress/kicad-pcb-01-ir-core-contracts.md (new)
+- packages/io/src/jsonl/golden.test.ts (golden coverage for the new pcb.* types; assigned during reconciliation)
+- packages/io/src/__fixtures__/pcb.jsonl (new; self-authored PCB golden fixture)
 
 ## sharedPaths
 

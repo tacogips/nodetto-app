@@ -220,7 +220,9 @@
         "packages/core/src/pcb-board/page.ts",
         "packages/core/src/pcb-board/page.test.ts",
         "packages/core/src/pcb-board/test-builder.ts",
-        "impl-plans/progress/kicad-pcb-01-ir-core-contracts.md"
+        "impl-plans/progress/kicad-pcb-01-ir-core-contracts.md",
+        "packages/io/src/jsonl/golden.test.ts",
+        "packages/io/src/__fixtures__/pcb.jsonl"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],

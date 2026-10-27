@@ -18,6 +18,15 @@ copies under `tmp/breadboard-mode-s485/breadboard-05-collab/`
 `breadboard-mode-s485-dispatch.json` stays in `active/`, and its `planPath`
 values name the pre-archive `active/` locations.
 
+KiCad PCB pages overview:
+[kicad-pcb-00-overview](active/kicad-pcb-00-overview.md) lists waves
+1-3, ownership, gates and final verification for plans
+`kicad-pcb-01` to `kicad-pcb-13` (design:
+`design-docs/specs/design-kicad-pcb.md`, user QA:
+`design-docs/user-qa/kicad-pcb.md`). The dispatch manifest is
+`kicad-pcb-s530-dispatch.json`. Evidence: `tmp/kicad-pcb-s530/<planId>/`
+and `tmp/kicad-pcb-s530/reconcile*/`.
+
 `active/` also holds the historical dispatch manifests
 `ddl-frame-dispatch.json` and the BPMN manifests
 (`bpmn-operation-flow-s356-dispatch.json`,
