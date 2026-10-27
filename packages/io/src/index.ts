@@ -94,3 +94,4 @@ export {
   type SexprList,
   type SexprNode,
 } from "./kicad/index.ts";
+export { isZip, readZip, type ZipFile, ZipReadError } from "./zip-read.ts";

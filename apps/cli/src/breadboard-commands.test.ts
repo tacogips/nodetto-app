@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { encodeBreadboardPcbZip, exportBreadboardPcb } from "@nodetto/core";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
 import { importBpmnXml } from "@nodetto/io";
 import {
@@ -266,4 +267,134 @@ test("breadboard import reads fixtures, stages a valid document and handles diag
   );
   expect(strict.exitCode).toBe(EXIT_WARNINGS);
   expect(strict.stdout).toBe("");
+});
+
+test("breadboard gerber writes a ZIP of fabrication files", () => {
+  const example = readFileSync(
+    join(import.meta.dir, "../../../examples/breadboard/led-button.jsonl"),
+    "utf8",
+  );
+  const written = new Map<string, Uint8Array>();
+  const io = {
+    ...memoryIo({ "doc.jsonl": example }),
+    writeBytes(path: string, bytes: Uint8Array) {
+      written.set(path, bytes);
+    },
+  };
+  const result = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "out/led-pcb.zip"],
+    io,
+  );
+  expect(result.exitCode).toBe(EXIT_OK);
+  expect(result.stdout).toBe("");
+  expect(result.stderr).toContain(
+    "warning: Hole e7 holds SW1 pin 3 and R1 pin 1; a PCB hole takes one lead",
+  );
+  expect(result.stderr).toContain("All 2 wire(s) are top-layer traces.");
+  expect(
+    result.stderr.endsWith(
+      "Wrote Gerber and drill files to out/led-pcb.zip.\n",
+    ),
+  ).toBe(true);
+  const zip = written.get("out/led-pcb.zip");
+  if (!zip) throw new Error("no archive written");
+  expect([...zip.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+  const listing = new TextDecoder().decode(zip);
+  for (const extension of ["GTL", "GBL", "GTS", "GBS", "GTO", "GKO", "DRL"])
+    expect(listing).toContain(`led-pcb.${extension}`);
+
+  const strict = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "strict.zip", "--strict"],
+    io,
+  );
+  expect(strict.exitCode).toBe(EXIT_WARNINGS);
+  expect(written.has("strict.zip")).toBe(false);
+});
+
+test("breadboard gerber usage errors", () => {
+  const io = {
+    ...memoryIo({ "doc.jsonl": breadboardDocument() }),
+    writeBytes() {},
+  };
+  const noOutput = cli(["breadboard", "gerber", "doc.jsonl"], io);
+  expect(noOutput.exitCode).toBe(EXIT_ERROR);
+  expect(noOutput.stderr).toContain("requires --output <file.zip>");
+  const empty = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "x.zip"],
+    io,
+  );
+  expect(empty.exitCode).toBe(EXIT_ERROR);
+  expect(empty.stderr).toContain(
+    "Nothing is seated on this board, so there is no PCB to make.",
+  );
+  const wrongBoard = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "x.zip", "--board", "zz"],
+    io,
+  );
+  expect(wrongBoard.stderr).toContain(
+    "No board on this page has an id starting with zz.",
+  );
+  const textOnly = cli(
+    ["breadboard", "gerber", "doc.jsonl", "--output", "x.zip"],
+    memoryIo({ "doc.jsonl": breadboardDocument() }),
+  );
+  expect(textOnly.stderr).toContain("This host cannot write binary files.");
+});
+
+test("breadboard gerber --outline", () => {
+  const example = readFileSync(
+    join(import.meta.dir, "../../../examples/breadboard/led-button.jsonl"),
+    "utf8",
+  );
+  const written = new Map<string, Uint8Array>();
+  const io = {
+    ...memoryIo({ "doc.jsonl": example }),
+    writeBytes(path: string, bytes: Uint8Array) {
+      written.set(path, bytes);
+    },
+  };
+  const run = (...extra: string[]) =>
+    cli(
+      ["breadboard", "gerber", "doc.jsonl", "--output", "pcb.zip", ...extra],
+      io,
+    );
+  const document = parseDocumentResult(example);
+  if (!document.ok) throw new Error("example does not parse");
+  const page = document.document.pages.find(
+    ({ kind }) => kind === "breadboard",
+  );
+  if (!page) throw new Error("example has no breadboard page");
+  const core = (outline: "board" | "used") => {
+    const pcb = exportBreadboardPcb(document.document, page.id, {
+      name: "pcb",
+      outline,
+    });
+    if (typeof pcb === "string") throw new Error(pcb);
+    return encodeBreadboardPcbZip(pcb);
+  };
+
+  expect(run().exitCode).toBe(EXIT_OK);
+  const byDefault = written.get("pcb.zip");
+  expect(byDefault).toEqual(core("board"));
+  expect(run("--outline", "board").exitCode).toBe(EXIT_OK);
+  expect(written.get("pcb.zip")).toEqual(byDefault);
+
+  const used = run("--outline", "used");
+  expect(used.exitCode).toBe(EXIT_OK);
+  expect(written.get("pcb.zip")).toEqual(core("used"));
+  expect(written.get("pcb.zip")).not.toEqual(byDefault);
+  expect(used.stderr).toContain("Board 30.98 x 32.66 mm");
+
+  written.clear();
+  const wrong = run("--outline", "square");
+  expect(wrong.exitCode).toBe(EXIT_ERROR);
+  expect(
+    wrong.stderr.startsWith(
+      "--outline must be board or used.\n\nUsage: nodetto-cli breadboard",
+    ),
+  ).toBe(true);
+  const missing = run("--outline");
+  expect(missing.exitCode).toBe(EXIT_ERROR);
+  expect(missing.stderr).toContain("--outline requires a value.");
+  expect(written.size).toBe(0);
 });

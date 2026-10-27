@@ -11,3 +11,4 @@ export * from "./notation.ts";
 export * from "./resistor-bands.ts";
 export * from "./ratsnest.ts";
 export * from "./parity.ts";
+export * from "./pcb.ts";

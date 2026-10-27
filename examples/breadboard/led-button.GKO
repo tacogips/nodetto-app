@@ -1,0 +1,16 @@
+%TF.GenerationSoftware,Nodetto,Breadboard PCB*%
+%TF.SameCoordinates,Original*%
+%TF.FileFunction,Profile,NP*%
+%TF.FilePolarity,Positive*%
+%FSLAX46Y46*%
+%MOMM*%
+%LPD*%
+G01*
+%ADD10C,0.100000*%
+D10*
+X0Y0D02*
+X83820000Y0D01*
+X83820000Y55880000D01*
+X0Y55880000D01*
+X0Y0D01*
+M02*

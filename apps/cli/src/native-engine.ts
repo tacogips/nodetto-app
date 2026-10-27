@@ -9,6 +9,7 @@ import { COMMAND_HELP, OVERVIEW } from "./help.ts";
 declare const native: {
   path(path: string): string;
   readText(path: string): string;
+  readBytes(path: string): Uint8Array;
   writeBytes(path: string, data: Uint8Array): void;
   exists(path: string): boolean;
   readStdin(): string;
@@ -20,6 +21,8 @@ declare const native: {
 
 const io = {
   readText: (path: string) => native.readText(native.path(path)),
+  readBytes: (path: string) =>
+    new Uint8Array(native.readBytes(native.path(path))),
   writeText: (path: string, text: string) =>
     native.writeBytes(native.path(path), new TextEncoder().encode(text)),
   writeBytes: (path: string, bytes: Uint8Array) =>

@@ -126,7 +126,10 @@ nodetto-cli bpmn export process.jsonl --page process --check process.bpmn
 nodetto-cli breadboard bom board.jsonl --check board.bom.csv
 nodetto-cli breadboard netlist board.jsonl --format kicad --output board.net
 nodetto-cli breadboard netlist board.jsonl --format spice --output board.cir
+nodetto-cli breadboard gerber board.jsonl --output board-pcb.zip
+nodetto-cli breadboard gerber board.jsonl --outline used --output board-pcb.zip
 nodetto-cli breadboard import circuit.kicad_sch --output board.jsonl
+nodetto-cli gerber import board-gerbers.zip --output board.jsonl
 ```
 
 `ddl` emits exactly what the inspector's Database DDL panel generates for one
@@ -145,8 +148,8 @@ findings exist, and 2 for usage, parse, or config errors; it has no `--strict`
 option. `bpmn import` and `bpmn export` exit 3 with `--strict` when they report
 warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
 `breadboard bom --check` and `breadboard netlist --check` exit 1 on drift;
-`breadboard bom`, `netlist` and `import` exit 3 with `--strict` when they
-report warnings, and 2 for usage or input errors.
+`breadboard bom`, `netlist`, `gerber` and `import`, and `gerber import`, exit 3
+with `--strict` when they report warnings, and 2 for usage or input errors.
 
 ### Drawing with AI agents and live co-editing
 
@@ -181,9 +184,10 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   It also exports HTML website ZIPs, Mermaid, D2, draw.io files (every page
   unless `--page` is given), and every output in the Code panel
   (`--format code --element <id> --code-format <output>`). SQL uses `ddl`,
-  and BPMN XML uses `bpmn export`; both accept `--page`. Breadboard BOMs and
-  netlists use `breadboard bom` and `breadboard netlist`. `drawio import`,
-  `bpmn import` and `breadboard import` convert those files to JSONL.
+  and BPMN XML uses `bpmn export`; both accept `--page`. Breadboard BOMs,
+  netlists and PCB Gerber ZIPs use `breadboard bom`, `breadboard netlist` and
+  `breadboard gerber`. `drawio import`, `bpmn import`, `breadboard import`
+  and `gerber import` convert those files to JSONL.
 - The desktop app applies outside changes to an open file live, keeping the
   camera and selection. With unsaved local edits it merges three ways at element
   and field level (a move and a rename of the same table both survive) and
@@ -676,15 +680,26 @@ canvas. `nodetto-cli lint` runs the same checks.
 
 Export a component BOM, a KiCad-style netlist, or a SPICE netlist with
 `nodetto-cli breadboard bom|netlist` or the **Breadboard** tab of the
-**Export** dialog. Import KiCad 6+ `.kicad_sch` or `.net` files with
-`nodetto-cli breadboard import` or the desktop Open dialog. The import is
-detached and creates a new page with a target netlist card. Its parts are staged beside the board, so the page fails
+**Export** dialog. To have a board made, export it as a PCB Gerber and drill
+ZIP with `nodetto-cli breadboard gerber` or the same tab, and upload the ZIP to
+a board house such as JLCPCB. The PCB keeps the breadboard layout: used holes
+become plated holes, strips become traces, and wires become traces or
+silkscreen jumper lines. `--outline used` trims the board to the used area so
+small circuits fit cheaper size tiers. Import KiCad 6+ `.kicad_sch` or
+`.net` files with `nodetto-cli breadboard import` or the desktop Open dialog.
+The import is detached and creates a new page with a target netlist card. Its
+parts are staged beside the board, so the page fails
 lint until every part is placed. Builds older than breadboard support reject
 documents that contain a breadboard page.
 
+Any board's Gerber and drill files, for example a KiCad project's fabrication
+output, can be drawn on a page with `nodetto-cli gerber import`; see
+[Gerber import](docs/pcb/gerber-import.md).
+
 See the [breadboard format](docs/breadboard/format.md),
 [electrical rule reference](docs/breadboard/erc-rules.md),
-[KiCad import details](docs/breadboard/kicad-import.md), and the
+[KiCad import details](docs/breadboard/kicad-import.md),
+[PCB export details](docs/breadboard/pcb.md), and the
 [LED/button example and golden exports](examples/breadboard/).
 
 ## D2 export

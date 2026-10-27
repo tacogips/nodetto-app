@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Editor, HANDOFF_FORMATS } from "@nodetto/core";
+import { Editor, HANDOFF_FORMATS, svgRasterDimensions } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
 import { PDFDocument } from "pdf-lib";
 import type { CommandIo } from "./commands.ts";
@@ -281,4 +281,51 @@ test("large-page PNG fits below half scale and explicit overview scales render",
     expect(header.getUint32(16)).toBeLessThanOrEqual(8192);
     expect(header.getUint32(20)).toBeLessThanOrEqual(8192);
   }
+});
+
+test("raster export snaps the frame to whole pixels so the background covers the raster", async () => {
+  const { editor, io } = fixture();
+  editor.createElement("shape.geo", {
+    semantic: { geo: "rect", label: "" },
+    // With the 400 x 300 artboard the page spans 601 x 301 units; with 16
+    // padding a side, 633 x 333 units are 474.75 x 249.75 px at 0.75.
+    visual: { x: 500, y: 0, width: 101, height: 301 },
+  });
+  let captured = "";
+  const backend: RasterBackend = {
+    rasterize: async (svg) => {
+      captured = svg;
+      return new Uint8Array([1]);
+    },
+    pngToPdf: async () => new Uint8Array([2]),
+  };
+  const result = await exportCommand(
+    io,
+    [
+      "snap.jsonl",
+      "--page",
+      "Design",
+      "--format",
+      "png",
+      "--scale",
+      "0.75",
+      "--output",
+      "snap.png",
+    ],
+    backend,
+  );
+  expect(result.exitCode).toBe(0);
+  expect(result.stderr).toContain("475x250 px");
+  // A renderer drawing at exactly 0.75 onto the 475 x 250 canvas finds the
+  // frame and its background reaching the last pixel.
+  const { width, height } = svgRasterDimensions(captured);
+  expect(width * 0.75).toBeGreaterThan(474.99);
+  expect(Math.ceil(width * 0.75)).toBe(475);
+  expect(height * 0.75).toBeGreaterThan(249.99);
+  const background =
+    /<rect x="-16" y="-16" width="([^"]+)" height="([^"]+)" fill="#ffffff"/.exec(
+      captured,
+    );
+  expect(Number(background?.[1]) * 0.75).toBeGreaterThanOrEqual(475);
+  expect(Number(background?.[2]) * 0.75).toBeGreaterThanOrEqual(250);
 });

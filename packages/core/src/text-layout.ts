@@ -21,6 +21,14 @@ function graphemes(text: string): string[] {
   return Array.from(graphemeSegmenter.segment(text), (part) => part.segment);
 }
 
+/**
+ * Lines of `text`, CRLF or LF. Splits on a string: the native CLI's
+ * interpreter splits on a regular expression in quadratic time.
+ */
+function paragraphs(text: string): string[] {
+  return text.replace(/\r\n/g, "\n").split("\n");
+}
+
 function safeSize(value: number): number {
   return Math.min(
     MAX_AUTO_TEXT_SIZE,
@@ -58,7 +66,7 @@ export function wrapTextLines(
     Math.floor(maxWidth / glyphAdvance(fontSize, letterSpacing)),
   );
   const lines: string[] = [];
-  for (const paragraph of text.split(/\r?\n/)) {
+  for (const paragraph of paragraphs(text)) {
     let line = "";
     let lineLength = 0;
     for (const token of paragraph.split(/( +)/)) {
@@ -101,7 +109,7 @@ export function measureTextNote(
   const lineHeight = fontSize * (style?.lineHeight ?? TEXT_NOTE_LINE_HEIGHT);
   const letterSpacing = style?.letterSpacing ?? 0;
   if (mode === "auto-width") {
-    const explicitLines = text.split(/\r?\n/);
+    const explicitLines = paragraphs(text);
     const characters = explicitLines.reduce(
       (longest, line) => Math.max(longest, graphemes(line).length),
       0,

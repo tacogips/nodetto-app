@@ -39,6 +39,7 @@ import { typesCommand } from "./types-command.ts";
 import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
+import { gerberCommand } from "./gerber-command.ts";
 import { MIN_PREFIX, shortIds, type Resolution } from "./ids.ts";
 
 /** Result of one command: text for stdout/stderr plus a process exit code. */
@@ -62,6 +63,8 @@ export const USAGE = OVERVIEW;
 /** Reads and writes go through this seam so commands stay testable. */
 export interface CommandIo {
   readText(path: string): string;
+  /** Binary input (ZIP archives); required only by commands that read bytes. */
+  readBytes?(path: string): Uint8Array;
   /** Launch the desktop editor with an existing local file. */
   openDocument?(path: string, app?: string): Promise<void>;
   readAttachment?(documentPath: string, relative: string): Uint8Array;
@@ -137,7 +140,7 @@ export function parseArgs(
   return { positional, options, flags };
 }
 
-function formatIssue(issue: ValidationIssue): string {
+export function formatIssue(issue: ValidationIssue): string {
   return `${issue.severity}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}`;
 }
 
@@ -860,6 +863,8 @@ export function runCli(
       return drawioCommand(io, rest);
     case "breadboard":
       return breadboardCommand(io, rest);
+    case "gerber":
+      return gerberCommand(io, rest);
     case "diff":
       return diffCommand(io, rest);
     case "edit":

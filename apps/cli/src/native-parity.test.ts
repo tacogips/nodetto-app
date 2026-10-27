@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { inflateSync } from "node:zlib";
 import { join } from "node:path";
 import {
   Editor,
@@ -643,4 +644,223 @@ nativeTest(
     }
   },
   60000,
+);
+
+nativeTest(
+  "native CLI writes the same breadboard PCB archive as the TypeScript CLI",
+  () => {
+    const example = join(
+      import.meta.dir,
+      "../../../examples/breadboard/led-button.jsonl",
+    );
+    for (const extra of [[], ["--outline", "used"]]) {
+      const expectedDir = mkdtempSync(join(tmpdir(), "nodetto-pcb-ts-"));
+      const actualDir = mkdtempSync(join(tmpdir(), "nodetto-pcb-native-"));
+      try {
+        const args = [
+          "breadboard",
+          "gerber",
+          example,
+          "--output",
+          "led-button.zip",
+          ...extra,
+        ];
+        const expected = Bun.spawnSync([process.execPath, source, ...args], {
+          cwd: expectedDir,
+        });
+        const actual = Bun.spawnSync([binary!, ...args], { cwd: actualDir });
+        expect(actual.exitCode).toBe(0);
+        expect(actual.exitCode).toBe(expected.exitCode);
+        expect(actual.stdout.toString()).toBe(expected.stdout.toString());
+        expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+        expect(readFileSync(join(actualDir, "led-button.zip"))).toEqual(
+          readFileSync(join(expectedDir, "led-button.zip")),
+        );
+      } finally {
+        rmSync(expectedDir, { recursive: true, force: true });
+        rmSync(actualDir, { recursive: true, force: true });
+      }
+    }
+  },
+  60000,
+);
+
+nativeTest(
+  "native gerber import matches the TypeScript CLI for files, a ZIP and --into",
+  () => {
+    const example = join(import.meta.dir, "../../../examples/breadboard");
+    const layers = ["GTL", "GBL", "GTS", "GBS", "GTO", "GKO", "DRL"].map(
+      (extension) => join(example, `led-button.${extension}`),
+    );
+    const expectedDir = mkdtempSync(join(tmpdir(), "nodetto-gerber-ts-"));
+    const actualDir = mkdtempSync(join(tmpdir(), "nodetto-gerber-native-"));
+    try {
+      const both = (args: string[]) => {
+        const expected = Bun.spawnSync([process.execPath, source, ...args], {
+          cwd: expectedDir,
+        });
+        const actual = Bun.spawnSync([binary!, ...args], { cwd: actualDir });
+        expect(actual.exitCode).toBe(0);
+        expect(actual.exitCode).toBe(expected.exitCode);
+        expect(actual.stdout.toString()).toBe(expected.stdout.toString());
+        expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+      };
+      both([
+        "breadboard",
+        "gerber",
+        join(example, "led-button.jsonl"),
+        "--output",
+        "board.zip",
+      ]);
+      both(["gerber", "import", ...layers]);
+      both(["gerber", "import", "board.zip", "--output", "pcb.jsonl"]);
+      both([
+        "gerber",
+        "import",
+        ...layers,
+        "--into",
+        "pcb.jsonl",
+        "--page-name",
+        "Again",
+      ]);
+      expect(readFileSync(join(actualDir, "pcb.jsonl"), "utf8")).toBe(
+        readFileSync(join(expectedDir, "pcb.jsonl"), "utf8"),
+      );
+    } finally {
+      rmSync(expectedDir, { recursive: true, force: true });
+      rmSync(actualDir, { recursive: true, force: true });
+    }
+  },
+  120000,
+);
+
+/** RGBA pixels of an 8-bit RGBA PNG, enough to inspect native output. */
+function decodeRgbaPng(png: Uint8Array): {
+  width: number;
+  height: number;
+  pixels: Uint8Array;
+} {
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  const data: Uint8Array[] = [];
+  while (offset < png.length) {
+    const length = view.getUint32(offset);
+    const type = new TextDecoder().decode(png.subarray(offset + 4, offset + 8));
+    const body = png.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") {
+      width = view.getUint32(offset + 8);
+      height = view.getUint32(offset + 12);
+      expect([body[8], body[9]]).toEqual([8, 6]);
+    } else if (type === "IDAT") data.push(body);
+    offset += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(data));
+  const stride = width * 4;
+  const pixels = new Uint8Array(height * stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const value = raw[y * (stride + 1) + 1 + x] as number;
+      const left = x >= 4 ? (pixels[y * stride + x - 4] as number) : 0;
+      const up = y > 0 ? (pixels[(y - 1) * stride + x] as number) : 0;
+      const corner =
+        x >= 4 && y > 0 ? (pixels[(y - 1) * stride + x - 4] as number) : 0;
+      const estimate = left + up - corner;
+      const paeth =
+        Math.abs(estimate - left) <= Math.abs(estimate - up) &&
+        Math.abs(estimate - left) <= Math.abs(estimate - corner)
+          ? left
+          : Math.abs(estimate - up) <= Math.abs(estimate - corner)
+            ? up
+            : corner;
+      const predictor = [0, left, up, (left + up) >> 1, paeth][
+        filter as number
+      ] as number;
+      pixels[y * stride + x] = (value + predictor) & 0xff;
+    }
+  }
+  return { width, height, pixels };
+}
+
+nativeTest(
+  "native PNG export fills its last row and column when the frame ends inside a pixel",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-snap-"));
+    try {
+      const editor = new Editor();
+      // 101 x 77 plus 16 padding a side: 133 x 109 units, 99.75 x 81.75 px at 0.75.
+      editor.createElement("shape.geo", {
+        semantic: { geo: "rect", label: "" },
+        visual: { x: 0, y: 0, width: 101, height: 77 },
+      });
+      writeFileSync(
+        join(cwd, "snap.jsonl"),
+        serializeDocument(editor.getSnapshot()),
+      );
+      const result = Bun.spawnSync(
+        [
+          binary!,
+          "export",
+          "snap.jsonl",
+          "--format",
+          "png",
+          "--scale",
+          "0.75",
+          "--output",
+          "snap.png",
+        ],
+        { cwd },
+      );
+      expect(result.exitCode).toBe(0);
+      const { width, height, pixels } = decodeRgbaPng(
+        readFileSync(join(cwd, "snap.png")),
+      );
+      expect([width, height]).toEqual([100, 82]);
+      for (let y = 0; y < height; y++)
+        expect(pixels[(y * width + width - 1) * 4 + 3]).toBe(255);
+      for (let x = 0; x < width; x++)
+        expect(pixels[((height - 1) * width + x) * 4 + 3]).toBe(255);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30000,
+);
+
+nativeTest(
+  "native CLI reads a document with a 20,000-point path quickly",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-large-"));
+    try {
+      const editor = new Editor();
+      const contours = Array.from({ length: 1000 }, (_, contour) => ({
+        points: Array.from({ length: 20 }, (_, index) => ({
+          x: (contour % 40) * 30 + 10 * Math.cos((index / 20) * 2 * Math.PI),
+          y:
+            Math.floor(contour / 40) * 30 +
+            10 * Math.sin((index / 20) * 2 * Math.PI),
+        })),
+      }));
+      editor.createElement("draw.path", {
+        semantic: { contours, fillRule: "nonzero" },
+      });
+      writeFileSync(
+        join(cwd, "large.jsonl"),
+        serializeDocument(editor.getSnapshot()),
+      );
+      // Splitting such a line on a regular expression took minutes in the
+      // native interpreter; the whole command now takes about a second.
+      const started = performance.now();
+      const result = Bun.spawnSync([binary!, "validate", "large.jsonl"], {
+        cwd,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(performance.now() - started).toBeLessThan(20000);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  120000,
 );

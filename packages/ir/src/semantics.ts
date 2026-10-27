@@ -445,6 +445,10 @@ export interface FreehandSemantic {
 export const PATH_FILL_RULES = ["nonzero", "evenodd"] as const;
 export type PathFillRule = (typeof PATH_FILL_RULES)[number];
 
+/** Most contours and points one `draw.path` element may hold. */
+export const MAX_PATH_CONTOURS = 1024;
+export const MAX_PATH_POINTS = 20000;
+
 /** One editable closed contour in a compound vector path. */
 export interface PathContour {
   readonly points: readonly FreehandPoint[];

@@ -8,6 +8,7 @@ import { writeFileAtomic } from "./write-atomic.ts";
 export function localIo(): CommandIo {
   return {
     readText: (path) => readFileSync(path, "utf8"),
+    readBytes: (path) => new Uint8Array(readFileSync(path)),
     readAttachment: readLocalAttachment,
     openDocument: openDesktopDocument,
     readStdin: () => readFileSync(0, "utf8"),

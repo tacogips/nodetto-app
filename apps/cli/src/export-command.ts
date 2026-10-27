@@ -25,6 +25,7 @@ import {
   type PdfPageSize,
   RASTER_SCALES,
   rasterDimensions,
+  snapSvgFrameToPixels,
   svgRasterDimensions,
 } from "@nodetto/core";
 import {
@@ -364,7 +365,9 @@ export async function exportCommand(
         note = `, scaled to ${fitting} to fit the pixel limit`;
       }
     }
-    pixels = rasterDimensions(viewport.width, viewport.height, scale);
+    svg = snapSvgFrameToPixels(svg, scale);
+    const snapped = svgRasterDimensions(svg);
+    pixels = rasterDimensions(snapped.width, snapped.height, scale);
     const renderer = backend ?? (await import("./raster-backend.ts"));
     const png = await renderer.rasterize(
       svg,
@@ -374,7 +377,7 @@ export async function exportCommand(
     bytes =
       exportFormat === "png"
         ? png
-        : await renderer.pngToPdf(png, viewport.width, viewport.height, {
+        : await renderer.pngToPdf(png, snapped.width, snapped.height, {
             pageSize,
             orientation,
             marginMm,

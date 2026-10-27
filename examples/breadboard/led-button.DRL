@@ -1,0 +1,20 @@
+M48
+; Nodetto breadboard PCB drill file: plated holes, millimetres, absolute, decimal point coordinates
+; #@! TF.FileFunction,Plated,1,2,PTH
+FMAT,2
+METRIC
+T1C1.000
+%
+G90
+G05
+T1
+X15.240Y50.800
+X15.240Y53.340
+X15.240Y33.020
+X15.240Y25.400
+X20.320Y33.020
+X20.320Y25.400
+X30.480Y33.020
+X33.020Y33.020
+X35.560Y53.340
+M30

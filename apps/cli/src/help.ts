@@ -27,7 +27,8 @@ Convert and check
   nodetto-cli lint <doc|bpmn>     Lint BPMN and breadboard pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
-  nodetto-cli breadboard ...      BOM, netlist and KiCad import
+  nodetto-cli gerber import       Gerber and drill files to a PCB page
+  nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
@@ -360,20 +361,35 @@ Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
        nodetto-cli breadboard netlist <document.jsonl> --format kicad|spice
                                       [--page <short-id|id|name>]
                                       [--output <file> | --check <file>] [--strict]
+       nodetto-cli breadboard gerber <document.jsonl> --output <file.zip>
+                                     [--page <short-id|id|name>] [--board <id>]
+                                     [--outline board|used] [--strict]
        nodetto-cli breadboard import <file.kicad_sch|file.net> [--output <file.jsonl>] [--strict]
 
-Export a breadboard bill of materials or netlist, or import a KiCad 6+
-schematic/netlist into a new breadboard document.
+Export a breadboard bill of materials or netlist, export a board as PCB
+fabrication files, or import a KiCad 6+ schematic/netlist into a new
+breadboard document.
+
+gerber writes a ZIP of Gerber (RS-274X, X2) and Excellon drill files that
+board houses such as JLCPCB, PCBWay and Elecrow accept as an upload. The PCB
+keeps the breadboard layout: used holes become plated holes, strips become
+bottom-layer traces, wires become top-layer traces where their path is clear
+and jumper wires drawn on the silkscreen otherwise.
 
   --page    Select one breadboard page by short ID, full ID or exact name.
+  --board   Select a board by element id or unique id prefix (gerber only).
+  --outline Board outline for gerber: board (default) or used, trimmed to the
+            used area plus a margin.
   --format  Required for netlist: kicad or spice.
-  --output  Write generated output to a file.
+  --output  Write generated output to a file; required for gerber.
   --check   Compare generated output with a file; exit 1 when out of date.
   --strict  Exit 3 when warnings are reported.
 
 Examples:
   nodetto-cli breadboard bom prototype.jsonl --output bom.csv
   nodetto-cli breadboard netlist prototype.jsonl --format kicad
+  nodetto-cli breadboard gerber prototype.jsonl --output prototype-pcb.zip
+  nodetto-cli breadboard gerber prototype.jsonl --outline used --output prototype-pcb.zip
   nodetto-cli breadboard import circuit.net --output staged.jsonl
 
 ${EXIT_CODES}`,
@@ -386,6 +402,28 @@ Import or export BPMN 2.0 XML.
 
   --strict  Exit 3 when import or export reports warnings.
   --check   (export) Exit 1 when the file is out of date.
+
+${EXIT_CODES}`,
+
+  gerber: `Usage: nodetto-cli gerber import <file|archive.zip>... [--output <doc.jsonl>]
+                                 [--into <doc.jsonl>] [--page-name <name>] [--strict]
+
+Draw a board's fabrication files on a freeform page: Gerber RS-274X layers
+(copper, solder mask, silkscreen, paste, outline) and Excellon drill files,
+given one by one or as a ZIP archive. Each layer becomes a named group of
+filled vector paths in board coordinates (10 page units per millimetre, the
+top view, with the board's bottom-left at the lower left). Layers are named
+from their Gerber X2 file function, else from KiCad, Protel or Eagle file
+names. Solder mask, paste, bottom silkscreen and inner layers start hidden.
+
+  --output     Write a new document with the PCB page.
+  --into       Add the PCB page to this existing document.
+  --page-name  Page name (default: the archive or file name, or "PCB").
+  --strict     Exit 3 when the import reports warnings.
+
+Example:
+  nodetto-cli gerber import board-gerbers.zip --output board.jsonl
+  nodetto-cli gerber import gerber/*.g* gerber/board.drl --into keyboard.jsonl --page-name PCB
 
 ${EXIT_CODES}`,
 

@@ -15,6 +15,13 @@ import {
   exportBreadboardKicadNetlist,
   exportBreadboardSpiceNetlist,
 } from "@nodetto/io";
+import { readIndependently } from "../pcb/oracle.test-support.ts";
+import {
+  legendClearanceErrors,
+  validateExcellon,
+  validateGerber,
+} from "../pcb/validate.ts";
+import { BREADBOARD_PCB_RULES, exportBreadboardPcb } from "./pcb.ts";
 import { BREADBOARD_ERC_RULE_IDS } from "./types.ts";
 
 const root = resolve(import.meta.dir, "../../../../");
@@ -73,4 +80,33 @@ test("example SVG keeps the half-board and original part notation", () => {
   expect(svg.split('class="breadboard-resistor-band-').length - 1).toBe(4);
   expect(svg.split('class="breadboard-led-flat"').length - 1).toBe(1);
   expect(BREADBOARD_ERC_RULE_IDS).toHaveLength(13);
+});
+
+test("PCB Gerber and drill files match the checked-in goldens", () => {
+  const pcb = exportBreadboardPcb(document, pageId, { name: "led-button" });
+  if (typeof pcb === "string") throw new Error(pcb);
+  // The example puts two leads in e7 and e11 on purpose (user QA Q2).
+  expect(pcb.warnings).toHaveLength(2);
+  for (const file of pcb.files) {
+    expect(file.text).toBe(readText(`examples/breadboard/${file.path}`));
+    const drill = file.path.endsWith(".DRL");
+    expect(
+      drill ? validateExcellon(file.text, pcb) : validateGerber(file.text, pcb),
+    ).toEqual([]);
+    expect(
+      readIndependently(file.text, drill ? "drill" : "gerber").warnings,
+    ).toEqual([]);
+  }
+  const text = (extension: string) =>
+    pcb.files.find((file) => file.path === `led-button.${extension}`)?.text ??
+    "";
+  expect(
+    legendClearanceErrors({
+      gto: text("GTO"),
+      gts: text("GTS"),
+      outline: pcb,
+      padClearance: BREADBOARD_PCB_RULES.legendPadClearance,
+      edgeClearance: BREADBOARD_PCB_RULES.legendEdgeClearance,
+    }),
+  ).toEqual([]);
 });

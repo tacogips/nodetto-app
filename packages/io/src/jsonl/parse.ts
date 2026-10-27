@@ -152,9 +152,11 @@ function collect(text: string): Collected {
     elements: [],
     unknownRecords: [],
   };
-  // Tolerate a leading BOM and CRLF line endings; writers emit neither.
+  // Tolerate a leading BOM and CRLF line endings; writers emit neither. A
+  // CR left at a line end is JSON whitespace. Split on a string: the native
+  // CLI's interpreter splits on a regular expression in quadratic time.
   const body = text.startsWith(BOM) ? text.slice(1) : text;
-  const lines = body.split(/\r?\n/);
+  const lines = body.split("\n");
 
   for (const [i, raw] of lines.entries()) {
     const lineNumber = i + 1;
