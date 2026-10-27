@@ -403,10 +403,20 @@ input {
 
 /* Connectors */
 
-.nodetto-connector line,
-.nodetto-connector polyline {
+/*
+ * Defaults only: any author rule beats an SVG presentation attribute, so a
+ * colour or width stored in the document (rendered as `stroke=` and so on)
+ * must be excluded here or it would never show.
+ */
+.nodetto-connector :is(line, polyline) {
   fill: none;
+}
+
+.nodetto-connector :is(line, polyline):not([stroke]) {
   stroke: var(--nodetto-ink);
+}
+
+.nodetto-connector :is(line, polyline):not([stroke-width]) {
   stroke-width: 1.5;
 }
 
@@ -459,12 +469,16 @@ input {
   overflow: visible;
 }
 
-.nodetto-geo rect,
-.nodetto-geo ellipse,
-.nodetto-geo polygon,
-.nodetto-geo path {
+/* Defaults only, for the same reason as the connector rules above. */
+.nodetto-geo :is(rect, ellipse, polygon, path):not([fill]) {
   fill: var(--nodetto-surface);
+}
+
+.nodetto-geo :is(rect, ellipse, polygon, path):not([stroke]) {
   stroke: var(--nodetto-ink);
+}
+
+.nodetto-geo :is(rect, ellipse, polygon, path):not([stroke-width]) {
   stroke-width: 1.5;
 }
 
