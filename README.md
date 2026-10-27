@@ -34,6 +34,13 @@ associations.
 - **Command line and MCP**: an AI agent edits a document while the desktop app
   shows its changes live. See [Command line](docs/cli.md).
 
+![The ErgoDash keyboard PCB opened from its Gerber ZIP](docs/images/nodetto-gerber-ergodash.png)
+
+The [ErgoDash](https://github.com/omkbd/ErgoDash) Rev. 1.2 Gerber ZIP opened
+from the Open dialog: copper, silkscreen, drill and outline become editable
+vector layers. ErgoDash is copyright (c) 2018 omkbd and released under the MIT
+License.
+
 ## Command line
 
 ```bash
