@@ -1,11 +1,11 @@
 # kicad-pcb-08-core-shapes
 
 - planId: kicad-pcb-08-core-shapes
-- planPath: impl-plans/active/kicad-pcb-08-core-shapes.md
+- planPath: impl-plans/completed/kicad-pcb-08-core-shapes.md
 - wave: 2; dependsOn: kicad-pcb-01-ir-core-contracts
 - design: design-docs/specs/design-kicad-pcb.md section 6.1
 - progress log: impl-plans/progress/kicad-pcb-08-core-shapes.md
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

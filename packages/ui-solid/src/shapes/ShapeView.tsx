@@ -17,6 +17,7 @@ import { UmlComponentView } from "./UmlComponentView.tsx";
 
 import { isBpmnShapeType, type Box } from "@nodetto/core";
 import { isBreadboardElementType } from "@nodetto/ir";
+import { isPcbElementType } from "@nodetto/ir";
 import type { AccessibilityRole, Element } from "@nodetto/ir";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { ErdTableView } from "./ErdTableView.tsx";
@@ -31,6 +32,8 @@ import { TextNoteView } from "./TextNoteView.tsx";
 import { UmlClassView } from "./UmlClassView.tsx";
 import { BpmnShapeView } from "./BpmnShapeView.tsx";
 import { BreadboardShapeView } from "./BreadboardShapeView.tsx";
+import { PcbShapeView } from "./PcbShapeView.tsx";
+import type { Accessor } from "solid-js";
 import { layerAppearanceStyle } from "./visual.ts";
 
 export interface ShapeViewProps {
@@ -45,6 +48,7 @@ export interface ShapeViewProps {
   readonly showLayoutGrids?: boolean;
   /** Expose authored semantics in interactive prototype DOM, not editor chrome. */
   readonly exposeAccessibility?: boolean;
+  readonly pcbHidden?: Accessor<ReadonlySet<string>>;
 }
 
 const HTML_ROLES: Partial<
@@ -182,6 +186,13 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
               element={props.element}
               box={props.box}
               inert={props.breadboardInert}
+            />
+          </Match>
+          <Match when={isPcbElementType(props.element.type)}>
+            <PcbShapeView
+              element={props.element}
+              box={props.box}
+              hidden={props.pcbHidden ?? (() => new Set<string>())}
             />
           </Match>
           <Match when={props.element.type === "state.node"}>

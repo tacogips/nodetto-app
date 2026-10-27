@@ -1,7 +1,7 @@
 # kicad-pcb-07-core-export
 
 - planId: kicad-pcb-07-core-export
-- planPath: impl-plans/active/kicad-pcb-07-core-export.md
+- planPath: impl-plans/completed/kicad-pcb-07-core-export.md
 - wave: 2; dependsOn: kicad-pcb-01-ir-core-contracts,
   kicad-pcb-02-fabrication-writers
 - design: design-docs/specs/design-kicad-pcb.md sections 7.1, 7.3 (all
@@ -10,7 +10,7 @@
   attributes)
 - progress log: impl-plans/progress/kicad-pcb-07-core-export.md
 - scratch: tmp/kicad-pcb-s534/kicad-pcb-07-core-export/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

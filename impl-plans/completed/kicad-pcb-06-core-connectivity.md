@@ -1,12 +1,12 @@
 # kicad-pcb-06-core-connectivity
 
 - planId: kicad-pcb-06-core-connectivity
-- planPath: impl-plans/active/kicad-pcb-06-core-connectivity.md
+- planPath: impl-plans/completed/kicad-pcb-06-core-connectivity.md
 - wave: 2; dependsOn: kicad-pcb-01-ir-core-contracts
 - design: design-docs/specs/design-kicad-pcb.md section 5.5 (and 5.4 for
   `pcbNetNames`)
 - progress log: impl-plans/progress/kicad-pcb-06-core-connectivity.md
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

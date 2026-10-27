@@ -1,14 +1,14 @@
 # kicad-pcb-01-ir-core-contracts
 
 - planId: kicad-pcb-01-ir-core-contracts
-- planPath: impl-plans/active/kicad-pcb-01-ir-core-contracts.md
+- planPath: impl-plans/completed/kicad-pcb-01-ir-core-contracts.md
 - wave: 1; dependsOn: none
 - design: design-docs/specs/design-kicad-pcb.md sections 3.1-3.4, 4.1
   (`PcbImportPlan`, `pcbPageFromPlan`), 5.1 (anchors), 6.3 (pad shapes),
   5.5 (grid index)
 - progress log: impl-plans/progress/kicad-pcb-01-ir-core-contracts.md
 - scratch: tmp/kicad-pcb-s530/kicad-pcb-01-ir-core-contracts/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

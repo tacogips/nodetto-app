@@ -1,13 +1,13 @@
 # kicad-pcb-03-docs
 
 - planId: kicad-pcb-03-docs
-- planPath: impl-plans/active/kicad-pcb-03-docs.md
+- planPath: impl-plans/completed/kicad-pcb-03-docs.md
 - wave: 1; dependsOn: none
 - design: design-docs/specs/design-kicad-pcb.md sections 3, 4.3, 5, 6.4,
   7.3, 8, 9, 10, 13, 15; user QA defaults
   design-docs/user-qa/kicad-pcb.md
 - progress log: impl-plans/progress/kicad-pcb-03-docs.md
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

@@ -1,13 +1,13 @@
 # kicad-pcb-11-ui-canvas
 
 - planId: kicad-pcb-11-ui-canvas
-- planPath: impl-plans/active/kicad-pcb-11-ui-canvas.md
+- planPath: impl-plans/completed/kicad-pcb-11-ui-canvas.md
 - wave: 4; dependsOn: kicad-pcb-09-core-index-fixture-integration
 - design: design-docs/specs/design-kicad-pcb.md sections 6.2, 6.4 (tools,
   hover, layers, R key), 5.1, 5.2, 5.4, 5.5; user QA Q1 (transient layer
   visibility) and Q5 (free track angles)
 - progress log: impl-plans/progress/kicad-pcb-11-ui-canvas.md
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

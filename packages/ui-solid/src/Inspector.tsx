@@ -25,6 +25,7 @@ import { BatchRenameSection } from "./inspector/BatchRenameSection.tsx";
 import { ReplaceNoteTextSection } from "./inspector/ReplaceNoteTextSection.tsx";
 import { BpmnSection } from "./inspector/BpmnSection.tsx";
 import { BreadboardSection } from "./inspector/BreadboardSection.tsx";
+import { PcbSection } from "./inspector/PcbSection.tsx";
 import {
   type Element,
   type ElementId,
@@ -181,6 +182,11 @@ export function Inspector(props: InspectorProps): JSX.Element {
     if (type === "breadboard.netlist") return "Target netlist";
     if (type.startsWith("breadboard."))
       return isBreadboardPartType(type) ? "Part" : "Breadboard";
+    if (type === "pcb.footprint") return "Footprint";
+    if (type === "pcb.track") return "Track";
+    if (type === "pcb.via") return "Via";
+    if (type === "pcb.zone") return "Zone";
+    if (type === "pcb.graphic") return "Graphic";
     const labels: Record<string, string> = {
       "ui.control": "Control",
       "erd.table": "Table",
@@ -304,6 +310,9 @@ export function Inspector(props: InspectorProps): JSX.Element {
               element={element()}
               viewport={props.viewport}
             />
+          </Match>
+          <Match when={element().type.startsWith("pcb.")}>
+            <PcbSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type === "group"}>
             <GroupSection editor={props.editor} element={element()} />

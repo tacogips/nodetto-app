@@ -1,13 +1,13 @@
 # kicad-pcb-04-kicad-reader
 
 - planId: kicad-pcb-04-kicad-reader
-- planPath: impl-plans/active/kicad-pcb-04-kicad-reader.md
+- planPath: impl-plans/completed/kicad-pcb-04-kicad-reader.md
 - wave: 2; dependsOn: kicad-pcb-01-ir-core-contracts
 - design: design-docs/specs/design-kicad-pcb.md sections 3.2, 3.4, 4
   (all), 11 (fixtures)
 - progress log: impl-plans/progress/kicad-pcb-04-kicad-reader.md
 - scratch: tmp/kicad-pcb-s534/kicad-pcb-04-kicad-reader/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

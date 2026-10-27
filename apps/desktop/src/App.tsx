@@ -1,7 +1,9 @@
 import { TemplateDialog } from "./TemplateDialog.tsx";
 import {
   computeBreadboardConnectivity,
+  encodePcbBoardZip,
   encodeBreadboardPcbZip,
+  exportPcbBoard,
   exportBreadboardPcb,
   createDesignTemplate,
   toBreadboardNetlist,
@@ -731,6 +733,46 @@ export function App(props: AppProps): JSX.Element {
     );
   };
 
+  const exportPcbGerber = async (): Promise<void> => {
+    setExportError(null);
+    const page = props.editor.store.getPage(props.editor.currentPageId);
+    if (page?.kind !== "pcb") return;
+    try {
+      const pcb = exportPcbBoard(props.editor.store.getSnapshot(), page.id, {
+        name: page.name,
+      });
+      if (typeof pcb === "string") {
+        setExportError(pcb);
+        return;
+      }
+      const bytes = encodePcbBoardZip(pcb);
+      const name = `${exportBaseName(page.name)}.zip`;
+      if (!props.exportBackend.available) {
+        const url = URL.createObjectURL(
+          new Blob([bytes], { type: "application/zip" }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        const path = await props.exportBackend.pickExportPath(name, "zip");
+        if (path === null) return;
+        await props.exportBackend.writeBytes(path, bytes);
+      }
+      setExportError(
+        `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
+      );
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   const exportBreadboard = async (
     kind: "bom" | "kicad" | "spice" | "gerber",
   ): Promise<void> => {
@@ -1001,6 +1043,7 @@ export function App(props: AppProps): JSX.Element {
           }
           exportBpmn={exportBpmn}
           exportBreadboard={exportBreadboard}
+          exportPcb={exportPcbGerber}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />

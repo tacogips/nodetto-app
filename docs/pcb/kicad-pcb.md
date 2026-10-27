@@ -47,14 +47,29 @@ Select and drag or nudge footprints, tracks, vias, zones and graphics. Press
 `R` to rotate selected footprints by 90 degrees. Track ends inside a moved
 footprint's pads follow the pads. Use the Track tool to click a start point and
 each corner, then double-click or press Enter to finish; press Esc to cancel.
-The track's net comes from the pad, track or via at its start point. The Via
-tool adds vias. Set track width, layer and net in the inspector, and use
-Delete to remove selected items.
+The Via tool adds a via where you click. Both tools snap to the pad, track or
+via under the pointer; a pad snaps to its pad position, which is also the
+drill position.
+
+A PCB page shows a panel with two groups:
+
+- **Layers**: one checkbox per layer. Items whose layers are all hidden are
+  not drawn and cannot be selected. Visibility lasts for the current session
+  and is not saved with the document.
+- **Tool options**: **Copper layer**, **Net** (or **No net**), **Track
+  width**, **Via diameter** and **Via drill** for new tracks and vias. The
+  width must be greater than 0, and the via diameter must be greater than the
+  drill. An invalid value is ignored. These options are not saved with the
+  document.
+
+A new track or via takes its net from the item it snaps to at its start point,
+or from **Tool options** when it does not snap to anything. Select a track or
+via to change its layer, width, net, diameter or drill in the inspector, and
+press Delete to remove selected items.
 
 Hover over an item to highlight its net, or choose **Select net** in the
 inspector. Dashed ratsnest lines show same-net pads that are not joined by
-copper. Layer checkboxes control visibility for the current session and are
-not saved with the document.
+copper.
 
 PCB pages do not support autorouting, zone refill, design rule checks,
 footprint flipping, creating nets or writing changes back to a `.kicad_pcb`
@@ -116,6 +131,10 @@ omitted. Its summary has this form:
 ```text
 Board <w> x <h> mm: <f> footprints, <p> pads, <t> tracks, <v> vias, <z> zones, <n> nets.
 ```
+
+A board without an Edge.Cuts outline still imports; the summary then starts
+with `Board with no outline:`, and `pcb gerber` refuses the page with
+`The board has no Edge.Cuts outline.`
 
 `pcb gerber` writes a ZIP for the selected PCB page. If the document has more
 than one PCB page, use `--page` to choose one. `--strict` exits with code 3

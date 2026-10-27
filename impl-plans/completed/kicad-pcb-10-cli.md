@@ -1,13 +1,13 @@
 # kicad-pcb-10-cli
 
 - planId: kicad-pcb-10-cli
-- planPath: impl-plans/active/kicad-pcb-10-cli.md
+- planPath: impl-plans/completed/kicad-pcb-10-cli.md
 - wave: 4; dependsOn: kicad-pcb-09-core-index-fixture-integration
 - design: design-docs/specs/design-kicad-pcb.md section 8 (and 7.3 for the
   notes and warnings)
 - progress log: impl-plans/progress/kicad-pcb-10-cli.md
 - scratch: tmp/kicad-pcb-s536/kicad-pcb-10-cli/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

@@ -1,12 +1,12 @@
 # kicad-pcb-12-ui-inspector-export
 
 - planId: kicad-pcb-12-ui-inspector-export
-- planPath: impl-plans/active/kicad-pcb-12-ui-inspector-export.md
+- planPath: impl-plans/completed/kicad-pcb-12-ui-inspector-export.md
 - wave: 4; dependsOn: kicad-pcb-09-core-index-fixture-integration
 - design: design-docs/specs/design-kicad-pcb.md sections 6.4 (inspector,
   "Select net"), 9 (Export dialog), 5.2, 5.4
 - progress log: impl-plans/progress/kicad-pcb-12-ui-inspector-export.md
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

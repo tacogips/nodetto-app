@@ -1,13 +1,13 @@
 # kicad-pcb-05-core-editing
 
 - planId: kicad-pcb-05-core-editing
-- planPath: impl-plans/active/kicad-pcb-05-core-editing.md
+- planPath: impl-plans/completed/kicad-pcb-05-core-editing.md
 - wave: 2; dependsOn: kicad-pcb-01-ir-core-contracts
 - design: design-docs/specs/design-kicad-pcb.md sections 5.1, 5.2, 5.3,
   5.4
 - progress log: impl-plans/progress/kicad-pcb-05-core-editing.md
 - scratch: tmp/kicad-pcb-s534/kicad-pcb-05-core-editing/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

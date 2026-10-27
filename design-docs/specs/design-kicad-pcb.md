@@ -604,7 +604,7 @@ Fixtures are self-authored, in `test-fixtures/kicad/`, listed in its
 
 ## 12. Implementation slicing (for the plan)
 
-The binding split is `impl-plans/active/kicad-pcb-00-overview.md` and
+The binding split is `impl-plans/completed/kicad-pcb-00-overview.md` and
 plans 01-13. Plans 01-08 are committed. Plan 09 publishes the
 `pcb-board` barrel and runs the fixture acceptance tests; plans 10 (CLI),
 11 (canvas, tools, layers, workspace), 12 (inspector, Export dialog,

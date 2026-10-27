@@ -1,13 +1,13 @@
 # kicad-pcb-02-fabrication-writers
 
 - planId: kicad-pcb-02-fabrication-writers
-- planPath: impl-plans/active/kicad-pcb-02-fabrication-writers.md
+- planPath: impl-plans/completed/kicad-pcb-02-fabrication-writers.md
 - wave: 1; dependsOn: none
 - design: design-docs/specs/design-kicad-pcb.md section 7.2; baseline
   design-docs/specs/design-breadboard-pcb.md sections 5 and 11.1
 - progress log: impl-plans/progress/kicad-pcb-02-fabrication-writers.md
 - scratch: tmp/kicad-pcb-s530/kicad-pcb-02-fabrication-writers/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

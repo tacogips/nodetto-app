@@ -1,12 +1,12 @@
 # kicad-pcb-13-desktop-open
 
 - planId: kicad-pcb-13-desktop-open
-- planPath: impl-plans/active/kicad-pcb-13-desktop-open.md
+- planPath: impl-plans/completed/kicad-pcb-13-desktop-open.md
 - wave: 4; dependsOn: kicad-pcb-09-core-index-fixture-integration
 - design: design-docs/specs/design-kicad-pcb.md section 9 (Open dialog,
   `dialogs.rs`)
 - progress log: impl-plans/progress/kicad-pcb-13-desktop-open.md
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

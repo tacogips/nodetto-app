@@ -1,7 +1,7 @@
 # kicad-pcb-09-core-index-fixture-integration
 
 - planId: kicad-pcb-09-core-index-fixture-integration
-- planPath: impl-plans/active/kicad-pcb-09-core-index-fixture-integration.md
+- planPath: impl-plans/completed/kicad-pcb-09-core-index-fixture-integration.md
 - wave: 3; dependsOn: kicad-pcb-04-kicad-reader,
   kicad-pcb-05-core-editing, kicad-pcb-06-core-connectivity,
   kicad-pcb-07-core-export, kicad-pcb-08-core-shapes
@@ -17,7 +17,7 @@
   read-back")
 - progress log: impl-plans/progress/kicad-pcb-09-core-index-fixture-integration.md
 - scratch: tmp/kicad-pcb-s536/kicad-pcb-09-core-index-fixture-integration/
-- protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
+- protocol: impl-plans/completed/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
 

@@ -100,6 +100,7 @@ import {
 } from "@nodetto/core";
 import {
   isBreadboardPartType,
+  isPcbElementType,
   type Element,
   type ElementId,
   type BreadboardElementType,
@@ -107,6 +108,17 @@ import {
   getElementTypeDefinition,
 } from "@nodetto/ir";
 import { type Accessor, createSignal } from "solid-js";
+import type { PcbTrackDraft } from "./pcb-interaction.ts";
+import {
+  pcbSnapTarget,
+  pcbTrackDraft,
+  pcbViaInput,
+} from "./pcb-interaction.ts";
+import {
+  isPcbElementShown,
+  pcbHiddenLayers,
+  pcbToolOptions,
+} from "./pcb-state.ts";
 import {
   creationFor,
   componentRelationshipFor,
@@ -476,6 +488,8 @@ export interface Interaction {
   readonly breadboardHover: Accessor<
     BreadboardPinRef | { wireId: ElementId } | null
   >;
+  readonly pcbHover: Accessor<string>;
+  readonly pcbDraft: Accessor<readonly Vec[] | null>;
 }
 
 /** True when two boxes overlap at all (touching edges count). */
@@ -820,10 +834,60 @@ export function createInteraction(
   const [breadboardHover, setBreadboardHover] = createSignal<
     BreadboardPinRef | { wireId: ElementId } | null
   >(null);
+  const [pcbHover, setPcbHover] = createSignal("");
+  const [pcbDraftPoints, setPcbDraftPoints] = createSignal<
+    readonly Vec[] | null
+  >(null);
+  let pcbTrackState: PcbTrackDraft | null = null;
   let wirePoints: Vec[] = [];
 
+  const isPcbPage = (): boolean =>
+    editor.store.getPage(editor.currentPageId)?.kind === "pcb";
   const isBreadboardPage = (): boolean =>
     editor.store.getPage(editor.currentPageId)?.kind === "breadboard";
+  const canvasHitTest = (point: Vec): ElementId | null => {
+    if (!isPcbPage()) return editor.hitTest(point);
+    const context = editor.createShapeContext();
+    const elements = editor.store.getPageElements(editor.currentPageId);
+    const hidden = pcbHiddenLayers(editor.currentPageId);
+    for (let index = elements.length - 1; index >= 0; index -= 1) {
+      const element = elements[index] as Element | undefined;
+      if (
+        !element ||
+        context.isHidden?.(element.id) ||
+        context.isLocked?.(element.id)
+      )
+        continue;
+      if (isPcbElementType(element.type) && !isPcbElementShown(element, hidden))
+        continue;
+      if (isGroup(element)) continue;
+      if (editor.getShapeUtil(element.type).hitTest(element, point, context))
+        return element.id;
+    }
+    return null;
+  };
+
+  const finishPcbTrack = (): void => {
+    if (
+      !isPcbPage() ||
+      editor.readOnly ||
+      !pcbTrackState ||
+      pcbTrackState.vertices.length === 0
+    )
+      return;
+    const last = pcbTrackState.vertices.at(-1) ?? pcbTrackState.start;
+    const result = pcbTrackDraft(
+      pcbTrackState,
+      { kind: "finish", point: last },
+      pcbToolOptions(),
+    );
+    if (result.input) {
+      const id = editor.addPcbTrack(editor.currentPageId, result.input);
+      if (id) editor.selection.set([id]);
+    }
+    pcbTrackState = null;
+    setPcbDraftPoints(null);
+  };
 
   const finishWireDraft = (): void => {
     if (wirePoints.length >= 2 && isBreadboardPage() && !editor.readOnly) {
@@ -864,7 +928,7 @@ export function createInteraction(
         }
       } else if (
         element.type === "breadboard.wire" &&
-        editor.hitTest(point) === element.id
+        canvasHitTest(point) === element.id
       ) {
         setBreadboardHover({ wireId: element.id });
         return;
@@ -1444,6 +1508,62 @@ export function createInteraction(
     if (!creation) {
       return;
     }
+    if (tool === Tool.PcbTrack || tool === Tool.PcbVia) {
+      if (!isPcbPage() || editor.readOnly) return;
+      const pageId = editor.currentPageId;
+      const pointMm = [point.x / 10, point.y / 10] as const;
+      const hidden = pcbHiddenLayers(pageId);
+      const snap = pcbSnapTarget(editor.getSnapshot(), pageId, pointMm, hidden);
+      if (tool === Tool.PcbVia) {
+        const id = editor.addPcbVia(
+          pageId,
+          pcbViaInput(pointMm, snap, pcbToolOptions()),
+        );
+        if (id) editor.selection.set([id]);
+        return;
+      }
+      if (!pcbTrackState) {
+        const result = pcbTrackDraft(
+          null,
+          { kind: "start", point: pointMm, target: snap },
+          pcbToolOptions(),
+        );
+        pcbTrackState = result.draft;
+        setPcbDraftPoints(
+          pcbTrackState
+            ? [
+                {
+                  x: pcbTrackState.start[0] * 10,
+                  y: pcbTrackState.start[1] * 10,
+                },
+              ]
+            : null,
+        );
+      } else {
+        const targetPoint = snap?.point ?? pointMm;
+        const result = pcbTrackDraft(
+          pcbTrackState,
+          { kind: "vertex", point: targetPoint },
+          pcbToolOptions(),
+        );
+        pcbTrackState = result.draft;
+        setPcbDraftPoints(
+          pcbTrackState
+            ? [
+                {
+                  x: pcbTrackState.start[0] * 10,
+                  y: pcbTrackState.start[1] * 10,
+                },
+                ...pcbTrackState.vertices.map(([x, y]) => ({
+                  x: x * 10,
+                  y: y * 10,
+                })),
+              ]
+            : null,
+        );
+      }
+      return;
+    }
     if (tool === Tool.BreadboardWire) {
       if (!isBreadboardPage()) return;
       const snapped = snapBreadboardPoint(point);
@@ -1618,6 +1738,10 @@ export function createInteraction(
     const requestedTool = options.tool();
     const tool =
       editor.readOnly && requestedTool !== "hand" ? "select" : requestedTool;
+    if (pcbTrackState && tool !== Tool.PcbTrack) {
+      pcbTrackState = null;
+      setPcbDraftPoints(null);
+    }
     const point = pagePoint(event);
     lastPointer = { screen: screenPoint(event), page: point };
     if (isBreadboardPage() && requestedTool !== Tool.BreadboardWire) {
@@ -1670,7 +1794,7 @@ export function createInteraction(
       return;
     }
 
-    const hit = editor.hitTest(point);
+    const hit = canvasHitTest(point);
 
     if (!hit) {
       // Empty canvas with the select tool starts a marquee; shift keeps the
@@ -2096,6 +2220,16 @@ export function createInteraction(
           ? targetUnder(pagePoint(event), [])
           : null,
       );
+      if (isPcbPage()) {
+        const point = pagePoint(event);
+        const target = pcbSnapTarget(
+          editor.getSnapshot(),
+          editor.currentPageId,
+          [point.x / 10, point.y / 10],
+          pcbHiddenLayers(editor.currentPageId),
+        );
+        setPcbHover(target?.net ?? "");
+      } else setPcbHover("");
       if (isBreadboardPage()) {
         const point = pagePoint(event);
         updateBreadboardHover(point);
@@ -2450,6 +2584,11 @@ export function createInteraction(
   /** Escape, in order: cancel, drill out of a group, deselect (design 5). */
   const pressEscape = (): void => {
     if (isBreadboardPage()) editor.setBreadboardProbe(null);
+    if (pcbTrackState) {
+      pcbTrackState = null;
+      setPcbDraftPoints(null);
+      if (isPcbPage()) return;
+    }
     if (wirePoints.length > 0) {
       wirePoints = [];
       setWireDraft(null);
@@ -2487,7 +2626,7 @@ export function createInteraction(
   /** Right-click: the hit becomes the selection unless it already is. */
   const contextMenuAt = (screen: Vec): void => {
     const page = editor.camera.screenToPage(screen);
-    const hit = editor.hitTest(page);
+    const hit = canvasHitTest(page);
     let reported: ElementId | null = null;
     if (hit) {
       const chain = ancestorChain(editor.store, hit);
@@ -2654,6 +2793,24 @@ export function createInteraction(
       }
     }
 
+    if (isPcbPage() && key === "r") {
+      const ids = [...editor.selection.ids()].filter(
+        (id) => editor.store.get(id)?.type === "pcb.footprint",
+      );
+      if (ids.length > 0) {
+        event.preventDefault();
+        if (!editor.readOnly)
+          editor.rotatePcbFootprints(ids, event.shiftKey ? -90 : 90);
+        return;
+      }
+    }
+
+    if (key === "enter" && pcbTrackState) {
+      event.preventDefault();
+      finishPcbTrack();
+      return;
+    }
+
     if (key === "enter" && wirePoints.length > 0) {
       event.preventDefault();
       finishWireDraft();
@@ -2759,6 +2916,27 @@ export function createInteraction(
       return;
     }
     const point = pagePoint(event);
+    if (pcbTrackState && options.tool() === Tool.PcbTrack && isPcbPage()) {
+      event.preventDefault();
+      const pointMm = [point.x / 10, point.y / 10] as const;
+      const snap = pcbSnapTarget(
+        editor.getSnapshot(),
+        editor.currentPageId,
+        pointMm,
+        pcbHiddenLayers(editor.currentPageId),
+      );
+      const last = pcbTrackState.vertices.at(-1);
+      if (!last || last[0] !== pointMm[0] || last[1] !== pointMm[1]) {
+        const next = pcbTrackDraft(
+          pcbTrackState,
+          { kind: "vertex", point: snap?.point ?? pointMm },
+          pcbToolOptions(),
+        );
+        pcbTrackState = next.draft;
+      }
+      finishPcbTrack();
+      return;
+    }
     if (wirePoints.length > 0 && options.tool() === Tool.BreadboardWire) {
       event.preventDefault();
       finishWireDraft();
@@ -2839,7 +3017,7 @@ export function createInteraction(
         }
       }
     }
-    const hit = editor.hitTest(point);
+    const hit = canvasHitTest(point);
     if (!hit) {
       return;
     }
@@ -3212,5 +3390,7 @@ export function createInteraction(
     panning,
     wireDraft,
     breadboardHover,
+    pcbHover,
+    pcbDraft: pcbDraftPoints,
   };
 }
