@@ -6,7 +6,7 @@
 - design: design-docs/specs/design-kicad-pcb.md section 8 (and 7.3 for the
   notes and warnings)
 - progress log: impl-plans/progress/kicad-pcb-10-cli.md
-- scratch: tmp/kicad-pcb-s530/kicad-pcb-10-cli/
+- scratch: tmp/kicad-pcb-s534/kicad-pcb-10-cli/
 - protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent
@@ -151,13 +151,13 @@ none
 3. `bunx biome check apps/cli/src/pcb-command.ts apps/cli/src/pcb-commands.test.ts apps/cli/src/commands.ts apps/cli/src/help.ts apps/cli/src/native-parity.test.ts --diagnostic-level=warn`
    exits 0.
 4. Run
-   `mkdir -p tmp/kicad-pcb-s530/kicad-pcb-10-cli && CARGO_TERM_QUIET=true mise run test-cli > tmp/kicad-pcb-s530/kicad-pcb-10-cli/test-cli.log 2>&1; echo "exit=$?"`.
+   `mkdir -p tmp/kicad-pcb-s534/kicad-pcb-10-cli && CARGO_TERM_QUIET=true mise run test-cli > tmp/kicad-pcb-s534/kicad-pcb-10-cli/test-cli.log 2>&1; echo "exit=$?"`.
    - Do not pipe through `tee`: a pipeline reports tee's status, not
      test-cli's.
    - The printed `exit=` value must be 0, and it is the exit code of
      `mise run test-cli` itself. Record it and the log path.
    - Then
-     `grep -n "native pcb import and gerber match the TypeScript CLI" tmp/kicad-pcb-s530/kicad-pcb-10-cli/test-cli.log`
+     `grep -n "native pcb import and gerber match the TypeScript CLI" tmp/kicad-pcb-s534/kicad-pcb-10-cli/test-cli.log`
      must show that test with bun's pass marker (`(pass)`). Record the
      matching line.
    - If the native binary build fails for reasons outside this plan,

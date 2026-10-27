@@ -9,7 +9,7 @@
   design-docs/specs/design-breadboard-pcb.md section 5 (names, X2
   attributes)
 - progress log: impl-plans/progress/kicad-pcb-07-core-export.md
-- scratch: tmp/kicad-pcb-s530/kicad-pcb-07-core-export/
+- scratch: tmp/kicad-pcb-s534/kicad-pcb-07-core-export/
 - protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent

@@ -6,7 +6,7 @@
 - design: design-docs/specs/design-kicad-pcb.md sections 5.1, 5.2, 5.3,
   5.4
 - progress log: impl-plans/progress/kicad-pcb-05-core-editing.md
-- scratch: tmp/kicad-pcb-s530/kicad-pcb-05-core-editing/
+- scratch: tmp/kicad-pcb-s534/kicad-pcb-05-core-editing/
 - protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent

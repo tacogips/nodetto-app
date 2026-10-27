@@ -6,7 +6,7 @@
 - design: design-docs/specs/design-kicad-pcb.md sections 3.2, 3.4, 4
   (all), 11 (fixtures)
 - progress log: impl-plans/progress/kicad-pcb-04-kicad-reader.md
-- scratch: tmp/kicad-pcb-s530/kicad-pcb-04-kicad-reader/
+- scratch: tmp/kicad-pcb-s534/kicad-pcb-04-kicad-reader/
 - protocol: impl-plans/active/kicad-pcb-00-overview.md "Per-worker protocol"
 
 ## Intent

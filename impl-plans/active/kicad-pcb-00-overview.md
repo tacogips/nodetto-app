@@ -4,10 +4,12 @@
 - design: design-docs/specs/design-kicad-pcb.md (revision 1, accepted by
   step3 comm-009827); user QA defaults: design-docs/user-qa/kicad-pcb.md
   (Q1-Q5, implement the defaults)
-- session: opus-luna-design-and-implement-review-loop-session-530; issue:
-  none (workflowInput only); branch feat/kicad-pcb; gitPush=false
-- scratch root: tmp/kicad-pcb-s530/<planId>/ (git-ignored; never put
-  `*.test.ts` files there)
+- session: opus-luna-design-and-implement-review-loop-session-530 (plans
+  01-03, committed 6865464); session-534 implements plans 04-13 through
+  impl-plans/active/kicad-pcb-s534-dispatch.json; issue: none
+  (workflowInput only); branch feat/kicad-pcb; gitPush=false
+- scratch root: tmp/kicad-pcb-s534/<planId>/ for plans 04-13 (git-ignored;
+  never put `*.test.ts` files there)
 
 ## Intent
 
