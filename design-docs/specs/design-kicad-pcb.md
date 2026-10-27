@@ -137,6 +137,10 @@ net.
 `drill: {diameter, slot?: PcbXY, offset?: PcbXY}`, `roundrectRatio`,
 `trapezoidDelta: PcbXY`, `maskMargin`, `primitives: PcbShape[]` (custom
 pads: polygons, with `width`).
+`drill.offset` is KiCad's pad shape offset: the hole is at the pad's `at`,
+and the copper, mask and paste shapes (and custom primitives) are centred
+at `at` plus `offset` rotated by the pad's rotation. The offset never moves
+the hole.
 
 `PcbShape` (shared by footprint graphics, pad primitives and board
 graphics):
@@ -395,9 +399,11 @@ graphic near its stroke or inside a filled shape.
 layer, in board millimetres: circle (centre, radius) or a contour of lines
 and arcs (rect, oval as a capsule, roundrect with corner radius
 `roundrectRatio * min(size)`, trapezoid from `trapezoidDelta`, custom as the
-anchor shape plus its polygons). It is used for containment tests, for
-track follow, for the view, and for Gerber regions (section 7.2), so the
-editor and the export agree.
+anchor shape plus its polygons). The outline is centred on the pad's shape
+position: `at` plus `drill.offset` rotated by the pad's rotation (section
+4); the hole stays at `at`. It is used for containment tests, for track
+follow, for the view, and for Gerber regions (section 7.2), so the editor
+and the export agree.
 
 ### 6.4 Workspace, tools and inspector
 
@@ -468,8 +474,9 @@ warnings, notes}`. `encodePcbBoardZip` writes the stored ZIP with
   stroked at its width (0.1 mm when the width is 0); circles as two
   half-circle arcs.
 - Drill (DRL, `Plated,1,2,PTH`): via drills and `thru_hole` pad drills;
-  oval drills as slots along the pad's rotated long axis; drill `offset`
-  applied. `np_thru_hole` drills go to `<name>-NPTH.DRL`
+  oval drills as slots along the pad's rotated long axis, centred on the
+  pad's `at`; `drill.offset` moves the copper, mask and paste shapes, not
+  the hole (section 6.3). `np_thru_hole` drills go to `<name>-NPTH.DRL`
   (`NonPlated,1,2,NPTH`), written only when present. Drill coordinates and
   tool diameters are written at the existing Excellon resolution of
   0.001 mm (three decimals, as in the breadboard export); finer hole

@@ -437,7 +437,9 @@
       "writePaths": [
         "packages/core/src/pcb-board/export.ts",
         "packages/core/src/pcb-board/export.test.ts",
-        "impl-plans/progress/kicad-pcb-07-core-export.md"
+        "impl-plans/progress/kicad-pcb-07-core-export.md",
+        "packages/core/src/pcb-board/geometry.ts",
+        "packages/core/src/pcb-board/geometry.test.ts"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],

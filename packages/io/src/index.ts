@@ -89,9 +89,12 @@ export {
 } from "./bpmn/index.ts";
 export {
   importKicad,
+  importKicadPcb,
   readSexpr,
   type SexprAtom,
   type SexprList,
   type SexprNode,
+  type PcbImportPlan,
+  type PcbImportResult,
 } from "./kicad/index.ts";
 export { isZip, readZip, type ZipFile, ZipReadError } from "./zip-read.ts";

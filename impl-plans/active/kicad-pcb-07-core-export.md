@@ -52,6 +52,8 @@ and the Boa native CLI.
 - packages/core/src/pcb-board/export.ts (new)
 - packages/core/src/pcb-board/export.test.ts (new)
 - impl-plans/progress/kicad-pcb-07-core-export.md (new)
+- packages/core/src/pcb-board/geometry.ts
+- packages/core/src/pcb-board/geometry.test.ts
 
 ## sharedPaths
 
@@ -135,7 +137,15 @@ none
   (0.1 when width is 0 or less); a circle is two half arcs.
 - Drill:
   - `<name>.DRL` (plated): one hit per via drill and per `thru_hole` pad
-    drill at the pad centre plus the rotated drill `offset`. A pad with
+    drill at the pad's `at` (the hole position). The drill `offset` is
+    KiCad's shape offset: it moves the copper, mask and paste shapes, never
+    the hole (design sections 4, 6.3, 7.3). Correct `padCopperOutline` and
+    `padPrimitiveOutlines` in `geometry.ts` to centre the shape at `at` plus
+    `offset` rotated by `fp.rotation + pad.rotation`, and add tests in
+    `geometry.test.ts` and `export.test.ts` for a rotated footprint with an
+    offset oval pad: the DRL hit is at the pad's `at`, the copper region is
+    centred at the offset position, and track follow and connectivity use the
+    offset shape. A pad with
     `drill.slot` becomes a slot along the rotated long axis: the length
     is `max(slot) - min(slot)` between the two end centres, and the
     diameter is `min(slot)`.
