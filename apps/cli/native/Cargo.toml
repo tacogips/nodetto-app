@@ -1,6 +1,6 @@
 [package]
 name = "nodetto-cli"
-version = "0.6.1"
+version = "0.7.0"
 description = "Native Nodetto CLI and MCP server"
 edition = "2021"
 license = "MIT"
