@@ -23,8 +23,12 @@ export interface FileBackend {
   /** The chosen path, or `null` when the dialog was cancelled. */
   pickOpenPath(): Promise<string | null>;
   pickSavePath(defaultName?: string): Promise<string | null>;
-  /** Allocate an app-managed path without a dialog; does not create a file. */
-  autosavePath?(): Promise<string | null>;
+  /**
+   * Allocate an app-managed path without a dialog; does not create a file.
+   * `name` is the file a detached document was imported from, whose stem
+   * the managed file keeps.
+   */
+  autosavePath?(name?: string | null): Promise<string | null>;
   readDocument(path: string): Promise<string>;
   /** Raw bytes of a binary import source such as a Gerber ZIP. */
   readDocumentBytes?(path: string): Promise<Uint8Array>;
@@ -56,7 +60,8 @@ interface ChangedPayload {
 export function createTauriBackend(): FileBackend {
   return {
     available: true,
-    autosavePath: () => invoke<string>("autosave_document_path"),
+    autosavePath: (name?: string | null) =>
+      invoke<string>("autosave_document_path", { name: name ?? null }),
     pickOpenPath: () => invoke<string | null>("pick_open_path"),
     pickSavePath: (defaultName?: string) =>
       invoke<string | null>("pick_save_path", {

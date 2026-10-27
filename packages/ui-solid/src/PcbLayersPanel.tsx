@@ -10,6 +10,8 @@ import {
   setPcbLayerHidden,
   setPcbToolOptions,
 } from "./pcb-state.ts";
+import { pcbLayerColor } from "./shapes/pcb-view.ts";
+import "./PcbLayersPanel.css";
 
 export function PcbLayersPanel(props: {
   readonly editor: Editor;
@@ -42,13 +44,7 @@ export function PcbLayersPanel(props: {
     value: number,
     update: (value: number) => boolean,
   ): JSX.Element => (
-    <label
-      style={{
-        display: "grid",
-        "grid-template-columns": "1fr 5rem",
-        gap: "0.4rem",
-      }}
-    >
+    <label class="nodetto-pcb-tool-option">
       {label}
       <input
         aria-label={label}
@@ -68,92 +64,83 @@ export function PcbLayersPanel(props: {
     <aside
       class="nodetto-pcb-layers-panel"
       aria-label="PCB layers and tool options"
-      style={{
-        position: "absolute",
-        right: "12px",
-        top: "12px",
-        "z-index": 20,
-        padding: "10px",
-        background: "#20242b",
-        color: "white",
-        "font-size": "12px",
-        "max-height": "80%",
-        overflow: "auto",
-        "min-width": "190px",
-      }}
     >
-      <h3>Layers</h3>
-      <For each={model().layers}>
-        {(layer) => (
-          <label
-            style={{ display: "flex", gap: "0.5rem", "align-items": "center" }}
-          >
-            <input
-              type="checkbox"
-              checked={!model().hidden.has(layer)}
+      <details>
+        <summary>Layers</summary>
+        <div class="nodetto-pcb-layers-section">
+          <For each={model().layers}>
+            {(layer) => (
+              <label class="nodetto-pcb-layer">
+                <input
+                  type="checkbox"
+                  checked={!model().hidden.has(layer)}
+                  onChange={(event) =>
+                    setPcbLayerHidden(
+                      pageId(),
+                      layer,
+                      !event.currentTarget.checked,
+                    )
+                  }
+                />
+                <span
+                  class="nodetto-pcb-layer-swatch"
+                  style={{ background: pcbLayerColor(layer) }}
+                />
+                {layer}
+              </label>
+            )}
+          </For>
+        </div>
+      </details>
+      <details>
+        <summary>Tool options</summary>
+        <div class="nodetto-pcb-layers-section">
+          <label class="nodetto-pcb-tool-option">
+            Copper layer
+            <select
+              aria-label="Copper layer"
+              value={options().layer}
               onChange={(event) =>
-                setPcbLayerHidden(pageId(), layer, !event.currentTarget.checked)
+                setPcbToolOptions({ layer: event.currentTarget.value })
               }
-            />
-            {layer}
+            >
+              <For each={model().copper}>
+                {(layer) => <option value={layer}>{layer}</option>}
+              </For>
+            </select>
           </label>
-        )}
-      </For>
-      <h3>Tool options</h3>
-      <label
-        style={{
-          display: "grid",
-          "grid-template-columns": "1fr 7rem",
-          gap: "0.4rem",
-        }}
-      >
-        Copper layer
-        <select
-          aria-label="Copper layer"
-          value={options().layer}
-          onChange={(event) =>
-            setPcbToolOptions({ layer: event.currentTarget.value })
-          }
-        >
-          <For each={model().copper}>
-            {(layer) => <option value={layer}>{layer}</option>}
-          </For>
-        </select>
-      </label>
-      <label
-        style={{
-          display: "grid",
-          "grid-template-columns": "1fr 7rem",
-          gap: "0.4rem",
-        }}
-      >
-        Net
-        <select
-          aria-label="Net"
-          value={options().net}
-          onChange={(event) =>
-            setPcbToolOptions({ net: event.currentTarget.value })
-          }
-        >
-          <option value="">No net</option>
-          <For each={model().nets}>
-            {(net) => <option value={net}>{net}</option>}
-          </For>
-        </select>
-      </label>
-      {numberInput("Track width", options().width, (width) =>
-        setPcbToolOptions({ width }),
-      )}
-      {numberInput("Via diameter", options().viaDiameter, (viaDiameter) => {
-        return (
-          viaDiameter > options().viaDrill && setPcbToolOptions({ viaDiameter })
-        );
-      })}
-      {numberInput("Via drill", options().viaDrill, (viaDrill) => {
-        return (
-          viaDrill < options().viaDiameter && setPcbToolOptions({ viaDrill })
-        );
-      })}
+          <label class="nodetto-pcb-tool-option">
+            Net
+            <select
+              aria-label="Net"
+              value={options().net}
+              onChange={(event) =>
+                setPcbToolOptions({ net: event.currentTarget.value })
+              }
+            >
+              <option value="">No net</option>
+              <For each={model().nets}>
+                {(net) => <option value={net}>{net}</option>}
+              </For>
+            </select>
+          </label>
+          {numberInput("Track width", options().width, (width) =>
+            setPcbToolOptions({ width }),
+          )}
+          {numberInput("Via diameter", options().viaDiameter, (viaDiameter) => {
+            return (
+              viaDiameter > options().viaDrill &&
+              setPcbToolOptions({ viaDiameter })
+            );
+          })}
+          {numberInput("Via drill", options().viaDrill, (viaDrill) => {
+            return (
+              viaDrill < options().viaDiameter &&
+              setPcbToolOptions({ viaDrill })
+            );
+          })}
+        </div>
+      </details>
     </aside>
   );
 }

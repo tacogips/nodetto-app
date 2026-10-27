@@ -368,9 +368,18 @@ export function App(props: AppProps): JSX.Element {
     }
   };
 
+  /**
+   * An imported board or drawing (KiCad, Gerber) keeps its source
+   * coordinates, which may lie off screen: show all of it.
+   */
+  const fitImported = (opened: boolean): void => {
+    if (opened && props.session.state().filePath === null)
+      props.editor.zoomToFit(viewport());
+  };
+
   const open = (): void => {
     if (mayDiscard()) {
-      void props.session.open();
+      void props.session.open().then(fitImported);
     }
   };
 
@@ -381,7 +390,7 @@ export function App(props: AppProps): JSX.Element {
 
   const openRecent = (path: string): void => {
     if (path !== "" && mayDiscard()) {
-      void props.session.openPath(path);
+      void props.session.openPath(path).then(fitImported);
     }
   };
 

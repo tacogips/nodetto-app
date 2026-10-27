@@ -75,6 +75,20 @@ export function setPcbToolOptions(patch: Partial<PcbToolOptions>): boolean {
   return true;
 }
 
+/**
+ * Whether `layer` is hidden. A KiCad wildcard such as `*.Cu` is hidden once
+ * both of its outer layers are.
+ */
+export function isPcbLayerHidden(
+  hidden: ReadonlySet<string>,
+  layer: string,
+): boolean {
+  if (hidden.has(layer)) return true;
+  if (!layer.startsWith("*.")) return false;
+  const suffix = layer.slice(1);
+  return hidden.has(`F${suffix}`) && hidden.has(`B${suffix}`);
+}
+
 export function isPcbElementShown(
   element: Element,
   hidden: ReadonlySet<string>,
@@ -100,7 +114,10 @@ export function isPcbElementShown(
   } else if (semantic.layer) {
     layers = [semantic.layer];
   }
-  return layers.length === 0 || layers.some((layer) => !hidden.has(layer));
+  return (
+    layers.length === 0 ||
+    layers.some((layer) => !isPcbLayerHidden(hidden, layer))
+  );
 }
 
 export function pcbPageLayers(
@@ -110,7 +127,9 @@ export function pcbPageLayers(
   const declared = board?.layers.map((layer) => layer.name) ?? [];
   const used = new Set<string>(declared);
   for (const element of elements) {
-    if (!element.type.startsWith("pcb.")) continue;
+    // The board's own `layers` are the declared layer records read above.
+    if (!element.type.startsWith("pcb.") || element.type === "pcb.board")
+      continue;
     const semantic = element.semantic as {
       layer?: string;
       layers?: readonly string[];
@@ -123,5 +142,6 @@ export function pcbPageLayers(
     for (const pad of semantic.pads ?? [])
       for (const layer of pad.layers) used.add(layer);
   }
-  return [...used];
+  // Wildcards such as `*.Cu` follow their concrete layers.
+  return [...used].filter((layer) => !layer.startsWith("*."));
 }

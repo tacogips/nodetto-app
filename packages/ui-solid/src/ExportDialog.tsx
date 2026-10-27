@@ -70,7 +70,13 @@ export interface ExportDialogProps {
 
 export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
-  const [format, setFormat] = createSignal<Format>("svg");
+  // A board is exported for fabrication far more often than as artwork.
+  const [format, setFormat] = createSignal<Format>(
+    props.exportPcb &&
+      props.editor.store.getPage(props.editor.currentPageId)?.kind === "pcb"
+      ? "pcb"
+      : "svg",
+  );
   let dialog: HTMLDialogElement | undefined;
   const page = createMemo(() => {
     signals.rev();

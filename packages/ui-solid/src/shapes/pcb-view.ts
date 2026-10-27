@@ -4,8 +4,7 @@ import {
   footprintToBoard,
   padCopperOutline,
   padPrimitiveOutlines,
-  strokeText,
-  strokeTextWidth,
+  strokeTextBlock,
 } from "@nodetto/core";
 import type { PcbOutline } from "@nodetto/core";
 import type {
@@ -19,6 +18,7 @@ import type {
   PcbXY,
 } from "@nodetto/ir";
 import { PCB_PAGE_SCALE, pcbRotate } from "@nodetto/ir";
+import { isPcbLayerHidden } from "../pcb-state.ts";
 
 export interface PcbViewPath {
   readonly kind: "path";
@@ -49,7 +49,8 @@ export const PCB_LAYER_COLORS: Readonly<Record<string, string>> = {
   "Edge.Cuts": "#d0d0d0",
 };
 export const PCB_HOLES_COLOR = "#202020";
-const color = (layer: string): string =>
+/** Display colour of a PCB layer on the canvas. */
+export const pcbLayerColor = (layer: string): string =>
   layer.endsWith(".Cu")
     ? (PCB_LAYER_COLORS[layer] ?? "#c8a034")
     : (PCB_LAYER_COLORS[layer] ?? "#d0d0d0");
@@ -62,7 +63,7 @@ const path = (
 ): PcbViewPath => ({
   kind: "path",
   d,
-  stroke: color(layer),
+  stroke: pcbLayerColor(layer),
   width: width * PCB_PAGE_SCALE,
   fill,
   layer,
@@ -114,20 +115,12 @@ function graphicPaths(
     );
   const s = item.shape;
   if (s.kind === "text") {
-    const height = s.size[1];
-    const width = strokeTextWidth(s.text, height);
     if (s.hidden) return [];
-    const lines = strokeText(s.text, 0, 0, height);
-    const justify =
-      s.justify?.horizontal === "left"
-        ? width / 2
-        : s.justify?.horizontal === "right"
-          ? -width / 2
-          : 0;
+    const lines = strokeTextBlock(s.text, s.size[1], s.justify?.horizontal);
     const paths: PcbViewPrimitive[] = [];
     for (const polyline of lines) {
       const points = polyline.map(({ x, y }) => {
-        const yUp: PcbXY = [x + justify, -y];
+        const yUp: PcbXY = [x, -y];
         const mirrored: PcbXY = s.justify?.mirror ? [-yUp[0], yUp[1]] : yUp;
         const rotated = pcbRotate(mirrored, s.rotation);
         const local: PcbXY = [s.at[0] + rotated[0], s.at[1] + rotated[1]];
@@ -177,9 +170,9 @@ function graphicPaths(
         cx: c[0],
         cy: c[1],
         r: s.radius * PCB_PAGE_SCALE,
-        stroke: color(item.layer),
+        stroke: pcbLayerColor(item.layer),
         width: item.width * PCB_PAGE_SCALE,
-        fill: item.fill ? color(item.layer) : "none",
+        fill: item.fill ? pcbLayerColor(item.layer) : "none",
         layer: item.layer,
       },
     ];
@@ -199,7 +192,7 @@ function graphicPaths(
       `M ${pts.map((pt) => transform(pt).join(" ")).join(" L ")} Z`,
       item.layer,
       item.width,
-      item.fill ? color(item.layer) : "none",
+      item.fill ? pcbLayerColor(item.layer) : "none",
     ),
   ];
 }
@@ -214,16 +207,16 @@ function padPaths(fp: PcbFootprintSemantic, pad: PcbPad): PcbViewPrimitive[] {
         cx: c[0],
         cy: c[1],
         r: outline.radius * PCB_PAGE_SCALE,
-        stroke: color(layer),
+        stroke: pcbLayerColor(layer),
         width: 0,
-        fill: color(layer),
+        fill: pcbLayerColor(layer),
         layer,
       });
     } else {
-      out.push(path(outlinePath(outline), layer, 0, color(layer)));
+      out.push(path(outlinePath(outline), layer, 0, pcbLayerColor(layer)));
     }
     for (const primitive of padPrimitiveOutlines(fp, pad))
-      out.push(path(outlinePath(primitive), layer, 0, color(layer)));
+      out.push(path(outlinePath(primitive), layer, 0, pcbLayerColor(layer)));
   }
   if ((pad.type === "thru_hole" || pad.type === "np_thru_hole") && pad.drill) {
     const [x, y] = page(footprintToBoard(fp, pad.at));
@@ -270,27 +263,28 @@ export function pcbViewModel(
     PcbZoneSemantic &
     PcbGraphicItem;
   if (element.visual.hidden === true || element.type === "pcb.board") return [];
+  const off = (layer: string): boolean => isPcbLayerHidden(hidden, layer);
   if (element.type === "pcb.footprint") {
     const fp = s as PcbFootprintSemantic;
     const layers = new Set([
       ...fp.graphics.map((g) => g.layer),
       ...fp.pads.flatMap((p) => p.layers),
     ]);
-    if ([...layers].every((layer) => hidden.has(layer))) return [];
+    if ([...layers].every((layer) => off(layer))) return [];
     const result: PcbViewPrimitive[] = [];
     const graphics = [...fp.graphics].sort(
       (a, b) =>
         Number(a.layer.startsWith("F.")) - Number(b.layer.startsWith("F.")),
     );
     for (const graphic of graphics)
-      if (!hidden.has(graphic.layer)) result.push(...graphicPaths(graphic, fp));
+      if (!off(graphic.layer)) result.push(...graphicPaths(graphic, fp));
     for (const pad of fp.pads)
-      if (!pad.layers.every((layer) => hidden.has(layer)))
+      if (!pad.layers.every((layer) => off(layer)))
         result.push(...padPaths(fp, pad));
     return result;
   }
   if (element.type === "pcb.track") {
-    if (hidden.has(s.layer)) return [];
+    if (off(s.layer)) return [];
     const points = s.points.map(page);
     if (s.mid && points.length === 2) {
       const mid = page(s.mid);
@@ -308,7 +302,7 @@ export function pcbViewModel(
     ];
   }
   if (element.type === "pcb.via") {
-    if (s.layers.every((layer) => hidden.has(layer))) return [];
+    if (s.layers.every((layer) => off(layer))) return [];
     const [x, y] = page(s.at);
     return [
       {
@@ -335,7 +329,7 @@ export function pcbViewModel(
   }
   if (element.type === "pcb.zone") {
     const result: PcbViewPrimitive[] = [];
-    if (!s.layers.every((layer) => hidden.has(layer))) {
+    if (!s.layers.every((layer) => off(layer))) {
       const points = s.outline.map(page);
       result.push(
         path(
@@ -345,21 +339,21 @@ export function pcbViewModel(
         ),
       );
       for (const filled of s.filled)
-        if (!hidden.has(filled.layer))
+        if (!off(filled.layer))
           for (const polygon of filled.polygons) {
             const ps = polygon.map(page);
             const item = path(
               `M ${ps.map((p) => p.join(" ")).join(" L ")} Z`,
               filled.layer,
               0,
-              color(filled.layer),
+              pcbLayerColor(filled.layer),
             );
-            result.push({ ...item, fill: `${color(filled.layer)}59` });
+            result.push({ ...item, fill: `${pcbLayerColor(filled.layer)}59` });
           }
     }
     return result;
   }
   if (element.type === "pcb.graphic")
-    return hidden.has(s.layer) ? [] : graphicPaths(s);
+    return off(s.layer) ? [] : graphicPaths(s);
   return [];
 }

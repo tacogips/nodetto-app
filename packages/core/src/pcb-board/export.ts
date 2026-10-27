@@ -30,8 +30,7 @@ import {
   excellonDrill,
   GerberLayer,
   strokeFontSupports,
-  strokeText,
-  strokeTextWidth,
+  strokeTextBlock,
   type GerberRegionContour,
   type PcbFile,
   type PcbPoint,
@@ -214,20 +213,15 @@ function drawShape(
     }
     case "text": {
       if (shape.hidden) return;
-      const text = resolvedText(shape, graphic);
-      const width = strokeTextWidth(text, shape.size[1]);
-      const justification =
-        shape.justify?.horizontal === "left"
-          ? width / 2
-          : shape.justify?.horizontal === "right"
-            ? -width / 2
-            : 0;
-      const strokes = strokeText(text, 0, 0, shape.size[1]);
+      const strokes = strokeTextBlock(
+        resolvedText(shape, graphic),
+        shape.size[1],
+        shape.justify?.horizontal,
+      );
       for (const stroke of strokes) {
         const transformed = stroke.map(({ x, y }) => {
           let sx = x;
           const sy = -y;
-          sx += justification;
           if (shape.justify?.mirror) sx = -sx;
           const rotated = pcbRotate([sx, sy], shape.rotation);
           return p([shape.at[0] + rotated[0], shape.at[1] + rotated[1]]);
@@ -452,7 +446,9 @@ export function exportPcbBoard(
         const shape = graphic.shape;
         if (
           shape.kind === "text" &&
-          [...resolvedText(shape, graphic)].some((c) => !strokeFontSupports(c))
+          [...resolvedText(shape, graphic)].some(
+            (c) => c !== "\n" && !strokeFontSupports(c),
+          )
         )
           warnings.push(
             `${resolvedText(shape, graphic)} has characters the silkscreen font cannot draw; they are omitted.`,

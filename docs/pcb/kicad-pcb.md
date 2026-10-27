@@ -1,8 +1,8 @@
 # KiCad PCB boards
 
 Nodetto opens `.kicad_pcb` boards as editable PCB pages. In the desktop app,
-choose a board in the Open dialog; it opens as a new unsaved document and the
-source board is not changed. The command line can also import a board and
+choose a board in the Open dialog; it opens as a new unsaved document zoomed
+to fit the board, and the source board is not changed. The command line can also import a board and
 export Gerber and drill files:
 
 ```sh
@@ -51,11 +51,12 @@ The Via tool adds a via where you click. Both tools snap to the pad, track or
 via under the pointer; a pad snaps to its pad position, which is also the
 drill position.
 
-A PCB page shows a panel with two groups:
+A PCB page shows a panel with two collapsible groups:
 
-- **Layers**: one checkbox per layer. Items whose layers are all hidden are
-  not drawn and cannot be selected. Visibility lasts for the current session
-  and is not saved with the document.
+- **Layers**: one checkbox and colour swatch per layer. Items whose layers are
+  all hidden are not drawn and cannot be selected; a through-hole pad on
+  `*.Cu` is hidden once both F.Cu and B.Cu are. Visibility lasts for the
+  current session and is not saved with the document.
 - **Tool options**: **Copper layer**, **Net** (or **No net**), **Track
   width**, **Via diameter** and **Via drill** for new tracks and vias. The
   width must be greater than 0, and the via diameter must be greater than the
@@ -63,9 +64,11 @@ A PCB page shows a panel with two groups:
   document.
 
 A new track or via takes its net from the item it snaps to at its start point,
-or from **Tool options** when it does not snap to anything. Select a track or
-via to change its layer, width, net, diameter or drill in the inspector, and
-press Delete to remove selected items.
+or from **Tool options** when it does not snap to anything. Selecting a PCB
+item opens its own inspector tab: a footprint's reference, value, position and
+rotation, or a track or via's layer, width, net, diameter or drill. Press
+Delete to remove selected items. The Layers list names footprints by reference
+and value, and tracks, vias and zones by net.
 
 Hover over an item to highlight its net, or choose **Select net** in the
 inspector. Dashed ratsnest lines show same-net pads that are not joined by
@@ -91,7 +94,8 @@ PCB element types store:
 
 ## Gerber and drill export
 
-The desktop Export dialog has a PCB tab with **Gerber and drill (.zip)**.
+The desktop Export dialog has a PCB tab with **Gerber and drill (.zip)**, and
+opens on it when the current page is a PCB page.
 Export uses the Edge.Cuts outline and places the origin at its bottom-left
 corner. It writes Gerber X2 in millimetres; drill coordinates use 0.001 mm
 precision.

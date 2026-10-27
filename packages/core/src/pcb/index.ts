@@ -16,8 +16,10 @@ export {
 export {
   strokeFontSupports,
   strokeText,
+  strokeTextBlock,
   strokeTextWidth,
   type StrokePoint,
+  STROKE_LINE_SPACING,
 } from "./font.ts";
 export {
   GerberLayer,

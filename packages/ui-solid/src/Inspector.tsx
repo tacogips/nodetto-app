@@ -213,7 +213,12 @@ export function Inspector(props: InspectorProps): JSX.Element {
     const context = props.editor.createShapeContext();
     return selectedIds().some((id) => context.isLocked?.(id));
   });
-  createEffect(on(selectedElementId, () => setActiveTab("shape")));
+  // Fill and stroke mean nothing on a board item: open its own fields.
+  createEffect(
+    on(selectedElementId, () =>
+      setActiveTab(single()?.type.startsWith("pcb.") ? "specific" : "shape"),
+    ),
+  );
   createEffect(
     on([() => props.focus, selectedElementId], ([focus, id]) => {
       if (focus && focus.id === id && typeLabel()) setActiveTab("specific");

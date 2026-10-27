@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import type { Element } from "@nodetto/ir";
 import { parseDocument, serializeDocument } from "@nodetto/io";
 import { layerName, renameLayer } from "./layer-name.ts";
 import { makeEditor, document, erdFixture } from "./test-helpers.ts";
@@ -51,4 +52,28 @@ test("nonsemantic shapes can have names without visible text changes", () => {
   expect(editor.store.get(copy ?? "")?.visual.layerName).toBe(
     "Hero background",
   );
+});
+
+test("PCB items are named by reference, net or layer", () => {
+  const named = (type: string, semantic: Record<string, unknown>): string =>
+    layerName({
+      id: "e",
+      pageId: "p",
+      type,
+      semantic,
+      visual: { x: 0, y: 0, w: 1, h: 1, z: "a0" },
+    } as unknown as Element);
+  expect(named("pcb.footprint", { reference: "SW1", value: "Switch" })).toBe(
+    "SW1 Switch",
+  );
+  expect(named("pcb.footprint", { reference: "", value: "" })).toBe(
+    "Footprint",
+  );
+  expect(named("pcb.track", { net: "GND" })).toBe("Track GND");
+  expect(named("pcb.via", { net: "" })).toBe("Via");
+  expect(named("pcb.zone", { net: "VCC" })).toBe("Zone VCC");
+  expect(named("pcb.graphic", { layer: "Edge.Cuts" })).toBe(
+    "Graphic on Edge.Cuts",
+  );
+  expect(named("pcb.board", { layers: [] })).toBe("Board");
 });

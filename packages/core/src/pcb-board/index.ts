@@ -45,5 +45,6 @@ export {
 export {
   strokeFontSupports,
   strokeText,
+  strokeTextBlock,
   strokeTextWidth,
 } from "../pcb/font.ts";

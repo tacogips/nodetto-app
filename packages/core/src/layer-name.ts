@@ -14,7 +14,42 @@ export function layerName(element: Element): string {
     return String(data?.["trigger"] || "Transition");
   if (element.type === "edge.generic" && data?.["prototype"] === true)
     return "Screen transition";
+  if (element.type.startsWith("pcb.")) return pcbLayerName(element.type, data);
   return element.type === "frame" ? "Artboard" : element.type;
+}
+
+/** Footprints by reference; copper items by kind and net; graphics by layer. */
+function pcbLayerName(
+  type: string,
+  data: Record<string, unknown> | null,
+): string {
+  const text = (field: string): string => {
+    const value = data?.[field];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const net = text("net");
+  switch (type) {
+    case "pcb.board":
+      return "Board";
+    case "pcb.footprint": {
+      const reference = text("reference");
+      const value = text("value");
+      if (reference && value) return `${reference} ${value}`;
+      return reference || value || "Footprint";
+    }
+    case "pcb.track":
+      return net ? `Track ${net}` : "Track";
+    case "pcb.via":
+      return net ? `Via ${net}` : "Via";
+    case "pcb.zone":
+      return net ? `Zone ${net}` : "Zone";
+    case "pcb.graphic": {
+      const layer = text("layer");
+      return layer ? `Graphic on ${layer}` : "Graphic";
+    }
+    default:
+      return type;
+  }
 }
 
 /** Empty input restores the semantic/type label without touching content. */

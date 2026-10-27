@@ -833,7 +833,9 @@ export class DocumentSession {
     let path = this.current.filePath;
     const firstSave = path === null;
     try {
-      if (path === null) path = (await this.backend.autosavePath?.()) ?? null;
+      if (path === null)
+        path =
+          (await this.backend.autosavePath?.(this.current.fileName)) ?? null;
     } catch (error) {
       if (generation === this.documentGeneration)
         this.fail(`could not create autosave file: ${describe(error)}`);

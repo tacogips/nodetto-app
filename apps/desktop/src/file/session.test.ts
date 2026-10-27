@@ -1621,6 +1621,24 @@ describe("saving modes and first-shape autosave", () => {
     h.session.dispose();
   });
 
+  test("an imported document autosaves under a name from its source file", async () => {
+    const h = createHarness({ seeded: false });
+    const names: (string | null | undefined)[] = [];
+    h.backend.autosavePath = async (name) => {
+      names.push(name);
+      return "board.jsonl";
+    };
+    await h.session.importDocument(
+      { ...h.editor.getSnapshot(), title: "Board", elements: [] },
+      "/boards/board.kicad_pcb",
+    );
+    addShape(h.editor, "edit");
+    expect(await h.session.flush()).toBe(true);
+    expect(names).toEqual(["board.kicad_pcb"]);
+    expect(h.session.state().filePath).toBe("board.jsonl");
+    h.session.dispose();
+  });
+
   test("undoing the first shape before autosave leaves no file", async () => {
     const h = createHarness({ seeded: false });
     let allocations = 0;

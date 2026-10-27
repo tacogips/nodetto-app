@@ -2,8 +2,8 @@
 //
 // Gerber has no text primitive, so legend text is drawn as strokes. Each glyph
 // is a list of polylines on a 4 x 6 cell with y pointing up; the set covers
-// what breadboard legends print: references, row and column labels, pinouts
-// and polarity marks.
+// what breadboard legends and board silkscreens print: references, row and
+// column labels, pinouts, polarity marks, revisions and common punctuation.
 
 type Glyph = readonly (readonly (readonly [number, number])[])[];
 
@@ -34,6 +34,198 @@ const P: Glyph = [
 
 const GLYPHS: Readonly<Record<string, Glyph>> = {
   " ": [],
+  ".": [
+    [
+      [2, 0],
+      [2, 0.4],
+    ],
+  ],
+  ",": [
+    [
+      [2, 0.6],
+      [2, 0],
+      [1.5, -1],
+    ],
+  ],
+  ":": [
+    [
+      [2, 1],
+      [2, 1.4],
+    ],
+    [
+      [2, 4],
+      [2, 4.4],
+    ],
+  ],
+  "/": [
+    [
+      [0, 0],
+      [4, 6],
+    ],
+  ],
+  _: [
+    [
+      [0, 0],
+      [4, 0],
+    ],
+  ],
+  "(": [
+    [
+      [3, 6],
+      [2, 5],
+      [2, 1],
+      [3, 0],
+    ],
+  ],
+  ")": [
+    [
+      [1, 6],
+      [2, 5],
+      [2, 1],
+      [1, 0],
+    ],
+  ],
+  "[": [
+    [
+      [3, 6],
+      [2, 6],
+      [2, 0],
+      [3, 0],
+    ],
+  ],
+  "]": [
+    [
+      [1, 6],
+      [2, 6],
+      [2, 0],
+      [1, 0],
+    ],
+  ],
+  "=": [
+    [
+      [0, 2],
+      [4, 2],
+    ],
+    [
+      [0, 4],
+      [4, 4],
+    ],
+  ],
+  "*": [
+    [
+      [2, 1],
+      [2, 5],
+    ],
+    [
+      [0, 2],
+      [4, 4],
+    ],
+    [
+      [0, 4],
+      [4, 2],
+    ],
+  ],
+  "#": [
+    [
+      [1, 0],
+      [1, 6],
+    ],
+    [
+      [3, 0],
+      [3, 6],
+    ],
+    [
+      [0, 2],
+      [4, 2],
+    ],
+    [
+      [0, 4],
+      [4, 4],
+    ],
+  ],
+  "'": [
+    [
+      [2, 6],
+      [2, 4.5],
+    ],
+  ],
+  '"': [
+    [
+      [1, 6],
+      [1, 4.5],
+    ],
+    [
+      [3, 6],
+      [3, 4.5],
+    ],
+  ],
+  "!": [
+    [
+      [2, 6],
+      [2, 2],
+    ],
+    [
+      [2, 0],
+      [2, 0.4],
+    ],
+  ],
+  "?": [
+    [
+      [0, 5],
+      [1, 6],
+      [3, 6],
+      [4, 5],
+      [4, 4],
+      [2, 3],
+      [2, 2],
+    ],
+    [
+      [2, 0],
+      [2, 0.4],
+    ],
+  ],
+  "<": [
+    [
+      [4, 5],
+      [0, 3],
+      [4, 1],
+    ],
+  ],
+  ">": [
+    [
+      [0, 5],
+      [4, 3],
+      [0, 1],
+    ],
+  ],
+  "%": [
+    [
+      [0, 0],
+      [4, 6],
+    ],
+    [
+      [0, 6],
+      [1, 6],
+      [1, 5],
+      [0, 5],
+      [0, 6],
+    ],
+    [
+      [3, 1],
+      [4, 1],
+      [4, 0],
+      [3, 0],
+      [3, 1],
+    ],
+  ],
+  "~": [
+    [
+      [0, 3],
+      [1, 4],
+      [3, 2],
+      [4, 3],
+    ],
+  ],
   "+": [
     [
       [2, 1],
@@ -491,4 +683,32 @@ export function strokeText(
       );
   });
   return strokes;
+}
+
+/** Distance between baselines of multi-line text, in text heights. */
+export const STROKE_LINE_SPACING = 1.6;
+
+/**
+ * Polylines for `text` split at line breaks, `height` tall, with y pointing
+ * up. The block of lines is centred vertically on the origin; each line is
+ * centred on it, or starts or ends there for left or right alignment.
+ */
+export function strokeTextBlock(
+  text: string,
+  height: number,
+  horizontal: "left" | "center" | "right" = "center",
+): readonly (readonly StrokePoint[])[] {
+  const lines = text.split("\n");
+  const pitch = height * STROKE_LINE_SPACING;
+  return lines.flatMap((line, index) => {
+    const width = strokeTextWidth(line, height);
+    const x =
+      horizontal === "left"
+        ? width / 2
+        : horizontal === "right"
+          ? -width / 2
+          : 0;
+    const y = ((lines.length - 1) / 2 - index) * pitch;
+    return strokeText(line, x, y, height);
+  });
 }
