@@ -1,7 +1,16 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
-const CSS = readFileSync(`${import.meta.dir}/style.css`, "utf8");
+/** A stylesheet with its relative `@import` rules inlined in cascade order. */
+function stylesheet(path: string): string {
+  return readFileSync(path, "utf8").replace(
+    /@import\s+"([^"]+)";/g,
+    (_, file: string) => stylesheet(join(dirname(path), file)),
+  );
+}
+
+const CSS = stylesheet(`${import.meta.dir}/style.css`);
 
 /** Each rule's selector and declarations, comments removed. */
 function rules(css: string): { selector: string; body: string }[] {

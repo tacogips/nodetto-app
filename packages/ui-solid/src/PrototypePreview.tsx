@@ -1,30 +1,12 @@
 import {
-  backdropEffectsCss,
-  booleanGeometry,
-  booleanMaskCss,
-  clipCss,
   Editor,
-  groupOf,
-  layerClipPolygons,
-  memberIdsOf,
-  polygonBounds,
   prototypeDelayedLink,
   prototypeFitScale,
   prototypeScreen,
   prototypeSmartPlan,
   prototypeSmartPlanBetween,
-  rotatedBox,
-  type ShapeContext,
-  effectsCss,
 } from "@nodetto/core";
-import {
-  type Element,
-  type FrameSemantic,
-  getElementTypeDefinition,
-  type GroupSemantic,
-  type PrototypeOverflow,
-  type PrototypeTransition,
-} from "@nodetto/ir";
+import type { Element, FrameSemantic, PrototypeTransition } from "@nodetto/ir";
 import {
   createMemo,
   createEffect,
@@ -37,183 +19,33 @@ import {
   Show,
 } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
-import { ShapeView } from "./shapes/ShapeView.tsx";
-import { ConnectorMarkers, ConnectorView } from "./shapes/ConnectorView.tsx";
+import {
+  type PrototypeLinkHandlers,
+  PrototypeHotspots,
+} from "./PrototypeHotspots.tsx";
+import { PrototypeLayer } from "./PrototypeLayer.tsx";
+import { PrototypeOverlaySurface } from "./PrototypeOverlaySurface.tsx";
 import { PrototypeAnimation } from "./prototype-transition.ts";
-import { prototypeEventMatches } from "./prototype-trigger.ts";
 import { PrototypeSurfaceFocus } from "./prototype-surface-focus.ts";
 import {
-  dismissPrototypeOverlay,
   popPrototypeOverlay,
-  prototypeOverlayPlacement,
+  dismissPrototypeOverlay,
   pushPrototypeOverlay,
   type PrototypeOverlayEntry,
 } from "./prototype-overlays.ts";
 import {
-  advancePrototypeScroll,
-  prototypeDragDelta,
-  prototypeKeyboardDelta,
-  prototypeScrollRange,
-  type PrototypeScrollPoint,
-} from "./prototype-scroll.ts";
+  prototypeElementsById,
+  prototypeIsFixed,
+  prototypeScrollMode,
+  prototypeSurfaceContext,
+  type PrototypeView,
+  prototypeVisualRoots,
+} from "./prototype-surface.ts";
+import { createPrototypeSurfaceScroll } from "./prototype-surface-scroll.ts";
 import {
   PrototypeVariantState,
   type PrototypeVariantMode,
 } from "./prototype-variant-state.ts";
-
-type PrototypeView = NonNullable<ReturnType<typeof prototypeScreen>>;
-
-function PrototypeLayer(props: {
-  readonly editor: Editor;
-  readonly element: Element;
-  readonly elements: ReadonlyMap<string, Element>;
-  readonly markerPrefix: string;
-  readonly context?: ShapeContext;
-  readonly ancestors?: ReadonlySet<string>;
-}): JSX.Element {
-  const imageSignals =
-    props.element.type === "image.raster"
-      ? createEditorSignals(props.editor)
-      : undefined;
-  const context = props.context ?? props.editor.createShapeContext();
-  if (props.element.type === "group") {
-    if (props.ancestors?.has(props.element.id)) return null;
-    const nextAncestors = new Set(props.ancestors).add(props.element.id);
-    const style = props.element.visual.style;
-    const semantic = props.element.semantic as GroupSemantic;
-    const boolean = booleanGeometry(props.element, context);
-    const children = memberIdsOf(props.element).flatMap((id) => {
-      const element = props.elements.get(id);
-      return element ? [element] : [];
-    });
-    const contents = (
-      <For each={children}>
-        {(element) => (
-          <PrototypeLayer
-            editor={props.editor}
-            element={element}
-            elements={props.elements}
-            markerPrefix={props.markerPrefix}
-            context={context}
-            ancestors={nextAncestors}
-          />
-        )}
-      </For>
-    );
-    return boolean ? (
-      <div
-        data-nodetto-group={props.element.id}
-        data-boolean-operation={boolean.operation}
-        style={{
-          position: "absolute",
-          left: `${boolean.bounds.x}px`,
-          top: `${boolean.bounds.y}px`,
-          width: `${boolean.bounds.width}px`,
-          height: `${boolean.bounds.height}px`,
-          overflow: "visible",
-          "pointer-events": "none",
-          opacity: style?.opacity ?? 1,
-          filter: effectsCss(style),
-          "backdrop-filter": backdropEffectsCss(style),
-          "mix-blend-mode": style?.blendMode ?? "normal",
-          isolation: semantic.isolate ? "isolate" : undefined,
-          "mask-image": booleanMaskCss(boolean),
-          "mask-repeat": "no-repeat",
-          "mask-size": "100% 100%",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            left: `${-boolean.bounds.x}px`,
-            top: `${-boolean.bounds.y}px`,
-            width: "1px",
-            height: "1px",
-            overflow: "visible",
-          }}
-        >
-          {contents}
-        </div>
-      </div>
-    ) : (
-      <div
-        data-nodetto-group={props.element.id}
-        style={{
-          position: "absolute",
-          inset: 0,
-          "pointer-events": "none",
-          opacity: style?.opacity ?? 1,
-          filter: effectsCss(style),
-          "backdrop-filter": backdropEffectsCss(style),
-          "mix-blend-mode": style?.blendMode ?? "normal",
-          isolation: semantic.isolate ? "isolate" : undefined,
-        }}
-      >
-        {contents}
-      </div>
-    );
-  }
-  if (getElementTypeDefinition(props.element.type)?.category === "edge") {
-    const connectorPrefix = `${props.markerPrefix}${createUniqueId()}-`;
-    return (
-      <svg
-        width="1"
-        height="1"
-        style={{
-          position: "absolute",
-          overflow: "visible",
-          "pointer-events": "none",
-        }}
-      >
-        <title>Diagram connector</title>
-        <ConnectorMarkers prefix={connectorPrefix} />
-        <g
-          style={{
-            "clip-path": clipCss(
-              context.clipPolygonOf?.(props.element.id) ??
-                context.clipOf?.(props.element.id),
-            ),
-            opacity: props.element.visual.style?.opacity ?? 1,
-            filter: effectsCss(props.element.visual.style),
-            "backdrop-filter": backdropEffectsCss(props.element.visual.style),
-            "mix-blend-mode": props.element.visual.style?.blendMode ?? "normal",
-          }}
-        >
-          <ConnectorView
-            element={props.element}
-            context={context}
-            selected={false}
-            markerPrefix={connectorPrefix}
-          />
-        </g>
-      </svg>
-    );
-  }
-  const box = props.editor.getBounds(props.element.id);
-  return box ? (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        "clip-path": clipCss(
-          context.clipPolygonOf?.(props.element.id) ??
-            context.clipOf?.(props.element.id),
-        ),
-      }}
-    >
-      <ShapeView
-        resolveAsset={(source) => {
-          imageSignals?.rev();
-          return props.editor.assets.resolve(source);
-        }}
-        element={props.element}
-        box={box}
-        selected={false}
-        exposeAccessibility
-      />
-    </div>
-  ) : null;
-}
 
 export function PrototypePreview(props: {
   editor: Editor;
@@ -226,17 +58,6 @@ export function PrototypePreview(props: {
   let outgoingTimer: number | undefined;
   let navigationVersion = 0;
   let overlayVersion = 0;
-  let scrollGesture:
-    | {
-        readonly pointerId: number;
-        readonly frameId: string;
-        readonly start: PrototypeScrollPoint;
-        readonly origin: PrototypeScrollPoint;
-        moved: boolean;
-      }
-    | undefined;
-  let suppressedClickFrame = "";
-  let suppressedClickTimer: number | undefined;
   const animation = new PrototypeAnimation();
   const surfaceFocus = new PrototypeSurfaceFocus();
   const runtime = new Editor({
@@ -258,8 +79,7 @@ export function PrototypePreview(props: {
   onCleanup(() => {
     navigationVersion += 1;
     if (outgoingTimer !== undefined) window.clearTimeout(outgoingTimer);
-    if (suppressedClickTimer !== undefined)
-      window.clearTimeout(suppressedClickTimer);
+    scrolling.dispose();
     animation.cancel();
     surfaceFocus.dispose();
     for (const cleanup of pressCleanups) cleanup();
@@ -298,9 +118,7 @@ export function PrototypePreview(props: {
   const [overlays, setOverlays] = createSignal<
     readonly PrototypeOverlayEntry[]
   >([]);
-  const [surfaceScroll, setSurfaceScroll] = createSignal<
-    Readonly<Record<string, PrototypeScrollPoint>>
-  >({});
+  const scrolling = createPrototypeSurfaceScroll(runtime, () => scale());
   const [zoom, setZoom] = createSignal("fit");
   const [scroll, setScroll] = createSignal<HTMLDivElement>();
   const [viewport, setViewport] = createSignal({ width: 0, height: 0 });
@@ -311,8 +129,7 @@ export function PrototypePreview(props: {
     variantState.clear();
     delayedFired.clear();
     setOverlays([]);
-    setSurfaceScroll({});
-    scrollGesture = undefined;
+    scrolling.reset();
     if (!runtime.store.get(current())) {
       const fallback = frames()[0];
       setCurrent(fallback?.id ?? "");
@@ -355,172 +172,22 @@ export function PrototypePreview(props: {
   });
   const activeView = (): PrototypeView | undefined =>
     overlayViews().at(-1)?.view ?? screen() ?? undefined;
-  const elementsById = (view: PrototypeView): ReadonlyMap<string, Element> =>
-    new Map(view.elements.map((element) => [element.id, element]));
-  const visualRoots = (view: PrototypeView): readonly Element[] => {
-    const available = new Set(view.elements.map((element) => element.id));
-    return view.elements.filter(
-      (element) =>
-        element.id !== view.frame.id &&
-        !available.has(groupOf(runtime.store, element.id)?.id ?? ""),
-    );
-  };
-  const visualRoot = (view: PrototypeView, id: string): Element | undefined => {
-    const available = new Set(view.elements.map((element) => element.id));
-    let element = runtime.store.get(id);
-    const visited = new Set<string>();
-    while (element && !visited.has(element.id)) {
-      visited.add(element.id);
-      const group = groupOf(runtime.store, element.id);
-      if (!group || !available.has(group.id)) return element;
-      element = group;
-    }
-    return element;
-  };
-  const isFixed = (view: PrototypeView, id: string): boolean => {
-    const root = visualRoot(view, id);
-    return (
-      root?.visual.prototypeFixed === true &&
-      getElementTypeDefinition(root.type)?.category !== "edge"
-    );
-  };
-  const scrollAt = (id: string): PrototypeScrollPoint =>
-    surfaceScroll()[id] ?? { x: 0, y: 0 };
-  const scrollMode = (view: PrototypeView): PrototypeOverflow =>
-    (view.frame.semantic as FrameSemantic).prototypeOverflow ?? "none";
-  const surfaceContext = (view: PrototypeView): ShapeContext => {
-    const base = runtime.createShapeContext();
-    if (scrollMode(view) === "none") return base;
-    const polygons = layerClipPolygons(
-      runtime.store,
-      base,
-      new Set([view.frame.id]),
-    );
-    return {
-      ...base,
-      clipPolygonOf: polygons,
-      clipOf: (id) => {
-        const polygon = polygons(id);
-        return polygon ? polygonBounds(polygon) : null;
-      },
-    };
-  };
-  const scrollRange = (view: PrototypeView): PrototypeScrollPoint =>
-    prototypeScrollRange(
-      view.bounds,
-      view.elements.flatMap((element) => {
-        if (element.id === view.frame.id || isFixed(view, element.id))
-          return [];
-        const box = runtime.getBounds(element.id);
-        return box
-          ? [
-              rotatedBox(
-                box,
-                getElementTypeDefinition(element.type)?.category === "edge"
-                  ? 0
-                  : (element.visual.rotation ?? 0),
-              ),
-            ]
-          : [];
-      }),
-    );
-  const advanceSurface = (
-    view: PrototypeView,
-    delta: PrototypeScrollPoint,
-  ): boolean => {
-    const id = view.frame.id;
-    const currentOffset = scrollAt(id);
-    const next = advancePrototypeScroll(
-      scrollMode(view),
-      currentOffset,
-      delta,
-      scrollRange(view),
-    );
-    if (next.x === currentOffset.x && next.y === currentOffset.y) return false;
-    setSurfaceScroll({ ...surfaceScroll(), [id]: next });
-    return true;
-  };
-  const scrollSurface = (event: WheelEvent, view: PrototypeView): void => {
-    if (!advanceSurface(view, { x: event.deltaX, y: event.deltaY })) return;
-    event.preventDefault();
-    event.stopPropagation();
-  };
-  const keyboardScrollSurface = (
-    event: KeyboardEvent,
-    view: PrototypeView,
-  ): void => {
-    const delta = prototypeKeyboardDelta(event.key, view.bounds);
-    if (!delta || !advanceSurface(view, delta)) return;
-    event.preventDefault();
-    event.stopPropagation();
-  };
-  const beginScrollGesture = (
-    event: PointerEvent,
-    view: PrototypeView,
-  ): void => {
-    if (!event.isPrimary || event.button !== 0 || scrollMode(view) === "none")
-      return;
-    scrollGesture = {
-      pointerId: event.pointerId,
-      frameId: view.frame.id,
-      start: { x: event.clientX, y: event.clientY },
-      origin: scrollAt(view.frame.id),
-      moved: false,
-    };
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  };
-  const moveScrollGesture = (
-    event: PointerEvent,
-    view: PrototypeView,
-  ): void => {
-    const gesture = scrollGesture;
-    if (
-      !gesture ||
-      gesture.pointerId !== event.pointerId ||
-      gesture.frameId !== view.frame.id
-    )
-      return;
-    const distance = Math.hypot(
-      event.clientX - gesture.start.x,
-      event.clientY - gesture.start.y,
-    );
-    if (distance >= 5) gesture.moved = true;
-    if (!gesture.moved) return;
-    const next = advancePrototypeScroll(
-      scrollMode(view),
-      gesture.origin,
-      prototypeDragDelta(
-        gesture.start,
-        { x: event.clientX, y: event.clientY },
-        scale(),
-      ),
-      scrollRange(view),
-    );
-    event.preventDefault();
-    event.stopPropagation();
-    setSurfaceScroll({ ...surfaceScroll(), [gesture.frameId]: next });
-  };
-  const finishScrollGesture = (event: PointerEvent): void => {
-    const gesture = scrollGesture;
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
-    scrollGesture = undefined;
-    const target = event.currentTarget as HTMLElement;
-    if (target.hasPointerCapture?.(event.pointerId))
-      target.releasePointerCapture(event.pointerId);
-    if (!gesture.moved) return;
-    suppressedClickFrame = gesture.frameId;
-    if (suppressedClickTimer !== undefined)
-      window.clearTimeout(suppressedClickTimer);
-    suppressedClickTimer = window.setTimeout(() => {
-      suppressedClickTimer = undefined;
-      suppressedClickFrame = "";
-    }, 0);
-  };
-  const consumeSuppressedClick = (frameId: string): boolean => {
-    if (suppressedClickFrame !== frameId) return false;
-    suppressedClickFrame = "";
-    return true;
-  };
+  const elementsById = prototypeElementsById;
+  const visualRoots = (view: PrototypeView): readonly Element[] =>
+    prototypeVisualRoots(runtime, view);
+  const isFixed = (view: PrototypeView, id: string): boolean =>
+    prototypeIsFixed(runtime, view, id);
+  const scrollMode = prototypeScrollMode;
+  const surfaceContext = (view: PrototypeView) =>
+    prototypeSurfaceContext(runtime, view);
+  const {
+    scrollAt,
+    scrollSurface,
+    keyboardScrollSurface,
+    beginScrollGesture,
+    moveScrollGesture,
+    finishScrollGesture,
+  } = scrolling;
   const showScreen = (
     id: string,
     transition: PrototypeTransition = "instant",
@@ -534,8 +201,7 @@ export function PrototypePreview(props: {
     outgoingLayer = undefined;
     setOutgoing(undefined);
     setOverlays([]);
-    setSurfaceScroll({});
-    scrollGesture = undefined;
+    scrolling.reset();
     delayedFired.clear();
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -739,91 +405,11 @@ export function PrototypePreview(props: {
           viewport(),
         )
       : Number(zoom());
-  const PrototypeHotspots = (hotspotProps: {
-    readonly view: PrototypeView;
-    readonly fixed: boolean;
-  }): JSX.Element => {
-    const context = surfaceContext(hotspotProps.view);
-    return (
-      <For
-        each={hotspotProps.view.links.filter(
-          (link) =>
-            isFixed(hotspotProps.view, link.from) === hotspotProps.fixed,
-        )}
-      >
-        {(link) => (
-          <Show when={link.trigger !== "after-delay"}>
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                "pointer-events": "none",
-                "clip-path": clipCss(
-                  context.clipPolygonOf?.(link.from) ??
-                    context.clipOf?.(link.from),
-                ),
-              }}
-            >
-              <button
-                type="button"
-                class="nodetto-prototype-hotspot"
-                aria-label={link.label}
-                role={link.role}
-                disabled={link.disabled}
-                title={`${link.label} (${link.trigger})`}
-                style={{
-                  "pointer-events": "auto",
-                  transform: link.rotation
-                    ? `rotate(${link.rotation}deg)`
-                    : undefined,
-                  "transform-origin": "center",
-                  left: `${link.box.x}px`,
-                  top: `${link.box.y}px`,
-                  width: `${link.box.width}px`,
-                  height: `${link.box.height}px`,
-                  "clip-path": clipCss(link.hitPolygon),
-                  "mask-image": link.hitMask ?? undefined,
-                  "mask-repeat": link.hitMask ? "no-repeat" : undefined,
-                  "mask-size": link.hitMask ? "100% 100%" : undefined,
-                }}
-                onClick={(event) => {
-                  if (consumeSuppressedClick(hotspotProps.view.frame.id)) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    return;
-                  }
-                  if (
-                    prototypeEventMatches(
-                      link.trigger,
-                      event.detail === 0 ? "keyboard-activate" : "click",
-                    )
-                  )
-                    activate(link);
-                }}
-                onPointerEnter={() => {
-                  if (prototypeEventMatches(link.trigger, "pointer-enter"))
-                    activate(link, link.action === "change-to");
-                }}
-                onPointerLeave={() => {
-                  if (link.action === "change-to" && link.trigger === "hover")
-                    changeVariant(link, "restore");
-                }}
-                onPointerDown={(event) => {
-                  if (
-                    event.isPrimary &&
-                    event.button === 0 &&
-                    prototypeEventMatches(link.trigger, "pointer-down")
-                  )
-                    link.action === "change-to"
-                      ? beginPress(link, event.pointerId)
-                      : activate(link);
-                }}
-              />
-            </div>
-          </Show>
-        )}
-      </For>
-    );
+  const linkHandlers: PrototypeLinkHandlers = {
+    activate,
+    changeVariant,
+    beginPress,
+    consumeSuppressedClick: scrolling.consumeSuppressedClick,
   };
   return (
     <dialog
@@ -1021,7 +607,12 @@ export function PrototypePreview(props: {
                       )}
                     </For>
                     <Show when={!overlays().length}>
-                      <PrototypeHotspots view={view()} fixed={false} />
+                      <PrototypeHotspots
+                        runtime={runtime}
+                        view={view()}
+                        fixed={false}
+                        handlers={linkHandlers}
+                      />
                     </Show>
                   </div>
                   <div
@@ -1047,165 +638,30 @@ export function PrototypePreview(props: {
                       )}
                     </For>
                     <Show when={!overlays().length}>
-                      <PrototypeHotspots view={view()} fixed={true} />
+                      <PrototypeHotspots
+                        runtime={runtime}
+                        view={view()}
+                        fixed={true}
+                        handlers={linkHandlers}
+                      />
                     </Show>
                   </div>
                 </div>
                 <For each={overlayViews()}>
-                  {(overlay, index) => {
-                    const placement = () =>
-                      prototypeOverlayPlacement(
-                        view().bounds,
-                        overlay.view.bounds,
-                        overlay.entry,
-                      );
-                    const top = () => index() === overlays().length - 1;
-                    return (
-                      <div
-                        data-prototype-overlay={overlay.entry.key}
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: overlay.entry.backdrop
-                            ? "rgba(0, 0, 0, 0.35)"
-                            : "transparent",
-                          "pointer-events": top() ? "auto" : "none",
-                        }}
-                        onClick={() => {
-                          if (top())
-                            setOverlays(dismissPrototypeOverlay(overlays()));
-                        }}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onWheel={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      >
-                        <div
-                          role="dialog"
-                          tabIndex={top() ? 0 : -1}
-                          data-prototype-active-surface={
-                            top() ? "true" : undefined
-                          }
-                          aria-label={
-                            (overlay.view.frame.semantic as FrameSemantic)
-                              .name || "Prototype overlay"
-                          }
-                          style={{
-                            position: "absolute",
-                            left: `${placement().x - view().bounds.x}px`,
-                            top: `${placement().y - view().bounds.y}px`,
-                            width: `${overlay.view.bounds.width}px`,
-                            height: `${overlay.view.bounds.height}px`,
-                            overflow: "hidden",
-                            background: "white",
-                            "touch-action":
-                              scrollMode(overlay.view) === "none"
-                                ? "auto"
-                                : "none",
-                          }}
-                          onPointerDown={(event) => {
-                            beginScrollGesture(event, overlay.view);
-                            event.stopPropagation();
-                          }}
-                          onPointerMove={(event) =>
-                            moveScrollGesture(event, overlay.view)
-                          }
-                          onPointerUp={finishScrollGesture}
-                          onPointerCancel={finishScrollGesture}
-                          onClick={(event) => event.stopPropagation()}
-                          onWheel={(event) => {
-                            if (top()) scrollSurface(event, overlay.view);
-                          }}
-                          onKeyDown={(event) => {
-                            if (top())
-                              keyboardScrollSurface(event, overlay.view);
-                          }}
-                        >
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: `${-overlay.view.bounds.x}px`,
-                              top: `${-overlay.view.bounds.y}px`,
-                            }}
-                          >
-                            <For
-                              each={overlay.view.elements.filter(
-                                (element) =>
-                                  element.id === overlay.view.frame.id,
-                              )}
-                            >
-                              {(element) => (
-                                <PrototypeLayer
-                                  editor={runtime}
-                                  element={element}
-                                  elements={elementsById(overlay.view)}
-                                  markerPrefix={`${markerPrefix}overlay-`}
-                                  context={surfaceContext(overlay.view)}
-                                />
-                              )}
-                            </For>
-                          </div>
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: `${-overlay.view.bounds.x - scrollAt(overlay.view.frame.id).x}px`,
-                              top: `${-overlay.view.bounds.y - scrollAt(overlay.view.frame.id).y}px`,
-                            }}
-                          >
-                            <For
-                              each={visualRoots(overlay.view).filter(
-                                (element) => !isFixed(overlay.view, element.id),
-                              )}
-                            >
-                              {(element) => (
-                                <PrototypeLayer
-                                  editor={runtime}
-                                  element={element}
-                                  elements={elementsById(overlay.view)}
-                                  markerPrefix={`${markerPrefix}overlay-`}
-                                  context={surfaceContext(overlay.view)}
-                                />
-                              )}
-                            </For>
-                            <Show when={top()}>
-                              <PrototypeHotspots
-                                view={overlay.view}
-                                fixed={false}
-                              />
-                            </Show>
-                          </div>
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: `${-overlay.view.bounds.x}px`,
-                              top: `${-overlay.view.bounds.y}px`,
-                            }}
-                          >
-                            <For
-                              each={visualRoots(overlay.view).filter(
-                                (element) => isFixed(overlay.view, element.id),
-                              )}
-                            >
-                              {(element) => (
-                                <PrototypeLayer
-                                  editor={runtime}
-                                  element={element}
-                                  elements={elementsById(overlay.view)}
-                                  markerPrefix={`${markerPrefix}overlay-fixed-`}
-                                  context={surfaceContext(overlay.view)}
-                                />
-                              )}
-                            </For>
-                            <Show when={top()}>
-                              <PrototypeHotspots
-                                view={overlay.view}
-                                fixed={true}
-                              />
-                            </Show>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }}
+                  {(overlay, index) => (
+                    <PrototypeOverlaySurface
+                      runtime={runtime}
+                      overlay={overlay}
+                      screenBounds={view().bounds}
+                      top={index() === overlays().length - 1}
+                      markerPrefix={markerPrefix}
+                      scroll={scrolling}
+                      handlers={linkHandlers}
+                      onDismiss={() =>
+                        setOverlays(dismissPrototypeOverlay(overlays()))
+                      }
+                    />
+                  )}
                 </For>
               </div>
             </div>

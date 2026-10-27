@@ -1,0 +1,124 @@
+/* Header actions and status: saving setting, close dialog, header icons,
+   file actions menu and import notes.
+   Imported in cascade order from style.css. */
+
+.app-saving-setting {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  font-size: 12px;
+}
+
+.app-saving-setting select {
+  color: inherit;
+  background: var(--nodetto-panel-bg, #fff);
+  border: 1px solid var(--nodetto-border, #ddd);
+  padding: 4px;
+}
+
+.app-close-dialog {
+  color: var(--nodetto-text, #172b35);
+  background: var(--nodetto-panel-bg, #fff);
+  border: 1px solid var(--nodetto-border, #ccc);
+  padding: 20px;
+}
+.app-close-dialog::backdrop {
+  background: rgb(0 0 0 / 30%);
+}
+.app-close-dialog button {
+  margin-right: 8px;
+  padding: 6px 12px;
+}
+
+.nodetto-ruler-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.app-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+.app-header-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.app-document-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 10px;
+  background: var(--app-chrome-surface);
+  border-bottom: 1px solid var(--app-chrome-line);
+}
+
+.app-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.app-file-actions summary {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-height: 30px;
+  padding: 4px;
+  cursor: pointer;
+  list-style: none;
+}
+.app-file-actions summary::-webkit-details-marker {
+  display: none;
+}
+.app-file-actions summary:hover,
+.app-file-actions details[open] > summary {
+  background: var(--app-chrome-hover);
+}
+.app-file-actions .app-file-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  gap: 6px;
+}
+.app-file-actions .app-file-controls > button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  padding: 4px;
+}
+.app-file-actions .app-file-controls > button svg {
+  width: 18px;
+  height: 18px;
+}
+.app-file-actions .app-recent-select {
+  grid-column: 1 / -1;
+  max-width: 100%;
+  width: 100%;
+}
+.app-file-actions .app-settings-controls {
+  z-index: 40;
+}
+
+.app-document-status .app-file-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-import-notes {
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--nodetto-line);
+  font-size: 0.78rem;
+  max-height: 140px;
+  overflow: auto;
+}
+.app-import-notes summary {
+  cursor: pointer;
+}
