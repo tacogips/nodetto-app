@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createDefaultRegistry, Editor } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
+import { encodeStoredZip } from "../../../../packages/core/src/zip.ts";
 import { seed } from "../seed.ts";
 import type {
   FileBackend,
@@ -35,6 +36,8 @@ const KICAD_UNKNOWN_FIXTURE = readFileSync(
 
 interface MockBackend extends FileBackend {
   readonly files: Map<string, string>;
+  /** Binary files, read only through `readDocumentBytes`. */
+  readonly binaries: Map<string, Uint8Array>;
   /** Queued dialog answers, consumed in order. */
   readonly openAnswers: (string | null)[];
   readonly saveAnswers: (string | null)[];
@@ -57,6 +60,7 @@ const MISSING_FILE_ERROR = "file not found";
 
 function createMockBackend(): MockBackend {
   const files = new Map<string, string>();
+  const binaries = new Map<string, Uint8Array>();
   const listeners = new Set<FileChangedListener>();
   let recent: RecentEntry[] = [];
   let clock = 0;
@@ -68,6 +72,7 @@ function createMockBackend(): MockBackend {
   const backend: MockBackend = {
     available: true,
     files,
+    binaries,
     openAnswers: [],
     saveAnswers: [],
     writes: [],
@@ -106,6 +111,12 @@ function createMockBackend(): MockBackend {
         return Promise.reject(new Error(message));
       }
       const contents = files.get(path);
+      return contents === undefined
+        ? Promise.reject(new Error(`${MISSING_FILE_ERROR}: ${path}`))
+        : Promise.resolve(contents);
+    },
+    readDocumentBytes(path: string) {
+      const contents = binaries.get(path);
       return contents === undefined
         ? Promise.reject(new Error(`${MISSING_FILE_ERROR}: ${path}`))
         : Promise.resolve(contents);
@@ -615,6 +626,116 @@ describe("opening", () => {
         .some((element) => element.type === "breadboard.netlist"),
     ).toBe(true);
     expect(harness.backend.watched).toEqual([]);
+  });
+
+  const gerber = (fileFunction: string, ...body: string[]) =>
+    [
+      `%TF.FileFunction,${fileFunction}*%`,
+      "%FSLAX46Y46*%",
+      "%MOMM*%",
+      "%ADD10C,0.200000*%",
+      ...body,
+      "M02*",
+    ].join("\n");
+  const GERBER_OUTLINE = gerber(
+    "Profile,NP",
+    "D10*",
+    "X0Y0D02*",
+    "X20000000Y0D01*",
+    "X20000000Y10000000D01*",
+    "X0Y0D01*",
+  );
+  const GERBER_COPPER = gerber("Copper,L1,Top", "D10*", "X5000000Y5000000D03*");
+  const DRILL = "M48\nMETRIC\nT1C0.800\n%\nT1\nX5.0Y5.0\nM30\n";
+  const layerNames = (editor: Editor) =>
+    editor.store
+      .listElements()
+      .filter((element) => element.type === "group")
+      .map((element) => String(element.visual.layerName))
+      .sort();
+
+  test("opening a Gerber ZIP imports a detached PCB document", async () => {
+    const harness = createHarness();
+    const path = "/docs/keyboard-gerbers.zip";
+    const encode = (text: string) => new TextEncoder().encode(text);
+    harness.backend.binaries.set(
+      path,
+      encodeStoredZip(
+        [
+          {
+            path: "gerber/board-Edge_Cuts.gm1",
+            contents: encode(GERBER_OUTLINE),
+          },
+          { path: "gerber/board-F_Cu.gtl", contents: encode(GERBER_COPPER) },
+          { path: "gerber/board.drl", contents: encode(DRILL) },
+          { path: "README.txt", contents: encode("Order 5 boards.\n") },
+        ],
+        "test",
+      ),
+    );
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state()).toMatchObject({
+      filePath: null,
+      fileName: "keyboard-gerbers.zip",
+      dirty: true,
+      error: null,
+      importWarnings: [],
+    });
+    const snapshot = harness.editor.getSnapshot();
+    expect(snapshot.pages).toMatchObject([
+      { kind: "freeform", name: "keyboard-gerbers" },
+    ]);
+    expect(layerNames(harness.editor)).toEqual([
+      "Board outline (board-Edge_Cuts.gm1)",
+      "Drill (board.drl)",
+      "Top copper (board-F_Cu.gtl)",
+    ]);
+    expect(harness.backend.watched).toEqual([]);
+  });
+
+  test("opening a single Gerber file imports it as text", async () => {
+    const harness = createHarness();
+    const path = "/docs/board.gbr";
+    harness.backend.files.set(path, GERBER_OUTLINE);
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state()).toMatchObject({
+      fileName: "board.gbr",
+      error: null,
+    });
+    expect(layerNames(harness.editor)).toEqual(["Board outline (board.gbr)"]);
+  });
+
+  test("a ZIP without Gerber or drill files leaves the current document intact", async () => {
+    const source = await savedFile("original");
+    const harness = createHarness();
+    harness.backend.files.set(source.path, source.text);
+    await harness.session.openPath(source.path);
+    const before = serializeDocument(harness.editor.getSnapshot());
+    harness.backend.binaries.set(
+      "/docs/notes.zip",
+      encodeStoredZip(
+        [{ path: "notes.txt", contents: new TextEncoder().encode("hello\n") }],
+        "test",
+      ),
+    );
+    harness.backend.binaries.set(
+      "/docs/fake.zip",
+      new TextEncoder().encode("not an archive"),
+    );
+
+    expect(await harness.session.openPath("/docs/notes.zip")).toBe(false);
+    expect(harness.session.state().error).toBe(
+      "could not import notes.zip: the archive holds no Gerber or drill file",
+    );
+    expect(await harness.session.openPath("/docs/fake.zip")).toBe(false);
+    expect(harness.session.state().error).toBe(
+      "could not import fake.zip: not a ZIP archive",
+    );
+    expect(serializeDocument(harness.editor.getSnapshot())).toBe(before);
+    expect(harness.session.state().filePath).toBe(source.path);
+    expect(harness.backend.watched).toEqual([source.path]);
   });
 
   test("a malformed KiCad file leaves the current document intact", async () => {

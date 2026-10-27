@@ -35,7 +35,7 @@ function nanometres(value: number): number {
 
 /** True when the text looks like an Excellon drill file. */
 export function isExcellon(text: string): boolean {
-  return /^\s*(?:;[^\n]*\n\s*)*M48\b/.test(text);
+  return /^\s*(?:;[^\n]*\n\s*)*M48[ \t]*(?:\r?\n|$)/.test(text);
 }
 
 /** Interprets an Excellon drill file. Throws ExcellonReadError when unreadable. */

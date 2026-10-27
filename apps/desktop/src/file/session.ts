@@ -27,6 +27,7 @@ import {
   isEmptyCommit,
   mergeDocuments,
   newElementId,
+  type PcbImportFile,
 } from "@nodetto/core";
 import {
   assertValidDocument,
@@ -149,6 +150,14 @@ function isBpmnPath(path: string): boolean {
 
 function isKicadPath(path: string): boolean {
   return /\.(?:kicad_sch|net)$/i.test(path);
+}
+
+/** Gerber and drill files, alone or in a board house ZIP. */
+const PCB_PATH =
+  /\.(?:zip|gbr|ger|gtl|gbl|gts|gbs|gto|gbo|gtp|gbp|gko|gm1|gml|drl|xln|exc)$/i;
+
+function isPcbPath(path: string): boolean {
+  return PCB_PATH.test(path);
 }
 
 function bpmnTitle(path: string): string {
@@ -330,6 +339,45 @@ export class DocumentSession {
     return true;
   }
 
+  /**
+   * Gerber and drill files are an interchange source: the board becomes a
+   * detached document so autosave never rewrites the fabrication files.
+   */
+  private async importPcbPath(
+    path: string,
+    stale: () => boolean,
+  ): Promise<boolean> {
+    const name = baseName(path);
+    try {
+      const { importPcbFiles, pcbFilesFromZip } = await import("@nodetto/core");
+      let files: PcbImportFile[];
+      if (/\.zip$/i.test(path)) {
+        if (!this.backend.readDocumentBytes)
+          throw new Error("this build cannot read ZIP archives");
+        files = pcbFilesFromZip(await this.backend.readDocumentBytes(path));
+        if (files.length === 0)
+          throw new Error("the archive holds no Gerber or drill file");
+      } else {
+        files = [{ name, text: await this.backend.readDocument(path) }];
+      }
+      if (stale()) return false;
+      const report = importPcbFiles(files, {
+        pageName: name.replace(/\.[^.]+$/, ""),
+      });
+      return await this.importDocument(
+        report.document,
+        name,
+        report.warnings.map((warning) => ({
+          element: warning.file ? baseName(warning.file) : name,
+          message: warning.message,
+        })),
+      );
+    } catch (error) {
+      if (!stale()) this.fail(`could not import ${name}: ${describe(error)}`);
+      return false;
+    }
+  }
+
   /** Ask for a file and open it. Returns false when cancelled or failed. */
   async open(): Promise<boolean> {
     if (this.refuseWhileSuspended()) {
@@ -361,6 +409,8 @@ export class DocumentSession {
       request !== this.openRequest || this.suspended || this.disposed;
     this.cancelAutosave();
     this.patch({ status: "loading", error: null });
+
+    if (isPcbPath(path)) return this.importPcbPath(path, stale);
 
     let diskText: string;
     try {

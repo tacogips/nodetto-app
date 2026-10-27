@@ -92,8 +92,8 @@ Open a document from a terminal with `nodetto-cli open path/to/file.jsonl`
 (or `open -a nodetto path/to/file.jsonl` on macOS);
 Finder "Open With" also lists nodetto for `.jsonl`, `.mmd`, `.mermaid`, `.bpmn`,
 `.drawio` and `.dio` files without becoming their default application. KiCad
-`.kicad_sch` and `.net` files are not associated; open them from the Open
-dialog. A path passed while the app
+`.kicad_sch` and `.net` files, Gerber and drill files and Gerber ZIPs are not
+associated; open them from the Open dialog. A path passed while the app
 is running opens in the existing window (after the usual unsaved-changes
 prompt).
 
@@ -693,7 +693,8 @@ lint until every part is placed. Builds older than breadboard support reject
 documents that contain a breadboard page.
 
 Any board's Gerber and drill files, for example a KiCad project's fabrication
-output, can be drawn on a page with `nodetto-cli gerber import`; see
+output, can be drawn on a page with `nodetto-cli gerber import` or by opening
+the ZIP or a single Gerber or drill file from the desktop Open dialog; see
 [Gerber import](docs/pcb/gerber-import.md).
 
 See the [breadboard format](docs/breadboard/format.md),

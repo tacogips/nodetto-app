@@ -26,6 +26,8 @@ export interface FileBackend {
   /** Allocate an app-managed path without a dialog; does not create a file. */
   autosavePath?(): Promise<string | null>;
   readDocument(path: string): Promise<string>;
+  /** Raw bytes of a binary import source such as a Gerber ZIP. */
+  readDocumentBytes?(path: string): Promise<Uint8Array>;
   /** Writes atomically: readers never observe a partial document. */
   writeDocument(path: string, contents: string): Promise<void>;
   /** Binary attachments stay beside the JSONL and use relative paths. */
@@ -61,6 +63,10 @@ export function createTauriBackend(): FileBackend {
         defaultName: defaultName ?? null,
       }),
     readDocument: (path: string) => invoke<string>("read_document", { path }),
+    readDocumentBytes: async (path: string) =>
+      new Uint8Array(
+        await invoke<ArrayBuffer>("read_document_bytes", { path }),
+      ),
     writeDocument: (path: string, contents: string) =>
       invoke<void>("write_document_atomic", { path, contents }),
     readAttachment: async (documentPath, relative) =>

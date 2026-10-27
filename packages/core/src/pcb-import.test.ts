@@ -8,8 +8,15 @@ import {
   type PathSemantic,
   validateDocument,
 } from "@nodetto/ir";
-import { importPcbFiles, importPcbPage, PcbImportError } from "./pcb-import.ts";
+import {
+  importPcbFiles,
+  importPcbPage,
+  isFabricationText,
+  PcbImportError,
+  pcbFilesFromZip,
+} from "./pcb-import.ts";
 import { compoundPathGeometry } from "./shapes/compound-path.ts";
+import { encodeStoredZip } from "./zip.ts";
 
 const HEADER = [
   "%FSLAX46Y46*%",
@@ -252,4 +259,24 @@ test("each path renders its points where they are, even when Bezier handles over
       }),
     );
   }
+});
+
+test("a board house ZIP yields its Gerber and drill files, recognised by content", () => {
+  const encode = (text: string) => new TextEncoder().encode(text);
+  const drill = "; DRILL file\nM48\nMETRIC\nT1C0.800\n%\nT1\nX5.0Y5.0\nM30\n";
+  const zip = encodeStoredZip(
+    [
+      { path: "out/board.gm1", contents: encode(OUTLINE) },
+      { path: "out/board.drl", contents: encode(drill) },
+      { path: "out/board-pos.csv", contents: encode("Ref,Val\nR1,1k\n") },
+      { path: "README.txt", contents: encode("M48 is the drill header\n") },
+    ],
+    "test",
+  );
+  expect(pcbFilesFromZip(zip)).toEqual([
+    { name: "out/board.gm1", text: OUTLINE },
+    { name: "out/board.drl", text: drill },
+  ]);
+  expect(isFabricationText("Ref,Val\n")).toBe(false);
+  expect(() => pcbFilesFromZip(encode("plain text"))).toThrow(PcbImportError);
 });

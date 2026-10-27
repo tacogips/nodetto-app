@@ -50,12 +50,27 @@ pub fn autosave_document_path(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|error| format!("could not allocate autosave path: {error}"))
 }
 
-#[tauri::command]
-pub fn read_document(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|error| match error.kind() {
+fn read_error(path: &str, error: io::Error) -> String {
+    match error.kind() {
         io::ErrorKind::NotFound => format!("{MISSING_FILE_MESSAGE}: {path}"),
         _ => format!("failed to read {path}: {error}"),
-    })
+    }
+}
+
+#[tauri::command]
+pub fn read_document(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|error| read_error(&path, error))
+}
+
+fn read_bytes(path: &str) -> Result<Vec<u8>, String> {
+    fs::read(path).map_err(|error| read_error(path, error))
+}
+
+/// Binary import sources such as a board house ZIP. The bytes go back as a
+/// raw IPC response, not a JSON number array.
+#[tauri::command]
+pub fn read_document_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    read_bytes(&path).map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]
@@ -184,6 +199,22 @@ mod tests {
         );
         assert!(
             error.contains("failed to read"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn read_bytes_returns_binary_contents_and_reports_a_missing_file() {
+        let directory = tempdir().expect("temp dir");
+        let target = directory.path().join("board.zip");
+        let bytes = [0x50, 0x4b, 0x03, 0x04, 0, 255, 128];
+        fs::write(&target, bytes).expect("seed file");
+        assert_eq!(read_bytes(&target.to_string_lossy()).expect("read"), bytes);
+
+        let missing = directory.path().join("absent.zip");
+        let error = read_bytes(&missing.to_string_lossy()).expect_err("missing file");
+        assert!(
+            error.starts_with(MISSING_FILE_MESSAGE),
             "unexpected error: {error}"
         );
     }

@@ -3,8 +3,9 @@ import {
   keyAfter,
   type PcbImportFile,
   type PcbImportWarning,
+  pcbFilesFromZip,
 } from "@nodetto/core";
-import { isZip, readZip, serializeDocument } from "@nodetto/io";
+import { isZip, serializeDocument } from "@nodetto/io";
 import {
   assertValidDocument,
   type Document,
@@ -24,11 +25,6 @@ import { helpFor } from "./help.ts";
 
 const IMPORT_OPTIONS = new Set(["--output", "--into", "--page-name"]);
 
-/** Fabrication data in an archive: Gerber (a %FS format) or Excellon (M48). */
-function isFabricationText(text: string): boolean {
-  return /%FS[LTD]?[AI]/.test(text) || /^\s*(?:;[^\n]*\n\s*)*M48\b/.test(text);
-}
-
 function baseName(path: string): string {
   return path.split(/[\\/]/).at(-1) ?? path;
 }
@@ -44,11 +40,7 @@ function readInputs(
         if (!io.readBytes) return "This environment cannot read ZIP archives.";
         const bytes = io.readBytes(path);
         if (!isZip(bytes)) return `${path} is not a ZIP archive.`;
-        const decoder = new TextDecoder();
-        for (const entry of readZip(bytes)) {
-          const text = decoder.decode(entry.contents);
-          if (isFabricationText(text)) files.push({ name: entry.path, text });
-        }
+        files.push(...pcbFilesFromZip(bytes));
       } else files.push({ name: path, text: io.readText(path) });
     } catch (cause) {
       return `Cannot read ${path}: ${cause instanceof Error ? cause.message : String(cause)}`;

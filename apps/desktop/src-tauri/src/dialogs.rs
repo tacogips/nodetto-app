@@ -24,6 +24,24 @@ const OPEN_FILTER_EXTENSIONS: &[&str] = &[
     "htm",
     "kicad_sch",
     "net",
+    // Gerber and drill files, alone or in a board house ZIP.
+    "zip",
+    "gbr",
+    "ger",
+    "gtl",
+    "gbl",
+    "gts",
+    "gbs",
+    "gto",
+    "gbo",
+    "gtp",
+    "gbp",
+    "gko",
+    "gm1",
+    "gml",
+    "drl",
+    "xln",
+    "exc",
 ];
 const SAVE_FILTER_EXTENSIONS: &[&str] = &["jsonl"];
 const DEFAULT_FILE_NAME: &str = "untitled.jsonl";
@@ -220,6 +238,13 @@ mod tests {
     fn open_filter_includes_kicad() {
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"kicad_sch"));
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"net"));
+    }
+
+    #[test]
+    fn open_filter_includes_gerber_and_drill() {
+        for extension in ["zip", "gbr", "gtl", "gko", "drl"] {
+            assert!(OPEN_FILTER_EXTENSIONS.contains(&extension), "{extension}");
+        }
     }
 
     #[test]

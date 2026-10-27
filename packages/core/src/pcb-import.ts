@@ -15,6 +15,7 @@ import {
   SCHEMA_VERSION,
   assertValidDocument,
 } from "@nodetto/ir";
+import { isZip, readZip } from "@nodetto/io";
 import polygonClipping, {
   type MultiPolygon,
   type Polygon,
@@ -38,6 +39,26 @@ import {
 export interface PcbImportFile {
   readonly name: string;
   readonly text: string;
+}
+
+/** Fabrication data: Gerber (a `%FS` format) or Excellon (an `M48` header). */
+export function isFabricationText(text: string): boolean {
+  return /%FS[LTD]?[AI]/.test(text) || isExcellon(text);
+}
+
+/**
+ * The Gerber and drill files in a board house ZIP. Other entries (READMEs,
+ * pick-and-place tables, BOMs) are skipped by content, not by name.
+ */
+export function pcbFilesFromZip(bytes: Uint8Array): PcbImportFile[] {
+  if (!isZip(bytes)) throw new PcbImportError("not a ZIP archive");
+  const decoder = new TextDecoder();
+  const files: PcbImportFile[] = [];
+  for (const entry of readZip(bytes)) {
+    const text = decoder.decode(entry.contents);
+    if (isFabricationText(text)) files.push({ name: entry.path, text });
+  }
+  return files;
 }
 
 export interface PcbImportOptions {

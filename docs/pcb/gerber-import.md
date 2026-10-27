@@ -15,6 +15,13 @@ prints the board size and one line per layer. `--strict` exits 3 when a file
 needed a warning; unreadable files are skipped with a warning, and the command
 fails only when none can be read.
 
+The desktop app's Open dialog does the same for a ZIP archive or a single
+Gerber or drill file (`.gbr`, `.ger`, Protel extensions such as `.gtl`,
+`.drl`, `.xln`). The board opens as a new unsaved document named after the
+file; warnings are listed under **Import notes**, and an archive without
+any Gerber or drill file is refused with a message. To draw several loose
+files on one page, use the command or put them in a ZIP.
+
 ## The page
 
 Each layer is a group named after the layer and its file, for example

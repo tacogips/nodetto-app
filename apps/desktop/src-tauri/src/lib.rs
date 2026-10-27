@@ -54,6 +54,7 @@ pub fn run() {
             attachments::read_attachment,
             attachments::store_attachment,
             fs::read_document,
+            fs::read_document_bytes,
             fs::write_document_atomic,
             fs::write_export_atomic,
             recent::recent_files_list,

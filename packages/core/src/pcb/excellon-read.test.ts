@@ -90,6 +90,8 @@ test("unknown lines warn once; a file without M48 is refused", () => {
   expect(drill.warnings).toEqual(['line "R4X1.0" is not supported']);
   expect(drill.holes).toHaveLength(1);
   expect(isExcellon("G04 a Gerber file*")).toBe(false);
+  expect(isExcellon("M48 starts the header of a drill file.\n")).toBe(false);
+  expect(isExcellon("; KiCad drill\r\nM48\r\nMETRIC\r\n")).toBe(true);
   expect(() => readExcellon("%FSLAX46Y46*%")).toThrow(ExcellonReadError);
 });
 
