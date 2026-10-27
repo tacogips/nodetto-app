@@ -1,6 +1,9 @@
 # PCB Pages from KiCad Boards
 
-Status: design record, revision 1, for branch `feat/kicad-pcb`.
+Status: design record, revision 2, for branch `feat/kicad-pcb`.
+Revision 2 (session 535) pins the pad drill offset: the anchor and shape
+centre of section 3.2, and their use in sections 6.3 and 7.3. No other
+decision changed.
 Issue: "Add a PCB page kind: KiCad .kicad_pcb import, desktop editing,
 lossless JSONL, Gerber and drill export" (workflow input only, no GitHub
 issue number; execution `opus-luna-design-and-implement-review-loop-session-530`).
@@ -137,10 +140,21 @@ net.
 `drill: {diameter, slot?: PcbXY, offset?: PcbXY}`, `roundrectRatio`,
 `trapezoidDelta: PcbXY`, `maskMargin`, `primitives: PcbShape[]` (custom
 pads: polygons, with `width`).
-`drill.offset` is KiCad's pad shape offset: the hole is at the pad's `at`,
-and the copper, mask and paste shapes (and custom primitives) are centred
-at `at` plus `offset` rotated by the pad's rotation. The offset never moves
-the hole.
+`drill.offset` is KiCad's pad shape offset. A pad has two reference
+points in board millimetres:
+
+- the pad anchor `A = footprintToBoard(fp, at)`: the hole position (DRL
+  hit or slot centre, and the hole drawn in the view), the ratsnest end
+  point, the pad point tested against zone fills (section 5.5) and the
+  Track/Via tool snap point (section 6.4). For a KiCad-valid pad the anchor
+  lies inside the pad copper, so these contacts are unchanged by the offset;
+- the shape centre `S = A + pcbRotate(offset, fp.rotation + pad.rotation)`
+  (`S = A` without an offset): the centre of the copper, mask and paste
+  shapes and the origin of custom primitives (section 6.3), and the
+  position of a Gerber pad flash (section 7.3).
+
+The offset never moves the hole. A bottom-side offset is used as read, like
+the rest of the pre-mirrored local geometry (section 4.3).
 
 `PcbShape` (shared by footprint graphics, pad primitives and board
 graphics):
@@ -345,7 +359,7 @@ revision in the UI):
     of another track's centreline on the same layer;
   - a via centre inside a pad's copper shape, or a track end within the
     via radius;
-  - a pad centre, via centre or track end inside a zone fill polygon of the
+  - a pad anchor (section 3.2), via centre or track end inside a zone fill polygon of the
     same layer (point in polygon, even-odd).
 - Spatial index: per copper layer, a uniform grid of 2.54 mm cells; each
   item is inserted in the cells its bounds cover, and contacts are tested
@@ -353,7 +367,7 @@ revision in the UI):
 - `computePcbRatsnest(document, pageId, connectivity)`: for each net other
   than `""` with two or more pads, group its pads by connectivity
   component. With g > 1 groups, Prim's tree over the groups by squared
-  Euclidean pad-centre distance gives g - 1 lines
+  Euclidean pad-anchor distance gives g - 1 lines
   `{net, from: {footprintId, pad, x, y}, to: {...}}`. Ties: footprint
   element order, then pad index. Copper of a different net never joins
   groups of this net, so a short does not hide a missing connection. The
@@ -395,22 +409,26 @@ graphic near its stroke or inside a filled shape.
 
 ### 6.3 Pad copper shapes
 
-`packages/core/src/pcb-board/pad-shape.ts` gives one outline per pad on a
-layer, in board millimetres: circle (centre, radius) or a contour of lines
+`padCopperOutline` gives one outline per pad on a layer, in board
+millimetres: circle (centre, radius) or a contour of lines
 and arcs (rect, oval as a capsule, roundrect with corner radius
 `roundrectRatio * min(size)`, trapezoid from `trapezoidDelta`, custom as the
-anchor shape plus its polygons). The outline is centred on the pad's shape
-position: `at` plus `drill.offset` rotated by the pad's rotation (section
-4); the hole stays at `at`. It is used for containment tests, for track
-follow, for the view, and for Gerber regions (section 7.2), so the editor
-and the export agree.
+anchor shape plus its polygons). The outline (and every custom primitive)
+is centred on the shape centre `S` of section 3.2, rotated by
+`fp.rotation + pad.rotation`; the hole stays at the anchor `A`.
+`padCopperOutline` and `padPrimitiveOutlines` in
+`packages/core/src/pcb-board/geometry.ts` implement this, so footprint
+bounds and hit tests (section 6.1), track-end and via contacts (section
+5.5), track follow (section 5.3), the view and the Gerber regions and
+flashes (section 7.3) all use the same offset shape, and the editor and the
+export agree.
 
 ### 6.4 Workspace, tools and inspector
 
 - Workspace `pcb` (label "PCB") with tools Select, Track and Via. The tool
   options show the active copper layer (copper layers of the board, default
   `F.Cu`), the net, track width and via sizes.
-- Track tool: click a start point (snapped to the centre of the pad, via or
+- Track tool: click a start point (snapped to the pad anchor, via centre or
   track end under the pointer, else free), click to add vertices, double
   click or Enter to finish with one `pcb.track`, Esc to cancel. Via tool:
   click to place one `pcb.via` (snapped the same way).
@@ -458,8 +476,8 @@ warnings, notes}`. `encodePcbBoardZip` writes the stored ZIP with
   as in the breadboard export. `width`/`height` are that extent.
 - Copper (F.Cu to GTL, B.Cu to GBL): pads on that layer (circle as `C`;
   rect and oval at a multiple of 90 degrees total rotation as `R`/`O` with
-  swapped sizes at 90/270; every other pad as a region of its section 6.3
-  outline), tracks (strokes; arc tracks as arc strokes with the centre from
+  swapped sizes at 90/270, each flashed at the shape centre `S`; every
+  other pad as a region of its section 6.3 outline), tracks (strokes; arc tracks as arc strokes with the centre from
   the three points), vias (circle flash on both layers), zone fills on that
   layer (dark regions), and graphics on that copper layer.
 - Solder mask (GTS, GBS, Negative): openings for pads whose layers include
@@ -474,9 +492,11 @@ warnings, notes}`. `encodePcbBoardZip` writes the stored ZIP with
   stroked at its width (0.1 mm when the width is 0); circles as two
   half-circle arcs.
 - Drill (DRL, `Plated,1,2,PTH`): via drills and `thru_hole` pad drills;
-  oval drills as slots along the pad's rotated long axis, centred on the
-  pad's `at`; `drill.offset` moves the copper, mask and paste shapes, not
-  the hole (section 6.3). `np_thru_hole` drills go to `<name>-NPTH.DRL`
+  round drills as one hit at the anchor `A`; oval drills as slots along
+  the pad's rotated long axis (`fp.rotation + pad.rotation`), centred on
+  `A`, with diameter `min(slot)` and end centres `max(slot) - min(slot)`
+  apart; `drill.offset` moves the copper, mask and paste shapes, not the
+  hole (section 3.2). `np_thru_hole` drills go to `<name>-NPTH.DRL`
   (`NonPlated,1,2,NPTH`), written only when present. Drill coordinates and
   tool diameters are written at the existing Excellon resolution of
   0.001 mm (three decimals, as in the breadboard export); finer hole
@@ -626,6 +646,10 @@ Fixtures are self-authored, in `test-fixtures/kicad/`, listed in its
   to limit conflicts.
 - TS/native parity depends on `Math.cos`/`Math.sin` only for rotations that
   are not multiples of 45 degrees; the parity fixture avoids them.
+- Drill offset on bottom-side pads: the offset is used as read, like the
+  other pre-mirrored local geometry. Self-authored fixtures cannot prove
+  this against KiCad; the rule is confined to the two geometry functions of
+  section 6.3 (low).
 - Drill positions are quantised to 0.001 mm by the unchanged Excellon
   writer (low); this is within board-house drill tolerances, and no writer
   option is added.

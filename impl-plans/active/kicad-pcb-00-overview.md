@@ -55,7 +55,9 @@ modules only through relative paths, and only modules from earlier waves.
   `footprintToBoard`, `boardToFootprint`, `padCopperOutline`,
   `outlineContains`, `outlineBounds`, `padHasCopperLayer`,
   `expandCopperLayers`, `pageCopperLayers`, `arcCenter`, `shapeBounds`,
-  `footprintBounds`, `PcbGrid`, `pcbAnchor`, `translatePcbSemantic`.
+  `footprintBounds`, `PcbGrid`, `pcbAnchor`, `translatePcbSemantic`;
+  plan 07 adds `padShapeCenter` and centres `padCopperOutline` and
+  `padPrimitiveOutlines` on it (drill offset, design 3.2).
 - Page (plan 01, `page.ts`): `pcbPageFromPlan(plan, options)`.
 - Editing (plan 05): `Editor.rotatePcbFootprints`, `Editor.addPcbTrack`,
   `Editor.addPcbVia`, `planPcbTrackFollow`.

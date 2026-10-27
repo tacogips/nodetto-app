@@ -54,6 +54,28 @@ and the Boa native CLI.
 - impl-plans/progress/kicad-pcb-07-core-export.md (new)
 - packages/core/src/pcb-board/geometry.ts
 - packages/core/src/pcb-board/geometry.test.ts
+- packages/core/src/pcb-board/follow.test.ts (add offset-pad cases only;
+  `follow.ts` is not changed)
+- packages/core/src/pcb-board/connectivity.test.ts (add offset-pad cases
+  only; `connectivity.ts` is not changed)
+- docs/pcb/kicad-pcb.md (the one drill-offset sentence only)
+
+## Status at session 535 start
+
+`export.ts` and `export.test.ts` are committed in `cf0c4d7` under the
+superseded model: `export.ts` moves the DRL hit by the rotated offset, the
+slot test expects Gerber y 8.25/10.25, and `geometry.ts` ignores the
+offset. This plan is not done. Rework it in place: keep every other
+committed behaviour and test, correct the offset handling and its
+assertions (never weaken them), and rewrite the progress log, including
+new mutation controls.
+
+The evidence directory `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/`
+still holds logs from the superseded attempt. They are not evidence for
+this rework. Before any source edit, overwrite `pcb-sha256-start.txt` with
+`shasum -a 256 packages/core/src/pcb/*` and record the time. Write every new log
+under a fresh name with the prefix `s535-` (for example
+`s535-bun-test.log`), and cite only those logs in the progress file.
 
 ## sharedPaths
 
@@ -91,6 +113,10 @@ none
   5. pads
 - Pads:
   - total rotation `r = fp.rotation + pad.rotation`, normalised
+  - anchor `A = footprintToBoard(fp, pad.at)`; shape centre
+    `S = A + pcbRotate(pad.drill?.offset ?? [0, 0], fp.rotation + pad.rotation)`
+    from `padShapeCenter` (design 3.2; see "Geometry correction"). Every
+    flash below is at `S`, never at `A`
   - circle -> `flashAperture` circle
   - rect or oval with `r` a multiple of 90 -> `flashAperture` rectangle or
     obround (sizes swapped at 90 and 270)
@@ -137,18 +163,12 @@ none
   (0.1 when width is 0 or less); a circle is two half arcs.
 - Drill:
   - `<name>.DRL` (plated): one hit per via drill and per `thru_hole` pad
-    drill at the pad's `at` (the hole position). The drill `offset` is
+    drill at the anchor `A` (the hole position). The drill `offset` is
     KiCad's shape offset: it moves the copper, mask and paste shapes, never
-    the hole (design sections 4, 6.3, 7.3). Correct `padCopperOutline` and
-    `padPrimitiveOutlines` in `geometry.ts` to centre the shape at `at` plus
-    `offset` rotated by `fp.rotation + pad.rotation`, and add tests in
-    `geometry.test.ts` and `export.test.ts` for a rotated footprint with an
-    offset oval pad: the DRL hit is at the pad's `at`, the copper region is
-    centred at the offset position, and track follow and connectivity use the
-    offset shape. A pad with
-    `drill.slot` becomes a slot along the rotated long axis: the length
-    is `max(slot) - min(slot)` between the two end centres, and the
-    diameter is `min(slot)`.
+    the hole (design sections 3.2, 6.3, 7.3). Remove the offset from the
+    drill code in `export.ts`. A pad with `drill.slot` becomes a slot
+    centred on `A` along the long axis rotated by `r`: the end centres are
+    `max(slot) - min(slot)` apart and the diameter is `min(slot)`.
   - `<name>-NPTH.DRL`: `np_thru_hole` drills, with
     `{plating: "nonPlated"}`, written only when present.
   - Coordinates and diameters are written by the unchanged writer at
@@ -168,6 +188,30 @@ none
     slots
   - plus, when the page has a zone:
     `Zone fills are exported as read from the KiCad file; they are not refilled after edits.`
+
+## Geometry correction (`geometry.ts`)
+
+- `padCopperOutline(fp, pad, grow)` and `padPrimitiveOutlines(fp, pad)`
+  build the shape about the shape centre `S` (above), rotated by `r`,
+  instead of about `A`. The `circle` results (circle pads, and custom or
+  oval pads with equal sizes) use `S` as `center`. Add one exported helper
+  `padShapeCenter(fp: {at, rotation}, pad: PcbPad): PcbXY` (no rounding,
+  like `footprintToBoard`) and use it in both functions and in the
+  `export.ts` pad flashes; no other signature changes.
+- Without an offset the output is unchanged, so every committed plan 05,
+  06 and 08 test must still pass as is.
+- `footprintBounds`, `follow.ts` and `connectivity.ts` (track-end and via
+  contacts) already call these functions, and `shapes/pcb.ts` gets the
+  offset through `footprintBounds` (geometry.ts:502-508); none of them
+  needs an edit. `connectivity.ts` `boardPadCenter` stays at `A` (the anchor, design
+  3.2 and 5.5); do not change it.
+
+## Docs
+
+In `docs/pcb/kicad-pcb.md`, replace only the sentence "Drill holes include
+oval slots and offsets." with "Drill holes include oval slots. A pad's drill
+offset moves the pad's copper, mask and paste shapes; the hole stays at the
+pad position, as in KiCad."
 
 ## Pitfalls
 
@@ -197,7 +241,23 @@ none
 - A rect pad at rotation 90 -> a rectangle aperture with swapped sizes.
 - A roundrect pad -> a region with 4 arc segments.
 - An oval drill slot -> `readExcellon` gives one slot, with ends and
-  diameter within 0.0005.
+  diameter within 0.0005. The committed case (footprint rotation 90,
+  `slot: [3, 1]`, `offset: [0.25, 0]`) expects slot ends at Gerber x 2 and
+  y 8 and 10 (the hole at `A`), diameter 1, end distance 2. The old
+  8.25/10.25 values are the superseded model and must be replaced, not
+  loosened.
+- Offset pads, footprint at (10, 10), pad at (0, 0) rotation 0, oval
+  size (2, 1), `drill: {diameter: 0.6, offset: [0.5, 0]}`, on F.Cu:
+  - footprint rotation 90: DRL hit at board (10, 10); GTL has one
+    obround flash of 1 x 2 at board `S` = (10, 9.5); GTS has the mask
+    flash at the same `S`
+  - footprint rotation 45: DRL hit at board (10, 10); GTL has one region
+    whose two arc centres have their midpoint at `S` = (10 +
+    0.5 * SQRT1_2, 10 - 0.5 * SQRT1_2) within 1e-6
+  - the same pads with `slot: [1.2, 0.6]`: the slot centre (midpoint of
+    its ends) is at board (10, 10)
+  - expected Gerber values come from the board values through
+    `gy = maxY - y`, computed in the test, not read from the export
 - An `np_thru_hole` pad -> a `-NPTH.DRL` file whose `plating` is
   `nonPlated`; the plated DRL lacks that hole.
 - B.SilkS graphics -> GBO exists; without them, no GBO.
@@ -219,15 +279,60 @@ none
 - The oracle (`oracle.test-support.ts`) accepts every file with only the
   known warnings.
 
+## Tests (`geometry.test.ts`, `follow.test.ts`, `connectivity.test.ts`)
+
+Use the same offset pad (footprint at (10, 10), oval (2, 1), offset
+(0.5, 0)).
+
+- `geometry.test.ts`:
+  - rotation 90: `outlineBounds(padCopperOutline(...))` is x 9.5..10.5,
+    y 8.5..10.5 within 1e-9; `outlineContains` is true at `S` (10, 9.5)
+    and at `A` (10, 10), and false at (10, 10.8) (inside the un-offset
+    shape, outside the offset one)
+  - rotation 45: the circle or contour centre equals `S` within 1e-9
+  - a circle pad with an offset returns `center` = `S`
+  - `grow = 0.1` keeps the centre at `S`
+  - a custom pad with one polygon primitive and an offset: every
+    primitive point is the no-offset point plus `pcbRotate(offset, r)`
+  - `footprintBounds` of a footprint with only the offset pad equals the
+    offset outline bounds
+  - a pad without an offset gives the same outline as before the change
+    (pin one committed rect and oval case)
+- `follow.test.ts`: rotation 90 offset pad, an F.Cu track ending at
+  (10, 8.7) (inside the offset shape only); moving the footprint by
+  (1, 0) moves that end to (11, 8.7); a track ending at (10, 10.8)
+  does not move
+- `connectivity.test.ts`: two pads of one net joined by a track whose end
+  is inside the offset shape only -> no ratsnest line; the same track
+  ending at (10, 10.8) -> one ratsnest line
+
+## Mutation controls (record in the progress log)
+
+Run each mutation on an in-memory or `tmp/kicad-pcb-s534/kicad-pcb-07-core-export/`
+copy, never on the repository files:
+
+1. Add the rotated offset back to the DRL position in `export.ts`: the
+   slot and offset-pad hole assertions fail.
+2. Drop the offset in `padCopperOutline`: the geometry, follow,
+   connectivity and export copper assertions fail.
+3. Flash at `A` instead of `S` in `export.ts`: the rotation 90 flash
+   assertion fails.
+
+Record each command, the failing assertion and the log path.
+
 ## Verification
 
-1. `bun test packages/core/src/pcb-board/export.test.ts packages/core/src/pcb` exits 0.
+1. `bun test packages/core/src/pcb-board packages/core/src/pcb packages/core/src/shapes/pcb.test.ts`
+   exits 0 (the whole pcb-board suite, because plans 05, 06 and 08
+   consume `geometry.ts`).
 2. `bun run typecheck` exits 0.
-3. `bunx biome check packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/export.test.ts --diagnostic-level=warn`
+3. `bunx biome check packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/export.test.ts packages/core/src/pcb-board/geometry.ts packages/core/src/pcb-board/geometry.test.ts packages/core/src/pcb-board/follow.test.ts packages/core/src/pcb-board/connectivity.test.ts --diagnostic-level=warn`
    exits 0.
-4. `grep -nE "Math\.(hypot|atan2|sin|cos)" packages/core/src/pcb-board/export.ts`
+4. `git diff --quiet cf0c4d7 -- packages/core/src/pcb-board/follow.ts packages/core/src/pcb-board/connectivity.ts packages/core/src/pcb-board/edit.ts packages/core/src/shapes/pcb.ts`
+   exits 0.
+5. `grep -nE "Math\.(hypot|atan2|sin|cos)" packages/core/src/pcb-board/export.ts packages/core/src/pcb-board/geometry.ts`
    prints nothing.
-5. For every file under `packages/core/src/pcb/`, the sha256 recorded at
+6. For every file under `packages/core/src/pcb/`, the sha256 recorded at
    the start of this plan equals the sha256 at the end, so this plan
    changed none of them. Record both lists in the progress log.
 

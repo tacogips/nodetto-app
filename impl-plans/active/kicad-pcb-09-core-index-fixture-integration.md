@@ -62,7 +62,8 @@ none
 
 - from `page.ts`: `pcbPageFromPlan`, `pcbDocumentFromPlan`
 - from `geometry.ts`: `footprintToBoard`, `boardToFootprint`,
-  `padCopperOutline`, `padPrimitiveOutlines`, `outlineContains`,
+  `padCopperOutline`, `padPrimitiveOutlines`, `padShapeCenter`,
+  `outlineContains`,
   `shapeBounds`, `footprintBounds`, `expandCopperLayers`,
   `pageCopperLayers`, `viaCopperLayers`, `arcCenter`, `arcIsClockwise`,
   `pcbAnchor`, and the types `PcbOutline`, `PcbOutlineSegment`,
@@ -138,6 +139,12 @@ none
     - the H1 mounting hole in NPTH
     - positions, slot ends and tool diameters within 0.0005 mm of the
       expected board-frame values
+  - U1 pad 1 has `drill.offset` (0.1, 0) (design 3.2): its slot centre
+    (midpoint of the slot ends) is at the anchor
+    `footprintToBoard(fp, pad.at)` = board (40, 10), with diameter 0.8
+    and end centres 0.8 apart, while its GTL and GTS copper is centred at
+    `padShapeCenter(fp, pad)` = board (40 + 0.1 * SQRT1_2,
+    10 - 0.1 * SQRT1_2), within the tolerances above
   - two exports are byte-equal
 
 ## Pitfalls
@@ -145,8 +152,8 @@ none
 - Do not use `export *` in the barrel: it hides name clashes until
   typecheck and pulls in test support.
 - Expected values in the read-back test must come from the document
-  (pads transformed with `footprintToBoard`), not from the export's own
-  output.
+  (holes at `footprintToBoard(fp, pad.at)`, pad copper at
+  `padShapeCenter(fp, pad)`), not from the export's own output.
 - Excellon tolerance is 0.0005 mm. Do not tighten it to 1e-6, because the
   writer uses three decimals (DR-1).
 

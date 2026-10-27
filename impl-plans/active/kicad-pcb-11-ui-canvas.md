@@ -132,9 +132,13 @@ none
 - `page-workspace.ts`: `pcb: "pcb"` in `DEDICATED_WORKSPACES`;
   `pcb: "PCB"` in `DEDICATED_PAGE_NAMES`.
 - `pcb-interaction.ts` (pure helpers used by `interaction.ts`):
-  - `pcbSnapTarget(document, pageId, pointMm, hidden)`: the pad centre,
-    via centre or track end under the point (within the item's copper),
-    with its net and layer, or `undefined`
+  - `pcbSnapTarget(document, pageId, pointMm, hidden)`: the pad anchor
+    `footprintToBoard(fp, pad.at)` (design 3.2, 6.4), via centre or track
+    end under the point, with its net and layer, or `undefined`. "Under
+    the point" for a pad means containment in `padCopperOutline` or one of
+    `padPrimitiveOutlines`. The returned point is always the anchor, never
+    the `padCopperOutline` centre, which is the shape centre `S` for a pad
+    with `drill.offset` (plan 07)
   - `pcbTrackDraft` (start, vertices, finish, cancel) producing a
     `PcbTrackInput`; the net comes from the start snap target, otherwise
     the tool options
@@ -147,6 +151,14 @@ none
     stroke width = width * 10, arcs with SVG `A`), vias (ring plus a hole
     disc), zones (outline stroke plus translucent fills), graphics
     (strokes and fills; text via `strokeText` polylines)
+  - pad drill holes: every `thru_hole` and `np_thru_hole` pad with a
+    `drill` draws a hole in the holes colour on top of its copper, at the
+    anchor `A = footprintToBoard(fp, pad.at)`, never at the copper centre.
+    It is a disc of `drill.diameter`, or, with `drill.slot`, a capsule of
+    diameter `min(slot)` whose end centres are `max(slot) - min(slot)`
+    apart along the long axis rotated by `fp.rotation + pad.rotation`
+    (`pcbRotate` from `@nodetto/ir`). This is the plan 07 DRL rule, so the
+    canvas and the Excellon file agree
   - Text orientation: `strokeText(text, 0, 0, size[1])` returns
     polylines centred on the origin with y pointing UP
     (packages/core/src/pcb/font.ts:467-476). The page frame is y down.
@@ -214,6 +226,11 @@ none
 - Keep the breadboard and other workspaces unchanged. The tests of
   `breadboard-interaction.test.ts` must still pass.
 - `page-workspace.test.ts` keeps its existing cases and adds pcb cases.
+- `drill.offset` moves only the copper (and mask and paste) shape. The
+  pad hole and the snap point stay at the anchor (design 3.2). Do not
+  derive either from the `padCopperOutline` result, and do not change any
+  core file to get the anchor: use `footprintToBoard` from the plan 09
+  barrel.
 
 ## Tests (input -> expected)
 
@@ -226,11 +243,21 @@ none
   - text "T" at rotation 0, not mirrored: the page y of its horizontal
     bar is smaller than the page y of the stem bottom (upright); with
     `justify.mirror` the x order of the glyph points is reversed
+  - offset pad: footprint at (10, 10) rotation 90, one `thru_hole` pad at
+    (0, 0) rotation 0, oval size (2, 1), `drill: {diameter: 0.6, offset:
+    [0.5, 0]}` -> the copper path's bounds centre is page (100, 95)
+    within 1e-6, and the hole disc is centred at page (100, 100) with
+    radius 3
+  - the same pad with `drill: {diameter: 0.6, slot: [1.2, 0.6], offset:
+    [0.5, 0]}` -> the hole capsule's centre is page (100, 100)
 - `pcb-interaction.test.ts` (editor on `buildPcbDocument`-like data built
   with core exports, or a small document literal):
   - the Track tool starting on a GND pad and finished by Enter creates one
     `pcb.track` with net GND, layer F.Cu and 2+ points
   - Esc creates nothing
+  - offset pad (the `pcb-view.test.ts` offset pad, on F.Cu with net
+    GND): `pcbSnapTarget` at (10, 9.0) mm (inside the offset copper,
+    outside the un-offset copper) returns the point (10, 10) and net GND
   - the Via tool creates one via with default sizes
   - `R` rotates a selected footprint to 90
   - a footprint on a hidden layer is not hit
