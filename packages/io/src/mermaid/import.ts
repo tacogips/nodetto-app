@@ -118,7 +118,12 @@ function sourceLines(input: string): {
 } {
   if (new TextEncoder().encode(input).byteLength > MAX_MERMAID_BYTES)
     throw new MermaidParseError("Mermaid input exceeds the 1 MiB limit");
-  const raw = input.replace(/^\uFEFF/, "").split(/\r?\n/);
+  // A string separator: the native CLI's interpreter splits on a regular
+  // expression in quadratic time.
+  const raw = input
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n")
+    .split("\n");
   let at = 0;
   while (at < raw.length && !raw[at]?.trim()) at += 1;
   if (raw[at]?.trim() === "---") {

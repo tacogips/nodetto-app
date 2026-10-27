@@ -27,6 +27,7 @@ Convert and check
   nodetto-cli lint <doc|bpmn>     Lint BPMN and breadboard pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
+  nodetto-cli gerber import       Gerber and drill files to a PCB page
   nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 
 MCP server
@@ -401,6 +402,28 @@ Import or export BPMN 2.0 XML.
 
   --strict  Exit 3 when import or export reports warnings.
   --check   (export) Exit 1 when the file is out of date.
+
+${EXIT_CODES}`,
+
+  gerber: `Usage: nodetto-cli gerber import <file|archive.zip>... [--output <doc.jsonl>]
+                                 [--into <doc.jsonl>] [--page-name <name>] [--strict]
+
+Draw a board's fabrication files on a freeform page: Gerber RS-274X layers
+(copper, solder mask, silkscreen, paste, outline) and Excellon drill files,
+given one by one or as a ZIP archive. Each layer becomes a named group of
+filled vector paths in board coordinates (10 page units per millimetre, the
+top view, with the board's bottom-left at the lower left). Layers are named
+from their Gerber X2 file function, else from KiCad, Protel or Eagle file
+names. Solder mask, paste, bottom silkscreen and inner layers start hidden.
+
+  --output     Write a new document with the PCB page.
+  --into       Add the PCB page to this existing document.
+  --page-name  Page name (default: the archive or file name, or "PCB").
+  --strict     Exit 3 when the import reports warnings.
+
+Example:
+  nodetto-cli gerber import board-gerbers.zip --output board.jsonl
+  nodetto-cli gerber import gerber/*.g* gerber/board.drl --into keyboard.jsonl --page-name PCB
 
 ${EXIT_CODES}`,
 

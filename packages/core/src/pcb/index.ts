@@ -32,3 +32,41 @@ export type {
   PcbTrace,
 } from "./model.ts";
 export { trimPcbToUsed, type PcbTrimOptions } from "./trim.ts";
+export {
+  type DrillHole,
+  type DrillImage,
+  type DrillSlot,
+  ExcellonReadError,
+  isExcellon,
+  readExcellon,
+} from "./excellon-read.ts";
+export {
+  aperturePieces,
+  flattenContour,
+  type GerberShape,
+  gerberShape,
+  type OutlineArea,
+  type OutlineContour,
+  type OutlinePiece,
+  type OutlinePoint,
+  outlineBounds,
+} from "./gerber-outline.ts";
+export {
+  type GerberAperture,
+  type GerberArc,
+  type GerberContour,
+  type GerberImage,
+  type GerberObject,
+  type GerberPolarity,
+  GerberReadError,
+  type GerberSegment,
+  type MacroPrimitive,
+  readGerber,
+} from "./gerber-read.ts";
+export {
+  identifyLayer,
+  layerName,
+  type PcbLayerKind,
+  type PcbLayerRole,
+  type PcbLayerSide,
+} from "./layers.ts";

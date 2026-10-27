@@ -56,6 +56,8 @@ import {
   SCREEN_KINDS,
   FOREIGN_KEY_DEFERRABILITIES,
   MESSAGE_KINDS,
+  MAX_PATH_CONTOURS,
+  MAX_PATH_POINTS,
   PATH_FILL_RULES,
   MAX_CONNECTOR_WAYPOINTS,
   PARTICIPANT_KINDS,
@@ -1157,12 +1159,12 @@ const DRAW_PATH: ElementTypeDefinition = {
     checkEnum(out, semantic["fillRule"], `${path}.fillRule`, PATH_FILL_RULES);
     const contours = semantic["contours"];
     if (!checkArray(out, contours, `${path}.contours`)) return out;
-    if (contours.length === 0 || contours.length > 1024)
+    if (contours.length === 0 || contours.length > MAX_PATH_CONTOURS)
       out.push(
         error(
           "path.contours",
           `${path}.contours`,
-          "expected between 1 and 1024 contours",
+          `expected between 1 and ${MAX_PATH_CONTOURS} contours`,
         ),
       );
     let total = 0;
@@ -1200,12 +1202,12 @@ const DRAW_PATH: ElementTypeDefinition = {
         }
       }
     }
-    if (total > 20000)
+    if (total > MAX_PATH_POINTS)
       out.push(
         error(
           "path.points",
           `${path}.contours`,
-          "a compound path may contain at most 20000 points",
+          `a compound path may contain at most ${MAX_PATH_POINTS} points`,
         ),
       );
     return out;

@@ -113,6 +113,8 @@ export {
   type PathContour,
   type PathFillRule,
   type PathSemantic,
+  MAX_PATH_CONTOURS,
+  MAX_PATH_POINTS,
   PATH_FILL_RULES,
   GEO_KINDS,
   type GenericEdgeSemantic,

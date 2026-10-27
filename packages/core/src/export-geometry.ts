@@ -24,6 +24,53 @@ export function svgRasterDimensions(svg: string) {
   return { width, height };
 }
 
+/**
+ * Grows an editor SVG's frame, and its background, to whole pixels at
+ * `scale`. Rasterizers round the canvas up, so a frame that ends inside a
+ * pixel otherwise leaves the last row and column partly outside the
+ * background (transparent in a PNG). Geometry is not scaled or moved. Only
+ * for SVG produced by our deterministic serializer.
+ */
+export function snapSvgFrameToPixels(svg: string, scale: number): string {
+  const root = /^<svg\s[^>]*>/.exec(svg)?.[0];
+  const viewBox = root && /\bviewBox="([^"]+)"/.exec(root)?.[1];
+  if (!root || !viewBox) return svg;
+  const [x, y, width, height] = viewBox.trim().split(" ");
+  if ([x, y, width, height].some((value) => value === undefined)) return svg;
+  // The frame ends at the rasterizer's last pixel, in the serializer's two
+  // decimals (rounded down, so the pixel count does not grow); the
+  // background reaches one pixel further and the frame clips it.
+  const pixels = (value: number) => Math.ceil(value * scale - 1e-6);
+  const snap = (value: number) =>
+    Math.floor((pixels(value) / scale) * 100) / 100;
+  const snappedWidth = snap(Number(width));
+  const snappedHeight = snap(Number(height));
+  if (
+    pixels(Number(width)) === Number(width) * scale &&
+    pixels(Number(height)) === Number(height) * scale
+  )
+    return svg;
+  const overscan = Math.ceil(100 / scale) / 100;
+  const snappedRoot = root
+    .replace(/\bwidth="[^"]*"/, `width="${snappedWidth}"`)
+    .replace(/\bheight="[^"]*"/, `height="${snappedHeight}"`)
+    .replace(
+      /\bviewBox="[^"]*"/,
+      `viewBox="${x} ${y} ${snappedWidth} ${snappedHeight}"`,
+    );
+  // The background rect repeats the viewBox numbers exactly.
+  const background = `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill=`;
+  return (
+    snappedRoot +
+    svg
+      .slice(root.length)
+      .replace(
+        background,
+        `<rect x="${x}" y="${y}" width="${Math.round((snappedWidth + overscan) * 100) / 100}" height="${Math.round((snappedHeight + overscan) * 100) / 100}" fill=`,
+      )
+  );
+}
+
 /** Bound allocations before creating browser image/canvas resources. */
 export function rasterDimensions(width: number, height: number, scale: number) {
   if (

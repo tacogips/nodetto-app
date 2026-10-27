@@ -644,6 +644,7 @@ export {
   RASTER_SCALES,
   pdfLayout,
   rasterDimensions,
+  snapSvgFrameToPixels,
   svgRasterDimensions,
 } from "./export-geometry.ts";
 export {
@@ -696,3 +697,4 @@ export {
 } from "./handoff-export.ts";
 
 export { nodeLabelLayout } from "./node-label.ts";
+export * from "./pcb-import.ts";

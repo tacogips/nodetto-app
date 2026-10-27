@@ -62,12 +62,13 @@ fn binary_views_write_only_the_selected_bytes_and_attachments_stay_confined() {
       let blocked = false;
       try { native.attachment(native.path('doc.jsonl'), '../outside'); } catch { blocked = true; }
       return [Array.from(data), blocked, native.exists(native.path('image.bin')),
-        native.readText(native.path('doc.jsonl'))];
+        native.readText(native.path('doc.jsonl')),
+        Array.from(native.readBytes(native.path('image.bin')))];
     })()"#,
             Input::Mcp(None),
             Some(folder.path().into())
         ),
-        json!([[0, 128, 255], true, true, "diagram"])
+        json!([[0, 128, 255], true, true, "diagram", [0, 128, 255]])
     );
     assert_eq!(
         std::fs::read(folder.path().join("image.bin")).unwrap(),

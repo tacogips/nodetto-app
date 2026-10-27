@@ -32,6 +32,7 @@ import {
   type CommandIo,
   type CommandResult,
   fail,
+  formatIssue,
   ok,
   parseArgs,
 } from "./commands.ts";
@@ -730,7 +731,12 @@ export function applyBatch(
 ): BatchResult {
   const parsed = parseDocumentResult(documentText);
   if (!parsed.ok)
-    throw new Error("The document is not a valid nodetto document.");
+    throw new Error(
+      `The document is not a valid nodetto document:\n${parsed.issues
+        .filter((issue) => issue.severity === "error")
+        .map(formatIssue)
+        .join("\n")}`,
+    );
   const before = new Map(
     parsed.document.elements.map((element) => [element.id, element]),
   );
