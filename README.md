@@ -34,12 +34,15 @@ associations.
 - **Command line and MCP**: an AI agent edits a document while the desktop app
   shows its changes live. See [Command line](docs/cli.md).
 
-![The ErgoDash keyboard PCB opened from its Gerber ZIP](docs/images/nodetto-gerber-ergodash.png)
+| Edit an imported board | Export it back to Gerber |
+| --- | --- |
+| ![The ErgoDash keyboard PCB opened from its Gerber ZIP, with its top silkscreen layer selected for editing](docs/images/nodetto-gerber-edit.png) | ![The Export dialog writing the edited board as Gerber and drill files](docs/images/nodetto-gerber-export.png) |
 
 The [ErgoDash](https://github.com/omkbd/ErgoDash) Rev. 1.2 Gerber ZIP opened
 from the Open dialog: copper, silkscreen, drill and outline become editable
-vector layers, and the edited board exports back to Gerber and drill files.
-ErgoDash is copyright (c) 2018 omkbd and released under the MIT License.
+vector layers, and **Export > Gerber** writes the edited board back as Gerber
+and drill files. ErgoDash is copyright (c) 2018 omkbd and released under the
+MIT License.
 
 ## Command line
 
