@@ -74,8 +74,8 @@ test("BPMN documentation is ASCII only", () => {
   }
 });
 
-test("README documents BPMN lint and export commands", () => {
-  const readme = readText("README.md");
-  expect(readme).toContain("nodetto-cli lint");
-  expect(readme).toContain("nodetto-cli bpmn export");
+test("the CLI guide documents BPMN lint and export commands", () => {
+  const guide = readText("docs/cli.md");
+  expect(guide).toContain("nodetto-cli lint");
+  expect(guide).toContain("nodetto-cli bpmn export");
 });
