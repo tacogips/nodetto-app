@@ -122,6 +122,23 @@ Zone on <net> has no fill; refill it in KiCad.
 Zone fills are exported as read from the KiCad file; they are not refilled
 after edits.
 
+## SVG, PNG and PDF export
+
+The Export dialog and `nodetto-cli export` draw a PCB page as it appears on
+the canvas: the board outline, copper tracks and arcs, pads, vias with holes,
+zone fills, silkscreen and fabrication graphics, and text. The export uses the
+canvas layer colours. All layers are drawn; the Layers panel affects only the
+canvas. Hidden texts and elements are left out.
+
+The board area uses a dark board colour so the layer colours stay readable.
+The chosen export background, or transparency, fills the margin around the
+board. Line widths are true board widths and scale with the PNG scale.
+
+```bash
+nodetto-cli export board.jsonl --format svg --output board.svg
+nodetto-cli export board.jsonl --format png --scale 2 --output board.png
+```
+
 ## Command reference
 
 ```text

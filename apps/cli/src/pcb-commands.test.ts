@@ -8,6 +8,7 @@ import {
 } from "@nodetto/core";
 import { importKicadPcb, parseDocument, serializeDocument } from "@nodetto/io";
 import type { Document, Element, Page } from "@nodetto/ir";
+import { PDFDocument } from "pdf-lib";
 import {
   EXIT_ERROR,
   EXIT_OK,
@@ -15,6 +16,8 @@ import {
   type CommandIo,
   runCli,
 } from "./commands.ts";
+import { exportCommand, type RasterBackend } from "./export-command.ts";
+import * as raster from "./raster-backend.ts";
 
 const fixturePath = join(
   import.meta.dir,
@@ -235,4 +238,61 @@ test("pcb commands require a recognized subcommand and expose detailed help", ()
   expect(cli(["help", "pcb"], memoryIo()).stdout).toContain(
     "nodetto-cli pcb gerber <doc.jsonl> --output <file.zip>",
   );
+});
+
+test("export draws the PCB page as SVG, PNG and PDF", async () => {
+  const io = memoryIo({ "board.jsonl": serializeDocument(fixtureDocument) });
+  const svg = await exportCommand(io, ["board.jsonl", "--format", "svg"]);
+  expect(svg.exitCode).toBe(EXIT_OK);
+  for (const type of [
+    "pcb.track",
+    "pcb.footprint",
+    "pcb.via",
+    "pcb.zone",
+    "pcb.graphic",
+  ])
+    expect(svg.stdout).toContain(`data-type="${type}"`);
+  expect(svg.stdout).toContain('data-layer="pcb-board"');
+  expect(svg.stdout).not.toContain("unsupported:");
+
+  const rendered: string[] = [];
+  const backend: RasterBackend = {
+    rasterize: async (source) => {
+      rendered.push(source);
+      return new Uint8Array([1]);
+    },
+    pngToPdf: async () => new Uint8Array([2]),
+  };
+  for (const format of ["png", "pdf"]) {
+    const result = await exportCommand(
+      io,
+      ["board.jsonl", "--format", format, "--output", `out.${format}`],
+      backend,
+    );
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(rendered.at(-1)).toContain('data-type="pcb.track"');
+    expect(rendered.at(-1)).toContain('data-layer="pcb-board"');
+    expect(rendered.at(-1)).not.toContain("unsupported:");
+  }
+
+  const pngIo = memoryIo({ "board.jsonl": serializeDocument(fixtureDocument) });
+  const png = await exportCommand(
+    pngIo,
+    ["board.jsonl", "--format", "png", "--scale", "1", "--output", "out.png"],
+    raster,
+  );
+  expect(png.exitCode).toBe(EXIT_OK);
+  expect([...pngIo.binary.get("out.png")!.slice(0, 8)]).toEqual([
+    137, 80, 78, 71, 13, 10, 26, 10,
+  ]);
+
+  const pdfIo = memoryIo({ "board.jsonl": serializeDocument(fixtureDocument) });
+  const pdf = await exportCommand(
+    pdfIo,
+    ["board.jsonl", "--format", "pdf", "--output", "out.pdf"],
+    raster,
+  );
+  expect(pdf.exitCode).toBe(EXIT_OK);
+  const pdfDocument = await PDFDocument.load(pdfIo.binary.get("out.pdf")!);
+  expect(pdfDocument.getPageCount()).toBe(1);
 });
