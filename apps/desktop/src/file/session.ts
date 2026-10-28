@@ -152,6 +152,10 @@ function isKicadPath(path: string): boolean {
   return /\.(?:kicad_sch|net)$/i.test(path);
 }
 
+function isKicadPcbPath(path: string): boolean {
+  return path.toLowerCase().endsWith(".kicad_pcb");
+}
+
 /** Gerber and drill files, alone or in a board house ZIP. */
 const PCB_PATH =
   /\.(?:zip|gbr|ger|gtl|gbl|gts|gbs|gto|gbo|gtp|gbp|gko|gm1|gml|drl|xln|exc)$/i;
@@ -378,6 +382,53 @@ export class DocumentSession {
     }
   }
 
+  /** KiCad boards are imported as detached documents, never autosaved over. */
+  private async importKicadPcbPath(
+    path: string,
+    stale: () => boolean,
+  ): Promise<boolean> {
+    const name = baseName(path);
+    try {
+      const text = await this.backend.readDocument(path);
+      if (stale()) return false;
+      const { importKicadPcb } = await import("@nodetto/io/kicad");
+      if (stale()) return false;
+      const result = importKicadPcb(text, { fileName: name });
+      const error = result.diagnostics.find(
+        (diagnostic) => diagnostic.severity === "error",
+      );
+      if (error) {
+        this.fail(`could not import ${name}: ${error.message}`);
+        return false;
+      }
+      if (!result.plan) {
+        this.fail(`could not import ${name}: no import plan was produced`);
+        return false;
+      }
+      const { pcbDocumentFromPlan } = await import("@nodetto/core");
+      if (stale()) return false;
+      const document = pcbDocumentFromPlan(result.plan, {
+        pageName: result.plan.title,
+      });
+      return await this.importDocument(
+        document,
+        name,
+        result.diagnostics
+          .filter((diagnostic) => diagnostic.severity === "warning")
+          .map((diagnostic) => ({
+            element: name,
+            message:
+              diagnostic.line !== undefined && diagnostic.column !== undefined
+                ? `${diagnostic.line}:${diagnostic.column}: ${diagnostic.message}`
+                : diagnostic.message,
+          })),
+      );
+    } catch (error) {
+      if (!stale()) this.fail(`could not import ${name}: ${describe(error)}`);
+      return false;
+    }
+  }
+
   /** Ask for a file and open it. Returns false when cancelled or failed. */
   async open(): Promise<boolean> {
     if (this.refuseWhileSuspended()) {
@@ -410,6 +461,7 @@ export class DocumentSession {
     this.cancelAutosave();
     this.patch({ status: "loading", error: null });
 
+    if (isKicadPcbPath(path)) return this.importKicadPcbPath(path, stale);
     if (isPcbPath(path)) return this.importPcbPath(path, stale);
 
     let diskText: string;
@@ -781,7 +833,9 @@ export class DocumentSession {
     let path = this.current.filePath;
     const firstSave = path === null;
     try {
-      if (path === null) path = (await this.backend.autosavePath?.()) ?? null;
+      if (path === null)
+        path =
+          (await this.backend.autosavePath?.(this.current.fileName)) ?? null;
     } catch (error) {
       if (generation === this.documentGeneration)
         this.fail(`could not create autosave file: ${describe(error)}`);

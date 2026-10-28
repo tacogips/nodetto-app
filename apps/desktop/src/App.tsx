@@ -1,8 +1,10 @@
 import { TemplateDialog } from "./TemplateDialog.tsx";
 import {
   computeBreadboardConnectivity,
+  encodePcbBoardZip,
   encodeBreadboardPcbZip,
   encodePcbExportZip,
+  exportPcbBoard,
   exportBreadboardPcb,
   exportPcbPage,
   createDesignTemplate,
@@ -368,9 +370,18 @@ export function App(props: AppProps): JSX.Element {
     }
   };
 
+  /**
+   * An imported board or drawing (KiCad, Gerber) keeps its source
+   * coordinates, which may lie off screen: show all of it.
+   */
+  const fitImported = (opened: boolean): void => {
+    if (opened && props.session.state().filePath === null)
+      props.editor.zoomToFit(viewport());
+  };
+
   const open = (): void => {
     if (mayDiscard()) {
-      void props.session.open();
+      void props.session.open().then(fitImported);
     }
   };
 
@@ -381,7 +392,7 @@ export function App(props: AppProps): JSX.Element {
 
   const openRecent = (path: string): void => {
     if (path !== "" && mayDiscard()) {
-      void props.session.openPath(path);
+      void props.session.openPath(path).then(fitImported);
     }
   };
 
@@ -768,6 +779,33 @@ export function App(props: AppProps): JSX.Element {
     }
   };
 
+  const exportPcbGerber = async (): Promise<void> => {
+    setExportError(null);
+    const page = props.editor.store.getPage(props.editor.currentPageId);
+    if (page?.kind !== "pcb") return;
+    try {
+      const pcb = exportPcbBoard(props.editor.store.getSnapshot(), page.id, {
+        name: page.name,
+      });
+      if (typeof pcb === "string") {
+        setExportError(pcb);
+        return;
+      }
+      const saved = await saveZip(
+        encodePcbBoardZip(pcb),
+        `${exportBaseName(page.name)}.zip`,
+      );
+      if (saved)
+        setExportError(
+          `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
+        );
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   const exportBreadboard = async (
     kind: "bom" | "kicad" | "spice" | "gerber",
   ): Promise<void> => {
@@ -1039,6 +1077,7 @@ export function App(props: AppProps): JSX.Element {
           exportBpmn={exportBpmn}
           exportBreadboard={exportBreadboard}
           exportGerber={exportGerber}
+          exportPcb={exportPcbGerber}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />

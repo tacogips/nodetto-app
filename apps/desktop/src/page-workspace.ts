@@ -6,12 +6,14 @@ export const DEDICATED_WORKSPACES: Readonly<
 > = {
   bpmn: "bpmn",
   breadboard: "breadboard",
+  pcb: "pcb",
 };
 
 export const DEDICATED_PAGE_NAMES: Readonly<Partial<Record<PageKind, string>>> =
   {
     bpmn: "Process",
     breadboard: "Breadboard",
+    pcb: "PCB",
   };
 
 export function dedicatedWorkspaceFor(

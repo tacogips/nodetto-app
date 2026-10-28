@@ -29,6 +29,8 @@ associations.
 - **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,
   PCB Gerber export and Gerber import. See
   [Breadboard circuit pages](docs/breadboard/README.md).
+- **PCB boards**: open KiCad boards, edit parts and tracks, and export Gerber
+  and drill files. See [KiCad PCB boards](docs/pcb/kicad-pcb.md).
 - **Design artboards**: web and iPhone screens, transitions, and code export.
   See [Design artboards](docs/design.md).
 - **Command line and MCP**: an AI agent edits a document while the desktop app
@@ -51,7 +53,20 @@ nodetto-cli inspect schema.jsonl
 nodetto-cli export schema.jsonl --format png --output schema.png
 nodetto-cli ddl schema.jsonl --dialect postgresql --check schema.sql
 nodetto-cli gerber import board-gerbers.zip --output board.jsonl
+nodetto-cli pcb import board.kicad_pcb --output board.jsonl
 ```
+
+## KiCad PCB boards
+
+| Open a KiCad board | Move a part; its tracks follow |
+| --- | --- |
+| ![The ErgoDash keyboard PCB opened from its KiCad board file as a PCB page](docs/images/nodetto-kicad-board.png) | ![An LED footprint dragged on the ErgoDash board, with its connected tracks following and its net highlighted](docs/images/nodetto-kicad-edit.png) |
+
+The [ErgoDash](https://github.com/omkbd/ErgoDash) Rev. 1.2 `.kicad_pcb` opened
+from the Open dialog: footprints, pads, nets, tracks, vias, zones and the board
+outline become a PCB page. Parts and tracks can be moved and edited, the page
+saves as Nodetto JSONL, and **Export > PCB** writes Gerber and drill files.
+ErgoDash is copyright (c) 2018 omkbd and released under the MIT License.
 
 ## Development
 

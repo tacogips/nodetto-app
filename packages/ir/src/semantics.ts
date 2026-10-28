@@ -1,5 +1,13 @@
 import type { UiControlSemantic } from "./ui-controls.ts";
 import type { DatabaseObjectSemantic } from "./database-objects.ts";
+import type {
+  PcbBoardSemantic,
+  PcbFootprintSemantic,
+  PcbGraphicSemantic,
+  PcbTrackSemantic,
+  PcbViaSemantic,
+  PcbZoneSemantic,
+} from "./pcb.ts";
 // Semantic payloads for the v1 element type registry.
 // See the product design (nodetto-cloud repo), section 5.2.
 
@@ -917,6 +925,7 @@ export function isBreadboardElementType(
 export function isBreadboardPartType(type: string): type is BreadboardPartType {
   return (BREADBOARD_PART_TYPES as readonly string[]).includes(type);
 }
+
 export const BREADBOARD_REFERENCE_PREFIX: Readonly<
   Record<BreadboardPartType, string>
 > = {
@@ -1132,6 +1141,12 @@ export interface SemanticByType {
   "breadboard.header": BreadboardHeaderSemantic;
   "breadboard.battery": BreadboardBatterySemantic;
   "breadboard.netlist": BreadboardNetlistSemantic;
+  "pcb.board": PcbBoardSemantic;
+  "pcb.footprint": PcbFootprintSemantic;
+  "pcb.track": PcbTrackSemantic;
+  "pcb.via": PcbViaSemantic;
+  "pcb.zone": PcbZoneSemantic;
+  "pcb.graphic": PcbGraphicSemantic;
 }
 
 export type ElementType = keyof SemanticByType;

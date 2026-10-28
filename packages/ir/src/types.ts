@@ -32,6 +32,7 @@ export const PAGE_KINDS = [
   "architecture",
   "bpmn",
   "breadboard",
+  "pcb",
 ] as const;
 
 export type PageKind = (typeof PAGE_KINDS)[number];

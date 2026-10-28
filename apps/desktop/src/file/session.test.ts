@@ -33,6 +33,10 @@ const KICAD_UNKNOWN_FIXTURE = readFileSync(
   `${import.meta.dir}/../../../../test-fixtures/kicad/unknown-symbols.net`,
   "utf8",
 );
+const KICAD_PCB_FIXTURE = readFileSync(
+  `${import.meta.dir}/../../../../test-fixtures/kicad/two-layer.kicad_pcb`,
+  "utf8",
+);
 
 interface MockBackend extends FileBackend {
   readonly files: Map<string, string>;
@@ -626,6 +630,62 @@ describe("opening", () => {
         .some((element) => element.type === "breadboard.netlist"),
     ).toBe(true);
     expect(harness.backend.watched).toEqual([]);
+  });
+
+  test.each(["board.kicad_pcb", "board.KICAD_PCB"])(
+    "opening %s imports a detached PCB document",
+    async (fileName) => {
+      const harness = createHarness();
+      const path = `/docs/${fileName}`;
+      harness.backend.files.set(path, KICAD_PCB_FIXTURE);
+
+      expect(await harness.session.openPath(path)).toBe(true);
+      expect(harness.session.state()).toMatchObject({
+        filePath: null,
+        fileName,
+        dirty: true,
+        error: null,
+      });
+      expect(harness.editor.getSnapshot().pages).toMatchObject([
+        { kind: "pcb", name: "board" },
+      ]);
+      expect(harness.backend.watched).toEqual([]);
+      addShape(harness.editor, "local edit");
+      harness.timers.fire();
+      await harness.settle();
+      expect(harness.backend.writes).toEqual([]);
+      expect(harness.backend.files.get(path)).toBe(KICAD_PCB_FIXTURE);
+    },
+  );
+
+  test("a KiCad PCB suffix with a non-board root leaves the document intact", async () => {
+    const harness = createHarness();
+    const before = serializeDocument(harness.editor.getSnapshot());
+    const path = "/docs/x.kicad_pcb";
+    harness.backend.files.set(path, "(kicad_sch (version 20250101))");
+
+    expect(await harness.session.openPath(path)).toBe(false);
+    expect(harness.session.state().error).toMatch(
+      /^could not import x\.kicad_pcb: Unsupported KiCad root/,
+    );
+    expect(serializeDocument(harness.editor.getSnapshot())).toBe(before);
+  });
+
+  test("KiCad PCB warnings are surfaced as import notes", async () => {
+    const harness = createHarness();
+    const path = "/docs/warning.kicad_pcb";
+    harness.backend.files.set(
+      path,
+      '(kicad_pcb (version 20240108) (generator "fixture") (dimension))',
+    );
+
+    expect(await harness.session.openPath(path)).toBe(true);
+    expect(harness.session.state().importWarnings).toEqual([
+      {
+        element: "warning.kicad_pcb",
+        message: expect.stringContaining("Skipped 1 dimension items."),
+      },
+    ]);
   });
 
   const gerber = (fileFunction: string, ...body: string[]) =>
@@ -1558,6 +1618,24 @@ describe("saving modes and first-shape autosave", () => {
     ).toHaveLength(1);
     expect(h.backend.watched).toContain("managed.jsonl");
     expect(h.session.state().recent[0]?.path).toBe("managed.jsonl");
+    h.session.dispose();
+  });
+
+  test("an imported document autosaves under a name from its source file", async () => {
+    const h = createHarness({ seeded: false });
+    const names: (string | null | undefined)[] = [];
+    h.backend.autosavePath = async (name) => {
+      names.push(name);
+      return "board.jsonl";
+    };
+    await h.session.importDocument(
+      { ...h.editor.getSnapshot(), title: "Board", elements: [] },
+      "/boards/board.kicad_pcb",
+    );
+    addShape(h.editor, "edit");
+    expect(await h.session.flush()).toBe(true);
+    expect(names).toEqual(["board.kicad_pcb"]);
+    expect(h.session.state().filePath).toBe("board.jsonl");
     h.session.dispose();
   });
 

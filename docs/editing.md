@@ -220,8 +220,9 @@ are copied by Copy style and exported to SVG, PNG, PDF and draw.io.
 Settings > Files > File saving switches between Automatic (the default) and Manual.
 The preference is remembered across launches. Automatic saving creates a JSONL
 file in the app data directory's `documents` folder after the first shape is
-created; an empty document creates no file. These documents appear in File >
-Recent. File > Save as chooses a different location and copies referenced
+created; an empty document creates no file. An imported document is named
+after its source file, such as `board.jsonl` for `board.kicad_pcb`, with a
+number added when that name is taken. These documents appear in File > Recent. File > Save as chooses a different location and copies referenced
 images into its `artifacts/` directory before saving JSONL. Move or share both
 the JSONL file and this directory together. Missing attachments are reported;
 saving never deletes files needed by undo or other documents.

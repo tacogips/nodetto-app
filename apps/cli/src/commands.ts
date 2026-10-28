@@ -40,6 +40,7 @@ import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
 import { gerberCommand } from "./gerber-command.ts";
+import { pcbCommand } from "./pcb-command.ts";
 import { MIN_PREFIX, shortIds, type Resolution } from "./ids.ts";
 
 /** Result of one command: text for stdout/stderr plus a process exit code. */
@@ -865,6 +866,8 @@ export function runCli(
       return breadboardCommand(io, rest);
     case "gerber":
       return gerberCommand(io, rest);
+    case "pcb":
+      return pcbCommand(io, rest);
     case "diff":
       return diffCommand(io, rest);
     case "edit":

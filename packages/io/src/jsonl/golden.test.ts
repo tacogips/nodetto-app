@@ -33,6 +33,7 @@ const GOLDEN = [
   "forward-compat",
   "bpmn",
   "breadboard",
+  "pcb",
 ] as const;
 
 describe("golden files", () => {

@@ -4,10 +4,12 @@
 // serialization (`@nodetto/io`); Rust only moves the exact bytes it is
 // handed, so the file format can change without a Rust release.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
@@ -27,9 +29,51 @@ pub use nodetto_native::fs::write_selected_file_atomic as write_bytes_atomic;
 /// matched in `apps/desktop/src/file/session.ts`.
 pub const MISSING_FILE_MESSAGE: &str = "file not found";
 
-/// Allocate a managed document name without creating an empty file.
-fn autosave_path(directory: &Path) -> io::Result<PathBuf> {
+/// Managed names handed out by this process but not written yet.
+static ALLOCATED: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
+
+/// The file stem of `name` reduced to characters safe in any file system,
+/// or `None` when nothing usable is left.
+fn managed_stem(name: &str) -> Option<String> {
+    let base = Path::new(name).file_name()?.to_string_lossy().into_owned();
+    let stem = base.split('.').next().unwrap_or_default();
+    let safe: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let safe = safe
+        .trim()
+        .trim_matches('-')
+        .chars()
+        .take(80)
+        .collect::<String>();
+    (!safe.is_empty()).then_some(safe)
+}
+
+/// Allocate a managed document name without creating an empty file. A
+/// document imported from `name` keeps that file's stem, numbered when taken.
+fn autosave_path(directory: &Path, name: Option<&str>) -> io::Result<PathBuf> {
     fs::create_dir_all(directory)?;
+    if let Some(stem) = name.and_then(managed_stem) {
+        let mut allocated = ALLOCATED.lock().unwrap_or_else(|error| error.into_inner());
+        for index in 1..10_000 {
+            let file = if index == 1 {
+                format!("{stem}.jsonl")
+            } else {
+                format!("{stem}-{index}.jsonl")
+            };
+            let path = directory.join(file);
+            if !path.exists() && allocated.insert(path.clone()) {
+                return Ok(path);
+            }
+        }
+    }
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -39,13 +83,16 @@ fn autosave_path(directory: &Path) -> io::Result<PathBuf> {
 }
 
 #[tauri::command]
-pub fn autosave_document_path(app: tauri::AppHandle) -> Result<String, String> {
+pub fn autosave_document_path(
+    app: tauri::AppHandle,
+    name: Option<String>,
+) -> Result<String, String> {
     let directory = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join("documents");
-    autosave_path(&directory)
+    autosave_path(&directory, name.as_deref())
         .map(|path| path.to_string_lossy().into_owned())
         .map_err(|error| format!("could not allocate autosave path: {error}"))
 }
@@ -94,13 +141,33 @@ mod tests {
     fn autosave_names_are_unique_and_do_not_create_empty_files() {
         let directory = tempdir().expect("temp dir");
         let documents = directory.path().join("documents");
-        let first = autosave_path(&documents).expect("first path");
-        let second = autosave_path(&documents).expect("second path");
+        let first = autosave_path(&documents, None).expect("first path");
+        let second = autosave_path(&documents, None).expect("second path");
         assert_ne!(first, second);
         assert_eq!(first.parent(), Some(documents.as_path()));
         assert_eq!(fs::read_dir(&documents).expect("directory").count(), 0);
         write_atomic(&first, "shape\n").expect("first actual save");
         assert_eq!(fs::read_to_string(first).expect("read"), "shape\n");
+    }
+
+    #[test]
+    fn imported_documents_keep_their_name_and_never_reuse_one() {
+        let directory = tempdir().expect("temp dir");
+        let documents = directory.path().join("documents");
+        let first = autosave_path(&documents, Some("/boards/main board.kicad_pcb")).expect("first");
+        assert_eq!(first, documents.join("main board.jsonl"));
+        let second = autosave_path(&documents, Some("main board.kicad_pcb")).expect("second");
+        assert_eq!(second, documents.join("main board-2.jsonl"));
+        write_atomic(&documents.join("panel.jsonl"), "shape\n").expect("existing");
+        let third = autosave_path(&documents, Some("panel.zip")).expect("third");
+        assert_eq!(third, documents.join("panel-2.jsonl"));
+        let unnamed = autosave_path(&documents, Some("...")).expect("unnamed");
+        assert!(unnamed
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("Untitled-"));
+        assert_eq!(managed_stem("a/b:c?.d.e"), Some("b-c".to_string()));
     }
 
     #[test]

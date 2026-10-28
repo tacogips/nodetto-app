@@ -686,6 +686,42 @@ nativeTest(
 );
 
 nativeTest(
+  "native pcb import and gerber match the TypeScript CLI",
+  () => {
+    const fixture = join(
+      import.meta.dir,
+      "../../../test-fixtures/kicad/two-layer.kicad_pcb",
+    );
+    const expectedDir = mkdtempSync(join(tmpdir(), "nodetto-pcb-ts-"));
+    const actualDir = mkdtempSync(join(tmpdir(), "nodetto-pcb-native-"));
+    try {
+      const both = (args: string[]) => {
+        const expected = Bun.spawnSync([process.execPath, source, ...args], {
+          cwd: expectedDir,
+        });
+        const actual = Bun.spawnSync([binary!, ...args], { cwd: actualDir });
+        expect(actual.exitCode).toBe(0);
+        expect(actual.exitCode).toBe(expected.exitCode);
+        expect(actual.stdout.toString()).toBe(expected.stdout.toString());
+        expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+      };
+      both(["pcb", "import", fixture, "--output", "board.jsonl"]);
+      both(["pcb", "gerber", "board.jsonl", "--output", "board.zip"]);
+      expect(readFileSync(join(actualDir, "board.jsonl"), "utf8")).toBe(
+        readFileSync(join(expectedDir, "board.jsonl"), "utf8"),
+      );
+      expect(readFileSync(join(actualDir, "board.zip"))).toEqual(
+        readFileSync(join(expectedDir, "board.zip")),
+      );
+    } finally {
+      rmSync(expectedDir, { recursive: true, force: true });
+      rmSync(actualDir, { recursive: true, force: true });
+    }
+  },
+  120000,
+);
+
+nativeTest(
   "native gerber import matches the TypeScript CLI for files, a ZIP and --into",
   () => {
     const example = join(import.meta.dir, "../../../examples/breadboard");

@@ -3,6 +3,19 @@
 
 import type { PadShape, PcbPoint } from "./model.ts";
 
+export type GerberApertureShape =
+  | { readonly kind: "circle"; readonly diameter: number }
+  | {
+      readonly kind: "rectangle";
+      readonly width: number;
+      readonly height: number;
+    }
+  | {
+      readonly kind: "obround";
+      readonly width: number;
+      readonly height: number;
+    };
+
 /** Gerber 4.6 format: integer nanometres. */
 function coordinate(value: number): string {
   return String(Math.round(value * 1_000_000));
@@ -24,6 +37,12 @@ export interface RegionSegment {
   readonly to: PcbPoint;
   readonly center?: PcbPoint;
   readonly clockwise?: boolean;
+}
+
+/** A closed contour from `start` along `segments` back to `start`. */
+export interface GerberRegionContour {
+  readonly start: PcbPoint;
+  readonly segments: readonly RegionSegment[];
 }
 
 /** One Gerber image layer, built with flashes and strokes. */
@@ -74,6 +93,17 @@ export class GerberLayer {
     this.body.push(`${xy(at)}D03*`);
   }
 
+  /** Flash a standard circle, rectangle, or obround aperture. */
+  flashAperture(aperture: GerberApertureShape, at: PcbPoint): void {
+    this.setPolarity("dark");
+    this.use(
+      aperture.kind === "circle"
+        ? `C,${millimetres(aperture.diameter)}`
+        : `${aperture.kind === "rectangle" ? "R" : "O"},${millimetres(aperture.width)}X${millimetres(aperture.height)}`,
+    );
+    this.body.push(`${xy(at)}D03*`);
+  }
+
   /** A polyline drawn with a round aperture `width` wide. */
   stroke(width: number, points: readonly PcbPoint[]): void {
     const [first, ...rest] = points;
@@ -98,6 +128,17 @@ export class GerberLayer {
     this.trace(start, segments);
   }
 
+  /** A circular arc drawn with a round aperture `width` wide. */
+  arc(
+    width: number,
+    from: PcbPoint,
+    to: PcbPoint,
+    center: PcbPoint,
+    clockwise: boolean,
+  ): void {
+    this.path(width, from, [{ to, center, clockwise }]);
+  }
+
   private trace(start: PcbPoint, segments: readonly RegionSegment[]): void {
     let from = start;
     for (const segment of segments) {
@@ -107,6 +148,7 @@ export class GerberLayer {
           this.multiQuadrant = true;
         }
         this.setMode(segment.clockwise ? "G02" : "G03");
+        // Gerber I/J are offsets from the start point, rounded independently like X/Y.
         this.body.push(
           `${xy(segment.to)}I${coordinate(segment.center.x - from.x)}J${coordinate(segment.center.y - from.y)}D01*`,
         );
@@ -130,6 +172,8 @@ export class GerberLayer {
   ): void {
     if (segments.length < 2) return;
     this.setPolarity(polarity);
+    // Regions do not use an aperture, but independent readers expect a selection.
+    if (this.selected === undefined) this.use(`C,${millimetres(0.01)}`);
     this.body.push("G36*", `${xy(start)}D02*`);
     this.trace(start, segments);
     this.body.push("G37*");

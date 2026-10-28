@@ -28,6 +28,7 @@ Convert and check
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
   nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
+  nodetto-cli pcb import|gerber   KiCad board to a PCB page, Gerber and drill export
   nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 
 MCP server
@@ -436,6 +437,23 @@ Example:
   nodetto-cli gerber import board-gerbers.zip --output board.jsonl
   nodetto-cli gerber import gerber/*.g* gerber/board.drl --into keyboard.jsonl --page-name PCB
   nodetto-cli gerber export board.jsonl --output board-edited.zip
+
+${EXIT_CODES}`,
+
+  pcb: `Usage: nodetto-cli pcb import <file.kicad_pcb> [--output <doc.jsonl>] [--strict]
+       nodetto-cli pcb gerber <doc.jsonl> --output <file.zip>
+                               [--page <short-id|id|name>] [--strict]
+
+Import a KiCad board as a PCB page, or export a PCB page as Gerber and drill
+files in a ZIP archive.
+
+  --output  (import) Write the nodetto document; (gerber) required ZIP path.
+  --page    Select a PCB page when the document contains more than one.
+  --strict  Exit 3 when import or export reports warnings.
+
+Examples:
+  nodetto-cli pcb import board.kicad_pcb --output board.jsonl
+  nodetto-cli pcb gerber board.jsonl --output board.zip
 
 ${EXIT_CODES}`,
 

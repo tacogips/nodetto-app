@@ -97,6 +97,9 @@ import {
 import { ConnectorMarkers, ConnectorView } from "./shapes/ConnectorView.tsx";
 import { ShapeView } from "./shapes/ShapeView.tsx";
 import { BreadboardOverlay } from "./BreadboardOverlay.tsx";
+import { PcbOverlay } from "./PcbOverlay.tsx";
+import { PcbLayersPanel } from "./PcbLayersPanel.tsx";
+import { pcbHiddenLayers } from "./pcb-state.ts";
 import { Tool, isConnectorTool, type ToolKind } from "./tools.ts";
 
 const CanvasRulers = lazy(() => import("./CanvasRulers.tsx"));
@@ -368,6 +371,12 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     return (
       props.editor.store.getPage(props.editor.currentPageId)?.kind ===
       "breadboard"
+    );
+  });
+  const isPcbPage = createMemo(() => {
+    signals.rev();
+    return (
+      props.editor.store.getPage(props.editor.currentPageId)?.kind === "pcb"
     );
   });
   const context = createMemo(() => {
@@ -885,6 +894,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
               element={element()}
               box={bounds()}
               selected={isSelected(element().id)}
+              pcbHidden={() => pcbHiddenLayers(props.editor.currentPageId)}
               showLayoutGrids
             />
           </div>
@@ -1027,6 +1037,15 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
               probeRevision={probeRevision}
               wireDraft={interaction.wireDraft}
               startWirePoint={interaction.startBreadboardWirePoint}
+            />
+          </Show>
+          <Show when={isPcbPage()}>
+            <PcbOverlay
+              editor={props.editor}
+              revision={signals.rev}
+              highlightedNet={interaction.pcbHover}
+              hidden={() => pcbHiddenLayers(props.editor.currentPageId)}
+              draft={interaction.pcbDraft}
             />
           </Show>
           <Show when={interaction.marquee()}>
@@ -1359,6 +1378,9 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
 
         <div class={`nodetto-layer ${SLOT_LAYER_CLASS}`}>{props.children}</div>
       </div>
+      <Show when={isPcbPage()}>
+        <PcbLayersPanel editor={props.editor} revision={signals.rev} />
+      </Show>
       <Show when={!readOnly() && props.tool === "draw.freehand"}>
         <FreehandInput editor={props.editor} />
       </Show>
