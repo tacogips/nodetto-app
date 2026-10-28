@@ -1,0 +1,285 @@
+{
+  "taskId": "pcb-svg-s538",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-538",
+  "implementationBranch": "feat/pcb-svg-export",
+  "baseBranch": "feat/pcb-svg-export",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "28c9dede750c5c2f72ce8a1085ac2fc96f800c67",
+  "designDocPaths": [
+    "design-docs/specs/design-pcb-svg-export.md",
+    "design-docs/user-qa/pcb-svg-export.md",
+    "design-docs/specs/design-kicad-pcb.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/pcb-svg-s538",
+  "evidenceLayout": "tmp/pcb-svg-s538/<planId>/ per plan (logs, scratch scripts, sha256 lists); per-attempt dispatcher output under tmp/pcb-svg-s538/<planId>/attempt-<n>/; reconciliation output under tmp/pcb-svg-s538/reconcile/. tmp/ is git-ignored (.gitignore:41). No *.test.ts file may be written under tmp/.",
+  "reviewContext": {
+    "issueReference": "none (inline workflowInput request; execution opus-luna-design-and-implement-review-loop-session-538; step5 plan review comm-010052 accepted all four plans)",
+    "userProblem": "packages/core/src/svg-export draws every pcb.* element (pcb.board, pcb.footprint, pcb.track, pcb.via, pcb.zone, pcb.graphic) as an 'unsupported: <type>' placeholder (renderShape default -> renderUnsupported in basic-shapes.ts), so SVG, PNG and PDF export on desktop and nodetto-cli export of a KiCad or Gerber-derived PCB page show placeholders instead of the board.",
+    "requiredOutcomes": [
+      "Plan 01: move the pure PCB view model, PCB_LAYER_COLORS, PCB_HOLES_COLOR, pcbLayerColor and isPcbLayerHidden into packages/core/src/pcb-board/view.ts, add PCB_BOARD_COLOR = \"#2f4a3a\" and a num formatter parameter (default String); ui-solid pcb-view.ts and pcb-state.ts become re-export adapters; canvas output byte-identical (design 3).",
+      "Plan 02: docs/pcb/kicad-pcb.md 'SVG, PNG and PDF export' section, docs/cli.md example line, README PCB bullet (design 8).",
+      "Plan 03: renderPcbShape in packages/core/src/svg-export/pcb-shapes.ts, dispatch from renderShape, and one data-layer=\"pcb-board\" rect over the union of rendered PCB element boxes after the page background rect; fixture page draws tracks, arcs, pads, vias, zone fill, silkscreen text and outline with no 'unsupported:' (design 4, 5, 6, 7).",
+      "Plan 04: CLI test of export --format svg|png|pdf on the fixture PCB document and native parity of the PCB SVG under mise run test-cli (design 7, 10).",
+      "CARGO_TERM_QUIET=true BUN_OPTIONS=--jsx-runtime=classic mise run verify and CARGO_TERM_QUIET=true mise run test-cli pass."
+    ],
+    "nonGoals": [
+      "Any change to canvas appearance, including a canvas board background (design 2, 9).",
+      "Following the canvas's transient hidden-layer set in exports (user QA Q2).",
+      "New SvgExportOptions fields or CLI flags; there is no nodetto-cli render command (design 1, 2).",
+      "Changes to non-PCB SVG bytes, the Gerber exporter, export.md, versions, server code, auth or deployment config."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, cargo with CARGO_TERM_QUIET=true, strict TypeScript, bun run typecheck after TS changes.",
+      "Must typecheck under noUncheckedIndexedAccess (nodetto-cloud web build); no regular-expression split and no quadratic algorithms (Boa native CLI).",
+      "Only self-authored fixtures (test-fixtures/kicad/two-layer.kicad_pcb); never commit third-party boards such as ErgoDash.",
+      "Non-PCB golden SVG tests (svg-export.test.ts, breadboard export-golden, bpmn svg-export) must pass unedited.",
+      "packages/core must not import packages/ui-solid, solid-js or @nodetto/core; view.ts must not live in packages/core/src/pcb/ (boundary test).",
+      "Parallel run feat/canvas-theme owns the app theme and canvas background; this run owns pcb-view.ts, the PCB colour table and the board rect.",
+      "Workers follow each plan's Worker protocol: sha256 before and after each edit in the own progress log, stop on drift, edit only writePaths, no git commit/branch/stash/worktree, no workspace-wide formatting, no bun.lock edits, foreground commands with full logs under the evidence root."
+    ],
+    "designDecisionsAndRationale": [
+      "One geometry: the canvas and the exporter call the same pcbViewModel in core; only number spelling differs (num = String on canvas, fmt in export) so canvas strings are unchanged (design 3, 9).",
+      "The dark board rect is always drawn over the union of rendered PCB element boxes; the page background (explicit or default) still fills the whole view box below it, so an explicit background is honoured outside the board and layer colours stay readable (design 5, user QA Q1).",
+      "PCB_BOARD_COLOR #2f4a3a is darker than every layer colour and lighter than PCB_HOLES_COLOR #202020 so non-plated holes stay visible (user QA Q3).",
+      "8-digit zone fills are split into fill plus fill-opacity (59 -> 0.35) for renderer compatibility (plan 03).",
+      "All PNG/PDF exports rasterise the renderPageSvg/renderSelectionSvg/renderArtboardSvg string, so fixing SVG fixes every format and host; no separate desktop test (design 1, 7)."
+    ],
+    "intentionalTradeoffs": [
+      "Exports use page-unit stroke widths, not vector-effect non-scaling-stroke; widths scale with PNG scale (design 9).",
+      "Export path data uses two-decimal fmt spelling; the canvas keeps JavaScript spelling (design 9).",
+      "Exports draw all layers regardless of the canvas Layers panel (design 6, user QA Q2).",
+      "Footprint bounds approximate stroke-text extents, so text outside its footprint box may sit partly outside the board rect (design 11, low)."
+    ],
+    "supportedEdgeCases": [
+      "Hidden footprint/board texts (hidden: true) and visual.hidden elements are not drawn (design 6).",
+      "pcb.board has a null box and contributes no primitives and no board box.",
+      "Arc tracks, all pad shapes, rotations and drill offsets, slot holes, vias with holes, translucent zone fills, back-side footprint graphics drawn before front side (shared model, design 3).",
+      "background: null (transparent) and explicit backgrounds such as #ffffff; selection and artboard exports apply the same board-rect rule over the rendered elements (design 5).",
+      "Pages without rendered PCB elements get no board rect, so bytes are unchanged (design 5)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Following transient hidden layers in exports (user QA Q2).",
+      "A user-selectable board colour or a flag to replace the board colour with the background (user QA Q1 alternative).",
+      "Boa vs TS rounding at an exact two-decimal boundary beyond the parity fixture (design 11, low)."
+    ],
+    "residualRisks": [
+      "Plan 03 board-rect test reason is wrong: four fixture pcb.graphic boxes are under 1 unit on one side and renderElementsSvg widens them to 1 unit (document.ts:166-176); the step5 reviewer confirmed the raw and widened page unions are both [-28.083,-138.22,1108.25,230.75], so the assertion holds. If it fails, the expected union in the test must use Math.max(1, width/height) widening; the rect must not be changed to match the test (step5 low finding, pcb-svg-03-svg-renderer.md:154).",
+      "User QA Q1 reading of an explicit background versus the board colour (low).",
+      "Native/TS fmt rounding-boundary mismatch in native parity (low); plan 04 records the first differing offset and routes it to plan 03 rather than weakening the comparison.",
+      "feat/canvas-theme may edit svg-export/document.ts near the background rect (low; merge-time conflict only)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-pcb-svg-export.md",
+      "design-docs/user-qa/pcb-svg-export.md",
+      "design-docs/specs/design-kicad-pcb.md",
+      "impl-plans/active/pcb-svg-01-core-view-model.md",
+      "impl-plans/active/pcb-svg-02-docs.md",
+      "impl-plans/active/pcb-svg-03-svg-renderer.md",
+      "impl-plans/active/pcb-svg-04-cli-tests.md",
+      "packages/ui-solid/src/shapes/pcb-view.ts",
+      "packages/ui-solid/src/pcb-state.ts",
+      "packages/core/src/pcb-board/index.ts",
+      "packages/core/src/pcb-board/geometry.ts",
+      "packages/core/src/svg-export/shapes.ts",
+      "packages/core/src/svg-export/document.ts",
+      "packages/core/src/svg-export/markup.ts",
+      "packages/core/src/svg-export/basic-shapes.ts",
+      "apps/cli/src/export-command.ts",
+      "apps/cli/src/pcb-commands.test.ts",
+      "apps/cli/src/native-parity.test.ts",
+      "test-fixtures/kicad/two-layer.kicad_pcb"
+    ]
+  },
+  "acceptedDependencies": [],
+  "plans": [
+    {
+      "planId": "pcb-svg-01-core-view-model",
+      "planPath": "impl-plans/active/pcb-svg-01-core-view-model.md",
+      "progressPath": "impl-plans/progress/pcb-svg-01-core-view-model.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/pcb-board/view.ts",
+        "packages/core/src/pcb-board/index.ts",
+        "packages/ui-solid/src/shapes/pcb-view.ts",
+        "packages/ui-solid/src/pcb-state.ts",
+        "impl-plans/progress/pcb-svg-01-core-view-model.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "packages/core/src/pcb-board/view.ts exports PcbViewPath, PcbViewCircle, PcbViewPrimitive, PCB_LAYER_COLORS, PCB_HOLES_COLOR (#202020), pcbLayerColor, PCB_BOARD_COLOR (#2f4a3a), isPcbLayerHidden and pcbViewModel(element, hidden = new Set(), num = String); num spells every number written into a d string, cx/cy/r/width stay raw.",
+        "pcb-board/index.ts gains one explicit named export block from ./view.ts; packages/core/src/index.ts unchanged.",
+        "ui-solid shapes/pcb-view.ts contains only re-exports from @nodetto/core; pcb-state.ts imports and re-exports isPcbLayerHidden with no other change.",
+        "Canvas output byte-identical: pcb-view.test.ts, PcbShapeView.tsx, pcb-overlay.ts, PcbLayersPanel.tsx unedited and tests passing.",
+        "view.ts imports no ui-solid, solid-js or @nodetto/core; non-test sources clean under noUncheckedIndexedAccess.",
+        "Scratch check (not committed) with num = n.toFixed(1) on fixture elements shows every d number uses one decimal; recorded in the progress log."
+      ],
+      "verification": [
+        "mkdir -p tmp/pcb-svg-s538/pcb-svg-01-core-view-model",
+        "bun test packages/ui-solid/src/shapes/pcb-view.test.ts packages/ui-solid/src/pcb-interaction.test.ts",
+        "bun test packages/core/src/pcb-board packages/core/src/pcb",
+        "bun run typecheck > tmp/pcb-svg-s538/pcb-svg-01-core-view-model/typecheck.log 2>&1",
+        "bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/pcb-svg-s538/pcb-svg-01-core-view-model/tsc-unchecked.log 2>&1; test -z \"$(grep 'error TS' tmp/pcb-svg-s538/pcb-svg-01-core-view-model/tsc-unchecked.log | grep -v '\\.test\\.ts' | grep -v 'apps/desktop/scripts/fixtures')\"",
+        "bunx biome check packages/core/src/pcb-board/view.ts packages/core/src/pcb-board/index.ts packages/ui-solid/src/shapes/pcb-view.ts packages/ui-solid/src/pcb-state.ts",
+        "git diff --exit-code packages/ui-solid/src/shapes/pcb-view.test.ts packages/ui-solid/src/shapes/PcbShapeView.tsx packages/ui-solid/src/pcb-overlay.ts packages/ui-solid/src/PcbLayersPanel.tsx packages/core/src/index.ts",
+        "! grep -n 'ui-solid\\|solid-js\\|@nodetto/core' packages/core/src/pcb-board/view.ts",
+        "grep -n '#2f4a3a' packages/core/src/pcb-board/view.ts",
+        "test -s impl-plans/progress/pcb-svg-01-core-view-model.md"
+      ]
+    },
+    {
+      "planId": "pcb-svg-02-docs",
+      "planPath": "impl-plans/active/pcb-svg-02-docs.md",
+      "progressPath": "impl-plans/progress/pcb-svg-02-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "docs/pcb/kicad-pcb.md",
+        "docs/cli.md",
+        "README.md",
+        "impl-plans/progress/pcb-svg-02-docs.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "docs/pcb/kicad-pcb.md has exactly one '## SVG, PNG and PDF export' section between '## Gerber and drill export' and '## Command reference', describing canvas-equivalent drawing, all layers drawn, hidden texts/elements left out, dark board colour (no hex value), background filling the margin, true board widths, and the nodetto-cli export examples.",
+        "docs/cli.md 'PCB boards (KiCad)' block adds 'nodetto-cli export board.jsonl --format svg --output board.svg' after pcb gerber.",
+        "README PCB bullet ends with 'export the board as SVG, PNG or PDF.' keeping the link.",
+        "Only existing CLI flags used; no non-ASCII characters added; no other docs files changed."
+      ],
+      "verification": [
+        "mkdir -p tmp/pcb-svg-s538/pcb-svg-02-docs",
+        "test \"$(grep -c '^## SVG, PNG and PDF export' docs/pcb/kicad-pcb.md)\" -eq 1",
+        "awk '/^## Gerber and drill export/{g=NR} /^## SVG, PNG and PDF export/{s=NR} /^## Command reference/{c=NR} END{exit !(g && s && c && g<s && s<c)}' docs/pcb/kicad-pcb.md",
+        "grep -n 'nodetto-cli export board.jsonl --format svg' docs/cli.md",
+        "grep -n 'nodetto-cli export board.jsonl --format svg' docs/pcb/kicad-pcb.md",
+        "test \"$(grep -c 'SVG, PNG or PDF' README.md)\" -ge 1",
+        "test -z \"$(git diff -U0 -- docs/pcb/kicad-pcb.md docs/cli.md README.md | grep '^+' | LC_ALL=C tr -d '\\000-\\177')\"",
+        "test -z \"$(git diff --name-only -- docs README.md | grep -v -x -e docs/pcb/kicad-pcb.md -e docs/cli.md -e README.md)\"",
+        "test -s impl-plans/progress/pcb-svg-02-docs.md"
+      ]
+    },
+    {
+      "planId": "pcb-svg-03-svg-renderer",
+      "planPath": "impl-plans/active/pcb-svg-03-svg-renderer.md",
+      "progressPath": "impl-plans/progress/pcb-svg-03-svg-renderer.md",
+      "wave": 2,
+      "dependsOn": [
+        "pcb-svg-01-core-view-model"
+      ],
+      "writePaths": [
+        "packages/core/src/svg-export/pcb-shapes.ts",
+        "packages/core/src/svg-export/pcb-shapes.test.ts",
+        "packages/core/src/svg-export/shapes.ts",
+        "packages/core/src/svg-export/document.ts",
+        "impl-plans/progress/pcb-svg-03-svg-renderer.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "renderPcbShape(element) serialises pcbViewModel(element, new Set(), fmt) into path/circle tags with the pinned attribute order; 8-digit fills become fill plus fill-opacity; no vector-effect, data-* or wrapping group; empty model gives an empty string.",
+        "renderShape routes all six pcb.* types to renderPcbShape right after the BPMN check; renderUnsupported stays for unknown types.",
+        "renderElementsSvg emits one data-layer=\"pcb-board\" rect with PCB_BOARD_COLOR over unionBoxes of the visible boxes of rendered PCB elements, after the page background rect and before backdrops/connectors/shapes; nothing added when no PCB element rendered.",
+        "pcb-shapes.test.ts on test-fixtures/kicad/two-layer.kicad_pcb covers: no 'unsupported:', every element kind, F.Cu/B.Cu colours, the arc track d (M 230 100 A ... 292.5 100), pad copper, via ring and hole, zone fill-opacity 0.35 with no 9-character fill, silkscreen #f2eecb, Edge.Cuts #d0d0d0, one-geometry tag counts and d equality, board rect union and placement, background #ffffff and null, selection export, hidden text, hidden element, determinism, non-PCB page without pcb-board.",
+        "If the board-rect union assertion fails, the expected union uses Math.max(1, width/height) widening as renderElementsSvg does; the rect implementation is not changed to match the test (step5 low finding).",
+        "Non-PCB golden suites pass unedited; basic-shapes.ts, markup.ts, theme.ts unchanged; pcb-view.test.ts still passes."
+      ],
+      "verification": [
+        "mkdir -p tmp/pcb-svg-s538/pcb-svg-03-svg-renderer",
+        "bun test packages/core/src/svg-export/pcb-shapes.test.ts",
+        "bun test packages/core/src/svg-export.test.ts packages/core/src/breadboard/export-golden.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts packages/core/src/bpmn/svg-export-layers.test.ts packages/core/src/workspace-workflow.test.ts",
+        "git diff --exit-code packages/core/src/svg-export.test.ts packages/core/src/breadboard packages/core/src/bpmn packages/core/src/svg-export/basic-shapes.ts packages/core/src/svg-export/markup.ts packages/core/src/svg-export/theme.ts",
+        "bun test packages/ui-solid/src/shapes/pcb-view.test.ts",
+        "bun run typecheck > tmp/pcb-svg-s538/pcb-svg-03-svg-renderer/typecheck.log 2>&1",
+        "bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/pcb-svg-s538/pcb-svg-03-svg-renderer/tsc-unchecked.log 2>&1; test -z \"$(grep 'error TS' tmp/pcb-svg-s538/pcb-svg-03-svg-renderer/tsc-unchecked.log | grep -E 'svg-export/(pcb-shapes|shapes|document)')\"",
+        "bunx biome check packages/core/src/svg-export/pcb-shapes.ts packages/core/src/svg-export/pcb-shapes.test.ts packages/core/src/svg-export/shapes.ts packages/core/src/svg-export/document.ts",
+        "test \"$(grep -c 'renderPcbShape' packages/core/src/svg-export/shapes.ts)\" -ge 2",
+        "test \"$(grep -c 'pcb-board' packages/core/src/svg-export/document.ts)\" -ge 1",
+        "test -s impl-plans/progress/pcb-svg-03-svg-renderer.md"
+      ]
+    },
+    {
+      "planId": "pcb-svg-04-cli-tests",
+      "planPath": "impl-plans/active/pcb-svg-04-cli-tests.md",
+      "progressPath": "impl-plans/progress/pcb-svg-04-cli-tests.md",
+      "wave": 3,
+      "dependsOn": [
+        "pcb-svg-03-svg-renderer"
+      ],
+      "writePaths": [
+        "apps/cli/src/pcb-commands.test.ts",
+        "apps/cli/src/native-parity.test.ts",
+        "impl-plans/progress/pcb-svg-04-cli-tests.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "pcb-commands.test.ts adds one test: exportCommand --format svg stdout has data-layer=\"pcb-board\" and all five pcb data-type groups and no 'unsupported:'; png and pdf with a capturing RasterBackend receive an SVG with pcb.track and pcb-board; the real raster backend writes a PNG with the PNG signature and a one-page PDF.",
+        "native-parity.test.ts extends 'native pcb import and gerber match the TypeScript CLI' with both([\"export\", \"board.jsonl\", \"--format\", \"svg\"]) and asserts the TS stdout contains data-layer=\"pcb-board\"; no new nativeTest; comparison not weakened.",
+        "No production, package.json or bun.lock edits; a production failure or native/TS byte difference is recorded in the progress log and routed to plan 03.",
+        "mise run test-cli exits 0 with the native pcb parity test passing (not skipped); complete log path recorded."
+      ],
+      "verification": [
+        "mkdir -p tmp/pcb-svg-s538/pcb-svg-04-cli-tests",
+        "bun test apps/cli/src/pcb-commands.test.ts",
+        "bun test apps/cli/src/export-command.test.ts",
+        "CARGO_TERM_QUIET=true mise run test-cli > tmp/pcb-svg-s538/pcb-svg-04-cli-tests/test-cli.log 2>&1",
+        "grep -nE '\\(pass\\).*native pcb import and gerber match the TypeScript CLI' tmp/pcb-svg-s538/pcb-svg-04-cli-tests/test-cli.log",
+        "bun run typecheck > tmp/pcb-svg-s538/pcb-svg-04-cli-tests/typecheck.log 2>&1",
+        "bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/pcb-svg-s538/pcb-svg-04-cli-tests/tsc-unchecked.log 2>&1; test -z \"$(grep 'error TS' tmp/pcb-svg-s538/pcb-svg-04-cli-tests/tsc-unchecked.log | grep -E 'apps/cli/src/(pcb-commands|native-parity)\\.test\\.ts')\"",
+        "bunx biome check apps/cli/src/pcb-commands.test.ts apps/cli/src/native-parity.test.ts",
+        "git diff --exit-code apps/cli/src/export-command.ts apps/cli/src/commands.ts apps/cli/src/help.ts apps/cli/package.json bun.lock",
+        "test -s impl-plans/progress/pcb-svg-04-cli-tests.md"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      ["pcb-svg-01-core-view-model", "pcb-svg-02-docs"],
+      ["pcb-svg-03-svg-renderer"],
+      ["pcb-svg-04-cli-tests"]
+    ],
+    "afterWave": [
+      "bun run typecheck",
+      "bunx biome check .",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/pcb-board packages/core/src/svg-export.test.ts packages/core/src/svg-export packages/ui-solid/src/shapes/pcb-view.test.ts"
+    ],
+    "deferredSharedEdits": [],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths. View-model defects found by plan 03 or 04 route to plan 01; native/TS SVG byte differences route to plan 03. Drift recorded by a worker is repaired serially here.",
+    "commitPolicy": "Commit each wave on feat/pcb-svg-export staging explicit paths only; never git add -A; never stage tmp/; never push (gitPush false).",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-pcb-svg-export.md",
+        "design-docs/user-qa/pcb-svg-export.md",
+        "design-docs/specs/design-kicad-pcb.md",
+        "impl-plans/active/pcb-svg-01-core-view-model.md",
+        "impl-plans/active/pcb-svg-02-docs.md",
+        "impl-plans/active/pcb-svg-03-svg-renderer.md",
+        "impl-plans/active/pcb-svg-04-cli-tests.md",
+        "impl-plans/active/pcb-svg-s538-dispatch.json",
+        "impl-plans/README.md"
+      ],
+      "note": "Planning files committed in this checkpoint; workers never edit them."
+    },
+    "finalVerification": [
+      "mkdir -p tmp/pcb-svg-s538/reconcile",
+      "CARGO_TERM_QUIET=true BUN_OPTIONS=--jsx-runtime=classic mise run verify > tmp/pcb-svg-s538/reconcile/verify.log 2>&1",
+      "CARGO_TERM_QUIET=true mise run test-cli > tmp/pcb-svg-s538/reconcile/test-cli.log 2>&1",
+      "grep -nE '\\(pass\\).*native pcb import and gerber match the TypeScript CLI' tmp/pcb-svg-s538/reconcile/test-cli.log",
+      "bun test packages/core/src/svg-export.test.ts packages/core/src/svg-export/pcb-shapes.test.ts packages/ui-solid/src/shapes/pcb-view.test.ts packages/core/src/breadboard/export-golden.test.ts packages/core/src/bpmn apps/cli/src/pcb-commands.test.ts",
+      "bun run typecheck",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  }
+}

@@ -91,7 +91,8 @@ In scope:
 Out of scope: writing `.kicad_pcb`, autorouting, zone refill, DRC, flipping
 a footprint to the other side, creating nets, paste and fabrication-layer
 Gerbers, inner-layer Gerbers, pick-and-place, SVG/PNG export of PCB pages
-(existing fallback rendering applies), MCP tools, changes to the Gerber
+(now designed in `design-docs/specs/design-pcb-svg-export.md`, which also
+moves the section 6.2 view model into `packages/core`), MCP tools, changes to the Gerber
 import, changes to breadboard export bytes, `SCHEMA_VERSION` changes.
 
 ## 3. Data model (`packages/ir`)

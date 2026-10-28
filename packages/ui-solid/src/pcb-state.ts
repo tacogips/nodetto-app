@@ -1,4 +1,9 @@
-import { PCB_TRACK_DEFAULT_WIDTH, PCB_VIA_DEFAULT } from "@nodetto/core";
+import {
+  PCB_TRACK_DEFAULT_WIDTH,
+  PCB_VIA_DEFAULT,
+  isPcbLayerHidden,
+} from "@nodetto/core";
+export { isPcbLayerHidden };
 import type { Element, PageId, PcbBoardSemantic } from "@nodetto/ir";
 import { createSignal } from "solid-js";
 
@@ -73,20 +78,6 @@ export function setPcbToolOptions(patch: Partial<PcbToolOptions>): boolean {
   options = next;
   setToolOptions(next);
   return true;
-}
-
-/**
- * Whether `layer` is hidden. A KiCad wildcard such as `*.Cu` is hidden once
- * both of its outer layers are.
- */
-export function isPcbLayerHidden(
-  hidden: ReadonlySet<string>,
-  layer: string,
-): boolean {
-  if (hidden.has(layer)) return true;
-  if (!layer.startsWith("*.")) return false;
-  const suffix = layer.slice(1);
-  return hidden.has(`F${suffix}`) && hidden.has(`B${suffix}`);
 }
 
 export function isPcbElementShown(

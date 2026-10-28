@@ -45,11 +45,13 @@ input errors.
 
 ## PCB boards (KiCad)
 
-Import a board into a PCB page, then export Gerber and drill files:
+Import a board into a PCB page, then export Gerber and drill files or the
+board as an image:
 
 ```bash
 nodetto-cli pcb import board.kicad_pcb --output board.jsonl
 nodetto-cli pcb gerber board.jsonl --output board.zip
+nodetto-cli export board.jsonl --format svg --output board.svg
 ```
 
 See [KiCad PCB boards](pcb/kicad-pcb.md) for supported content, editing and

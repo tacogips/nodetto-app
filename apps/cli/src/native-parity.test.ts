@@ -704,9 +704,12 @@ nativeTest(
         expect(actual.exitCode).toBe(expected.exitCode);
         expect(actual.stdout.toString()).toBe(expected.stdout.toString());
         expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+        return expected.stdout.toString();
       };
       both(["pcb", "import", fixture, "--output", "board.jsonl"]);
       both(["pcb", "gerber", "board.jsonl", "--output", "board.zip"]);
+      const svg = both(["export", "board.jsonl", "--format", "svg"]);
+      expect(svg).toContain('data-layer="pcb-board"');
       expect(readFileSync(join(actualDir, "board.jsonl"), "utf8")).toBe(
         readFileSync(join(expectedDir, "board.jsonl"), "utf8"),
       );
