@@ -1,0 +1,357 @@
+/* Layers panel, component library, design tokens, review comments and
+   inspector list entries.
+   Imported in cascade order from style.css. */
+
+.nodetto-layers {
+  flex: 0 0 210px;
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--line, #d8d2c3);
+  background: var(--surface, #fffdf8);
+  font-size: 12px;
+}
+.nodetto-layers h2 {
+  font-size: 13px;
+  margin: 14px 12px 8px;
+}
+.nodetto-layers p {
+  margin: 8px 12px;
+  color: #596366;
+}
+.nodetto-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.nodetto-layer-row button,
+.nodetto-layer-actions button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 7px 4px;
+  font: inherit;
+}
+.nodetto-layer-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+.nodetto-layer-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodetto-layer-name[aria-pressed="true"] {
+  background: #dbe6e8;
+}
+.nodetto-layer-row button:focus-visible,
+.nodetto-layer-row input:focus-visible {
+  outline: 2px solid #227c91;
+  outline-offset: -2px;
+}
+.nodetto-layer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 8px;
+  gap: 6px;
+}
+
+.nodetto-layer-row button.nodetto-layer-icon {
+  display: inline-grid;
+  flex: 0 0 24px;
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  place-items: center;
+  color: var(--app-chrome-muted);
+}
+
+.nodetto-layer-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nodetto-layer-row .nodetto-layer-icon[aria-pressed="true"] {
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-active);
+}
+.nodetto-component-library {
+  border-bottom: 1px solid #d8d2c3;
+  padding: 8px;
+}
+
+.nodetto-color-tokens,
+.nodetto-number-tokens,
+.nodetto-typography-styles,
+.nodetto-review-comments {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--nodetto-border, #ddd);
+}
+.nodetto-color-tokens form,
+.nodetto-number-tokens form,
+.nodetto-typography-styles form,
+.nodetto-color-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px;
+}
+.nodetto-color-tokens input:not([type="color"]):not([type="checkbox"]),
+.nodetto-number-tokens input {
+  min-width: 0;
+  width: 120px;
+  flex: 1;
+}
+.nodetto-typography-styles form input,
+.nodetto-typography-entry input {
+  min-width: 0;
+  width: 112px;
+  flex: 1;
+}
+.nodetto-typography-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin: 8px;
+}
+.nodetto-typography-entry > span {
+  color: #596366;
+  font-variant-numeric: tabular-nums;
+}
+.nodetto-typography-entry button[aria-pressed="true"] {
+  border-color: var(--nodetto-accent, #335c67);
+  color: #fff;
+  background: var(--nodetto-accent, #335c67);
+}
+.nodetto-color-tokens input[type="color"] {
+  width: 32px;
+  height: 28px;
+  padding: 1px;
+}
+.nodetto-review-comments > textarea,
+.nodetto-comment-thread textarea {
+  box-sizing: border-box;
+  width: calc(100% - 16px);
+  min-height: 54px;
+  margin: 0 8px;
+  resize: vertical;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 6px;
+  padding: 6px;
+  color: inherit;
+  background: var(--surface, #fffdf8);
+  font: inherit;
+}
+.nodetto-comment-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 8px;
+}
+.nodetto-comment-actions button,
+.nodetto-comment-placement button,
+.nodetto-comment-thread header button,
+.nodetto-comment-popover button {
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 5px;
+  padding: 4px 7px;
+  background: var(--surface, #fffdf8);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nodetto-comment-thread {
+  margin: 8px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 7px;
+  background: #fff;
+  overflow: hidden;
+}
+.nodetto-comment-thread.is-resolved {
+  opacity: 0.65;
+}
+.nodetto-comment-thread header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: #f5f2e9;
+}
+.nodetto-comment-thread header span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodetto-comment-message {
+  padding: 6px 8px 0;
+}
+.nodetto-comment-message time {
+  display: block;
+  color: #727b7e;
+  font-size: 10px;
+}
+.nodetto-comment-message p {
+  margin: 3px 0 6px;
+  color: inherit;
+  white-space: pre-wrap;
+}
+.nodetto-comment-placement {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 8px;
+  padding: 7px;
+  border: 1px solid var(--nodetto-accent, #335c67);
+  border-radius: 7px;
+  color: var(--nodetto-ink);
+  background: var(--nodetto-accent-soft);
+  font-size: 11px;
+}
+.nodetto-comment-pins {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nodetto-comment-pin-wrap {
+  position: absolute;
+  pointer-events: auto;
+}
+.nodetto-comment-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 8px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 28%);
+  color: #fff;
+  background: var(--nodetto-accent, #335c67);
+  font: 700 11px / 1 sans-serif;
+  cursor: grab;
+  touch-action: none;
+}
+.nodetto-comment-pin.is-dragging {
+  cursor: grabbing;
+}
+.nodetto-comment-popover {
+  position: absolute;
+  z-index: 4;
+  left: 18px;
+  top: 18px;
+  width: 220px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 9px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 22%);
+  color: var(--ink, #172124);
+  background: var(--surface, #fffdf8);
+  font: 12px / 1.35 sans-serif;
+}
+.nodetto-comment-popover > span {
+  display: block;
+  color: #596366;
+}
+.nodetto-comment-popover p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+.nodetto-color-entry > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+}
+.nodetto-gradient-stop {
+  display: grid;
+  grid-template-columns: 32px minmax(48px, 1fr) minmax(48px, 1fr);
+  gap: 4px;
+  margin: 6px 0;
+  align-items: center;
+}
+.nodetto-gradient-stop button {
+  grid-column: 1 / -1;
+}
+.nodetto-effect-actions,
+.nodetto-inspector-actions,
+.nodetto-effect-entry > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.nodetto-inspector-stack {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 6px;
+}
+.nodetto-effect-entry {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 6px;
+}
+.nodetto-effect-entry > label,
+.nodetto-effect-entry > select,
+.nodetto-effect-entry > div {
+  grid-column: 1 / -1;
+}
+.nodetto-component-library input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+}
+.nodetto-component-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 4px;
+  border-bottom: 1px solid #eee9dd;
+}
+.nodetto-component-entry strong,
+.nodetto-component-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodetto-component-preview {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+  box-sizing: border-box;
+  border: 1px solid #d8d2c3;
+  border-radius: 4px;
+  background: #f2f0e9;
+}
+.nodetto-component-entry span {
+  color: #596366;
+}
+.nodetto-component-entry button {
+  border: 1px solid #d8d2c3;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-right: 4px;
+  cursor: pointer;
+  background: #fffdf8;
+  color: #1d2a2e;
+}
