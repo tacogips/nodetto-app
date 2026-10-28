@@ -2,8 +2,9 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { encodeStoredZip } from "../../../packages/core/src/zip.ts";
-import { parseDocument, serializeDocument } from "@nodetto/io";
-import type { Document, Element } from "@nodetto/ir";
+import { parseDocument, readZip, serializeDocument } from "@nodetto/io";
+import type { Document, Element, GroupSemantic } from "@nodetto/ir";
+import { readExcellon } from "../../../packages/core/src/pcb/index.ts";
 import {
   EXIT_ERROR,
   EXIT_OK,
@@ -42,8 +43,16 @@ function memoryIo(
   bytes: Record<string, Uint8Array> = {},
 ) {
   const files = new Map(Object.entries(text));
-  const io: CommandIo & { files: Map<string, string> } = {
+  const written = new Map<string, Uint8Array>();
+  const io: CommandIo & {
+    files: Map<string, string>;
+    written: Map<string, Uint8Array>;
+  } = {
     files,
+    written,
+    writeBytes(path, value) {
+      written.set(path, value);
+    },
     readText(path) {
       const value = files.get(path);
       if (value === undefined) throw new Error("ENOENT");
@@ -171,7 +180,7 @@ test("--strict fails on reader warnings; usage and input errors are explained", 
   );
   expect(cli(["gerber", "import", "open.gtl"], io).exitCode).toBe(EXIT_OK);
   for (const [args, message] of [
-    [["gerber"], "gerber expects the import subcommand."],
+    [["gerber"], "gerber expects the import or export subcommand."],
     [
       ["gerber", "import"],
       "gerber import expects Gerber, drill or ZIP file paths.",
@@ -192,8 +201,99 @@ test("--strict fails on reader warnings; usage and input errors are explained", 
     expect(result.stderr).toContain(message);
   }
   expect(cli(["help"], io).stdout).toContain(
-    "nodetto-cli gerber import       Gerber and drill files to a PCB page",
+    "nodetto-cli gerber ...          Gerber and drill files to a PCB page and back",
   );
+});
+
+test("gerber export writes an imported page back as the board's files", () => {
+  const io = memoryIo({}, { "led-button-pcb.zip": ZIP });
+  cli(["gerber", "import", "led-button-pcb.zip", "--output", "pcb.jsonl"], io);
+  const result = cli(
+    ["gerber", "export", "pcb.jsonl", "--output", "edited.zip"],
+    io,
+  );
+  expect(result.exitCode).toBe(EXIT_OK);
+  expect(result.stderr).toContain("  Drill: led-button.DRL (");
+  expect(result.stderr).toEndWith(
+    "Wrote Gerber and drill files to edited.zip.\n",
+  );
+  const entries = readZip(io.written.get("edited.zip") as Uint8Array);
+  expect(entries.map((entry) => entry.path).sort()).toEqual(
+    EXTENSIONS.map((extension) => `led-button.${extension}`).sort(),
+  );
+  const drill = (text: string) =>
+    readExcellon(text)
+      .holes.map((hole) => `${hole.at.x},${hole.at.y},${hole.diameter}`)
+      .sort();
+  const exported = entries.find((entry) => entry.path.endsWith(".DRL"));
+  expect(drill(new TextDecoder().decode(exported?.contents))).toEqual(
+    drill(goldens["gerber/led-button.DRL"] as string),
+  );
+});
+
+test("gerber export explains a page without Gerber layers and --strict warnings", () => {
+  const io = memoryIo({}, { "led-button-pcb.zip": ZIP });
+  cli(["gerber", "import", "led-button-pcb.zip", "--output", "pcb.jsonl"], io);
+  const document = parseDocument(io.files.get("pcb.jsonl") as string);
+  const silk = document.elements.find(
+    (element) =>
+      (element.semantic as GroupSemantic).fabricationLayer?.kind ===
+      "silkscreen",
+  ) as Element;
+  io.files.set(
+    "noted.jsonl",
+    serializeDocument({
+      ...document,
+      elements: [
+        ...document.elements.map((element) =>
+          element.id === silk.id
+            ? {
+                ...element,
+                semantic: {
+                  ...(element.semantic as GroupSemantic),
+                  memberIds: [
+                    ...(element.semantic as GroupSemantic).memberIds,
+                    "note",
+                  ],
+                },
+              }
+            : element,
+        ),
+        {
+          id: "note",
+          page: "pcb-page-1",
+          type: "text.note",
+          index: "z0",
+          semantic: { text: "REV B" },
+          visual: { x: 10, y: 10 },
+        },
+      ],
+    }),
+  );
+  const strict = cli(
+    ["gerber", "export", "noted.jsonl", "--output", "x.zip", "--strict"],
+    io,
+  );
+  expect(strict.exitCode).toBe(EXIT_WARNINGS);
+  expect(strict.stderr).toBe(
+    "warning: led-button.GTO: 1 text.note element(s) have no filled outline and are left out\n1 Gerber export warning(s) with --strict.\n",
+  );
+  io.files.set("plain.jsonl", serializeDocument({ ...document, elements: [] }));
+  for (const [args, message] of [
+    [
+      ["gerber", "export", "plain.jsonl", "--output", "x.zip"],
+      "The document has no page with Gerber layers",
+    ],
+    [["gerber", "export", "pcb.jsonl"], "requires --output <file.zip>"],
+    [
+      ["gerber", "export", "pcb.jsonl", "--output", "x.zip", "--page", "nope"],
+      "nope",
+    ],
+  ] as const) {
+    const failed = cli(args, io);
+    expect(failed.exitCode).toBe(EXIT_ERROR);
+    expect(failed.stderr).toContain(message);
+  }
 });
 
 test("edit names the validation errors of a document it refuses", () => {
