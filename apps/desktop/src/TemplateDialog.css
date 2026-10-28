@@ -8,7 +8,7 @@
   background: var(--nodetto-surface);
 }
 .app-template-dialog::backdrop {
-  background: rgb(10 25 22 / 40%);
+  background: var(--app-template-backdrop);
 }
 .app-template-dialog header {
   display: flex;
@@ -44,7 +44,7 @@
   width: 100%;
   height: 260px;
   object-fit: contain;
-  background: #ebece6;
+  background: var(--app-template-preview);
   border-radius: 6px;
 }
 .app-template-grid span {

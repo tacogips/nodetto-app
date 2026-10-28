@@ -5,18 +5,48 @@
 /* Canvas */
 
 .nodetto-canvas {
+  --nodetto-canvas-bg: #f6f4ee;
+  --nodetto-canvas-grid: #e3ded1;
+  --nodetto-canvas-ruler-surface: #fffdf8;
+  --nodetto-canvas-ruler-line: #d8d2c3;
+  --nodetto-canvas-ruler-text: #596366;
+  --nodetto-canvas-overlay: #335c67;
+  --nodetto-canvas-handle-fill: #fffdf8;
+  --nodetto-canvas-crop-line: #f8fafc;
+  --nodetto-canvas-crop-handle: #f97316;
+  --nodetto-canvas-crop-mask: rgb(15 23 42 / 45%);
+  --nodetto-canvas-gradient-line: #0f172a;
+  --nodetto-canvas-shadow: rgb(0 0 0 / 18%);
   position: relative;
   height: 100%;
   overflow: hidden;
-  background-color: var(--nodetto-canvas);
-  background-image: radial-gradient(var(--nodetto-grid) 1px, transparent 1px);
+  background-color: var(--nodetto-canvas-bg);
+  background-image: radial-gradient(
+    var(--nodetto-canvas-grid) 1px,
+    transparent 1px
+  );
   outline: none;
   touch-action: none;
   cursor: default;
 }
 
+.nodetto-canvas.nodetto-canvas-dark {
+  --nodetto-canvas-bg: #15191b;
+  --nodetto-canvas-grid: #343c40;
+  --nodetto-canvas-ruler-surface: #1f2427;
+  --nodetto-canvas-ruler-line: #3a4245;
+  --nodetto-canvas-ruler-text: #a3adb1;
+  --nodetto-canvas-overlay: #5fb4c7;
+  --nodetto-canvas-handle-fill: #1f2427;
+  --nodetto-canvas-crop-line: #f8fafc;
+  --nodetto-canvas-crop-handle: #f97316;
+  --nodetto-canvas-crop-mask: rgb(15 23 42 / 45%);
+  --nodetto-canvas-gradient-line: #0f172a;
+  --nodetto-canvas-shadow: rgb(0 0 0 / 18%);
+}
+
 .nodetto-canvas.nodetto-image-drop-active {
-  box-shadow: inset 0 0 0 2px var(--nodetto-accent);
+  box-shadow: inset 0 0 0 2px var(--nodetto-canvas-overlay);
 }
 
 .nodetto-image-drop-overlay,
@@ -29,7 +59,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--nodetto-surface) 94%, transparent);
   color: var(--nodetto-ink);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  box-shadow: 0 8px 24px var(--nodetto-canvas-shadow);
 }
 
 .nodetto-image-drop-overlay {
@@ -93,6 +123,20 @@
   pointer-events: none;
 }
 
+.nodetto-backdrop-layer,
+.nodetto-shape-layer,
+.nodetto-connector-layer,
+.nodetto-text-editor {
+  --nodetto-ink: #1d2a2e;
+  --nodetto-muted: #596366;
+  --nodetto-line: #d8d2c3;
+  --nodetto-surface: #fffdf8;
+  --nodetto-accent: #335c67;
+  --nodetto-accent-soft: #dbe6e8;
+  color: var(--nodetto-ink);
+  color-scheme: light;
+}
+
 /* Connectors */
 
 /*
@@ -114,7 +158,7 @@
 
 .nodetto-connector.nodetto-selected line,
 .nodetto-connector.nodetto-selected polyline {
-  stroke: var(--nodetto-accent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 2.5;
 }
 
@@ -143,7 +187,7 @@
 }
 
 .nodetto-pending-connection {
-  stroke: var(--nodetto-accent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
 }
@@ -367,62 +411,62 @@
 /* Selection overlay */
 
 .nodetto-marquee {
-  fill: color-mix(in srgb, var(--nodetto-accent) 10%, transparent);
-  stroke: var(--nodetto-accent);
+  fill: color-mix(in srgb, var(--nodetto-canvas-overlay) 10%, transparent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 1;
   stroke-dasharray: 3 3;
 }
 
 .nodetto-selection-outline {
   fill: none;
-  stroke: var(--nodetto-accent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
 
 .nodetto-handle {
-  fill: var(--nodetto-surface);
-  stroke: var(--nodetto-accent);
+  fill: var(--nodetto-canvas-handle-fill);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 1.5;
   pointer-events: all;
 }
 
 .nodetto-crop-outline {
   fill: none;
-  stroke: #f8fafc;
+  stroke: var(--nodetto-canvas-crop-line);
   stroke-width: 1.5;
   stroke-dasharray: 5 3;
   pointer-events: none;
 }
 
 .nodetto-crop-mask {
-  fill: rgb(15 23 42 / 45%);
+  fill: var(--nodetto-canvas-crop-mask);
   pointer-events: none;
 }
 
 .nodetto-crop-handle {
-  fill: var(--nodetto-surface);
-  stroke: #f97316;
+  fill: var(--nodetto-canvas-handle-fill);
+  stroke: var(--nodetto-canvas-crop-handle);
   stroke-width: 2;
   pointer-events: all;
 }
 
 .nodetto-gradient-axis {
-  stroke: #f8fafc;
+  stroke: var(--nodetto-canvas-crop-line);
   stroke-width: 2;
   pointer-events: none;
 }
 
 .nodetto-gradient-stop-handle,
 .nodetto-gradient-geometry-handle {
-  stroke: #0f172a;
+  stroke: var(--nodetto-canvas-gradient-line);
   stroke-width: 1.5;
   pointer-events: all;
   cursor: move;
 }
 
 .nodetto-gradient-geometry-handle {
-  fill: var(--nodetto-surface);
-  stroke: #f97316;
+  fill: var(--nodetto-canvas-handle-fill);
+  stroke: var(--nodetto-canvas-crop-handle);
   stroke-width: 2;
 }

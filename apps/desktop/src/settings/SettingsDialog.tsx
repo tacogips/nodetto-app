@@ -14,12 +14,22 @@ import {
 } from "@nodetto/ui-solid";
 import type { SaveMode } from "../file/save-mode.ts";
 import type { CloudSettings } from "../cloud/settings.ts";
+import {
+  CANVAS_BACKGROUND_OPTIONS,
+  isCanvasBackgroundPreference,
+  isThemePreference,
+  PCB_CANVAS_BACKGROUND_OPTIONS,
+  THEME_OPTIONS,
+  type CanvasBackgroundPreference,
+  type ThemePreference,
+} from "./appearance.ts";
 import type { CliInstaller } from "./cli-install.ts";
 import { CommandLineSettings } from "./CommandLineSettings.tsx";
 import "./settings.css";
 
 type Category =
   | "general"
+  | "appearance"
   | "canvas"
   | "snapping"
   | "files"
@@ -27,6 +37,16 @@ type Category =
   | "cli"
   | "shortcuts";
 export interface SettingsDialogProps {
+  readonly theme: ThemePreference;
+  readonly onThemeChange: (theme: ThemePreference) => void;
+  readonly canvasBackground: CanvasBackgroundPreference;
+  readonly onCanvasBackgroundChange: (
+    background: CanvasBackgroundPreference,
+  ) => void;
+  readonly pcbCanvasBackground: CanvasBackgroundPreference;
+  readonly onPcbCanvasBackgroundChange: (
+    background: CanvasBackgroundPreference,
+  ) => void;
   readonly workspace: WorkspaceId;
   readonly onWorkspaceChange: (id: WorkspaceId) => void;
   readonly showGrid: boolean;
@@ -58,6 +78,7 @@ export function SettingsDialog(props: SettingsDialogProps): JSX.Element {
   const categories = () =>
     [
       { id: "general", label: "General" },
+      { id: "appearance", label: "Appearance" },
       { id: "canvas", label: "Canvas" },
       { id: "snapping", label: "Snapping" },
       ...(props.filesAvailable ? [{ id: "files", label: "Files" }] : []),
@@ -170,6 +191,61 @@ export function SettingsDialog(props: SettingsDialogProps): JSX.Element {
                 <For each={WORKSPACES}>
                   {(workspace) => (
                     <option value={workspace.id}>{workspace.label}</option>
+                  )}
+                </For>
+              </select>
+            </label>
+          </Show>
+          <Show when={category() === "appearance"}>
+            <label class="app-settings-row">
+              <span>Theme</span>
+              <select
+                aria-label="App theme"
+                value={props.theme}
+                onChange={(event) => {
+                  const value: unknown = event.currentTarget.value;
+                  if (isThemePreference(value)) props.onThemeChange(value);
+                }}
+              >
+                <For each={THEME_OPTIONS}>
+                  {(option) => (
+                    <option value={option.value}>{option.label}</option>
+                  )}
+                </For>
+              </select>
+            </label>
+            <label class="app-settings-row">
+              <span>Canvas</span>
+              <select
+                aria-label="Canvas background"
+                value={props.canvasBackground}
+                onChange={(event) => {
+                  const value: unknown = event.currentTarget.value;
+                  if (isCanvasBackgroundPreference(value))
+                    props.onCanvasBackgroundChange(value);
+                }}
+              >
+                <For each={CANVAS_BACKGROUND_OPTIONS}>
+                  {(option) => (
+                    <option value={option.value}>{option.label}</option>
+                  )}
+                </For>
+              </select>
+            </label>
+            <label class="app-settings-row">
+              <span>PCB canvas</span>
+              <select
+                aria-label="PCB canvas background"
+                value={props.pcbCanvasBackground}
+                onChange={(event) => {
+                  const value: unknown = event.currentTarget.value;
+                  if (isCanvasBackgroundPreference(value))
+                    props.onPcbCanvasBackgroundChange(value);
+                }}
+              >
+                <For each={PCB_CANVAS_BACKGROUND_OPTIONS}>
+                  {(option) => (
+                    <option value={option.value}>{option.label}</option>
                   )}
                 </For>
               </select>

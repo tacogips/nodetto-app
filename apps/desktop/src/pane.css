@@ -105,7 +105,7 @@
   z-index: 8;
   top: 0;
   bottom: 0;
-  box-shadow: 3px 0 12px rgb(0 0 0 / 14%);
+  box-shadow: 3px 0 12px var(--app-pane-shadow);
 }
 
 .app-pane-left.is-overlay {
@@ -114,7 +114,7 @@
 
 .app-pane-right.is-overlay {
   right: 0;
-  box-shadow: -3px 0 12px rgb(0 0 0 / 14%);
+  box-shadow: -3px 0 12px var(--app-pane-shadow);
 }
 
 .app-pane.is-collapsed .app-pane-content {
@@ -147,7 +147,7 @@
 }
 
 .app-pane-restore:disabled {
-  color: #a8a8a8;
+  color: var(--app-disabled-soft-ink);
   cursor: default;
 }
 
@@ -212,7 +212,7 @@
   border: 1px solid var(--app-chrome-line);
   border-radius: 0;
   background: var(--app-chrome-surface);
-  box-shadow: 0 8px 18px rgb(20 28 32 / 10%);
+  box-shadow: 0 8px 18px var(--app-shadow-small);
 }
 
 .app-file-controls > .app-file-button,
@@ -310,7 +310,7 @@
 }
 .app-viewer-footer .nodetto-page-tab.nodetto-active {
   border-bottom-color: var(--nodetto-accent);
-  background: var(--app-chrome-active, #e5e9eb);
+  background: var(--app-chrome-active);
   box-shadow: none;
 }
 .app-viewer-footer .nodetto-page-tab-name {

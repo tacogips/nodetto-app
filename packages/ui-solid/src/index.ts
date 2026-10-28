@@ -5,6 +5,12 @@ export { createEditorSignals, type EditorSignals } from "./adapter.ts";
 export { HelpHint } from "./HelpHint.tsx";
 export { type NodettoCanvasProps, NodettoCanvas } from "./Canvas.tsx";
 export {
+  CANVAS_DARK_CLASS,
+  type CanvasBackgroundSetting,
+  type CanvasMode,
+  canvasModeFor,
+} from "./canvas/canvas-background.ts";
+export {
   createInteraction,
   type Interaction,
   type InteractionOptions,

@@ -26,6 +26,11 @@ import type { Box, Editor, Vec, ViewportSize } from "@nodetto/core";
 import { connectorBackdropIds, groupOf } from "@nodetto/core";
 import type { Element, ElementId } from "@nodetto/ir";
 import {
+  CANVAS_DARK_CLASS,
+  canvasModeFor,
+  type CanvasBackgroundSetting,
+} from "./canvas/canvas-background.ts";
+import {
   batch,
   createMemo,
   createEffect,
@@ -81,6 +86,8 @@ export interface NodettoCanvasProps {
   /** False hides the dotted background. */
   readonly showGrid: boolean;
   readonly showRulers?: boolean;
+  /** Resolved light/dark canvas per page kind; omitted keeps every page light. */
+  readonly canvasBackground?: CanvasBackgroundSetting;
   /** Double-click, Enter/F2, or a freshly placed text element. */
   readonly onEditRequest?: (id: ElementId, region: EditRegion) => void;
   /** Right-click or Shift+F10; `hit` is the group-resolved element. */
@@ -188,6 +195,13 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       props.editor.store.getPage(props.editor.currentPageId)?.kind === "pcb"
     );
   });
+  const canvasMode = createMemo(() => {
+    signals.rev();
+    return canvasModeFor(
+      props.editor.store.getPage(props.editor.currentPageId)?.kind,
+      props.canvasBackground,
+    );
+  });
   const context = createMemo(() => {
     signals.rev();
     return props.editor.createShapeContext(cameraZoom());
@@ -258,6 +272,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       class="nodetto-canvas"
       classList={{
         [`nodetto-tool-${props.tool.replace(":", "-")}`]: true,
+        [CANVAS_DARK_CLASS]: canvasMode() === "dark",
         "nodetto-grid-hidden": !props.showGrid,
         "nodetto-space-pan": interaction.temporaryHand(),
         "nodetto-panning": interaction.panning(),

@@ -11,19 +11,19 @@
 
 .app-saving-setting select {
   color: inherit;
-  background: var(--nodetto-panel-bg, #fff);
-  border: 1px solid var(--nodetto-border, #ddd);
+  background: var(--app-chrome-surface);
+  border: 1px solid var(--app-divider);
   padding: 4px;
 }
 
 .app-close-dialog {
-  color: var(--nodetto-text, #172b35);
-  background: var(--nodetto-panel-bg, #fff);
-  border: 1px solid var(--nodetto-border, #ccc);
+  color: var(--app-header-ink);
+  background: var(--app-chrome-surface);
+  border: 1px solid var(--app-divider);
   padding: 20px;
 }
 .app-close-dialog::backdrop {
-  background: rgb(0 0 0 / 30%);
+  background: var(--app-backdrop);
 }
 .app-close-dialog button {
   margin-right: 8px;

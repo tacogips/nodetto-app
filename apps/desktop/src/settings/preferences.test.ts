@@ -61,3 +61,75 @@ test("malformed or unavailable preference storage cannot break editing", () => {
   expect(loadEditorPreferences(blocked).showGrid).toBe(true);
   expect(() => storeEditorPreferences(preferences, blocked)).not.toThrow();
 });
+
+test("appearance preferences default and migrate from legacy ruler storage", () => {
+  const empty = loadEditorPreferences(storage());
+  expect(empty.theme).toBe("system");
+  expect(empty.canvasBackground).toBe("light");
+  expect(empty.pcbCanvasBackground).toBe("dark");
+
+  const legacy = storage();
+  legacy.setItem("nodetto.view.show-rulers", "false");
+  const migrated = loadEditorPreferences(legacy);
+  expect(migrated.showRulers).toBe(false);
+  expect(migrated.theme).toBe("system");
+  expect(migrated.canvasBackground).toBe("light");
+  expect(migrated.pcbCanvasBackground).toBe("dark");
+});
+
+test("v1 preferences without appearance keys use appearance defaults", () => {
+  const store = storage();
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({ showGrid: false }),
+  );
+  const preferences = loadEditorPreferences(store);
+  expect(preferences.showGrid).toBe(false);
+  expect(preferences.theme).toBe("system");
+  expect(preferences.canvasBackground).toBe("light");
+  expect(preferences.pcbCanvasBackground).toBe("dark");
+});
+
+test("appearance preferences round trip and invalid values fall back per key", () => {
+  const store = storage();
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({
+      theme: "dark",
+      canvasBackground: "match",
+      pcbCanvasBackground: "light",
+    }),
+  );
+  const preferences = loadEditorPreferences(store);
+  expect(preferences.theme).toBe("dark");
+  expect(preferences.canvasBackground).toBe("match");
+  expect(preferences.pcbCanvasBackground).toBe("light");
+  storeEditorPreferences(preferences, store);
+  expect(loadEditorPreferences(store)).toEqual(preferences);
+
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({
+      theme: "blue",
+      canvasBackground: 1,
+      pcbCanvasBackground: null,
+      showGrid: false,
+      showRulers: false,
+    }),
+  );
+  const invalid = loadEditorPreferences(store);
+  expect(invalid.theme).toBe("system");
+  expect(invalid.canvasBackground).toBe("light");
+  expect(invalid.pcbCanvasBackground).toBe("dark");
+  expect(invalid.showGrid).toBe(false);
+  expect(invalid.showRulers).toBe(false);
+});
+
+test("malformed JSON returns all appearance defaults", () => {
+  const store = storage();
+  store.setItem("nodetto.editor.preferences.v1", "broken");
+  const preferences = loadEditorPreferences(store);
+  expect(preferences.theme).toBe("system");
+  expect(preferences.canvasBackground).toBe("light");
+  expect(preferences.pcbCanvasBackground).toBe("dark");
+});
