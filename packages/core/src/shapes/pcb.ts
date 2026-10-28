@@ -38,6 +38,12 @@ function pageBounds(
   };
 }
 
+/** A track's points, with an arc's midpoint between its two ends. */
+function trackPath(track: PcbTrackSemantic): readonly PcbXY[] {
+  const [start, end] = track.points;
+  return track.mid && start && end ? [start, track.mid, end] : track.points;
+}
+
 function boundsFor(type: PcbElementType, element: Element): Box | null {
   switch (type) {
     case "pcb.board":
@@ -48,11 +54,9 @@ function boundsFor(type: PcbElementType, element: Element): Box | null {
     }
     case "pcb.track": {
       const track = semantic<PcbTrackSemantic>(element);
-      const points = track.mid
-        ? [track.points[0], track.mid, track.points[1]]
-        : track.points;
-      const xs = points.map((point) => point?.[0] ?? 0);
-      const ys = points.map((point) => point?.[1] ?? 0);
+      const points = trackPath(track);
+      const xs = points.map((point) => point[0]);
+      const ys = points.map((point) => point[1]);
       const half = track.width / 2;
       return pageBounds(
         Math.min(...xs) - half,
@@ -290,9 +294,7 @@ function hitTest(
     }
     case "pcb.track": {
       const track = semantic<PcbTrackSemantic>(element);
-      const points = track.mid
-        ? [track.points[0], track.mid, track.points[1]]
-        : track.points;
+      const points = trackPath(track);
       return nearSegments(
         point,
         points,
