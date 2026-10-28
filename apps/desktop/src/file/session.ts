@@ -1,8 +1,3 @@
-import {
-  hydrateDocumentAttachments,
-  prepareDocumentAttachments,
-  type PreparedAttachments,
-} from "./attachments.ts";
 // The document lifecycle: which file is open, whether it has unsaved edits,
 // and what to do when the file changes underneath us.
 //
@@ -18,164 +13,70 @@ import {
 //     rewrites the file identically also stays quiet.
 //   - `loading` is set while the editor is being replaced, so the diffs a
 //     load produces never mark the fresh document dirty.
+//
+// The pieces live beside this file: `session-types.ts` (the published
+// state), `session-paths.ts` (path and error helpers), `session-import.ts`
+// (interchange formats) and `session-reconcile.ts` (outside changes and
+// attachment rewrites).
 
 import {
-  diffDocuments,
   DocumentChangeMonitor,
   type DocumentChangeSource,
   type Editor,
   isEmptyCommit,
-  mergeDocuments,
-  newElementId,
-  type PcbImportFile,
 } from "@nodetto/core";
 import {
   assertValidDocument,
   type Document,
   formatIssue,
   getElementTypeDefinition,
-  SCHEMA_VERSION,
-  type ImageSemantic,
 } from "@nodetto/ir";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
 import type { BpmnImportWarning } from "@nodetto/io";
-import type { SaveMode } from "./save-mode.ts";
+import {
+  hydrateDocumentAttachments,
+  prepareDocumentAttachments,
+  type PreparedAttachments,
+} from "./attachments.ts";
+import type { FileBackend } from "./backend.ts";
 import { createFileDocumentChangeSource } from "./change-source.ts";
-import type { FileBackend, RecentEntry } from "./backend.ts";
+import type { SaveMode } from "./save-mode.ts";
+import {
+  type ImportHost,
+  importInterchangeText,
+  importUnreadPath,
+} from "./session-import.ts";
+import {
+  baseName,
+  describeError,
+  emptyLocalDocument,
+  isMissingFile,
+} from "./session-paths.ts";
+import {
+  attachmentSourcePatches,
+  planOutsideChange,
+} from "./session-reconcile.ts";
+import type {
+  DocumentSessionOptions,
+  SessionConflict,
+  SessionListener,
+  SessionState,
+  TimerHandle,
+} from "./session-types.ts";
 
-export type SessionStatus = "idle" | "loading" | "saving";
-
-export interface SessionConflict {
-  /** What the file holds now, ready to be loaded if the user reloads. */
-  readonly diskText: string;
-  /**
-   * Ids changed on both sides when an outside change was merged into unsaved
-   * local edits; the local version of those was kept. Absent when the disk
-   * change could not be merged at all.
-   */
-  readonly mergedConflicts?: readonly string[];
-}
-
-/** The last change another writer made to the open file, shown live. */
-export interface OutsideChange {
-  readonly added: number;
-  readonly updated: number;
-  readonly removed: number;
-  /** True when it was merged into unsaved local edits. */
-  readonly merged: boolean;
-}
-
-export interface SessionState {
-  readonly saveMode: SaveMode;
-  readonly filePath: string | null;
-  readonly fileName: string | null;
-  readonly dirty: boolean;
-  readonly conflict: SessionConflict | null;
-  /** Cleared by the next local edit, open or new document. */
-  readonly outsideChange: OutsideChange | null;
-  readonly recent: readonly RecentEntry[];
-  readonly importWarnings: readonly BpmnImportWarning[];
-  readonly status: SessionStatus;
-  readonly error: string | null;
-}
-
-export type SessionListener = (state: SessionState) => void;
-
-/** Opaque timer token, so tests can hand over their own scheduler. */
-export type TimerHandle = unknown;
-
-export interface DocumentSessionOptions {
-  readonly editor: Editor;
-  readonly backend: FileBackend;
-  readonly changes?: DocumentChangeSource;
-  readonly saveMode?: SaveMode;
-  /** Quiet period after the last edit before autosave writes. */
-  readonly autosaveDelayMs?: number;
-  readonly scheduleTimer?: (
-    callback: () => void,
-    delayMs: number,
-  ) => TimerHandle;
-  readonly cancelTimer?: (handle: TimerHandle) => void;
-}
+export { baseName, emptyLocalDocument } from "./session-paths.ts";
+export type {
+  DocumentSessionOptions,
+  OutsideChange,
+  SessionConflict,
+  SessionListener,
+  SessionState,
+  SessionStatus,
+  TimerHandle,
+} from "./session-types.ts";
 
 const DEFAULT_AUTOSAVE_DELAY_MS = 1000;
 const UNTITLED_FILE_NAME = "untitled.jsonl";
-
-/**
- * How the backend reports a file that is not there. Must match
- * `MISSING_FILE_MESSAGE` in `apps/desktop/src-tauri/src/fs.rs`; both sides
- * carry a comment saying so, and both sides have a test pinning it.
- */
-const MISSING_FILE_MARKER = "file not found";
-
-/**
- * The document a new file starts from: one empty freeform page, matching
- * what `Editor` builds for itself when constructed without a document.
- */
-export function emptyLocalDocument(): Document {
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    id: newElementId(),
-    title: "Untitled",
-    pages: [{ id: newElementId(), name: "Page 1", kind: "freeform" }],
-    elements: [],
-  };
-}
-
-/** The last path segment, for either separator. */
-export function baseName(path: string): string {
-  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return separator === -1 ? path : path.slice(separator + 1);
-}
-
-function isMermaidPath(path: string): boolean {
-  return /\.(?:mmd|mermaid)$/i.test(path);
-}
-
-function mermaidTitle(path: string): string {
-  return baseName(path).replace(/\.(?:mmd|mermaid)$/i, "");
-}
-
-function isDrawioPath(path: string): boolean {
-  return /\.(?:drawio|dio)$/i.test(path);
-}
-
-function drawioTitle(path: string): string {
-  return baseName(path).replace(/\.(?:drawio|dio)$/i, "");
-}
-
-function isBpmnPath(path: string): boolean {
-  return /\.bpmn$/i.test(path);
-}
-
-function isKicadPath(path: string): boolean {
-  return /\.(?:kicad_sch|net)$/i.test(path);
-}
-
-function isKicadPcbPath(path: string): boolean {
-  return path.toLowerCase().endsWith(".kicad_pcb");
-}
-
-/** Gerber and drill files, alone or in a board house ZIP. */
-const PCB_PATH =
-  /\.(?:zip|gbr|ger|gtl|gbl|gts|gbs|gto|gbo|gtp|gbp|gko|gm1|gml|drl|xln|exc)$/i;
-
-function isPcbPath(path: string): boolean {
-  return PCB_PATH.test(path);
-}
-
-function bpmnTitle(path: string): string {
-  return baseName(path).replace(/\.bpmn$/i, "");
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** True when a read failed because the file does not exist. */
-function isMissingFile(error: unknown): boolean {
-  return describe(error).startsWith(MISSING_FILE_MARKER);
-}
 
 export class DocumentSession {
   private readonly editor: Editor;
@@ -343,92 +244,6 @@ export class DocumentSession {
     return true;
   }
 
-  /**
-   * Gerber and drill files are an interchange source: the board becomes a
-   * detached document so autosave never rewrites the fabrication files.
-   */
-  private async importPcbPath(
-    path: string,
-    stale: () => boolean,
-  ): Promise<boolean> {
-    const name = baseName(path);
-    try {
-      const { importPcbFiles, pcbFilesFromZip } = await import("@nodetto/core");
-      let files: PcbImportFile[];
-      if (/\.zip$/i.test(path)) {
-        if (!this.backend.readDocumentBytes)
-          throw new Error("this build cannot read ZIP archives");
-        files = pcbFilesFromZip(await this.backend.readDocumentBytes(path));
-        if (files.length === 0)
-          throw new Error("the archive holds no Gerber or drill file");
-      } else {
-        files = [{ name, text: await this.backend.readDocument(path) }];
-      }
-      if (stale()) return false;
-      const report = importPcbFiles(files, {
-        pageName: name.replace(/\.[^.]+$/, ""),
-      });
-      return await this.importDocument(
-        report.document,
-        name,
-        report.warnings.map((warning) => ({
-          element: warning.file ? baseName(warning.file) : name,
-          message: warning.message,
-        })),
-      );
-    } catch (error) {
-      if (!stale()) this.fail(`could not import ${name}: ${describe(error)}`);
-      return false;
-    }
-  }
-
-  /** KiCad boards are imported as detached documents, never autosaved over. */
-  private async importKicadPcbPath(
-    path: string,
-    stale: () => boolean,
-  ): Promise<boolean> {
-    const name = baseName(path);
-    try {
-      const text = await this.backend.readDocument(path);
-      if (stale()) return false;
-      const { importKicadPcb } = await import("@nodetto/io/kicad");
-      if (stale()) return false;
-      const result = importKicadPcb(text, { fileName: name });
-      const error = result.diagnostics.find(
-        (diagnostic) => diagnostic.severity === "error",
-      );
-      if (error) {
-        this.fail(`could not import ${name}: ${error.message}`);
-        return false;
-      }
-      if (!result.plan) {
-        this.fail(`could not import ${name}: no import plan was produced`);
-        return false;
-      }
-      const { pcbDocumentFromPlan } = await import("@nodetto/core");
-      if (stale()) return false;
-      const document = pcbDocumentFromPlan(result.plan, {
-        pageName: result.plan.title,
-      });
-      return await this.importDocument(
-        document,
-        name,
-        result.diagnostics
-          .filter((diagnostic) => diagnostic.severity === "warning")
-          .map((diagnostic) => ({
-            element: name,
-            message:
-              diagnostic.line !== undefined && diagnostic.column !== undefined
-                ? `${diagnostic.line}:${diagnostic.column}: ${diagnostic.message}`
-                : diagnostic.message,
-          })),
-      );
-    } catch (error) {
-      if (!stale()) this.fail(`could not import ${name}: ${describe(error)}`);
-      return false;
-    }
-  }
-
   /** Ask for a file and open it. Returns false when cancelled or failed. */
   async open(): Promise<boolean> {
     if (this.refuseWhileSuspended()) {
@@ -438,7 +253,7 @@ export class DocumentSession {
     try {
       path = await this.backend.pickOpenPath();
     } catch (error) {
-      this.fail(describe(error));
+      this.fail(describeError(error));
       return false;
     }
     if (path === null) {
@@ -461,8 +276,8 @@ export class DocumentSession {
     this.cancelAutosave();
     this.patch({ status: "loading", error: null });
 
-    if (isKicadPcbPath(path)) return this.importKicadPcbPath(path, stale);
-    if (isPcbPath(path)) return this.importPcbPath(path, stale);
+    const unread = importUnreadPath(this.importHost(), path, stale);
+    if (unread !== null) return unread;
 
     let diskText: string;
     try {
@@ -475,7 +290,7 @@ export class DocumentSession {
         await this.forgetRecent(path);
       }
       if (!stale()) {
-        this.fail(`could not open ${baseName(path)}: ${describe(error)}`);
+        this.fail(`could not open ${baseName(path)}: ${describeError(error)}`);
       }
       return false;
     }
@@ -483,125 +298,13 @@ export class DocumentSession {
       return false;
     }
 
-    if (/\.html?$/i.test(path)) {
-      try {
-        const { importHtmlPage } = await import("./html-import.ts");
-        const report = await importHtmlPage(diskText, path, this.backend);
-        if (stale()) return false;
-        const imported = await this.importDocument(
-          report.document,
-          baseName(path),
-          report.warnings,
-        );
-        if (imported)
-          for (const [relative, data] of report.assets)
-            this.editor.assets.set(relative, data);
-        return imported;
-      } catch (error) {
-        if (!stale())
-          this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
-        return false;
-      }
-    }
-
-    if (isMermaidPath(path)) {
-      try {
-        const { importMermaid } = await import("@nodetto/io/mermaid/import");
-        if (stale()) {
-          return false;
-        }
-        const imported = importMermaid(diskText, { title: mermaidTitle(path) });
-        // Mermaid is an interchange source, not our persistence format. Keep
-        // the imported document detached so autosave can never rewrite it.
-        return await this.importDocument(imported.document, baseName(path));
-      } catch (error) {
-        this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
-        return false;
-      }
-    }
-
-    if (isDrawioPath(path)) {
-      try {
-        const { importDrawio } = await import("@nodetto/io/drawio");
-        if (stale()) {
-          return false;
-        }
-        const report = importDrawio(diskText, { title: drawioTitle(path) });
-        // draw.io files are an interchange source, not our persistence
-        // format. Keep them detached so autosave never rewrites the source.
-        return await this.importDocument(
-          report.document,
-          baseName(path),
-          report.warnings.map((warning) => ({
-            element: warning.cell ?? warning.page,
-            message: `${warning.page}: ${warning.message}`,
-          })),
-        );
-      } catch (error) {
-        if (!stale()) {
-          this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
-        }
-        return false;
-      }
-    }
-
-    if (isKicadPath(path)) {
-      try {
-        const { importKicad } = await import("@nodetto/io/kicad");
-        if (stale()) return false;
-        const result = importKicad(diskText, { fileName: baseName(path) });
-        if (!result.plan) {
-          const diagnostic = result.diagnostics.find(
-            (item) => item.severity === "error",
-          );
-          this.fail(
-            `could not import ${baseName(path)}: ${diagnostic?.message ?? "no import plan was produced"}`,
-          );
-          return false;
-        }
-        const { layoutBreadboardImport } = await import("@nodetto/core");
-        if (stale()) return false;
-        return await this.importDocument(
-          layoutBreadboardImport(result.plan),
-          baseName(path),
-          result.diagnostics.map((diagnostic) => ({
-            element:
-              diagnostic.reference ??
-              (diagnostic.line !== undefined && diagnostic.column !== undefined
-                ? `${diagnostic.line}:${diagnostic.column}`
-                : baseName(path)),
-            message: `${diagnostic.code}: ${diagnostic.message}`,
-          })),
-        );
-      } catch (error) {
-        if (!stale()) {
-          this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
-        }
-        return false;
-      }
-    }
-
-    if (isBpmnPath(path)) {
-      try {
-        const { importBpmnXml } = await import("@nodetto/io/bpmn");
-        if (stale()) {
-          return false;
-        }
-        const report = importBpmnXml(diskText, { title: bpmnTitle(path) });
-        // BPMN XML is an interchange source, not our persistence format.
-        // Keep it detached so autosave can never rewrite the source file.
-        return await this.importDocument(
-          report.document,
-          baseName(path),
-          report.warnings,
-        );
-      } catch (error) {
-        if (!stale()) {
-          this.fail(`could not import ${baseName(path)}: ${describe(error)}`);
-        }
-        return false;
-      }
-    }
+    const imported = importInterchangeText(
+      this.importHost(),
+      path,
+      diskText,
+      stale,
+    );
+    if (imported !== null) return imported;
 
     const parsed = parseDocumentResult(diskText);
     if (!parsed.ok) {
@@ -655,7 +358,7 @@ export class DocumentSession {
         this.current.fileName ?? UNTITLED_FILE_NAME,
       );
     } catch (error) {
-      this.fail(describe(error));
+      this.fail(describeError(error));
       return false;
     }
     if (path === null) {
@@ -838,7 +541,7 @@ export class DocumentSession {
           (await this.backend.autosavePath?.(this.current.fileName)) ?? null;
     } catch (error) {
       if (generation === this.documentGeneration)
-        this.fail(`could not create autosave file: ${describe(error)}`);
+        this.fail(`could not create autosave file: ${describeError(error)}`);
       return false;
     }
     if (!path || generation !== this.documentGeneration || !this.canAutosave())
@@ -927,7 +630,7 @@ export class DocumentSession {
         return false;
       text = serializeDocument(attachments.document);
     } catch (error) {
-      this.fail(`could not serialize the document: ${describe(error)}`);
+      this.fail(`could not serialize the document: ${describeError(error)}`);
       return false;
     }
 
@@ -935,7 +638,7 @@ export class DocumentSession {
     try {
       await this.backend.writeDocument(path, text);
     } catch (error) {
-      this.fail(`could not save ${baseName(path)}: ${describe(error)}`);
+      this.fail(`could not save ${baseName(path)}: ${describeError(error)}`);
       return false;
     }
 
@@ -949,22 +652,7 @@ export class DocumentSession {
 
     for (const [reference, data] of attachments.resolved)
       this.editor.assets.set(reference, data);
-    const patches = attachments.changes.flatMap((change) => {
-      const element = this.editor.store.get(change.id);
-      return element?.type === "image.raster" &&
-        (element.semantic as ImageSemantic).src === change.before
-        ? [
-            {
-              type: "updateSemantic" as const,
-              id: change.id,
-              semantic: {
-                ...(element.semantic as ImageSemantic),
-                src: change.after,
-              },
-            },
-          ]
-        : [];
-    });
+    const patches = attachmentSourcePatches(this.editor, attachments.changes);
     this.loading = true;
     try {
       if (patches.length) this.editor.apply(patches, { history: "ignore" });
@@ -1041,33 +729,16 @@ export class DocumentSession {
     ) {
       return false;
     }
-    const local = this.editor.getSnapshot();
-    if (remote.document.id !== local.id) {
+    const plan = planOutsideChange(
+      this.editor.getSnapshot(),
+      remote.document,
+      this.lastSavedText,
+      this.current.dirty,
+    );
+    if (plan === null) {
       return false;
     }
-    let target = remote.document;
-    let conflicts: readonly string[] = [];
-    if (this.current.dirty) {
-      const base =
-        this.lastSavedText === null
-          ? null
-          : parseDocumentResult(this.lastSavedText);
-      if (base === null || !base.ok || base.document.id !== local.id) {
-        return false;
-      }
-      const merged = mergeDocuments(base.document, local, remote.document);
-      target = merged.document;
-      conflicts = merged.conflicts.map((conflict) => conflict.id);
-    }
-    const commit = diffDocuments(local, target);
-    const outsideChange = {
-      added: (commit?.insert?.length ?? 0) + (commit?.insertPages?.length ?? 0),
-      updated:
-        (commit?.update?.length ?? 0) + (commit?.updatePages?.length ?? 0),
-      removed:
-        (commit?.remove?.length ?? 0) + (commit?.removePages?.length ?? 0),
-      merged: this.current.dirty,
-    };
+    const { target, commit, conflicts, outsideChange } = plan;
     this.loading = true;
     try {
       if (commit === null) {
@@ -1157,6 +828,17 @@ export class DocumentSession {
     } catch {
       // Same as above.
     }
+  }
+
+  /** The view of this session the interchange importers work through. */
+  private importHost(): ImportHost {
+    return {
+      editor: this.editor,
+      backend: this.backend,
+      importDocument: (document, name, importWarnings) =>
+        this.importDocument(document, name, importWarnings),
+      fail: (message) => this.fail(message),
+    };
   }
 
   /** Report and refuse a file open while another mode owns the editor. */

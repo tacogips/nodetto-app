@@ -1,28 +1,3 @@
-import { TemplateDialog } from "./TemplateDialog.tsx";
-import {
-  computeBreadboardConnectivity,
-  encodePcbBoardZip,
-  encodeBreadboardPcbZip,
-  encodePcbExportZip,
-  exportPcbBoard,
-  exportBreadboardPcb,
-  exportPcbPage,
-  createDesignTemplate,
-  toBreadboardNetlist,
-  type DesignTemplateId,
-} from "@nodetto/core";
-import { SettingsDialog } from "./settings/SettingsDialog.tsx";
-import type { CliInstaller } from "./settings/cli-install.ts";
-import {
-  loadEditorPreferences,
-  storeEditorPreferences,
-} from "./settings/preferences.ts";
-import { watchNativeFileMenu } from "./file/native-menu.ts";
-import {
-  dedicatedPageKindFor,
-  dedicatedWorkspaceFor,
-  DEDICATED_PAGE_NAMES,
-} from "./page-workspace.ts";
 // App shell: file controls, cloud controls, the toolbar, page tabs, the
 // canvas with its floating chrome, and the Inspector column.
 //
@@ -38,15 +13,19 @@ import {
 // one editor can be showing a local file or a cloud room, never both — and
 // everything that has two implementations (undo, the title, which controls
 // are live) is routed through that discriminator rather than guessed at.
+//
+// The pieces it composes live in `shell/`: the side panes and their layout,
+// the file and status chrome, export handlers, file commands, window input
+// and cloud presence.
 
 import {
-  type Box,
+  createDesignTemplate,
   createReviewComment,
+  type DesignTemplateId,
   type EditableField,
   type Editor,
   type NewReviewMessage,
   type Vec,
-  bpmnRouteResolver,
 } from "@nodetto/core";
 import type { ElementId } from "@nodetto/ir";
 import {
@@ -80,33 +59,41 @@ import {
 import {
   createEffect,
   createSignal,
-  For,
   type JSX,
   onCleanup,
   onMount,
   Show,
 } from "solid-js";
 import { CloudPanel } from "./cloud/CloudPanel.tsx";
-import { handleHistoryShortcut } from "./history-shortcuts.ts";
-import { PresenceChip, PresenceOverlay } from "./cloud/PresenceOverlay.tsx";
+import { PresenceOverlay } from "./cloud/PresenceOverlay.tsx";
 import type { CloudSession, CloudSessionState } from "./cloud/session.ts";
 import { bindCloudFileOwnership } from "./cloud/file-ownership.ts";
 import { type CloudSettings, defaultCloudSettings } from "./cloud/settings.ts";
 import type { ExportBackend } from "./file/backend.ts";
 import { type LaunchBackend, watchOpenRequests } from "./file/launch.ts";
+import { watchNativeFileMenu } from "./file/native-menu.ts";
 import { loadSaveMode, storeSaveMode } from "./file/save-mode.ts";
 import type { DocumentSession, SessionState } from "./file/session.ts";
+import { SettingsDialog } from "./settings/SettingsDialog.tsx";
+import type { CliInstaller } from "./settings/cli-install.ts";
 import {
-  CANVAS_MIN_WIDTH,
-  clampPaneWidth,
-  PANE_MIN_WIDTH,
-  paneBounds,
-  paneWidthFromKey,
-  paneWidthFromPointer,
-  type PaneSide,
-} from "./layout/pane.ts";
+  loadEditorPreferences,
+  storeEditorPreferences,
+} from "./settings/preferences.ts";
+import { createDocumentCommands } from "./shell/document-commands.ts";
+import { DocumentBanners, DocumentStatus } from "./shell/DocumentStatus.tsx";
+import { createExportHandlers } from "./shell/export-handlers.ts";
+import { FileActions } from "./shell/FileActions.tsx";
+import { createPaneLayout } from "./shell/pane-layout.ts";
+import { createPresencePublisher } from "./shell/presence.ts";
+import { PaneDivider, SidePane } from "./shell/SidePanes.tsx";
+import { watchWindowInput } from "./shell/window-input.ts";
+import { followPageWorkspace, selectWorkspacePage } from "./shell/workspace.ts";
+import { TemplateDialog } from "./TemplateDialog.tsx";
 import "./square-chrome.css";
 import "./pane.css";
+
+export { exportBaseName } from "./shell/export-handlers.ts";
 
 export interface AppProps {
   readonly editor: Editor;
@@ -148,16 +135,6 @@ export interface InspectorFocus {
   readonly row?: number;
 }
 
-const DISCARD_PROMPT = "Discard unsaved changes?";
-/** Presence is a pointer trail; 20 Hz is plenty and keeps the socket quiet. */
-const CURSOR_THROTTLE_MS = 50;
-/** Drop a trailing extension and anything a filesystem would refuse. */
-export function exportBaseName(name: string): string {
-  const stem = name.replace(/\.[^./\\]+$/, "");
-  const safe = stem.replace(/[/\\:*?"<>|]+/g, "-").trim();
-  return safe === "" ? "untitled" : safe;
-}
-
 export function App(props: AppProps): JSX.Element {
   const preferenceStorage = () => {
     try {
@@ -171,25 +148,7 @@ export function App(props: AppProps): JSX.Element {
   );
   const simpleWorkspace = () => !workspaceById(workspace()).design;
   const changeWorkspace = (id: WorkspaceId) => {
-    const page = props.editor.store.getPage(props.editor.currentPageId);
-    const targetKind = dedicatedPageKindFor(id);
-    if (targetKind && page?.kind !== targetKind) {
-      const existing = props.editor.store
-        .listPages()
-        .find((candidate) => candidate.kind === targetKind);
-      if (existing) props.editor.setCurrentPage(existing.id);
-      else
-        props.editor.createPage({
-          kind: targetKind,
-          name: DEDICATED_PAGE_NAMES[targetKind] ?? "Page",
-        });
-    } else if (!targetKind && page && dedicatedWorkspaceFor(page.kind)) {
-      const existing = props.editor.store
-        .listPages()
-        .find((candidate) => !dedicatedWorkspaceFor(candidate.kind));
-      if (existing) props.editor.setCurrentPage(existing.id);
-      else props.editor.createPage({ kind: "freeform", name: "Page" });
-    }
+    selectWorkspacePage(props.editor, id);
     setActiveTool("select");
     setContextMenu(null);
     setWorkspace(id);
@@ -239,36 +198,24 @@ export function App(props: AppProps): JSX.Element {
   const [exportRequest, setExportRequest] = createSignal(0);
   const [exportError, setExportError] = createSignal<string | null>(null);
   const [canvasHost, setCanvasHost] = createSignal<HTMLDivElement>();
-  const [leftPaneOpen, setLeftPaneOpen] = createSignal(
-    preferences.leftPaneOpen,
-  );
-  const [rightPaneOpen, setRightPaneOpen] = createSignal(
-    preferences.rightPaneOpen,
-  );
+  const panes = createPaneLayout({
+    leftPaneOpen: preferences.leftPaneOpen,
+    rightPaneOpen: preferences.rightPaneOpen,
+  });
   createEffect(() =>
     storeEditorPreferences(
       {
         showGrid: showGrid(),
         showRulers: showRulers(),
-        leftPaneOpen: leftPaneOpen(),
-        rightPaneOpen: rightPaneOpen(),
+        leftPaneOpen: panes.leftPaneOpen(),
+        rightPaneOpen: panes.rightPaneOpen(),
         snap: snap(),
         autosaveDelayMs: autosaveDelayMs(),
       },
       preferenceStorage(),
     ),
   );
-  const [leftPaneWidth, setLeftPaneWidth] = createSignal(260);
-  const [rightPaneWidth, setRightPaneWidth] = createSignal(300);
-  const [draggingPane, setDraggingPane] = createSignal<PaneSide | null>(null);
   let inspectorHost: HTMLDivElement | undefined;
-  let editorBody: HTMLDivElement | undefined;
-  let dragTarget: HTMLButtonElement | undefined;
-  let dragPointerId: number | undefined;
-  let leftRestoreButton: HTMLButtonElement | undefined;
-  let rightRestoreButton: HTMLButtonElement | undefined;
-  let leftCollapseButton: HTMLButtonElement | undefined;
-  let rightCollapseButton: HTMLButtonElement | undefined;
   let fileMenu: HTMLDetailsElement | undefined;
   let settingsButton: HTMLButtonElement | undefined;
   let cloudPanelHost: HTMLDivElement | undefined;
@@ -278,7 +225,6 @@ export function App(props: AppProps): JSX.Element {
     setCloudPanelExpanded(false);
     settingsButton?.focus();
   };
-  const [editorBodyWidth, setEditorBodyWidth] = createSignal(0);
 
   const setActiveTool = (next: ToolKind): void => {
     if (props.editor.readOnly && next !== "select" && next !== "hand") return;
@@ -344,9 +290,8 @@ export function App(props: AppProps): JSX.Element {
     props.onCloudSettingsChange?.(next);
   };
 
-  /** True when it is safe to throw away what is in the editor. */
-  const mayDiscard = (): boolean =>
-    !file().dirty || window.confirm(DISCARD_PROMPT);
+  const { mayDiscard, newDocument, open, reload, openRecent } =
+    createDocumentCommands(props, file, viewport);
 
   const [templatesOpen, setTemplatesOpen] = createSignal(false);
   const openTemplates = () => setTemplatesOpen(true);
@@ -361,38 +306,6 @@ export function App(props: AppProps): JSX.Element {
       );
       if (first) props.editor.selection.set([first.id]);
       props.editor.zoomToSelection(viewport());
-    }
-  };
-
-  const newDocument = (): void => {
-    if (mayDiscard()) {
-      void props.session.newDocument();
-    }
-  };
-
-  /**
-   * An imported board or drawing (KiCad, Gerber) keeps its source
-   * coordinates, which may lie off screen: show all of it.
-   */
-  const fitImported = (opened: boolean): void => {
-    if (opened && props.session.state().filePath === null)
-      props.editor.zoomToFit(viewport());
-  };
-
-  const open = (): void => {
-    if (mayDiscard()) {
-      void props.session.open().then(fitImported);
-    }
-  };
-
-  const reload = (): void => {
-    const path = file().filePath;
-    if (path !== null && mayDiscard()) void props.session.openPath(path);
-  };
-
-  const openRecent = (path: string): void => {
-    if (path !== "" && mayDiscard()) {
-      void props.session.openPath(path).then(fitImported);
     }
   };
 
@@ -411,13 +324,7 @@ export function App(props: AppProps): JSX.Element {
     );
   };
 
-  createEffect(() => {
-    editorSignals.rev();
-    const kind = props.editor.store.getPage(props.editor.currentPageId)?.kind;
-    const dedicatedWorkspace = dedicatedWorkspaceFor(kind);
-    if (dedicatedWorkspace) setWorkspace(dedicatedWorkspace);
-    else if (dedicatedPageKindFor(workspace())) setWorkspace("flow");
-  });
+  followPageWorkspace(props, editorSignals.rev, workspace, setWorkspace);
 
   onMount(() => {
     const launch = props.launchBackend;
@@ -445,168 +352,11 @@ export function App(props: AppProps): JSX.Element {
 
   const focusInspector = (focus: InspectorFocus | undefined): void => {
     setInspectorFocus(focus);
-    restorePane("right");
+    panes.restorePane("right");
     queueMicrotask(() => inspectorHost?.focus());
   };
 
-  const paneInput = (side: PaneSide) => {
-    const rect = editorBody?.getBoundingClientRect();
-    return {
-      containerWidth: rect?.width ?? window.innerWidth,
-      oppositeWidth:
-        side === "left"
-          ? rightPaneOpen()
-            ? rightPaneWidth()
-            : 34
-          : leftPaneOpen()
-            ? leftPaneWidth()
-            : 34,
-      overlaysCanvas: paneOverlaysCanvas(),
-    };
-  };
-  const setPaneWidth = (side: PaneSide, width: number): void => {
-    const next = clampPaneWidth(width, paneInput(side));
-    if (side === "left") setLeftPaneWidth(next);
-    else setRightPaneWidth(next);
-  };
-  const keepCanvasUseful = (): void => {
-    const width = editorBody?.getBoundingClientRect().width;
-    if (!width) return;
-    setEditorBodyWidth(width);
-    if (!leftPaneOpen() && !rightPaneOpen()) return;
-    if (!leftPaneOpen()) {
-      setRightPaneWidth(
-        clampPaneWidth(rightPaneWidth(), {
-          containerWidth: width,
-          oppositeWidth: 34,
-          overlaysCanvas: width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34,
-        }),
-      );
-      return;
-    }
-    if (!rightPaneOpen()) {
-      setLeftPaneWidth(
-        clampPaneWidth(leftPaneWidth(), {
-          containerWidth: width,
-          oppositeWidth: 34,
-          overlaysCanvas: width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34,
-        }),
-      );
-      return;
-    }
-    const fittedLeft = clampPaneWidth(leftPaneWidth(), {
-      containerWidth: width,
-      oppositeWidth: 34,
-      overlaysCanvas: width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34,
-    });
-    if (width < CANVAS_MIN_WIDTH + fittedLeft + rightPaneWidth()) {
-      setRightPaneOpen(false);
-      setLeftPaneWidth(fittedLeft);
-    } else {
-      setLeftPaneWidth(fittedLeft);
-      setRightPaneWidth(
-        clampPaneWidth(rightPaneWidth(), {
-          containerWidth: width,
-          oppositeWidth: fittedLeft,
-          overlaysCanvas: width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34,
-        }),
-      );
-    }
-  };
-  const restorePane = (side: PaneSide, focusContent = false): void => {
-    const width =
-      editorBody?.getBoundingClientRect().width ?? window.innerWidth;
-    if (side === "left") {
-      if (
-        rightPaneOpen() &&
-        width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + rightPaneWidth()
-      )
-        setRightPaneOpen(false);
-      setLeftPaneWidth(
-        clampPaneWidth(leftPaneWidth(), {
-          containerWidth: width,
-          oppositeWidth: rightPaneOpen() ? rightPaneWidth() : 34,
-          overlaysCanvas: width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34,
-        }),
-      );
-      setLeftPaneOpen(true);
-    } else {
-      if (
-        leftPaneOpen() &&
-        width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + leftPaneWidth()
-      )
-        setLeftPaneOpen(false);
-      setRightPaneWidth(
-        clampPaneWidth(rightPaneWidth(), {
-          containerWidth: width,
-          oppositeWidth: leftPaneOpen() ? leftPaneWidth() : 34,
-          overlaysCanvas: width < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34,
-        }),
-      );
-      setRightPaneOpen(true);
-    }
-    if (focusContent) {
-      queueMicrotask(() => {
-        (side === "left" ? leftCollapseButton : rightCollapseButton)?.focus({
-          preventScroll: true,
-        });
-      });
-    }
-  };
-  const hidePane = (side: PaneSide): void => {
-    if (side === "left") setLeftPaneOpen(false);
-    else setRightPaneOpen(false);
-    queueMicrotask(() => {
-      (side === "left" ? leftRestoreButton : rightRestoreButton)?.focus();
-    });
-  };
-  const paneOverlaysCanvas = (): boolean =>
-    editorBodyWidth() < CANVAS_MIN_WIDTH + PANE_MIN_WIDTH + 34;
-  const beginPaneResize = (side: PaneSide, event: PointerEvent): void => {
-    if (event.button !== 0) return;
-    restorePane(side);
-    const target = event.currentTarget as HTMLButtonElement;
-    target.setPointerCapture(event.pointerId);
-    dragTarget = target;
-    dragPointerId = event.pointerId;
-    setDraggingPane(side);
-    event.preventDefault();
-  };
-  const movePaneResize = (side: PaneSide, event: PointerEvent): void => {
-    if (draggingPane() !== side || dragPointerId !== event.pointerId) return;
-    const rect = editorBody?.getBoundingClientRect();
-    if (!rect) return;
-    setPaneWidth(
-      side,
-      paneWidthFromPointer(side, event.clientX, rect.left, rect.right),
-    );
-  };
-  const endPaneResize = (event: PointerEvent): void => {
-    if (dragPointerId !== event.pointerId) return;
-    if (dragTarget?.hasPointerCapture(event.pointerId)) {
-      dragTarget.releasePointerCapture(event.pointerId);
-    }
-    dragTarget = undefined;
-    dragPointerId = undefined;
-    setDraggingPane(null);
-  };
-  const resizePaneByKey = (side: PaneSide, event: KeyboardEvent): void => {
-    const width = side === "left" ? leftPaneWidth() : rightPaneWidth();
-    const next = paneWidthFromKey(side, width, event.key, paneInput(side));
-    if (next === undefined) return;
-    event.preventDefault();
-    event.stopPropagation();
-    setPaneWidth(side, next);
-  };
-  onCleanup(() => {
-    if (
-      dragTarget &&
-      dragPointerId !== undefined &&
-      dragTarget.hasPointerCapture(dragPointerId)
-    ) {
-      dragTarget.releasePointerCapture(dragPointerId);
-    }
-  });
+  onCleanup(panes.releaseDrag);
   onMount(() => {
     const header = documentStatusHost;
     if (!header) return;
@@ -623,11 +373,8 @@ export function App(props: AppProps): JSX.Element {
     });
   });
   onMount(() => {
-    if (!editorBody) return;
-    const observer = new ResizeObserver(keepCanvasUseful);
-    observer.observe(editorBody);
-    keepCanvasUseful();
-    onCleanup(() => observer.disconnect());
+    const stop = panes.observeEditorBody();
+    if (stop) onCleanup(stop);
   });
 
   // A focus hint is about one element; once that element leaves the
@@ -647,220 +394,7 @@ export function App(props: AppProps): JSX.Element {
   const openExport = () => {
     setExportRequest((value) => value + 1);
   };
-  const saveArtwork = async (
-    name: string,
-    blob: Blob,
-    extension: string,
-  ): Promise<boolean> => {
-    const path = await props.exportBackend.pickExportPath(name, extension);
-    if (path === null) return false;
-    await props.exportBackend.writeBytes(
-      path,
-      new Uint8Array(await blob.arrayBuffer()),
-    );
-    return true;
-  };
-
-  const exportBpmn = async (): Promise<void> => {
-    setExportError(null);
-    const page = props.editor.store.getPage(props.editor.currentPageId);
-    if (page?.kind !== "bpmn") return;
-    try {
-      const { exportBpmnXml } = await import("@nodetto/io/bpmn");
-      const { xml } = exportBpmnXml(
-        props.editor.store.getSnapshot(),
-        props.editor.currentPageId,
-        { routeOf: bpmnRouteResolver(props.editor) },
-      );
-      const name = `${exportBaseName(page.name)}.bpmn`;
-      if (!props.exportBackend.available) {
-        const url = URL.createObjectURL(
-          new Blob([xml], { type: "application/xml" }),
-        );
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = name;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        return;
-      }
-      const path = await props.exportBackend.pickExportPath(name, "bpmn");
-      if (path === null) return;
-      await props.exportBackend.writeText(path, xml);
-    } catch (error) {
-      setExportError(
-        `could not export: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  };
-
-  /** Gerber and drill ZIP for the selected board, or the page's only board. */
-  const exportBreadboardGerber = async (
-    snapshot: ReturnType<typeof props.editor.getSnapshot>,
-    pageName: string,
-  ): Promise<void> => {
-    const pageId = props.editor.currentPageId;
-    const selected = new Set(props.editor.selection.ids());
-    const board = snapshot.elements.find(
-      (element) =>
-        element.page === pageId &&
-        element.type === "breadboard.board" &&
-        selected.has(element.id),
-    );
-    const pcb = exportBreadboardPcb(snapshot, pageId, {
-      name: exportBaseName(pageName),
-      ...(board ? { board: board.id } : {}),
-    });
-    if (typeof pcb === "string") {
-      setExportError(
-        pcb.startsWith("The page has")
-          ? "This page has several boards; select the board to export and try again."
-          : pcb,
-      );
-      return;
-    }
-    const saved = await saveZip(
-      encodeBreadboardPcbZip(pcb),
-      `${exportBaseName(pageName)}-pcb.zip`,
-    );
-    if (saved)
-      setExportError(
-        `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
-      );
-  };
-
-  /** Saves a ZIP through the export backend, or downloads it; false if cancelled. */
-  const saveZip = async (bytes: Uint8Array, name: string): Promise<boolean> => {
-    if (!props.exportBackend.available) {
-      const url = URL.createObjectURL(
-        new Blob([bytes], { type: "application/zip" }),
-      );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = name;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      return true;
-    }
-    const path = await props.exportBackend.pickExportPath(name, "zip");
-    if (path === null) return false;
-    await props.exportBackend.writeBytes(path, bytes);
-    return true;
-  };
-
-  /** The imported board's Gerber and drill files, edits included. */
-  const exportGerber = async (): Promise<void> => {
-    setExportError(null);
-    const page = props.editor.store.getPage(props.editor.currentPageId);
-    if (!page) return;
-    try {
-      const report = exportPcbPage(props.editor.getSnapshot(), page.id, {
-        name: exportBaseName(page.name),
-      });
-      const saved = await saveZip(
-        encodePcbExportZip(report),
-        `${exportBaseName(page.name)}-gerber.zip`,
-      );
-      if (saved)
-        setExportError(
-          `Export notes: ${[
-            ...report.warnings,
-            `${report.layers.length} layer(s) written; nothing was checked, so review the files before ordering.`,
-          ].join("; ")}`,
-        );
-    } catch (error) {
-      setExportError(
-        `could not export: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  };
-
-  const exportPcbGerber = async (): Promise<void> => {
-    setExportError(null);
-    const page = props.editor.store.getPage(props.editor.currentPageId);
-    if (page?.kind !== "pcb") return;
-    try {
-      const pcb = exportPcbBoard(props.editor.store.getSnapshot(), page.id, {
-        name: page.name,
-      });
-      if (typeof pcb === "string") {
-        setExportError(pcb);
-        return;
-      }
-      const saved = await saveZip(
-        encodePcbBoardZip(pcb),
-        `${exportBaseName(page.name)}.zip`,
-      );
-      if (saved)
-        setExportError(
-          `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
-        );
-    } catch (error) {
-      setExportError(
-        `could not export: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  };
-
-  const exportBreadboard = async (
-    kind: "bom" | "kicad" | "spice" | "gerber",
-  ): Promise<void> => {
-    setExportError(null);
-    const page = props.editor.store.getPage(props.editor.currentPageId);
-    if (page?.kind !== "breadboard") return;
-    try {
-      const snapshot = props.editor.getSnapshot();
-      if (kind === "gerber") {
-        await exportBreadboardGerber(snapshot, page.name);
-        return;
-      }
-      const connectivity = computeBreadboardConnectivity(
-        snapshot,
-        props.editor.currentPageId,
-      );
-      const netlist = toBreadboardNetlist(
-        snapshot,
-        props.editor.currentPageId,
-        connectivity,
-      );
-      const io = await import("@nodetto/io");
-      const report =
-        kind === "bom"
-          ? io.exportBreadboardBomCsv(netlist)
-          : kind === "kicad"
-            ? io.exportBreadboardKicadNetlist(netlist)
-            : io.exportBreadboardSpiceNetlist(netlist);
-      const extension =
-        kind === "bom" ? "csv" : kind === "kicad" ? "net" : "cir";
-      const name = `${exportBaseName(page.name)}.${extension}`;
-      if (!props.exportBackend.available) {
-        const url = URL.createObjectURL(
-          new Blob([report.text], { type: "text/plain" }),
-        );
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = name;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } else {
-        const path = await props.exportBackend.pickExportPath(name, extension);
-        if (path === null) return;
-        await props.exportBackend.writeText(path, report.text);
-      }
-      if (report.warnings.length > 0)
-        setExportError(`Export notes: ${report.warnings.join("; ")}`);
-    } catch (error) {
-      setExportError(
-        `could not export: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  };
+  const exportHandlers = createExportHandlers(props, setExportError);
 
   /** Everything the shared action table needs from the shell. */
   const actionContext = (): ActionContext => ({
@@ -871,7 +405,7 @@ export function App(props: AppProps): JSX.Element {
       setActiveTool("select");
       setEditing(null);
       setContextMenu(null);
-      restorePane("left");
+      panes.restorePane("left");
       setCommentRequest((value) => value + 1);
     },
     exportSvg: openExport,
@@ -901,159 +435,27 @@ export function App(props: AppProps): JSX.Element {
   // ----------------------------------------------------------- keyboard
 
   onMount(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (settingsOpen()) return;
-      const modifier = event.metaKey || event.ctrlKey;
-      const key = event.key.toLowerCase();
-
-      // Undo in cloud mode is the Y.UndoManager's, not the core History's:
-      // the core's inverse commands describe a document only this client saw,
-      // so replaying them would revert whatever a peer did in between. This
-      // listener runs in the capture phase and stops the event, so the
-      // canvas's own binding never sees the chord while a room is open.
-      if (isCloud() && props.cloud && handleHistoryShortcut(event, props.cloud))
-        return;
-
-      // Cmd/Ctrl+Shift+E exports wherever focus is: the export is a document
-      // action, not a canvas gesture, and the canvas never binds it.
-      if (modifier && event.shiftKey && !event.altKey && key === "e") {
-        event.preventDefault();
-        event.stopPropagation();
-        runAction(getAction("exportSvg"), actionContext());
-        return;
-      }
-
-      // Exactly cmd/ctrl + S, and only for a local file.
-      const save =
-        modifier &&
-        !event.shiftKey &&
-        !event.altKey &&
-        key === "s" &&
-        props.filesAvailable &&
-        !isCloud();
-      if (!save) {
-        return;
-      }
-      event.preventDefault();
-      void props.session.save();
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    const localHistory = (event: KeyboardEvent): void => {
-      if (settingsOpen()) return;
-      if (!isCloud()) handleHistoryShortcut(event, props.editor);
-    };
-    // Bubble after canvas handlers so their nudge/gesture bookkeeping runs
-    // first and a handled chord cannot undo twice.
-    window.addEventListener("keydown", localHistory);
-    const dismissHeaderMenus = (event: KeyboardEvent | MouseEvent): void => {
-      if (
-        cloudPanelExpanded() &&
-        event instanceof MouseEvent &&
-        event.target instanceof Node &&
-        !cloudPanelHost?.contains(event.target) &&
-        !settingsButton?.contains(event.target) &&
-        !(
-          event.target instanceof Element &&
-          event.target.closest(".nodetto-help-tooltip")
-        )
-      ) {
-        setCloudPanelExpanded(false);
-      }
-      for (const menu of [fileMenu]) {
-        if (
-          !menu?.open ||
-          !(
-            (event instanceof KeyboardEvent && event.key === "Escape") ||
-            (event instanceof MouseEvent &&
-              !menu.contains(event.target as Node))
-          )
-        )
-          continue;
-        menu.removeAttribute("open");
-        if (event instanceof KeyboardEvent) {
-          event.preventDefault();
-          event.stopPropagation();
-          menu.querySelector<HTMLElement>("summary")?.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", dismissHeaderMenus, true);
-    window.addEventListener("pointerdown", dismissHeaderMenus, true);
-    onCleanup(() => {
-      window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("keydown", localHistory);
-      window.removeEventListener("keydown", dismissHeaderMenus, true);
-      window.removeEventListener("pointerdown", dismissHeaderMenus, true);
-    });
+    onCleanup(
+      watchWindowInput(props, {
+        settingsOpen,
+        isCloud,
+        exportDocument: () =>
+          runAction(getAction("exportSvg"), actionContext()),
+        save: () => {
+          void props.session.save();
+        },
+        cloudPanelExpanded,
+        collapseCloudPanel: () => setCloudPanelExpanded(false),
+        cloudPanelHost: () => cloudPanelHost,
+        settingsButton: () => settingsButton,
+        fileMenu: () => fileMenu,
+      }),
+    );
   });
 
   // ----------------------------------------------------------- presence
 
-  let lastCursorAt = 0;
-  /** Where this user's pointer was, so a republish does not lose it. */
-  let cursor: { x: number; y: number } | null = null;
-  let lastBrushAt = 0;
-  /** The marquee this user is dragging, so a republish does not lose it. */
-  let brush: Box | null = null;
-
-  const onMarquee = (rect: Box | null): void => {
-    const ended = rect === null && brush !== null;
-    const started = rect !== null && brush === null;
-    brush = rect;
-    if (!isCloud()) {
-      return;
-    }
-    // Start and end publish immediately so the remote brush never lingers;
-    // growth in between is throttled like the cursor.
-    const now = Date.now();
-    if (!started && !ended && now - lastBrushAt < CURSOR_THROTTLE_MS) {
-      return;
-    }
-    lastBrushAt = now;
-    props.cloud?.publishPresence(cursor, brush);
-  };
-
-  const onCanvasPointerMove = (event: PointerEvent): void => {
-    const host = canvasHost();
-    if (!isCloud() || !host) {
-      return;
-    }
-    const now = Date.now();
-    if (now - lastCursorAt < CURSOR_THROTTLE_MS) {
-      return;
-    }
-    lastCursorAt = now;
-    const rect = host.getBoundingClientRect();
-    cursor = props.editor.camera.screenToPage({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
-    props.cloud?.publishPresence(cursor, brush);
-  };
-
-  const onCanvasPointerLeave = (): void => {
-    cursor = null;
-    if (isCloud()) {
-      props.cloud?.publishPresence(null, brush);
-    }
-  };
-
-  // Selection and page changes are part of presence too, and neither of them
-  // moves the pointer (design 6).
-  onCleanup(
-    props.editor.selection.subscribe(() => {
-      if (isCloud()) {
-        props.cloud?.publishPresence(cursor, brush);
-      }
-    }),
-  );
-  onCleanup(
-    props.editor.subscribe((diff) => {
-      if (isCloud() && diff.pagesChanged) {
-        props.cloud?.publishPresence(cursor, brush);
-      }
-    }),
-  );
+  const presence = createPresencePublisher(props, isCloud, canvasHost);
 
   return (
     <div
@@ -1070,14 +472,20 @@ export function App(props: AppProps): JSX.Element {
       <Show when={exportRequest() > 0}>
         <ExportDialog
           editor={props.editor}
-          saveArtwork={props.exportBackend.available ? saveArtwork : undefined}
-          saveHtmlBundle={
-            props.exportBackend.available ? saveArtwork : undefined
+          saveArtwork={
+            props.exportBackend.available
+              ? exportHandlers.saveArtwork
+              : undefined
           }
-          exportBpmn={exportBpmn}
-          exportBreadboard={exportBreadboard}
-          exportGerber={exportGerber}
-          exportPcb={exportPcbGerber}
+          saveHtmlBundle={
+            props.exportBackend.available
+              ? exportHandlers.saveArtwork
+              : undefined
+          }
+          exportBpmn={exportHandlers.exportBpmn}
+          exportBreadboard={exportHandlers.exportBreadboard}
+          exportGerber={exportHandlers.exportGerber}
+          exportPcb={exportHandlers.exportPcbGerber}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />
@@ -1108,52 +516,15 @@ export function App(props: AppProps): JSX.Element {
           </div>
         )}
       </Show>
-      {/* A cloud failure is reported wherever it happens: a refused connect
-          leaves the app in file mode, and its message still has to be read. */}
-      <Show
-        when={
-          !isBpmnPage() &&
-          !isBreadboardPage() &&
-          file().importWarnings.length > 0
+      <DocumentBanners
+        file={file()}
+        isCloud={isCloud()}
+        problemsPanelOpen={isBpmnPage() || isBreadboardPage()}
+        error={cloud()?.error ?? file().error ?? exportError()}
+        onResolveConflict={(choice) =>
+          void props.session.resolveConflict(choice)
         }
-      >
-        <details class="app-import-notes">
-          <summary>Import notes ({file().importWarnings.length})</summary>
-          <ul>
-            <For each={file().importWarnings}>
-              {(warning) => <li>{warning.message}</li>}
-            </For>
-          </ul>
-        </details>
-      </Show>
-      <Show when={cloud()?.error ?? file().error ?? exportError()}>
-        {(message) => <pre class="app-error">{message()}</pre>}
-      </Show>
-      <Show when={file().conflict && !isCloud()}>
-        <div class="app-conflict" role="alert">
-          <span>
-            {file().conflict?.mergedConflicts?.length
-              ? `File changed on disk. ${file().conflict?.mergedConflicts?.length} item(s) were changed on both sides; your version was kept.`
-              : "File changed on disk."}
-          </span>
-          <button
-            type="button"
-            class="app-file-button"
-            onClick={() => void props.session.resolveConflict("reload")}
-          >
-            {file().conflict?.mergedConflicts?.length
-              ? "Use disk version"
-              : "Reload"}
-          </button>
-          <button
-            type="button"
-            class="app-file-button"
-            onClick={() => void props.session.resolveConflict("keep")}
-          >
-            Keep mine
-          </button>
-        </div>
-      </Show>
+      />
       <Show when={settingsOpen()}>
         <SettingsDialog
           workspace={workspace()}
@@ -1162,11 +533,11 @@ export function App(props: AppProps): JSX.Element {
           onShowGridChange={setShowGrid}
           showRulers={showRulers()}
           onShowRulersChange={changeShowRulers}
-          leftPaneOpen={leftPaneOpen()}
-          rightPaneOpen={rightPaneOpen()}
+          leftPaneOpen={panes.leftPaneOpen()}
+          rightPaneOpen={panes.rightPaneOpen()}
           onPaneChange={(side, open) => {
-            if (open) restorePane(side);
-            else hidePane(side);
+            if (open) panes.restorePane(side);
+            else panes.hidePane(side);
           }}
           snap={snap()}
           onSnapChange={setSnap}
@@ -1208,122 +579,26 @@ export function App(props: AppProps): JSX.Element {
         onToolChange={setActiveTool}
         context={actionContext()}
         leadingContent={
-          <div class="app-file-actions">
-            <Show when={props.filesAvailable}>
-              <details class="app-file-menu" ref={fileMenu}>
-                <summary
-                  class="app-file-button app-header-icon"
-                  aria-label="File"
-                  title="File"
-                >
-                  <Icon name="file" />
-                </summary>
-                <div class="app-file-controls">
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    disabled={!props.filesAvailable || isCloud()}
-                    onClick={newDocument}
-                    aria-label="New"
-                    title="New"
-                  >
-                    <Icon name="newFile" />
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    disabled={isCloud()}
-                    onClick={openTemplates}
-                    aria-label="New from template"
-                    title="New from template"
-                  >
-                    <Icon name="frame" />
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    disabled={!props.filesAvailable || isCloud()}
-                    onClick={open}
-                    aria-label="Open"
-                    title="Open"
-                  >
-                    <Icon name="openFile" />
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    aria-label="Reload from disk"
-                    title="Reload from disk"
-                    disabled={!file().filePath || isCloud()}
-                    onClick={reload}
-                  >
-                    <Icon name="reload" />
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    onClick={openExport}
-                    aria-label="Export…"
-                    title="Export…"
-                  >
-                    <Icon name="export" />
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    disabled={!props.filesAvailable || isCloud()}
-                    onClick={() => void props.session.save()}
-                    aria-label="Save"
-                    title="Save"
-                  >
-                    <Icon name="save" />
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    disabled={!props.filesAvailable || isCloud()}
-                    onClick={() => void props.session.saveAs()}
-                    aria-label="Save As"
-                    title="Save As"
-                  >
-                    <Icon name="saveAs" />
-                  </button>
-                  <select
-                    class="app-recent-select"
-                    disabled={
-                      !props.filesAvailable ||
-                      isCloud() ||
-                      file().recent.length === 0
-                    }
-                    value=""
-                    onChange={(event) => {
-                      const path = event.currentTarget.value;
-                      event.currentTarget.value = "";
-                      openRecent(path);
-                    }}
-                  >
-                    <option value="">Recent</option>
-                    <For each={file().recent}>
-                      {(entry) => (
-                        <option value={entry.path}>{entry.path}</option>
-                      )}
-                    </For>
-                  </select>
-                </div>
-              </details>
-            </Show>
-            <button
-              type="button"
-              class="app-file-button app-header-icon"
-              ref={settingsButton}
-              aria-label="Settings"
-              title="Settings"
-              aria-haspopup="dialog"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Icon name="settings" />
-            </button>
-          </div>
+          <FileActions
+            filesAvailable={props.filesAvailable}
+            isCloud={isCloud()}
+            file={file()}
+            onNew={newDocument}
+            onNewFromTemplate={openTemplates}
+            onOpen={open}
+            onReload={reload}
+            onExport={openExport}
+            onSave={() => void props.session.save()}
+            onSaveAs={() => void props.session.saveAs()}
+            onOpenRecent={openRecent}
+            onOpenSettings={() => setSettingsOpen(true)}
+            menuRef={(menu) => {
+              fileMenu = menu;
+            }}
+            settingsButtonRef={(button) => {
+              settingsButton = button;
+            }}
+          />
         }
         toolsContent={
           <Show
@@ -1350,201 +625,61 @@ export function App(props: AppProps): JSX.Element {
           </>
         }
       />
-      <div class="app-editor-body" ref={editorBody}>
-        <aside
-          class="app-pane app-pane-left"
-          classList={{
-            "is-collapsed": !leftPaneOpen(),
-            "is-overlay": leftPaneOpen() && paneOverlaysCanvas(),
-          }}
-          style={{ "--pane-width": `${leftPaneWidth()}px` }}
-          aria-label="Shapes and layers"
+      <div class="app-editor-body" ref={panes.setEditorBody}>
+        <SidePane
+          layout={panes}
+          side="left"
+          label="Shapes and layers"
+          restoreText="Show Shapes & layers"
         >
-          <div
-            class="app-pane-content"
-            id="left-pane-content"
-            aria-hidden={!leftPaneOpen()}
-            inert={!leftPaneOpen()}
-          >
-            <button
-              type="button"
-              class="app-pane-collapse"
-              onClick={() => hidePane("left")}
-              aria-label="Collapse Shapes and layers"
-              aria-expanded="true"
-              aria-controls="left-pane-content"
-              ref={leftCollapseButton}
-              title="Collapse Shapes and layers"
-            >
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M11 4l-5 6 5 6" />
-              </svg>
-            </button>
-            <div class="app-pane-navigation">{props.navigationContent}</div>
-            <ShapePalette
-              editor={props.editor}
-              workspace={workspace()}
-              tool={tool()}
-              onToolChange={setActiveTool}
-              context={actionContext()}
-              onShapeDrop={(tool, client) => setShapeDrop({ tool, client })}
-            />
-            <Layers
-              simple={simpleWorkspace()}
-              editor={props.editor}
-              viewport={viewport()}
-              commentAuthor={settings().userName}
-              commentRequest={commentRequest()}
-              commentPlacementActive={
-                tool() === "comment" && pendingComment() !== null
-              }
-              onPlaceComment={beginCommentPlacement}
-              onCancelCommentPlacement={() => setActiveTool("select")}
-            />
-          </div>
-          <button
-            type="button"
-            class="app-pane-restore"
-            onClick={() => restorePane("left", true)}
-            aria-label="Show Shapes and layers"
-            ref={leftRestoreButton}
-            aria-expanded="false"
-            aria-controls="left-pane-content"
-            title="Show Shapes and layers"
-          >
-            Show Shapes &amp; layers
-          </button>
-        </aside>
-        <button
-          type="button"
-          class="app-pane-divider"
-          classList={{
-            "is-dragging": draggingPane() === "left",
-            "is-overlay-divider": leftPaneOpen() && paneOverlaysCanvas(),
-          }}
-          style={
-            leftPaneOpen() && paneOverlaysCanvas()
-              ? { left: `${leftPaneWidth() - 4}px` }
-              : undefined
-          }
-          role="separator"
-          aria-label="Resize Shapes and layers"
-          aria-orientation="vertical"
-          aria-valuemin={paneBounds(paneInput("left")).min}
-          aria-valuemax={paneBounds(paneInput("left")).max}
-          aria-valuenow={leftPaneWidth()}
-          onPointerDown={(event) => beginPaneResize("left", event)}
-          onPointerMove={(event) => movePaneResize("left", event)}
-          onPointerUp={endPaneResize}
-          onPointerCancel={endPaneResize}
-          onKeyDown={(event) => resizePaneByKey("left", event)}
-        />
+          <div class="app-pane-navigation">{props.navigationContent}</div>
+          <ShapePalette
+            editor={props.editor}
+            workspace={workspace()}
+            tool={tool()}
+            onToolChange={setActiveTool}
+            context={actionContext()}
+            onShapeDrop={(tool, client) => setShapeDrop({ tool, client })}
+          />
+          <Layers
+            simple={simpleWorkspace()}
+            editor={props.editor}
+            viewport={viewport()}
+            commentAuthor={settings().userName}
+            commentRequest={commentRequest()}
+            commentPlacementActive={
+              tool() === "comment" && pendingComment() !== null
+            }
+            onPlaceComment={beginCommentPlacement}
+            onCancelCommentPlacement={() => setActiveTool("select")}
+          />
+        </SidePane>
+        <PaneDivider layout={panes} side="left" label="Shapes and layers" />
         <div class="app-viewer-column">
-          <div
-            class="app-viewer-heading"
-            style={{
-              "margin-left":
-                leftPaneOpen() && paneOverlaysCanvas()
-                  ? `${leftPaneWidth()}px`
-                  : undefined,
-              "margin-right":
-                rightPaneOpen() && paneOverlaysCanvas()
-                  ? `${rightPaneWidth()}px`
-                  : undefined,
-            }}
-          >
-            <div
-              class="app-document-status"
-              ref={documentStatusHost}
-              aria-label="Document status"
-            >
-              <Show
-                when={isCloud()}
-                fallback={
-                  <span
-                    class="app-file-name"
-                    title={file().filePath ?? undefined}
-                  >
-                    {file().fileName?.replace(/\.jsonl$/i, "") ?? "untitled"}
-                    <Show when={file().dirty}>
-                      <span class="app-dirty-marker" title="unsaved changes">
-                        *
-                      </span>
-                    </Show>
-                  </span>
-                }
-              >
-                <span class="app-file-name">
-                  {cloud()?.title ?? cloud()?.docId}
-                </span>
-                <span class="app-cloud-badge" data-status={cloud()?.status}>
-                  {cloud()?.status}
-                  {cloud()?.role === "viewer" ? " · Viewer" : ""}
-                </span>
-                <PresenceChip peers={cloud()?.peers ?? []} />
-                <div class="app-file-controls">
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    aria-label="Undo"
-                    title="Undo (Cmd/Ctrl+Z)"
-                    disabled={!cloud()?.canUndo}
-                    onClick={() => props.cloud?.undo()}
-                  >
-                    <svg
-                      class="app-history-icon"
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
-                    >
-                      <path d="M8 6l-5 5 5 5v-3c5 0 7 2 8 5 0-6-3-9-8-9z" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="app-file-button"
-                    aria-label="Redo"
-                    title="Redo (Cmd/Ctrl+Shift+Z)"
-                    disabled={!cloud()?.canRedo}
-                    onClick={() => props.cloud?.redo()}
-                  >
-                    <svg
-                      class="app-history-icon"
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 6l5 5-5 5v-3c-5 0-7 2-8 5 0-6 3-9 8-9z" />
-                    </svg>
-                  </button>
-                </div>
-              </Show>
-              <Show when={file().status === "saving" && !isCloud()}>
-                <span class="app-file-status">saving…</span>
-              </Show>
-              <Show when={!isCloud() && file().outsideChange}>
-                {(change) => (
-                  <span
-                    class="app-file-status app-outside-change"
-                    role="status"
-                    title="Another program (for example nodetto-cli) changed this file; the canvas shows its changes."
-                  >
-                    {`updated from disk +${change().added} ~${change().updated} -${change().removed}${change().merged ? " (merged)" : ""}`}
-                  </span>
-                )}
-              </Show>
-            </div>
+          <div class="app-viewer-heading" style={panes.viewerMargins()}>
+            <DocumentStatus
+              isCloud={isCloud()}
+              file={file()}
+              cloud={cloud()}
+              onUndo={() => props.cloud?.undo()}
+              onRedo={() => props.cloud?.redo()}
+              hostRef={(element) => {
+                documentStatusHost = element;
+              }}
+            />
           </div>
           <div
             class="app-canvas-host"
             ref={setCanvasHost}
-            onPointerMove={onCanvasPointerMove}
-            onPointerLeave={onCanvasPointerLeave}
+            onPointerMove={presence.onCanvasPointerMove}
+            onPointerLeave={presence.onCanvasPointerLeave}
           >
             <NodettoCanvas
               shapeDrop={shapeDrop()}
               editor={props.editor}
               tool={tool()}
               onToolChange={setActiveTool}
-              onMarquee={onMarquee}
+              onMarquee={presence.onMarquee}
               onCommentPlace={placeComment}
               snap={snap()}
               showGrid={showGrid()}
@@ -1613,19 +748,7 @@ export function App(props: AppProps): JSX.Element {
               )}
             </Show>
           </div>
-          <div
-            class="app-viewer-footer"
-            style={{
-              "margin-left":
-                leftPaneOpen() && paneOverlaysCanvas()
-                  ? `${leftPaneWidth()}px`
-                  : undefined,
-              "margin-right":
-                rightPaneOpen() && paneOverlaysCanvas()
-                  ? `${rightPaneWidth()}px`
-                  : undefined,
-            }}
-          >
+          <div class="app-viewer-footer" style={panes.viewerMargins()}>
             <PageTabs editor={props.editor} placement="bottom" />
             <ZoomControls
               context={actionContext()}
@@ -1638,95 +761,36 @@ export function App(props: AppProps): JSX.Element {
             />
           </div>
         </div>
-        <button
-          type="button"
-          class="app-pane-divider"
-          classList={{
-            "is-dragging": draggingPane() === "right",
-            "is-overlay-divider": rightPaneOpen() && paneOverlaysCanvas(),
-          }}
-          style={
-            rightPaneOpen() && paneOverlaysCanvas()
-              ? { right: `${rightPaneWidth() - 4}px` }
-              : undefined
-          }
-          role="separator"
-          aria-label="Resize Properties"
-          aria-orientation="vertical"
-          aria-valuemin={paneBounds(paneInput("right")).min}
-          aria-valuemax={paneBounds(paneInput("right")).max}
-          aria-valuenow={rightPaneWidth()}
-          onPointerDown={(event) => beginPaneResize("right", event)}
-          onPointerMove={(event) => movePaneResize("right", event)}
-          onPointerUp={endPaneResize}
-          onPointerCancel={endPaneResize}
-          onKeyDown={(event) => resizePaneByKey("right", event)}
-        />
-        <aside
-          class="app-pane app-pane-right"
-          classList={{
-            "is-collapsed": !rightPaneOpen(),
-            "is-overlay": rightPaneOpen() && paneOverlaysCanvas(),
-          }}
-          style={{ "--pane-width": `${rightPaneWidth()}px` }}
-          aria-label="Properties"
+        <PaneDivider layout={panes} side="right" label="Properties" />
+        <SidePane
+          layout={panes}
+          side="right"
+          label="Properties"
+          restoreText="Show Properties"
         >
-          <div
-            class="app-pane-content"
-            id="right-pane-content"
-            aria-hidden={!rightPaneOpen()}
-            inert={!rightPaneOpen()}
-          >
-            <button
-              type="button"
-              class="app-pane-collapse"
-              onClick={() => hidePane("right")}
-              aria-label="Collapse Properties"
-              aria-expanded="true"
-              aria-controls="right-pane-content"
-              ref={rightCollapseButton}
-              title="Collapse Properties"
-            >
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M9 4l5 6-5 6" />
-              </svg>
-            </button>
-            <div class="app-inspector" tabIndex={-1} ref={inspectorHost}>
-              <Inspector
-                editor={props.editor}
-                focus={inspectorFocus()}
-                simple={simpleWorkspace()}
-                viewport={viewport}
-              />
-            </div>
-            <Show when={isBpmnPage()}>
-              <BpmnProblemsPanel
-                editor={props.editor}
-                viewport={viewport}
-                importWarnings={file().importWarnings}
-              />
-            </Show>
-            <Show when={isBreadboardPage()}>
-              <BreadboardProblemsPanel
-                editor={props.editor}
-                viewport={viewport}
-                importWarnings={file().importWarnings}
-              />
-            </Show>
+          <div class="app-inspector" tabIndex={-1} ref={inspectorHost}>
+            <Inspector
+              editor={props.editor}
+              focus={inspectorFocus()}
+              simple={simpleWorkspace()}
+              viewport={viewport}
+            />
           </div>
-          <button
-            type="button"
-            class="app-pane-restore"
-            onClick={() => restorePane("right", true)}
-            aria-label="Show Properties"
-            ref={rightRestoreButton}
-            aria-expanded="false"
-            aria-controls="right-pane-content"
-            title="Show Properties"
-          >
-            Show Properties
-          </button>
-        </aside>
+          <Show when={isBpmnPage()}>
+            <BpmnProblemsPanel
+              editor={props.editor}
+              viewport={viewport}
+              importWarnings={file().importWarnings}
+            />
+          </Show>
+          <Show when={isBreadboardPage()}>
+            <BreadboardProblemsPanel
+              editor={props.editor}
+              viewport={viewport}
+              importWarnings={file().importWarnings}
+            />
+          </Show>
+        </SidePane>
       </div>
     </div>
   );
