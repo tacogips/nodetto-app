@@ -48,3 +48,15 @@ export {
   strokeTextBlock,
   strokeTextWidth,
 } from "../pcb/font.ts";
+
+export {
+  isPcbLayerHidden,
+  PCB_BOARD_COLOR,
+  PCB_HOLES_COLOR,
+  PCB_LAYER_COLORS,
+  pcbLayerColor,
+  pcbViewModel,
+  type PcbViewCircle,
+  type PcbViewPath,
+  type PcbViewPrimitive,
+} from "./view.ts";

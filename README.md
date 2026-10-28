@@ -29,8 +29,9 @@ associations.
 - **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,
   PCB Gerber export and Gerber import. See
   [Breadboard circuit pages](docs/breadboard/README.md).
-- **PCB boards**: open KiCad boards, edit parts and tracks, and export Gerber
-  and drill files. See [KiCad PCB boards](docs/pcb/kicad-pcb.md).
+- **PCB boards**: open KiCad boards, edit parts and tracks, export Gerber
+  and drill files, and export the board as SVG, PNG or PDF. See [KiCad PCB
+  boards](docs/pcb/kicad-pcb.md).
 - **Design artboards**: web and iPhone screens, transitions, and code export.
   See [Design artboards](docs/design.md).
 - **Appearance**: choose a System, Light or Dark app theme, a Light, Dark or

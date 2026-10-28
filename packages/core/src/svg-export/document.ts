@@ -8,6 +8,7 @@ import {
   type GroupSemantic,
   type ImageSemantic,
   isBreadboardElementType,
+  isPcbElementType,
   type PageId,
 } from "@nodetto/ir";
 import { connectorBackdropIds } from "../backdrops.ts";
@@ -39,6 +40,7 @@ import { endpointReaderFor, resolveConnector } from "../shapes/connector.ts";
 import { freehandGeometry } from "../shapes/freehand.ts";
 import { stateNodeLabelBox } from "../shapes/state.ts";
 import { umlComponentPaintBounds } from "../shapes/umlComponent.ts";
+import { PCB_BOARD_COLOR } from "../pcb-board/view.ts";
 import type { Store } from "../store.ts";
 import { markerDefs, renderConnector } from "./connectors.ts";
 import { fmt, tag, wrap } from "./markup.ts";
@@ -107,6 +109,7 @@ export function renderElementsSvg(
   const renderedKinds = new Map<ElementId, "connector" | "shape">();
   const groups = new Map<ElementId, Element>();
   const boxes: Box[] = [];
+  const pcbBoxes: Box[] = [];
   const clips: string[] = [];
   const effects: string[] = [];
   const gradients: string[] = [];
@@ -268,6 +271,7 @@ export function renderElementsSvg(
     }
     if (visible !== null) {
       boxes.push(visible);
+      if (isPcbElementType(element.type)) pcbBoxes.push(visible);
     }
     if (box && isBpmnShapeType(element.type)) {
       const label = bpmnLabelBox(element, box);
@@ -307,6 +311,7 @@ export function renderElementsSvg(
   }
 
   const bounds = options.viewport ?? unionBoxes(boxes);
+  const board = unionBoxes(pcbBoxes);
   if (bounds === null) {
     return null;
   }
@@ -466,6 +471,16 @@ export function renderElementsSvg(
     background === null
       ? ""
       : tag("rect", { x, y, width, height, fill: background }),
+    board === null
+      ? ""
+      : tag("rect", {
+          "data-layer": "pcb-board",
+          x: board.x,
+          y: board.y,
+          width: board.width,
+          height: board.height,
+          fill: PCB_BOARD_COLOR,
+        }),
     backdrops.length
       ? wrap("g", { "data-layer": "backdrops" }, backdrops.join(""))
       : "",

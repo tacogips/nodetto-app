@@ -5,6 +5,7 @@ import {
   type Element,
   type ImageSemantic,
   isBreadboardElementType,
+  isPcbElementType,
   type PathSemantic,
   UmlComponentType,
 } from "@nodetto/ir";
@@ -38,6 +39,7 @@ import {
   renderUmlComponent,
 } from "./structured-shapes.ts";
 import { renderTextNote } from "./text-note.ts";
+import { renderPcbShape } from "./pcb-shapes.ts";
 import type { SvgTheme } from "./theme.ts";
 import { renderUiControl } from "./ui-control.ts";
 
@@ -51,6 +53,7 @@ export function renderShape(
   if (isBreadboardElementType(element.type))
     return renderBreadboardShape(element, box, breadboard);
   if (isBpmnShapeType(element.type)) return renderBpmnShape(element, box);
+  if (isPcbElementType(element.type)) return renderPcbShape(element);
   switch (element.type) {
     case "draw.path": {
       const geometry = compoundPathGeometry(element);

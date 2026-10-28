@@ -20,7 +20,8 @@ values name the pre-archive `active/` locations.
 
 `active/` also holds the historical dispatch manifests
 `canvas-theme-s539-dispatch.json` (appearance settings),
-`ddl-frame-dispatch.json`, the KiCad PCB manifests
+`ddl-frame-dispatch.json`, the PCB SVG export manifest
+`pcb-svg-s538-dispatch.json`, the KiCad PCB manifests
 (`kicad-pcb-s530-dispatch.json`, `kicad-pcb-s534-dispatch.json`,
 `kicad-pcb-s536-dispatch.json`; s536 was the final dispatch, with plans
 01-08 as its accepted dependencies) and the BPMN manifests
@@ -58,6 +59,25 @@ locations. Evidence: `tmp/canvas-theme-s539/<planId>/` and
 | [appearance-05-ui-solid-chrome-css](completed/appearance-05-ui-solid-chrome-css.md) | ui-solid chrome CSS on `var(--token, <literal>)` fallbacks |
 | [appearance-06-desktop-wiring](completed/appearance-06-desktop-wiring.md) | `main.tsx`, `App.tsx`, Settings Appearance category, Tauri `setTheme` capability, README |
 | [appearance-07-theme-tokens-test](completed/appearance-07-theme-tokens-test.md) | `styles/theme-tokens.test.ts` |
+
+PCB pages in SVG, PNG and PDF export (session 538; design:
+`design-docs/specs/design-pcb-svg-export.md`, user QA:
+`design-docs/user-qa/pcb-svg-export.md`). Wave 1: plans 01 and 02; wave 2:
+plan 03 (after 01); wave 3: plan 04 (after 03). Accepted by the
+session-538 serial integration review on the combined tree:
+`BUN_OPTIONS=--jsx-runtime=classic mise run verify` exit 0 (2756 pass, 23
+skip, 0 fail) and `mise run test-cli` exit 0 (142 pass, native PCB parity
+run, not skipped). Evidence: `tmp/pcb-svg-s538/<planId>/` and
+`tmp/pcb-svg-s538/reconcile/`. The dispatch manifest
+`active/pcb-svg-s538-dispatch.json` keeps the pre-archive `active/`
+`planPath` values.
+
+| Plan | Scope |
+|---|---|
+| [pcb-svg-01-core-view-model](completed/pcb-svg-01-core-view-model.md) | Move the PCB view model and colour table to `packages/core/src/pcb-board/view.ts`; ui-solid re-exports |
+| [pcb-svg-02-docs](completed/pcb-svg-02-docs.md) | `docs/pcb/kicad-pcb.md`, `docs/cli.md`, README |
+| [pcb-svg-03-svg-renderer](completed/pcb-svg-03-svg-renderer.md) | `renderPcbShape`, `renderShape` dispatch, board rect, core tests |
+| [pcb-svg-04-cli-tests](completed/pcb-svg-04-cli-tests.md) | CLI SVG/PNG/PDF test and native parity of the PCB SVG |
 
 KiCad PCB pages (sessions 530-536; design:
 `design-docs/specs/design-kicad-pcb.md` revision 3, user QA:
