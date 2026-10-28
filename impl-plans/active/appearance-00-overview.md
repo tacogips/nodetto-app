@@ -113,8 +113,49 @@ from 02. 07 tests the finished CSS of 03, 04 and 05.
   `packages/ui-solid/src/shapes/PcbShapeView.tsx`, `PcbOverlay.tsx`,
   `BreadboardOverlay.tsx`, `TextEditor.tsx`, the PCB layer colour table,
   any export module, or `packages/ui-solid/src/shapes/*.css`.
-- No light token value changes. No version bumps. No `tauri.conf.json`
+- No light token value changes, except the light `--app-muted-label`
+  `#727b7e` -> `#6d7679` (design invariant 2, plan 03 only). No version
+  bumps. No `tauri.conf.json`
   change. No server, auth or deployment code. English only, no emojis.
+
+## Session 540 continuation
+
+Session opus-luna-design-and-implement-review-loop-session-540 continues
+session 539 from checkpoint `58c8171` (plans 01, 02, 04 and 06 code in the
+tree, unreviewed). The design and plans are reused, not redesigned; the
+only design edit is the `--app-muted-label` wording in design 4.1 and
+6 item 5. Evidence for this session goes under
+`tmp/canvas-theme-s539/<planId>/s540/`.
+
+| Plan | Session 540 mode | Work |
+| --- | --- | --- |
+| 01, 02, 04, 06 | verify-only | Rerun own verification on the tree; no source edit unless a gate fails in an own writePath; independent review follows |
+| 03 | finish | `base.css` light `--app-muted-label` -> `#6d7679`; rerun every plan 03 gate |
+| 05 | implement | As written |
+| 07 | implement | As written; case 5 includes the `--app-muted-label` pair |
+
+Verify-only rules (plans 01, 02, 04, 06):
+
+1. Do not edit any source file. Rerun every command in the plan's
+   Verification section, logging to the `s540/` subdirectory.
+2. If a gate fails in a file you own, make the smallest fix, record
+   pre/post sha256 and the reason. If it traces to another plan's file,
+   record `owner: <planId>` and `pending-join`; do not edit.
+3. Append `## Session 540 re-verification` to your progress log with each
+   command, exit code and log path. Remove the old final `STATUS: done`
+   line and write `STATUS: done` again as the new last line.
+
+Baseline on `58c8171` plus the design edit, taken by step 4 (exit codes):
+`bun run typecheck` 0 (`tmp/canvas-theme-s539/s540-step4/typecheck.log`),
+`bun test apps/desktop/src/settings packages/ui-solid/src/canvas/canvas-background.test.ts`
+0, 19 pass (`.../s540-step4/targeted.log`),
+`bun test apps/desktop/src/style.test.ts` 0 (`.../s540-step4/style.log`).
+The App.tsx `EditorPreferences` mismatch that plan 02 recorded as
+`pending-join` is therefore resolved; reconciliation still reruns it.
+
+Review: after each wave joins, each plan gets an independent review
+against the code in the tree. Each repair goes back to the owning plan's
+implementer, and shared gates are rerun in serial reconciliation.
 
 ## Final verification (serial, after wave 3, owned by reconciliation)
 

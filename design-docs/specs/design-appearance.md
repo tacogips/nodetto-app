@@ -123,7 +123,8 @@ colour values:
 
 - `:root { ... }`: the light set. The 13 existing tokens keep their values.
   Tokens added while removing literals (4.2) take the exact literal they
-  replace, so light rendering is unchanged.
+  replace, so light rendering is unchanged. The single exception is
+  `--app-muted-label`, whose light value is `#6d7679` (invariant 2).
 - `:root[data-nodetto-theme="dark"] { ... }`: the dark set. It declares
   every token declared in the light `:root` block, and nothing else.
 
@@ -306,7 +307,9 @@ New `apps/desktop/src/styles/theme-tokens.test.ts` reads CSS with the
    (`--nodetto-ink`, `--nodetto-surface`), (`--nodetto-muted`,
    `--nodetto-surface`), (`--nodetto-ink`, `--app-chrome-surface`),
    (`--app-chrome-muted`, `--app-chrome-surface`), (`--app-chrome-muted`,
-   `--app-chrome-hover`), (`--nodetto-accent`, `--nodetto-surface`), each
+   `--app-chrome-hover`), (`--nodetto-accent`, `--nodetto-surface`),
+   (`--app-muted-label`, `--app-chrome-surface`) (light `#6d7679` measures
+   4.65, dark `#a3adb1` on `#1b1f21` measures 7.25), each
    `--nodetto-on-*` with its background, and every other text/background
    pair the tokenization introduces. Canvas pairs, for both canvas sets:
    (`--nodetto-canvas-overlay`, `--nodetto-canvas-bg`) at 3:1 or more, and

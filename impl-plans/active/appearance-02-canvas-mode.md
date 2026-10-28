@@ -120,3 +120,15 @@ canvasModeFor } from "./canvas/canvas-background.ts";`
   line.
 - The verification results and the progress log are complete, and the
   last line of the log is `STATUS: done` (overview rules 8-9).
+
+## Session 540 continuation (verify-only)
+
+The code is in the tree at `58c8171`. Follow the overview "Verify-only
+rules". Rerun every Verification command with logs in
+`tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/`. The typecheck that
+was `pending-join` on plan 06 (`App.tsx:207`) must now exit 0; record it
+as resolved. Expected: both canvas tests exit 0, ui-solid suite exit 0,
+typecheck exit 0, zero `noUncheckedIndexedAccess` hits in
+`canvas-background*` and `ui-solid/src/Canvas.tsx`, biome exit 0, both
+grep counts 1. Confirm `git diff 28c9ded -- packages/ui-solid/src/Canvas.tsx`
+adds only the prop, the memo and the classList entry.

@@ -207,6 +207,33 @@ these mechanical checks.
 - No `var()` in the plan's files references an undeclared name, except
   `--app-cloud-top`.
 
+## Session 540 continuation (finish mode)
+
+Everything except the contrast gate is done (progress log line 170:
+`contrast.ts` exit 1, light `--app-muted-label` 4.33:1). Remaining work:
+
+1. Fresh-read `apps/desktop/src/styles/base.css`, record sha256, then
+   change only line 42 `--app-muted-label: #727b7e;` to
+   `--app-muted-label: #6d7679;`. Do not touch the dark value at line 111
+   (`#a3adb1`, 7.25:1 on `#1b1f21`) or any other line. Record the post
+   sha256.
+2. In the progress log, update the registry row for `--app-muted-label`
+   (light `#6d7679`, light result 4.65:1) and replace the note saying the
+   light value cannot change with a pointer to design invariant 2.
+3. Rerun every check in "Tests and checks" with logs in
+   `tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/`. The contrast
+   script `contrast.ts` (it already lists the pair at line 33) must exit 0.
+   `git diff 58c8171 -- apps/desktop/src/styles/base.css` must show exactly
+   one removed and one added line.
+4. Pitfall: do not "fix" the gap by lightening `--app-chrome-surface` or
+   by changing any other light token. Plan 05 must not be started until
+   this log ends with `STATUS: done`.
+5. Replace the last line `STATUS: incomplete` with `STATUS: done`.
+
+Mechanical checks: `grep -c '#727b7e' apps/desktop/src/styles/base.css`
+prints 0; `grep -c -- '--app-muted-label: #6d7679;' apps/desktop/src/styles/base.css`
+prints 1.
+
 ## Done criteria
 
 - The literal sweep is empty, the parity diff exits 0, the undeclared

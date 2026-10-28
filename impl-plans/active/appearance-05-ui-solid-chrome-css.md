@@ -120,3 +120,12 @@ files, including pairs that only reuse existing tokens.
 - The checks above pass and are recorded, the registry is appended, and
   the hashes and intent snapshot are logged. The last line of the progress
   log is `STATUS: done` (overview rules 8-9).
+
+## Session 540 continuation (implement)
+
+Not started in session 539. Implement as written once plan 03's progress
+log ends with `STATUS: done`. Before the first `base.css` append, fresh-read
+the file and record its sha256: it must already contain
+`--app-muted-label: #6d7679;` (plan 03). Do not touch that line. No
+ui-solid chrome CSS uses `#727b7e` today (`grep -rn 727b7e packages/*/src`
+prints nothing), so no fallback depends on the old value.

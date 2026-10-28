@@ -33,6 +33,9 @@ Read `appearance-00-overview.md` and the exports of
 - apps/desktop/src/App.tsx
 - apps/desktop/src/settings/SettingsDialog.tsx
 - apps/desktop/src-tauri/capabilities/default.json
+- apps/desktop/src-tauri/gen/schemas/capabilities.json (tracked, generated
+  by the Tauri build from `default.json`; must list exactly the same
+  permissions; never hand-edit beyond that)
 - README.md
 - impl-plans/progress/appearance-06-desktop-wiring.md (new)
 
@@ -153,3 +156,21 @@ checks below.
   as `pending-join` under rule 8.
 - The progress log records each command, exit code and log path, plus
   hashes and the intent snapshot, and its last line is `STATUS: done`.
+
+## Session 540 continuation (verify-only)
+
+The code is in the tree at `58c8171`. Follow the overview "Verify-only
+rules". Rerun every check with logs in
+`tmp/canvas-theme-s539/appearance-06-desktop-wiring/s540/`. Also:
+
+- Delete the stale `Status: in progress` line near the top of your progress
+  log. `STATUS: done` as the last line is the only status marker.
+- Capability scope: `default.json` permissions must equal
+  `["core:default", "core:window:allow-set-theme"]`, and
+  `gen/schemas/capabilities.json` must list the same two permissions and
+  nothing else. Check with `grep -c 'allow-set-theme'` on both (1 each).
+- The `bun test apps/desktop/src` run is a shared-input gate with plan 05
+  (wave 2). It counts only once plan 05's log ends with `STATUS: done`.
+Expected: typecheck exit 0, zero `noUncheckedIndexedAccess` hits in the
+three TSX files, settings tests exit 0, desktop tests exit 0 (or
+`pending-join` on plan 05), biome exit 0, `tauri.conf.json` unchanged.

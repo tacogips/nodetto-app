@@ -1,7 +1,7 @@
 {
   "taskId": "canvas-theme-s539",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-539",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-540",
   "implementationBranch": "feat/canvas-theme",
   "baseBranch": "feat/canvas-theme",
   "baseBranchUpstream": "origin/main",
@@ -17,7 +17,7 @@
   "evidenceRoot": "tmp/canvas-theme-s539",
   "evidenceLayout": "tmp/canvas-theme-s539/<planId>/ per plan (logs, sha256 lists, scratch contrast and fallback scripts); per-attempt dispatcher output under tmp/canvas-theme-s539/<planId>/attempt-<n>/; reconciliation output under tmp/canvas-theme-s539/reconcile/. The noUncheckedIndexedAccess baseline is tmp/canvas-theme-s539/step4/unchecked-baseline.log (exit 2, 91 pre-existing errors, none in target files). tmp/ is git-ignored (.gitignore:41). No *.test.ts file may be written under tmp/.",
   "reviewContext": {
-    "issueReference": "none (workflowInput.requestedOutcome is the issue body; runtime id opus-luna-design-and-implement-review-loop-session-539; plans accepted by step5-impl-plan-review comm-010056)",
+    "issueReference": "none (workflowInput.requestedOutcome is the issue body; continuation of opus-luna-design-and-implement-review-loop-session-539 -> session-540; session 539 plans accepted by step5-impl-plan-review comm-010056; session 540 continuation plans accepted by step5-impl-plan-review comm-010112)",
     "userProblem": "The Nodetto desktop app has only a light UI: there is no app theme setting, the chrome CSS is full of hard-coded light colours, the canvas cannot be dark, and PCB pages (whose layer colours are tuned for a dark board) render on a light canvas.",
     "requiredOutcomes": [
       "Settings shows an Appearance category directly after General, with Theme (System/Light/Dark), Canvas (Light/Dark/Match theme) and PCB canvas (Dark/Light/Match theme) selects; choices persist in nodetto.editor.preferences.v1 and apply live (design 3.1, 3.4; plans 01, 06).",
@@ -47,7 +47,7 @@
     ],
     "designDecisionsAndRationale": [
       "Theme applied through data-nodetto-theme on <html> plus root color-scheme, set in main.tsx before render because the CSP forbids an inline script in index.html (design 3.3).",
-      "base.css is the only file declaring chrome colour values; new tokens take the exact literal they replace so light rendering is unchanged (design 4.1, 4.2).",
+      "base.css is the only file declaring chrome colour values; new tokens take the exact literal they replace so light rendering is unchanged, except light --app-muted-label #727b7e -> #6d7679 for WCAG AA (design invariant 2, commit 94497ec) (design 4.1, 4.2).",
       "Canvas mode is resolved in the desktop app and passed as already-resolved light/dark per page kind; ui-solid knows nothing about match or the app theme, so nodetto-cloud keeps a light canvas (design 5.1).",
       "Canvas tokens are independent of the chrome theme so a light canvas under a dark theme stays light (design 5.2).",
       "The paint pin re-declares six tokens as literals plus color and color-scheme: light because color and color-scheme inherit as computed values from :root (design 5.3, DR-1).",
@@ -77,7 +77,9 @@
     "residualRisks": [
       "low: plan 06 re-reads matchMedia after setTheme; switching from an explicit theme back to System may briefly resolve against the previous window theme.",
       "Serial repair may be needed for plan 07 findings against plans 03, 04 or 05.",
-      "Live macOS appearance switching and the native title bar can only be checked manually."
+      "Live macOS appearance switching and the native title bar can only be checked manually.",
+      "low (s540 review): impl-plans/progress/appearance-03-chrome-tokens.md lines 170 and 182-184 hold stale session 539 text (contrast.ts exit 1, design-owner decision needed); the plan 03 worker marks them superseded in its Session 540 section, and the Session 540 evidence plus final STATUS: done take precedence.",
+      "low (s540 review): the plan 06 capability check is count-based (grep -c allow-set-theme); the integration review must confirm default.json and gen/schemas/capabilities.json list exactly core:default and core:window:allow-set-theme."
     ],
     "sourcePaths": [
       "design-docs/specs/design-appearance.md",
@@ -100,7 +102,8 @@
       "apps/desktop/src/style.test.ts",
       "packages/ui-solid/src/Canvas.tsx",
       "packages/ui-solid/src/index.ts",
-      "apps/desktop/src-tauri/capabilities/default.json"
+      "apps/desktop/src-tauri/capabilities/default.json",
+      "apps/desktop/src-tauri/gen/schemas/capabilities.json"
     ]
   },
   "plans": [
@@ -204,7 +207,8 @@
         "Button tokens move from buttons.css into base.css (0 in buttons.css, 6 in base.css); --app-control-radius stays in buttons.css.",
         "Every colour literal in the other 12 files is replaced by var(--token) whose light value is the same colour; undeclared var() names (--line, --surface, --ink, --nodetto-border, --nodetto-panel-bg, --nodetto-text) are replaced whole by declared tokens; only --app-cloud-top stays undeclared.",
         "Presence label ink and comment pin border are fixed tokens; document-paint literals in inspector.css and prototype-preview.css use fixed tokens.",
-        "Token registry (name | light | dark | role | pairs with) and contrast script output (every pair >= 4.5 in both themes) are recorded; style.test.ts passes or is recorded as pending-join under overview rule 8; progress log ends with STATUS: done."
+        "Token registry (name | light | dark | role | pairs with) and contrast script output (every pair >= 4.5 in both themes) are recorded; style.test.ts passes or is recorded as pending-join under overview rule 8; progress log ends with STATUS: done.",
+        "Session 540: base.css light --app-muted-label is #6d7679 (the only light value change, design invariant 2); #727b7e no longer appears; contrast.ts exits 0; progress log last line STATUS: done."
       ],
       "verification": [
         "mkdir -p tmp/canvas-theme-s539/appearance-03-chrome-tokens",
@@ -214,7 +218,10 @@
         "test \"$(grep -c 'data-nodetto-theme=\"dark\"' apps/desktop/src/styles/base.css)\" -ge 1",
         "bun tmp/canvas-theme-s539/appearance-03-chrome-tokens/contrast.ts > tmp/canvas-theme-s539/appearance-03-chrome-tokens/contrast.log 2>&1",
         "bun test apps/desktop/src/style.test.ts > tmp/canvas-theme-s539/appearance-03-chrome-tokens/style-test.log 2>&1",
-        "test -s impl-plans/progress/appearance-03-chrome-tokens.md"
+        "test -s impl-plans/progress/appearance-03-chrome-tokens.md",
+        "test \"$(grep -c \"#727b7e\" apps/desktop/src/styles/base.css)\" -eq 0",
+        "test \"$(grep -c -- \"--app-muted-label: #6d7679;\" apps/desktop/src/styles/base.css)\" -eq 1",
+        "test \"$(tail -n 1 impl-plans/progress/appearance-03-chrome-tokens.md)\" = \"STATUS: done\""
       ]
     },
     {
@@ -315,6 +322,7 @@
         "apps/desktop/src/App.tsx",
         "apps/desktop/src/settings/SettingsDialog.tsx",
         "apps/desktop/src-tauri/capabilities/default.json",
+        "apps/desktop/src-tauri/gen/schemas/capabilities.json",
         "README.md",
         "impl-plans/progress/appearance-06-desktop-wiring.md"
       ],
@@ -326,7 +334,8 @@
         "App.tsx owns theme, canvasBackground, pcbCanvasBackground and systemDark signals, a resolvedTheme memo, an applyTheme effect, a theme-only Tauri setTheme effect (null for system, re-reads media.matches after resolve, rejection ignored), persists the three keys, and passes resolved canvasBackground {diagram, pcb} to NodettoCanvas and the values/setters to SettingsDialog.",
         "SettingsDialog adds an Appearance category after General with Theme, Canvas and PCB canvas selects (aria-labels App theme, Canvas background, PCB canvas background) validated by type guards, no bare as cast.",
         "capabilities/default.json adds core:window:allow-set-theme after core:default; README gains one appearance feature line; no tauri.conf.json, Rust or dependency change.",
-        "Desktop tests pass or are pending-join under overview rule 8; progress log ends with STATUS: done."
+        "Desktop tests pass or are pending-join under overview rule 8; progress log ends with STATUS: done.",
+        "Session 540: gen/schemas/capabilities.json lists exactly core:default and core:window:allow-set-theme, matching default.json; the stale 'Status: in progress' header line is removed from the progress log."
       ],
       "verification": [
         "mkdir -p tmp/canvas-theme-s539/appearance-06-desktop-wiring",
@@ -338,7 +347,9 @@
         "bunx biome check apps/desktop/src/main.tsx apps/desktop/src/App.tsx apps/desktop/src/settings/SettingsDialog.tsx --diagnostic-level=warn",
         "test \"$(grep -c 'allow-set-theme' apps/desktop/src-tauri/capabilities/default.json)\" -eq 1",
         "git diff --quiet -- apps/desktop/src-tauri/tauri.conf.json",
-        "test -s impl-plans/progress/appearance-06-desktop-wiring.md"
+        "test -s impl-plans/progress/appearance-06-desktop-wiring.md",
+        "test \"$(grep -c allow-set-theme apps/desktop/src-tauri/gen/schemas/capabilities.json)\" -eq 1",
+        "test \"$(grep -c \"^Status: in progress\" impl-plans/progress/appearance-06-desktop-wiring.md)\" -eq 0"
       ]
     },
     {
@@ -374,7 +385,8 @@
         "theme-tokens.test.ts implements cases 1, 1b and 2-7 as specified (literal allowlist keyed by file and selector; every desktop var() declared except --app-cloud-top; light/dark and canvas parity; light values equal design 4.1/5.2; paint pin; WCAG pairs; ui-solid fallback equality; export isolation).",
         "Cases 1, 1b, 4 and 6 are pure functions returning string[]; five negative inline cases (a)-(e) each return at least one problem; no repository file is mutated by the test; no non-null assertions; typechecks under noUncheckedIndexedAccess.",
         "Findings in other plans' files are recorded with owner planId, not fixed here.",
-        "Progress log lists findings, dark-value adjustments, commands, exit codes, log paths and ends with STATUS: done."
+        "Progress log lists findings, dark-value adjustments, commands, exit codes, log paths and ends with STATUS: done.",
+        "Session 540: case 5 includes (--app-muted-label, --app-chrome-surface) in both themes; case 3 table holds only the 13 original tokens and the light canvas set."
       ],
       "verification": [
         "mkdir -p tmp/canvas-theme-s539/appearance-07-theme-tokens-test",
@@ -437,5 +449,39 @@
       "test -z \"$(find tmp -name '*.test.ts')\"",
       "git status --short"
     ]
+  },
+  "continuation": {
+    "previousWorkflowExecutionId": "opus-luna-design-and-implement-review-loop-session-539",
+    "checkpointHead": "58c81713be42033a9a7a0fc7bd7ee775a955cf3e",
+    "session539OriginalHead": "28c9dede750c5c2f72ce8a1085ac2fc96f800c67",
+    "designAmendment": "94497ec (invariant 2: light --app-muted-label #727b7e -> #6d7679); session-540 step2 wording edit in design 4.1 and 6 item 5",
+    "evidenceSubdir": "tmp/canvas-theme-s539/<planId>/s540/",
+    "baselineEvidence": [
+      {
+        "command": "bun run typecheck",
+        "exit": 0,
+        "log": "tmp/canvas-theme-s539/s540-step4/typecheck.log"
+      },
+      {
+        "command": "bun test apps/desktop/src/settings packages/ui-solid/src/canvas/canvas-background.test.ts",
+        "exit": 0,
+        "log": "tmp/canvas-theme-s539/s540-step4/targeted.log"
+      },
+      {
+        "command": "bun test apps/desktop/src/style.test.ts",
+        "exit": 0,
+        "log": "tmp/canvas-theme-s539/s540-step4/style.log"
+      }
+    ],
+    "planModes": {
+      "appearance-01-preferences": "verify-only",
+      "appearance-02-canvas-mode": "verify-only",
+      "appearance-03-chrome-tokens": "finish",
+      "appearance-04-canvas-css": "verify-only",
+      "appearance-05-ui-solid-chrome-css": "implement",
+      "appearance-06-desktop-wiring": "verify-only",
+      "appearance-07-theme-tokens-test": "implement"
+    },
+    "rules": "impl-plans/active/appearance-00-overview.md section 'Session 540 continuation'"
   }
 }

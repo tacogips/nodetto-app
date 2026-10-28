@@ -150,3 +150,13 @@ behaviour; existing `toEqual` round trip now includes the new keys through
   log records hashes, the intent snapshot, commands, exit codes and log
   paths. Its last line is `STATUS: done` (overview rules 8-9; typecheck
   failures in sibling files follow rule 8).
+
+## Session 540 continuation (verify-only)
+
+The code is in the tree at `58c8171`. Follow the overview "Verify-only
+rules". Rerun every Verification command with logs in
+`tmp/canvas-theme-s539/appearance-01-preferences/s540/`. Expected: settings
+tests exit 0, typecheck exit 0, zero `noUncheckedIndexedAccess` hits in
+`settings/appearance*` and `settings/preferences*`, biome exit 0, and the
+two grep counts (4 and 1). Do not edit source files unless one of these
+fails in an owned file.

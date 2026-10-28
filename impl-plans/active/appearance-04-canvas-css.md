@@ -155,3 +155,14 @@ That is intended.
 - The style test passes, or is recorded as `pending-join` under rule 8.
 - The progress log contains hashes, the intent snapshot and the block line
   ranges, and its last line is `STATUS: done`.
+
+## Session 540 continuation (verify-only)
+
+The code is in the tree at `58c8171`. Follow the overview "Verify-only
+rules". Rerun every check with logs in
+`tmp/canvas-theme-s539/appearance-04-canvas-css/s540/`. The style test that
+was `pending-join` on plan 03 counts as a pass only after plan 03's
+progress log ends with `STATUS: done` (overview rule 8); otherwise record
+`pending-join` again. Expected: both canvas-gestures greps print nothing,
+`color-scheme: light` count 1, `nodetto-canvas-dark` count at least 1,
+contrast script exit 0, style test exit 0, rulers test exit 0.

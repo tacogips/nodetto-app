@@ -161,3 +161,15 @@ Pitfalls:
 - The progress log lists any findings with owners, any dark-value
   adjustments (old -> new, with ratio), the commands, exit codes and log
   paths, and its last line is `STATUS: done`.
+
+## Session 540 continuation (implement)
+
+Not started in session 539. Implement as written after plans 03, 04 and 05
+end with `STATUS: done`. Two clarifications that follow the design edit:
+
+- Case 5 must include the pair (`--app-muted-label`,
+  `--app-chrome-surface`) in both themes (design 6 item 5). Expected
+  light 4.65, dark 7.25.
+- Case 3 hard-codes only the 13 original tokens of design 4.1 and the
+  light canvas set of design 5.2. Do not add `--app-muted-label` to that
+  table, and do not encode the old `#727b7e` anywhere.
