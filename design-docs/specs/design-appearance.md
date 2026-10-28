@@ -31,7 +31,10 @@ nodetto-cloud web app's own theme, and version bumps.
    the colour scheme of native controls drawn inside elements. Exports
    (SVG, PNG, PDF, JSONL) take no input from appearance state.
 2. With `theme=light` and `canvasBackground=light`, every computed colour on
-   a diagram page equals today's value. Light token values do not change.
+   a diagram page equals today's value. Light token values do not change,
+   with one exception: the light `--app-muted-label` (comment timestamps,
+   formerly `#727b7e`, 4.33:1 on `--app-chrome-surface`) darkens to
+   `#6d7679` (4.65:1) so it meets invariant 4. No other light value moves.
 3. `packages/ui-solid` renders exactly as today when only today's light
    tokens are defined (nodetto-cloud), and when `NodettoCanvas` is given no
    new prop.

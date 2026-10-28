@@ -163,7 +163,9 @@ these mechanical checks.
   are identical. Extract them with a `grep -o "\-\-[a-z0-9-]*:"` per
   block, diff them, and record the diff exit code (0).
 - Light unchanged: `git diff -U0 -- apps/desktop/src/styles/base.css`
-  shows no removed line among the 13 original token lines.
+  shows no removed line among the 13 original token lines. The light
+  `--app-muted-label` value is `#6d7679` (the one allowed change; see
+  Invariants), and the former `#727b7e` literal no longer appears.
 - Contrast: write a scratch script
   `tmp/canvas-theme-s539/appearance-03-chrome-tokens/contrast.ts`, which is
   not a test file. It computes WCAG contrast for every text/background pair
@@ -196,7 +198,10 @@ these mechanical checks.
 ## Invariants
 
 - Light computed colours are unchanged: each replaced literal maps to a
-  token whose light value is the same colour.
+  token whose light value is the same colour. The single exception
+  (design section 2, invariant 2) is the light `--app-muted-label`, which
+  is `#6d7679` (4.65:1 on `--app-chrome-surface`) instead of the former
+  `#727b7e` (4.33:1), so the contrast gate passes.
 - The dark block declares exactly the light block's names.
 - No colour literal remains outside the two `:root` blocks.
 - No `var()` in the plan's files references an undeclared name, except
