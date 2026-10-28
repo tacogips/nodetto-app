@@ -12,6 +12,7 @@ export type WorkspaceId =
   | "flow"
   | "bpmn"
   | "breadboard"
+  | "pcb"
   | "all";
 export interface Workspace {
   readonly id: WorkspaceId;
@@ -108,6 +109,16 @@ export const WORKSPACES = [
       { tool: Tool.BreadboardLed, label: "LED" },
       { tool: Tool.BreadboardButton, label: "Push button" },
       { tool: Tool.BreadboardWire, label: "Wire" },
+    ],
+  },
+  {
+    id: "pcb",
+    label: "PCB",
+    design: false,
+    shapes: false,
+    tools: [
+      { tool: Tool.PcbTrack, label: "Track" },
+      { tool: Tool.PcbVia, label: "Via" },
     ],
   },
   {

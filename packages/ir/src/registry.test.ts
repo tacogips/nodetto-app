@@ -91,6 +91,12 @@ describe("registry contents", () => {
         "breadboard.header",
         "breadboard.battery",
         "breadboard.netlist",
+        "pcb.board",
+        "pcb.footprint",
+        "pcb.track",
+        "pcb.via",
+        "pcb.zone",
+        "pcb.graphic",
       ].sort(),
     );
   });

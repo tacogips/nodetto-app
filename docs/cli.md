@@ -20,6 +20,7 @@ nodetto-cli breadboard gerber board.jsonl --output board-pcb.zip
 nodetto-cli breadboard gerber board.jsonl --outline used --output board-pcb.zip
 nodetto-cli breadboard import circuit.kicad_sch --output board.jsonl
 nodetto-cli gerber import board-gerbers.zip --output board.jsonl
+nodetto-cli gerber export board.jsonl --output board-edited.zip
 ```
 
 `ddl` emits exactly what the inspector's Database DDL panel generates for one
@@ -38,8 +39,21 @@ findings exist, and 2 for usage, parse, or config errors; it has no `--strict`
 option. `bpmn import` and `bpmn export` exit 3 with `--strict` when they report
 warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
 `breadboard bom --check` and `breadboard netlist --check` exit 1 on drift;
-`breadboard bom`, `netlist`, `gerber` and `import`, and `gerber import`, exit 3
-with `--strict` when they report warnings, and 2 for usage or input errors.
+`breadboard bom`, `netlist`, `gerber` and `import`, and `gerber import` and
+`export`, exit 3 with `--strict` when they report warnings, and 2 for usage or
+input errors.
+
+## PCB boards (KiCad)
+
+Import a board into a PCB page, then export Gerber and drill files:
+
+```bash
+nodetto-cli pcb import board.kicad_pcb --output board.jsonl
+nodetto-cli pcb gerber board.jsonl --output board.zip
+```
+
+See [KiCad PCB boards](pcb/kicad-pcb.md) for supported content, editing and
+export details.
 
 ## Drawing with AI agents and live co-editing
 

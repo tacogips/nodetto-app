@@ -122,6 +122,11 @@ const FLATTEN_TOLERANCE = 0.01;
 const PAGE_MARGIN_MM = 5;
 const BOARD_BACKDROP = "#001023";
 
+/** Rounds millimetres to nanometres, dropping floating-point noise. */
+function nanometres(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
 interface LayerStyle {
   readonly fill: string;
   readonly opacity?: number;
@@ -420,6 +425,7 @@ function slug(text: string): string {
 interface ParsedLayer {
   readonly file: string;
   readonly role: PcbLayerRole;
+  readonly plating?: "plated" | "nonPlated";
   readonly shapes: readonly GerberShape[];
   readonly objects: number;
 }
@@ -453,6 +459,7 @@ function parseLayer(
     return {
       file: file.name,
       role: { kind: "drill", side: "board" },
+      ...(drill.plating ? { plating: drill.plating } : {}),
       shapes,
       objects: drill.holes.length + drill.slots.length,
     };
@@ -614,12 +621,27 @@ export function importPcbPage(
       }
     }
     if (members.length === 0) continue;
+    const file = layer.file.split(/[\\/]/).at(-1) ?? layer.file;
     add({
       id: id(`pcb-${layerId}`),
       type: "group",
-      semantic: { memberIds: members },
+      semantic: {
+        memberIds: members,
+        fabricationLayer: {
+          kind: layer.role.kind,
+          side: layer.role.side,
+          ...(layer.role.inner === undefined || layer.role.inner < 1
+            ? {}
+            : { inner: layer.role.inner }),
+          ...(layer.plating ? { plating: layer.plating } : {}),
+          file,
+          unitsPerMm: scale,
+          originX: nanometres(extent.minX - PAGE_MARGIN_MM),
+          originY: nanometres(extent.maxY + PAGE_MARGIN_MM),
+        },
+      },
       visual: {
-        layerName: `${name} (${layer.file.split(/[\\/]/).at(-1)})`,
+        layerName: `${name} (${file})`,
         ...(layer.style.hidden ? { hidden: true } : {}),
       },
     });

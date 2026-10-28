@@ -3,13 +3,14 @@ import {
   type SaveHtmlBundle,
 } from "./inspector/HtmlExportSection.tsx";
 import { isDatabaseObjectType, shortPageId } from "@nodetto/ir";
-import type { Editor } from "@nodetto/core";
+import { type Editor, fabricationLayerGroups } from "@nodetto/core";
 import { availableMermaidKinds } from "@nodetto/io";
 import {
   BREADBOARD_EXPORTS,
   breadboardExportEnabled,
   type BreadboardExportKind,
 } from "./breadboard-export.ts";
+import { pcbExportEnabled } from "./pcb-export.ts";
 import {
   createMemo,
   createSignal,
@@ -52,6 +53,8 @@ type Format =
   | "sql"
   | "bpmn"
   | "breadboard"
+  | "gerber"
+  | "pcb"
   | "code"
   | "html";
 
@@ -61,13 +64,22 @@ export interface ExportDialogProps {
   readonly saveHtmlBundle?: SaveHtmlBundle;
   readonly exportBpmn: () => Promise<void>;
   readonly exportBreadboard?: (kind: BreadboardExportKind) => Promise<void>;
+  /** Gerber and drill ZIP of a page drawn by Gerber import. */
+  readonly exportGerber?: () => Promise<void>;
+  readonly exportPcb?: () => Promise<void>;
   readonly error?: string | null;
   readonly onClose: () => void;
 }
 
 export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
-  const [format, setFormat] = createSignal<Format>("svg");
+  // A board is exported for fabrication far more often than as artwork.
+  const [format, setFormat] = createSignal<Format>(
+    props.exportPcb &&
+      props.editor.store.getPage(props.editor.currentPageId)?.kind === "pcb"
+      ? "pcb"
+      : "svg",
+  );
   let dialog: HTMLDialogElement | undefined;
   const page = createMemo(() => {
     signals.rev();
@@ -117,6 +129,21 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
           props.exportBreadboard !== undefined,
         ),
       },
+      {
+        id: "gerber",
+        label: "Gerber",
+        enabled:
+          props.exportGerber !== undefined &&
+          fabricationLayerGroups(
+            props.editor.getSnapshot(),
+            props.editor.currentPageId,
+          ).length > 0,
+      },
+      {
+        id: "pcb",
+        label: "PCB",
+        enabled: pcbExportEnabled(page()?.kind, props.exportPcb !== undefined),
+      },
       { id: "code", label: "Code", enabled: selected() !== undefined },
     ] satisfies readonly { id: Format; label: string; enabled: boolean }[];
   });
@@ -127,8 +154,9 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     { label: "Artwork", ids: ["svg", "png", "pdf"] },
     {
       label: "Diagram source",
-      ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard"],
+      ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
     },
+    { label: "Fabrication", ids: ["pcb"] },
     { label: "Web & developer", ids: ["html", "code"] },
   ];
   const descriptions: Record<Format, string> = {
@@ -142,6 +170,9 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     bpmn: "BPMN 2.0 XML for other process modeling tools.",
     breadboard:
       "BOM and netlists for other circuit tools, and PCB files for board houses such as JLCPCB.",
+    gerber:
+      "The imported board's Gerber and drill files with your edits, for a board house. Nothing is checked.",
+    pcb: "Gerber copper, solder mask, silkscreen, outline and drill files.",
     html: "A website ZIP containing artboard HTML, CSS and assets.",
     code: "Design details, web code and native code for the selected element.",
   };
@@ -292,6 +323,16 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                   </button>
                 )}
               </For>
+            </Match>
+            <Match when={active() === "gerber"}>
+              <button type="button" onClick={() => void props.exportGerber?.()}>
+                Gerber and drill (.zip)
+              </button>
+            </Match>
+            <Match when={active() === "pcb"}>
+              <button type="button" onClick={() => void props.exportPcb?.()}>
+                Gerber and drill (.zip)
+              </button>
             </Match>
             <Match when={active() === "code" && selected()}>
               {(element) => <Code editor={props.editor} id={element().id} />}

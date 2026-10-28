@@ -1,5 +1,13 @@
 import type { UiControlSemantic } from "./ui-controls.ts";
 import type { DatabaseObjectSemantic } from "./database-objects.ts";
+import type {
+  PcbBoardSemantic,
+  PcbFootprintSemantic,
+  PcbGraphicSemantic,
+  PcbTrackSemantic,
+  PcbViaSemantic,
+  PcbZoneSemantic,
+} from "./pcb.ts";
 // Semantic payloads for the v1 element type registry.
 // See the product design (nodetto-cloud repo), section 5.2.
 
@@ -646,6 +654,45 @@ export interface GroupSemantic {
   readonly booleanOperation?: BooleanOperation;
   /** Force a compositing boundary while retaining ordinary member geometry. */
   readonly isolate?: boolean;
+  /** The PCB fabrication layer this group draws, set by Gerber import. */
+  readonly fabricationLayer?: FabricationLayer;
+}
+
+export const FABRICATION_LAYER_KINDS = [
+  "copper",
+  "soldermask",
+  "silkscreen",
+  "paste",
+  "outline",
+  "drill",
+  "other",
+] as const;
+export type FabricationLayerKind = (typeof FABRICATION_LAYER_KINDS)[number];
+export const FABRICATION_LAYER_SIDES = [
+  "top",
+  "bottom",
+  "inner",
+  "board",
+] as const;
+export type FabricationLayerSide = (typeof FABRICATION_LAYER_SIDES)[number];
+
+/**
+ * A group's PCB layer and its page placement: page point (x, y) is board
+ * point (originX + x / unitsPerMm, originY - y / unitsPerMm) in millimetres,
+ * y pointing up.
+ */
+export interface FabricationLayer {
+  readonly kind: FabricationLayerKind;
+  readonly side: FabricationLayerSide;
+  /** Inner copper layer number, 1 for the first inner layer. */
+  readonly inner?: number;
+  /** Drill files only: whether the holes are plated. */
+  readonly plating?: "plated" | "nonPlated";
+  /** The imported file name, reused when the layer is exported. */
+  readonly file?: string;
+  readonly unitsPerMm: number;
+  readonly originX: number;
+  readonly originY: number;
 }
 
 export interface ImageSemantic {
@@ -878,6 +925,7 @@ export function isBreadboardElementType(
 export function isBreadboardPartType(type: string): type is BreadboardPartType {
   return (BREADBOARD_PART_TYPES as readonly string[]).includes(type);
 }
+
 export const BREADBOARD_REFERENCE_PREFIX: Readonly<
   Record<BreadboardPartType, string>
 > = {
@@ -1093,6 +1141,12 @@ export interface SemanticByType {
   "breadboard.header": BreadboardHeaderSemantic;
   "breadboard.battery": BreadboardBatterySemantic;
   "breadboard.netlist": BreadboardNetlistSemantic;
+  "pcb.board": PcbBoardSemantic;
+  "pcb.footprint": PcbFootprintSemantic;
+  "pcb.track": PcbTrackSemantic;
+  "pcb.via": PcbViaSemantic;
+  "pcb.zone": PcbZoneSemantic;
+  "pcb.graphic": PcbGraphicSemantic;
 }
 
 export type ElementType = keyof SemanticByType;

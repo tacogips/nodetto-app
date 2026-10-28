@@ -1,8 +1,12 @@
 import { TemplateDialog } from "./TemplateDialog.tsx";
 import {
   computeBreadboardConnectivity,
+  encodePcbBoardZip,
   encodeBreadboardPcbZip,
+  encodePcbExportZip,
+  exportPcbBoard,
   exportBreadboardPcb,
+  exportPcbPage,
   createDesignTemplate,
   toBreadboardNetlist,
   type DesignTemplateId,
@@ -366,9 +370,18 @@ export function App(props: AppProps): JSX.Element {
     }
   };
 
+  /**
+   * An imported board or drawing (KiCad, Gerber) keeps its source
+   * coordinates, which may lie off screen: show all of it.
+   */
+  const fitImported = (opened: boolean): void => {
+    if (opened && props.session.state().filePath === null)
+      props.editor.zoomToFit(viewport());
+  };
+
   const open = (): void => {
     if (mayDiscard()) {
-      void props.session.open();
+      void props.session.open().then(fitImported);
     }
   };
 
@@ -379,7 +392,7 @@ export function App(props: AppProps): JSX.Element {
 
   const openRecent = (path: string): void => {
     if (path !== "" && mayDiscard()) {
-      void props.session.openPath(path);
+      void props.session.openPath(path).then(fitImported);
     }
   };
 
@@ -708,8 +721,18 @@ export function App(props: AppProps): JSX.Element {
       );
       return;
     }
-    const bytes = encodeBreadboardPcbZip(pcb);
-    const name = `${exportBaseName(pageName)}-pcb.zip`;
+    const saved = await saveZip(
+      encodeBreadboardPcbZip(pcb),
+      `${exportBaseName(pageName)}-pcb.zip`,
+    );
+    if (saved)
+      setExportError(
+        `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
+      );
+  };
+
+  /** Saves a ZIP through the export backend, or downloads it; false if cancelled. */
+  const saveZip = async (bytes: Uint8Array, name: string): Promise<boolean> => {
     if (!props.exportBackend.available) {
       const url = URL.createObjectURL(
         new Blob([bytes], { type: "application/zip" }),
@@ -721,14 +744,66 @@ export function App(props: AppProps): JSX.Element {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } else {
-      const path = await props.exportBackend.pickExportPath(name, "zip");
-      if (path === null) return;
-      await props.exportBackend.writeBytes(path, bytes);
+      return true;
     }
-    setExportError(
-      `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
-    );
+    const path = await props.exportBackend.pickExportPath(name, "zip");
+    if (path === null) return false;
+    await props.exportBackend.writeBytes(path, bytes);
+    return true;
+  };
+
+  /** The imported board's Gerber and drill files, edits included. */
+  const exportGerber = async (): Promise<void> => {
+    setExportError(null);
+    const page = props.editor.store.getPage(props.editor.currentPageId);
+    if (!page) return;
+    try {
+      const report = exportPcbPage(props.editor.getSnapshot(), page.id, {
+        name: exportBaseName(page.name),
+      });
+      const saved = await saveZip(
+        encodePcbExportZip(report),
+        `${exportBaseName(page.name)}-gerber.zip`,
+      );
+      if (saved)
+        setExportError(
+          `Export notes: ${[
+            ...report.warnings,
+            `${report.layers.length} layer(s) written; nothing was checked, so review the files before ordering.`,
+          ].join("; ")}`,
+        );
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
+  const exportPcbGerber = async (): Promise<void> => {
+    setExportError(null);
+    const page = props.editor.store.getPage(props.editor.currentPageId);
+    if (page?.kind !== "pcb") return;
+    try {
+      const pcb = exportPcbBoard(props.editor.store.getSnapshot(), page.id, {
+        name: page.name,
+      });
+      if (typeof pcb === "string") {
+        setExportError(pcb);
+        return;
+      }
+      const saved = await saveZip(
+        encodePcbBoardZip(pcb),
+        `${exportBaseName(page.name)}.zip`,
+      );
+      if (saved)
+        setExportError(
+          `Export notes: ${[...pcb.warnings, ...pcb.notes].join("; ")}`,
+        );
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   };
 
   const exportBreadboard = async (
@@ -1001,6 +1076,8 @@ export function App(props: AppProps): JSX.Element {
           }
           exportBpmn={exportBpmn}
           exportBreadboard={exportBreadboard}
+          exportGerber={exportGerber}
+          exportPcb={exportPcbGerber}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />

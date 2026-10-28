@@ -28,7 +28,10 @@ import {
   BREADBOARD_PITCH,
   comparePageOrder,
   isBreadboardElementType,
+  isPcbElementType,
   isPlainObject,
+  PCB_PAGE_SCALE,
+  roundNm,
   type AccessibilityMetadata,
   isBreadboardPartType,
   type BreadboardElementType,
@@ -43,6 +46,7 @@ import {
   type Page,
   type PageId,
   type PageKind,
+  type PcbFootprintSemantic,
   type ParticipantKind,
   SCHEMA_VERSION,
   type SequenceActivationSemantic,
@@ -158,6 +162,16 @@ import {
 import { planBreadboardTranslations } from "./breadboard/board-carry.ts";
 import { planBreadboardRotation } from "./breadboard/rotate.ts";
 import { snapBreadboardPoint } from "./breadboard/snap.ts";
+import { pcbAnchor } from "./pcb-board/geometry.ts";
+import {
+  type PcbTrackInput,
+  type PcbViaInput,
+  pcbInsertIndex,
+  pcbMoveCommand,
+  rotatePcbFootprintSemantic,
+  roundPcbTrackInput,
+} from "./pcb-board/edit.ts";
+import { planPcbTrackFollow } from "./pcb-board/follow.ts";
 
 export interface EditorOptions {
   /** Document to open. A single empty freeform page is created otherwise. */
@@ -1171,6 +1185,16 @@ export class Editor {
       ) {
         derived.push(...planBreadboardTranslations(this.store, draft));
       }
+      if (
+        this.store.listPages().some((page) => page.kind === "pcb") ||
+        draft.listPages().some((page) => page.kind === "pcb") ||
+        this.store
+          .listElements()
+          .some((element) => element.type.startsWith("pcb.")) ||
+        draft.listElements().some((element) => element.type.startsWith("pcb."))
+      ) {
+        derived.push(...planPcbTrackFollow(this.store, draft));
+      }
       const beforeLayout = new Store(draft.getSnapshot());
       derived.push(...planAutoLayout(draft, this.registry));
       const resizedText = planTextResize(draft, this.registry);
@@ -1626,6 +1650,8 @@ export class Editor {
     if (
       !moves.some((move) => {
         const current = this.store.get(move.id);
+        if (current && isPcbElementType(current.type))
+          return pcbMoveCommand(current, move.x, move.y) !== undefined;
         return (
           current &&
           (current.visual.x !== move.x || current.visual.y !== move.y)
@@ -1637,6 +1663,11 @@ export class Editor {
     for (const move of moves) {
       const element = this.store.get(move.id);
       if (!element) continue;
+      if (isPcbElementType(element.type)) {
+        const command = pcbMoveCommand(element, move.x, move.y);
+        if (command) commands.push(command);
+        continue;
+      }
       if (element.type === "edge.generic") {
         const semantic = element.semantic as GenericEdgeSemantic;
         if (semantic.fromPoint && semantic.toPoint) {
@@ -1668,6 +1699,67 @@ export class Editor {
     if (commands.length > 0) {
       this.apply(commands, applyOptions);
     }
+  }
+
+  /** Rotate selected PCB footprints without changing their local pad geometry. */
+  rotatePcbFootprints(
+    ids: readonly ElementId[],
+    degrees: number,
+    options: ApplyOptions = {},
+  ): void {
+    const context = this.createShapeContext();
+    const commands: Command[] = [];
+    for (const id of ids) {
+      const element = this.store.get(id);
+      if (
+        !element ||
+        element.type !== "pcb.footprint" ||
+        context.isLocked?.(id)
+      )
+        continue;
+      commands.push({
+        type: "updateSemantic",
+        id,
+        semantic: rotatePcbFootprintSemantic(
+          element.semantic as PcbFootprintSemantic,
+          degrees,
+        ),
+      });
+    }
+    if (commands.length) this.apply(commands, options);
+  }
+
+  /** Add one PCB track; returns an empty id when the target page is not PCB. */
+  addPcbTrack(pageId: PageId, input: PcbTrackInput): ElementId {
+    if (this.store.getPage(pageId)?.kind !== "pcb") return "";
+    const element = this.buildElement("pcb.track", {
+      page: pageId,
+      index: pcbInsertIndex(this.store, pageId, "pcb.track"),
+      semantic: roundPcbTrackInput(input),
+    });
+    this.apply([
+      { type: "createElement", element: { ...element, visual: {} } },
+    ]);
+    return element.id;
+  }
+
+  /** Add one PCB via; returns an empty id when the target page is not PCB. */
+  addPcbVia(pageId: PageId, input: PcbViaInput): ElementId {
+    if (this.store.getPage(pageId)?.kind !== "pcb") return "";
+    const semantic = {
+      ...input,
+      at: [roundNm(input.at[0]), roundNm(input.at[1])] as const,
+      layers: input.layers ?? (["F.Cu", "B.Cu"] as const),
+    };
+    const element = this.buildElement("pcb.via", {
+      page: pageId,
+      index: pcbInsertIndex(this.store, pageId, "pcb.via"),
+      semantic,
+    });
+    this.apply([
+      { type: "createElement", element: { ...element, visual: {} } },
+    ]);
+    return element.id;
   }
 
   /** Resize through the element's ShapeUtil; a no-op for fixed shapes. */
@@ -2073,6 +2165,17 @@ export class Editor {
         semantic.toPoint
       ) {
         out.push({ id: leaf.id, x: x ?? 0, y: y ?? 0 });
+      } else if (isPcbElementType(leaf.type)) {
+        const anchor = pcbAnchor(
+          leaf.type,
+          leaf.semantic as Record<string, unknown>,
+        );
+        if (anchor)
+          out.push({
+            id: leaf.id,
+            x: anchor[0] * PCB_PAGE_SCALE,
+            y: anchor[1] * PCB_PAGE_SCALE,
+          });
       } else if (x !== undefined && y !== undefined) {
         out.push({ id: leaf.id, x, y });
       }

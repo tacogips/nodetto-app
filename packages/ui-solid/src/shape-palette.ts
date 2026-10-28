@@ -285,6 +285,11 @@ export const BREADBOARD_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.BreadboardWire, label: "Wire", icon: "wire" },
 ];
 
+export const PCB_SHAPES: readonly ShapePaletteItem[] = [
+  { tool: Tool.PcbTrack, label: "Track", icon: "wire" },
+  { tool: Tool.PcbVia, label: "Via", icon: "ellipse" },
+];
+
 export const INTERACTION_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.ScreenTransition, label: "Screen transition", icon: "edge" },
   { tool: Tool.PopupFrame, label: "Popup / dialog", icon: "frame" },
@@ -320,6 +325,7 @@ const PRIMARY_TOOLS = {
     Tool.BreadboardButton,
     Tool.BreadboardWire,
   ],
+  pcb: [Tool.PcbTrack, Tool.PcbVia],
   component: [
     Tool.Component,
     Tool.ProvidedInterface,
@@ -386,6 +392,7 @@ const PALETTE_SHAPES = [
   ...ARTBOARD_SHAPES,
   ...BPMN_SHAPES,
   ...BREADBOARD_SHAPES,
+  ...PCB_SHAPES,
 ];
 
 /** Preserve semantic workspace labels, such as Relationship or Message. */
@@ -407,7 +414,9 @@ export function additionalShapes(id: WorkspaceId): readonly ShapePaletteItem[] {
       ? [...BPMN_SHAPES, ...COMMON_SHAPES]
       : id === "breadboard"
         ? [...BREADBOARD_SHAPES, ...COMMON_SHAPES]
-        : COMMON_SHAPES
+        : id === "pcb"
+          ? [...PCB_SHAPES, ...COMMON_SHAPES]
+          : COMMON_SHAPES
   ).filter((item) => !primary.has(item.tool));
 }
 
@@ -471,6 +480,7 @@ export function shapePaletteGroups(
     if (BPMN_SHAPES.some((item) => item.tool === tool)) return "BPMN";
     if (BREADBOARD_SHAPES.some((item) => item.tool === tool))
       return "Breadboard";
+    if (PCB_SHAPES.some((item) => item.tool === tool)) return "PCB";
     if (ARTBOARD_SHAPES.some((item) => item.tool === tool)) return "Artboards";
     return "General";
   };

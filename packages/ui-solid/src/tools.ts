@@ -47,6 +47,8 @@ export const Tool = {
   BreadboardHeader: "breadboard:header",
   BreadboardBattery: "breadboard:battery",
   BreadboardWire: "breadboard:wire",
+  PcbTrack: "pcb:track",
+  PcbVia: "pcb:via",
 
   Select: "select",
   Hand: "hand",
@@ -239,6 +241,13 @@ export const BREADBOARD_TOOLS = [
   Tool.BreadboardWire,
 ] as const;
 export type BreadboardToolKind = (typeof BREADBOARD_TOOLS)[number];
+
+export const PCB_TOOLS = [Tool.PcbTrack, Tool.PcbVia] as const;
+export type PcbToolKind = (typeof PCB_TOOLS)[number];
+export const PCB_CREATIONS: Readonly<Record<PcbToolKind, CreationTool>> = {
+  [Tool.PcbTrack]: { type: "pcb.track" },
+  [Tool.PcbVia]: { type: "pcb.via" },
+};
 
 const BREADBOARD_CREATIONS: Readonly<Record<BreadboardToolKind, CreationTool>> =
   {
@@ -487,6 +496,9 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.BreadboardBattery:
     case Tool.BreadboardWire:
       return BREADBOARD_CREATIONS[tool];
+    case Tool.PcbTrack:
+    case Tool.PcbVia:
+      return PCB_CREATIONS[tool];
     case Tool.BpmnPool:
     case Tool.BpmnPoolCollapsed:
     case Tool.BpmnLane:

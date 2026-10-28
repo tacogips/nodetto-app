@@ -1,0 +1,437 @@
+{
+  "taskId": "kicad-pcb-s536",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-536",
+  "implementationBranch": "feat/kicad-pcb",
+  "baseBranch": "feat/kicad-pcb",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "8181d519d782c2b74d85a333ddeb82376ca13c7e",
+  "designDocPaths": [
+    "design-docs/specs/design-kicad-pcb.md",
+    "design-docs/user-qa/kicad-pcb.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/kicad-pcb-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/kicad-pcb-s536",
+  "evidenceLayout": "tmp/kicad-pcb-s536/<planId>/ per plan (logs, baselines, sha256 lists); per-attempt dispatcher output under tmp/kicad-pcb-s536/<planId>/attempt-<n>/; reconciliation output under tmp/kicad-pcb-s536/reconcile/. tmp/ is git-ignored. No *.test.ts file may be written under tmp/.",
+  "historicalManifests": {
+    "paths": [
+      "impl-plans/active/kicad-pcb-s530-dispatch.json",
+      "impl-plans/active/kicad-pcb-s534-dispatch.json"
+    ],
+    "note": "Historical manifests, not dispatched and not changed. The plan entries below are copied from kicad-pcb-s534-dispatch.json, which session-535 step5 accepted (comm-009954). Only the evidence root changes (s534 -> s536). Plan 07 moves to acceptedDependencies (commit 8181d51)."
+  },
+  "reviewContext": {
+    "issueReference": "none (workflowInput only; no issueUrl, issueNumber or issueRepository). Session-536: intake comm-009973; design revision 3 accepted by step3 comm-009975 (one low cosmetic finding, fixed in the overview header).",
+    "designBaseline": "design-docs/specs/design-kicad-pcb.md revision 3 (sync of the section 4.1 page builder signatures, the section 8 summary stream, the section 11 lossless JSONL test location and the section 12 plan pointer; no behaviour change) and plans kicad-pcb-00..13.",
+    "userProblem": "Nodetto cannot yet expose the committed KiCad PCB core (reader, editing, connectivity, export, shapes) to users: there is no @nodetto/core barrel, no end-to-end fixture acceptance test, no CLI commands, no PCB canvas, inspector or Export tab, and the desktop app cannot open .kicad_pcb files.",
+    "requiredOutcomes": [
+      "Plans 01-08 are accepted dependencies (6865464, cf0c4d7, 8181d51) and are not re-implemented. This checkpoint dispatches plans 09-13 only.",
+      "Plan 09: the pcb-board barrel and one core index line; fixture.test.ts proves import completeness, lossless JSONL (before and after edits), track follow, ratsnest after deleting a track, net selection, and Gerber/Excellon read-back on test-fixtures/kicad/two-layer.kicad_pcb (design 3.4, 4.1, 5, 7, 11).",
+      "Plan 10: nodetto-cli pcb import and pcb gerber in the TS CLI, plus a native parity case passing under mise run test-cli (design 8).",
+      "Plan 11: PCB canvas views, overlay, Track/Via tools, layers and tool options panel, hover highlight, R key, workspace mapping (design 6).",
+      "Plan 12: inspector PCB section with Select net; Export dialog PCB tab and App.tsx wiring (design 6.4, 9).",
+      "Plan 13: desktop Open of .kicad_pcb as a detached document; kicad_pcb in the dialogs.rs filter (design 9).",
+      "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify and CARGO_TERM_QUIET=true mise run test-cli pass."
+    ],
+    "nonGoals": [
+      "Writing .kicad_pcb back, autorouting, zone refill, DRC, footprint flip, creating nets (design 2).",
+      "Changes to wave-2 modules (plan 09 records fixture defects instead), the existing Gerber import, breadboard export bytes, SCHEMA_VERSION.",
+      "Rust changes in apps/cli/native; 45-degree track constraint (user QA Q5); saving layer visibility (user QA Q1).",
+      "Server code, auth or deployment config (public repo)."
+    ],
+    "designDecisionsAndRationale": [
+      "PCB geometry lives in semantic, in millimetres, in the KiCad board frame, rounded to 1 nm (roundNm); visual rounding of 0.01 would lose KiCad resolution (design 3.1, 13).",
+      "Page kind pcb is appended to PAGE_KINDS with no migration and no SCHEMA_VERSION bump, as for breadboard (design 3.1).",
+      "The PCB page has its own copper connectivity and ratsnest, not the lattice and target-netlist breadboard modules (design 5.5, 13).",
+      "Gerber and Excellon export reuses the packages/core/src/pcb writers with additive changes only, so breadboard ZIP bytes stay unchanged (design 7.2).",
+      "Pad anchor (footprintToBoard(fp, pad.at)) is the drill and snap point; copper is centred at padShapeCenter, which applies the drill offset (design 3.2, 6.4).",
+      "One core barrel line (pcb-board/index.ts with explicit named exports) is written by plan 09 alone in wave 3 so that wave-4 plans never edit packages/core (overview DAG)."
+    ],
+    "intentionalTradeoffs": [
+      "Silkscreen is not clipped against mask openings; the board designer owns silkscreen layout (design 13).",
+      "Text uses the Nodetto stroke font, so silkscreen text shapes differ from KiCad (design 13).",
+      "Vias are always tented; pad mask openings use a grown pad shape (design 13).",
+      "Zone fills are kept as read and never refilled, so edited copper may not match the fills (design 2).",
+      "The native CLI is an interpreter and is slow on large boards, as the Gerber import is (design 15)."
+    ],
+    "supportedEdgeCases": [
+      "KiCad 5 to 9 syntax differences: module/footprint, fp_text/property reference and value, quoted and bare atoms, net code or name, KiCad 5 centre/angle arcs vs start/mid/end, stroke width forms, fill forms, track arcs, user silkscreen layer names, tstamp/uuid (design 4.3).",
+      "Board-absolute pad and text angles minus footprint rotation, normalised to [0, 360); bottom-side footprints with pre-mirrored local geometry (design 4.3).",
+      "Pads with drill offsets (U1 pad 1 in the fixture), unknown pad shapes mapped to custom with a warning, zone polygons with arc entries kept as points with a warning (design 4.3, plan 09).",
+      "Rule-area zones and unsupported items (dimension, target, group, image, gr_bbox, gr_text_box, model) are skipped with one warning per kind; non-finite numbers drop the item with kicad.badNumber (design 4.2, 4.3).",
+      "A board with no outline is reported in the pcb gerber command; --strict writes nothing when warnings exist (plan 10).",
+      "Case-insensitive .kicad_pcb detection checked before the KiCad schematic/netlist and Gerber path checks (plan 13)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Footprint flip to the other side, creating nets, paste and fabrication-layer Gerbers, inner-layer Gerbers, pick-and-place, SVG/PNG export of PCB pages, MCP tools (design 2).",
+      "Proving the angle, KiCad 5 arc sign and bottom-side conventions against real KiCad output; only self-authored fixtures are used (design 15).",
+      "Persisting layer visibility (user QA Q1) and a 45-degree track constraint (user QA Q5)."
+    ],
+    "constraints": [
+      "Follow AGENTS.md: English only, no emojis, cargo with CARGO_TERM_QUIET=true, strict TypeScript, bun run typecheck after TS changes, cargo fmt after Rust changes.",
+      "KiCad source is reference only; only self-authored fixtures; never commit third-party boards.",
+      "No regex split and no quadratic parsing (Boa native CLI); base names via lastIndexOf.",
+      "Workers follow impl-plans/active/kicad-pcb-00-overview.md 'Per-worker protocol' (sha256 before and after edits, intent snapshot, edit only writePaths and own progress log, no state-changing git, no workspace-wide formatter, foreground commands, no pipe into tee or head, sibling typecheck failures recorded and rerun, never counted as a pass).",
+      "Plans 10-13 run in parallel with disjoint writePaths; none edits packages/core."
+    ],
+    "residualRisks": [
+      "KiCad angle convention, KiCad 5 arc sign and bottom-side drill offset are unproven against KiCad (design 15).",
+      "Wave-4 transient failures: plan 11 runs 'bun test packages/ui-solid' while plan 12 edits ui-solid files; plans 10 and 13 may build cargo concurrently. Handled by overview protocol item 8 and serial reconciliation.",
+      "Native test-cli depends on building the binary; a build failure is recorded as blocked with the log path, never as a pass."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-kicad-pcb.md",
+      "design-docs/user-qa/kicad-pcb.md",
+      "impl-plans/active/kicad-pcb-00-overview.md",
+      "impl-plans/active/kicad-pcb-09-core-index-fixture-integration.md",
+      "impl-plans/active/kicad-pcb-10-cli.md",
+      "impl-plans/active/kicad-pcb-11-ui-canvas.md",
+      "impl-plans/active/kicad-pcb-12-ui-inspector-export.md",
+      "impl-plans/active/kicad-pcb-13-desktop-open.md",
+      "packages/core/src/pcb-board/geometry.ts",
+      "packages/core/src/pcb-board/page.ts",
+      "packages/core/src/pcb-board/edit.ts",
+      "packages/core/src/pcb-board/connectivity.ts",
+      "packages/core/src/pcb-board/ratsnest.ts",
+      "packages/core/src/pcb-board/export.ts",
+      "packages/core/src/index.ts",
+      "packages/io/src/kicad/pcb.ts",
+      "test-fixtures/kicad/two-layer.kicad_pcb",
+      "apps/cli/src/gerber-command.ts",
+      "apps/cli/src/breadboard-command.ts",
+      "apps/cli/src/native-parity.test.ts",
+      "apps/desktop/src/file/session.ts",
+      "apps/desktop/src-tauri/src/dialogs.rs"
+    ]
+  },
+  "acceptedDependencies": [
+    {
+      "planId": "kicad-pcb-01-ir-core-contracts",
+      "planPath": "impl-plans/active/kicad-pcb-01-ir-core-contracts.md",
+      "commit": "6865464",
+      "progressPath": "impl-plans/progress/kicad-pcb-01-ir-core-contracts.md",
+      "provides": [
+        "packages/ir/src/pcb.ts: page kind pcb, six pcb.* element types with validation, PCB_PAGE_SCALE, pcbRotate, roundNm, PcbImportPlan",
+        "packages/core/src/pcb-board/geometry.ts, page.ts (pcbPageFromPlan, pcbDocumentFromPlan), test-builder.ts",
+        "apps/cli/src/types-command.ts TYPICAL.pcb"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-02-fabrication-writers",
+      "planPath": "impl-plans/active/kicad-pcb-02-fabrication-writers.md",
+      "commit": "6865464",
+      "progressPath": "impl-plans/progress/kicad-pcb-02-fabrication-writers.md",
+      "provides": [
+        "packages/core/src/pcb/gerber.ts: additive flashAperture, region and arc output",
+        "packages/core/src/pcb/excellon.ts: additive plating option and slot hits; breadboard ZIP bytes unchanged"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-03-docs",
+      "planPath": "impl-plans/active/kicad-pcb-03-docs.md",
+      "commit": "6865464",
+      "progressPath": "impl-plans/progress/kicad-pcb-03-docs.md",
+      "provides": [
+        "docs/pcb/kicad-pcb.md, docs/cli.md pcb block and README feature bullet"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-04-kicad-reader",
+      "planPath": "impl-plans/active/kicad-pcb-04-kicad-reader.md",
+      "commit": "cf0c4d7",
+      "progressPath": "impl-plans/progress/kicad-pcb-04-kicad-reader.md",
+      "provides": [
+        "packages/io/src/kicad/pcb.ts importKicadPcb, exported from @nodetto/io and @nodetto/io/kicad",
+        "test-fixtures/kicad/two-layer.kicad_pcb, test-fixtures/kicad/kicad5.kicad_pcb, test-fixtures/kicad/README.md"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-05-core-editing",
+      "planPath": "impl-plans/active/kicad-pcb-05-core-editing.md",
+      "commit": "cf0c4d7",
+      "progressPath": "impl-plans/progress/kicad-pcb-05-core-editing.md",
+      "provides": [
+        "packages/core/src/editor.ts pcb branches: movableSelection, moveElements, rotatePcbFootprints, addPcbTrack, addPcbVia",
+        "packages/core/src/pcb-board/follow.ts planPcbTrackFollow; packages/core/src/pcb-board/edit.ts PCB_TRACK_DEFAULT_WIDTH, PCB_VIA_DEFAULT, PcbTrackInput, PcbViaInput"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-06-core-connectivity",
+      "planPath": "impl-plans/active/kicad-pcb-06-core-connectivity.md",
+      "commit": "cf0c4d7",
+      "progressPath": "impl-plans/progress/kicad-pcb-06-core-connectivity.md",
+      "provides": [
+        "packages/core/src/pcb-board/connectivity.ts computePcbConnectivity, pcbNetHighlight, pcbNetMembers, pcbNetNames",
+        "packages/core/src/pcb-board/ratsnest.ts computePcbRatsnest"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-07-core-export",
+      "planPath": "impl-plans/active/kicad-pcb-07-core-export.md",
+      "commit": "8181d51",
+      "progressPath": "impl-plans/progress/kicad-pcb-07-core-export.md",
+      "provides": [
+        "packages/core/src/pcb-board/export.ts exportPcbBoard, encodePcbBoardZip, PcbBoardExport",
+        "packages/core/src/pcb-board/geometry.ts padShapeCenter; padCopperOutline and padPrimitiveOutlines centred on the shape centre (drill offset, design 3.2)"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-08-core-shapes",
+      "planPath": "impl-plans/active/kicad-pcb-08-core-shapes.md",
+      "commit": "cf0c4d7",
+      "progressPath": "impl-plans/progress/kicad-pcb-08-core-shapes.md",
+      "provides": [
+        "packages/core/src/shapes/pcb.ts shape utils registered in createDefaultRegistry"
+      ]
+    }
+  ],
+  "plans": [
+    {
+      "planId": "kicad-pcb-09-core-index-fixture-integration",
+      "planPath": "impl-plans/active/kicad-pcb-09-core-index-fixture-integration.md",
+      "progressPath": "impl-plans/progress/kicad-pcb-09-core-index-fixture-integration.md",
+      "wave": 3,
+      "dependsOn": [
+        "kicad-pcb-04-kicad-reader",
+        "kicad-pcb-05-core-editing",
+        "kicad-pcb-06-core-connectivity",
+        "kicad-pcb-07-core-export",
+        "kicad-pcb-08-core-shapes"
+      ],
+      "writePaths": [
+        "packages/core/src/pcb-board/index.ts",
+        "packages/core/src/index.ts",
+        "packages/core/src/pcb-board/fixture.test.ts",
+        "impl-plans/progress/kicad-pcb-09-core-index-fixture-integration.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "All five dependsOn plans are acceptedDependencies of this manifest; do not block on them.",
+        "pcb-board/index.ts uses explicit named exports only (padShapeCenter included; outlineBounds exported as pcbOutlineBounds; strokeText, strokeTextWidth, strokeFontSupports re-exported; test-builder and follow not exported); packages/core/src/index.ts gains exactly one 'export * from \"./pcb-board/index.ts\";' line next to the breadboard line.",
+        "fixture.test.ts on test-fixtures/kicad/two-layer.kicad_pcb proves: import preserves every item and net; lossless JSONL byte-equal and deep-equal before and after editor edits; J1 move keeps track ends at the same pad-local offset; ratsnest 0 -> 1 after deleting the SIG link and back after undo; pcbNetMembers('GND') equals an independently computed set; Gerber read-back within 1e-6 mm and Excellon within 0.0005 mm; two exports byte-equal.",
+        "U1 pad 1 (drill.offset 0.1 0): slot centre at the anchor (40, 10), copper centred at padShapeCenter, as pinned in the plan.",
+        "Wave-2 modules are not changed; any fixture failure is recorded with the owning plan id and the plan is marked blocked, not done."
+      ],
+      "verification": [
+        "mkdir -p tmp/kicad-pcb-s536/kicad-pcb-09-core-index-fixture-integration",
+        "bun test packages/core/src/pcb-board packages/core/src/pcb packages/io/src/kicad packages/ir/src",
+        "bun run typecheck > tmp/kicad-pcb-s536/kicad-pcb-09-core-index-fixture-integration/typecheck.log 2>&1",
+        "bunx biome check packages/core/src/pcb-board/index.ts packages/core/src/index.ts packages/core/src/pcb-board/fixture.test.ts --diagnostic-level=warn",
+        "bun test packages/core/src/breadboard/export-golden.test.ts",
+        "test \"$(grep -c 'pcb-board/index.ts' packages/core/src/index.ts)\" -eq 1",
+        "! grep -n 'export \\*' packages/core/src/pcb-board/index.ts",
+        "git diff --quiet 8181d51 -- packages/core/src/pcb-board/geometry.ts packages/core/src/pcb-board/page.ts packages/core/src/pcb-board/edit.ts packages/core/src/pcb-board/follow.ts packages/core/src/pcb-board/connectivity.ts packages/core/src/pcb-board/ratsnest.ts packages/core/src/pcb-board/export.ts packages/io/src/kicad/pcb.ts",
+        "test -s impl-plans/progress/kicad-pcb-09-core-index-fixture-integration.md"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-10-cli",
+      "planPath": "impl-plans/active/kicad-pcb-10-cli.md",
+      "progressPath": "impl-plans/progress/kicad-pcb-10-cli.md",
+      "wave": 4,
+      "dependsOn": [
+        "kicad-pcb-09-core-index-fixture-integration"
+      ],
+      "writePaths": [
+        "apps/cli/src/pcb-command.ts",
+        "apps/cli/src/pcb-commands.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/native-parity.test.ts",
+        "impl-plans/progress/kicad-pcb-10-cli.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "pcb import <file.kicad_pcb> [--output] [--strict] and pcb gerber <doc> --output <zip> [--page] [--strict] behave exactly as pinned (messages, summary line on stderr, 'Board with no outline' form, warning lines, exit codes 0/2/3, base names via lastIndexOf, nothing written on --strict with warnings).",
+        "commands.ts has one case \"pcb\"; help OVERVIEW line after gerber import and COMMAND_HELP.pcb with usage, options, EXIT_CODES and examples; breadboard and gerber commands unchanged.",
+        "native-parity.test.ts adds 'native pcb import and gerber match the TypeScript CLI' comparing exit codes, stdout, stderr, board.jsonl text and board.zip bytes; it passes under mise run test-cli (a native build failure is recorded as blocked with the log path, never as a pass).",
+        "No apps/cli/native, MCP, types-command.ts or docs changes."
+      ],
+      "verification": [
+        "mkdir -p tmp/kicad-pcb-s536/kicad-pcb-10-cli",
+        "bun test apps/cli/src/pcb-commands.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/gerber-commands.test.ts",
+        "bun run typecheck > tmp/kicad-pcb-s536/kicad-pcb-10-cli/typecheck.log 2>&1",
+        "bunx biome check apps/cli/src/pcb-command.ts apps/cli/src/pcb-commands.test.ts apps/cli/src/commands.ts apps/cli/src/help.ts apps/cli/src/native-parity.test.ts --diagnostic-level=warn",
+        "CARGO_TERM_QUIET=true mise run test-cli > tmp/kicad-pcb-s536/kicad-pcb-10-cli/test-cli.log 2>&1",
+        "grep -nE '\\(pass\\).*native pcb import and gerber match the TypeScript CLI' tmp/kicad-pcb-s536/kicad-pcb-10-cli/test-cli.log",
+        "test \"$(grep -c 'case \"pcb\"' apps/cli/src/commands.ts)\" -eq 1",
+        "test \"$(grep -c 'pcb import|gerber' apps/cli/src/help.ts)\" -ge 1",
+        "git diff --quiet -- apps/cli/native apps/cli/src/types-command.ts",
+        "test -s impl-plans/progress/kicad-pcb-10-cli.md"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-11-ui-canvas",
+      "planPath": "impl-plans/active/kicad-pcb-11-ui-canvas.md",
+      "progressPath": "impl-plans/progress/kicad-pcb-11-ui-canvas.md",
+      "wave": 4,
+      "dependsOn": [
+        "kicad-pcb-09-core-index-fixture-integration"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/shapes/PcbShapeView.tsx",
+        "packages/ui-solid/src/shapes/pcb-view.ts",
+        "packages/ui-solid/src/shapes/pcb-view.test.ts",
+        "packages/ui-solid/src/shapes/ShapeView.tsx",
+        "packages/ui-solid/src/PcbOverlay.tsx",
+        "packages/ui-solid/src/pcb-overlay.ts",
+        "packages/ui-solid/src/pcb-state.ts",
+        "packages/ui-solid/src/PcbLayersPanel.tsx",
+        "packages/ui-solid/src/pcb-interaction.ts",
+        "packages/ui-solid/src/pcb-interaction.test.ts",
+        "packages/ui-solid/src/interaction.ts",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/tools.ts",
+        "packages/ui-solid/src/workspaces.ts",
+        "packages/ui-solid/src/shape-palette.ts",
+        "apps/desktop/src/page-workspace.ts",
+        "apps/desktop/src/page-workspace.test.ts",
+        "impl-plans/progress/kicad-pcb-11-ui-canvas.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Views for six pcb types from pure pcb-view.ts (mm * 10, pinned colours, hidden layers skipped, B-side before F-side, 6-step text pipeline ending with PCB_PAGE_SCALE); ShapeView routes pcb types.",
+        "PcbOverlay shows dashed ratsnest and net-highlight glow, memoised per document revision; PcbLayersPanel on pcb pages holds 'Layers' checkboxes and 'Tool options' (copper layer, net with No net, width > 0, via diameter > drill > 0) bound to transient pcb-state, nothing written to the document.",
+        "tools.ts Tool.PcbTrack/Tool.PcbVia, PCB_TOOLS, PCB_CREATIONS with non-null creationFor before the never check; shape-palette.ts PCB_SHAPES in PALETTE_SHAPES, PRIMARY_TOOLS.pcb, additionalShapes and a 'PCB' category; workspaces.ts 'pcb' workspace; page-workspace.ts pcb mappings.",
+        "interaction.ts: placeShape intercepts PCB tools with an isPcbPage guard (no generic placement); track vertices, Enter/double click finish, Esc cancel; via click; hover highlight; R rotates via rotatePcbFootprints; hidden-layer elements not hit; snap net wins over tool options.",
+        "Pad anchor rule (design 3.2, 6.4): pcbSnapTarget returns footprintToBoard(fp, pad.at), never the padCopperOutline centre; pad holes drawn at the anchor. Offset pad (fp (10,10) rot 90, oval (2,1), offset (0.5,0)) gives copper bounds centre page (100,95), hole page (100,100), and pcbSnapTarget at (10,9.0) returning (10,10).",
+        "Listed tests pass; workspaces.test.ts and breadboard-palette.test.ts unchanged and passing; other page kinds unchanged; no packages/core edits."
+      ],
+      "verification": [
+        "mkdir -p tmp/kicad-pcb-s536/kicad-pcb-11-ui-canvas",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid apps/desktop/src/page-workspace.test.ts",
+        "bun run typecheck > tmp/kicad-pcb-s536/kicad-pcb-11-ui-canvas/typecheck.log 2>&1",
+        "bunx biome check packages/ui-solid/src/shapes/PcbShapeView.tsx packages/ui-solid/src/shapes/pcb-view.ts packages/ui-solid/src/shapes/pcb-view.test.ts packages/ui-solid/src/shapes/ShapeView.tsx packages/ui-solid/src/PcbOverlay.tsx packages/ui-solid/src/pcb-overlay.ts packages/ui-solid/src/pcb-state.ts packages/ui-solid/src/PcbLayersPanel.tsx packages/ui-solid/src/pcb-interaction.ts packages/ui-solid/src/pcb-interaction.test.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/tools.ts packages/ui-solid/src/workspaces.ts packages/ui-solid/src/shape-palette.ts apps/desktop/src/page-workspace.ts apps/desktop/src/page-workspace.test.ts --diagnostic-level=warn",
+        "test \"$(grep -c '\"pcb\"' packages/ui-solid/src/workspaces.ts)\" -ge 1",
+        "test \"$(grep -c 'PcbOverlay' packages/ui-solid/src/Canvas.tsx)\" -ge 1",
+        "test \"$(grep -c 'PCB_SHAPES' packages/ui-solid/src/shape-palette.ts)\" -ge 2",
+        "test \"$(grep -c 'PCB_CREATIONS' packages/ui-solid/src/tools.ts)\" -ge 2",
+        "git diff --quiet -- packages/ui-solid/src/workspaces.test.ts packages/ui-solid/src/breadboard-palette.test.ts packages/core",
+        "test -s impl-plans/progress/kicad-pcb-11-ui-canvas.md"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-12-ui-inspector-export",
+      "planPath": "impl-plans/active/kicad-pcb-12-ui-inspector-export.md",
+      "progressPath": "impl-plans/progress/kicad-pcb-12-ui-inspector-export.md",
+      "wave": 4,
+      "dependsOn": [
+        "kicad-pcb-09-core-index-fixture-integration"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/inspector/PcbSection.tsx",
+        "packages/ui-solid/src/inspector/pcb-edits.ts",
+        "packages/ui-solid/src/inspector/pcb-edits.test.ts",
+        "packages/ui-solid/src/Inspector.tsx",
+        "packages/ui-solid/src/ExportDialog.tsx",
+        "packages/ui-solid/src/pcb-export.ts",
+        "packages/ui-solid/src/pcb-export.test.ts",
+        "apps/desktop/src/App.tsx",
+        "impl-plans/progress/kicad-pcb-12-ui-inspector-export.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Inspector titles Footprint, Track, Via, Zone, Graphic; PcbSection fields as pinned (footprint rotation through rotatePcbFootprints, never visual.rotation; track layer/width/net; via diameter > drill > 0; zone and graphic read-only); 'Select net' for track, via and zone selects pcbNetMembers.",
+        "pcb-edits.ts builds updateSemantic commands with roundNm and rejects invalid width and via sizes.",
+        "ExportDialog PCB tab with 'Gerber and drill (.zip)', enabled by pcbExportEnabled(pageKind, hasHandler); prop exportPcb.",
+        "App.tsx exportPcbGerber saves encodePcbBoardZip(exportPcbBoard(...)) as <page name>.zip through the breadboard save path, reports warnings and notes, and shows error strings; breadboard tab and other App.tsx lines unchanged.",
+        "Listed tests pass; no packages/core edits."
+      ],
+      "verification": [
+        "mkdir -p tmp/kicad-pcb-s536/kicad-pcb-12-ui-inspector-export",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/inspector packages/ui-solid/src/pcb-export.test.ts packages/ui-solid/src/breadboard-export.test.ts",
+        "bun run typecheck > tmp/kicad-pcb-s536/kicad-pcb-12-ui-inspector-export/typecheck.log 2>&1",
+        "bunx biome check packages/ui-solid/src/inspector/PcbSection.tsx packages/ui-solid/src/inspector/pcb-edits.ts packages/ui-solid/src/inspector/pcb-edits.test.ts packages/ui-solid/src/Inspector.tsx packages/ui-solid/src/ExportDialog.tsx packages/ui-solid/src/pcb-export.ts packages/ui-solid/src/pcb-export.test.ts apps/desktop/src/App.tsx --diagnostic-level=warn",
+        "test \"$(grep -c 'exportPcb' apps/desktop/src/App.tsx)\" -ge 1",
+        "test \"$(grep -c 'exportPcb' packages/ui-solid/src/ExportDialog.tsx)\" -ge 1",
+        "test -s impl-plans/progress/kicad-pcb-12-ui-inspector-export.md"
+      ]
+    },
+    {
+      "planId": "kicad-pcb-13-desktop-open",
+      "planPath": "impl-plans/active/kicad-pcb-13-desktop-open.md",
+      "progressPath": "impl-plans/progress/kicad-pcb-13-desktop-open.md",
+      "wave": 4,
+      "dependsOn": [
+        "kicad-pcb-09-core-index-fixture-integration"
+      ],
+      "writePaths": [
+        "apps/desktop/src/file/session.ts",
+        "apps/desktop/src/file/session.test.ts",
+        "apps/desktop/src-tauri/src/dialogs.rs",
+        "impl-plans/progress/kicad-pcb-13-desktop-open.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "isKicadPcbPath (case-insensitive .kicad_pcb via toLowerCase().endsWith) is checked before isKicadPath and isPcbPath; importKicadPcbPath reads, checks stale, imports, fails with 'could not import <name>: <first error>' on errors, otherwise opens pcbDocumentFromPlan(plan, {pageName: plan.title}) as a detached dirty document with warnings mapped to import notes; modules lazy-imported.",
+        "dialogs.rs OPEN_FILTER_EXTENSIONS includes 'kicad_pcb' and the existing filter test asserts it; cargo fmt clean.",
+        "Gerber, KiCad schematic and netlist opening unchanged; App.tsx untouched.",
+        "Listed session and Rust tests pass."
+      ],
+      "verification": [
+        "mkdir -p tmp/kicad-pcb-s536/kicad-pcb-13-desktop-open",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/desktop/src/file/session.test.ts",
+        "bun run typecheck > tmp/kicad-pcb-s536/kicad-pcb-13-desktop-open/typecheck.log 2>&1",
+        "CARGO_TERM_QUIET=true cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+        "CARGO_TERM_QUIET=true cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml dialogs",
+        "bunx biome check apps/desktop/src/file/session.ts apps/desktop/src/file/session.test.ts --diagnostic-level=warn",
+        "test \"$(grep -c 'kicad_pcb' apps/desktop/src-tauri/src/dialogs.rs)\" -ge 2",
+        "test \"$(grep -c 'importKicadPcbPath' apps/desktop/src/file/session.ts)\" -ge 2",
+        "test -s impl-plans/progress/kicad-pcb-13-desktop-open.md"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "afterWave": [
+      "bun run typecheck",
+      "bunx biome check .",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir/src packages/io/src/kicad packages/io/src/jsonl packages/core/src/pcb packages/core/src/pcb-board packages/core/src/breadboard"
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Add a short 'KiCad PCB pages' entry indexing kicad-pcb-00..13; done by the orchestrator in serial reconciliation, not by any worker."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths. Plan 09 fixture failures in a wave-2 module are routed to a bounded repair of the accepted dependency's file here, serially, not inside a wave-4 worker.",
+    "commitPolicy": "Commit each wave on feat/kicad-pcb staging explicit paths only; never git add -A; never stage .reference/ or tmp/; never push.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-kicad-pcb.md",
+        "impl-plans/active/kicad-pcb-00-overview.md",
+        "impl-plans/active/kicad-pcb-09-core-index-fixture-integration.md",
+        "impl-plans/active/kicad-pcb-10-cli.md",
+        "impl-plans/active/kicad-pcb-s536-dispatch.json",
+        "impl-plans/README.md"
+      ],
+      "note": "The overview final git-status check (no change outside the union of plan writePaths) excludes these orchestrator-owned planning files (step5 low finding at kicad-pcb-00-overview.md:110)."
+    },
+    "finalVerification": [
+      "mkdir -p tmp/kicad-pcb-s536/reconcile",
+      "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/kicad-pcb-s536/reconcile/verify.log 2>&1",
+      "CARGO_TERM_QUIET=true mise run test-cli > tmp/kicad-pcb-s536/reconcile/test-cli.log 2>&1",
+      "grep -nE '\\(pass\\).*native pcb import and gerber match the TypeScript CLI' tmp/kicad-pcb-s536/reconcile/test-cli.log",
+      "bun test packages/io/src/kicad packages/core/src/pcb packages/core/src/pcb-board packages/ir/src packages/io/src/jsonl apps/cli/src/pcb-commands.test.ts",
+      "bun run typecheck",
+      "CARGO_TERM_QUIET=true cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+      "bun test packages/core/src/breadboard/export-golden.test.ts",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "test \"$(git status --short | grep -c '.reference')\" -eq 0",
+      "git status --short"
+    ]
+  }
+}

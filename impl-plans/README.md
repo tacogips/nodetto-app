@@ -19,7 +19,10 @@ copies under `tmp/breadboard-mode-s485/breadboard-05-collab/`
 values name the pre-archive `active/` locations.
 
 `active/` also holds the historical dispatch manifests
-`ddl-frame-dispatch.json` and the BPMN manifests
+`ddl-frame-dispatch.json`, the KiCad PCB manifests
+(`kicad-pcb-s530-dispatch.json`, `kicad-pcb-s534-dispatch.json`,
+`kicad-pcb-s536-dispatch.json`; s536 was the final dispatch, with plans
+01-08 as its accepted dependencies) and the BPMN manifests
 (`bpmn-operation-flow-s356-dispatch.json`,
 `bpmn-operation-flow-s357-dispatch.json`,
 `bpmn-operation-flow-s359-dispatch.json`,
@@ -28,6 +31,33 @@ manifests, only s359 was the final dispatch. Their `planPath` values name
 the pre-archive `active/` locations.
 
 ## Completed
+
+KiCad PCB pages (sessions 530-536; design:
+`design-docs/specs/design-kicad-pcb.md` revision 3, user QA:
+`design-docs/user-qa/kicad-pcb.md`). Plans 01-03 were committed in
+6865464, 04-06 and 08 in cf0c4d7, and 07 in 8181d51. Plans 09-13 were
+accepted by the session-536 serial integration review on the combined
+tree: `mise run verify` exit 0 (2738 pass, 0 fail) and `mise run
+test-cli` exit 0 (139 pass). Evidence: `tmp/kicad-pcb-s530/<planId>/`,
+`tmp/kicad-pcb-s534/<planId>/`, `tmp/kicad-pcb-s536/<planId>/` and
+`tmp/kicad-pcb-s536/reconcile/wave-003/`.
+
+| Plan | Scope |
+|---|---|
+| [kicad-pcb-00-overview](completed/kicad-pcb-00-overview.md) | Waves, ownership, gates, final verification |
+| [kicad-pcb-01-ir-core-contracts](completed/kicad-pcb-01-ir-core-contracts.md) | `pcb` page kind, six `pcb.*` types, board geometry and page builder |
+| [kicad-pcb-02-fabrication-writers](completed/kicad-pcb-02-fabrication-writers.md) | Additive Gerber layer and Excellon drill writer changes |
+| [kicad-pcb-03-docs](completed/kicad-pcb-03-docs.md) | `docs/pcb/kicad-pcb.md`, `docs/cli.md`, README |
+| [kicad-pcb-04-kicad-reader](completed/kicad-pcb-04-kicad-reader.md) | `.kicad_pcb` reader for KiCad 5 to 9, self-authored fixtures |
+| [kicad-pcb-05-core-editing](completed/kicad-pcb-05-core-editing.md) | Footprint move and rotate with track follow, add track and via |
+| [kicad-pcb-06-core-connectivity](completed/kicad-pcb-06-core-connectivity.md) | Copper connectivity, ratsnest, net highlight |
+| [kicad-pcb-07-core-export](completed/kicad-pcb-07-core-export.md) | `exportPcbBoard`, `encodePcbBoardZip`, drill offset |
+| [kicad-pcb-08-core-shapes](completed/kicad-pcb-08-core-shapes.md) | Shape utils for the six `pcb.*` types |
+| [kicad-pcb-09-core-index-fixture-integration](completed/kicad-pcb-09-core-index-fixture-integration.md) | `pcb-board` barrel, core index line, fixture acceptance tests |
+| [kicad-pcb-10-cli](completed/kicad-pcb-10-cli.md) | `nodetto-cli pcb import` and `pcb gerber`, native parity case |
+| [kicad-pcb-11-ui-canvas](completed/kicad-pcb-11-ui-canvas.md) | Canvas views, overlay, Track and Via tools, Layers and Tool options panel, workspace |
+| [kicad-pcb-12-ui-inspector-export](completed/kicad-pcb-12-ui-inspector-export.md) | Inspector PCB section with Select net, Export dialog PCB tab |
+| [kicad-pcb-13-desktop-open](completed/kicad-pcb-13-desktop-open.md) | Desktop Open of `.kicad_pcb` as a detached document |
 
 Breadboard circuit pages (sessions 485-490; design:
 `design-docs/specs/design-breadboard.md` revision 2, user QA:

@@ -361,6 +361,7 @@ export {
 export { createDefaultRegistry } from "./shapes/index.ts";
 export * from "./bpmn/index.ts";
 export * from "./breadboard/index.ts";
+export * from "./pcb-board/index.ts";
 export {
   NODE_DEFAULT_HEIGHT,
   NODE_DEFAULT_WIDTH,
@@ -698,3 +699,4 @@ export {
 
 export { nodeLabelLayout } from "./node-label.ts";
 export * from "./pcb-import.ts";
+export * from "./pcb-export.ts";

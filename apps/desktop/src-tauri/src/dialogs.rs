@@ -23,6 +23,7 @@ const OPEN_FILTER_EXTENSIONS: &[&str] = &[
     "html",
     "htm",
     "kicad_sch",
+    "kicad_pcb",
     "net",
     // Gerber and drill files, alone or in a board house ZIP.
     "zip",
@@ -237,6 +238,7 @@ mod tests {
     #[test]
     fn open_filter_includes_kicad() {
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"kicad_sch"));
+        assert!(OPEN_FILTER_EXTENSIONS.contains(&"kicad_pcb"));
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"net"));
     }
 

@@ -3,6 +3,8 @@ import type {
   BreadboardImportResult,
 } from "@nodetto/ir";
 import { importNetlist } from "./netlist.ts";
+export { importKicadPcb } from "./pcb.ts";
+export type { PcbImportPlan, PcbImportResult } from "@nodetto/ir";
 import { importSchematic } from "./schematic.ts";
 import { atomAt, readSexpr, SEXPR_SLOT } from "./sexpr.ts";
 
@@ -38,6 +40,17 @@ export function importKicad(
     return {
       plan: importNetlist(root, options.fileName, diagnostics),
       diagnostics,
+    };
+  if (rootName === "kicad_pcb")
+    return {
+      diagnostics: [
+        ...diagnostics,
+        {
+          severity: "error",
+          code: "kicad.pcbRoot",
+          message: "KiCad board files open as PCB pages; use pcb import.",
+        },
+      ],
     };
   return {
     diagnostics: [
