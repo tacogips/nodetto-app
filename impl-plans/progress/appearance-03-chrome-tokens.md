@@ -136,7 +136,7 @@ Post-edit SHA-256: ce68b4188a909ac59995eb30316518f3bd85cb34f06042757fc6f15c4e85e
 | `--app-comment-shadow` | `rgb(15 23 42 / 22%)` | `rgb(0 0 0 / 40%)` | shadow | — |
 | `--app-comment-pin-shadow` | `rgb(15 23 42 / 28%)` | `rgb(0 0 0 / 45%)` | shadow | — |
 | `--app-focus-ring` | `#227c91` | `#7fb3bf` | border | — |
-| `--app-muted-label` | `#727b7e` | `#a3adb1` | text | `--app-chrome-surface` (light result 4.33:1; unresolved) |
+| `--app-muted-label` | `#6d7679` | `#a3adb1` | text | `--app-chrome-surface` (light result 4.65:1; dark result 7.25:1) |
 | `--app-divider-soft` | `#eee9dd` | `#33393c` | border | — |
 | `--app-submit-hover` | `#274b55` | `#6b9da8` | background | — |
 | `--app-submit-active` | `#1d3d46` | `#5c8790` | background | — |
@@ -158,7 +158,7 @@ Post-edit SHA-256: ce68b4188a909ac59995eb30316518f3bd85cb34f06042757fc6f15c4e85e
 | `--app-button-hover` | `#e5e9ec` | `#2c3337` | background | — |
 | `--app-button-active` | `#d8dfe3` | `#343c40` | background | — |
 
-The `--nodetto-on-accent` pair uses existing `--nodetto-accent`. Comment pin and presence label tokens are fixed over user/document colors. Disabled control text is intentionally recorded separately because WCAG exempts inactive controls. `--app-muted-label` is the existing comment timestamp color, preserved exactly in light mode; it measures 4.33:1 against its white comment surface. No token-only dark value can raise that light result, and changing the light value would violate design invariant 2.
+The `--nodetto-on-accent` pair uses existing `--nodetto-accent`. Comment pin and presence label tokens are fixed over user/document colors. Disabled control text is intentionally recorded separately because WCAG exempts inactive controls. `--app-muted-label` is the existing comment timestamp color. Its light value is `#6d7679` per design invariant 2 and measures 4.65:1 against its white comment surface.
 
 ## Final verification
 
@@ -184,3 +184,19 @@ The latest fanout snapshot and current source are identical for `apps/desktop/sr
 The accepted plan requires both exact light-value preservation and at least 4.5:1 for this text pair. No source-only correction can satisfy both. Resume requires the design owner to choose whether the comment timestamp may use a darker light value (relaxing the exact-light-rendering invariant) or whether this existing metadata pair is explicitly exempt from the 4.5:1 gate. No source files changed in this continuation.
 
 STATUS: incomplete
+
+## Session 540 continuation
+
+The accepted design invariant 2 and this session's plan contract explicitly allow the single light token adjustment `--app-muted-label: #727b7e` to `#6d7679`. `base.css` pre-edit SHA-256 was `8c1d080b1b520bdd1ebcea9d43b6907c12460c3271b4001dede8b71fdba1a99b`; post-edit SHA-256 was `45aa8b69b3577da4133cf29aae1718e04167840ec01d8c9b85ed14387adf4140`. `git diff 58c8171 -- apps/desktop/src/styles/base.css` contains exactly this one removed and one added declaration (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/base-diff-assert.log`).
+
+- `bun tmp/canvas-theme-s539/appearance-03-chrome-tokens/contrast.ts` exited 0; every registry and design text pair passed 4.5:1 in light and dark (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/contrast.log`).
+- The requested broad literal grep `! grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsla?\\(|\\b(white|black)\\b' ...` exited 1 because it matches CSS `white-space` property names (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/literals.log`). The precise color-value audit, `! grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsla?\\(|(^|[;{[:space:]])(white|black)([;[:space:]]|$)' <the same 12 assigned CSS paths>`, exited 0 with no matches (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/literals-precise.log`).
+- `python3 tmp/canvas-theme-s539/appearance-03-chrome-tokens/parity.py` exited 0; light/dark token sets both contain 57 identical names (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/parity.log`).
+- `python3 tmp/canvas-theme-s539/appearance-03-chrome-tokens/light-values.py` exited 0; the 13 original token values are identical (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/light-values.log`).
+- `python3 tmp/canvas-theme-s539/appearance-03-chrome-tokens/undeclared.py` exited 0; only the allowed `--app-cloud-top` is undeclared (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/undeclared.log`).
+- Button declaration audit exited 0: zero `--app-button-*` declarations in `buttons.css`, six in `base.css`; `--app-control-radius` remains in `buttons.css`. The earlier substring-only count also saw the three intended `var()` references in `buttons.css` (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/button-declarations.log`).
+- `bun test apps/desktop/src/style.test.ts` exited 0; 1 test passed, 0 failures, 6 expectations. The final rerun occurred while this and plan 04 progress logs both ended with `STATUS: done` (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/style-test-final.log`).
+- Scoped `bunx biome check ... --diagnostic-level=warn` exited 0 for all 13 assigned CSS files (`tmp/canvas-theme-s539/appearance-03-chrome-tokens/s540/biome.log`). `git diff --check` exited 0; mechanical muted-label assertions and checkpoint diff assertion exited 0.
+
+STATUS: done
+STATUS: done

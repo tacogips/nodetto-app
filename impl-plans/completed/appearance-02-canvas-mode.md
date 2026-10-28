@@ -1,7 +1,7 @@
 # appearance-02-canvas-mode
 
 - planId: appearance-02-canvas-mode
-- planPath: impl-plans/active/appearance-02-canvas-mode.md
+- planPath: impl-plans/completed/appearance-02-canvas-mode.md
 - wave: 1
 - dependsOn: none
 - design: `design-docs/specs/design-appearance.md` sections 2 (invariant 3),

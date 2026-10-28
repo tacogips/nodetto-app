@@ -1,7 +1,7 @@
 # appearance-03-chrome-tokens
 
 - planId: appearance-03-chrome-tokens
-- planPath: impl-plans/active/appearance-03-chrome-tokens.md
+- planPath: impl-plans/completed/appearance-03-chrome-tokens.md
 - wave: 1
 - dependsOn: none
 - design: `design-docs/specs/design-appearance.md` sections 2 (invariants

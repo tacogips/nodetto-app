@@ -1,7 +1,7 @@
 # appearance-07-theme-tokens-test
 
 - planId: appearance-07-theme-tokens-test
-- planPath: impl-plans/active/appearance-07-theme-tokens-test.md
+- planPath: impl-plans/completed/appearance-07-theme-tokens-test.md
 - wave: 3
 - dependsOn: appearance-03-chrome-tokens, appearance-04-canvas-css,
   appearance-05-ui-solid-chrome-css

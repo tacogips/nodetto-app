@@ -1,7 +1,7 @@
 # appearance-06-desktop-wiring
 
 - planId: appearance-06-desktop-wiring
-- planPath: impl-plans/active/appearance-06-desktop-wiring.md
+- planPath: impl-plans/completed/appearance-06-desktop-wiring.md
 - wave: 2
 - dependsOn: appearance-01-preferences, appearance-02-canvas-mode
 - design: `design-docs/specs/design-appearance.md` sections 3.3, 3.4, 5.1,

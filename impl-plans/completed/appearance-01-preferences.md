@@ -1,7 +1,7 @@
 # appearance-01-preferences
 
 - planId: appearance-01-preferences
-- planPath: impl-plans/active/appearance-01-preferences.md
+- planPath: impl-plans/completed/appearance-01-preferences.md
 - wave: 1
 - dependsOn: none
 - design: `design-docs/specs/design-appearance.md` sections 1, 3.1, 3.2

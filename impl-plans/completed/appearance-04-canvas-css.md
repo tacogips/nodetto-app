@@ -1,7 +1,7 @@
 # appearance-04-canvas-css
 
 - planId: appearance-04-canvas-css
-- planPath: impl-plans/active/appearance-04-canvas-css.md
+- planPath: impl-plans/completed/appearance-04-canvas-css.md
 - wave: 1
 - dependsOn: none (styles the class pinned by plan 02; no file overlap)
 - design: `design-docs/specs/design-appearance.md` sections 2 (invariants

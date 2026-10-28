@@ -34,3 +34,14 @@ STATUS: done
 - Review evidence file: `tmp/canvas-theme-s539/appearance-01-preferences/intent-integration-review-redispatch.md`.
 
 STATUS: done
+
+## Session 540 re-verification
+- Verify-only source identity: the four settings source/test SHA-256 values remain `76da55dbbb1b0d141c88dda11f18f7e47e65ebe357ffb4798dfc35e82179054b`, `4f2c4abd581ecf94e5096af66b8afd20e5c9e3f4bb082c8d142ee0e7c7bc0a78`, `8e6e40f4b70d08f66fc035a28c34d38a34c9ac575014d1f52796e2e5cc544869`, and `542bb11632defd2a3a3fdec0f0e2467ea6bdc15aa035022da114f546ffb252a4` respectively.
+- `bun test apps/desktop/src/settings > tmp/canvas-theme-s539/appearance-01-preferences/s540/test.log 2>&1`: exit 0; 14 pass, 0 fail, 65 assertions; complete log `tmp/canvas-theme-s539/appearance-01-preferences/s540/test.log`.
+- `bun run typecheck > tmp/canvas-theme-s539/appearance-01-preferences/s540/typecheck.log 2>&1`: exit 0; complete log `tmp/canvas-theme-s539/appearance-01-preferences/s540/typecheck.log`.
+- `bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/canvas-theme-s539/appearance-01-preferences/s540/unchecked.log 2>&1`: exit 2 due to repository diagnostics outside settings; `test "$(grep -c 'apps/desktop/src/settings/appearance\|apps/desktop/src/settings/preferences' tmp/canvas-theme-s539/appearance-01-preferences/s540/unchecked.log)" -eq 0`: exit 0, no diagnostics in this plan's files. Complete log `tmp/canvas-theme-s539/appearance-01-preferences/s540/unchecked.log`.
+- `bunx biome check apps/desktop/src/settings/appearance.ts apps/desktop/src/settings/appearance.test.ts apps/desktop/src/settings/preferences.ts apps/desktop/src/settings/preferences.test.ts --diagnostic-level=warn > tmp/canvas-theme-s539/appearance-01-preferences/s540/biome.log 2>&1`: exit 0; four files checked, no fixes; complete log `tmp/canvas-theme-s539/appearance-01-preferences/s540/biome.log`.
+- Appearance export count (expected 4), PCB dark-default count (expected 1), and progress-log existence checks: exit 0; complete command outputs are recorded in `tmp/canvas-theme-s539/appearance-01-preferences/s540/contract-check.log`.
+- No source edits were needed. A concurrent change is present in `apps/desktop/src/styles/base.css`, owned by another plan and left untouched. No Cargo commands were needed.
+
+STATUS: done

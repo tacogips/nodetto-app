@@ -5,8 +5,8 @@
   display: flex;
   gap: 4px;
   padding: 6px 52px 6px 10px;
-  border-bottom: 1px solid var(--nodetto-line);
-  background: var(--app-chrome-surface, var(--nodetto-surface));
+  border-bottom: 1px solid var(--nodetto-line, #d8d2c3);
+  background: var(--app-chrome-surface, var(--nodetto-surface, #fffdf8));
 }
 .nodetto-inspector-tabs > button {
   flex: 1 1 0;
@@ -15,7 +15,7 @@
   padding: 4px 8px;
   border: 0;
   border-radius: 6px;
-  color: var(--nodetto-muted);
+  color: var(--nodetto-muted, #596366);
   background: transparent;
   font: inherit;
   font-size: 12px;
@@ -23,13 +23,13 @@
   cursor: pointer;
 }
 .nodetto-inspector-tabs > button:hover {
-  background: var(--app-chrome-hover);
+  background: var(--app-chrome-hover, #f1f3f4);
 }
 .nodetto-inspector-tabs > button[aria-selected="true"] {
-  color: var(--nodetto-ink);
+  color: var(--nodetto-ink, #1d2a2e);
   background: var(--app-chrome-active, #e5e9eb);
 }
 .nodetto-inspector-tabs > button:focus-visible {
-  outline: 2px solid var(--nodetto-accent);
+  outline: 2px solid var(--nodetto-accent, #335c67);
   outline-offset: -2px;
 }

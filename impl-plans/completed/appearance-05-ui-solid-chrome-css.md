@@ -1,7 +1,7 @@
 # appearance-05-ui-solid-chrome-css
 
 - planId: appearance-05-ui-solid-chrome-css
-- planPath: impl-plans/active/appearance-05-ui-solid-chrome-css.md
+- planPath: impl-plans/completed/appearance-05-ui-solid-chrome-css.md
 - wave: 2
 - dependsOn: appearance-03-chrome-tokens
 - design: `design-docs/specs/design-appearance.md` sections 2 (invariant

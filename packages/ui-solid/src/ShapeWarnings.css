@@ -1,8 +1,8 @@
 .nodetto-authoring-warnings {
   padding: 8px 10px;
-  border-left: 3px solid #b45309;
-  background: #fffbeb;
-  color: #92400e;
+  border-left: 3px solid var(--app-warning-badge-border, #b45309);
+  background: var(--app-warning-badge-surface, #fffbeb);
+  color: var(--app-warning-badge-ink, #92400e);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -18,10 +18,10 @@
   place-items: center;
   width: 18px;
   height: 18px;
-  border: 1px solid #b45309;
+  border: 1px solid var(--app-warning-badge-border, #b45309);
   border-radius: 50%;
-  color: #92400e;
-  background: #fffbeb;
+  color: var(--app-warning-badge-ink, #92400e);
+  background: var(--app-warning-badge-surface, #fffbeb);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;

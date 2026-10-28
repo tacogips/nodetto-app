@@ -37,3 +37,24 @@ A first literal-audit invocation had incorrect shell escaping and exited 2; its 
 No Cargo commands were needed. No TS/TSX files changed. The final `git diff --check` passes.
 
 STATUS: done
+
+## Session 540 re-verification
+
+No CSS source edits were needed. Source hashes were identical before and after verification (`tmp/canvas-theme-s539/appearance-04-canvas-css/s540/source-before.sha256`, `source-after.sha256`): `canvas.css` e09226e28bb892bb1720445d02146ececc3136f33b7761f70ccfb204e402c4c3 and `canvas-gestures.css` e44ef847593772f67204506b8a2233d2f348ec68ad13fa65827d44736a2c1d58.
+
+| Command | Exit / result | Evidence |
+| --- | ---: | --- |
+| `bun tmp/canvas-theme-s539/appearance-04-canvas-css/contrast.ts` | 0; overlay/bg 6.66:1 light, 7.45:1 dark; ruler text/surface 6.07:1 light, 6.84:1 dark | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/contrast.log` |
+| `! grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b' apps/desktop/src/styles/canvas-gestures.css` | 0; no color literal | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/gestures-literals.log` |
+| `! grep -nE 'var\(--nodetto-(accent|surface)\)' apps/desktop/src/styles/canvas-gestures.css` | 0; no chrome accent/surface references | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/gestures-tokens.log` |
+| `test "$(grep -c 'color-scheme: light' apps/desktop/src/styles/canvas.css)" -eq 1 && test "$(grep -c 'nodetto-canvas-dark' apps/desktop/src/styles/canvas.css)" -ge 1` | 0 | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/counts.log` |
+| `bun tmp/canvas-theme-s539/appearance-04-canvas-css/s540/canvas-contract.ts` | 0; token names/values, fixed tokens, light parity, paint pin, canvas references and chrome popup tokens pass | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/contract-corrected.log` |
+| `grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b' apps/desktop/src/styles/canvas.css apps/desktop/src/styles/canvas-gestures.css` | 0; reported matches are token literals in blocks at lines 8-19, 34-45, 130-135; remaining `white-space` matches are keyword-regex false positives | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/literals-audit.log` |
+| `bun test apps/desktop/src/style.test.ts` | 0; 1 test passed, 0 failed, 6 assertions; **pending-join** because plan 03 currently ends `STATUS: incomplete` | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/style-test.log` |
+| `BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/canvas-rulers.test.ts` | 0; 1 test passed, 0 failed, 6 assertions | `tmp/canvas-theme-s539/appearance-04-canvas-css/s540/rulers.log` |
+
+The first scratch contract run exited 1 because its radial-gradient assertion assumed the function and token were on one line; the existing CSS correctly wraps those declarations across lines. No source changed. The whitespace-tolerant copy reran the full contract successfully; original failure is retained in `contract.log` and the copy in `canvas-contract.ts`.
+
+The style test's successful local result is not counted as a joined pass until plan 03 is complete; reconciliation must rerun it after the wave joins. No TypeScript or Rust files changed; no cargo command was needed.
+
+STATUS: done

@@ -39,7 +39,7 @@
   --app-comment-shadow: rgb(15 23 42 / 22%);
   --app-comment-pin-shadow: rgb(15 23 42 / 28%);
   --app-focus-ring: #227c91;
-  --app-muted-label: #727b7e;
+  --app-muted-label: #6d7679;
   --app-divider-soft: #eee9dd;
   --app-submit-hover: #274b55;
   --app-submit-active: #1d3d46;
@@ -60,6 +60,31 @@
   --app-button-surface: #f0f2f3;
   --app-button-hover: #e5e9ec;
   --app-button-active: #d8dfe3;
+  --app-problem-ink: #20252a;
+  --app-problem-muted: #5d6872;
+  --app-bpmn-warning-ink: #b54708;
+  --app-bpmn-warning-surface: #fff4e5;
+  --app-help-border: #d7dce0;
+  --app-help-ink: #263238;
+  --app-help-shadow: #0000001a;
+  --app-ui-focus: #5d7480;
+  --app-warning-badge-border: #b45309;
+  --app-warning-badge-surface: #fffbeb;
+  --app-warning-badge-ink: #92400e;
+  --app-switch-off: #a1a1aa;
+  --app-switch-thumb: #ffffff;
+  --app-switch-on: #34c759;
+  --app-toolbar-selection-surface: #e7edf6;
+  --app-toolbar-selection-border: #526d96;
+  --app-toolbar-selection-ink: #526071;
+  --app-toolbar-selected-surface: #303a40;
+  --app-toolbar-selected-ink: #ffffff;
+  --app-image-dismiss-hover: #eef0f2;
+  --app-toolbar-menu-shadow: rgb(0 0 0 / 0.14);
+  --app-ui-shadow: #0003;
+  --app-export-backdrop: #0006;
+  --app-export-accent-shade: #000;
+  --app-export-surface-fallback: #ffffff;
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -129,6 +154,31 @@
   --app-button-surface: #242a2d;
   --app-button-hover: #2c3337;
   --app-button-active: #343c40;
+  --app-problem-ink: #e6e9ea;
+  --app-problem-muted: #a3adb1;
+  --app-bpmn-warning-ink: #ffb4a8;
+  --app-bpmn-warning-surface: #4b2521;
+  --app-help-border: #41494d;
+  --app-help-ink: #e6e9ea;
+  --app-help-shadow: rgb(0 0 0 / 32%);
+  --app-ui-focus: #7fb3bf;
+  --app-warning-badge-border: #f1cf76;
+  --app-warning-badge-surface: #41351b;
+  --app-warning-badge-ink: #f1cf76;
+  --app-switch-off: #626c72;
+  --app-switch-thumb: #ffffff;
+  --app-switch-on: #2f9e50;
+  --app-toolbar-selection-surface: #303a40;
+  --app-toolbar-selection-border: #8aa6cf;
+  --app-toolbar-selection-ink: #d6deeb;
+  --app-toolbar-selected-surface: #2b3438;
+  --app-toolbar-selected-ink: #e6e9ea;
+  --app-image-dismiss-hover: #262c2f;
+  --app-toolbar-menu-shadow: rgb(0 0 0 / 38%);
+  --app-ui-shadow: rgb(0 0 0 / 38%);
+  --app-export-backdrop: rgb(0 0 0 / 60%);
+  --app-export-accent-shade: #11181b;
+  --app-export-surface-fallback: #1b1f21;
 }
 
 * {

@@ -49,3 +49,24 @@ Current hashes after formatting:
 Final-source follow-up evidence: `BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/canvas/canvas-background.test.ts packages/ui-solid/src/canvas-rulers.test.ts` exited 0 with 6 tests passed and 27 expectations (`tmp/canvas-theme-s539/appearance-02-canvas-mode/focused-final.log`); the four-file Biome check exited 0 (`tmp/canvas-theme-s539/appearance-02-canvas-mode/biome-final2.log`); the final noUncheckedIndexedAccess rerun exited 2 with zero diagnostics in the changed canvas files (`tmp/canvas-theme-s539/appearance-02-canvas-mode/unchecked-final2.log`; filter exit 0 at `tmp/canvas-theme-s539/appearance-02-canvas-mode/unchecked-target-filter-final2.log`).
 
 STATUS: done
+
+## Session 540 re-verification
+
+Verify-only continuation on the committed implementation. Source identity is unchanged from the recorded hashes above. The `Canvas.tsx` diff from `28c9ded` contains only the planned import, optional prop, `signals.rev()` memo and root class entry: 15 added lines, no removed lines.
+
+| Command | Exit | Result / log |
+| --- | ---: | --- |
+| `BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/canvas/canvas-background.test.ts packages/ui-solid/src/canvas-rulers.test.ts` | 0 | 6 tests passed, 0 failed, 27 expectations. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/focused.log`. |
+| `BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid` | 0 | 559 tests passed, 0 failed, 4123 expectations. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/ui-solid.log`. |
+| `bun run typecheck` | 0 | Repository typecheck passes on the joined shared tree. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/typecheck.log`. |
+| `bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess` | 2 | 91 diagnostics, matching the recorded 91-error pre-existing baseline; zero diagnostics mention `canvas-background` or `ui-solid/src/Canvas.tsx`. Full log: `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/unchecked.log`. |
+| `test "$(grep -c 'canvas-background\\|ui-solid/src/Canvas.tsx' tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/unchecked.log)" -eq 0` | 0 | Scoped noUncheckedIndexedAccess criterion passes. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/unchecked-filter.log` (the command result is also confirmed by the zero-match count in the full log). |
+| `bunx biome check packages/ui-solid/src/canvas/canvas-background.ts packages/ui-solid/src/canvas/canvas-background.test.ts packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/index.ts --diagnostic-level=warn` | 0 | Four owned TS files checked with no diagnostics. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/biome.log`. |
+| `test "$(grep -c 'canvasBackground?: CanvasBackgroundSetting' packages/ui-solid/src/Canvas.tsx)" -eq 1 && test "$(grep -c 'canvas-background.ts' packages/ui-solid/src/index.ts)" -eq 1` | 0 | Prop and export each occur once. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/source-counts.log`. |
+| `git diff 28c9ded -- packages/ui-solid/src/Canvas.tsx` | 0 | Reviewed diff confirms only the planned 15 additions. `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/canvas-diff.log`. |
+
+The focused resolver test covers undefined setting, desktop defaults, inverted settings, every `PAGE_KINDS` value without index access, and the class constant. The repository's ordinary typecheck passes. The stricter repository-wide noUncheckedIndexedAccess invocation retains its baseline 91 diagnostics, with no errors in this plan's resolver, test or `Canvas.tsx`.
+
+Fresh progress-log pre-edit hash and exact edit intent are preserved in `tmp/canvas-theme-s539/appearance-02-canvas-mode/s540/progress-pre-edit.sha256` and `progress-edit-intent.md`.
+
+STATUS: done

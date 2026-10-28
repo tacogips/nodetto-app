@@ -252,11 +252,29 @@ tabs within the viewer column. Pane corners have small collapse chevrons.
 General is the default mode and appears first in the mode selector. Its palette
 includes basic shapes, UML classes/components, ERD tables and sequence
 participants without switching modes; Freehand is available under More shapes.
-Settings opens a dialog with categories down the left: General, Canvas,
-Snapping, Files and Shortcuts, plus Collaboration when cloud features are
-available. Grid/rulers, snapping, pane visibility and autosave delay are remembered
-across launches. The same view preferences stay synchronized with the canvas
-controls.
+Settings opens a dialog with categories down the left: General, Appearance,
+Canvas, Snapping, Files and Shortcuts, plus Collaboration when cloud features
+are available. Grid/rulers, snapping, pane visibility, appearance and autosave
+delay are remembered across launches. The same view preferences stay
+synchronized with the canvas controls.
+
+## Appearance
+
+Settings > Appearance has three choices, each applied immediately:
+
+- **Theme**: System (the default), Light or Dark. It restyles the toolbar,
+  side panes, inspector, layers, dialogs, menus, page tabs, zoom controls and
+  rulers. System follows the macOS appearance and updates when it changes, and
+  the native title bar follows the chosen theme.
+- **Canvas**: Light (the default), Dark or Match theme for diagram pages.
+- **PCB canvas**: Dark (the default), Light or Match theme for PCB pages, so
+  copper, silkscreen and outline colours read as they do on a board.
+
+The canvas settings change only the canvas background, dot grid and rulers.
+Element colours stored in the document are never changed, elements without a
+stored colour keep their usual default paint (dark strokes and text) on a dark
+canvas, and SVG, PNG, PDF
+and JSONL exports are the same in every theme.
 
 ## Multiline nodes and scoped schema export
 
