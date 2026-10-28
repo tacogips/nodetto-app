@@ -123,7 +123,8 @@ function outlineContour(
       start: point(map(start)),
       segments: [opposite, start].map((to) => ({
         to: point(map(to)),
-        arc: { center: point(map(c)), clockwise: false },
+        center: point(map(c)),
+        clockwise: false,
       })),
     };
   }
@@ -132,10 +133,8 @@ function outlineContour(
       to: point(map(segment.to)),
       ...(segment.arc
         ? {
-            arc: {
-              center: point(map(segment.arc.center)),
-              clockwise: segment.arc.clockwise,
-            },
+            center: point(map(segment.arc.center)),
+            clockwise: segment.arc.clockwise,
           }
         : {}),
     };
@@ -152,6 +151,9 @@ function contour(
     start: point(map(start)),
     segments: points.slice(1).map((p) => ({ to: point(map(p)) })),
   };
+}
+function fillContour(layer: GerberLayer, shape: GerberRegionContour): void {
+  layer.region(shape.start, shape.segments);
 }
 function drawShape(
   layer: GerberLayer,
@@ -203,7 +205,7 @@ function drawShape(
       return;
     }
     case "polygon": {
-      if (graphic.fill) layer.region([contour(shape.points, map)]);
+      if (graphic.fill) fillContour(layer, contour(shape.points, map));
       else {
         const points = [...shape.points];
         if (points.length) points.push(points[0] as PcbXY);
@@ -277,10 +279,10 @@ function flashPad(
     return;
   }
   const outline = padCopperOutline(fp, pad, grow);
-  layer.region([outlineContour(outline, map)]);
+  fillContour(layer, outlineContour(outline, map));
   if (pad.shape === "custom")
     for (const primitive of padPrimitiveOutlines(fp, pad))
-      layer.region([outlineContour(primitive, map)]);
+      fillContour(layer, outlineContour(primitive, map));
   void copper;
 }
 function layerGraphic(graphic: PcbGraphicItem, layerName: string): boolean {
@@ -375,7 +377,7 @@ export function exportPcbBoard(
       for (const fill of zone.filled)
         if (fill.layer === name)
           for (const polygon of fill.polygons)
-            layer.region([contour(polygon, map)]);
+            fillContour(layer, contour(polygon, map));
     }
     for (const graphic of graphics)
       if (layerGraphic(graphic, name)) drawShape(layer, graphic, map);

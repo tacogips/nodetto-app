@@ -41,6 +41,8 @@ import {
   BPMN_LOOP_TYPES,
   BPMN_TASK_TYPES,
   BPMN_TIMER_TYPES,
+  FABRICATION_LAYER_KINDS,
+  FABRICATION_LAYER_SIDES,
   BREADBOARD_ELEMENT_TYPES,
   BREADBOARD_PART_TYPES,
   BREADBOARD_BOARD_SIZES,
@@ -1884,7 +1886,14 @@ const GROUP: ElementTypeDefinition = {
   type: "group",
   category: "container",
   keyOrder: {
-    keys: ["memberIds", "maskId", "maskMode", "booleanOperation", "isolate"],
+    keys: [
+      "memberIds",
+      "maskId",
+      "maskMode",
+      "booleanOperation",
+      "isolate",
+      "fabricationLayer",
+    ],
   },
   onReferenceDeleted: "detach",
   references(semantic) {
@@ -1967,9 +1976,42 @@ const GROUP: ElementTypeDefinition = {
     checkBoolean(out, semantic["isolate"], `${path}.isolate`, {
       optional: true,
     });
+    validateFabricationLayer(
+      out,
+      semantic["fabricationLayer"],
+      `${path}.fabricationLayer`,
+    );
     return out;
   },
 };
+
+function validateFabricationLayer(
+  out: ValidationIssue[],
+  layer: unknown,
+  path: string,
+): void {
+  if (layer === undefined || !checkObject(out, layer, path)) return;
+  checkEnum(out, layer["kind"], `${path}.kind`, FABRICATION_LAYER_KINDS);
+  checkEnum(out, layer["side"], `${path}.side`, FABRICATION_LAYER_SIDES);
+  checkNumber(out, layer["inner"], `${path}.inner`, {
+    optional: true,
+    integer: true,
+    min: 1,
+  });
+  checkEnum(out, layer["plating"], `${path}.plating`, ["plated", "nonPlated"], {
+    optional: true,
+  });
+  checkString(out, layer["file"], `${path}.file`, { optional: true });
+  if (
+    checkNumber(out, layer["unitsPerMm"], `${path}.unitsPerMm`) &&
+    (layer["unitsPerMm"] as number) <= 0
+  )
+    out.push(
+      error("value.min", `${path}.unitsPerMm`, "must be greater than 0"),
+    );
+  checkNumber(out, layer["originX"], `${path}.originX`);
+  checkNumber(out, layer["originY"], `${path}.originY`);
+}
 
 function bpmnDefinition(
   type: ElementType,

@@ -6,7 +6,7 @@ export {
   excellonDrill,
   type DrillHit,
   type DrillSlotHit,
-  type ExcellonDrillOptions,
+  type ExcellonOptions,
 } from "./excellon.ts";
 export {
   PCB_LAYER_COUNT,
@@ -24,8 +24,8 @@ export {
 export {
   GerberLayer,
   type GerberApertureShape,
-  type GerberContourSegment,
   type GerberRegionContour,
+  type RegionSegment,
 } from "./gerber.ts";
 export {
   boxClearOfKeepouts,
@@ -82,3 +82,20 @@ export {
   type PcbLayerRole,
   type PcbLayerSide,
 } from "./layers.ts";
+export {
+  type Area,
+  areasOf,
+  type Contour,
+  contourOf,
+  micrometres,
+  polygonContour,
+  signedArea,
+} from "./contour.ts";
+export {
+  type DrillShape,
+  drillHits,
+  exactDrill,
+  measuredDrill,
+  snapSizes,
+} from "./drill-shapes.ts";
+export { writeOutline } from "./outline-strokes.ts";

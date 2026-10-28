@@ -1,4 +1,4 @@
-# Gerber import
+# Gerber import and export
 
 `nodetto-cli gerber import` draws a printed circuit board's fabrication files
 on a freeform page: Gerber RS-274X layers and Excellon drill files, given one
@@ -76,3 +76,41 @@ several paths.
 The native `nodetto-cli` runs this geometry in an interpreter, so a large
 board (eight layers, 30,000 objects) takes about a minute; the TypeScript CLI
 used in development takes a few seconds.
+
+## Editing and exporting the board
+
+An imported page can be edited and written back as Gerber and drill files:
+**Export > Gerber > Gerber and drill (.zip)** in the desktop app, or
+
+```sh
+nodetto-cli gerber export board.jsonl --output board-edited.zip
+```
+
+Each layer group becomes one file again, under the name it was imported from,
+drawn from the page as it is now. Moved, resized, rotated and deleted paths
+reach the files, and so do paths and basic shapes (rectangles, ellipses and the
+other geometric shapes) added to a layer group from the Layers panel. Text,
+lines and other elements in a layer group are left out with a warning;
+elements outside the layer groups, such as notes on the page, are ignored.
+Colours, opacity and hidden layers do not matter: every layer group is
+exported.
+
+- Filled areas are written as Gerber regions. Arcs from the imported files stay
+  exact arcs; other curves become lines within 0.001 mm. A hole in an area is
+  written as a clear region after it.
+- The board outline is written as cut lines. Lines and arcs from the imported
+  outline go back as the lines they were, with their width. Any other shape in
+  the outline group, such as an added rectangle for a cut-out, is cut along
+  its edges with the outline's line width, and the export says so.
+- Drill shapes are written to an Excellon file as holes and `G85` slots, sized
+  from their outline, with the original plating. Draw a new hole as an
+  ellipse with equal width and height in the drill group.
+- Soldermask files keep their negative polarity, so their shapes stay the mask
+  openings.
+- The files keep the board's original coordinates. Layer groups remember
+  their file and position (the group's `fabricationLayer`); ungrouping a layer
+  loses that, and the layer is no longer exported.
+
+Nothing is checked. Moving a track does not move what it connects to, and the
+export does not check spacing, connections or drill sizes. Review the files in
+a Gerber viewer or the board house's preview before ordering.

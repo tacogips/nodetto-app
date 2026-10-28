@@ -44,16 +44,11 @@ test("rectangle and obround flashes read back with shared aperture codes", () =>
 
 test("regions read back linear contours and arc direction and centre", () => {
   const square = new GerberLayer("Copper,L1,Top");
-  square.region([
-    {
-      start: p(0, 0),
-      segments: [
-        { to: p(2, 0) },
-        { to: p(2, 2) },
-        { to: p(0, 2) },
-        { to: p(0, 0) },
-      ],
-    },
+  square.region(p(0, 0), [
+    { to: p(2, 0) },
+    { to: p(2, 2) },
+    { to: p(0, 2) },
+    { to: p(0, 0) },
   ]);
   expect(readGerber(square.text("Nodetto,Test")).objects).toMatchObject([
     {
@@ -73,14 +68,9 @@ test("regions read back linear contours and arc direction and centre", () => {
   ]);
 
   const curved = new GerberLayer("Copper,L1,Top");
-  curved.region([
-    {
-      start: p(0, 0),
-      segments: [
-        { to: p(2, 0), arc: { center: p(1, 0), clockwise: false } },
-        { to: p(0, 0) },
-      ],
-    },
+  curved.region(p(0, 0), [
+    { to: p(2, 0), center: p(1, 0), clockwise: false },
+    { to: p(0, 0) },
   ]);
   const image = readGerber(curved.text("Nodetto,Test"));
   expect(image.warnings).toEqual([]);
@@ -101,16 +91,11 @@ test("regions read back linear contours and arc direction and centre", () => {
 
 test("region-only layers are accepted by the independent reader", () => {
   const layer = new GerberLayer("Copper,L1,Top");
-  layer.region([
-    {
-      start: p(0, 0),
-      segments: [
-        { to: p(2, 0) },
-        { to: p(2, 2) },
-        { to: p(0, 2) },
-        { to: p(0, 0) },
-      ],
-    },
+  layer.region(p(0, 0), [
+    { to: p(2, 0) },
+    { to: p(2, 2) },
+    { to: p(0, 2) },
+    { to: p(0, 0) },
   ]);
 
   const source = layer.text("Nodetto,Test");
@@ -138,10 +123,11 @@ test("arcs use one multi-quadrant declaration and return to linear mode", () => 
   const layer = new GerberLayer("Copper,L1,Top");
   layer.arc(0.2, p(1, 0), p(0, 1), p(0, 0), false);
   layer.arc(0.2, p(0, 1), p(-1, 0), p(0, 0), false);
+  layer.stroke(0.2, [p(-1, 0), p(-1, -1)]);
   const source = layer.text("Nodetto,Test");
   expect(source.match(/G75\*/g)).toHaveLength(1);
-  expect(source.match(/G03\*/g)).toHaveLength(2);
-  expect(source.match(/D01\*\nG01\*/g)).toHaveLength(2);
+  expect(source.match(/G03\*/g)).toHaveLength(1);
+  expect(source).toContain("G01*\nX-1000000Y0D02*\nX-1000000Y-1000000D01*");
   expect(readGerber(source).objects).toMatchObject([
     {
       kind: "draw",
@@ -155,6 +141,7 @@ test("arcs use one multi-quadrant declaration and return to linear mode", () => 
       to: p(-1, 0),
       arc: { center: p(0, 0), clockwise: false },
     },
+    { kind: "draw", from: p(-1, 0), to: p(-1, -1) },
   ]);
 
   const linear = new GerberLayer("Copper,L1,Top");
@@ -195,14 +182,9 @@ test("Excellon plated defaults stay byte-identical and non-plated slots round-tr
 test("independent Gerber and drill parsers accept arcs, regions, and slots", () => {
   const gerber = new GerberLayer("Copper,L1,Top");
   gerber.flashAperture({ kind: "circle", diameter: 0.2 }, p(-1, 0));
-  gerber.region([
-    {
-      start: p(0, 0),
-      segments: [
-        { to: p(2, 0), arc: { center: p(1, 0), clockwise: false } },
-        { to: p(0, 0) },
-      ],
-    },
+  gerber.region(p(0, 0), [
+    { to: p(2, 0), center: p(1, 0), clockwise: false },
+    { to: p(0, 0) },
   ]);
   gerber.arc(0.2, p(1, 0), p(0, 1), p(0, 0), false);
   const source = gerber.text("Nodetto,Test");

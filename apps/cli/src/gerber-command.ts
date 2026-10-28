@@ -1,6 +1,10 @@
 import {
+  encodePcbExportZip,
+  exportPcbPage,
+  fabricationLayerGroups,
   importPcbPage,
   keyAfter,
+  type PcbExportReport,
   type PcbImportFile,
   type PcbImportWarning,
   pcbFilesFromZip,
@@ -9,6 +13,8 @@ import { isZip, serializeDocument } from "@nodetto/io";
 import {
   assertValidDocument,
   type Document,
+  type Page,
+  resolvePageQuery,
   SCHEMA_VERSION,
 } from "@nodetto/ir";
 import {
@@ -165,11 +171,98 @@ function importCommand(io: CommandIo, args: readonly string[]): CommandResult {
   return ok(jsonl, `${warnings}${summary}\n`);
 }
 
+/** The page to export: `query`, or the only page with Gerber layers. */
+function selectPcbPage(
+  document: Document,
+  query: string | undefined,
+): Page | string {
+  const pages = document.pages.filter(
+    (page) => fabricationLayerGroups(document, page.id).length > 0,
+  );
+  if (query !== undefined) {
+    const resolved = resolvePageQuery(document.pages, query);
+    if (!resolved.ok) return resolved.message;
+    return pages.includes(resolved.page)
+      ? resolved.page
+      : `Page "${resolved.page.name}" has no Gerber layers; import a board's Gerber files first.`;
+  }
+  const [only, ...others] = pages;
+  if (!only)
+    return "The document has no page with Gerber layers; import a board's Gerber files first.";
+  if (!others.length) return only;
+  return `The document has ${pages.length} pages with Gerber layers; choose one with --page:\n${pages
+    .map((page) => `  ${page.name} (full id: ${page.id})`)
+    .join("\n")}`;
+}
+
+function exportCommand(io: CommandIo, args: readonly string[]): CommandResult {
+  const parsed = parseArgs(
+    args,
+    new Set(["--page", "--output"]),
+    new Set(["--strict"]),
+  );
+  if (typeof parsed === "string")
+    return fail(`${parsed}\n\n${helpFor("gerber")}`);
+  if (parsed.positional.length !== 1)
+    return fail(
+      `gerber export expects exactly one document path.\n\n${helpFor("gerber")}`,
+    );
+  const outputPath = parsed.options.get("--output");
+  if (outputPath === undefined)
+    return fail(
+      `gerber export writes a ZIP archive and requires --output <file.zip>.\n\n${helpFor("gerber")}`,
+    );
+  if (!io.writeBytes) return fail("This host cannot write binary files.");
+  const loaded = loadDocument(io, parsed.positional[0] as string);
+  if (typeof loaded === "string") return fail(loaded);
+  const page = selectPcbPage(loaded.document, parsed.options.get("--page"));
+  if (typeof page === "string") return fail(page);
+  let report: PcbExportReport;
+  try {
+    report = exportPcbPage(loaded.document, page.id, {
+      name: baseName(outputPath).replace(/\.zip$/i, ""),
+    });
+  } catch (cause) {
+    return fail(
+      `Cannot export: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  const warnings = `${loaded.warnings}${report.warnings
+    .map((warning) => `warning: ${warning}\n`)
+    .join("")}`;
+  if (parsed.flags.has("--strict") && report.warnings.length)
+    return {
+      exitCode: EXIT_WARNINGS,
+      stdout: "",
+      stderr: `${warnings}${report.warnings.length} Gerber export warning(s) with --strict.\n`,
+    };
+  try {
+    io.writeBytes(outputPath, encodePcbExportZip(report));
+  } catch (cause) {
+    return fail(
+      `${warnings}Cannot write ${outputPath}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  const summary = report.layers
+    .map(
+      (layer) =>
+        `  ${layer.name}: ${layer.path} (${layer.objects} object(s))\n`,
+    )
+    .join("");
+  return ok(
+    "",
+    `${warnings}${report.layers.length} layer(s):\n${summary}Wrote Gerber and drill files to ${outputPath}.\n`,
+  );
+}
+
 export function gerberCommand(
   io: CommandIo,
   args: readonly string[],
 ): CommandResult {
   const [subcommand, ...rest] = args;
   if (subcommand === "import") return importCommand(io, rest);
-  return fail(`gerber expects the import subcommand.\n\n${helpFor("gerber")}`);
+  if (subcommand === "export") return exportCommand(io, rest);
+  return fail(
+    `gerber expects the import or export subcommand.\n\n${helpFor("gerber")}`,
+  );
 }

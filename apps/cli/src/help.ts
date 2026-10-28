@@ -27,7 +27,7 @@ Convert and check
   nodetto-cli lint <doc|bpmn>     Lint BPMN and breadboard pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
-  nodetto-cli gerber import       Gerber and drill files to a PCB page
+  nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
   nodetto-cli pcb import|gerber   KiCad board to a PCB page, Gerber and drill export
   nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 
@@ -408,6 +408,7 @@ ${EXIT_CODES}`,
 
   gerber: `Usage: nodetto-cli gerber import <file|archive.zip>... [--output <doc.jsonl>]
                                  [--into <doc.jsonl>] [--page-name <name>] [--strict]
+       nodetto-cli gerber export <doc.jsonl> --output <board.zip> [--page <page>] [--strict]
 
 Draw a board's fabrication files on a freeform page: Gerber RS-274X layers
 (copper, solder mask, silkscreen, paste, outline) and Excellon drill files,
@@ -422,9 +423,20 @@ names. Solder mask, paste, bottom silkscreen and inner layers start hidden.
   --page-name  Page name (default: the archive or file name, or "PCB").
   --strict     Exit 3 when the import reports warnings.
 
+export writes an imported page back as a ZIP of Gerber and drill files, one
+per layer group under its imported file name, drawn from the page as it is
+now: moved, resized, rotated, deleted and added paths and shapes in a layer
+group reach the files; other elements are reported and left out. Nothing is
+checked: spacing, connections and drill sizes are up to you.
+
+  --output     The ZIP archive to write (required).
+  --page       The page with Gerber layers (required when there are several).
+  --strict     Exit 3 when the export reports warnings.
+
 Example:
   nodetto-cli gerber import board-gerbers.zip --output board.jsonl
   nodetto-cli gerber import gerber/*.g* gerber/board.drl --into keyboard.jsonl --page-name PCB
+  nodetto-cli gerber export board.jsonl --output board-edited.zip
 
 ${EXIT_CODES}`,
 
