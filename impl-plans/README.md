@@ -7,6 +7,19 @@
 
 ## Active
 
+PCB pages in SVG, PNG and PDF export (session 538; design:
+`design-docs/specs/design-pcb-svg-export.md`, user QA:
+`design-docs/user-qa/pcb-svg-export.md`). Wave 1: plans 01 and 02; wave 2:
+plan 03 (after 01); wave 3: plan 04 (after 03). Logs go under
+`tmp/pcb-svg-s538/<planId>/`.
+
+| Plan | Scope |
+|---|---|
+| [pcb-svg-01-core-view-model](active/pcb-svg-01-core-view-model.md) | Move the PCB view model and colour table to `packages/core/src/pcb-board/view.ts`; ui-solid re-exports |
+| [pcb-svg-02-docs](active/pcb-svg-02-docs.md) | `docs/pcb/kicad-pcb.md`, `docs/cli.md`, README |
+| [pcb-svg-03-svg-renderer](active/pcb-svg-03-svg-renderer.md) | `renderPcbShape`, `renderShape` dispatch, board rect, core tests |
+| [pcb-svg-04-cli-tests](active/pcb-svg-04-cli-tests.md) | CLI SVG/PNG/PDF test and native parity of the PCB SVG |
+
 Breadboard circuit pages overview:
 [breadboard-00-overview](active/breadboard-00-overview.md) lists waves
 1-7, ownership, gates and final verification. Its 18 plans are complete
