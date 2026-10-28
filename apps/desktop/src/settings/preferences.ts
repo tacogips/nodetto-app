@@ -1,4 +1,10 @@
 import type { SnapSettings } from "@nodetto/ui-solid";
+import {
+  isCanvasBackgroundPreference,
+  isThemePreference,
+  type CanvasBackgroundPreference,
+  type ThemePreference,
+} from "./appearance.ts";
 
 export interface EditorPreferences {
   readonly showGrid: boolean;
@@ -7,6 +13,9 @@ export interface EditorPreferences {
   readonly rightPaneOpen: boolean;
   readonly snap: SnapSettings;
   readonly autosaveDelayMs: number;
+  readonly theme: ThemePreference;
+  readonly canvasBackground: CanvasBackgroundPreference;
+  readonly pcbCanvasBackground: CanvasBackgroundPreference;
 }
 const KEY = "nodetto.editor.preferences.v1";
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
@@ -17,6 +26,9 @@ const defaults: EditorPreferences = {
   rightPaneOpen: true,
   snap: { grid: true, objects: true, guides: true },
   autosaveDelayMs: 1000,
+  theme: "system",
+  canvasBackground: "light",
+  pcbCanvasBackground: "dark",
 };
 export function loadEditorPreferences(
   storage?: PreferenceStorage,
@@ -55,6 +67,17 @@ export function loadEditorPreferences(
         delay <= 60000
           ? delay
           : 1000,
+      theme: isThemePreference(value["theme"])
+        ? value["theme"]
+        : defaults.theme,
+      canvasBackground: isCanvasBackgroundPreference(value["canvasBackground"])
+        ? value["canvasBackground"]
+        : defaults.canvasBackground,
+      pcbCanvasBackground: isCanvasBackgroundPreference(
+        value["pcbCanvasBackground"],
+      )
+        ? value["pcbCanvasBackground"]
+        : defaults.pcbCanvasBackground,
     };
   } catch {
     return defaults;

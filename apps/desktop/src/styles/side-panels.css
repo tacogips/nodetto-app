@@ -6,8 +6,8 @@
   flex: 0 0 210px;
   min-width: 0;
   overflow: auto;
-  border-right: 1px solid var(--line, #d8d2c3);
-  background: var(--surface, #fffdf8);
+  border-right: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
   font-size: 12px;
 }
 .nodetto-layers h2 {
@@ -16,7 +16,7 @@
 }
 .nodetto-layers p {
   margin: 8px 12px;
-  color: #596366;
+  color: var(--nodetto-muted);
 }
 .nodetto-layer-row {
   display: flex;
@@ -44,11 +44,11 @@
   white-space: nowrap;
 }
 .nodetto-layer-name[aria-pressed="true"] {
-  background: #dbe6e8;
+  background: var(--nodetto-accent-soft);
 }
 .nodetto-layer-row button:focus-visible,
 .nodetto-layer-row input:focus-visible {
-  outline: 2px solid #227c91;
+  outline: 2px solid var(--app-focus-ring);
   outline-offset: -2px;
 }
 .nodetto-layer-actions {
@@ -83,7 +83,7 @@
   background: var(--app-chrome-active);
 }
 .nodetto-component-library {
-  border-bottom: 1px solid #d8d2c3;
+  border-bottom: 1px solid var(--nodetto-line);
   padding: 8px;
 }
 
@@ -92,7 +92,7 @@
 .nodetto-typography-styles,
 .nodetto-review-comments {
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--nodetto-border, #ddd);
+  border-bottom: 1px solid var(--app-divider);
 }
 .nodetto-color-tokens form,
 .nodetto-number-tokens form,
@@ -123,13 +123,13 @@
   margin: 8px;
 }
 .nodetto-typography-entry > span {
-  color: #596366;
+  color: var(--nodetto-muted);
   font-variant-numeric: tabular-nums;
 }
 .nodetto-typography-entry button[aria-pressed="true"] {
-  border-color: var(--nodetto-accent, #335c67);
-  color: #fff;
-  background: var(--nodetto-accent, #335c67);
+  border-color: var(--nodetto-accent);
+  color: var(--nodetto-on-accent);
+  background: var(--nodetto-accent);
 }
 .nodetto-color-tokens input[type="color"] {
   width: 32px;
@@ -143,11 +143,11 @@
   min-height: 54px;
   margin: 0 8px;
   resize: vertical;
-  border: 1px solid var(--line, #d8d2c3);
+  border: 1px solid var(--nodetto-line);
   border-radius: 6px;
   padding: 6px;
   color: inherit;
-  background: var(--surface, #fffdf8);
+  background: var(--nodetto-surface);
   font: inherit;
 }
 .nodetto-comment-actions {
@@ -161,19 +161,19 @@
 .nodetto-comment-placement button,
 .nodetto-comment-thread header button,
 .nodetto-comment-popover button {
-  border: 1px solid var(--line, #d8d2c3);
+  border: 1px solid var(--nodetto-line);
   border-radius: 5px;
   padding: 4px 7px;
-  background: var(--surface, #fffdf8);
+  background: var(--nodetto-surface);
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
 .nodetto-comment-thread {
   margin: 8px;
-  border: 1px solid var(--line, #d8d2c3);
+  border: 1px solid var(--nodetto-line);
   border-radius: 7px;
-  background: #fff;
+  background: var(--app-chrome-surface);
   overflow: hidden;
 }
 .nodetto-comment-thread.is-resolved {
@@ -184,7 +184,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px;
-  background: #f5f2e9;
+  background: var(--app-component-header);
 }
 .nodetto-comment-thread header span {
   flex: 1;
@@ -198,7 +198,7 @@
 }
 .nodetto-comment-message time {
   display: block;
-  color: #727b7e;
+  color: var(--app-muted-label);
   font-size: 10px;
 }
 .nodetto-comment-message p {
@@ -213,7 +213,7 @@
   justify-content: space-between;
   margin: 6px 8px;
   padding: 7px;
-  border: 1px solid var(--nodetto-accent, #335c67);
+  border: 1px solid var(--nodetto-accent);
   border-radius: 7px;
   color: var(--nodetto-ink);
   background: var(--nodetto-accent-soft);
@@ -233,11 +233,11 @@
   transform: translate(-50%, -50%);
   width: 26px;
   height: 26px;
-  border: 2px solid #fff;
+  border: 2px solid var(--app-comment-pin-border);
   border-radius: 50% 50% 50% 8px;
-  box-shadow: 0 2px 8px rgb(15 23 42 / 28%);
-  color: #fff;
-  background: var(--nodetto-accent, #335c67);
+  box-shadow: 0 2px 8px var(--app-comment-pin-shadow);
+  color: var(--app-comment-pin-ink);
+  background: var(--nodetto-accent);
   font: 700 11px / 1 sans-serif;
   cursor: grab;
   touch-action: none;
@@ -254,16 +254,16 @@
   max-height: 260px;
   overflow: auto;
   padding: 9px;
-  border: 1px solid var(--line, #d8d2c3);
+  border: 1px solid var(--nodetto-line);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(15 23 42 / 22%);
-  color: var(--ink, #172124);
-  background: var(--surface, #fffdf8);
+  box-shadow: 0 8px 24px var(--app-comment-shadow);
+  color: var(--app-popover-ink);
+  background: var(--nodetto-surface);
   font: 12px / 1.35 sans-serif;
 }
 .nodetto-comment-popover > span {
   display: block;
-  color: #596366;
+  color: var(--nodetto-muted);
 }
 .nodetto-comment-popover p {
   margin: 8px 0;
@@ -297,7 +297,7 @@
   gap: 6px;
   margin: 8px 0;
   padding: 8px;
-  border: 1px solid var(--line, #d8d2c3);
+  border: 1px solid var(--nodetto-line);
   border-radius: 6px;
 }
 .nodetto-effect-entry {
@@ -306,7 +306,7 @@
   gap: 6px;
   margin: 8px 0;
   padding: 8px;
-  border: 1px solid var(--line, #d8d2c3);
+  border: 1px solid var(--nodetto-line);
   border-radius: 6px;
 }
 .nodetto-effect-entry > label,
@@ -325,7 +325,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 10px 4px;
-  border-bottom: 1px solid #eee9dd;
+  border-bottom: 1px solid var(--app-divider-soft);
 }
 .nodetto-component-entry strong,
 .nodetto-component-entry span {
@@ -339,19 +339,19 @@
   height: 160px;
   object-fit: contain;
   box-sizing: border-box;
-  border: 1px solid #d8d2c3;
+  border: 1px solid var(--nodetto-line);
   border-radius: 4px;
-  background: #f2f0e9;
+  background: var(--app-component-preview);
 }
 .nodetto-component-entry span {
-  color: #596366;
+  color: var(--nodetto-muted);
 }
 .nodetto-component-entry button {
-  border: 1px solid #d8d2c3;
+  border: 1px solid var(--nodetto-line);
   border-radius: 4px;
   padding: 4px 6px;
   margin-right: 4px;
   cursor: pointer;
-  background: #fffdf8;
-  color: #1d2a2e;
+  background: var(--nodetto-surface);
+  color: var(--nodetto-ink);
 }

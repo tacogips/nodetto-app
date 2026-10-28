@@ -29,7 +29,7 @@
 }
 
 .nodetto-snap-guide {
-  stroke: var(--nodetto-accent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 1;
   pointer-events: none;
 }
@@ -55,7 +55,7 @@
 }
 
 .nodetto-persistent-guide-label {
-  fill: var(--nodetto-accent);
+  fill: var(--nodetto-canvas-overlay);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   pointer-events: none;
 }
@@ -70,8 +70,8 @@
 
 .nodetto-ruler rect,
 .nodetto-ruler-corner {
-  fill: color-mix(in srgb, var(--nodetto-surface) 92%, transparent);
-  stroke: var(--nodetto-line);
+  fill: color-mix(in srgb, var(--nodetto-canvas-ruler-surface) 92%, transparent);
+  stroke: var(--nodetto-canvas-ruler-line);
   stroke-width: 1;
 }
 
@@ -81,41 +81,41 @@
 }
 
 .nodetto-ruler line {
-  stroke: var(--nodetto-muted);
+  stroke: var(--nodetto-canvas-ruler-text);
   stroke-width: 1;
   pointer-events: none;
 }
 
 .nodetto-ruler text {
-  fill: var(--nodetto-muted);
+  fill: var(--nodetto-canvas-ruler-text);
   font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
   pointer-events: none;
 }
 
 .nodetto-ruler-draft {
-  stroke: var(--nodetto-accent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 1;
   pointer-events: none;
 }
 
 .nodetto-hover-target {
-  fill: color-mix(in srgb, var(--nodetto-accent) 12%, transparent);
-  stroke: var(--nodetto-accent);
+  fill: color-mix(in srgb, var(--nodetto-canvas-overlay) 12%, transparent);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 2;
   pointer-events: none;
 }
 
 .nodetto-endpoint-handle {
-  fill: var(--nodetto-surface);
-  stroke: var(--nodetto-accent);
+  fill: var(--nodetto-canvas-handle-fill);
+  stroke: var(--nodetto-canvas-overlay);
   stroke-width: 2;
   pointer-events: all;
   cursor: crosshair;
 }
 
 .nodetto-connect-handle {
-  fill: var(--nodetto-accent);
-  stroke: var(--nodetto-surface);
+  fill: var(--nodetto-canvas-overlay);
+  stroke: var(--nodetto-canvas-handle-fill);
   stroke-width: 1.5;
   opacity: 0.85;
   pointer-events: all;

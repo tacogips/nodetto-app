@@ -16,14 +16,14 @@
   padding: 0 7px;
   border: 1px solid transparent;
   border-radius: var(--app-control-radius, 6px);
-  color: var(--nodetto-ink);
+  color: var(--nodetto-ink, #1d2a2e);
   cursor: pointer;
   font-size: 0.74rem;
   line-height: 24px;
 }
 
 .nodetto-selection-disclosure > summary:hover {
-  background: var(--nodetto-accent-soft);
+  background: var(--nodetto-accent-soft, #dbe6e8);
 }
 
 .nodetto-selection-disclosure-body {
@@ -34,9 +34,9 @@
   max-width: 100%;
   margin-top: 4px;
   padding: 4px;
-  border: 1px solid var(--nodetto-line);
+  border: 1px solid var(--nodetto-line, #d8d2c3);
   border-radius: 0;
-  background: var(--nodetto-surface);
+  background: var(--nodetto-surface, #fffdf8);
 }
 
 .nodetto-selection-disclosure-body.nodetto-float-colours {

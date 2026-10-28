@@ -5,13 +5,13 @@
   border-radius: 12px;
   border: 1px solid var(--nodetto-line);
   color: var(--nodetto-ink);
-  background: var(--nodetto-surface, white);
+  background: var(--nodetto-surface);
   overflow: hidden;
   box-sizing: border-box;
   font: inherit;
 }
 .app-settings-dialog::backdrop {
-  background: #0006;
+  background: var(--app-backdrop);
 }
 .app-settings-dialog > header {
   display: flex;
@@ -59,7 +59,7 @@
   text-align: left;
 }
 .app-settings-dialog [role="tab"][aria-selected="true"] {
-  color: white;
+  color: var(--nodetto-on-accent);
   background: var(--nodetto-accent);
 }
 .app-settings-layout > section {

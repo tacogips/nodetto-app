@@ -7,8 +7,8 @@
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  background: #f3f4f5;
-  color: #1d2a2e;
+  background: var(--app-preview-surface);
+  color: var(--app-preview-ink);
 }
 .nodetto-prototype-overlay > header {
   display: flex;
@@ -43,11 +43,11 @@
   background: var(--app-chrome-hover);
 }
 .nodetto-prototype-overlay > header :is(button, select):disabled {
-  color: #9aa2a8;
+  color: var(--app-preview-disabled);
   cursor: default;
 }
 .nodetto-prototype-overlay > header :is(button, select):focus-visible {
-  outline: 2px solid #5d7480;
+  outline: 2px solid var(--app-preview-focus);
   outline-offset: 1px;
 }
 .nodetto-prototype-overlay > p {
@@ -68,8 +68,8 @@
 }
 .nodetto-prototype-hotspot:hover,
 .nodetto-prototype-hotspot:focus-visible {
-  outline: 2px solid #335c67;
-  background: #335c6710;
+  outline: 2px solid var(--app-preview-hotspot);
+  background: var(--app-preview-hotspot-fill);
 }
 .nodetto-prototype-overlay {
   margin: 0;

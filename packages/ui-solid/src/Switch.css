@@ -12,7 +12,7 @@ input.nodetto-switch {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: #a1a1aa;
+  background: var(--app-switch-off, #a1a1aa);
   cursor: pointer;
   transition: background-color 160ms ease;
 }
@@ -24,12 +24,12 @@ input.nodetto-switch::before {
   width: var(--nodetto-switch-thumb, 20px);
   height: var(--nodetto-switch-thumb, 20px);
   border-radius: 50%;
-  background: white;
-  box-shadow: 0 1px 3px #0003;
+  background: var(--app-switch-thumb, white);
+  box-shadow: 0 1px 3px var(--app-ui-shadow, #0003);
   transition: transform 160ms ease;
 }
 input.nodetto-switch:checked {
-  background: #34c759;
+  background: var(--app-switch-on, #34c759);
 }
 input.nodetto-switch:checked::before {
   transform: translateX(var(--nodetto-switch-travel, 18px));

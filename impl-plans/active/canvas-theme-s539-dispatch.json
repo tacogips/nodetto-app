@@ -1,0 +1,487 @@
+{
+  "taskId": "canvas-theme-s539",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-540",
+  "implementationBranch": "feat/canvas-theme",
+  "baseBranch": "feat/canvas-theme",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "28c9dede750c5c2f72ce8a1085ac2fc96f800c67",
+  "designDocPaths": [
+    "design-docs/specs/design-appearance.md",
+    "design-docs/user-qa/appearance.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/appearance-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/canvas-theme-s539",
+  "evidenceLayout": "tmp/canvas-theme-s539/<planId>/ per plan (logs, sha256 lists, scratch contrast and fallback scripts); per-attempt dispatcher output under tmp/canvas-theme-s539/<planId>/attempt-<n>/; reconciliation output under tmp/canvas-theme-s539/reconcile/. The noUncheckedIndexedAccess baseline is tmp/canvas-theme-s539/step4/unchecked-baseline.log (exit 2, 91 pre-existing errors, none in target files). tmp/ is git-ignored (.gitignore:41). No *.test.ts file may be written under tmp/.",
+  "reviewContext": {
+    "issueReference": "none (workflowInput.requestedOutcome is the issue body; continuation of opus-luna-design-and-implement-review-loop-session-539 -> session-540; session 539 plans accepted by step5-impl-plan-review comm-010056; session 540 continuation plans accepted by step5-impl-plan-review comm-010112)",
+    "userProblem": "The Nodetto desktop app has only a light UI: there is no app theme setting, the chrome CSS is full of hard-coded light colours, the canvas cannot be dark, and PCB pages (whose layer colours are tuned for a dark board) render on a light canvas.",
+    "requiredOutcomes": [
+      "Settings shows an Appearance category directly after General, with Theme (System/Light/Dark), Canvas (Light/Dark/Match theme) and PCB canvas (Dark/Light/Match theme) selects; choices persist in nodetto.editor.preferences.v1 and apply live (design 3.1, 3.4; plans 01, 06).",
+      "Preference parsing tests cover defaults (system/light/dark), round trip, invalid values per key, a stored v1 payload without the new keys and the legacy nodetto.view.show-rulers path (design 6; plan 01).",
+      "System theme follows macOS appearance and updates live via watchSystemTheme; the theme is applied in main.tsx before render; the native title bar follows the theme through Window.setTheme with core:window:allow-set-theme (design 3.3; user QA Q2; plan 06).",
+      "A complete dark chrome token set in base.css under :root[data-nodetto-theme=\"dark\"] mirroring the light block; no colour literal left in desktop chrome CSS outside token blocks, enforced by theme-tokens.test.ts (design 4.1, 4.2, 6; plans 03, 07).",
+      "ui-solid chrome CSS uses var(--token, <today's literal>) so nodetto-cloud renders unchanged with only light tokens (design 4.3; plan 05).",
+      "NodettoCanvas gets an optional canvasBackground {diagram, pcb} prop and the nodetto-canvas-dark class; PCB pages are dark by default, diagram pages light by default, Match theme follows the resolved theme (design 5.1; plans 02, 06).",
+      "Canvas background, dot grid, rulers and overlays use canvas tokens with light and dark sets; a document paint pin keeps element defaults light in every theme (design 5.2, 5.3; plan 04).",
+      "README feature list gains one appearance line (design 7; plan 06).",
+      "BUN_OPTIONS=--jsx-runtime=classic mise run verify passes and mise run build succeeds."
+    ],
+    "nonGoals": [
+      "Theming document elements or a dark variant of element default paint (user QA Q1 default).",
+      "Edits to packages/ui-solid/src/shapes/pcb-view.ts, PcbShapeView.tsx, PcbOverlay.tsx, BreadboardOverlay.tsx, TextEditor.tsx, the PCB layer colour table, any export module, or packages/ui-solid/src/shapes/*.css.",
+      "A separate KiCad-navy PCB canvas set (user QA Q3 alternative); the PCB dark canvas uses #15191b.",
+      "tauri.conf.json changes, Rust changes, new npm dependencies, version bumps, nodetto-cloud's own theme, server/auth/deployment code."
+    ],
+    "constraints": [
+      "A parallel branch owns pcb-view.ts, PcbShapeView.tsx and the PCB layer colour table; the PCB dark look comes only from the canvas background.",
+      "Stored element colours are never inverted or rewritten; SVG, PNG, PDF and JSONL exports take no input from appearance state (design invariant 1; theme-tokens case 7).",
+      "Default diagram rendering stays identical (light canvas, unchanged light token values); the only default change is the dark PCB canvas (design invariant 2).",
+      "Selection outlines, handles, guides, comments and presence stay visible on both canvases (overlay >= 3:1); panel text meets WCAG AA 4.5:1 in both themes (design invariant 4).",
+      "packages/ui-solid must work with only today's light tokens and no new prop; new code typechecks under noUncheckedIndexedAccess.",
+      "English only, no emojis, cargo with CARGO_TERM_QUIET=true, no version bump, no unrelated file changes.",
+      "Workers follow impl-plans/active/appearance-00-overview.md 'Per-worker protocol' rules 1-9: sha256 before/after edits, intent snapshot, edit only writePaths/sharedPaths and own progress log, no state-changing git, no workspace-wide formatter, foreground commands without tee/head pipes, shared-input gates count only when same-wave siblings show STATUS: done otherwise recorded as pending-join and rerun in reconciliation."
+    ],
+    "designDecisionsAndRationale": [
+      "Theme applied through data-nodetto-theme on <html> plus root color-scheme, set in main.tsx before render because the CSP forbids an inline script in index.html (design 3.3).",
+      "base.css is the only file declaring chrome colour values; new tokens take the exact literal they replace so light rendering is unchanged, except light --app-muted-label #727b7e -> #6d7679 for WCAG AA (design invariant 2, commit 94497ec) (design 4.1, 4.2).",
+      "Canvas mode is resolved in the desktop app and passed as already-resolved light/dark per page kind; ui-solid knows nothing about match or the app theme, so nodetto-cloud keeps a light canvas (design 5.1).",
+      "Canvas tokens are independent of the chrome theme so a light canvas under a dark theme stays light (design 5.2).",
+      "The paint pin re-declares six tokens as literals plus color and color-scheme: light because color and color-scheme inherit as computed values from :root (design 5.3, DR-1).",
+      "ui-solid fallbacks equal today's literals byte for byte, so nodetto-cloud renders the same bytes (design 4.3).",
+      "Button tokens move from buttons.css into base.css; undeclared var() fallbacks (--line, --surface, --ink, --nodetto-border, --nodetto-panel-bg, --nodetto-text) are replaced by declared tokens, never just dropped (plan 03, F-S5-01).",
+      "base.css is written serially: plan 03 (wave 1), plan 05 append-only (wave 2), plan 07 dark values only (wave 3)."
+    ],
+    "intentionalTradeoffs": [
+      "On a dark diagram canvas, elements without stored colours keep dark default strokes so the canvas matches exports (user QA Q1).",
+      "With Dark selected, the native title bar follows via setTheme; switching from an explicit theme back to System can briefly resolve against the previous window theme until the watcher re-reads matchMedia (step5 residual low).",
+      "Workers choose dark values for new tokens; plan 03/05 contrast scripts and plan 07 WCAG case are the backstop, and plan 07 may adjust dark values only.",
+      "Some per-plan gates are pending-join and move evidence to reconciliation, which must rerun all of them."
+    ],
+    "supportedEdgeCases": [
+      "Stored preferences without the new keys, with invalid values per key, malformed JSON, blocked storage, and the legacy show-rulers key (plan 01).",
+      "matchMedia unavailable: systemDark defaults to false; setTheme rejection is caught and the CSS theme still applies (plan 06).",
+      "NodettoCanvas without canvasBackground or with an undefined page kind renders light (plan 02).",
+      "Light canvas under dark chrome and dark canvas under light chrome; Match theme for either canvas setting (plans 01, 04, 06).",
+      "Comment pin white border and presence label ink #fffdf8 are fixed tokens that read on both canvases (design 5.4).",
+      "@media (forced-colors: active) blocks in base.css keep parsing in the token test (plan 07)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live macOS appearance switching and native title bar rendering are checked manually only.",
+      "Inline colours in PcbOverlay.tsx, BreadboardOverlay.tsx and PresenceOverlay.tsx stroke attributes.",
+      "nodetto-cloud dark theme; export dialog background default."
+    ],
+    "residualRisks": [
+      "low: plan 06 re-reads matchMedia after setTheme; switching from an explicit theme back to System may briefly resolve against the previous window theme.",
+      "Serial repair may be needed for plan 07 findings against plans 03, 04 or 05.",
+      "Live macOS appearance switching and the native title bar can only be checked manually.",
+      "low (s540 review): impl-plans/progress/appearance-03-chrome-tokens.md lines 170 and 182-184 hold stale session 539 text (contrast.ts exit 1, design-owner decision needed); the plan 03 worker marks them superseded in its Session 540 section, and the Session 540 evidence plus final STATUS: done take precedence.",
+      "low (s540 review): the plan 06 capability check is count-based (grep -c allow-set-theme); the integration review must confirm default.json and gen/schemas/capabilities.json list exactly core:default and core:window:allow-set-theme."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-appearance.md",
+      "design-docs/user-qa/appearance.md",
+      "impl-plans/active/appearance-00-overview.md",
+      "impl-plans/active/appearance-01-preferences.md",
+      "impl-plans/active/appearance-02-canvas-mode.md",
+      "impl-plans/active/appearance-03-chrome-tokens.md",
+      "impl-plans/active/appearance-04-canvas-css.md",
+      "impl-plans/active/appearance-05-ui-solid-chrome-css.md",
+      "impl-plans/active/appearance-06-desktop-wiring.md",
+      "impl-plans/active/appearance-07-theme-tokens-test.md",
+      "apps/desktop/src/settings/preferences.ts",
+      "apps/desktop/src/settings/SettingsDialog.tsx",
+      "apps/desktop/src/App.tsx",
+      "apps/desktop/src/main.tsx",
+      "apps/desktop/src/styles/base.css",
+      "apps/desktop/src/styles/canvas.css",
+      "apps/desktop/src/styles/canvas-gestures.css",
+      "apps/desktop/src/style.test.ts",
+      "packages/ui-solid/src/Canvas.tsx",
+      "packages/ui-solid/src/index.ts",
+      "apps/desktop/src-tauri/capabilities/default.json",
+      "apps/desktop/src-tauri/gen/schemas/capabilities.json"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "appearance-01-preferences",
+      "planPath": "impl-plans/active/appearance-01-preferences.md",
+      "progressPath": "impl-plans/progress/appearance-01-preferences.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/settings/appearance.ts",
+        "apps/desktop/src/settings/appearance.test.ts",
+        "apps/desktop/src/settings/preferences.ts",
+        "apps/desktop/src/settings/preferences.test.ts",
+        "impl-plans/progress/appearance-01-preferences.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "appearance.ts exports ThemePreference, CanvasBackgroundPreference, ResolvedTheme, SYSTEM_DARK_QUERY, THEME_OPTIONS, CANVAS_BACKGROUND_OPTIONS, PCB_CANVAS_BACKGROUND_OPTIONS (as const, dialog order), isThemePreference, isCanvasBackgroundPreference, resolveTheme, resolveCanvasMode, applyTheme (structural root), watchSystemTheme (returns disposer, no immediate call).",
+        "EditorPreferences gains theme (default system), canvasBackground (default light), pcbCanvasBackground (default dark); invalid values fall back per key; storage key and existing key parsing unchanged; load never throws.",
+        "preferences.test.ts and appearance.test.ts cover every case listed in the plan; no new errors in settings files under noUncheckedIndexedAccess.",
+        "Progress log records hashes, intent snapshot, commands, exit codes, log paths and ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-01-preferences",
+        "bun test apps/desktop/src/settings > tmp/canvas-theme-s539/appearance-01-preferences/test.log 2>&1",
+        "bun run typecheck > tmp/canvas-theme-s539/appearance-01-preferences/typecheck.log 2>&1",
+        "bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/canvas-theme-s539/appearance-01-preferences/unchecked.log 2>&1 || true",
+        "test \"$(grep -c 'apps/desktop/src/settings/appearance\\|apps/desktop/src/settings/preferences' tmp/canvas-theme-s539/appearance-01-preferences/unchecked.log)\" -eq 0",
+        "bunx biome check apps/desktop/src/settings/appearance.ts apps/desktop/src/settings/appearance.test.ts apps/desktop/src/settings/preferences.ts apps/desktop/src/settings/preferences.test.ts --diagnostic-level=warn",
+        "test \"$(grep -c 'export function resolveTheme\\|export function resolveCanvasMode\\|export function applyTheme\\|export function watchSystemTheme' apps/desktop/src/settings/appearance.ts)\" -eq 4",
+        "test \"$(grep -c 'pcbCanvasBackground: \"dark\"' apps/desktop/src/settings/preferences.ts)\" -eq 1",
+        "test -s impl-plans/progress/appearance-01-preferences.md"
+      ]
+    },
+    {
+      "planId": "appearance-02-canvas-mode",
+      "planPath": "impl-plans/active/appearance-02-canvas-mode.md",
+      "progressPath": "impl-plans/progress/appearance-02-canvas-mode.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/canvas/canvas-background.ts",
+        "packages/ui-solid/src/canvas/canvas-background.test.ts",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/index.ts",
+        "impl-plans/progress/appearance-02-canvas-mode.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "canvas-background.ts exports CanvasMode, CanvasBackgroundSetting, canvasModeFor (undefined setting -> light; pcb -> setting.pcb; others and undefined kind -> setting.diagram) and CANVAS_DARK_CLASS = nodetto-canvas-dark.",
+        "NodettoCanvasProps gains optional canvasBackground after showRulers; a memo following the isPcbPage pattern adds the CANVAS_DARK_CLASS classList entry; nothing else in Canvas.tsx changes (about 15 lines).",
+        "index.ts gains one export line for canvas-background.ts.",
+        "canvas-background.test.ts covers undefined setting, desktop defaults, inverted setting and every PAGE_KINDS value without index access; no new noUncheckedIndexedAccess errors in these files.",
+        "Progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-02-canvas-mode",
+        "bun test packages/ui-solid/src/canvas/canvas-background.test.ts packages/ui-solid/src/canvas-rulers.test.ts > tmp/canvas-theme-s539/appearance-02-canvas-mode/test.log 2>&1",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid > tmp/canvas-theme-s539/appearance-02-canvas-mode/ui-solid.log 2>&1",
+        "bun run typecheck > tmp/canvas-theme-s539/appearance-02-canvas-mode/typecheck.log 2>&1",
+        "bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/canvas-theme-s539/appearance-02-canvas-mode/unchecked.log 2>&1 || true",
+        "test \"$(grep -c 'canvas-background\\|ui-solid/src/Canvas.tsx' tmp/canvas-theme-s539/appearance-02-canvas-mode/unchecked.log)\" -eq 0",
+        "bunx biome check packages/ui-solid/src/canvas/canvas-background.ts packages/ui-solid/src/canvas/canvas-background.test.ts packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/index.ts --diagnostic-level=warn",
+        "test \"$(grep -c 'canvasBackground?: CanvasBackgroundSetting' packages/ui-solid/src/Canvas.tsx)\" -eq 1",
+        "test \"$(grep -c 'canvas-background.ts' packages/ui-solid/src/index.ts)\" -eq 1",
+        "test -s impl-plans/progress/appearance-02-canvas-mode.md"
+      ]
+    },
+    {
+      "planId": "appearance-03-chrome-tokens",
+      "planPath": "impl-plans/active/appearance-03-chrome-tokens.md",
+      "progressPath": "impl-plans/progress/appearance-03-chrome-tokens.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/styles/base.css",
+        "apps/desktop/src/styles/app-header.css",
+        "apps/desktop/src/styles/cloud.css",
+        "apps/desktop/src/styles/panels.css",
+        "apps/desktop/src/styles/prototype-preview.css",
+        "apps/desktop/src/styles/side-panels.css",
+        "apps/desktop/src/styles/toolbar.css",
+        "apps/desktop/src/buttons.css",
+        "apps/desktop/src/inspector.css",
+        "apps/desktop/src/pane.css",
+        "apps/desktop/src/square-chrome.css",
+        "apps/desktop/src/TemplateDialog.css",
+        "apps/desktop/src/settings/settings.css",
+        "impl-plans/progress/appearance-03-chrome-tokens.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "base.css keeps the 13 light token values byte-identical, appends new role tokens to the light :root block, and adds :root[data-nodetto-theme=\"dark\"] declaring exactly the same custom-property names with design 4.1 dark values.",
+        "Button tokens move from buttons.css into base.css (0 in buttons.css, 6 in base.css); --app-control-radius stays in buttons.css.",
+        "Every colour literal in the other 12 files is replaced by var(--token) whose light value is the same colour; undeclared var() names (--line, --surface, --ink, --nodetto-border, --nodetto-panel-bg, --nodetto-text) are replaced whole by declared tokens; only --app-cloud-top stays undeclared.",
+        "Presence label ink and comment pin border are fixed tokens; document-paint literals in inspector.css and prototype-preview.css use fixed tokens.",
+        "Token registry (name | light | dark | role | pairs with) and contrast script output (every pair >= 4.5 in both themes) are recorded; style.test.ts passes or is recorded as pending-join under overview rule 8; progress log ends with STATUS: done.",
+        "Session 540: base.css light --app-muted-label is #6d7679 (the only light value change, design invariant 2); #727b7e no longer appears; contrast.ts exits 0; progress log last line STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-03-chrome-tokens",
+        "! grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsla?\\(|\\b(white|black)\\b' apps/desktop/src/styles/app-header.css apps/desktop/src/styles/cloud.css apps/desktop/src/styles/panels.css apps/desktop/src/styles/prototype-preview.css apps/desktop/src/styles/side-panels.css apps/desktop/src/styles/toolbar.css apps/desktop/src/buttons.css apps/desktop/src/inspector.css apps/desktop/src/pane.css apps/desktop/src/square-chrome.css apps/desktop/src/TemplateDialog.css apps/desktop/src/settings/settings.css",
+        "test \"$(grep -c -- '--app-button-' apps/desktop/src/buttons.css)\" -eq 0",
+        "test \"$(grep -c -- '--app-button-' apps/desktop/src/styles/base.css)\" -eq 6",
+        "test \"$(grep -c 'data-nodetto-theme=\"dark\"' apps/desktop/src/styles/base.css)\" -ge 1",
+        "bun tmp/canvas-theme-s539/appearance-03-chrome-tokens/contrast.ts > tmp/canvas-theme-s539/appearance-03-chrome-tokens/contrast.log 2>&1",
+        "bun test apps/desktop/src/style.test.ts > tmp/canvas-theme-s539/appearance-03-chrome-tokens/style-test.log 2>&1",
+        "test -s impl-plans/progress/appearance-03-chrome-tokens.md",
+        "test \"$(grep -c \"#727b7e\" apps/desktop/src/styles/base.css)\" -eq 0",
+        "test \"$(grep -c -- \"--app-muted-label: #6d7679;\" apps/desktop/src/styles/base.css)\" -eq 1",
+        "test \"$(tail -n 1 impl-plans/progress/appearance-03-chrome-tokens.md)\" = \"STATUS: done\""
+      ]
+    },
+    {
+      "planId": "appearance-04-canvas-css",
+      "planPath": "impl-plans/active/appearance-04-canvas-css.md",
+      "progressPath": "impl-plans/progress/appearance-04-canvas-css.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/styles/canvas.css",
+        "apps/desktop/src/styles/canvas-gestures.css",
+        "impl-plans/progress/appearance-04-canvas-css.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "canvas.css declares the light canvas token set (design 5.2 values) on .nodetto-canvas and the dark set on .nodetto-canvas.nodetto-canvas-dark with identical names; crop, gradient and shadow tokens are fixed in both sets; background and dot grid use --nodetto-canvas-bg and --nodetto-canvas-grid.",
+        "One paint pin rule (.nodetto-backdrop-layer, .nodetto-shape-layer, .nodetto-connector-layer, .nodetto-text-editor) declares the six tokens as light literals plus color: var(--nodetto-ink) and color-scheme: light, placed after .nodetto-layer.",
+        "Overlay, handle, guide and ruler rules listed in the plan use canvas tokens; canvas-gestures.css has no colour literal and no var(--nodetto-accent|surface); image-drop popups stay on chrome tokens.",
+        "Light canvas values equal the HEAD values they replace; contrast overlay/bg >= 3 and ruler text/surface >= 4.5 in both sets; style.test.ts passes or is pending-join under overview rule 8; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-04-canvas-css",
+        "! grep -nE '#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsla?\\(|\\b(white|black)\\b' apps/desktop/src/styles/canvas-gestures.css",
+        "! grep -nE 'var\\(--nodetto-(accent|surface)\\)' apps/desktop/src/styles/canvas-gestures.css",
+        "test \"$(grep -c 'color-scheme: light' apps/desktop/src/styles/canvas.css)\" -eq 1",
+        "test \"$(grep -c 'nodetto-canvas-dark' apps/desktop/src/styles/canvas.css)\" -ge 1",
+        "bun tmp/canvas-theme-s539/appearance-04-canvas-css/contrast.ts > tmp/canvas-theme-s539/appearance-04-canvas-css/contrast.log 2>&1",
+        "bun test apps/desktop/src/style.test.ts > tmp/canvas-theme-s539/appearance-04-canvas-css/style-test.log 2>&1",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/canvas-rulers.test.ts > tmp/canvas-theme-s539/appearance-04-canvas-css/rulers.log 2>&1",
+        "test -s impl-plans/progress/appearance-04-canvas-css.md"
+      ]
+    },
+    {
+      "planId": "appearance-05-ui-solid-chrome-css",
+      "planPath": "impl-plans/active/appearance-05-ui-solid-chrome-css.md",
+      "progressPath": "impl-plans/progress/appearance-05-ui-solid-chrome-css.md",
+      "wave": 2,
+      "dependsOn": [
+        "appearance-03-chrome-tokens"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/Toolbar.css",
+        "packages/ui-solid/src/Layers.css",
+        "packages/ui-solid/src/BpmnProblemsPanel.css",
+        "packages/ui-solid/src/BreadboardProblemsPanel.css",
+        "packages/ui-solid/src/HelpHint.css",
+        "packages/ui-solid/src/ShapePalette.css",
+        "packages/ui-solid/src/ShapeWarnings.css",
+        "packages/ui-solid/src/Switch.css",
+        "packages/ui-solid/src/PcbLayersPanel.css",
+        "packages/ui-solid/src/ExportDialog.css",
+        "packages/ui-solid/src/ImageImport.css",
+        "packages/ui-solid/src/Inspector.css",
+        "packages/ui-solid/src/ZoomControls.css",
+        "packages/ui-solid/src/SelectionToolbar.css",
+        "packages/ui-solid/src/inspector/AssetExportSection.css",
+        "impl-plans/progress/appearance-05-ui-solid-chrome-css.md"
+      ],
+      "sharedPaths": [
+        "apps/desktop/src/styles/base.css"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "apps/desktop/src/styles/base.css",
+          "intendedEdit": "Append-only: add new role tokens at the end of the light :root block and the dark :root[data-nodetto-theme=\"dark\"] block (light value = exact ui-solid literal). Do not modify, reorder or remove any line written by plan 03; no light value change. Written after plan 03 is done (wave 2), with sha256 drift logging."
+        }
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Every colour literal in the 15 ui-solid chrome CSS files is the fallback of var(--token, <literal exactly as today>); no var() without a fallback; no dark-only token referenced.",
+        "Where base.css light defines the token, its normalized value equals the fallback (scratch fallbacks.ts reports 0 mismatches).",
+        "base.css light and dark blocks still declare identical name sets; base.css diff adds lines only inside the two blocks.",
+        "Status/warning tokens and all recorded text pairs reach >= 4.5 in both themes; packages/ui-solid/src/shapes/*.css untouched.",
+        "Registry rows appended in plan 03 format; ui-solid tests pass; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-05-ui-solid-chrome-css",
+        "bun tmp/canvas-theme-s539/appearance-05-ui-solid-chrome-css/fallbacks.ts > tmp/canvas-theme-s539/appearance-05-ui-solid-chrome-css/fallbacks.log 2>&1",
+        "bun tmp/canvas-theme-s539/appearance-05-ui-solid-chrome-css/contrast.ts > tmp/canvas-theme-s539/appearance-05-ui-solid-chrome-css/contrast.log 2>&1",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid > tmp/canvas-theme-s539/appearance-05-ui-solid-chrome-css/ui-solid.log 2>&1",
+        "git diff --quiet -- packages/ui-solid/src/shapes",
+        "test -s impl-plans/progress/appearance-05-ui-solid-chrome-css.md"
+      ]
+    },
+    {
+      "planId": "appearance-06-desktop-wiring",
+      "planPath": "impl-plans/active/appearance-06-desktop-wiring.md",
+      "progressPath": "impl-plans/progress/appearance-06-desktop-wiring.md",
+      "wave": 2,
+      "dependsOn": [
+        "appearance-01-preferences",
+        "appearance-02-canvas-mode"
+      ],
+      "writePaths": [
+        "apps/desktop/src/main.tsx",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/settings/SettingsDialog.tsx",
+        "apps/desktop/src-tauri/capabilities/default.json",
+        "apps/desktop/src-tauri/gen/schemas/capabilities.json",
+        "README.md",
+        "impl-plans/progress/appearance-06-desktop-wiring.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "main.tsx applies the resolved theme to document.documentElement before render inside try/catch, with guarded localStorage and matchMedia.",
+        "App.tsx owns theme, canvasBackground, pcbCanvasBackground and systemDark signals, a resolvedTheme memo, an applyTheme effect, a theme-only Tauri setTheme effect (null for system, re-reads media.matches after resolve, rejection ignored), persists the three keys, and passes resolved canvasBackground {diagram, pcb} to NodettoCanvas and the values/setters to SettingsDialog.",
+        "SettingsDialog adds an Appearance category after General with Theme, Canvas and PCB canvas selects (aria-labels App theme, Canvas background, PCB canvas background) validated by type guards, no bare as cast.",
+        "capabilities/default.json adds core:window:allow-set-theme after core:default; README gains one appearance feature line; no tauri.conf.json, Rust or dependency change.",
+        "Desktop tests pass or are pending-join under overview rule 8; progress log ends with STATUS: done.",
+        "Session 540: gen/schemas/capabilities.json lists exactly core:default and core:window:allow-set-theme, matching default.json; the stale 'Status: in progress' header line is removed from the progress log."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-06-desktop-wiring",
+        "bun run typecheck > tmp/canvas-theme-s539/appearance-06-desktop-wiring/typecheck.log 2>&1",
+        "bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/canvas-theme-s539/appearance-06-desktop-wiring/unchecked.log 2>&1 || true",
+        "test \"$(grep -c 'apps/desktop/src/App.tsx\\|apps/desktop/src/main.tsx\\|SettingsDialog.tsx' tmp/canvas-theme-s539/appearance-06-desktop-wiring/unchecked.log)\" -eq 0",
+        "bun test apps/desktop/src/settings > tmp/canvas-theme-s539/appearance-06-desktop-wiring/settings-tests.log 2>&1",
+        "bun test apps/desktop/src > tmp/canvas-theme-s539/appearance-06-desktop-wiring/desktop-tests.log 2>&1",
+        "bunx biome check apps/desktop/src/main.tsx apps/desktop/src/App.tsx apps/desktop/src/settings/SettingsDialog.tsx --diagnostic-level=warn",
+        "test \"$(grep -c 'allow-set-theme' apps/desktop/src-tauri/capabilities/default.json)\" -eq 1",
+        "git diff --quiet -- apps/desktop/src-tauri/tauri.conf.json",
+        "test -s impl-plans/progress/appearance-06-desktop-wiring.md",
+        "test \"$(grep -c allow-set-theme apps/desktop/src-tauri/gen/schemas/capabilities.json)\" -eq 1",
+        "test \"$(grep -c \"^Status: in progress\" impl-plans/progress/appearance-06-desktop-wiring.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "appearance-07-theme-tokens-test",
+      "planPath": "impl-plans/active/appearance-07-theme-tokens-test.md",
+      "progressPath": "impl-plans/progress/appearance-07-theme-tokens-test.md",
+      "wave": 3,
+      "dependsOn": [
+        "appearance-03-chrome-tokens",
+        "appearance-04-canvas-css",
+        "appearance-05-ui-solid-chrome-css"
+      ],
+      "writePaths": [
+        "apps/desktop/src/styles/theme-tokens.test.ts",
+        "impl-plans/progress/appearance-07-theme-tokens-test.md"
+      ],
+      "sharedPaths": [
+        "apps/desktop/src/styles/base.css",
+        "apps/desktop/src/styles/canvas.css"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "apps/desktop/src/styles/base.css",
+          "intendedEdit": "Dark values only in :root[data-nodetto-theme=\"dark\"], and only to reach a contrast ratio the test requires; no name, light value or ordering change. Each adjustment recorded as old -> new with ratio."
+        },
+        {
+          "path": "apps/desktop/src/styles/canvas.css",
+          "intendedEdit": "Dark canvas-set values only in .nodetto-canvas.nodetto-canvas-dark, and only to reach a required contrast ratio; no name, light value or ordering change."
+        }
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "theme-tokens.test.ts implements cases 1, 1b and 2-7 as specified (literal allowlist keyed by file and selector; every desktop var() declared except --app-cloud-top; light/dark and canvas parity; light values equal design 4.1/5.2; paint pin; WCAG pairs; ui-solid fallback equality; export isolation).",
+        "Cases 1, 1b, 4 and 6 are pure functions returning string[]; five negative inline cases (a)-(e) each return at least one problem; no repository file is mutated by the test; no non-null assertions; typechecks under noUncheckedIndexedAccess.",
+        "Findings in other plans' files are recorded with owner planId, not fixed here.",
+        "Progress log lists findings, dark-value adjustments, commands, exit codes, log paths and ends with STATUS: done.",
+        "Session 540: case 5 includes (--app-muted-label, --app-chrome-surface) in both themes; case 3 table holds only the 13 original tokens and the light canvas set."
+      ],
+      "verification": [
+        "mkdir -p tmp/canvas-theme-s539/appearance-07-theme-tokens-test",
+        "bun test apps/desktop/src/styles/theme-tokens.test.ts apps/desktop/src/style.test.ts > tmp/canvas-theme-s539/appearance-07-theme-tokens-test/test.log 2>&1",
+        "bun run typecheck > tmp/canvas-theme-s539/appearance-07-theme-tokens-test/typecheck.log 2>&1",
+        "bunx biome check apps/desktop/src/styles/theme-tokens.test.ts --diagnostic-level=warn",
+        "test -s impl-plans/progress/appearance-07-theme-tokens-test.md"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "appearance-01-preferences",
+        "appearance-02-canvas-mode",
+        "appearance-03-chrome-tokens",
+        "appearance-04-canvas-css"
+      ],
+      [
+        "appearance-05-ui-solid-chrome-css",
+        "appearance-06-desktop-wiring"
+      ],
+      [
+        "appearance-07-theme-tokens-test"
+      ]
+    ],
+    "afterWave": [
+      "bun run typecheck",
+      "bun test apps/desktop/src/style.test.ts",
+      "rerun every gate recorded as pending-join in the joined wave's progress logs (overview protocol rule 8)"
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Add an 'Appearance settings' entry indexing appearance-00..07; done by the orchestrator in serial reconciliation, not by any worker."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths. Plan 07 findings against plans 03, 04 or 05 are repaired serially after the wave-3 join, not inside the plan 07 worker.",
+    "commitPolicy": "Commit each wave on feat/canvas-theme staging explicit paths only; never git add -A; never stage tmp/; never push (gitPush=false).",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-appearance.md",
+        "design-docs/user-qa/appearance.md",
+        "impl-plans/active/appearance-00-overview.md",
+        "impl-plans/active/canvas-theme-s539-dispatch.json",
+        "impl-plans/README.md"
+      ],
+      "note": "The overview final git-status check (no change outside the union of plan writePaths and sharedPaths plus impl-plans/) also excludes these orchestrator-owned planning files."
+    },
+    "finalVerification": [
+      "mkdir -p tmp/canvas-theme-s539/reconcile",
+      "BUN_OPTIONS=--jsx-runtime=classic mise run verify > tmp/canvas-theme-s539/reconcile/verify.log 2>&1",
+      "mise run build > tmp/canvas-theme-s539/reconcile/build.log 2>&1",
+      "bun test apps/desktop/src/settings",
+      "bun test apps/desktop/src/styles/theme-tokens.test.ts apps/desktop/src/style.test.ts",
+      "bun test packages/ui-solid/src/canvas/canvas-background.test.ts packages/ui-solid/src/canvas-rulers.test.ts",
+      "bun run typecheck",
+      "git diff --quiet -- packages/ui-solid/src/shapes/pcb-view.ts packages/ui-solid/src/shapes/PcbShapeView.tsx packages/ui-solid/src/PcbOverlay.tsx apps/desktop/src-tauri/tauri.conf.json",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  },
+  "continuation": {
+    "previousWorkflowExecutionId": "opus-luna-design-and-implement-review-loop-session-539",
+    "checkpointHead": "58c81713be42033a9a7a0fc7bd7ee775a955cf3e",
+    "session539OriginalHead": "28c9dede750c5c2f72ce8a1085ac2fc96f800c67",
+    "designAmendment": "94497ec (invariant 2: light --app-muted-label #727b7e -> #6d7679); session-540 step2 wording edit in design 4.1 and 6 item 5",
+    "evidenceSubdir": "tmp/canvas-theme-s539/<planId>/s540/",
+    "baselineEvidence": [
+      {
+        "command": "bun run typecheck",
+        "exit": 0,
+        "log": "tmp/canvas-theme-s539/s540-step4/typecheck.log"
+      },
+      {
+        "command": "bun test apps/desktop/src/settings packages/ui-solid/src/canvas/canvas-background.test.ts",
+        "exit": 0,
+        "log": "tmp/canvas-theme-s539/s540-step4/targeted.log"
+      },
+      {
+        "command": "bun test apps/desktop/src/style.test.ts",
+        "exit": 0,
+        "log": "tmp/canvas-theme-s539/s540-step4/style.log"
+      }
+    ],
+    "planModes": {
+      "appearance-01-preferences": "verify-only",
+      "appearance-02-canvas-mode": "verify-only",
+      "appearance-03-chrome-tokens": "finish",
+      "appearance-04-canvas-css": "verify-only",
+      "appearance-05-ui-solid-chrome-css": "implement",
+      "appearance-06-desktop-wiring": "verify-only",
+      "appearance-07-theme-tokens-test": "implement"
+    },
+    "rules": "impl-plans/active/appearance-00-overview.md section 'Session 540 continuation'"
+  }
+}

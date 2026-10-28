@@ -19,6 +19,7 @@ copies under `tmp/breadboard-mode-s485/breadboard-05-collab/`
 values name the pre-archive `active/` locations.
 
 `active/` also holds the historical dispatch manifests
+`canvas-theme-s539-dispatch.json` (appearance settings),
 `ddl-frame-dispatch.json`, the PCB SVG export manifest
 `pcb-svg-s538-dispatch.json`, the KiCad PCB manifests
 (`kicad-pcb-s530-dispatch.json`, `kicad-pcb-s534-dispatch.json`,
@@ -32,6 +33,32 @@ manifests, only s359 was the final dispatch. Their `planPath` values name
 the pre-archive `active/` locations.
 
 ## Completed
+
+Appearance settings (sessions 539-540; design:
+`design-docs/specs/design-appearance.md`, user QA:
+`design-docs/user-qa/appearance.md`). Covers the System/Light/Dark app
+theme, the dark chrome token set, and the diagram and PCB canvas
+backgrounds. All eight plans were accepted by the session-540 serial
+integration review on the combined tree:
+`BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify`
+exit 0 (2778 pass, 23 skip, 0 fail) and `CARGO_TERM_QUIET=true mise run
+build` exit 0. The aggregate `--noUncheckedIndexedAccess` typecheck still
+exits 2 with 91 errors, equal to the 28c9ded baseline and none in feature
+files. The dispatch manifest `canvas-theme-s539-dispatch.json` stays in
+`active/`, and its `planPath` values name the pre-archive `active/`
+locations. Evidence: `tmp/canvas-theme-s539/<planId>/` and
+`tmp/canvas-theme-s539/reconcile/s540-wave-00N/`.
+
+| Plan | Scope |
+|---|---|
+| [appearance-00-overview](completed/appearance-00-overview.md) | Waves, ownership, pinned contracts, final verification |
+| [appearance-01-preferences](completed/appearance-01-preferences.md) | `appearance.ts` contract, three new persisted preferences |
+| [appearance-02-canvas-mode](completed/appearance-02-canvas-mode.md) | `canvasBackground` prop and `nodetto-canvas-dark` class in ui-solid |
+| [appearance-03-chrome-tokens](completed/appearance-03-chrome-tokens.md) | Desktop chrome tokens and the dark `base.css` block |
+| [appearance-04-canvas-css](completed/appearance-04-canvas-css.md) | Canvas token sets and the document paint pin |
+| [appearance-05-ui-solid-chrome-css](completed/appearance-05-ui-solid-chrome-css.md) | ui-solid chrome CSS on `var(--token, <literal>)` fallbacks |
+| [appearance-06-desktop-wiring](completed/appearance-06-desktop-wiring.md) | `main.tsx`, `App.tsx`, Settings Appearance category, Tauri `setTheme` capability, README |
+| [appearance-07-theme-tokens-test](completed/appearance-07-theme-tokens-test.md) | `styles/theme-tokens.test.ts` |
 
 PCB pages in SVG, PNG and PDF export (session 538; design:
 `design-docs/specs/design-pcb-svg-export.md`, user QA:

@@ -25,7 +25,7 @@
   padding: 4px;
   border: 1px solid var(--app-chrome-line);
   background: var(--app-chrome-surface);
-  box-shadow: 0 8px 18px rgb(20 28 32 / 10%);
+  box-shadow: 0 8px 18px var(--app-shadow-small);
 }
 
 .app-file-button {
@@ -45,7 +45,7 @@
 }
 
 .app-file-button:disabled {
-  color: #9aa2a8;
+  color: var(--app-disabled-ink);
   cursor: default;
 }
 
@@ -87,8 +87,8 @@
   margin: 0;
   padding: 6px 16px;
   border-bottom: 1px solid var(--nodetto-line);
-  color: #8c2f26;
-  background: #fdf1ef;
+  color: var(--nodetto-danger);
+  background: var(--nodetto-danger-surface);
   font-size: 0.78rem;
   white-space: pre-wrap;
 }
@@ -141,7 +141,7 @@
 }
 
 .nodetto-tool-button:disabled {
-  color: #a8a8a8;
+  color: var(--app-disabled-soft-ink);
   cursor: default;
 }
 

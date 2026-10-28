@@ -43,7 +43,7 @@
   width: min(620px, calc(100vw - 16px));
   max-height: min(620px, calc(100dvh - var(--app-cloud-top, 44px) - 8px));
   overflow: auto;
-  box-shadow: 0 12px 30px rgb(20 28 32 / 16%);
+  box-shadow: 0 12px 30px var(--app-shadow);
 }
 
 .app-cloud-panel.is-dormant {
@@ -113,16 +113,16 @@
 
 .app-cloud-status[data-status="error"],
 .app-cloud-badge[data-status="error"] {
-  color: #8c2f26;
-  background: #fdf1ef;
+  color: var(--nodetto-danger);
+  background: var(--nodetto-danger-surface);
 }
 
 .app-cloud-status[data-status="reconnecting"],
 .app-cloud-badge[data-status="reconnecting"],
 .app-cloud-status[data-status="syncing"],
 .app-cloud-badge[data-status="syncing"] {
-  color: #7a5a12;
-  background: #fdf3dc;
+  color: var(--nodetto-warning);
+  background: var(--nodetto-warning-surface);
 }
 
 .app-cloud-notice {
@@ -169,7 +169,7 @@
 }
 
 .app-cloud-share button:disabled {
-  color: #9aa2a8;
+  color: var(--app-disabled-ink);
   cursor: default;
 }
 
@@ -309,7 +309,7 @@
   left: -1.5px;
   padding: 1px 6px;
   border-radius: 999px;
-  color: #fffdf8;
+  color: var(--nodetto-presence-label-ink);
   font-size: 0.68rem;
   white-space: nowrap;
 }
@@ -327,7 +327,7 @@
 .app-presence-name {
   padding: 1px 6px;
   border-radius: 999px;
-  color: #fffdf8;
+  color: var(--nodetto-presence-label-ink);
   font-size: 0.68rem;
   white-space: nowrap;
 }

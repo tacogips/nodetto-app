@@ -17,7 +17,7 @@
   padding: 4px;
   border: 0;
   border-radius: var(--app-control-radius, 6px);
-  color: var(--nodetto-ink);
+  color: var(--nodetto-ink, #1d2a2e);
   background: transparent;
   cursor: pointer;
 }
@@ -28,9 +28,9 @@
 }
 
 .nodetto-image-error-dismiss:hover {
-  background: #eef0f2;
+  background: var(--app-image-dismiss-hover, #eef0f2);
 }
 
 .nodetto-image-error-dismiss:focus-visible {
-  outline: 2px solid #5d7480;
+  outline: 2px solid var(--app-ui-focus, #5d7480);
 }

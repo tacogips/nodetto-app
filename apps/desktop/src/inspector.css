@@ -110,7 +110,7 @@
   border: 1px solid transparent;
   border-radius: var(--app-control-radius, 6px);
   color: var(--nodetto-ink);
-  background: var(--app-button-surface, #f0f2f3);
+  background: var(--app-button-surface);
   font: inherit;
   cursor: pointer;
 }
@@ -179,7 +179,7 @@
 
 .nodetto-input:disabled,
 .nodetto-select:disabled {
-  color: #a8a8a8;
+  color: var(--app-disabled-soft-ink);
   background: var(--nodetto-canvas);
 }
 
@@ -243,7 +243,7 @@
   top: 50%;
   left: -3px;
   right: -3px;
-  border-top: 1.5px solid #c0392b;
+  border-top: 1.5px solid var(--app-document-swatch-red);
   transform: rotate(-45deg);
 }
 
@@ -337,8 +337,8 @@
   flex-direction: column;
   gap: 6px;
   padding: 7px;
-  border: 1px solid var(--app-chrome-line, var(--nodetto-line));
-  background: var(--app-chrome-surface, var(--nodetto-surface));
+  border: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
 }
 
 .nodetto-erd-column-main {
@@ -452,13 +452,13 @@
 }
 
 .nodetto-row-button:disabled {
-  color: #c4c4c4;
+  color: var(--app-disabled-strong-ink);
   cursor: default;
 }
 
 .nodetto-row-remove:hover:not(:disabled) {
-  color: #8c2f26;
-  background: #fdf1ef;
+  color: var(--nodetto-danger);
+  background: var(--nodetto-danger-surface);
 }
 
 .nodetto-method {

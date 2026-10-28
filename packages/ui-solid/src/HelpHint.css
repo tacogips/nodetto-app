@@ -7,12 +7,12 @@
   max-height: calc(100vh - 16px);
   overflow: auto;
   padding: 8px 10px;
-  border: 1px solid #d7dce0;
+  border: 1px solid var(--app-help-border, #d7dce0);
   border-radius: 0;
-  background: #fff;
-  color: #263238;
+  background: var(--app-chrome-surface, #fff);
+  color: var(--app-help-ink, #263238);
   font: 12px / 1.5 system-ui, sans-serif;
-  box-shadow: 0 3px 12px #0000001a;
+  box-shadow: 0 3px 12px var(--app-help-shadow, #0000001a);
   pointer-events: auto;
 }
 
@@ -24,19 +24,19 @@
   place-items: center;
   border: 0;
   border-radius: 0;
-  color: var(--nodetto-muted);
+  color: var(--nodetto-muted, #596366);
   background: transparent;
   cursor: help;
 }
 
 .nodetto-help-hint:hover,
 .nodetto-help-hint:focus-visible {
-  color: var(--nodetto-ink);
-  background: #f1f3f4;
+  color: var(--nodetto-ink, #1d2a2e);
+  background: var(--app-chrome-hover, #f1f3f4);
 }
 
 .nodetto-help-hint:focus-visible {
-  outline: 2px solid #5d7480;
+  outline: 2px solid var(--app-ui-focus, #5d7480);
   outline-offset: 1px;
 }
 

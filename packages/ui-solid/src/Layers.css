@@ -67,5 +67,5 @@
   margin: 8px;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--nodetto-muted);
+  color: var(--nodetto-muted, #596366);
 }

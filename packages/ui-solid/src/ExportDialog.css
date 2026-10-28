@@ -3,17 +3,17 @@
   max-height: calc(100dvh - 48px);
   box-sizing: border-box;
   padding: 0;
-  border: 1px solid var(--nodetto-line);
+  border: 1px solid var(--nodetto-line, #d8d2c3);
   border-radius: 16px;
-  background: var(--nodetto-surface, white);
-  color: var(--nodetto-ink);
-  box-shadow: 0 24px 80px #0003;
+  background: var(--nodetto-surface, var(--app-export-surface-fallback, white));
+  color: var(--nodetto-ink, #1d2a2e);
+  box-shadow: 0 24px 80px var(--app-ui-shadow, #0003);
   overflow: auto;
   font-size: 14px;
   line-height: 1.5;
 }
 .nodetto-export-dialog::backdrop {
-  background: #0006;
+  background: var(--app-export-backdrop, #0006);
 }
 .nodetto-export-dialog > header {
   display: flex;
@@ -32,7 +32,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   padding: 0 24px 20px;
-  border-bottom: 1px solid var(--nodetto-line);
+  border-bottom: 1px solid var(--nodetto-line, #d8d2c3);
 }
 .nodetto-export-dialog label {
   display: grid;
@@ -44,7 +44,7 @@
 .nodetto-export-choices p {
   grid-column: 1 / -1;
   margin: 0;
-  color: var(--nodetto-muted);
+  color: var(--nodetto-muted, #596366);
   font-size: 13px;
 }
 .nodetto-export-panel {
@@ -71,10 +71,10 @@
 .nodetto-export-dialog
   :is(select, textarea, .nodetto-input, button:not(.nodetto-help-hint)) {
   box-sizing: border-box;
-  border: 1px solid var(--nodetto-line);
+  border: 1px solid var(--nodetto-line, #d8d2c3);
   border-radius: 8px;
-  color: var(--nodetto-ink);
-  background: var(--nodetto-surface, white);
+  color: var(--nodetto-ink, #1d2a2e);
+  background: var(--nodetto-surface, var(--app-export-surface-fallback, white));
 }
 .nodetto-export-dialog :is(select, .nodetto-input) {
   width: 100%;
@@ -89,8 +89,8 @@
   font-weight: 500;
 }
 .nodetto-export-dialog button:not(.nodetto-help-hint):hover:not(:disabled) {
-  background: var(--nodetto-accent-soft);
-  border-color: var(--nodetto-accent);
+  background: var(--nodetto-accent-soft, #dbe6e8);
+  border-color: var(--nodetto-accent, #335c67);
 }
 .nodetto-export-dialog button:disabled {
   opacity: 0.5;
@@ -98,7 +98,7 @@
 }
 .nodetto-export-dialog
   :is(button, select, textarea, .nodetto-input):focus-visible {
-  outline: 2px solid var(--nodetto-accent);
+  outline: 2px solid var(--nodetto-accent, #335c67);
   outline-offset: 3px;
 }
 .nodetto-export-dialog textarea {
@@ -121,7 +121,7 @@
 }
 .nodetto-export-panel p {
   margin: 0;
-  color: var(--nodetto-muted);
+  color: var(--nodetto-muted, #596366);
   font-size: 13px;
 }
 .nodetto-export-panel p:empty {
@@ -130,13 +130,17 @@
 .nodetto-export-dialog .nodetto-export-primary {
   margin-left: auto;
   padding-inline: 24px;
-  color: white;
-  border-color: var(--nodetto-accent);
-  background: var(--nodetto-accent);
+  color: var(--nodetto-on-accent, white);
+  border-color: var(--nodetto-accent, #335c67);
+  background: var(--nodetto-accent, #335c67);
 }
 .nodetto-export-dialog .nodetto-export-primary:hover:not(:disabled) {
-  color: white;
-  background: color-mix(in srgb, var(--nodetto-accent) 85%, black);
+  color: var(--nodetto-on-accent, white);
+  background: color-mix(
+    in srgb,
+    var(--nodetto-accent, #335c67) 85%,
+    var(--app-export-accent-shade, black)
+  );
 }
 @media (max-width: 520px) {
   .nodetto-export-dialog > header {

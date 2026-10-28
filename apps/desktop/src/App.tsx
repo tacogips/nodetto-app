@@ -28,6 +28,8 @@ import {
   type Vec,
 } from "@nodetto/core";
 import type { ElementId } from "@nodetto/ir";
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ExportDialog,
   Icon,
@@ -57,6 +59,7 @@ import {
   ZoomControls,
 } from "@nodetto/ui-solid";
 import {
+  createMemo,
   createEffect,
   createSignal,
   type JSX,
@@ -75,6 +78,13 @@ import { watchNativeFileMenu } from "./file/native-menu.ts";
 import { loadSaveMode, storeSaveMode } from "./file/save-mode.ts";
 import type { DocumentSession, SessionState } from "./file/session.ts";
 import { SettingsDialog } from "./settings/SettingsDialog.tsx";
+import {
+  applyTheme,
+  resolveCanvasMode,
+  resolveTheme,
+  SYSTEM_DARK_QUERY,
+  watchSystemTheme,
+} from "./settings/appearance.ts";
 import type { CliInstaller } from "./settings/cli-install.ts";
 import {
   loadEditorPreferences,
@@ -173,6 +183,30 @@ export function App(props: AppProps): JSX.Element {
 
   // Editor chrome state (design editor-ux 3.3, 3.5, 3.6, 4).
   const preferences = loadEditorPreferences(preferenceStorage());
+  const [theme, setTheme] = createSignal(preferences.theme);
+  const [canvasBackground, setCanvasBackground] = createSignal(
+    preferences.canvasBackground,
+  );
+  const [pcbCanvasBackground, setPcbCanvasBackground] = createSignal(
+    preferences.pcbCanvasBackground,
+  );
+  const media = window.matchMedia?.(SYSTEM_DARK_QUERY);
+  const [systemDark, setSystemDark] = createSignal(media?.matches ?? false);
+  if (media) onCleanup(watchSystemTheme(media, setSystemDark));
+  const resolvedTheme = createMemo(() => resolveTheme(theme(), systemDark()));
+  createEffect(() => applyTheme(document.documentElement, resolvedTheme()));
+  createEffect(() => {
+    const selectedTheme = theme();
+    if (!isTauri()) return;
+    void getCurrentWindow()
+      .setTheme(selectedTheme === "system" ? null : selectedTheme)
+      .then(() => {
+        if (media) setSystemDark(media.matches);
+      })
+      .catch(() => {
+        // CSS appearance remains applied when the host API rejects.
+      });
+  });
   props.session.setAutosaveDelayMs(preferences.autosaveDelayMs);
   const [autosaveDelayMs, setAutosaveDelayMs] = createSignal(
     preferences.autosaveDelayMs,
@@ -211,6 +245,9 @@ export function App(props: AppProps): JSX.Element {
         rightPaneOpen: panes.rightPaneOpen(),
         snap: snap(),
         autosaveDelayMs: autosaveDelayMs(),
+        theme: theme(),
+        canvasBackground: canvasBackground(),
+        pcbCanvasBackground: pcbCanvasBackground(),
       },
       preferenceStorage(),
     ),
@@ -527,6 +564,12 @@ export function App(props: AppProps): JSX.Element {
       />
       <Show when={settingsOpen()}>
         <SettingsDialog
+          theme={theme()}
+          onThemeChange={setTheme}
+          canvasBackground={canvasBackground()}
+          onCanvasBackgroundChange={setCanvasBackground}
+          pcbCanvasBackground={pcbCanvasBackground()}
+          onPcbCanvasBackgroundChange={setPcbCanvasBackground}
           workspace={workspace()}
           onWorkspaceChange={changeWorkspace}
           showGrid={showGrid()}
@@ -675,6 +718,10 @@ export function App(props: AppProps): JSX.Element {
             onPointerLeave={presence.onCanvasPointerLeave}
           >
             <NodettoCanvas
+              canvasBackground={{
+                diagram: resolveCanvasMode(canvasBackground(), resolvedTheme()),
+                pcb: resolveCanvasMode(pcbCanvasBackground(), resolvedTheme()),
+              }}
               shapeDrop={shapeDrop()}
               editor={props.editor}
               tool={tool()}

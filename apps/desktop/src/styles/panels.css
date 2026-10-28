@@ -140,7 +140,7 @@
   border: 1px solid var(--nodetto-line);
   border-radius: 6px;
   background: var(--nodetto-surface);
-  box-shadow: 0 6px 18px rgba(29, 42, 46, 0.14);
+  box-shadow: 0 6px 18px var(--app-shadow-strong);
   font-weight: 400;
 }
 
@@ -156,7 +156,7 @@
   border: 1px solid var(--nodetto-line);
   border-radius: 6px;
   background: var(--nodetto-surface);
-  box-shadow: 0 6px 18px rgba(29, 42, 46, 0.14);
+  box-shadow: 0 6px 18px var(--app-shadow-strong);
   font-size: 0.8rem;
   outline: none;
   user-select: none;
@@ -197,7 +197,7 @@
 }
 
 .nodetto-menu-item:disabled {
-  color: #a8a8a8;
+  color: var(--app-disabled-soft-ink);
   cursor: default;
 }
 
@@ -247,7 +247,7 @@
   border: 1px solid var(--nodetto-line);
   border-radius: 8px;
   background: var(--nodetto-surface);
-  box-shadow: 0 4px 14px rgba(29, 42, 46, 0.12);
+  box-shadow: 0 4px 14px var(--app-shadow-medium);
   will-change: transform;
   user-select: none;
 }
@@ -287,7 +287,7 @@
 }
 
 .nodetto-float-button:disabled {
-  color: #a8a8a8;
+  color: var(--app-disabled-soft-ink);
   cursor: default;
 }
 
@@ -315,8 +315,8 @@
   background: linear-gradient(
     135deg,
     transparent 45%,
-    #b91c1c 45%,
-    #b91c1c 55%,
+    var(--app-swatch-red) 45%,
+    var(--app-swatch-red) 55%,
     transparent 55%
   );
 }
@@ -349,7 +349,7 @@
   border: 1px solid var(--nodetto-line);
   border-radius: 6px;
   background: var(--nodetto-surface);
-  box-shadow: 0 2px 8px rgba(29, 42, 46, 0.08);
+  box-shadow: 0 2px 8px var(--app-shadow-soft);
   overflow: hidden;
 }
 
@@ -374,7 +374,7 @@
 }
 
 .nodetto-zoom-button:disabled {
-  color: #a8a8a8;
+  color: var(--app-disabled-soft-ink);
   cursor: default;
 }
 
@@ -420,7 +420,7 @@
   padding: 4px;
   border: 1px solid var(--nodetto-line);
   background: var(--nodetto-surface);
-  box-shadow: 0 2px 8px rgba(29, 42, 46, 0.08);
+  box-shadow: 0 2px 8px var(--app-shadow-soft);
 }
 
 .nodetto-view-menu-body .nodetto-zoom-button {

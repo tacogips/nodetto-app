@@ -34,6 +34,9 @@ associations.
   boards](docs/pcb/kicad-pcb.md).
 - **Design artboards**: web and iPhone screens, transitions, and code export.
   See [Design artboards](docs/design.md).
+- **Appearance**: choose a System, Light or Dark app theme, a Light, Dark or
+  Match theme diagram canvas, and a Dark-by-default PCB canvas. See
+  [Appearance](docs/editing.md#appearance).
 - **Command line and MCP**: an AI agent edits a document while the desktop app
   shows its changes live. See [Command line](docs/cli.md).
 

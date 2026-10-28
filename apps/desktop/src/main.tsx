@@ -14,7 +14,13 @@ import { createExportBackend, createFileBackend } from "./file/backend.ts";
 import { createLaunchBackend } from "./file/launch.ts";
 import { installCloseGuard } from "./file/close.ts";
 import { DocumentSession } from "./file/session.ts";
+import {
+  applyTheme,
+  resolveTheme,
+  SYSTEM_DARK_QUERY,
+} from "./settings/appearance.ts";
 import { createCliInstaller } from "./settings/cli-install.ts";
+import { loadEditorPreferences } from "./settings/preferences.ts";
 import "./style.css";
 import "./inspector.css";
 
@@ -35,6 +41,23 @@ const exportBackend = createExportBackend();
 void installCloseGuard(session).catch((error) => {
   console.error("Could not install document close guard", error);
 });
+
+try {
+  let storage: Storage | undefined;
+  try {
+    storage = window.localStorage;
+  } catch {
+    storage = undefined;
+  }
+  const preferences = loadEditorPreferences(storage);
+  const systemDark = window.matchMedia?.(SYSTEM_DARK_QUERY).matches ?? false;
+  applyTheme(
+    document.documentElement,
+    resolveTheme(preferences.theme, systemDark),
+  );
+} catch {
+  // Rendering must continue if the environment blocks appearance detection.
+}
 
 render(
   () => (
