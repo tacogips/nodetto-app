@@ -461,11 +461,11 @@ ${EXIT_CODES}`,
   validate: `Usage: nodetto-cli validate <document.jsonl> [--strict]
 
 Parse and validate a document; print warnings and errors and a one-line summary.
-
-${EXIT_CODES}`,
 Warnings include semantic.unknownField for a semantic field the element type
 does not define (kept, but ignored by this build). --strict exits 3 when there
 are warnings.
+
+${EXIT_CODES}`,
 
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
                         [--config <file>] [--format text|json]
