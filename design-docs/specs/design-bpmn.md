@@ -24,6 +24,19 @@ new 6.4 (BPMN connector backdrops and routing obstacles), 11 (regression
 tests) and 13 (flows still pass beneath flow nodes). The rest of the
 baseline is unchanged.
 
+Revision (export ownership run, workflow intake comm-010408; no GitHub
+issue): a boundary event with `attachedTo` but no `parent` was exported in
+an extra unreferenced process (N1). A sequence flow leaving it was then
+emitted twice under one id, and the importer rejected the file (N2).
+Changed sections: 5.2 (collaboration artifacts are imported), 5.3 (order
+and the new 5.3.1 ownership and placement rules, which replace the
+pool-less paragraph), 11 (export ownership tests) and 14 (risk). The rest
+of the baseline is unchanged. Design review DR-1 narrowed the duplicate-id
+safeguard to BPMN model and BPMNDI ids outside `extensionElements`. The
+session-550 rerun (intake comm-010418) re-validated this revision against
+the unchanged code at a9728e6. It only stated the effective-parent fallback
+in 5.3.1 explicitly.
+
 ## 1. Context and baseline
 
 - No `design-docs/` or `impl-plans/` existed on this branch. This is the
@@ -432,6 +445,12 @@ Mapping:
     with no `parent`.
   - Additional unreferenced processes are imported parent-less with a
     warning.
+  - `textAnnotation`, `group` and `association` children of the
+    `collaboration` use the same mapping as inside a process, with no
+    `parent`. They are added after all process contents and flows and
+    before the message flows: text annotations and groups first, then
+    associations, each in document order (flows follow their endpoints).
+    Before this revision they were silently dropped.
 - **Lanes**: `laneSet/lane` maps to `bpmn.lane`. The parent is the
   participant or, through `childLaneSet`, the enclosing lane. A node listed
   in `flowNodeRef` gets `parent` set to the innermost lane that lists it.
@@ -527,8 +546,11 @@ Ids:
   `LaneSet_<parentId>` and `<id>_di` (with the same NCName rule).
 
 Order:
-1. `collaboration` (participants, then message flows), only when the page
-   has participants.
+1. `collaboration` (participants, then message flows, then collaboration
+   associations, then collaboration text annotations and groups; section
+   5.3.1), only when the page has participants. The artifact order matches
+   the order inside a process and the `tCollaboration` sequence
+   (`participant`, `messageFlow`, `artifact`).
 2. One `process` per expanded participant, in element index order. Within a
    process:
    1. `laneSet`
@@ -543,12 +565,110 @@ Order:
    has bounds when `labelBounds` is set. A secondary diagram is emitted for
    each collapsed sub-process that has hidden children.
 
-Pool-less nodes on a page that also has participants are exported in an
-extra process not referenced by any participant, with a warning. Import maps
-that process back to parent-less nodes, so the round trip is stable.
-
 The output is byte-deterministic for a given page. `bpmn export --check`
 depends on this.
+
+#### 5.3.1 Ownership and placement (`export-scope.ts`, `export-process.ts`)
+
+Every placement decision uses one parent function, mirroring
+`parentOf` in core `bpmn/model.ts` (section 4.1, "A boundary event uses its
+host's scope"):
+- **Effective parent.** For a `bpmn.boundaryEvent` whose `attachedTo` names
+  a record on the page that is not itself a boundary event, the effective
+  parent is the host's `parent`. The boundary event's own `parent` is
+  ignored, as in core. When the host is missing or is a boundary event, the
+  boundary event's own `parent` is used. Every other record uses its own
+  `parent`. This fallback is the only difference from core. For a missing
+  host, core returns no parent. For a boundary-event host, core uses that
+  host's `parent`. Document validation already reports both cases (an
+  unknown reference, `bpmn.attachedToType`). The exporter keeps the
+  record's stored placement instead of moving it to the orphan process.
+  The walk never follows `attachedTo` chains.
+- **Ancestor walk.** `ownerParticipant` (first `bpmn.participant`
+  ancestor) and `subprocessScope` (first `bpmn.subProcess` ancestor) walk
+  effective parents. The walk stops with "no ancestor" when it meets an id
+  it has already visited, so a `parent` cycle cannot hang the export.
+- **Uses.** The effective parent decides:
+  - participant ownership, so a boundary event goes into its host's process
+  - sub-process scope, so a boundary event on an activity inside an
+    expanded sub-process is emitted inside that sub-process
+  - lane membership: a lane's `flowNodeRef` list holds every flow node
+    whose effective parent is that lane, so the boundary event is listed in
+    its host's lane (as bpmn-js does)
+  - the top-level node set of a page without participants
+  `attachedToRef` and BPMNDI are unchanged. Every non-flow record still gets
+  one shape on the single plane, so a boundary event's DI stays as before.
+
+Flow nodes and data:
+- A flow node or a non-IO data object/store with no owning participant
+  and no sub-process scope, on a page with participants, is pool-less. Only
+  pool-less flow nodes and data create `Process_orphan_<pageId>` (not
+  referenced by any participant) and the warning "Pool-less elements were
+  exported in an extra unreferenced process." Import maps that process back
+  to parent-less nodes, so the round trip is stable.
+- A boundary event whose host is pool-less is itself pool-less and stays
+  with its host in the orphan process.
+
+Artifacts (`bpmn.textAnnotation`, `bpmn.group`) and associations:
+- An artifact with an owning expanded participant is emitted in that
+  participant's process, or in its sub-process. This is unchanged.
+- On a page with participants, an artifact with no owning participant and
+  no sub-process scope is emitted in the `collaboration`. It never creates
+  or enters the orphan process. On a page without participants it stays in
+  the single process, as before.
+- An association is emitted in the process of its source's owning
+  participant, else its target's. When neither endpoint has an owning
+  participant on a page with participants, it is emitted in the
+  `collaboration`. Before this revision such an association went into the
+  orphan process, or was dropped when there was none.
+- Content of a collapsed participant is not exported and keeps its existing
+  warning.
+
+Sequence flows:
+- A sequence flow is emitted when both endpoints exist on the page. This is
+  unchanged.
+- It is emitted exactly once, in its source endpoint's container. That is
+  the source's sub-process scope if there is one, else the process of its
+  owning participant, else the orphan process (or the single process when
+  the page has no participants). For a legal flow this is the container
+  that owns both endpoints.
+- An illegal flow that crosses containers (only possible through import or
+  remote edits; lint reports it, section 7) is emitted once in its source's
+  container. Before this revision it was emitted in each top-level process
+  that held one endpoint, or dropped when it crossed a sub-process boundary.
+- A flow whose source belongs to a collapsed participant is not emitted
+  (covered by the collapsed-participant warning).
+- `incoming`/`outgoing` children and the `default` attribute are unchanged.
+
+Duplicate-id safeguard (`export.ts`):
+- After the `definitions` tree is assembled and before it is serialized,
+  the exporter walks it and collects the unprefixed `id` attribute of each
+  element whose resolved namespace (`ns`) is the BPMN model namespace or
+  the BPMNDI namespace. Exporter-built elements carry `ns` from
+  `element()`, and preserved raw XML carries it from `parseXml`.
+- The walk does not enter a `bpmn:extensionElements` subtree or any element
+  in another namespace (foreign, `dc`, `di`). Nothing below such an element
+  is scanned.
+- The scope therefore covers derived container ids (`definitions`,
+  `collaboration`, `process`, `laneSet`, `childLaneSet`), every model
+  element, every BPMNDI shape, edge, plane and diagram, and the
+  BPMN-namespace elements inside preserved root and unsupported raw XML,
+  under the same rule.
+- Rationale: this is the id space the importer enforces (`add()` in
+  `import.ts`) plus XML ID uniqueness across model and DI. Extension
+  vocabularies such as `camunda:formField` define their own id scopes, so
+  two tasks may repeat a form field id.
+- Each id that occurs more than once adds one warning,
+  "Duplicate BPMN id <id> was emitted." Nothing is dropped or renamed, and
+  the exporter does not throw. `bpmn export --strict` therefore exits 3
+  (section 8) instead of writing a file that the importer rejects.
+- A correct export never triggers it. It is a guard against future
+  placement regressions and against ids that collide with derived ids (a
+  record whose id equals another record's `<id>_di`).
+
+Out of scope: emitting the `group` name through `categoryValueRef`, and
+the secondary BPMNDI plane for collapsed sub-processes. The exporter emits
+neither today, and neither is needed for N1/N2.
 
 ### 5.4 Semantic equivalence (`bpmn/equivalence.ts`)
 
@@ -1120,6 +1240,34 @@ Tests (one line each, colocated `*.test.ts`):
   - unsupported and foreign preservation with warnings
   - the lossless contract (section 5.4) on all fixtures
   - export id mapping
+  - export ownership (section 5.3.1), in `export.test.ts` and
+    `roundtrip.test.ts`, on self-authored generic pages only:
+    - A pool with a lane holding a "Review order" task and a second task,
+      a "Timeout" timer boundary event with `attachedTo` set to "Review
+      order" and no `parent`, a sequence flow from the boundary event to
+      the second task, and a `bpmn.group` with no `parent`. The export has
+      no warnings (so `--strict` passes) and exactly one `bpmn:process`,
+      and contains no `Process_orphan_`. The boundary event is inside that
+      process with `attachedToRef`, and is a `flowNodeRef` of the lane. The
+      flow id occurs once. The group is a child of `bpmn:collaboration` and
+      has its `<id>_di` shape. Every `id` in the XML is unique. The XML
+      re-imports without throwing and with no warnings. The group comes
+      back with no `parent` and the boundary event with `parent` set to the
+      lane. Exporting the re-import gives the same bytes.
+    - A boundary event with no `parent`, attached to a task inside an
+      expanded sub-process in a pool, is emitted inside that sub-process.
+      So is its outgoing flow, exactly once.
+    - Regression: a page with a pool and a genuinely pool-less task still
+      emits `Process_orphan_<pageId>` and the pool-less warning.
+    - Safeguard: tasks `A` and `A_di` on one page produce the
+      duplicate-id warning for `A_di`. The model task `A_di` collides with
+      the BPMNDI shape id of `A`, and both are in the scan scope.
+    - Safeguard scope: two tasks that each preserve
+      `bpmn:extensionElements` holding a foreign element with the same id
+      (a self-authored `ext:field id="amount"` in a test namespace) import
+      cleanly and export with no duplicate-id warning.
+    - The existing fixtures' exports contain no duplicate ids and no
+      duplicate-id warning.
   - `reference.test.ts`, which `skipIf`s when `.reference/bpmn-article/docs`
     is absent. It imports the four files with no warnings and checks element
     counts per BPMN tag against an independent tag count, lane membership,
@@ -1245,5 +1393,22 @@ Dependencies:
 - **The hand-written XML parser** is scoped to well-formed BPMN, rejects
   DOCTYPE and is fuzzed with malformed-input tests.
 - **Older builds** cannot open `bpmn` pages (Q3).
+- **Export placement changes** (section 5.3.1) can move a parentless
+  artifact or an endpoint-less association from the orphan process to the
+  `collaboration`, and an illegal cross-container sequence flow to its
+  source's container. A legal page imported from XML keeps its bytes when
+  each boundary event shares its host's lane, as bpmn-js writes it, and
+  its artifacts and flows already resolve to the same container. The
+  existing fixture round trips and the reference test pin this.
+- **Boundary event outside its host's lane in source XML.** Import sets
+  such a boundary event's `parent` from its own `flowNodeRef` (or the
+  participant). Export then lists it in the host's lane, and a second
+  import sets `parent` to that lane. Core ignores a boundary event's own
+  `parent` (section 4.1), so behaviour is unchanged and export bytes are
+  stable from the first export on. The `parent` field in
+  `bpmnSemanticProjection` can still differ for such a file. Decision:
+  accept this, and change neither `equivalence.ts` nor the importer's lane
+  mapping in this revision. If the reference test fails on it, the
+  implementer stops and reports it.
 - **Exported routes** depend on core connector routing. `--check`
   determinism relies on that routing being deterministic, which holds today.
