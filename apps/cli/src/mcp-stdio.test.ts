@@ -126,7 +126,10 @@ for (const launch of launches) {
       await client.close();
       rmSync(cwd, { recursive: true, force: true });
     }
-  }, 15000);
+    // The compiled run takes about 14 s on a normal Linux release runner and
+    // up to half again as long on a slow one; keep it a performance guard
+    // without failing releases on runner speed.
+  }, 30000);
   test(`MCP stdio ${launch.name} exits successfully on input EOF`, async () => {
     const child = Bun.spawn([launch.command, ...launch.args], {
       stdin: "pipe",
