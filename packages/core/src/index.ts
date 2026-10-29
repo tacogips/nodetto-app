@@ -517,6 +517,7 @@ export {
 export { moveStrokeAnchor } from "./stroke-edit.ts";
 export {
   pathWorldContours,
+  type PathWorldContour,
   planPathWorldContours,
   PathAnchorDrag,
 } from "./compound-path-edit.ts";

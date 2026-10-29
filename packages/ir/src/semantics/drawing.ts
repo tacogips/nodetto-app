@@ -48,6 +48,7 @@ export const GEO_KINDS = [
   "right-triangle",
   "person",
   "package",
+  "actor",
 ] as const;
 export type GeoKind = (typeof GEO_KINDS)[number];
 
@@ -82,9 +83,11 @@ export type PathFillRule = (typeof PATH_FILL_RULES)[number];
 export const MAX_PATH_CONTOURS = 1024;
 export const MAX_PATH_POINTS = 20000;
 
-/** One editable closed contour in a compound vector path. */
+/** One editable contour in a compound vector path. */
 export interface PathContour {
   readonly points: readonly FreehandPoint[];
+  /** False is an open stroke with no fill; absent or true is closed. */
+  readonly closed?: boolean;
 }
 
 /** Portable vector geometry supporting holes and disconnected islands. */

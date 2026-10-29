@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { GroupSemantic, PathSemantic } from "@nodetto/ir";
 import { parseDocument, serializeDocument } from "@nodetto/io";
-import { PathAnchorDrag, pathWorldContours } from "./compound-path-edit.ts";
+import {
+  PathAnchorDrag,
+  pathWorldContours,
+  planPathWorldContours,
+} from "./compound-path-edit.ts";
 import { inspectDesign } from "./handoff.ts";
 import { generateInterfaceCode } from "./interface-code.ts";
 import { generateMobileInterfaceCode } from "./mobile-code.ts";
@@ -134,13 +138,99 @@ describe("editable compound paths", () => {
     expect(drag.start(1, path, 0, 0)).toBe(true);
     drag.finish(1, { x: 75, y: 90 });
     const changed = pathWorldContours(editor.store.get(path)!);
-    expect(changed[0]?.[0]?.x).toBeCloseTo(75);
-    expect(changed[0]?.[0]?.y).toBeCloseTo(90);
-    expect(changed[0]?.[1]?.x).toBeCloseTo(original[0]?.[1]?.x ?? 0);
+    expect(changed[0]?.points[0]?.x).toBeCloseTo(75);
+    expect(changed[0]?.points[0]?.y).toBeCloseTo(90);
+    expect(changed[0]?.points[1]?.x).toBeCloseTo(
+      original[0]?.points[1]?.x ?? 0,
+    );
     expect(editor.store.get(path)?.visual.rotation).toBe(30);
+    expect(
+      (editor.store.get(path)?.semantic as PathSemantic).contours[0],
+    ).not.toHaveProperty("closed");
     editor.undo();
     expect(editor.getSnapshot()).toEqual(before);
     drag.dispose();
+  });
+
+  test("open contour drags preserve their flags and point counts", () => {
+    for (const count of [2, 3]) {
+      const editor = makeEditor();
+      const id = editor.createElement("draw.path", {
+        semantic: {
+          name: "Line",
+          fillRule: "evenodd",
+          contours: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 100, y: 20 },
+                { x: 50, y: 60 },
+              ].slice(0, count),
+            },
+          ],
+        },
+        visual: { x: 0, y: 0, width: 100, height: 60 },
+      });
+      const drag = new PathAnchorDrag(editor, () => {});
+      expect(drag.start(1, id, 0, 0)).toBe(true);
+      drag.move(1, { x: 10, y: 10 });
+      drag.finish(1, { x: 10, y: 10 });
+      const contour = (editor.store.get(id)?.semantic as PathSemantic)
+        .contours[0]!;
+      expect(contour.closed).toBe(false);
+      expect(contour.points).toHaveLength(count);
+      expect(
+        pathWorldContours(editor.store.get(id)!)[0]?.points[0],
+      ).toMatchObject({ x: 10, y: 10 });
+      drag.dispose();
+    }
+  });
+
+  test("removing a contour keeps the remaining open flag and rejects invalid minima", () => {
+    const editor = makeEditor();
+    const id = editor.createElement("draw.path", {
+      semantic: {
+        name: "Mixed",
+        fillRule: "evenodd",
+        contours: [
+          {
+            points: [
+              { x: 0, y: 0 },
+              { x: 50, y: 0 },
+              { x: 25, y: 50 },
+            ],
+          },
+          {
+            closed: false,
+            points: [
+              { x: 60, y: 0 },
+              { x: 100, y: 40 },
+            ],
+          },
+        ],
+      },
+      visual: { x: 0, y: 0, width: 100, height: 50 },
+    });
+    const element = editor.store.get(id)!;
+    const contours = pathWorldContours(element);
+    expect(
+      planPathWorldContours(element, [
+        { closed: false, points: contours[1]!.points.slice(0, 1) },
+      ]),
+    ).toEqual([]);
+    expect(
+      planPathWorldContours(element, [
+        { closed: true, points: contours[1]!.points },
+      ]),
+    ).toEqual([]);
+    const commands = planPathWorldContours(element, contours.slice(1));
+    expect(commands.length).toBeGreaterThan(0);
+    editor.apply(commands);
+    const result = (editor.store.get(id)?.semantic as PathSemantic).contours;
+    expect(result).toHaveLength(1);
+    expect(result[0]?.closed).toBe(false);
+    expect(result[0]?.points).toHaveLength(2);
   });
 
   test("empty Boolean results cannot advertise or execute flattening", () => {

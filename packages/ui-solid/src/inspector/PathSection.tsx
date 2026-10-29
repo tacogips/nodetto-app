@@ -3,6 +3,7 @@ import {
   type Editor,
   moveStrokeAnchor,
   pathWorldContours,
+  type PathWorldContour,
   planPathWorldContours,
   splitStrokeSegment,
 } from "@nodetto/core";
@@ -24,17 +25,18 @@ export function PathSection(props: {
   const contours = () => pathWorldContours(props.element);
   const contourIndex = () =>
     Math.min(chosenContour(), Math.max(0, contours().length - 1));
-  const points = () => contours()[contourIndex()] ?? [];
+  const contour = () => contours()[contourIndex()];
+  const points = () => contour()?.points ?? [];
   const pointIndex = () =>
     Math.min(chosenPoint(), Math.max(0, points().length - 1));
   const point = () => points()[pointIndex()];
-  const write = (next: readonly (readonly FreehandPoint[])[]): void => {
+  const write = (next: readonly PathWorldContour[]): void => {
     props.editor.apply(planPathWorldContours(props.element, next));
   };
   const replacePoints = (next: FreehandPoint[]): void =>
     write(
       contours().map((contour, index) =>
-        index === contourIndex() ? next : contour,
+        index === contourIndex() ? { ...contour, points: next } : contour,
       ),
     );
   return (
@@ -180,9 +182,13 @@ export function PathSection(props: {
         </For>
         <button
           type="button"
-          disabled={contours().flat().length >= 20000}
+          disabled={contours().flatMap((c) => c.points).length >= 20000}
           onClick={() => {
-            const split = splitStrokeSegment(points(), pointIndex(), true);
+            const split = splitStrokeSegment(
+              points(),
+              pointIndex(),
+              contour()?.closed ?? true,
+            );
             if (!split) return;
             replacePoints(split);
             setChosenPoint(pointIndex() + 1);
@@ -192,7 +198,7 @@ export function PathSection(props: {
         </button>
         <button
           type="button"
-          disabled={points().length <= 3}
+          disabled={points().length <= (contour()?.closed ? 3 : 2)}
           onClick={() =>
             replacePoints(points().filter((_, index) => index !== pointIndex()))
           }
@@ -202,16 +208,23 @@ export function PathSection(props: {
       </Show>
       <button
         type="button"
-        disabled={contours().length >= 1024 || contours().flat().length > 19997}
+        disabled={
+          contours().length >= 1024 ||
+          contours().flatMap((c) => c.points).length > 19997
+        }
         onClick={() => {
-          const origin = points()[0] ?? contours()[0]?.[0] ?? { x: 0, y: 0 };
+          const origin = points()[0] ??
+            contours()[0]?.points[0] ?? { x: 0, y: 0 };
           const next = [
             ...contours(),
-            [
-              { x: origin.x + 10, y: origin.y + 10 },
-              { x: origin.x + 30, y: origin.y + 10 },
-              { x: origin.x + 20, y: origin.y + 30 },
-            ],
+            {
+              closed: true,
+              points: [
+                { x: origin.x + 10, y: origin.y + 10 },
+                { x: origin.x + 30, y: origin.y + 10 },
+                { x: origin.x + 20, y: origin.y + 30 },
+              ],
+            },
           ];
           write(next);
           setChosenContour(next.length - 1);

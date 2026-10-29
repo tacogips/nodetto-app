@@ -159,6 +159,8 @@ same resolved geometry without rewriting the imported document on open.
 
 See [the design](../design-docs/specs/design-cli-ai-drawing.md).
 
+Use `nodetto-cli validate doc.jsonl --strict` to exit 3 when validation reports warnings. `edit` reports newly introduced `semantic.unknownField` warnings per operation, for example `warning operation 0 (add): <id> (uml.component) semantic.kind: unknown semantic field (semantic.unknownField)`. JSON output includes a `warnings` array with `operation`, `op`, `element`, `type`, `path`, `code`, and `message`. Draw a stick figure with `nodetto-cli draw doc.jsonl geo:actor --label "Visitor"`.
+
 ## MCP server
 
 Run `nodetto-cli mcp` to expose every CLI operation to an MCP client over

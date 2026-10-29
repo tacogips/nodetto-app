@@ -6,7 +6,9 @@ import { flattenStroke, strokePath } from "../stroke-path.ts";
 export interface CompoundPathGeometry {
   readonly box: { x: number; y: number; width: number; height: number };
   readonly contours: readonly (readonly FreehandPoint[])[];
+  readonly closed: readonly boolean[];
   readonly path: string;
+  readonly openPath: string;
 }
 
 function mapPoint(
@@ -26,7 +28,12 @@ export function compoundPathGeometry(
 ): CompoundPathGeometry | null {
   if (element.type !== "draw.path") return null;
   const contours = (element.semantic as PathSemantic).contours;
-  if (!contours.length || contours.some((contour) => contour.points.length < 3))
+  if (
+    !contours.length ||
+    contours.some(
+      (contour) => contour.points.length < (contour.closed === false ? 2 : 3),
+    )
+  )
     return null;
   const samples = contours.flatMap((contour) =>
     contour.points.flatMap((point) =>
@@ -58,14 +65,22 @@ export function compoundPathGeometry(
   return {
     box,
     contours: mapped,
-    path: mapped.map((contour) => strokePath(contour, true)).join(" "),
+    closed: contours.map((contour) => contour.closed !== false),
+    path: mapped
+      .filter((_, index) => contours[index]?.closed !== false)
+      .map((contour) => strokePath(contour, true))
+      .join(" "),
+    openPath: mapped
+      .filter((_, index) => contours[index]?.closed === false)
+      .map((contour) => strokePath(contour, false))
+      .join(" "),
   };
 }
 
 /** CSS mask preserving every compound contour, including holes and curves. */
 export function compoundPathMaskCss(element: Element): string | undefined {
   const geometry = compoundPathGeometry(element);
-  if (!geometry) return undefined;
+  if (!geometry || !geometry.path) return undefined;
   const rule = (element.semantic as PathSemantic).fillRule;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geometry.box.width} ${geometry.box.height}"><path d="${geometry.path}" fill="white" fill-rule="${rule}"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
@@ -92,16 +107,24 @@ export const compoundPathShapeUtil: ShapeUtil = {
     const geometry = compoundPathGeometry(element);
     if (!geometry) return false;
     const local = { x: point.x - geometry.box.x, y: point.y - geometry.box.y };
-    const contours = geometry.contours.map((contour) =>
-      flattenStroke(contour, true, 0.5 / context.zoom),
+    const contours = geometry.contours.map((contour, index) =>
+      flattenStroke(
+        contour,
+        geometry.closed[index] ?? true,
+        0.5 / context.zoom,
+      ),
+    );
+    const closedContours = contours.filter(
+      (_, index) => geometry.closed[index],
     );
     const rule = (element.semantic as PathSemantic).fillRule;
     const inside =
       rule === "evenodd"
-        ? contours.filter((contour) => winding(contour, local) !== 0).length %
+        ? closedContours.filter((contour) => winding(contour, local) !== 0)
+            .length %
             2 ===
           1
-        : contours.reduce(
+        : closedContours.reduce(
             (total, contour) => total + winding(contour, local),
             0,
           ) !== 0;
@@ -116,9 +139,10 @@ export const compoundPathShapeUtil: ShapeUtil = {
       4 / context.zoom,
       (element.visual.style?.strokeWidth ?? 1) / 2,
     );
-    return contours.some((contour) =>
+    return contours.some((contour, contourIndex) =>
       contour.some(
         (sample, index) =>
+          (geometry.closed[contourIndex] || index < contour.length - 1) &&
           distanceToSegment(
             local,
             sample,

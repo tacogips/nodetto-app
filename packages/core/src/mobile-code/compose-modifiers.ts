@@ -179,12 +179,13 @@ export function composeCompoundPath(
   style: VisualStyle,
 ): string {
   const geometry = compoundPathGeometry(element);
-  if (!geometry) return "Spacer(modifier = Modifier)";
+  if (!geometry || !geometry.path) return "Spacer(modifier = Modifier)";
   const x = (value: number) =>
     `size.width * ${number(value / geometry.box.width)}f`;
   const y = (value: number) =>
     `size.height * ${number(value / geometry.box.height)}f`;
   const commands = geometry.contours
+    .filter((_, index) => geometry.closed[index])
     .flatMap((contour) => {
       const first = contour[0];
       if (!first) return [];

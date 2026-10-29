@@ -747,6 +747,40 @@ export function geoOutline(
         [right, bottom],
         [left, bottom],
       ]);
+    case "actor": {
+      // UML stick figure; picked and connected by its box.
+      const w = width - 2;
+      const h = height - 2;
+      const r = Math.max(1, Math.min(h * 0.11, w / 4));
+      const neck = round(top + 2 * r);
+      const shoulders = round(top + h * 0.36);
+      const hip = round(top + h * 0.64);
+      const reach = Math.max(1, Math.min(w / 2, h * 0.25));
+      const cx = round(middleX);
+      const x1 = round(cx - reach);
+      const x2 = round(cx + reach);
+      return polygon(
+        arcPoints(cx, top + r, r, r, 0, Math.PI * 2, 24).slice(0, -1),
+        [
+          [
+            [cx, neck],
+            [cx, hip],
+          ],
+          [
+            [x1, shoulders],
+            [x2, shoulders],
+          ],
+          [
+            [cx, hip],
+            [x1, bottom],
+          ],
+          [
+            [cx, hip],
+            [x2, bottom],
+          ],
+        ],
+      );
+    }
     case "person":
       return polygon(personPoints(width, height));
     case "package": {

@@ -63,7 +63,18 @@ interface Created {
   readonly page: string;
 }
 
+export interface EditWarning {
+  readonly operation: number;
+  readonly op: string;
+  readonly element: string;
+  readonly type: string;
+  readonly path: string;
+  readonly code: string;
+  readonly message: string;
+}
+
 interface BatchResult {
+  readonly warnings: readonly EditWarning[];
   readonly text: string;
   readonly created: readonly Created[];
   readonly counts: ReadonlyMap<
@@ -922,9 +933,19 @@ export function applyBatch(
   );
   const editor = new Editor({ document: parsed.document });
   const batch = new Batch(editor);
+  const lastTouch = new Map<string, number>();
+  let records = new Map(
+    editor.store.listElements().map((element) => [element.id, element]),
+  );
   operations.forEach((operation, index) => {
     try {
       batch.apply(operation, index);
+      const next = new Map(
+        editor.store.listElements().map((element) => [element.id, element]),
+      );
+      for (const [id, element] of next)
+        if (records.get(id) !== element) lastTouch.set(id, index);
+      records = next;
     } catch (cause) {
       if (cause instanceof OperationError) throw cause;
       if (cause instanceof CommandError) {
@@ -958,9 +979,8 @@ export function applyBatch(
       if (commands.length) editor.apply(commands, { placed });
     }
   const snapshot = editor.getSnapshot();
-  const issues = validateDocument(snapshot).filter(
-    (issue) => issue.severity === "error",
-  );
+  const validation = validateDocument(snapshot);
+  const issues = validation.filter((issue) => issue.severity === "error");
   if (issues.length)
     throw new Error(
       `The result is not a valid document:\n${issues
@@ -969,6 +989,42 @@ export function applyBatch(
         )
         .join("\n")}`,
     );
+  const warningKey = (path: string, elements: readonly Element[]) => {
+    const match = /^elements\[(\d+)\]\.(.+)$/.exec(path);
+    const element = match && elements[Number(match[1])];
+    return element && match
+      ? {
+          element,
+          path: match[2] as string,
+          key: JSON.stringify([element.id, match[2]]),
+        }
+      : undefined;
+  };
+  const baseline = new Set(
+    parsed.issues
+      .filter((issue) => issue.code === "semantic.unknownField")
+      .map((issue) => warningKey(issue.path, parsed.document.elements)?.key),
+  );
+  const warnings: EditWarning[] = [];
+  for (const issue of validation) {
+    if (issue.code !== "semantic.unknownField") continue;
+    const item = warningKey(issue.path, snapshot.elements);
+    if (!item || baseline.has(item.key)) continue;
+    const operation = lastTouch.get(item.element.id);
+    if (operation === undefined) continue;
+    warnings.push({
+      operation,
+      op: String(operations[operation]?.op),
+      element: item.element.id,
+      type: item.element.type,
+      path: item.path,
+      code: issue.code,
+      message: issue.message,
+    });
+  }
+  warnings.sort(
+    (a, b) => a.operation - b.operation || a.path.localeCompare(b.path),
+  );
   const counts = new Map<
     string,
     { added: number; updated: number; removed: number }
@@ -994,6 +1050,7 @@ export function applyBatch(
     created: batch.created,
     counts,
     operations: operations.length,
+    warnings,
   };
 }
 
@@ -1125,6 +1182,7 @@ export function runOperations(
           operations: result.operations,
           created: result.created,
           pages: Object.fromEntries(result.counts),
+          warnings: result.warnings,
         },
         null,
         2,
@@ -1141,5 +1199,11 @@ export function runOperations(
         `  created ${item.ref ? `@${item.ref} = ` : ""}${item.id} (${item.type})`,
     ),
   ];
+  lines.push(
+    ...result.warnings.map(
+      (warning) =>
+        `  warning operation ${warning.operation} (${warning.op}): ${warning.element} (${warning.type}) ${warning.path}: ${warning.message} (${warning.code})`,
+    ),
+  );
   return ok(`${lines.join("\n")}\n`);
 }

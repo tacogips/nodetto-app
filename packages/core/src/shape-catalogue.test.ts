@@ -29,6 +29,7 @@ describe("shape catalogue", () => {
       searchShapes({ category: "UML state" }).map((shape) => shape.id),
     ).toContain(Tool.InitialState);
     expect(searchShapes({ query: "actor" }).map((shape) => shape.id)).toEqual([
+      Tool.StickFigure,
       Tool.UseCaseActor,
       Tool.Actor,
     ]);

@@ -220,6 +220,8 @@ corners of a route and **Crossings** makes a connector hop over (Arc jump) or
 break around (Gap) connectors painted beneath it. Both are paint-only, so they
 are copied by Copy style and exported to SVG, PNG, PDF and draw.io.
 
+The General palette includes Stick figure (`geo:actor`), with a centred label; its box is used for picking and connections. A `draw.path` contour with `closed: false` and at least two points is an unfilled stroke without arrowheads; handoff and mobile code omit open contours. Unknown semantic fields produce a `semantic.unknownField` warning and are preserved, never treated as errors.
+
 ## File saving
 
 Settings > Files > File saving switches between Automatic (the default) and Manual.

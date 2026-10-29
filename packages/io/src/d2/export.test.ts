@@ -23,6 +23,14 @@ function document(elements: readonly Element[]): Document {
   };
 }
 
+test("exports a stick figure as a D2 person", () => {
+  const actor = element("figure", "a1", "shape.geo", {
+    geo: "actor",
+    label: "Visitor",
+  });
+  expect(exportD2(document([actor]), "page").code).toContain("shape: person");
+});
+
 test("exports nested architecture shapes, connections and portable styles", () => {
   const frame = element(
     "system",

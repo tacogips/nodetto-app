@@ -27,7 +27,11 @@ import {
   type ValidationIssue,
   warning,
 } from "./issues.ts";
-import { VISUAL_KEY_ORDER, VISUAL_STYLE_KEY_ORDER } from "./keyOrder.ts";
+import {
+  type KeyOrder,
+  VISUAL_KEY_ORDER,
+  VISUAL_STYLE_KEY_ORDER,
+} from "./keyOrder.ts";
 import { getElementTypeDefinition } from "./registry.ts";
 import {
   BLEND_MODES,
@@ -111,6 +115,45 @@ function warnUnknownFields(
           `unknown ${label} field; preserved but ignored by this build`,
         ),
       );
+    }
+  }
+}
+
+/** Unknown semantic keys remain inline and are preserved by the serializer. */
+function warnUnknownSemanticFields(
+  out: ValidationIssue[],
+  value: Record<string, unknown>,
+  order: KeyOrder,
+  path: string,
+  type: string,
+): void {
+  for (const key of Object.keys(value)) {
+    if (!order.keys.includes(key)) {
+      out.push(
+        warning(
+          "semantic.unknownField",
+          `${path}.${key}`,
+          `unknown semantic field for ${type}; preserved but ignored by this build`,
+        ),
+      );
+    } else if (order.children && Object.hasOwn(order.children, key)) {
+      const child = order.children[key];
+      if (!child) continue;
+      const nested = value[key];
+      if (isPlainObject(nested))
+        warnUnknownSemanticFields(out, nested, child, `${path}.${key}`, type);
+      else if (Array.isArray(nested)) {
+        nested.forEach((item, i) => {
+          if (isPlainObject(item))
+            warnUnknownSemanticFields(
+              out,
+              item,
+              child,
+              `${path}.${key}[${i}]`,
+              type,
+            );
+        });
+      }
     }
   }
 }
@@ -666,6 +709,13 @@ function validateElement(
   if (definition) {
     if (semanticIsObject) {
       out.push(...definition.validateSemantic(semantic, `${path}.semantic`));
+      warnUnknownSemanticFields(
+        out,
+        semantic,
+        definition.keyOrder,
+        `${path}.semantic`,
+        type,
+      );
     }
   } else {
     out.push(

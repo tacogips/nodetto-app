@@ -59,20 +59,38 @@ export function renderShape(
     case "draw.path": {
       const geometry = compoundPathGeometry(element);
       if (!geometry) return "";
-      return tag(
-        "path",
-        styled(
-          {
-            d: geometry.path,
-            transform: `translate(${fmt(box.x)} ${fmt(box.y)})`,
-            fill: theme.ink,
-            stroke: "none",
-            "fill-rule": (element.semantic as PathSemantic).fillRule,
-          },
-          element.visual,
-          element.id,
-        ),
-      );
+      const closedPath = geometry.path
+        ? tag(
+            "path",
+            styled(
+              {
+                d: geometry.path,
+                transform: `translate(${fmt(box.x)} ${fmt(box.y)})`,
+                fill: theme.ink,
+                stroke: "none",
+                "fill-rule": (element.semantic as PathSemantic).fillRule,
+              },
+              element.visual,
+              element.id,
+            ),
+          )
+        : "";
+      const openPath = geometry.openPath
+        ? tag("path", {
+            ...styled(
+              {
+                d: geometry.openPath,
+                transform: `translate(${fmt(box.x)} ${fmt(box.y)})`,
+                fill: "none",
+                stroke: theme.ink,
+              },
+              element.visual,
+              element.id,
+            ),
+            fill: "none",
+          })
+        : "";
+      return closedPath + openPath;
     }
     case "draw.freehand": {
       const geometry = freehandGeometry(element);

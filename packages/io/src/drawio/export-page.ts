@@ -414,6 +414,35 @@ export class PageWriter {
         );
         return;
       }
+      case "uml.component":
+      case "uml.interface":
+      case "uml.port": {
+        const entries: Entry[] =
+          element.type === "uml.component"
+            ? [
+                ["shape", "component"],
+                ["align", "left"],
+                ["spacingLeft", 36],
+              ]
+            : element.type === "uml.interface" &&
+                text(semantic["kind"]) === "required"
+              ? [["shape", "requiredInterface"]]
+              : element.type === "uml.port"
+                ? [["rounded", 0]]
+                : [];
+        const names =
+          element.type === "uml.interface" &&
+          text(semantic["kind"]) !== "required"
+            ? ["ellipse"]
+            : [];
+        this.vertex(
+          element,
+          box,
+          textToHtmlLabel(text(semantic["name"])),
+          formatStyle(names, [...entries, ...common, ...paint]),
+        );
+        return;
+      }
       default:
         this.fallback(element, "was exported as a labelled rectangle");
         this.vertex(

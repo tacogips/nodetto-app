@@ -47,6 +47,8 @@ export function geoOutlinePolygon(
   box: Box,
   flip?: GeoFlip,
 ): readonly Vec[] | null {
+  // The stick figure is picked and connected by its box.
+  if (kind === "actor") return null;
   const outline = geoOutline(kind, box.width, box.height, flip);
   if (outline.kind === "polygon") return parsePoints(outline.points, box);
   if (outline.kind === "ellipse")
@@ -117,6 +119,11 @@ export function elementOutlinePolygon(
   }
   if (element.type === "draw.path") {
     const semantic = element.semantic as PathSemantic;
+    if (
+      semantic.contours.length === 1 &&
+      semantic.contours[0]?.closed === false
+    )
+      return null;
     const geometry = compoundPathGeometry(element);
     const contour = geometry?.contours[0];
     if (semantic.contours.length !== 1 || !geometry || !contour) return null;

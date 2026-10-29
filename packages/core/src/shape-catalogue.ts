@@ -71,6 +71,7 @@ const LISTINGS: Readonly<Record<ShapeCategoryId, Listing>> = {
     [Tool.DoubleArrow, "Double arrow"],
     [Tool.RightTriangle, "Right triangle"],
     [Tool.Person, "Person"],
+    [Tool.StickFigure, "Stick figure"],
     [Tool.Package, "Package"],
     [Tool.Text, "Text"],
     [Tool.Note, "Note"],
