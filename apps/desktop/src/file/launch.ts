@@ -1,16 +1,26 @@
 // Documents the OS asked the app to open: command-line paths and, on macOS,
-// open-documents events (`open -a nodetto file.jsonl`, Finder "Open With").
-// Rust queues the paths until the frontend takes them, so a request that
-// arrives before the webview is listening is not lost.
+// open-documents events (`open -a nodetto file.jsonl`, Finder "Open With"),
+// plus nodetto://open links that also name a page. Rust queues the requests
+// until the frontend takes them, so a request that arrives before the
+// webview is listening is not lost.
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 const OPEN_REQUESTED_EVENT = "open-documents-requested";
 
+/** A document to open; a link may also choose the page to show. */
+export interface LaunchRequest {
+  readonly path: string;
+  /** Full or short page ID. */
+  readonly page?: string;
+  /** 1-based display position. */
+  readonly pageNumber?: number;
+}
+
 export interface LaunchBackend {
-  /** Remove and return the queued paths, oldest first. */
-  takePaths(): Promise<readonly string[]>;
+  /** Remove and return the queued requests, oldest first. */
+  takeRequests(): Promise<readonly LaunchRequest[]>;
   /**
    * Call `listener` when new paths were queued. Resolves to an unsubscribe
    * function once the listener is registered: only from then on is a newly
@@ -21,7 +31,7 @@ export interface LaunchBackend {
 
 export function createTauriLaunchBackend(): LaunchBackend {
   return {
-    takePaths: () => invoke<string[]>("take_launch_paths"),
+    takeRequests: () => invoke<LaunchRequest[]>("take_launch_requests"),
     onOpenRequested: (listener) =>
       listen(OPEN_REQUESTED_EVENT, () => listener()).then(
         (stop: UnlistenFn) => () => stop(),
@@ -31,7 +41,7 @@ export function createTauriLaunchBackend(): LaunchBackend {
 
 export function createUnavailableLaunchBackend(): LaunchBackend {
   return {
-    takePaths: () => Promise.resolve([]),
+    takeRequests: () => Promise.resolve([]),
     onOpenRequested: () => Promise.resolve(() => {}),
   };
 }
@@ -43,15 +53,15 @@ export function createLaunchBackend(): LaunchBackend {
 }
 
 /**
- * Take the queued paths and open the most recent request; earlier queued
- * paths are superseded because the editor holds one document at a time.
+ * Take the queued requests and open the most recent one; earlier requests
+ * are superseded because the editor holds one document at a time.
  */
 export async function openRequestedDocument(
   backend: LaunchBackend,
-  open: (path: string) => void,
+  open: (request: LaunchRequest) => void,
 ): Promise<void> {
-  const path = (await backend.takePaths()).at(-1);
-  if (path) open(path);
+  const request = (await backend.takeRequests()).at(-1);
+  if (request) open(request);
 }
 
 export interface OpenRequestWatcher {
@@ -68,14 +78,14 @@ export interface OpenRequestWatcher {
  */
 export function watchOpenRequests(
   backend: LaunchBackend,
-  open: (path: string) => void,
+  open: (request: LaunchRequest) => void,
   canOpen: () => boolean,
 ): OpenRequestWatcher {
   let stopped = false;
   let held = false;
-  // A path already taken off the queue when ownership changed under the
+  // A request already taken off the queue when ownership changed under the
   // take; it is opened on the next flush unless a newer request wins.
-  let pending: string | null = null;
+  let pending: LaunchRequest | null = null;
   let unlisten: (() => void) | null = null;
   const drain = (): void => {
     if (stopped) return;
@@ -84,18 +94,18 @@ export function watchOpenRequests(
       return;
     }
     held = false;
-    void backend.takePaths().then(
-      (paths) => {
+    void backend.takeRequests().then(
+      (requests) => {
         if (stopped) return;
-        const path = paths.at(-1) ?? pending;
-        if (!path) return;
+        const request = requests.at(-1) ?? pending;
+        if (!request) return;
         if (!canOpen()) {
-          pending = path;
+          pending = request;
           held = true;
           return;
         }
         pending = null;
-        open(path);
+        open(request);
       },
       () => {
         // Nothing was taken; whatever is pending stays for the next flush.

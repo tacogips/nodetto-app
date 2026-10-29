@@ -88,6 +88,10 @@ jobs:
           test -x "$packaged"
           test "$(env PATH=/usr/bin:/bin "$packaged" --version)" = "nodetto-cli $APP_VERSION"
           "$packaged" validate packages/io/src/__fixtures__/erd.jsonl
+          # nodetto:// links reach the app only if the launcher passes them on.
+          desktop="$RUNNER_TEMP/nodetto-deb/usr/share/applications/Nodetto.desktop"
+          grep -qx 'Exec=nodetto %U' "$desktop"
+          grep -q '^MimeType=.*x-scheme-handler/nodetto' "$desktop"
           appimage=$(realpath target/release/bundle/appimage/*.AppImage)
           (cd "$RUNNER_TEMP" && "$appimage" --appimage-extract > /dev/null)
           test "$("$RUNNER_TEMP/squashfs-root/usr/bin/nodetto-cli" --version)" = "nodetto-cli $APP_VERSION"

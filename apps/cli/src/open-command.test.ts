@@ -1,10 +1,13 @@
 import { expect, test } from "bun:test";
+import { shortPageId } from "@nodetto/ir";
+import { serializeDocument } from "@nodetto/io";
 import { resolve } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { runCliAsync } from "./cli.ts";
 import type { CommandIo } from "./commands.ts";
 import { desktopOpenArguments, openDesktopDocument } from "./open-desktop.ts";
+import { desktopOpenLink } from "./open-link.ts";
 
 const io: CommandIo = {
   readText: () => {
@@ -91,4 +94,77 @@ test("missing files and directories are rejected before launching", async () => 
   } finally {
     rmSync(directory, { recursive: true });
   }
+});
+
+const paged = serializeDocument({
+  schemaVersion: 1,
+  id: "doc",
+  title: "Paged",
+  pages: [
+    { id: "page-b", name: "Second", kind: "freeform", order: "b" },
+    { id: "page-a", name: "First", kind: "freeform", order: "a" },
+  ],
+  elements: [],
+});
+
+async function openWith(args: readonly string[]) {
+  const requests: unknown[][] = [];
+  const result = await runCliAsync(
+    ["open", "doc.jsonl", ...args],
+    {
+      ...io,
+      readText: () => paged,
+      openDocument: async (...request) => {
+        requests.push(request);
+      },
+    },
+    "test",
+  );
+  return { result, requests };
+}
+
+test("open --page and --page-number resolve against the file before launching", async () => {
+  for (const [args, id] of [
+    [["--page", "Second"], "page-b"],
+    [["--page", shortPageId("page-a")], "page-a"],
+    [["--page", "page-b"], "page-b"],
+    [["--page-number", "1"], "page-a"],
+    [["--page-number=2"], "page-b"],
+  ] as const) {
+    const { result, requests } = await openWith(args);
+    expect(result.exitCode).toBe(0);
+    expect(requests).toEqual([["doc.jsonl", undefined, id]]);
+    expect(result.stdout).toContain(shortPageId(id));
+  }
+});
+
+test("open rejects unknown pages and malformed page selections without launching", async () => {
+  for (const args of [
+    ["--page", "Missing"],
+    ["--page-number", "3"],
+    ["--page-number", "0"],
+    ["--page-number", "1.5"],
+    ["--page-number", "x"],
+    ["--page", "First", "--page-number", "1"],
+  ]) {
+    const { result, requests } = await openWith(args);
+    expect(result.exitCode).toBe(2);
+    expect(requests).toEqual([]);
+  }
+});
+
+test("a page travels as a nodetto:// link after the file on every platform", () => {
+  const path = "dir/a b&c.jsonl";
+  const link = desktopOpenLink(resolve(path), "page/1");
+  expect(link).toBe(
+    `nodetto://open?path=${encodeURIComponent(resolve(path))}&page=page%2F1`,
+  );
+  expect(desktopOpenArguments(path, undefined, "darwin", "page/1")).toEqual([
+    "/usr/bin/open",
+    ["-a", "nodetto", "--", resolve(path), link],
+  ]);
+  expect(desktopOpenArguments(path, undefined, "linux", "page/1")).toEqual([
+    "nodetto",
+    [resolve(path), link],
+  ]);
 });

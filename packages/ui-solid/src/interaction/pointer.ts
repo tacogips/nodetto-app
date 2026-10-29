@@ -436,6 +436,13 @@ export function createPointerHandlers(
     // be retargeted here. Resolve the selected handle before inserting a point.
     if (connectors.editSelectedRouteHandle(event, point)) return;
     const hit = hits.canvasHitTest(point);
+    // An edge label edits in place; elsewhere on the edge a double-click
+    // still adds a bend point.
+    const labelled = hits.edgeLabelAt(point, hit);
+    if (labelled) {
+      options.onEditRequest?.(labelled, "body");
+      return;
+    }
     if (!hit) {
       return;
     }

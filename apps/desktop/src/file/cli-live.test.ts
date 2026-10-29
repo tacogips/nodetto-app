@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { watch, type FSWatcher } from "node:fs";
+import { unwatchFile, watchFile } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDefaultRegistry, Editor } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
@@ -31,7 +31,7 @@ async function until(check: () => boolean): Promise<void> {
   expect(check()).toBe(true);
 }
 
-test("CLI atomic edits appear through a real file watch, merge human edits and render the shared result", async () => {
+test("CLI atomic edits appear through a polled file watch, merge human edits and render the shared result", async () => {
   const directory = await mkdtemp(join(tmpdir(), "nodetto-cli-live-"));
   const path = join(directory, "drawing.jsonl");
   const ops = join(directory, "ops.json");
@@ -42,7 +42,7 @@ test("CLI atomic edits appear through a real file watch, merge human edits and r
     semantic: { label: "Human node" },
   });
   await writeFile(path, serializeDocument(editor.getSnapshot()));
-  let watcher: FSWatcher | undefined;
+  let watched: string | undefined;
   const listeners = new Set<(path: string) => void>();
   const backend: FileBackend = {
     available: true,
@@ -53,14 +53,20 @@ test("CLI atomic edits appear through a real file watch, merge human edits and r
     listRecent: async () => [],
     addRecent: async () => [],
     removeRecent: async () => [],
+    // Stat polling stands in for the app's native watcher: macOS fs.watch
+    // can miss a change made just after it starts, or drop an atomic rename.
     watch: async (path) => {
-      watcher = watch(dirname(path), (_event, name) => {
-        if (name === basename(path))
+      watched = path;
+      watchFile(path, { interval: 20 }, (current, previous) => {
+        if (
+          current.ino !== previous.ino ||
+          current.mtimeMs !== previous.mtimeMs
+        )
           for (const listener of listeners) listener(path);
       });
     },
     unwatch: async () => {
-      watcher?.close();
+      if (watched !== undefined) unwatchFile(watched);
     },
     onFileChanged: (listener) => {
       listeners.add(listener);
@@ -129,7 +135,7 @@ test("CLI atomic edits appear through a real file watch, merge human edits and r
     ]);
   } finally {
     session.dispose();
-    watcher?.close();
+    if (watched !== undefined) unwatchFile(watched);
     await rm(directory, { recursive: true, force: true });
   }
 }, 15000);

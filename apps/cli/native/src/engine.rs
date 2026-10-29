@@ -113,7 +113,8 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
         "open" => {
             let path = string(args, 0, ctx)?;
             let app = optional_string(args, 1, ctx)?;
-            files::open_document(&path, app).map_err(host_error)?;
+            let link = optional_string(args, 2, ctx)?;
+            files::open_document(&path, app, link).map_err(host_error)?;
             Ok(JsValue::undefined())
         }
         "png" => {

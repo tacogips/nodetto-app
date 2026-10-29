@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { resolvePageQuery, shortPageId } from "./page-id.ts";
+import { pageAtNumber, resolvePageQuery, shortPageId } from "./page-id.ts";
 import type { Page } from "./types.ts";
 
 const pages: Page[] = [
@@ -46,4 +46,16 @@ test("duplicate names and alias/name conflicts require a full ID", () => {
     resolvePageQuery([first, { ...pages[1]!, name: first.name }], first.name)
       .ok,
   ).toBe(false);
+});
+
+test("page numbers follow display order, not storage order", () => {
+  const [schema, flow] = pages as [Page, Page];
+  const reordered = [
+    { ...schema, order: "b" },
+    { ...flow, order: "a" },
+  ];
+  expect(pageAtNumber(reordered, 1)).toEqual({ ok: true, page: reordered[1] });
+  expect(pageAtNumber(reordered, 2)).toEqual({ ok: true, page: reordered[0] });
+  for (const number of [0, 3, 1.5, Number.NaN])
+    expect(pageAtNumber(reordered, number).ok).toBe(false);
 });

@@ -327,8 +327,25 @@ export function App(props: AppProps): JSX.Element {
     props.onCloudSettingsChange?.(next);
   };
 
-  const { mayDiscard, newDocument, open, reload, openRecent } =
-    createDocumentCommands(props, file, viewport);
+  // A link whose page is missing still opens its file; say so on the page it
+  // landed on until the user moves to another page.
+  const [pageNotice, setPageNotice] = createSignal<{
+    readonly message: string;
+    readonly pageId: string;
+  } | null>(null);
+  createEffect(() => {
+    editorSignals.rev();
+    if (pageNotice()?.pageId !== props.editor.currentPageId)
+      setPageNotice(null);
+  });
+  const { mayDiscard, newDocument, open, reload, openRecent, openRequest } =
+    createDocumentCommands(props, file, viewport, (message) =>
+      setPageNotice(
+        message === null
+          ? null
+          : { message, pageId: props.editor.currentPageId },
+      ),
+    );
 
   const [templatesOpen, setTemplatesOpen] = createSignal(false);
   const openTemplates = () => setTemplatesOpen(true);
@@ -368,7 +385,7 @@ export function App(props: AppProps): JSX.Element {
     if (!launch) return;
     // A file opened from the OS must never be loaded into a cloud room's
     // document: hold it until the editor is back in file mode.
-    const requests = watchOpenRequests(launch, openRecent, () => !isCloud());
+    const requests = watchOpenRequests(launch, openRequest, () => !isCloud());
     onCleanup(() => requests.stop());
     createEffect(() => {
       if (!isCloud()) requests.flush();
@@ -557,7 +574,12 @@ export function App(props: AppProps): JSX.Element {
         file={file()}
         isCloud={isCloud()}
         problemsPanelOpen={isBpmnPage() || isBreadboardPage()}
-        error={cloud()?.error ?? file().error ?? exportError()}
+        error={
+          cloud()?.error ??
+          file().error ??
+          exportError() ??
+          pageNotice()?.message
+        }
         onResolveConflict={(choice) =>
           void props.session.resolveConflict(choice)
         }

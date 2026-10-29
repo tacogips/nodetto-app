@@ -386,18 +386,47 @@ describe("edit requests (design 3.3)", () => {
     const undoSize = editor.history.undoSize;
 
     interaction.onDoubleClick(mouse(50, 50));
-    interaction.onDoubleClick(mouse(250, 56));
+    // Off the midpoint, which is where a label is added instead.
+    interaction.onDoubleClick(mouse(150, 56));
     expect(requests).toEqual([[a, "body"]]);
     expect(editor.store.get(edge)?.semantic).toMatchObject({
       from: a,
       to: b,
       routing: "manual",
-      routingWaypoints: [{ u: 0.5, v: 0 }],
+      routingWaypoints: [{ u: 0.25, v: 0 }],
     });
     expect([...editor.selection.ids()]).toEqual([edge]);
     expect(editor.history.undoSize).toBe(undoSize + 1);
     expect(editor.undo()).toBe(true);
     expect(editor.store.get(edge)?.semantic).toMatchObject({ from: a, to: b });
+    expect(editor.store.get(edge)?.semantic).not.toHaveProperty("routing");
+  });
+
+  test("double-click on an edge label or an unlabelled midpoint edits the label", () => {
+    const editor = new Editor();
+    const a = editor.createElement("shape.geo", {
+      visual: { x: 0, y: 0, width: 100, height: 100 },
+    });
+    const b = editor.createElement("shape.geo", {
+      visual: { x: 400, y: 0, width: 100, height: 100 },
+    });
+    const edge = editor.connect(a, b) as ElementId;
+    const { interaction, requests } = editing(editor);
+
+    // The route runs along y = 50; its midpoint is at x = 250.
+    interaction.onDoubleClick(mouse(250, 50));
+    expect(requests).toEqual([[edge, "body"]]);
+    // Above an empty label there is no edge to hit: nothing happens.
+    interaction.onDoubleClick(mouse(250, 20));
+    expect(requests).toHaveLength(1);
+
+    editor.setText(edge, "charges\ncard");
+    // The upper line of a two-line label sits well clear of the route.
+    interaction.onDoubleClick(mouse(255, 30));
+    expect(requests).toEqual([
+      [edge, "body"],
+      [edge, "body"],
+    ]);
     expect(editor.store.get(edge)?.semantic).not.toHaveProperty("routing");
   });
 
@@ -430,7 +459,7 @@ describe("edit requests (design 3.3)", () => {
       endpointReaderFor("edge.generic"),
     );
     const { interaction } = interactionFor(editor, "select");
-    interaction.onDoubleClick(mouse(200, 150));
+    interaction.onDoubleClick(mouse(200, 100));
     const after = resolveConnector(
       editor.store.get(edge)!,
       editor.createShapeContext(),
@@ -442,7 +471,7 @@ describe("edit requests (design 3.3)", () => {
     const expected = [
       before?.points[0],
       before?.points[1],
-      { x: 200, y: 150 },
+      { x: 200, y: 100 },
       before?.points[2],
       before?.points[3],
     ];

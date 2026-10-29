@@ -1,3 +1,4 @@
+import { comparePageOrder } from "./page-order.ts";
 import type { Page } from "./types.ts";
 
 const ALPHABET =
@@ -47,4 +48,20 @@ export function resolvePageQuery(
     ok: false,
     message: `No page has the id, short id or name "${query}".`,
   };
+}
+
+/** A 1-based display position, numbered as `nodetto-cli pages` lists them. */
+export function pageAtNumber(
+  pages: readonly Page[],
+  number: number,
+): PageResolution {
+  const page = Number.isInteger(number)
+    ? [...pages].sort(comparePageOrder)[number - 1]
+    : undefined;
+  return page
+    ? { ok: true, page }
+    : {
+        ok: false,
+        message: `Page number ${number} is out of range; the document has ${pages.length} page${pages.length === 1 ? "" : "s"}.`,
+      };
 }

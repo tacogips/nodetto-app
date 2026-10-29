@@ -12,6 +12,7 @@ import {
   sampleGradient,
   strokeGradientId,
 } from "../gradient.ts";
+import { boxLabelLayout } from "../label-layout.ts";
 import { strokeDashCss } from "../stroke-dash.ts";
 import { type Attrs, fmt, tag, text, wrap } from "./markup.ts";
 import { type SvgTheme, TEXT_PADDING } from "./theme.ts";
@@ -228,7 +229,10 @@ export function textStyled(base: Attrs, visual: Visual): Attrs {
   return out;
 }
 
-/** A label centred in `box`, honouring the element's text styling. */
+/**
+ * A label centred in `box`, honouring the element's text styling. Long text
+ * wraps to the box and newlines break, as on the canvas.
+ */
 export function centredLabel(
   box: Box,
   label: string,
@@ -245,18 +249,29 @@ export function centredLabel(
       : anchor === "end"
         ? box.x + box.width - TEXT_PADDING
         : box.x + box.width / 2;
-  return text(
-    textStyled(
-      {
-        x,
-        y: box.y + box.height / 2,
-        "text-anchor": anchor,
-        "dominant-baseline": "central",
-        fill: theme.ink,
-        "font-size": theme.fontSize,
-      },
-      visual,
-    ),
-    label,
-  );
+  const layout = boxLabelLayout(label, box.width, visual, theme.fontSize);
+  const top =
+    box.y +
+    box.height / 2 -
+    ((layout.lines.length - 1) * layout.lineHeight) / 2;
+  return layout.lines
+    .map((line, index) =>
+      line === ""
+        ? ""
+        : text(
+            textStyled(
+              {
+                x,
+                y: top + index * layout.lineHeight,
+                "text-anchor": anchor,
+                "dominant-baseline": "central",
+                fill: theme.ink,
+                "font-size": theme.fontSize,
+              },
+              visual,
+            ),
+            line,
+          ),
+    )
+    .join("");
 }

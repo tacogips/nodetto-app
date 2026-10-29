@@ -300,6 +300,11 @@
   flex-wrap: nowrap;
   min-width: 0;
   overflow-x: auto;
+  /* The scroll arrows and right-button drag replace the scrollbar. */
+  scrollbar-width: none;
+}
+.app-viewer-footer .nodetto-page-tab-list::-webkit-scrollbar {
+  display: none;
 }
 .app-viewer-footer .nodetto-page-tab {
   flex: 0 0 auto;

@@ -1,13 +1,15 @@
 import { expect, test } from "bun:test";
 import {
   type LaunchBackend,
+  type LaunchRequest,
   openRequestedDocument,
   watchOpenRequests,
 } from "./launch.ts";
 
 function queue(paths: string[]): LaunchBackend {
   return {
-    takePaths: () => Promise.resolve(paths.splice(0)),
+    takeRequests: () =>
+      Promise.resolve(paths.splice(0).map((path) => ({ path }))),
     onOpenRequested: () => Promise.resolve(() => {}),
   };
 }
@@ -19,9 +21,9 @@ function slowListener(paths: string[]) {
   let unsubscribed = false;
   const takes: number[] = [];
   const backend: LaunchBackend = {
-    takePaths: () => {
+    takeRequests: () => {
       takes.push(paths.length);
-      return Promise.resolve(paths.splice(0));
+      return Promise.resolve(paths.splice(0).map((path) => ({ path })));
     },
     onOpenRequested: (next) =>
       new Promise((resolve) => {
@@ -54,14 +56,14 @@ async function settle(): Promise<void> {
 test("opens the newest requested document once", async () => {
   const backend = queue(["/tmp/old.jsonl", "/tmp/new.jsonl"]);
   const opened: string[] = [];
-  await openRequestedDocument(backend, (path) => opened.push(path));
-  await openRequestedDocument(backend, (path) => opened.push(path));
+  await openRequestedDocument(backend, ({ path }) => opened.push(path));
+  await openRequestedDocument(backend, ({ path }) => opened.push(path));
   expect(opened).toEqual(["/tmp/new.jsonl"]);
 });
 
 test("does nothing when no document was requested", async () => {
   const opened: string[] = [];
-  await openRequestedDocument(queue([]), (path) => opened.push(path));
+  await openRequestedDocument(queue([]), ({ path }) => opened.push(path));
   expect(opened).toEqual([]);
 });
 
@@ -70,7 +72,7 @@ test("drains the queue only after the listener is registered", async () => {
   const opened: string[] = [];
   watchOpenRequests(
     launch.backend,
-    (path) => opened.push(path),
+    ({ path }) => opened.push(path),
     () => true,
   );
   await settle();
@@ -93,7 +95,7 @@ test("holds requests while opening is not allowed and opens them on flush", asyn
   let allowed = false;
   const watcher = watchOpenRequests(
     launch.backend,
-    (path) => opened.push(path),
+    ({ path }) => opened.push(path),
     () => allowed,
   );
   launch.register();
@@ -118,7 +120,7 @@ test("stopping before registration unsubscribes and opens nothing", async () => 
   const opened: string[] = [];
   const watcher = watchOpenRequests(
     launch.backend,
-    (path) => opened.push(path),
+    ({ path }) => opened.push(path),
     () => true,
   );
   watcher.stop();
@@ -134,15 +136,15 @@ test("a path taken just before the cloud takes over opens on the next flush", as
   let allowed = true;
   const opened: string[] = [];
   const backend: LaunchBackend = {
-    takePaths: () =>
+    takeRequests: () =>
       new Promise((resolve) => {
-        release = resolve;
+        release = (paths) => resolve(paths.map((path) => ({ path })));
       }),
     onOpenRequested: () => Promise.resolve(() => {}),
   };
   const watcher = watchOpenRequests(
     backend,
-    (path) => opened.push(path),
+    ({ path }) => opened.push(path),
     () => allowed,
   );
   await settle();
@@ -157,4 +159,18 @@ test("a path taken just before the cloud takes over opens on the next flush", as
   release([]);
   await settle();
   expect(opened).toEqual(["/tmp/raced.jsonl"]);
+});
+
+test("a link request keeps its page choice", async () => {
+  const backend: LaunchBackend = {
+    takeRequests: () =>
+      Promise.resolve([
+        { path: "/tmp/a.jsonl" },
+        { path: "/tmp/a.jsonl", page: "AbC123xyz_-" },
+      ]),
+    onOpenRequested: () => Promise.resolve(() => {}),
+  };
+  const opened: LaunchRequest[] = [];
+  await openRequestedDocument(backend, (request) => opened.push(request));
+  expect(opened).toEqual([{ path: "/tmp/a.jsonl", page: "AbC123xyz_-" }]);
 });

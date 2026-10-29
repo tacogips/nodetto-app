@@ -9,6 +9,9 @@ import {
   bpmnFlowDecoration,
   connectorDefaultDash,
   connectorDecoration,
+  connectorLabelBackdrop,
+  connectorLabelBaselines,
+  connectorLabelLayout,
   connectorPath,
   diamondGradientPatches,
   endpointReaderFor,
@@ -348,14 +351,42 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
             )}
           </Show>
           <Show when={decoration().label}>
-            <text
-              class="nodetto-connector-label"
-              x={resolved().labelPoint.x}
-              y={resolved().labelPoint.y - 6}
-              text-anchor="middle"
-            >
-              {decoration().label}
-            </text>
+            {(label) => {
+              const layout = createMemo(() =>
+                connectorLabelLayout(label(), props.element.visual),
+              );
+              const baselines = () =>
+                connectorLabelBaselines(layout(), resolved().labelPoint.y);
+              const backdrop = () =>
+                connectorLabelBackdrop(layout(), resolved().labelPoint);
+              return (
+                <>
+                  <Show when={backdrop()}>
+                    {(box) => (
+                      <rect
+                        class="nodetto-connector-label-backdrop"
+                        x={box().x}
+                        y={box().y}
+                        width={box().width}
+                        height={box().height}
+                      />
+                    )}
+                  </Show>
+                  <text class="nodetto-connector-label" text-anchor="middle">
+                    <For each={layout().lines}>
+                      {(line, index) => (
+                        <tspan
+                          x={resolved().labelPoint.x}
+                          y={baselines()[index()]}
+                        >
+                          {line}
+                        </tspan>
+                      )}
+                    </For>
+                  </text>
+                </>
+              );
+            }}
           </Show>
         </g>
       )}

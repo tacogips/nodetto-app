@@ -14,6 +14,9 @@ import {
   ERD_TABLE_HEADER_HEIGHT,
   UML_CLASS_NAME_HEIGHT,
   umlNameHeight,
+  connectorDecoration,
+  connectorLabelBox,
+  connectorLabelLayout,
 } from "@nodetto/core";
 import {
   type Element,
@@ -100,12 +103,21 @@ function placeEditor(
 
   if (isEdge) {
     const fontSize = style.fontSize ?? CONNECTOR_FONT_SIZE;
-    const height = fontSize * LINE_HEIGHT + 8;
-    const centreX = box.x + box.width / 2;
-    const centreY = box.y + box.height / 2;
+    const lines = connectorLabelLayout(
+      connectorDecoration(element).label,
+      element.visual,
+    ).lines.length;
+    const height = fontSize * LINE_HEIGHT * Math.max(1, lines) + 8;
+    // Over the label as drawn; BPMN flows place theirs by notation, so they
+    // keep the bounds centre.
+    const label = connectorLabelBox(element, editor.createShapeContext());
+    const centreX = label ? label.x + label.width / 2 : box.x + box.width / 2;
+    const centreY = label
+      ? label.y + label.height / 2
+      : box.y + box.height / 2 - 6;
     return {
       x: centreX - CONNECTOR_EDITOR_WIDTH / 2,
-      y: centreY - height / 2 - 6,
+      y: centreY - height / 2,
       width: CONNECTOR_EDITOR_WIDTH,
       height,
       fontSize,
@@ -181,9 +193,20 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
   let textarea: HTMLTextAreaElement | undefined;
   let done = false;
+  // Edge labels render line breaks, so editing one keeps them; Enter still
+  // commits and Shift+Enter adds a line.
+  const edgeLabel = (): boolean => {
+    const type = props.editor.store.get(props.target.id)?.type;
+    return (
+      props.target.field === "label" &&
+      type !== undefined &&
+      getElementTypeDefinition(type)?.category === "edge"
+    );
+  };
   const multiline = (): boolean =>
     props.target.field === "text" ||
-    props.editor.store.get(props.target.id)?.type === "node.generic";
+    props.editor.store.get(props.target.id)?.type === "node.generic" ||
+    edgeLabel();
   const draft = textEditDraft(props.editor, props.target.id);
   const initial = draft?.value ?? "";
   const [conflict, setConflict] = createSignal(false);
@@ -202,7 +225,7 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
   });
 
   const alignEditor = (): void => {
-    if (!done && textarea && multiline())
+    if (!done && textarea && multiline() && !edgeLabel())
       alignTextEditor(
         textarea,
         props.editor.store.get(props.target.id)?.visual.style?.verticalAlign,

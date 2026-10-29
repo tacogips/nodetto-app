@@ -74,6 +74,33 @@
   gap: 2px;
 }
 
+.nodetto-page-tab-scroll {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+}
+
+.nodetto-page-tab-scroll-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 4px;
+  border: 0;
+  color: var(--nodetto-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.nodetto-page-tab-scroll-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.nodetto-page-tab-scroll-button:hover:not(:disabled) {
+  color: var(--nodetto-accent);
+}
+
 .nodetto-page-tab-name:focus-visible,
 .nodetto-page-menu-button:focus-visible,
 .nodetto-page-add:focus-visible {
@@ -427,4 +454,14 @@
   text-align: left;
   border: 0;
   min-height: 32px;
+}
+
+/* Page IDs never change: show them as selectable text, not as a field. */
+.app-pane .nodetto-input.nodetto-readonly-value {
+  padding-inline: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--nodetto-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: text;
 }

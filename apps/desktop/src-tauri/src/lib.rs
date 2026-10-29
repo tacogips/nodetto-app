@@ -62,7 +62,7 @@ pub fn run() {
             recent::recent_files_remove,
             watch::watch_document,
             watch::unwatch_document,
-            launch::take_launch_paths,
+            launch::take_launch_requests,
             cli_install::cli_install_status,
             cli_install::cli_install,
             cli_install::cli_uninstall,
@@ -76,7 +76,7 @@ pub fn run() {
                 launch::request_open(
                     _app,
                     urls.into_iter()
-                        .filter_map(|url| url.to_file_path().ok())
+                        .filter_map(launch::LaunchTarget::from_url)
                         .collect(),
                 );
             }
