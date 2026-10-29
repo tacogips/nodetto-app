@@ -385,3 +385,41 @@ test("reports missing DI and assigns deterministic positions", () => {
   );
   expect(item?.visual).toMatchObject({ x: 0, y: 40, width: 100, height: 60 });
 });
+
+test("imports collaboration artifacts after process contents", () => {
+  const source = bpmn(
+    '<bpmn:task id="Task_Review" name="Review order"/>',
+    `<bpmndi:BPMNDiagram id="Diagram"><bpmndi:BPMNPlane id="Plane" bpmnElement="C">
+      <bpmndi:BPMNShape id="Pa_di" bpmnElement="Pa"><dc:Bounds x="0" y="0" width="600" height="300"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Review_di" bpmnElement="Task_Review"><dc:Bounds x="100" y="100" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_A_di" bpmnElement="Note_A"><dc:Bounds x="250" y="100" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Group_A_di" bpmnElement="Group_A"><dc:Bounds x="80" y="80" width="300" height="130"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Assoc_A_di" bpmnElement="Assoc_A"><di:waypoint x="250" y="140"/><di:waypoint x="200" y="140"/></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>`,
+    `<bpmn:collaboration id="C"><bpmn:participant id="Pa" processRef="Process"/>
+      <bpmn:textAnnotation id="Note_A"><bpmn:text>Note</bpmn:text></bpmn:textAnnotation>
+      <bpmn:group id="Group_A"/>
+      <bpmn:association id="Assoc_A" sourceRef="Note_A" targetRef="Task_Review" associationDirection="One"/>
+    </bpmn:collaboration>`,
+  );
+  const report = importBpmnXml(source);
+  const elements = report.document.elements;
+  const note = elements.find((item) => item.id === "Note_A");
+  const group = elements.find((item) => item.id === "Group_A");
+  const association = elements.find((item) => item.id === "Assoc_A");
+  expect(report.warnings).toEqual([]);
+  expect(note?.type).toBe("bpmn.textAnnotation");
+  expect(note?.semantic).toEqual({ text: "Note" });
+  expect(group?.type).toBe("bpmn.group");
+  expect("parent" in (semantic(report, "Group_A") ?? {})).toBe(false);
+  expect(association?.type).toBe("bpmn.association");
+  expect(association?.semantic).toMatchObject({
+    from: "Note_A",
+    to: "Task_Review",
+    direction: "one",
+  });
+  const index = (id: string) => elements.findIndex((item) => item.id === id);
+  expect(index("Task_Review")).toBeLessThan(index("Note_A"));
+  expect(index("Group_A")).toBeLessThan(index("Assoc_A"));
+  expect(index("Note_A")).toBeLessThan(index("Assoc_A"));
+});

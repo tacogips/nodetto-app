@@ -19,8 +19,12 @@ import {
   XSI,
 } from "./export-common.ts";
 import { collectExportScope } from "./export-scope.ts";
-import { processElements } from "./export-process.ts";
+import {
+  collaborationArtifactElements,
+  processElements,
+} from "./export-process.ts";
 import { diagramElement } from "./export-diagram.ts";
+import { duplicateIdWarnings } from "./export-duplicates.ts";
 
 export type {
   BpmnExportOptions,
@@ -97,6 +101,7 @@ export function exportBpmnXml(
                     | undefined,
                 }),
               ),
+            collaborationArtifactElements(scope),
           ),
         ),
       ]
@@ -145,5 +150,6 @@ export function exportBpmnXml(
       diagram,
     ],
   };
+  warnings.push(...duplicateIdWarnings(root));
   return { xml: serializeXml(root), warnings };
 }

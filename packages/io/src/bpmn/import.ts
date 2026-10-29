@@ -42,6 +42,16 @@ const finite = (value: string | undefined, fallback: number): number => {
 const nameValue = (element: XmlElement): string | undefined =>
   attr(element, "name");
 
+const artifactSemantic = (child: XmlElement): Record<string, unknown> => {
+  if (child.local === "textAnnotation")
+    return { text: textContent(firstChild(child, "text") ?? child) };
+  const categoryValue = firstChild(child, "categoryValue");
+  const categoryName = categoryValue
+    ? (nameValue(categoryValue) ?? attr(categoryValue, "value"))
+    : undefined;
+  return categoryName ? { name: categoryName } : {};
+};
+
 export interface BpmnImportOptions {
   readonly documentId?: string;
   readonly title?: string;
@@ -689,21 +699,11 @@ export function importBpmnXml(
               ...(nameValue(child) ? { name: nameValue(child) } : {}),
               ...(parent ? { parent } : {}),
             });
-          else if (local === "textAnnotation")
-            add(child, "bpmn.textAnnotation", {
-              text: textContent(firstChild(child, "text") ?? child),
+          else if (local === "textAnnotation" || local === "group")
+            add(child, `bpmn.${local}`, {
+              ...artifactSemantic(child),
               ...(parent ? { parent } : {}),
             });
-          else if (local === "group") {
-            const categoryValue = firstChild(child, "categoryValue");
-            const categoryName = categoryValue
-              ? (nameValue(categoryValue) ?? attr(categoryValue, "value"))
-              : undefined;
-            add(child, "bpmn.group", {
-              ...(categoryName ? { name: categoryName } : {}),
-              ...(parent ? { parent } : {}),
-            });
-          }
         } else if (
           local !== "laneSet" &&
           local !== "documentation" &&
@@ -802,6 +802,21 @@ export function importBpmnXml(
     addFlows(process);
   }
   if (collaboration) {
+    for (const child of childElements(collaboration)) {
+      if (child.local === "textAnnotation" || child.local === "group")
+        add(child, `bpmn.${child.local}`, artifactSemantic(child));
+    }
+    for (const child of childElements(collaboration, "association"))
+      add(child, "bpmn.association", {
+        from: attr(child, "sourceRef") ?? "",
+        to: attr(child, "targetRef") ?? "",
+        direction:
+          attr(child, "associationDirection") === "One"
+            ? "one"
+            : attr(child, "associationDirection") === "Both"
+              ? "both"
+              : "none",
+      });
     for (const flow of childElements(collaboration, "messageFlow"))
       add(flow, "bpmn.messageFlow", {
         from: attr(flow, "sourceRef") ?? "",

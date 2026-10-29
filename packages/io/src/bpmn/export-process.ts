@@ -66,6 +66,45 @@ function nodeTag(elementRecord: Element): string {
   }
 }
 
+const artifactXmlElement = (item: Element): XmlElement =>
+  item.type === "bpmn.textAnnotation"
+    ? element("bpmn:textAnnotation", { id: bpmnExportId(item) }, [
+        element("bpmn:text", {}, [text(String(semantic(item)["text"] ?? ""))]),
+      ])
+    : element("bpmn:group", { id: bpmnExportId(item) });
+
+const associationXmlElement = (
+  scope: BpmnExportScope,
+  item: Element,
+): XmlElement =>
+  element("bpmn:association", {
+    id: bpmnExportId(item),
+    sourceRef: scope.idOf(String(semantic(item)["from"])),
+    targetRef: scope.idOf(String(semantic(item)["to"])),
+    associationDirection:
+      semantic(item)["direction"] === "one"
+        ? "One"
+        : semantic(item)["direction"] === "both"
+          ? "Both"
+          : undefined,
+  });
+
+export function collaborationArtifactElements(
+  scope: BpmnExportScope,
+): XmlElement[] {
+  return [
+    ...scope.flows
+      .filter(
+        (item) =>
+          item.type === "bpmn.association" &&
+          scope.hasParticipants &&
+          scope.associationOwner(item) === undefined,
+      )
+      .map((item) => associationXmlElement(scope, item)),
+    ...scope.collaborationArtifacts.map(artifactXmlElement),
+  ];
+}
+
 export function processElements(scope: BpmnExportScope): XmlElement[] {
   const {
     pageId,
@@ -79,7 +118,8 @@ export function processElements(scope: BpmnExportScope): XmlElement[] {
     artifacts,
     hasParticipants,
     parentOf,
-    ownerParticipant,
+    effectiveParent,
+    associationOwner,
     subprocessScope,
     belongsToProcess,
     processNodes,
@@ -209,14 +249,6 @@ export function processElements(scope: BpmnExportScope): XmlElement[] {
       reference,
     ];
   };
-  const artifactXmlElement = (item: Element): XmlElement =>
-    item.type === "bpmn.textAnnotation"
-      ? element("bpmn:textAnnotation", { id: bpmnExportId(item) }, [
-          element("bpmn:text", {}, [
-            text(String(semantic(item)["text"] ?? "")),
-          ]),
-        ])
-      : element("bpmn:group", { id: bpmnExportId(item) });
   const nodeXml = (item: Element): XmlElement => {
     const s = semantic(item);
     const id = bpmnExportId(item);
@@ -347,18 +379,15 @@ export function processElements(scope: BpmnExportScope): XmlElement[] {
         element("bpmn:text", {}, [text(String(s["text"] ?? ""))]),
       );
     if (item.type === "bpmn.subProcess") {
-      const children = flowNodes.filter((child) => parentOf(child) === item.id);
+      const children = flowNodes.filter(
+        (child) => effectiveParent(child) === item.id,
+      );
       childrenXml.push(...children.map(nodeXml));
       const nestedFlows = flows.filter((flow) => {
         if (flow.type !== "bpmn.sequenceFlow") return false;
         const from = byId.get(String(semantic(flow)["from"]));
         const to = byId.get(String(semantic(flow)["to"]));
-        return (
-          !!from &&
-          !!to &&
-          subprocessScope(from) === item.id &&
-          subprocessScope(to) === item.id
-        );
+        return !!from && !!to && subprocessScope(from) === item.id;
       });
       childrenXml.push(...nestedFlows.map(sequenceFlowXml));
       childrenXml.push(
@@ -419,7 +448,7 @@ export function processElements(scope: BpmnExportScope): XmlElement[] {
     const s = semantic(lane);
     const members = records.filter(
       (item) =>
-        semantic(item)["parent"] === lane.id &&
+        effectiveParent(item) === lane.id &&
         [
           "bpmn.task",
           "bpmn.subProcess",
@@ -482,11 +511,9 @@ export function processElements(scope: BpmnExportScope): XmlElement[] {
               !!from &&
               !!to &&
               subprocessScope(from) === undefined &&
-              subprocessScope(to) === undefined
+              belongsToProcess(from, participantId)
             );
-          })() &&
-          (members.some((node) => node.id === semantic(item)["from"]) ||
-            members.some((node) => node.id === semantic(item)["to"])),
+          })(),
       )
       .map((item) =>
         element(
@@ -530,33 +557,16 @@ export function processElements(scope: BpmnExportScope): XmlElement[] {
       }
     }
     const artifactXml = artifacts
+      .filter(() => participantId !== "orphan")
       .filter((item) => belongsToProcess(item, participantId))
       .filter((item) => subprocessScope(item) === undefined)
       .map(artifactXmlElement);
     const associationXml = flows
       .filter((item) => item.type === "bpmn.association")
-      .filter((item) => {
-        const from = byId.get(String(semantic(item)["from"]));
-        const to = byId.get(String(semantic(item)["to"]));
-        const owner =
-          (from && ownerParticipant(from)) || (to && ownerParticipant(to));
-        return !hasParticipants || participantId === "orphan"
-          ? owner === undefined
-          : owner === participantId;
-      })
-      .map((item) =>
-        element("bpmn:association", {
-          id: bpmnExportId(item),
-          sourceRef: idOf(String(semantic(item)["from"])),
-          targetRef: idOf(String(semantic(item)["to"])),
-          associationDirection:
-            semantic(item)["direction"] === "one"
-              ? "One"
-              : semantic(item)["direction"] === "both"
-                ? "Both"
-                : undefined,
-        }),
-      );
+      .filter(
+        (item) => !hasParticipants || associationOwner(item) === participantId,
+      )
+      .map((item) => associationXmlElement(scope, item));
     processXml.push(
       element("bpmn:process", { id: pid, isExecutable: "false" }, [
         ...(laneSet.length

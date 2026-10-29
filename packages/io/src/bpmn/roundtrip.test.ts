@@ -201,3 +201,78 @@ test("pool-less associations and subprocess contents survive export", () => {
   expect(firstXml).toContain('<bpmn:task id="T1"');
   expect(firstXml).toContain('<bpmn:sequenceFlow id="F1"');
 });
+
+test("parentless boundary events and groups round-trip without an orphan process", () => {
+  const source = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI"><bpmn:collaboration id="C"><bpmn:participant id="Pool_Orders" processRef="P"/></bpmn:collaboration><bpmn:process id="P"><bpmn:laneSet id="LS"><bpmn:lane id="Lane_Review"><bpmn:flowNodeRef>Task_Review</bpmn:flowNodeRef><bpmn:flowNodeRef>Event_Timeout</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_Escalate</bpmn:flowNodeRef></bpmn:lane></bpmn:laneSet><bpmn:task id="Task_Review" name="Review order"/><bpmn:boundaryEvent id="Event_Timeout" name="Timeout" attachedToRef="Task_Review"><bpmn:timerEventDefinition id="Timer_Timeout"/></bpmn:boundaryEvent><bpmn:task id="Task_Escalate" name="Escalate order"/><bpmn:sequenceFlow id="Flow_Timeout" sourceRef="Event_Timeout" targetRef="Task_Escalate"/><bpmn:group id="Group_Notes"/></bpmn:process><bpmndi:BPMNDiagram id="D"><bpmndi:BPMNPlane id="Plane" bpmnElement="C">${shapes("Pool_Orders Lane_Review Task_Review Event_Timeout Task_Escalate Group_Notes")}${edges("Flow_Timeout")}</bpmndi:BPMNPlane></bpmndi:BPMNDiagram></bpmn:definitions>`;
+  const first = importBpmnXml(source, { documentId: "ownership" });
+  for (const id of ["Event_Timeout", "Group_Notes"]) {
+    const item = first.document.elements.find((element) => element.id === id);
+    if (!item) throw new Error(`Missing ${id}`);
+    // biome-ignore lint/performance/noDelete: model editor state with no parent key.
+    delete (item.semantic as Record<string, unknown>)["parent"];
+  }
+  const exported = exportBpmnXml(first.document, first.pageId);
+  expect(exported.warnings).toEqual([]);
+  expect(exported.xml).not.toContain("Process_orphan_");
+  expect(exported.xml.match(/<bpmn:process\b/g)).toHaveLength(1);
+  const second = importBpmnXml(exported.xml, { documentId: "ownership" });
+  expect(second.warnings).toEqual([]);
+  const group = second.document.elements.find(
+    (item) => item.id === "Group_Notes",
+  );
+  const boundary = second.document.elements.find(
+    (item) => item.id === "Event_Timeout",
+  );
+  expect(group?.semantic).not.toHaveProperty("parent");
+  expect(boundary?.semantic).toMatchObject({ parent: "Lane_Review" });
+  expect(exportBpmnXml(second.document, second.pageId).xml).toBe(exported.xml);
+  const ids = [...exported.xml.matchAll(/\bid="([^"]+)"/g)].map(
+    (match) => match[1],
+  );
+  expect(new Set(ids).size).toBe(ids.length);
+});
+
+test("a model id colliding with a diagram id is reported", () => {
+  const source = inlineDefinitions(
+    `<bpmn:process id="P"><bpmn:task id="A"/><bpmn:task id="A_di"/></bpmn:process><bpmndi:BPMNDiagram id="D"><bpmndi:BPMNPlane id="Plane" bpmnElement="C"><bpmndi:BPMNShape id="S1" bpmnElement="A"><dc:Bounds x="0" y="0" width="100" height="60"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="S2" bpmnElement="A_di"><dc:Bounds x="0" y="0" width="100" height="60"/></bpmndi:BPMNShape>${shapes("Pa Pb")}</bpmndi:BPMNPlane></bpmndi:BPMNDiagram>`,
+    false,
+  );
+  const imported = importBpmnXml(source, { documentId: "collision" });
+  const warnings = exportBpmnXml(imported.document, imported.pageId).warnings;
+  expect(
+    warnings.filter((warning) =>
+      warning.message.startsWith("Duplicate BPMN id"),
+    ),
+  ).toEqual([{ message: "Duplicate BPMN id A_di was emitted." }]);
+});
+
+test("repeated ids inside extension elements are not reported", () => {
+  const source = inlineDefinitions(
+    `<bpmn:process id="P"><bpmn:task id="Task_One"><bpmn:extensionElements><ext:field id="amount"/></bpmn:extensionElements></bpmn:task><bpmn:task id="Task_Two"><bpmn:extensionElements><ext:field id="amount"/></bpmn:extensionElements></bpmn:task></bpmn:process><bpmndi:BPMNDiagram id="D"><bpmndi:BPMNPlane id="Plane" bpmnElement="C">${shapes("Pa Pb Task_One Task_Two")}</bpmndi:BPMNPlane></bpmndi:BPMNDiagram>`,
+    false,
+  ).replace(
+    "<bpmn:definitions ",
+    '<bpmn:definitions xmlns:ext="urn:example:ext" ',
+  );
+  const imported = importBpmnXml(source, { documentId: "extensions" });
+  const exported = exportBpmnXml(imported.document, imported.pageId);
+  expect(
+    exported.warnings.filter((warning) =>
+      warning.message.startsWith("Duplicate BPMN id"),
+    ),
+  ).toEqual([]);
+  expect(exported.xml.match(/<ext:field\b/g)).toHaveLength(2);
+  expect(exported.xml.match(/id="amount"/g)).toHaveLength(2);
+});
+
+test("fixture exports contain no duplicate BPMN ids", () => {
+  for (const { name, source } of fixtures) {
+    const imported = importBpmnXml(source, { documentId: name });
+    const warnings = exportBpmnXml(imported.document, imported.pageId).warnings;
+    expect(
+      warnings.filter((warning) =>
+        warning.message.startsWith("Duplicate BPMN id"),
+      ),
+    ).toEqual([]);
+  }
+});

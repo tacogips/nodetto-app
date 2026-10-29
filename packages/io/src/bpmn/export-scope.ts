@@ -27,6 +27,9 @@ export interface BpmnExportScope {
   readonly data: readonly Element[];
   readonly artifacts: readonly Element[];
   readonly hasParticipants: boolean;
+  readonly collaborationArtifacts: readonly Element[];
+  readonly associationOwner: (item: Element) => string | undefined;
+  readonly effectiveParent: (item: Element) => string | undefined;
   readonly parentOf: (item: Element) => string | undefined;
   readonly ownerParticipant: (item: Element) => string | undefined;
   readonly subprocessScope: (item: Element) => string | undefined;
@@ -103,13 +106,24 @@ export function collectExportScope(
     typeof semantic(item)["parent"] === "string"
       ? (semantic(item)["parent"] as string)
       : undefined;
+  const effectiveParent = (item: Element): string | undefined => {
+    const attachedTo = semantic(item)["attachedTo"];
+    if (item.type === "bpmn.boundaryEvent" && typeof attachedTo === "string") {
+      const host = byId.get(attachedTo);
+      if (host && host.type !== "bpmn.boundaryEvent") return parentOf(host);
+    }
+    return parentOf(item);
+  };
   const ancestor = (item: Element, type: string): Element | undefined => {
-    let parent = parentOf(item);
+    let parent = effectiveParent(item);
+    const visited = new Set([item.id]);
     while (parent) {
+      if (visited.has(parent)) return undefined;
+      visited.add(parent);
       const record = byId.get(parent);
       if (!record) return undefined;
       if (record.type === type) return record;
-      parent = parentOf(record);
+      parent = effectiveParent(record);
     }
     return undefined;
   };
@@ -117,6 +131,18 @@ export function collectExportScope(
     ancestor(item, "bpmn.participant")?.id;
   const subprocessScope = (item: Element): string | undefined =>
     ancestor(item, "bpmn.subProcess")?.id;
+  const collaborationArtifacts = hasParticipants
+    ? artifacts.filter(
+        (item) =>
+          ownerParticipant(item) === undefined &&
+          subprocessScope(item) === undefined,
+      )
+    : [];
+  const associationOwner = (item: Element): string | undefined => {
+    const from = byId.get(String(semantic(item)["from"]));
+    const to = byId.get(String(semantic(item)["to"]));
+    return (from && ownerParticipant(from)) || (to && ownerParticipant(to));
+  };
   const belongsToProcess = (item: Element, participantId: string): boolean => {
     if (participantId === "orphan") return ownerParticipant(item) === undefined;
     if (!hasParticipants) return ownerParticipant(item) === undefined;
@@ -128,7 +154,7 @@ export function collectExportScope(
       "",
       records.filter((item) => {
         if (!flowNodes.includes(item)) return false;
-        const parent = parentOf(item);
+        const parent = effectiveParent(item);
         return (
           (!parent || byId.get(parent)?.type === "bpmn.lane") &&
           subprocessScope(item) === undefined
@@ -152,7 +178,7 @@ export function collectExportScope(
         ownerParticipant(item) === undefined &&
         subprocessScope(item) === undefined,
     );
-    const orphanContent = [...data, ...artifacts].some(
+    const orphanContent = data.some(
       (item) => ownerParticipant(item) === undefined && !parentOf(item),
     );
     if (orphan.length || orphanContent) {
@@ -199,6 +225,9 @@ export function collectExportScope(
     artifacts,
     hasParticipants,
     parentOf,
+    effectiveParent,
+    collaborationArtifacts,
+    associationOwner,
     ownerParticipant,
     subprocessScope,
     belongsToProcess,

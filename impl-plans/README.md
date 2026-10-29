@@ -29,11 +29,41 @@ values name the pre-archive `active/` locations.
 (`bpmn-operation-flow-s356-dispatch.json`,
 `bpmn-operation-flow-s357-dispatch.json`,
 `bpmn-operation-flow-s359-dispatch.json`,
-`bpmn-render-fix-s360-dispatch.json`). Of the BPMN operation-flow
+`bpmn-render-fix-s360-dispatch.json`,
+`bpmn-export-ownership-s550-dispatch.json`). Of the BPMN operation-flow
 manifests, only s359 was the final dispatch. Their `planPath` values name
 the pre-archive `active/` locations.
 
 ## Completed
+
+BPMN export ownership (session 550; design:
+`design-docs/specs/design-bpmn.md` export ownership revision, sections 5.2,
+5.3, 5.3.1, 8, 11 and 14; no GitHub issue). This work fixes two problems.
+A boundary event with `attachedTo` but no `parent` was exported into an
+extra unreferenced process. A sequence flow from such an event was emitted
+twice, so the XML re-import failed. Parentless text annotations and groups
+on pages with participants now go into `bpmn:collaboration`, and an export
+that would repeat an id warns `Duplicate BPMN id <id> was emitted.` Wave 1
+ran plans 01, 02 and 03; wave 2 ran plan 04, after 01-03. The session-550
+serial integration review accepted all of them on the combined tree. Each
+of these exited 0: `bun test packages/io/src/bpmn` (47 pass, 1
+pre-existing skip, 0 fail), `bun test packages/io
+apps/cli/src/bpmn-commands.test.ts` (282 pass, 1 skip, 0 fail),
+`mise run lint-ts` and `CARGO_TERM_QUIET=true mise run check`. No native
+CLI code changed, so `mise run test-cli` was not required. There is no
+browser E2E suite. The dispatch manifest
+`active/bpmn-export-ownership-s550-dispatch.json` keeps the pre-archive
+`active/` `planPath` values. Evidence:
+`tmp/bpmn-export-ownership-s550/<planId>/` and
+`tmp/bpmn-export-ownership-s550/reconcile/wave-00N/`.
+
+| Plan | Scope |
+|---|---|
+| [bpmn-export-ownership-00-overview](completed/bpmn-export-ownership-00-overview.md) | Waves, ownership, worker rules, serial reconciliation and final verification |
+| [bpmn-export-ownership-01-import-collab-artifacts](completed/bpmn-export-ownership-01-import-collab-artifacts.md) | Import parentless text annotations, groups and associations from `bpmn:collaboration` |
+| [bpmn-export-ownership-02-duplicate-id-guard](completed/bpmn-export-ownership-02-duplicate-id-guard.md) | `duplicateIdWarnings` over BPMN model and BPMNDI ids, excluding extension vocabularies |
+| [bpmn-export-ownership-03-export-placement](completed/bpmn-export-ownership-03-export-placement.md) | Boundary events placed by their `attachedTo` host, collaboration artifacts, each sequence flow emitted once |
+| [bpmn-export-ownership-04-roundtrip-integration](completed/bpmn-export-ownership-04-roundtrip-integration.md) | Guard wired into `exportBpmnXml`; boundary-event-plus-group round trip and safeguard tests |
 
 Shape lateral consistency (sessions 544-548; design:
 `design-docs/specs/design-shape-lateral-consistency.md`, user QA:

@@ -54,7 +54,14 @@ in the same page.
 without lanes, or a sub-process. A lane points to its participant or enclosing
 lane. With no parent, a node belongs to the page's implicit process. Membership
 is stored on the member record; lane membership lists are derived. A boundary
-event uses `attachedTo` for its activity host.
+event uses `attachedTo` for its activity host. On XML export, a boundary event
+with no `parent` takes its host's process, lane and sub-process. Text
+annotations and groups with no `parent` on a page with participants are
+written to `bpmn:collaboration`. Import reads them back without a parent. Only
+pool-less flow nodes and data go to the extra unreferenced process. Each
+sequence flow is written once, in its source's container. If an export would
+repeat a BPMN model or BPMNDI id, it reports `Duplicate BPMN id <id> was
+emitted.`; with `--strict`, the CLI exits 3.
 
 An event's `definitions` is an array of `EventDefinition` values with the
 shape `{id, kind, ref?, linkName?, timer?, condition?}`. `kind` is one of
