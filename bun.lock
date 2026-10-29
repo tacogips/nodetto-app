@@ -13,7 +13,7 @@
     },
     "apps/cli": {
       "name": "@nodetto/cli",
-      "version": "0.8.3",
+      "version": "0.8.4",
       "bin": {
         "nodetto-cli": "./src/main.ts",
       },
@@ -29,7 +29,7 @@
     },
     "apps/desktop": {
       "name": "@nodetto/desktop",
-      "version": "0.8.3",
+      "version": "0.8.4",
       "dependencies": {
         "@nodetto/collab": "workspace:*",
         "@nodetto/core": "workspace:*",
