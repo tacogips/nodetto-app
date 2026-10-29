@@ -190,3 +190,12 @@ Expected:
 - All of the above is logged with exit codes and log paths.
 - The progress log lists each keyOrder change as `type: added keys`.
 - The last line is `STATUS: done`.
+
+## Scope amendment (after wave 2)
+
+Wave 2 blocked because the shared keyOrder for UML component, interface and
+port declares `kind` for all three, so `uml.component` with `kind` cannot
+warn. `packages/ir/src/registry/uml.ts` is added to this plan's writePaths:
+give `uml.component` and `uml.port` keyOrders without `kind` (interface keeps
+`kind`), keeping every other key and order unchanged, and repair the
+type errors this plan's `validate.test.ts` reports in the joined typecheck.

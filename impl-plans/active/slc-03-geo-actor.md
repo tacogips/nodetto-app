@@ -162,3 +162,11 @@ Expected:
 - The rule-9 transient failures (`svg-export.test.ts`,
   `geo-outline.test.ts` for `actor`) now pass.
 - The last line of the progress log is `STATUS: done`.
+
+## Scope amendment (after wave 2)
+
+Wave 2 blocked because the shape-search expectations for "actor" omit the
+new stick figure. `packages/core/src/shape-catalogue.test.ts` and
+`packages/ui-solid/src/shape-search.test.ts` are added to this plan's
+writePaths: update only the "actor" search expectations to include
+`geo:actor` in catalogue order, and keep every other assertion.

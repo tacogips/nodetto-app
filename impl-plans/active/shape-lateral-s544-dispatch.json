@@ -8,6 +8,16 @@
   "remote": "origin",
   "gitPush": false,
   "originalHead": "878f2cb82eb3b0b3e5f1f108a75e2aa77c00cb48",
+  "amendment": {
+    "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-547",
+    "previousCheckpointCommit": "51993943c8678b35c08aea23bf52a4129ae1bde8",
+    "reason": "Wave 2 blocked. slc-02 needs packages/ir/src/registry/uml.ts, because the shared UML keyOrder declares kind for component, interface and port. slc-03 needs the shape-search 'actor' expectations in packages/core/src/shape-catalogue.test.ts and packages/ui-solid/src/shape-search.test.ts.",
+    "amendedPlans": [
+      "slc-02-ir-unknown-field",
+      "slc-03-geo-actor"
+    ],
+    "resumeState": "No plan is committed yet. The wave-1 and wave-2 source edits stay uncommitted in the working tree, and workers resume from them. Progress logs: slc-01 done, slc-02/03/04/05 blocked, slc-06/07 not started."
+  },
   "designDocPaths": [
     "design-docs/specs/design-shape-lateral-consistency.md",
     "design-docs/user-qa/shape-lateral-consistency.md"
@@ -132,6 +142,7 @@
         "packages/ir/src/semantics/bpmn.ts",
         "packages/ir/src/database-objects.ts",
         "packages/core/src/semantic-field-audit.test.ts",
+        "packages/ir/src/registry/uml.ts",
         "impl-plans/progress/slc-02-ir-unknown-field.md"
       ],
       "sharedPaths": [],
@@ -141,6 +152,7 @@
         "validateDocument emits warning-level semantic.unknownField at elements[i].semantic.<key> (recursing into keyOrder.children objects and array items) with message 'unknown semantic field for <type>; preserved but ignored by this build'; never an error; unknown keys are preserved.",
         "validate.test.ts covers uml.component {kind:'actor'}, node.generic, erd.table nested columns[0].x, shape.geo, usecase.node, state.node, draw.path nested contours[0].x, __proto__/constructor own keys, and no warning for future.widget.",
         "keyOrder omissions in BPMN and database-object registries are fixed (appended lexicographically); each change is logged as 'type: added keys'.",
+        "Amendment: uml.component and uml.port get keyOrders without kind in packages/ir/src/registry/uml.ts, uml.interface keeps kind, and every other key and its order is unchanged.",
         "semantic-field-audit.test.ts asserts zero semantic.unknownField for every fixture (except forward-compat n-known keys), example, defaultSemantic of every registered type, design template and BPMN import.",
         "git diff --quiet -- packages/io/src/__fixtures__ examples exits 0; progress log ends with STATUS: done."
       ],
@@ -150,7 +162,7 @@
         "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/semantic-field-audit.test.ts > tmp/shape-lateral-s544/slc-02-ir-unknown-field/audit.log 2>&1; echo \"exit=$?\"",
         "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io > tmp/shape-lateral-s544/slc-02-ir-unknown-field/io.log 2>&1; echo \"exit=$?\"",
         "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-02-ir-unknown-field/tsc.log 2>&1; echo \"exit=$?\"",
-        "bunx biome check packages/ir/src/validate.ts packages/ir/src/validate.test.ts packages/ir/src/registry/bpmn.ts packages/ir/src/semantics/bpmn.ts packages/ir/src/database-objects.ts packages/core/src/semantic-field-audit.test.ts",
+        "bunx biome check packages/ir/src/validate.ts packages/ir/src/validate.test.ts packages/ir/src/registry/bpmn.ts packages/ir/src/semantics/bpmn.ts packages/ir/src/database-objects.ts packages/core/src/semantic-field-audit.test.ts packages/ir/src/registry/uml.ts",
         "grep -c 'semantic.unknownField' packages/ir/src/validate.ts",
         "git diff --quiet -- packages/io/src/__fixtures__ examples; echo \"exit=$?\"",
         "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core apps/cli/src > tmp/shape-lateral-s544/slc-02-ir-unknown-field/core-cli-sweep.log 2>&1; echo \"exit=$?\""
@@ -161,7 +173,9 @@
       "planPath": "impl-plans/active/slc-03-geo-actor.md",
       "progressPath": "impl-plans/progress/slc-03-geo-actor.md",
       "wave": 2,
-      "dependsOn": ["slc-01-ir-drawing-contract"],
+      "dependsOn": [
+        "slc-01-ir-drawing-contract"
+      ],
       "writePaths": [
         "packages/core/src/shapes/geo-outline.ts",
         "packages/core/src/interface-code.ts",
@@ -173,6 +187,8 @@
         "packages/ui-solid/src/workspaces.test.ts",
         "packages/io/src/d2/export.ts",
         "packages/io/src/d2/export.test.ts",
+        "packages/core/src/shape-catalogue.test.ts",
+        "packages/ui-solid/src/shape-search.test.ts",
         "impl-plans/progress/slc-03-geo-actor.md"
       ],
       "sharedPaths": [],
@@ -182,15 +198,16 @@
         "geo-outline.ts draws geo actor as a stick figure (head circle, body, arms, legs) inside the box, honouring flip, on canvas and in SVG/PNG/PDF export; geo person is unchanged.",
         "Tool.StickFigure = \"geo:actor\" with default visual 60x110; shape catalogue entry geo:actor labelled 'Stick figure'; General palette tile 'Stick figure'; inspector kind label 'Stick figure'.",
         "interface-code.ts clip handling covers actor; D2 export maps geo actor to shape: person.",
+        "Amendment: the 'actor' shape-search expectations in shape-catalogue.test.ts and shape-search.test.ts include geo:actor in catalogue order, and every other assertion is unchanged.",
         "The wave-1 rule-9 transient failures (svg-export.test.ts and geo-outline.test.ts for actor) pass; progress log ends with STATUS: done."
       ],
       "verification": [
         "mkdir -p tmp/shape-lateral-s544/slc-03-geo-actor",
         "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/geo-actor.test.ts packages/core/src/shapes/geo-outline.test.ts packages/core/src/svg-export.test.ts packages/core/src/shapes/connection-points.test.ts packages/core/src/shape-catalogue.test.ts packages/core/src/interface-code.test.ts > tmp/shape-lateral-s544/slc-03-geo-actor/core.log 2>&1; echo \"exit=$?\"",
-        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/workspaces.test.ts > tmp/shape-lateral-s544/slc-03-geo-actor/ui.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/workspaces.test.ts packages/ui-solid/src/shape-search.test.ts > tmp/shape-lateral-s544/slc-03-geo-actor/ui.log 2>&1; echo \"exit=$?\"",
         "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io/src/d2 > tmp/shape-lateral-s544/slc-03-geo-actor/d2.log 2>&1; echo \"exit=$?\"",
         "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-03-geo-actor/tsc.log 2>&1; echo \"exit=$?\"",
-        "bunx biome check packages/core/src/shapes/geo-outline.ts packages/core/src/interface-code.ts packages/core/src/tools.ts packages/core/src/shape-catalogue.ts packages/core/src/geo-actor.test.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/inspector/ShapeSections.tsx packages/ui-solid/src/workspaces.test.ts packages/io/src/d2/export.ts packages/io/src/d2/export.test.ts",
+        "bunx biome check packages/core/src/shapes/geo-outline.ts packages/core/src/interface-code.ts packages/core/src/tools.ts packages/core/src/shape-catalogue.ts packages/core/src/geo-actor.test.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/inspector/ShapeSections.tsx packages/ui-solid/src/workspaces.test.ts packages/io/src/d2/export.ts packages/io/src/d2/export.test.ts packages/core/src/shape-catalogue.test.ts packages/ui-solid/src/shape-search.test.ts",
         "grep -c 'StickFigure: \"geo:actor\"' packages/core/src/tools.ts"
       ]
     },
@@ -199,7 +216,9 @@
       "planPath": "impl-plans/active/slc-04-open-path-render.md",
       "progressPath": "impl-plans/progress/slc-04-open-path-render.md",
       "wave": 2,
-      "dependsOn": ["slc-01-ir-drawing-contract"],
+      "dependsOn": [
+        "slc-01-ir-drawing-contract"
+      ],
       "writePaths": [
         "packages/core/src/shapes/compound-path.ts",
         "packages/core/src/svg-export/shapes.ts",
@@ -235,7 +254,9 @@
       "planPath": "impl-plans/active/slc-05-drawio.md",
       "progressPath": "impl-plans/progress/slc-05-drawio.md",
       "wave": 2,
-      "dependsOn": ["slc-01-ir-drawing-contract"],
+      "dependsOn": [
+        "slc-01-ir-drawing-contract"
+      ],
       "writePaths": [
         "packages/io/src/drawio/style.ts",
         "packages/io/src/drawio/export-shape-style.ts",
@@ -268,7 +289,9 @@
       "planPath": "impl-plans/active/slc-06-open-path-edit.md",
       "progressPath": "impl-plans/progress/slc-06-open-path-edit.md",
       "wave": 3,
-      "dependsOn": ["slc-04-open-path-render"],
+      "dependsOn": [
+        "slc-04-open-path-render"
+      ],
       "writePaths": [
         "packages/core/src/compound-path-edit.ts",
         "packages/core/src/index.ts",
@@ -301,7 +324,10 @@
       "planPath": "impl-plans/active/slc-07-cli-docs.md",
       "progressPath": "impl-plans/progress/slc-07-cli-docs.md",
       "wave": 3,
-      "dependsOn": ["slc-02-ir-unknown-field", "slc-03-geo-actor"],
+      "dependsOn": [
+        "slc-02-ir-unknown-field",
+        "slc-03-geo-actor"
+      ],
       "writePaths": [
         "apps/cli/src/edit-command.ts",
         "apps/cli/src/commands.ts",
@@ -312,7 +338,9 @@
         "docs/editing.md",
         "impl-plans/progress/slc-07-cli-docs.md"
       ],
-      "sharedPaths": ["apps/cli/src/commands.test.ts"],
+      "sharedPaths": [
+        "apps/cli/src/commands.test.ts"
+      ],
       "sharedPathNotes": [
         {
           "path": "apps/cli/src/commands.test.ts",
@@ -341,9 +369,19 @@
   "reconciliation": {
     "owner": "orchestrator",
     "waves": [
-      ["slc-01-ir-drawing-contract", "slc-02-ir-unknown-field"],
-      ["slc-03-geo-actor", "slc-04-open-path-render", "slc-05-drawio"],
-      ["slc-06-open-path-edit", "slc-07-cli-docs"]
+      [
+        "slc-01-ir-drawing-contract",
+        "slc-02-ir-unknown-field"
+      ],
+      [
+        "slc-03-geo-actor",
+        "slc-04-open-path-render",
+        "slc-05-drawio"
+      ],
+      [
+        "slc-06-open-path-edit",
+        "slc-07-cli-docs"
+      ]
     ],
     "afterWave": [
       "bunx tsc -p tsconfig.json --noEmit",
