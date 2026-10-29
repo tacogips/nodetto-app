@@ -63,7 +63,9 @@ single-expression SQL predicates of up to 65,536 characters; line breaks are
 exported as spaces and string literals may contain any printable text except
 backslashes. PostgreSQL output also accepts `::` casts, the `~` / `~*` / `!~` /
 `!~*` regular-expression operators and `ARRAY[...]`; MySQL and SQLite omit
-expressions that use them. Expressions are omitted with a warning naming the
+expressions that use them. Caveat: a unary `~` (bitwise NOT, as in `~flags`) is
+valid in MySQL and SQLite, but it is also omitted there, with a warning that
+calls it a regular-expression operator. Expressions are omitted with a warning naming the
 reason if they are longer or contain unsafe syntax. Check and generated expressions that call functions or operators the target dialect
 lacks (for example PostgreSQL's `num_nonnulls()` or `ILIKE` on SQLite) are kept
 and reported as warnings, so `--strict` fails before the migration does.

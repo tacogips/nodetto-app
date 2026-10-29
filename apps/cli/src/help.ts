@@ -428,6 +428,8 @@ Unsafe or longer expressions are omitted with a warning that names the reason
 (for MySQL and SQLite this includes PostgreSQL-only syntax). Expressions that
 call functions or operators the target dialect lacks (for example
 num_nonnulls() or ILIKE on SQLite) are kept and reported as warnings.
+Caveat: a unary "~" (bitwise NOT) is valid in MySQL and SQLite but is still
+omitted there, with a warning that calls it a regular-expression operator.
 
 Page and element ids are auto-assigned, opaque and never change. rename-page
 changes only the display name; names are the human-facing key (for example,
