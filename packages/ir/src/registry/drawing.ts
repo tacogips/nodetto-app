@@ -84,7 +84,7 @@ export const DRAW_PATH: ElementTypeDefinition = {
     keys: ["name", "contours", "fillRule"],
     children: {
       contours: {
-        keys: ["points"],
+        keys: ["points", "closed"],
         children: {
           points: {
             keys: ["x", "y", "pressure", "controlIn", "controlOut"],
@@ -119,15 +119,21 @@ export const DRAW_PATH: ElementTypeDefinition = {
     for (const [contourIndex, contour] of contours.entries()) {
       const contourPath = `${path}.contours[${contourIndex}]`;
       if (!checkObject(out, contour, contourPath)) continue;
+      checkBoolean(out, contour["closed"], `${contourPath}.closed`, {
+        optional: true,
+      });
       const points = contour["points"];
       if (!checkArray(out, points, `${contourPath}.points`)) continue;
       total += points.length;
-      if (points.length < 3)
+      const open = contour["closed"] === false;
+      if (points.length < (open ? 2 : 3))
         out.push(
           error(
             "path.points",
             `${contourPath}.points`,
-            "a closed contour requires at least three points",
+            open
+              ? "an open contour requires at least two points"
+              : "a closed contour requires at least three points",
           ),
         );
       for (const [pointIndex, point] of points.entries()) {

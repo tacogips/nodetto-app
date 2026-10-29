@@ -112,13 +112,16 @@ the draw.io file.
 editable `.drawio` file of every page, or only the current one. Geometric shapes
 use draw.io's own shapes with matching proportions and round-trip exactly; ERD
 tables and UML classes become draw.io lists with one row per column or member.
+UML components, interfaces and ports use draw.io component, interface and square shapes.
+Use-case actors and stick figures (`geo:actor`) become `umlActor`, use cases
+become ellipses and systems become container rectangles.
 Types without a draw.io counterpart are written as labelled rectangles and
 listed in the export panel.
 
 Shape kinds map onto draw.io shape names (the `shape=` style value, or a named
 style such as `ellipse`) in both directions; the exporter writes the first name
-in each row. Shapes nodetto can only approximate (the UML stick-figure actor,
-draw.io's double rectangle and its 4/6/8-point stars) import as the listed kind
+in each row. Shapes nodetto can only approximate (draw.io's double rectangle
+and its 4/6/8-point stars) import as the listed kind
 with an import note.
 
 | nodetto kind | draw.io shape names |
@@ -158,7 +161,8 @@ with an import note.
 | direct-data | `mxgraph.flowchart.direct_data` |
 | sequential-data | `tapeData`, `mxgraph.flowchart.sequential_data` |
 | right-triangle | `mxgraph.basic.orthogonal_triangle` |
-| person | `actor`, `mermaidPerson`, `umlActor` (approximated) |
+| person | `actor`, `mermaidPerson` |
+| actor | `umlActor` |
 
 ## D2 export
 

@@ -19,6 +19,7 @@ copies under `tmp/breadboard-mode-s485/breadboard-05-collab/`
 values name the pre-archive `active/` locations.
 
 `active/` also holds the historical dispatch manifests
+`shape-lateral-s544-dispatch.json` (shape lateral consistency),
 `canvas-theme-s539-dispatch.json` (appearance settings),
 `ddl-frame-dispatch.json`, the PCB SVG export manifest
 `pcb-svg-s538-dispatch.json`, the KiCad PCB manifests
@@ -33,6 +34,32 @@ manifests, only s359 was the final dispatch. Their `planPath` values name
 the pre-archive `active/` locations.
 
 ## Completed
+
+Shape lateral consistency (sessions 544-548; design:
+`design-docs/specs/design-shape-lateral-consistency.md`, user QA:
+`design-docs/user-qa/shape-lateral-consistency.md`). Covers
+`semantic.unknownField` warnings, the geo `actor` stick figure, exact
+draw.io `umlActor` and native UML exports, and open `draw.path` contours.
+Waves: 01 and 02; then 03, 04 and 05 (after 01); then 06 (after 04) and 07
+(after 02 and 03). All eight plans were accepted by the session-548 serial
+integration review on the combined tree:
+`BUN_OPTIONS=--jsx-runtime=classic mise run verify` exit 0 (2888 pass, 23
+skip, 0 fail). No browser E2E suite exists, so the stick-figure tile and
+open-path editing have unit and SVG coverage only. The dispatch manifest
+`active/shape-lateral-s544-dispatch.json` keeps the pre-archive `active/`
+`planPath` values. Evidence: `tmp/shape-lateral-s544/<planId>/` and
+`tmp/shape-lateral-s544/reconcile/session-548-wave-00N/`.
+
+| Plan | Scope |
+|---|---|
+| [slc-00-overview](completed/slc-00-overview.md) | Waves, ownership, per-worker protocol, final verification |
+| [slc-01-ir-drawing-contract](completed/slc-01-ir-drawing-contract.md) | `GEO_KINDS` actor, `PathContour.closed`, open-contour validation, outline rules |
+| [slc-02-ir-unknown-field](completed/slc-02-ir-unknown-field.md) | `semantic.unknownField` warning, registry keyOrder audit, corpus audit test |
+| [slc-03-geo-actor](completed/slc-03-geo-actor.md) | Stick figure geometry, tool, catalogue, palette, inspector label, D2 person |
+| [slc-04-open-path-render](completed/slc-04-open-path-render.md) | Open contour geometry, stroke-only hit test, canvas and SVG rendering, consumer skips |
+| [slc-05-drawio](completed/slc-05-drawio.md) | draw.io `umlActor` import and export, native UML component, interface and port export |
+| [slc-06-open-path-edit](completed/slc-06-open-path-edit.md) | `PathWorldContour` closed flag through anchor drags, handles and the path inspector |
+| [slc-07-cli-docs](completed/slc-07-cli-docs.md) | CLI per-operation warnings, `validate --strict`, TYPICAL, help and docs |
 
 Appearance settings (sessions 539-540; design:
 `design-docs/specs/design-appearance.md`, user QA:

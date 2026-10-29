@@ -132,7 +132,7 @@ export const DRAWIO_SHAPES: Readonly<Record<string, DrawioShape>> = {
   tapeData: { geo: "sequential-data" },
   doubleArrow: { geo: "double-arrow", direction: "east" },
   actor: { geo: "person" },
-  umlActor: { geo: "person", approximate: true },
+  umlActor: { geo: "actor" },
   mermaidPerson: { geo: "person" },
   folder: { geo: "package" },
   wedgeCallout: { geo: "callout" },

@@ -176,7 +176,9 @@ Example:
 
 ${EXIT_CODES}`,
 
-  edit: `Usage: nodetto-cli edit <doc.jsonl> --ops <file.json|-> [--arrange] [--dry-run]
+  edit: `New semantic.unknownField warnings identify the operation; JSON output includes a warnings array.
+
+Usage: nodetto-cli edit <doc.jsonl> --ops <file.json|-> [--arrange] [--dry-run]
                         [--snapshot <file>] [--format text|json]
 
 Apply a batch of operations through the editor's command layer, so the result is
@@ -265,7 +267,9 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
 Exit codes: 0 applied, 2 usage, input or operation error, 4 the file kept
 changing during the write (retry later).`,
 
-  shapes: `Usage: nodetto-cli shapes [<words>...] [--category <category>] [--connectors|--no-connectors]
+  shapes: `Example: nodetto-cli draw doc.jsonl geo:actor --label "Visitor"
+
+Usage: nodetto-cli shapes [<words>...] [--category <category>] [--connectors|--no-connectors]
                           [--format text|json]
        nodetto-cli shapes <shape-id> [--format text|json]
 
@@ -294,7 +298,9 @@ Examples:
 
 ${EXIT_CODES}`,
 
-  draw: `Usage: nodetto-cli draw <doc.jsonl> <shape-id> [--page <short-id|id|name>] [--label <text>]
+  draw: `Example: nodetto-cli draw doc.jsonl geo:actor --label "Visitor"
+
+Usage: nodetto-cli draw <doc.jsonl> <shape-id> [--page <short-id|id|name>] [--label <text>]
                         [--at <x>,<y>] [--size <width>x<height>] [--right-of <id>]
                         [--below <id>] [--dry-run] [--format text|json]
        nodetto-cli draw <doc.jsonl> <connector-shape-id> --from <id> --to <id> [--label <text>]
@@ -454,7 +460,8 @@ Print the canonical JSONL form.
 
 ${EXIT_CODES}`,
 
-  validate: `Usage: nodetto-cli validate <document.jsonl>
+  validate: `Usage: nodetto-cli validate <document.jsonl> [--strict]
+Warnings include semantic.unknownField for undefined semantic fields; --strict exits 3 on warnings.
 
 Parse and validate a document; print warnings and errors and a one-line summary.
 

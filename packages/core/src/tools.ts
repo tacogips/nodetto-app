@@ -163,6 +163,7 @@ export const Tool = {
   DoubleArrow: "geo:double-arrow",
   RightTriangle: "geo:right-triangle",
   Person: "geo:person",
+  StickFigure: "geo:actor",
   Package: "geo:package",
 } as const;
 
@@ -209,6 +210,7 @@ export const GEO_TOOLS = [
   Tool.DoubleArrow,
   Tool.RightTriangle,
   Tool.Person,
+  Tool.StickFigure,
   Tool.Package,
 ] as const;
 
@@ -454,6 +456,7 @@ const GEO_KINDS = {
   [Tool.DoubleArrow]: "double-arrow",
   [Tool.RightTriangle]: "right-triangle",
   [Tool.Person]: "person",
+  [Tool.StickFigure]: "actor",
   [Tool.Package]: "package",
 } as const satisfies Record<(typeof GEO_TOOLS)[number], GeoKind>;
 
@@ -494,6 +497,12 @@ export interface CreationTool {
 /** Exhaustive so adding a tool requires deciding its placement behavior. */
 export function creationFor(tool: ToolKind): CreationTool | null {
   switch (tool) {
+    case Tool.StickFigure:
+      return {
+        type: "shape.geo",
+        semantic: { geo: "actor", label: "" },
+        visual: { width: 60, height: 110 },
+      };
     case Tool.BreadboardFull:
     case Tool.BreadboardHalf:
     case Tool.BreadboardMini:

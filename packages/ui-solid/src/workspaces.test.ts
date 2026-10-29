@@ -174,6 +174,15 @@ test("ERD foreign keys stay beside tables and General provides a separate Note t
   expect(note?.visual?.style?.fill).toBe("#fff1c9");
 });
 
+test("General offers the stick figure", () => {
+  const general = shapePaletteGroups("flow").find(
+    (group) => group.label === "General",
+  );
+  expect(general?.items).toContainEqual(
+    expect.objectContaining({ tool: Tool.StickFigure, label: "Stick figure" }),
+  );
+});
+
 test("state tools are reachable in focused and general palettes", () => {
   const expected = [
     Tool.State,

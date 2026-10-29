@@ -35,6 +35,7 @@ test("every palette shape has a shape ID in the shared catalogue", () => {
 
 test("palette search finds shapes in any mode by name, ID or category", () => {
   expect(searchPaletteShapes("actor").map((item) => item.tool)).toEqual([
+    Tool.StickFigure,
     Tool.UseCaseActor,
     Tool.Actor,
   ]);

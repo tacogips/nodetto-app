@@ -148,7 +148,7 @@ function pathContours(element: Element, toBoard: PointMap): Contour[] {
     return toBoard(rotation ? rotatePoint(page, center, rotation) : page);
   };
   return contours.flatMap((contour) => {
-    if (contour.points.length < 3) return [];
+    if (contour.closed === false || contour.points.length < 3) return [];
     const mapped = contourOf(
       contour.points.map((point) => mapPoint(point, map)),
     );

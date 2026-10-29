@@ -202,7 +202,12 @@ export const UML_COMPONENT_TYPES: readonly ElementTypeDefinition[] = [
     (type): ElementTypeDefinition => ({
       type,
       category: "node",
-      keyOrder: { keys: ["name", "kind", "owner", "side", "offset"] },
+      keyOrder: {
+        keys:
+          type === UmlComponentType.Interface
+            ? ["name", "kind", "owner", "side", "offset"]
+            : ["name", "owner", "side", "offset"],
+      },
       onReferenceDeleted: "cascade",
       references: (semantic) =>
         type === UmlComponentType.Port ? refFields(semantic, ["owner"]) : [],

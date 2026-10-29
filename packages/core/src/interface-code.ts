@@ -223,7 +223,12 @@ function declarationBody(
       element.visual.flipX === true || element.visual.flipY === true;
     if (shape && !(flipped && shape.startsWith("clip-path")))
       geometry.push(shape);
-    else if (geo !== "rect" && geo !== "ellipse" && geo !== "cylinder") {
+    else if (
+      geo !== "rect" &&
+      geo !== "ellipse" &&
+      geo !== "cylinder" &&
+      geo !== "actor"
+    ) {
       const traced = outlineClipPath(geo, geoFlipOf(element));
       if (traced) geometry.push(traced);
     }

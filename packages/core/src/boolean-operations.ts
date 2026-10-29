@@ -86,7 +86,11 @@ export function booleanSourcePolygon(
     return null;
   if (element.type === "draw.path") {
     const contours = (element.semantic as PathSemantic).contours;
-    if (contours.length !== 1) return null;
+    if (
+      contours.length !== 1 ||
+      contours.some((contour) => contour.closed === false)
+    )
+      return null;
   }
   const box = context.boundsOf(element.id);
   if (!box) return null;
@@ -483,7 +487,7 @@ function openStrokeSourceMultiPolygon(
 function pathSourceMultiPolygon(element: Element): BooleanMultiPolygon | null {
   const semantic = element.semantic as PathSemantic;
   const geometry = compoundPathGeometry(element);
-  if (!geometry) return null;
+  if (!geometry || geometry.closed.some((closed) => !closed)) return null;
   const center = boxCenter(geometry.box);
   const rotation = element.visual.rotation ?? 0;
   const rings = geometry.contours.map((contour) =>
