@@ -328,6 +328,7 @@ export {
   readDirectEndpoints,
   readTableEndpoints,
   resolveConnector,
+  connectorLabelBox,
 } from "./shapes/connector.ts";
 export {
   connectorPath,
@@ -698,5 +699,17 @@ export {
 } from "./handoff-export.ts";
 
 export { nodeLabelLayout } from "./node-label.ts";
+export {
+  BOX_LABEL_FONT_SIZE,
+  boxLabelLayout,
+  CONNECTOR_LABEL_FONT_SIZE,
+  CONNECTOR_LABEL_GAP,
+  CONNECTOR_LABEL_WIDTH,
+  connectorLabelBackdrop,
+  connectorLabelBaselines,
+  connectorLabelExtent,
+  connectorLabelLayout,
+  type LabelLayout,
+} from "./label-layout.ts";
 export * from "./pcb-import.ts";
 export * from "./pcb-export.ts";

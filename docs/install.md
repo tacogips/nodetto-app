@@ -28,6 +28,12 @@ Finder "Open With" also lists nodetto for `.jsonl`, `.mmd`, `.mermaid`, `.bpmn`,
 associated; open them from the Open dialog. A path passed while the app
 is running opens in the existing window (after the usual unsaved-changes
 prompt).
+Add `--page <short ID, full ID or name>` or `--page-number <n>` to open at a
+page (`nodetto-cli pages file.jsonl` lists both). On macOS (and with the
+Linux Debian package) a `nodetto://open?path=<absolute path>&page=<page id>` link (or
+`&pageNumber=<n>`) does the same from a browser or chat; when that file is
+already open, the app only switches pages. A link to a page the file does not
+have opens the file and says which page was missing.
 
 ## Linux
 
@@ -35,7 +41,9 @@ The `Linux desktop and CLI` GitHub Actions workflow builds x86_64 Linux `.deb`
 and AppImage packages, each including `nodetto-cli`, plus a standalone CLI tarball.
 It uses Ubuntu 22.04 and WebKitGTK 4.1. The CLI needs no Node.js or Bun runtime.
 Install the Debian package with `sudo apt install ./Nodetto_VERSION_amd64.deb`,
-or run the AppImage after making it executable. For the standalone CLI, extract
+or run the AppImage after making it executable. The Debian package also
+registers `nodetto://` links; on Linux each link or file opened this way starts
+a new window rather than reusing a running one. For the standalone CLI, extract
 its tarball and place `nodetto-cli` in a directory on your PATH.
 
 Run the workflow manually with an empty `release_tag` for build artifacts only.

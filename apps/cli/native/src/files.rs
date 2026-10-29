@@ -6,7 +6,9 @@ use std::{
 
 pub use nodetto_native::{attachments::read as attachment, fs::write_atomic};
 
-pub fn open_document(path: &str, app: Option<String>) -> io::Result<()> {
+/// `link` is a nodetto:// link for the same file that selects a page; the
+/// file still goes first so a sandboxed macOS app is granted access to it.
+pub fn open_document(path: &str, app: Option<String>, link: Option<String>) -> io::Result<()> {
     if !fs::metadata(path)?.is_file() {
         return Err(io::Error::other("The path must be a regular file."));
     }
@@ -16,6 +18,7 @@ pub fn open_document(path: &str, app: Option<String>) -> io::Result<()> {
         let status = Command::new("/usr/bin/open")
             .args(["-a", app.as_deref().unwrap_or("nodetto"), "--"])
             .arg(absolute)
+            .args(link)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -38,6 +41,7 @@ pub fn open_document(path: &str, app: Option<String>) -> io::Result<()> {
             .into()
         }))
         .arg(absolute)
+        .args(link)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

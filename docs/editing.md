@@ -166,6 +166,9 @@ Navigate the page strip with Left/Right arrows or Home/End. F2 renames the
 focused page; Down opens its options. Within page options, Up/Down and Home/End
 move between actions, Escape returns to the page, and Tab leaves the menu.
 Only the selected page and its options enter the normal tab order.
+When the bottom page strip overflows, arrow buttons beside it shift the tabs
+one page at a time; dragging with the right mouse button pans the strip and a
+quick release lets it glide. Left-button drag still reorders pages.
 Each page remembers its pan and zoom for the current editing session. Returning
 to a page restores its view; an unvisited page starts at 100% and the origin.
 Remote page updates retain your active page, views and surviving layer selection.
@@ -187,7 +190,9 @@ can disable avoidance when an exact manual channel is more important. Detours
 are recomputed deterministically instead of storing derived waypoints. Manual
 routing supports up to 32 ordered checkpoints with direct canvas dragging,
 numeric along/offset editing, insertion, removal and reordering. Double-click a
-connector segment to insert a projected checkpoint directly; straight and
+connector segment away from its label to insert a projected checkpoint directly
+(double-clicking the label, or an unlabelled connector's midpoint, edits the
+label instead); straight and
 orthogonal routes retain their visible internal vertices when converted to a
 manual route. Checkpoints use an endpoint-relative basis, so moving or copying
 both endpoints carries the authored path while moving one endpoint reshapes it
@@ -237,6 +242,12 @@ selection toolbar or **Straighten connector** in its context menu. Double-click
 a bend handle to remove just that point; removing the final bend makes the line
 straight. A focused bend handle also supports Delete/Backspace. Undo restores
 the removed points.
+
+Connector labels and basic-shape labels wrap long text and keep line breaks,
+identically on the canvas and in SVG/PNG/PDF export. A connector label sits on
+a small backdrop, so a vertical or diagonal line does not run through its text.
+Edit a connector label in
+place by double-clicking it; Enter commits and Shift+Enter adds a line.
 
 The toolbar has File and Settings icons with hover labels. File offers New,
 Open, Reload from disk, Export, Save and Save As icons; Recent lists previous

@@ -3,8 +3,8 @@
 // The tab strip reads the store's page list on every revision and writes
 // only through the editor's page commands, so an undo puts a deleted tab back
 // where it was and a remote rename shows up like a local one. The only state
-// kept here is transient UI: which tab is being renamed and which tab's menu
-// is open.
+// kept here is transient UI: which tab is being renamed, which tab's menu
+// is open, and how far an overflowing strip is scrolled.
 
 import type { Editor } from "@nodetto/core";
 import type { Page, PageId } from "@nodetto/ir";
@@ -19,17 +19,34 @@ import {
   Show,
 } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
+import { Icon } from "./Icon.tsx";
 import {
   PageTabDrag,
   type PageTabDrop,
   type PageTabBox,
 } from "./page-tab-drag.ts";
 import { pageRenameDraft } from "./page-rename.ts";
+import {
+  pageTabFlingStep,
+  pageTabScrollEdges,
+  pageTabScrollStep,
+  PageTabPan,
+  type PageTabViewport,
+} from "./page-tab-scroll.ts";
 
 export interface PageTabsProps {
   readonly editor: Editor;
   readonly placement?: "top" | "bottom";
 }
+
+const reducedMotion = (): boolean =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+const viewportOf = (list: HTMLElement): PageTabViewport => ({
+  scrollLeft: list.scrollLeft,
+  width: list.clientWidth,
+  scrollWidth: list.scrollWidth,
+});
 
 const DELETE_PROMPT = (page: Page, count: number): string =>
   `Delete page "${page.name}" and the ${count} element${
@@ -55,6 +72,7 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
   const [renameError, setRenameError] = createSignal("");
   const renameErrorId = createUniqueId();
   let strip: HTMLDivElement | undefined;
+  let list: HTMLDivElement | undefined;
   const drag = new PageTabDrag(props.editor);
   const [draggedPage, setDraggedPage] = createSignal<PageId | null>(null);
   const [drop, setDrop] = createSignal<PageTabDrop | null>(null);
@@ -107,8 +125,95 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
     cancelDrag();
   });
 
+  // Overflow scrolling: arrows step a tab at a time, a right-button drag pans.
+  const [edges, setEdges] = createSignal(
+    { back: false, forward: false },
+    { equals: (a, b) => a.back === b.back && a.forward === b.forward },
+  );
+  const syncEdges = (): void => {
+    if (list) setEdges(pageTabScrollEdges(viewportOf(list)));
+  };
+  // Where an arrow's smooth scroll is heading, so quick repeated clicks keep
+  // stepping instead of measuring from mid-animation.
+  let stepTarget: number | null = null;
+  let fling = 0;
+  const stopFling = (): void => {
+    cancelAnimationFrame(fling);
+    fling = 0;
+  };
+  const startFling = (initial: number): void => {
+    stopFling();
+    if (!list || initial === 0 || reducedMotion()) return;
+    let velocity = initial;
+    let position = list.scrollLeft;
+    let last = performance.now();
+    const frame = (now: number): void => {
+      if (!list) return;
+      const step = pageTabFlingStep(velocity, now - last);
+      last = now;
+      velocity = step.velocity;
+      position += step.distance;
+      list.scrollLeft = position;
+      const edge = pageTabScrollEdges(viewportOf(list));
+      fling =
+        velocity !== 0 && (velocity > 0 ? edge.forward : edge.back)
+          ? requestAnimationFrame(frame)
+          : 0;
+    };
+    fling = requestAnimationFrame(frame);
+  };
+  const scrollTabs = (direction: -1 | 1): void => {
+    if (!list) return;
+    stopFling();
+    const origin = list.getBoundingClientRect().left - list.scrollLeft;
+    const spans = Array.from(list.children, (tab) => {
+      const box = tab.getBoundingClientRect();
+      return { start: box.left - origin, end: box.right - origin };
+    });
+    stepTarget = pageTabScrollStep(
+      spans,
+      { ...viewportOf(list), scrollLeft: stepTarget ?? list.scrollLeft },
+      direction,
+    );
+    list.scrollTo({
+      left: stepTarget,
+      behavior: reducedMotion() ? "auto" : "smooth",
+    });
+  };
+  const pan = new PageTabPan();
+  const endPan = (event: PointerEvent): void => {
+    if (!pan.owns(event.pointerId)) return;
+    const velocity = pan.finish(event.pointerId, event.timeStamp);
+    if (list?.hasPointerCapture(event.pointerId))
+      list.releasePointerCapture(event.pointerId);
+    startFling(velocity);
+  };
+  const resize =
+    typeof ResizeObserver === "undefined"
+      ? undefined
+      : new ResizeObserver(syncEdges);
+  createEffect(() => {
+    // Tab widths follow names, renames, and the page list.
+    pageIds();
+    renaming();
+    signals.rev();
+    queueMicrotask(() => {
+      if (!list) return;
+      resize?.disconnect();
+      resize?.observe(list);
+      for (const tab of list.children) resize?.observe(tab);
+      syncEdges();
+    });
+  });
+  onCleanup(() => {
+    resize?.disconnect();
+    stopFling();
+  });
+
   const focusPage = (id: PageId): void => {
     queueMicrotask(() => {
+      stopFling();
+      stepTarget = null;
       const button = Array.from(
         strip?.querySelectorAll<HTMLButtonElement>("[data-page-tab]") ?? [],
       ).find((candidate) => candidate.dataset.pageTab === id);
@@ -271,7 +376,60 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
         class="nodetto-page-tab-list"
         role="tablist"
         aria-label="Pages"
-        onScroll={() => setMenuFor(null)}
+        ref={list}
+        onScroll={(event) => {
+          setMenuFor(null);
+          if (
+            stepTarget !== null &&
+            Math.abs(event.currentTarget.scrollLeft - stepTarget) < 1
+          )
+            stepTarget = null;
+          syncEdges();
+        }}
+        onPointerDown={(event) => {
+          stopFling();
+          stepTarget = null;
+          if (
+            event.button !== 2 ||
+            pan.owns(event.pointerId) ||
+            (event.target instanceof Element && event.target.closest("input"))
+          )
+            return;
+          pan.start(
+            event.pointerId,
+            event.clientX,
+            event.currentTarget.scrollLeft,
+            event.timeStamp,
+          );
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={(event) => {
+          const left = pan.move(
+            event.pointerId,
+            event.clientX,
+            event.timeStamp,
+          );
+          if (left !== null) event.currentTarget.scrollLeft = left;
+        }}
+        onPointerUp={endPan}
+        onWheel={() => {
+          stopFling();
+          stepTarget = null;
+        }}
+        onPointerCancel={(event) => {
+          if (pan.owns(event.pointerId)) pan.cancel();
+        }}
+        onLostPointerCapture={(event) => {
+          if (pan.owns(event.pointerId)) pan.cancel();
+        }}
+        // Right-button drag scrolls the strip, so no menu on the press; the
+        // rename field keeps its text menu.
+        onContextMenu={(event) => {
+          if (
+            !(event.target instanceof Element && event.target.closest("input"))
+          )
+            event.preventDefault();
+        }}
       >
         <For each={pageIds()}>
           {(id) => (
@@ -528,6 +686,34 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
           )}
         </For>
       </div>
+      <Show when={edges().back || edges().forward}>
+        {/* Arrow keys on the tabs already scroll; these are pointer-only. */}
+        <div class="nodetto-page-tab-scroll">
+          <For each={[-1, 1] as const}>
+            {(direction) => (
+              <button
+                type="button"
+                class="nodetto-page-tab-scroll-button"
+                tabindex="-1"
+                title={
+                  direction === -1 ? "Show earlier pages" : "Show later pages"
+                }
+                aria-label={
+                  direction === -1
+                    ? "Scroll page tabs left"
+                    : "Scroll page tabs right"
+                }
+                disabled={direction === -1 ? !edges().back : !edges().forward}
+                onClick={() => scrollTabs(direction)}
+              >
+                <Icon
+                  name={direction === -1 ? "chevronLeft" : "chevronRight"}
+                />
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
       <button
         type="button"
         class="nodetto-page-add"

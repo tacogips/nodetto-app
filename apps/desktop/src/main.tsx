@@ -21,6 +21,7 @@ import {
 } from "./settings/appearance.ts";
 import { createCliInstaller } from "./settings/cli-install.ts";
 import { loadEditorPreferences } from "./settings/preferences.ts";
+import { installNativeContextMenuGuard } from "./shell/native-context-menu.ts";
 import "./style.css";
 import "./inspector.css";
 
@@ -41,6 +42,9 @@ const exportBackend = createExportBackend();
 void installCloseGuard(session).catch((error) => {
   console.error("Could not install document close guard", error);
 });
+
+// The webview's own menu offers Reload, which would drop the open document.
+installNativeContextMenuGuard(window);
 
 try {
   let storage: Storage | undefined;

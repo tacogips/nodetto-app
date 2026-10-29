@@ -162,9 +162,20 @@
   stroke-width: 2.5;
 }
 
+/* A backdrop (and a halo where the estimated width falls short) in the
+   canvas colour keeps the label readable where a line runs through it. */
+.nodetto-connector-label-backdrop {
+  fill: var(--nodetto-canvas-bg);
+  pointer-events: none;
+}
+
 .nodetto-connector-label {
   fill: var(--nodetto-muted);
   font-size: 11px;
+  stroke: var(--nodetto-canvas-bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 
 .nodetto-marker-filled {
@@ -227,8 +238,13 @@
   inset: 0;
   overflow: hidden;
   text-align: center;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Lines come pre-wrapped from the core layout, shared with SVG export. */
+.nodetto-label-lines > span {
+  display: block;
+  white-space: pre;
 }
 
 .nodetto-node {

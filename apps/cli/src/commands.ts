@@ -66,8 +66,11 @@ export interface CommandIo {
   readText(path: string): string;
   /** Binary input (ZIP archives); required only by commands that read bytes. */
   readBytes?(path: string): Uint8Array;
-  /** Launch the desktop editor with an existing local file. */
-  openDocument?(path: string, app?: string): Promise<void>;
+  /**
+   * Launch the desktop editor with an existing local file, optionally showing
+   * the page with full ID `page`.
+   */
+  openDocument?(path: string, app?: string, page?: string): Promise<void>;
   readAttachment?(documentPath: string, relative: string): Uint8Array;
   writeText(path: string, text: string): void;
   /** Standard input, for `--ops -`. */

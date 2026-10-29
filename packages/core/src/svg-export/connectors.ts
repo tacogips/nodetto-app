@@ -15,6 +15,11 @@ import {
   resolveConnector,
 } from "../shapes/connector.ts";
 import { connectorPath } from "../shapes/connector-path.ts";
+import {
+  connectorLabelBackdrop,
+  connectorLabelBaselines,
+  connectorLabelLayout,
+} from "../label-layout.ts";
 import { type Attrs, fmt, tag, text, wrap } from "./markup.ts";
 import { renderNotationPrimitive } from "./notation.ts";
 import { styled, textStyled } from "./paint.ts";
@@ -149,20 +154,43 @@ export function renderConnector(
   if (decoration.label === "") {
     return line;
   }
+  const layout = connectorLabelLayout(decoration.label, element.visual);
+  const baselines = connectorLabelBaselines(layout, resolved.labelPoint.y);
+  const backdrop = connectorLabelBackdrop(layout, resolved.labelPoint);
   return (
     line +
-    text(
-      textStyled(
-        {
-          x: resolved.labelPoint.x,
-          y: resolved.labelPoint.y - 6,
-          "text-anchor": "middle",
-          fill: theme.muted,
-          "font-size": 11,
-        },
-        element.visual,
-      ),
-      decoration.label,
-    )
+    (backdrop
+      ? tag("rect", {
+          x: backdrop.x,
+          y: backdrop.y,
+          width: backdrop.width,
+          height: backdrop.height,
+          fill: theme.surface,
+        })
+      : "") +
+    layout.lines
+      .map((labelLine, index) =>
+        labelLine === ""
+          ? ""
+          : text(
+              textStyled(
+                {
+                  x: resolved.labelPoint.x,
+                  y: baselines[index] as number,
+                  "text-anchor": "middle",
+                  fill: theme.muted,
+                  "font-size": layout.fontSize,
+                  // The halo covers what the estimated backdrop misses.
+                  stroke: theme.surface,
+                  "stroke-width": 3,
+                  "stroke-linejoin": "round",
+                  "paint-order": "stroke",
+                },
+                element.visual,
+              ),
+              labelLine,
+            ),
+      )
+      .join("")
   );
 }

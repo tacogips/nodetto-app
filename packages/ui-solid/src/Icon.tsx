@@ -21,6 +21,8 @@ export function Icon(props: {
     | "image"
     | "more"
     | "chevron"
+    | "chevronLeft"
+    | "chevronRight"
     | "reload"
     | "newFile"
     | "openFile"
@@ -70,6 +72,8 @@ export function Icon(props: {
     image: "M3 4h14v12H3zm2 9l3-3 2 2 2-3 3 4M6 7h.01",
     more: "M4 10a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z",
     chevron: "M6 8l4 4 4-4z",
+    chevronLeft: "M13 4l-6 6 6 6z",
+    chevronRight: "M7 4l6 6-6 6z",
 
     reload: "M17 8a7 7 0 10.4 5M17 3v5h-5",
     newFile: "M4 2h8l4 4v12H4zM12 2v5h4M7 12h6m-3-3v6",

@@ -38,7 +38,7 @@ export function PageSection(props: PageSectionProps): JSX.Element {
       </Field>
       <Field label="Page ID">
         <input
-          class="nodetto-input"
+          class="nodetto-input nodetto-readonly-value"
           aria-label="Short page ID"
           readOnly
           value={shortPageId(props.page.id)}
@@ -50,7 +50,7 @@ export function PageSection(props: PageSectionProps): JSX.Element {
         <summary>Page settings</summary>
         <Field label="Full page ID">
           <input
-            class="nodetto-input"
+            class="nodetto-input nodetto-readonly-value"
             aria-label="Full page ID"
             readOnly
             value={props.page.id}

@@ -7,6 +7,7 @@
 
 import {
   type Box,
+  boxLabelLayout,
   type GeoOutline,
   geoFlipOf,
   geoOutline,
@@ -14,7 +15,7 @@ import {
   roundedRectPath,
 } from "@nodetto/core";
 import type { Element, GeoKind, GeoShapeSemantic } from "@nodetto/ir";
-import { type JSX, Match, Show, Switch } from "solid-js";
+import { createMemo, For, type JSX, Match, Show, Switch } from "solid-js";
 import { SvgFillGradient } from "./SvgFillGradient.tsx";
 import { labelStyle, svgStyle } from "./visual.ts";
 
@@ -44,6 +45,9 @@ function asKind<K extends GeoOutline["kind"]>(
 export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
   const semantic = () => semanticOf(props.element);
   const width = () => props.box.width;
+  const label = createMemo(() =>
+    boxLabelLayout(semantic().label ?? "", width(), props.element.visual),
+  );
   const height = () => props.box.height;
   const outline = () =>
     geoOutline(semantic().geo, width(), height(), geoFlipOf(props.element));
@@ -137,7 +141,22 @@ export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
         data-smart-text
         style={labelStyle(props.element.visual)}
       >
-        {semantic().label}
+        <span
+          class="nodetto-label-lines"
+          style={{
+            "line-height": `${label().lineHeight}px`,
+            "text-align":
+              props.element.visual.style?.textAlign === "start"
+                ? "left"
+                : props.element.visual.style?.textAlign === "end"
+                  ? "right"
+                  : "center",
+          }}
+        >
+          <For each={label().lines}>
+            {(line) => <span>{line || "\u00a0"}</span>}
+          </For>
+        </span>
       </div>
     </>
   );

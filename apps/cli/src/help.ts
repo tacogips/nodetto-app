@@ -69,18 +69,29 @@ select the project directory explicitly (useful for the sandboxed Store build).
 The server can read/write files and launch the desktop app like the CLI.
 Stop by disconnecting the client (closing stdin).`,
 
-  open: `Usage: nodetto-cli open <file> [--app <application>]
+  open: `Usage: nodetto-cli open <file> [--page <page> | --page-number <n>] [--app <application>]
 
 Open an existing local file in the Nodetto desktop app. Relative paths resolve
 from the current directory. On macOS this also opens files in a running app.
 The command returns after the OS accepts the request; it does not wait for edits.
 
-  --app  macOS app name or .app path (default: nodetto). On Linux and Windows,
-         the Nodetto executable name or path (default: nodetto / nodetto.exe).
+  --page         Show this page: short ID, full ID or exact name.
+  --page-number  Show the page at this 1-based position, numbered as the
+                 pages command lists them.
+  --app          macOS app name or .app path (default: nodetto). On Linux and
+                 Windows, the Nodetto executable name or path (default:
+                 nodetto / nodetto.exe).
+
+A page is checked against the file before launching. The app receives it as a
+nodetto://open?path=<absolute path>&page=<page id> link; such links (also with
+pageNumber=<n> instead of page) open the same way from a browser or chat on
+macOS and with the Linux Debian package. If the file is already open, the app
+switches pages without reloading.
 
 Example:
   nodetto-cli open design.jsonl
-  nodetto-cli open design.jsonl --app "/Applications/Nodetto.app"
+  nodetto-cli open design.jsonl --page-number 3
+  nodetto-cli open design.jsonl --page AbC123xyz_- --app "/Applications/Nodetto.app"
 
 ${EXIT_CODES}`,
 

@@ -22,6 +22,7 @@ export {
   CONNECTOR_OBSTACLE_CLEARANCE,
   resolveConnector,
 } from "./connector/resolve.ts";
+export { connectorLabelBox } from "./connector/label-box.ts";
 export {
   CONNECTOR_HIT_TOLERANCE,
   createConnectorUtil,

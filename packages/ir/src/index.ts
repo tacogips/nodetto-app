@@ -299,6 +299,7 @@ export {
 export {
   shortPageId,
   resolvePageQuery,
+  pageAtNumber,
   type PageResolution,
 } from "./page-id.ts";
 

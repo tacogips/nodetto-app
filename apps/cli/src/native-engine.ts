@@ -3,6 +3,7 @@
 import { runCli } from "./commands.ts";
 import { exportCommand } from "./export-command.ts";
 import { openCommand } from "./open-command.ts";
+import { desktopOpenLink } from "./open-link.ts";
 import { pdfLayout } from "@nodetto/core";
 import { COMMAND_HELP, OVERVIEW } from "./help.ts";
 
@@ -14,7 +15,7 @@ declare const native: {
   exists(path: string): boolean;
   readStdin(): string;
   attachment(document: string, path: string): Uint8Array;
-  open(path: string, app: string | undefined): void;
+  open(path: string, app: string | undefined, link: string | undefined): void;
   png(svg: string, scale: number, fontDir: string | undefined): Uint8Array;
   pdf(png: Uint8Array, layout: string): Uint8Array;
 };
@@ -31,8 +32,14 @@ const io = {
   readStdin: native.readStdin,
   readAttachment: (document: string, path: string) =>
     new Uint8Array(native.attachment(native.path(document), path)),
-  openDocument: async (path: string, app?: string) =>
-    native.open(native.path(path), app),
+  openDocument: async (path: string, app?: string, page?: string) => {
+    const absolute = native.path(path);
+    native.open(
+      absolute,
+      app,
+      page === undefined ? undefined : desktopOpenLink(absolute, page),
+    );
+  },
 };
 
 // JSON at this boundary keeps interpreter handles local to each Rust invocation.

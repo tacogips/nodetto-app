@@ -5,6 +5,8 @@ import type { Box, Vec } from "@nodetto/core";
 import {
   boxContains,
   connectionPorts,
+  connectorDecoration,
+  connectorLabelBox,
   insideClip,
   isGroup,
   overlapsVisibleElement,
@@ -12,6 +14,7 @@ import {
 } from "@nodetto/core";
 import {
   CONNECTOR_ENDPOINT_TYPES,
+  getElementTypeDefinition,
   isPcbElementType,
   type Element,
   type ElementId,
@@ -26,6 +29,11 @@ export type NearestPort = ReturnType<typeof connectionPorts>[number];
 export interface HitTesting {
   /** `editor.hitTest`, skipping PCB layers the board view hides. */
   canvasHitTest(point: Vec): ElementId | null;
+  /**
+   * The editable edge whose label is under `point`. An unlabelled edge only
+   * counts at its midpoint and when `hit` (the press target) is that edge.
+   */
+  edgeLabelAt(point: Vec, hit: ElementId | null): ElementId | null;
   elementsIn(rect: Box): ElementId[];
   nearestPort(id: ElementId, point: Vec): NearestPort | undefined;
   targetUnder(point: Vec, excluded: readonly ElementId[]): ElementId | null;
@@ -52,6 +60,35 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
         continue;
       if (isGroup(element)) continue;
       if (editor.getShapeUtil(element.type).hitTest(element, point, context))
+        return element.id;
+    }
+    return null;
+  };
+
+  const edgeLabelAt = (point: Vec, hit: ElementId | null): ElementId | null => {
+    const context = editor.createShapeContext();
+    const slop = 4 / editor.camera.get().z;
+    const elements = editor.store.getPageElements(editor.currentPageId);
+    for (let index = elements.length - 1; index >= 0; index -= 1) {
+      const element = elements[index] as Element | undefined;
+      if (
+        !element ||
+        getElementTypeDefinition(element.type)?.category !== "edge" ||
+        context.isHidden?.(element.id) ||
+        context.isLocked?.(element.id) ||
+        editor.editableField(element.id) === null
+      )
+        continue;
+      if (connectorDecoration(element).label === "" && element.id !== hit)
+        continue;
+      const box = connectorLabelBox(element, context);
+      if (
+        box &&
+        point.x >= box.x - slop &&
+        point.x <= box.x + box.width + slop &&
+        point.y >= box.y - slop &&
+        point.y <= box.y + box.height + slop
+      )
         return element.id;
     }
     return null;
@@ -153,6 +190,7 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
 
   return {
     canvasHitTest,
+    edgeLabelAt,
     elementsIn,
     nearestPort,
     targetUnder,
