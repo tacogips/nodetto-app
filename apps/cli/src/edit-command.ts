@@ -17,8 +17,12 @@ import {
   isFractionalKey,
   newElementId,
   planArrangement,
+  planScale,
+  replaceText,
   type ShapeCatalogueEntry,
   shapeCreation,
+  type TextReplacement,
+  textMatcher,
 } from "@nodetto/core";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
 import {
@@ -66,6 +70,8 @@ interface Created {
 interface BatchResult {
   readonly text: string;
   readonly created: readonly Created[];
+  /** Text changed by replace-text operations. */
+  readonly replaced: readonly TextReplacement[];
   readonly counts: ReadonlyMap<
     string,
     { added: number; updated: number; removed: number }
@@ -164,6 +170,7 @@ class Batch {
   readonly refs = new Map<string, string>();
   readonly created: Created[] = [];
   readonly touchedPages = new Set<string>();
+  readonly replaced: TextReplacement[] = [];
   /** The element auto placement put last on each page, to line up with. */
   private readonly lastPlaced = new Map<string, string>();
 
@@ -403,6 +410,30 @@ class Batch {
     });
     this.touchedPages.add(page.id);
     return id;
+  }
+
+  /**
+   * The elements an operation targets: "ids", or every element on "page".
+   * Without either, the single page; `wholeDocument` widens that to every
+   * page.
+   */
+  private targets(
+    operation: JsonObject,
+    index: number,
+    wholeDocument: boolean,
+  ): Element[] {
+    const ids = operation["ids"];
+    if (ids !== undefined) {
+      if (operation["page"] !== undefined)
+        throw new OperationError(index, `use either "ids" or "page"`);
+      if (!Array.isArray(ids) || !ids.length)
+        throw new OperationError(index, `"ids" must be a non-empty array`);
+      return ids.map((id) => this.element(id, index));
+    }
+    if (operation["page"] === undefined && wholeDocument)
+      return [...this.editor.store.listElements()];
+    const page = this.page(operation["page"], index);
+    return [...this.editor.store.getPageElements(page.id)];
   }
 
   private shape(operation: JsonObject, index: number): ShapeCatalogueEntry {
@@ -888,6 +919,107 @@ class Batch {
         this.touchedPages.add(element.page);
         return;
       }
+      case "scale": {
+        const factor = number(operation["factor"], "factor", index);
+        if (factor <= 0)
+          throw new OperationError(index, `"factor" must be above zero`);
+        const origin = operation["origin"];
+        if (
+          origin !== undefined &&
+          !(
+            isPlainObject(origin) &&
+            typeof origin["x"] === "number" &&
+            typeof origin["y"] === "number"
+          )
+        )
+          throw new OperationError(
+            index,
+            `"origin" must be {"x":<number>,"y":<number>}`,
+          );
+        const targets = this.targets(operation, index, false);
+        const page = targets[0]?.page;
+        if (page === undefined)
+          throw new OperationError(index, "There is nothing to scale.");
+        this.editor.setCurrentPage(page);
+        const plan = planScale(
+          this.editor,
+          targets.map((element) => element.id),
+          factor,
+          isPlainObject(origin)
+            ? { x: Number(origin["x"]), y: Number(origin["y"]) }
+            : undefined,
+        );
+        if (!plan)
+          throw new OperationError(index, "There is nothing to scale.");
+        this.editor.apply(plan.commands, { placed: plan.placed });
+        this.touchedPages.add(page);
+        return;
+      }
+      case "replace-text": {
+        const find = text(operation["find"], "find", index);
+        const replacement = operation["replace"];
+        if (typeof replacement !== "string")
+          throw new OperationError(index, `"replace" must be a string`);
+        const matcher = textMatcher(find, {
+          regex: operation["regex"] === true,
+          ignoreCase: operation["ignoreCase"] === true,
+        });
+        if (typeof matcher === "string")
+          throw new OperationError(index, matcher);
+        const targets = this.targets(operation, index, true);
+        const changes = replaceText(
+          this.editor,
+          targets.map((element) => element.id),
+          matcher,
+          replacement,
+        );
+        for (const change of changes) {
+          const element = this.editor.store.get(change.id);
+          if (element) this.touchedPages.add(element.page);
+        }
+        this.replaced.push(...changes);
+        return;
+      }
+      case "group": {
+        const ids = operation["ids"];
+        if (!Array.isArray(ids) || ids.length < 2)
+          throw new OperationError(
+            index,
+            `"ids" must list two or more elements to group`,
+          );
+        const members = ids.map((id) => this.element(id, index));
+        const page = members[0]?.page as string;
+        if (members.some((member) => member.page !== page))
+          throw new OperationError(index, "group needs elements on one page.");
+        this.editor.setCurrentPage(page);
+        this.editor.selection.set(members.map((member) => member.id));
+        const id = this.editor.groupSelection();
+        if (!id)
+          throw new OperationError(
+            index,
+            "group needs two or more distinct elements on one page.",
+          );
+        const name = operation["name"];
+        if (typeof name === "string" && name.trim())
+          this.editor.apply([
+            { type: "updateVisual", id, visual: { layerName: name } },
+          ]);
+        this.record(operation, index, id, "group", page);
+        return;
+      }
+      case "ungroup": {
+        const group = this.element(operation["id"], index);
+        if (group.type !== "group")
+          throw new OperationError(
+            index,
+            `${group.id} is a ${group.type}, not a group.`,
+          );
+        this.editor.setCurrentPage(group.page);
+        this.editor.selection.set([group.id]);
+        this.editor.ungroupSelection();
+        this.touchedPages.add(group.page);
+        return;
+      }
       case "delete": {
         const element = this.element(operation["id"], index);
         this.editor.deleteElements([element.id]);
@@ -897,7 +1029,7 @@ class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move or delete.`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, scale, replace-text, group or ungroup.`,
         );
     }
   }
@@ -992,6 +1124,7 @@ export function applyBatch(
   return {
     text: serializeDocument(snapshot),
     created: batch.created,
+    replaced: batch.replaced,
     counts,
     operations: operations.length,
   };
@@ -1124,6 +1257,7 @@ export function runOperations(
           written: !dryRun,
           operations: result.operations,
           created: result.created,
+          ...(result.replaced.length ? { replaced: result.replaced } : {}),
           pages: Object.fromEntries(result.counts),
         },
         null,
@@ -1139,6 +1273,10 @@ export function runOperations(
     ...result.created.map(
       (item) =>
         `  created ${item.ref ? `@${item.ref} = ` : ""}${item.id} (${item.type})`,
+    ),
+    ...result.replaced.map(
+      (item) =>
+        `  replaced ${item.id} ${item.path}: ${JSON.stringify(item.before)} -> ${JSON.stringify(item.after)}`,
     ),
   ];
   return ok(`${lines.join("\n")}\n`);

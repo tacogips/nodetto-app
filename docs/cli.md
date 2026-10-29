@@ -93,6 +93,15 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   `--right-of` or `--below`. Connector shapes take `--from` and `--to`. In
   `edit` batches, `{"op":"add","shape":...}` and
   `{"op":"connect","shape":...}` do the same.
+- `edit` also scales a page or chosen elements while keeping the layout
+  (`{"op":"scale","page":"p1","factor":1.25}`: positions, sizes and text sizes
+  together, paths and connectors following), replaces part of the display
+  text across the document (`{"op":"replace-text","find":"example.dev",
+  "replace":"example.info"}`, with `regex` and `ignoreCase`; `--dry-run`
+  previews every change), and groups or ungroups elements
+  (`{"op":"group","ids":[...]}`, `{"op":"ungroup","id":...}`).
+  `inspect --text <text>` lists the elements whose labels, names or notes
+  contain the text.
 - `edit` operations reference elements by unique id prefix or by `@ref` names
   given earlier in the batch; list items such as columns get generated ids, and
   ERD relation ends may name a column instead of its id. Validation errors name

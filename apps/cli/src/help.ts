@@ -125,7 +125,8 @@ Examples:
 ${EXIT_CODES}`,
 
   inspect: `Usage: nodetto-cli inspect <doc.jsonl> [--page <short-id|id|name>] [--format outline|json]
-                           [--type <prefix>] [--ids short|full]
+                           [--type <prefix>] [--text <text> [--regex] [--ignore-case]]
+                           [--ids short|full]
 
 Print what the document contains.
 
@@ -138,6 +139,10 @@ Print what the document contains.
                     Page headings include stable short IDs; JSON includes shortId.
   --type            Only elements whose type starts with this prefix
                     (for example erd.table, bpmn., frame).
+  --text            Only elements whose display text (labels, names, notes,
+                    table and column names) contains this text; --regex reads
+                    it as a regular expression, --ignore-case ignores case.
+                    The replace-text edit operation changes the matches.
   --ids short       (default) Shortest unique id prefix of at least six
                     characters. Every command that takes an element id accepts
                     such a prefix. --ids full prints complete ids.
@@ -196,6 +201,10 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"remove-item","id":"@orders","field":"columns","item":"total"}
   {"op":"move","id":"t-users","x":40,"y":80}
   {"op":"delete","id":"01M4WD"}
+  {"op":"scale","page":"p1","factor":1.25}
+  {"op":"replace-text","find":"example.dev","replace":"example.info"}
+  {"op":"group","ids":["@gw","@cache"],"ref":"edge","name":"Edge tier"}
+  {"op":"ungroup","id":"@edge"}
   {"op":"add-page","name":"Flow","kind":"bpmn","ref":"flow","after":"p1"}
   {"op":"move-page","id":"p3","before":"p2"}
   {"op":"rename-page","id":"p1","name":"Shop schema"}
@@ -223,6 +232,19 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     "label" sets the label (trigger for states, name for BPMN); "type" and
     "semantic" override. A table or state may connect to itself (a
     self-referencing foreign key or a self-transition).
+  - scale enlarges or shrinks "ids" (with the contents of their frames and
+    groups) or every element of "page" by "factor", keeping the layout:
+    positions and sizes scale about "origin" ({"x","y"}; default the top-left
+    of their bounds), text sizes scale with them, paths stretch with their
+    box and connectors follow; free connector ends move too.
+  - replace-text replaces "find" with "replace" inside display text (labels,
+    names, notes, table and column names) of "ids", one "page" or, without
+    either, the whole document; never in ids or references. "regex": true
+    reads "find" as a regular expression ($1 works in "replace"),
+    "ignoreCase": true ignores case. The report lists every change; use
+    --dry-run to preview.
+  - group wraps two or more elements on one page in a group ("name" sets its
+    layer name); ungroup dissolves a group and keeps its members.
   - update deep-merges objects; arrays are replaced whole (use append and
     remove-item for single list items); null removes a key.
   - List items that need ids (columns, indexes, attributes) get generated ids.

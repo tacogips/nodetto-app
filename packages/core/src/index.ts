@@ -752,3 +752,13 @@ export {
   type ShapeSearch,
   searchShapes,
 } from "./shape-catalogue.ts";
+export { planScale, type ScalePlan } from "./scale.ts";
+export {
+  findText,
+  replaceText,
+  type TextField,
+  textFields,
+  type TextMatchOptions,
+  textMatcher,
+  type TextReplacement,
+} from "./text-replace.ts";
