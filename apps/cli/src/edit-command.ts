@@ -1066,6 +1066,25 @@ export function applyBatch(
   const editor = new Editor({ document: parsed.document });
   const batch = new Batch(editor);
   const lastTouch = new Map<string, number>();
+  // The operation after which each unknown field (element id + path) first
+  // appeared, so a later edit of the same element does not take the blame.
+  const introducedBy = new Map<string, number>();
+  const unknownFields = (element: Element): string[] => {
+    const page = editor.store.getPage(element.page);
+    if (!page) return [];
+    return validateDocument({
+      ...parsed.document,
+      pages: [page],
+      elements: [element],
+    })
+      .filter((issue) => issue.code === "semantic.unknownField")
+      .map((issue) =>
+        JSON.stringify([
+          element.id,
+          issue.path.replace(/^elements\[0\]\./, ""),
+        ]),
+      );
+  };
   let records = new Map(
     editor.store.listElements().map((element) => [element.id, element]),
   );
@@ -1076,7 +1095,12 @@ export function applyBatch(
         editor.store.listElements().map((element) => [element.id, element]),
       );
       for (const [id, element] of next)
-        if (records.get(id) !== element) lastTouch.set(id, index);
+        if (records.get(id) !== element) {
+          lastTouch.set(id, index);
+          if (records.get(id)?.semantic !== element.semantic)
+            for (const key of unknownFields(element))
+              if (!introducedBy.has(key)) introducedBy.set(key, index);
+        }
       records = next;
     } catch (cause) {
       if (cause instanceof OperationError) throw cause;
@@ -1142,7 +1166,8 @@ export function applyBatch(
     if (issue.code !== "semantic.unknownField") continue;
     const item = warningKey(issue.path, snapshot.elements);
     if (!item || baseline.has(item.key)) continue;
-    const operation = lastTouch.get(item.element.id);
+    const operation =
+      introducedBy.get(item.key) ?? lastTouch.get(item.element.id);
     if (operation === undefined) continue;
     warnings.push({
       operation,

@@ -111,3 +111,40 @@ test("actor is discoverable, drawable and connectable", () => {
   expect(types).toContain("usecase.relationship");
   expect(types).toContain("geo:actor");
 });
+
+test("an unknown-field warning names the operation that introduced it", () => {
+  const editor = new Editor();
+  let saved = serializeDocument(editor.getSnapshot());
+  const io: CommandIo = {
+    readText: () => saved,
+    writeText: (_path, value) => {
+      saved = value;
+    },
+    readStdin: () =>
+      JSON.stringify([
+        {
+          op: "add",
+          type: "uml.component",
+          semantic: { name: "Ledger", kind: "x" },
+        },
+        {
+          op: "add",
+          type: "shape.geo",
+          semantic: { geo: "rect", label: "Cache" },
+        },
+        { op: "scale", factor: 2 },
+      ]),
+  };
+  const result = runCli(
+    ["edit", "doc.jsonl", "--ops", "-", "--format", "json"],
+    io,
+    "t",
+  );
+  expect(result.exitCode).toBe(0);
+  const report = JSON.parse(result.stdout) as {
+    warnings: { operation: number; op: string; path: string }[];
+  };
+  expect(report.warnings).toEqual([
+    expect.objectContaining({ operation: 0, op: "add", path: "semantic.kind" }),
+  ]);
+});
