@@ -8,6 +8,12 @@ export {
   stateNodeBounds,
   stateNodeLabelBox,
 } from "./shapes/state.ts";
+export {
+  USECASE_NODE_SIZES,
+  useCaseNodeBounds,
+  useCaseNodeLabelBox,
+  useCaseNodeNotation,
+} from "./shapes/usecase.ts";
 // Editor core: framework-agnostic store, camera, selection, history,
 // shape utils, and commands. Must not touch the DOM.
 export {
@@ -511,6 +517,7 @@ export {
 export { moveStrokeAnchor } from "./stroke-edit.ts";
 export {
   pathWorldContours,
+  type PathWorldContour,
   planPathWorldContours,
   PathAnchorDrag,
 } from "./compound-path-edit.ts";
@@ -713,3 +720,46 @@ export {
 } from "./label-layout.ts";
 export * from "./pcb-import.ts";
 export * from "./pcb-export.ts";
+export {
+  Tool,
+  TOOLS,
+  GEO_TOOLS,
+  BPMN_TOOLS,
+  BREADBOARD_TOOLS,
+  PCB_TOOLS,
+  PCB_CREATIONS,
+  canUseTool,
+  creationFor,
+  componentRelationshipFor,
+  useCaseRelationshipFor,
+  isConnectorTool,
+  typedConnectorFor,
+  type ToolKind,
+  type BpmnToolKind,
+  type BreadboardToolKind,
+  type PcbToolKind,
+  type CreationTool,
+} from "./tools.ts";
+export {
+  categoryMatches,
+  connectShape,
+  findShape,
+  SHAPE_CATALOGUE,
+  SHAPE_CATEGORIES,
+  type ShapeCatalogueEntry,
+  type ShapeCategoryId,
+  shapeCategoryLabel,
+  shapeCreation,
+  type ShapeSearch,
+  searchShapes,
+} from "./shape-catalogue.ts";
+export { planScale, type ScalePlan } from "./scale.ts";
+export {
+  findText,
+  replaceText,
+  type TextField,
+  textFields,
+  type TextMatchOptions,
+  textMatcher,
+  type TextReplacement,
+} from "./text-replace.ts";

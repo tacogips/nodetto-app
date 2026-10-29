@@ -174,6 +174,15 @@ test("ERD foreign keys stay beside tables and General provides a separate Note t
   expect(note?.visual?.style?.fill).toBe("#fff1c9");
 });
 
+test("General offers the stick figure", () => {
+  const general = shapePaletteGroups("flow").find(
+    (group) => group.label === "General",
+  );
+  expect(general?.items).toContainEqual(
+    expect.objectContaining({ tool: Tool.StickFigure, label: "Stick figure" }),
+  );
+});
+
 test("state tools are reachable in focused and general palettes", () => {
   const expected = [
     Tool.State,
@@ -229,4 +238,56 @@ test("flowchart mode exposes standard notation and a directed flow tool", () => 
     geo: "parallelogram",
     label: "Input / Output",
   });
+});
+
+test("use-case mode lists its notation first and keeps the package with it", () => {
+  const workspace = workspaceById("usecase");
+  expect(workspace.label).toBe("UML use case");
+  expect(WORKSPACES.findIndex((entry) => entry.id === "usecase")).toBe(
+    WORKSPACES.findIndex((entry) => entry.id === "component") + 1,
+  );
+  expect(workspaceShapes("usecase").map((item) => item.label)).toEqual([
+    "Actor",
+    "Use case",
+    "System boundary",
+    "Association",
+    "Include",
+    "Extend",
+    "Generalization",
+    "Package",
+    "Text",
+    "Frame",
+  ]);
+  const groups = shapePaletteGroups("usecase");
+  expect(groups[0]?.label).toBe("UML use case");
+  expect(groups[0]?.items.map((item) => item.tool)).toEqual([
+    Tool.UseCaseActor,
+    Tool.UseCase,
+    Tool.UseCaseSystem,
+    Tool.UseCaseAssociation,
+    Tool.UseCaseInclude,
+    Tool.UseCaseExtend,
+    Tool.UseCaseGeneralization,
+    Tool.Package,
+  ]);
+  for (const tool of [
+    Tool.UseCaseAssociation,
+    Tool.UseCaseInclude,
+    Tool.UseCaseExtend,
+    Tool.UseCaseGeneralization,
+  ])
+    expect(isConnectorTool(tool)).toBe(true);
+  for (const id of ["flow", "all"] as const) {
+    const useCase = shapePaletteGroups(id).find(
+      (group) => group.label === "UML use case",
+    );
+    expect(useCase?.items.map((item) => item.tool)).toEqual(
+      expect.arrayContaining([Tool.UseCaseActor, Tool.UseCaseInclude]),
+    );
+    expect(
+      shapePaletteGroups(id)
+        .find((group) => group.label === "General")
+        ?.items.map((item) => item.tool),
+    ).toContain(Tool.Package);
+  }
 });

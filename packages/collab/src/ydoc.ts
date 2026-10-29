@@ -2,7 +2,7 @@
 //
 // Shape:
 //   meta     Y.Map   { schemaVersion, id, title, extensions?, unknownRecords? }
-//   pages    Y.Map<PageId, Y.Map{ name, kind, order?, tokenMode?, sqlDialect?, extensions? }>
+//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, extensions? }>
 //   elements Y.Map<ElementId, Y.Map{ type, page, index, semantic,
 //                                    accessibility?, visual, extensions? }>
 //
@@ -23,6 +23,7 @@ import {
   type Document,
   type Element,
   type ElementId,
+  isPageMode,
   isPlainObject,
   type Page,
   type PageId,
@@ -88,6 +89,7 @@ export function pageFields(page: Page): Record<string, unknown> {
   return {
     name: page.name,
     kind: page.kind,
+    ...(page.mode === undefined ? {} : { mode: page.mode }),
     ...(page.sqlDialect === undefined ? {} : { sqlDialect: page.sqlDialect }),
     ...(page.tokenMode === undefined ? {} : { tokenMode: page.tokenMode }),
     ...(page.order === undefined ? {} : { order: page.order }),
@@ -204,6 +206,7 @@ export function pageFromY(id: PageId, value: unknown): Page {
     id,
     name: String(record.name ?? ""),
     kind: record.kind as Page["kind"],
+    ...(isPageMode(record.mode) ? { mode: record.mode } : {}),
     ...(record.sqlDialect === "postgresql" ||
     record.sqlDialect === "mysql" ||
     record.sqlDialect === "sqlite"

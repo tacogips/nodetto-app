@@ -187,8 +187,9 @@ export function swiftCompoundPath(
   style: VisualStyle,
 ): string {
   const geometry = compoundPathGeometry(element);
-  if (!geometry) return "EmptyView()";
+  if (!geometry || !geometry.path) return "EmptyView()";
   const commands = geometry.contours
+    .filter((_, index) => geometry.closed[index])
     .flatMap((contour) => {
       const first = contour[0];
       if (!first) return [];

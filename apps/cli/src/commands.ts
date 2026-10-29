@@ -36,6 +36,8 @@ import { helpFor, OVERVIEW } from "./help.ts";
 import { pagesCommand } from "./pages-command.ts";
 import { inspectCommand } from "./inspect-command.ts";
 import { typesCommand } from "./types-command.ts";
+import { shapesCommand } from "./shapes-command.ts";
+import { drawCommand } from "./draw-command.ts";
 import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
@@ -145,13 +147,19 @@ export function parseArgs(
 }
 
 export function formatIssue(issue: ValidationIssue): string {
-  return `${issue.severity}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}`;
+  return `${issue.severity}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}${issue.code === "semantic.unknownField" ? ` (${issue.code})` : ""}`;
 }
 
 export function loadDocument(
   io: CommandIo,
   path: string,
-): { readonly document: Document; readonly warnings: string } | string {
+):
+  | {
+      readonly document: Document;
+      readonly warnings: string;
+      readonly warningCount: number;
+    }
+  | string {
   let text: string;
   try {
     text = io.readText(path);
@@ -161,7 +169,12 @@ export function loadDocument(
   const result = parseDocumentResult(text);
   const report = result.issues.map(formatIssue).join("\n");
   if (!result.ok) return `${path} is not a valid nodetto document:\n${report}`;
-  return { document: result.document, warnings: report ? `${report}\n` : "" };
+  return {
+    document: result.document,
+    warnings: report ? `${report}\n` : "",
+    warningCount: result.issues.filter((issue) => issue.severity === "warning")
+      .length,
+  };
 }
 
 function erdPages(document: Document): readonly Page[] {
@@ -815,7 +828,7 @@ function validateCommand(
   io: CommandIo,
   args: readonly string[],
 ): CommandResult {
-  const parsed = parseArgs(args, new Set(), new Set());
+  const parsed = parseArgs(args, new Set(), new Set(["--strict"]));
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("validate")}`);
   if (parsed.positional.length !== 1)
@@ -826,6 +839,12 @@ function validateCommand(
   const loaded = loadDocument(io, path);
   if (typeof loaded === "string") return fail(loaded);
   const { document } = loaded;
+  if (parsed.flags.has("--strict") && loaded.warningCount > 0)
+    return {
+      exitCode: EXIT_WARNINGS,
+      stdout: `${path}: ${document.pages.length} page(s), ${document.elements.length} element(s).\n`,
+      stderr: `${loaded.warnings}${loaded.warningCount} validation warning(s) with --strict.\n`,
+    };
   return ok(
     `${path}: ${document.pages.length} page(s), ${document.elements.length} element(s).\n`,
     loaded.warnings,
@@ -877,6 +896,10 @@ export function runCli(
       return editCommand(io, rest);
     case "types":
       return typesCommand(io, rest);
+    case "shapes":
+      return shapesCommand(io, rest);
+    case "draw":
+      return drawCommand(io, rest);
     case "pages":
       return pagesCommand(io, rest);
     case "inspect":

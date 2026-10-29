@@ -1,5 +1,5 @@
 // UML class, component and association payloads, sequence diagram
-// payloads, and state machine payloads.
+// payloads, state machine payloads, and use-case diagram payloads.
 
 import type { ElementId, FractionalIndex } from "../types.ts";
 import type { ConnectorRoutingSemantic } from "./connectors.ts";
@@ -143,4 +143,25 @@ export interface StateTransitionSemantic extends ConnectorRoutingSemantic {
   readonly trigger?: string;
   readonly guard?: string;
   readonly effect?: string;
+}
+
+export const USECASE_NODE_KINDS = ["actor", "usecase", "system"] as const;
+export type UseCaseNodeKind = (typeof USECASE_NODE_KINDS)[number];
+export interface UseCaseNodeSemantic {
+  readonly name: string;
+  readonly kind: UseCaseNodeKind;
+}
+export const USECASE_RELATIONSHIP_KINDS = [
+  "association",
+  "include",
+  "extend",
+  "generalization",
+] as const;
+export type UseCaseRelationshipKind =
+  (typeof USECASE_RELATIONSHIP_KINDS)[number];
+export interface UseCaseRelationshipSemantic extends ConnectorRoutingSemantic {
+  readonly from: ElementId;
+  readonly to: ElementId;
+  readonly kind: UseCaseRelationshipKind;
+  readonly label?: string;
 }

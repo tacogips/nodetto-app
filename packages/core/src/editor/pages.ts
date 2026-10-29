@@ -54,6 +54,7 @@ export function planNewPage(
     id: options.id ?? idSource(),
     name: options.name ?? `Page ${store.listPages().length + 1}`,
     kind: options.kind ?? "freeform",
+    ...(options.mode ? { mode: options.mode } : {}),
     order: ordering.order,
   };
   return {
@@ -110,6 +111,7 @@ export function planDuplicatePage(
     id: idSource(),
     name: `${source.name} copy`,
     kind: source.kind,
+    ...(source.mode ? { mode: source.mode } : {}),
     order: ordering.order,
     ...(source.tokenMode ? { tokenMode: source.tokenMode } : {}),
   };

@@ -29,6 +29,7 @@ import { writeSemantic } from "./write.ts";
 /** Names that read better than the stored kind in the shape picker. */
 const GEO_LABELS: Partial<Record<(typeof GEO_KINDS)[number], string>> = {
   rect: "Rectangle",
+  actor: "Stick figure",
   arrow: "Block arrow",
   note: "Folded note",
   "off-page": "Off-page connector",

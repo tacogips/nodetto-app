@@ -36,6 +36,25 @@ test("page input dialect survives Yjs wire round trips", () => {
   }
 });
 
+test("page editing modes survive Yjs wire round trips", () => {
+  const base = erdDocument();
+  const doc = {
+    ...base,
+    pages: base.pages.map((page) => ({ ...page, mode: "usecase" as const })),
+  };
+  const source = irToYDoc(doc);
+  const remote = new Y.Doc();
+  Y.applyUpdate(remote, Y.encodeStateAsUpdate(source));
+  expect(ydocToIr(remote).pages.every((page) => page.mode === "usecase")).toBe(
+    true,
+  );
+  expect(
+    pageFromY("p", { name: "x", kind: "freeform", mode: "bogus" }).mode,
+  ).toBeUndefined();
+  source.destroy();
+  remote.destroy();
+});
+
 test("portable column identity survives Yjs wire round trips", () => {
   const base = erdDocument();
   const doc = {

@@ -40,12 +40,14 @@ function compare(args: string[], cwd?: string, stdin?: string) {
   return actual;
 }
 
+const goldenFixtures = readdirSync(fixtureRoot).filter((name) =>
+  name.endsWith(".jsonl"),
+);
+
 nativeTest(
   "native CLI matches every JSONL golden fixture for validate, canonical format and both inspect formats",
   () => {
-    for (const name of readdirSync(fixtureRoot).filter((name) =>
-      name.endsWith(".jsonl"),
-    )) {
+    for (const name of goldenFixtures) {
       const path = join(fixtureRoot, name);
       for (const args of [
         ["validate", path],
@@ -56,7 +58,9 @@ nativeTest(
         compare(args);
     }
   },
-  60000,
+  // Eight CLI launches per fixture (TypeScript and native, four commands);
+  // the budget guards each launch, so it grows with the fixture count.
+  goldenFixtures.length * 5000,
 );
 
 nativeTest(

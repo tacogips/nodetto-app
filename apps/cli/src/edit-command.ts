@@ -11,10 +11,18 @@ import {
   type ArrangeMode,
   type Box,
   CommandError,
+  connectShape,
   Editor,
+  findShape,
   isFractionalKey,
   newElementId,
   planArrangement,
+  planScale,
+  replaceText,
+  type ShapeCatalogueEntry,
+  shapeCreation,
+  type TextReplacement,
+  textMatcher,
 } from "@nodetto/core";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
 import {
@@ -22,8 +30,10 @@ import {
   getElementTypeDefinition,
   isKnownElementType,
   isPageKind,
+  isPageMode,
   isPlainObject,
   type KeyOrder,
+  PAGE_MODES,
   type Page,
   resolvePageQuery,
   validateDocument,
@@ -57,9 +67,22 @@ interface Created {
   readonly page: string;
 }
 
+export interface EditWarning {
+  readonly operation: number;
+  readonly op: string;
+  readonly element: string;
+  readonly type: string;
+  readonly path: string;
+  readonly code: string;
+  readonly message: string;
+}
+
 interface BatchResult {
+  readonly warnings: readonly EditWarning[];
   readonly text: string;
   readonly created: readonly Created[];
+  /** Text changed by replace-text operations. */
+  readonly replaced: readonly TextReplacement[];
   readonly counts: ReadonlyMap<
     string,
     { added: number; updated: number; removed: number }
@@ -150,10 +173,15 @@ function number(value: Json, field: string, index: number): number {
   return value;
 }
 
+function unknownMode(mode: Json): string {
+  return `Unknown page mode "${String(mode)}". Choose ${PAGE_MODES.join(", ")}, or null to follow the page kind.`;
+}
+
 class Batch {
   readonly refs = new Map<string, string>();
   readonly created: Created[] = [];
   readonly touchedPages = new Set<string>();
+  readonly replaced: TextReplacement[] = [];
   /** The element auto placement put last on each page, to line up with. */
   private readonly lastPlaced = new Map<string, string>();
 
@@ -186,8 +214,9 @@ class Batch {
   }
 
   page(query: Json, index: number): Page {
-    const value = text(query, "page", index);
     const pages = this.editor.store.listPages();
+    if (query === undefined && pages.length === 1) return pages[0] as Page;
+    const value = text(query, "page", index);
     const byRef = value.startsWith("@")
       ? this.refs.get(value.slice(1))
       : undefined;
@@ -320,6 +349,8 @@ class Batch {
 
   /** Create one element; place it relative to another or beside the page content. */
   add(operation: JsonObject, index: number): string {
+    if (operation["shape"] !== undefined)
+      return this.addShape(operation, index);
     const type = text(operation["type"], "type", index);
     if (!isKnownElementType(type))
       throw new OperationError(
@@ -392,6 +423,173 @@ class Batch {
     return id;
   }
 
+  /**
+   * The elements an operation targets: "ids", or every element on "page".
+   * Without either, the single page; `wholeDocument` widens that to every
+   * page.
+   */
+  private targets(
+    operation: JsonObject,
+    index: number,
+    wholeDocument: boolean,
+  ): Element[] {
+    const ids = operation["ids"];
+    if (ids !== undefined) {
+      if (operation["page"] !== undefined)
+        throw new OperationError(index, `use either "ids" or "page"`);
+      if (!Array.isArray(ids) || !ids.length)
+        throw new OperationError(index, `"ids" must be a non-empty array`);
+      return ids.map((id) => this.element(id, index));
+    }
+    if (operation["page"] === undefined && wholeDocument)
+      return [...this.editor.store.listElements()];
+    const page = this.page(operation["page"], index);
+    return [...this.editor.store.getPageElements(page.id)];
+  }
+
+  private shape(operation: JsonObject, index: number): ShapeCatalogueEntry {
+    const id = text(operation["shape"], "shape", index);
+    const shape = findShape(id);
+    if (!shape)
+      throw new OperationError(
+        index,
+        `Unknown shape "${id}". Run "nodetto-cli shapes" for the shape IDs.`,
+      );
+    if (operation["type"] !== undefined)
+      throw new OperationError(index, `use either "shape" or "type", not both`);
+    return shape;
+  }
+
+  /**
+   * Draw a palette shape by its shape ID: the tool's own defaults (a
+   * flowchart decision is a labelled diamond, an iPhone artboard has the
+   * device size), then the operation's semantic and visual, then `label`
+   * in the shape's text field.
+   */
+  private addShape(operation: JsonObject, index: number): string {
+    const shape = this.shape(operation, index);
+    if (shape.connector)
+      throw new OperationError(
+        index,
+        `${shape.id} is a connector; use {"op":"connect","shape":"${shape.id}","from":...,"to":...}.`,
+      );
+    const creation = shapeCreation(shape.id);
+    if (!creation)
+      throw new OperationError(index, `${shape.id} cannot be placed.`);
+    const { shape: _shape, label, ...rest } = operation;
+    const semantic =
+      creation.semantic === undefined && operation["semantic"] === undefined
+        ? undefined
+        : deepMerge(creation.semantic ?? {}, operation["semantic"] ?? {});
+    const visual = isPlainObject(operation["visual"])
+      ? { ...(creation.visual ?? {}), ...operation["visual"] }
+      : (operation["visual"] ?? creation.visual);
+    const id =
+      creation.type === "sequence.participant"
+        ? this.addParticipant(rest, semantic, index)
+        : this.add(
+            {
+              ...rest,
+              type: creation.type,
+              ...(semantic === undefined ? {} : { semantic }),
+              ...(visual === undefined ? {} : { visual }),
+            },
+            index,
+          );
+    if (label !== undefined) {
+      const value = typeof label === "string" ? label : undefined;
+      if (value === undefined)
+        throw new OperationError(index, `"label" must be a string`);
+      if (this.editor.editableField(id)) this.editor.setText(id, value);
+      else {
+        // Shapes the canvas names in the inspector (sequence participants,
+        // pseudo-states) still take a label through their text field.
+        const element = this.editor.store.get(id);
+        const semantic = isPlainObject(element?.semantic)
+          ? element.semantic
+          : {};
+        const field = ["name", "label", "text"].find(
+          (key) => typeof semantic[key] === "string",
+        );
+        if (!field)
+          throw new OperationError(
+            index,
+            `${shape.id} has no text to label; set its fields with "semantic".`,
+          );
+        this.editor.apply([
+          {
+            type: "updateSemantic",
+            id,
+            semantic: { ...semantic, [field]: value },
+          },
+        ]);
+      }
+    }
+    return id;
+  }
+
+  /** Sequence participants take the next lifeline order on their page. */
+  private addParticipant(
+    operation: JsonObject,
+    semantic: Json,
+    index: number,
+  ): string {
+    const page = this.page(operation["page"], index);
+    this.editor.setCurrentPage(page.id);
+    const visual = isPlainObject(operation["visual"])
+      ? operation["visual"]
+      : {};
+    const content = this.editor.pageBounds(page.id);
+    const x =
+      typeof visual["x"] === "number"
+        ? visual["x"] + 80
+        : content
+          ? content.x + content.width + PLACE_GAP + 80
+          : 80;
+    const y =
+      typeof visual["y"] === "number"
+        ? visual["y"] + 28
+        : (content?.y ?? 0) + 28;
+    const kind = isPlainObject(semantic) ? semantic["kind"] : undefined;
+    const id = this.editor.createSequenceParticipant(
+      kind === "actor" || kind === "db" ? kind : "service",
+      { x, y },
+    );
+    const created = this.editor.store.get(id);
+    if (created && isPlainObject(semantic))
+      this.editor.apply([
+        {
+          type: "updateSemantic",
+          id,
+          semantic: deepMerge(created.semantic, semantic),
+        },
+      ]);
+    this.record(operation, index, id, "sequence.participant", page.id);
+    return id;
+  }
+
+  private record(
+    operation: JsonObject,
+    index: number,
+    id: string,
+    type: string,
+    page: string,
+  ): void {
+    const ref = operation["ref"];
+    if (typeof ref === "string") {
+      if (this.refs.has(ref))
+        throw new OperationError(index, `ref "${ref}" is already used.`);
+      this.refs.set(ref, id);
+    }
+    this.created.push({
+      ...(typeof ref === "string" ? { ref } : {}),
+      id,
+      type,
+      page,
+    });
+    this.touchedPages.add(page);
+  }
+
   /** Move an element so that its bounding box starts at (x, y). */
   private moveBoxTo(id: string, x: number, y: number): void {
     const element = this.editor.store.get(id);
@@ -456,6 +654,15 @@ class Batch {
         index,
         "connect needs two elements on the same page.",
       );
+    const shape =
+      operation["shape"] === undefined
+        ? undefined
+        : this.shape(operation, index);
+    if (shape && !shape.connector)
+      throw new OperationError(
+        index,
+        `${shape.id} is not a connector; use {"op":"add","shape":"${shape.id}"}.`,
+      );
     if (typeof operation["type"] === "string")
       return this.add(
         {
@@ -473,15 +680,18 @@ class Batch {
         index,
       );
     this.editor.setCurrentPage(from.page);
-    const id =
-      isPlainObject(operation["semantic"]) &&
-      operation["semantic"]["prototype"] === true
+    const id = shape
+      ? connectShape(this.editor, shape.id, from.id, to.id)
+      : isPlainObject(operation["semantic"]) &&
+          operation["semantic"]["prototype"] === true
         ? connectScreenTransition(this.editor, from.id, to.id)
         : this.editor.connectSmart(from.id, to.id);
     if (id === null)
       throw new OperationError(
         index,
-        `Cannot connect ${from.type} to ${to.type} here (a rule of this diagram kind forbids it, or an element is locked).`,
+        shape
+          ? `${shape.label} (${shape.id}) cannot connect ${from.type} to ${to.type}; it joins ${shape.type} endpoints of its own notation.`
+          : `Cannot connect ${from.type} to ${to.type} here (a rule of this diagram kind forbids it, or an element is locked).`,
       );
     const created = this.editor.store.get(id);
     if (!created)
@@ -565,9 +775,13 @@ class Batch {
             index,
             `Unknown page kind "${String(kind)}".`,
           );
+        const mode = operation["mode"];
+        if (mode !== undefined && !isPageMode(mode))
+          throw new OperationError(index, unknownMode(mode));
         const id = this.editor.createPage({
           name: text(operation["name"], "name", index),
           kind,
+          ...(mode === undefined ? {} : { mode }),
           ...(typeof operation["id"] === "string"
             ? { id: operation["id"] }
             : {}),
@@ -590,6 +804,14 @@ class Batch {
       case "rename-page": {
         const page = this.page(operation["id"], index);
         this.editor.renamePage(page.id, text(operation["name"], "name", index));
+        return;
+      }
+      case "set-page-mode": {
+        const page = this.page(operation["id"], index);
+        const mode = operation["mode"];
+        if (mode !== null && !isPageMode(mode))
+          throw new OperationError(index, unknownMode(mode));
+        this.editor.setPageMode(page.id, mode);
         return;
       }
       case "delete-page": {
@@ -708,6 +930,107 @@ class Batch {
         this.touchedPages.add(element.page);
         return;
       }
+      case "scale": {
+        const factor = number(operation["factor"], "factor", index);
+        if (factor <= 0)
+          throw new OperationError(index, `"factor" must be above zero`);
+        const origin = operation["origin"];
+        if (
+          origin !== undefined &&
+          !(
+            isPlainObject(origin) &&
+            typeof origin["x"] === "number" &&
+            typeof origin["y"] === "number"
+          )
+        )
+          throw new OperationError(
+            index,
+            `"origin" must be {"x":<number>,"y":<number>}`,
+          );
+        const targets = this.targets(operation, index, false);
+        const page = targets[0]?.page;
+        if (page === undefined)
+          throw new OperationError(index, "There is nothing to scale.");
+        this.editor.setCurrentPage(page);
+        const plan = planScale(
+          this.editor,
+          targets.map((element) => element.id),
+          factor,
+          isPlainObject(origin)
+            ? { x: Number(origin["x"]), y: Number(origin["y"]) }
+            : undefined,
+        );
+        if (!plan)
+          throw new OperationError(index, "There is nothing to scale.");
+        this.editor.apply(plan.commands, { placed: plan.placed });
+        this.touchedPages.add(page);
+        return;
+      }
+      case "replace-text": {
+        const find = text(operation["find"], "find", index);
+        const replacement = operation["replace"];
+        if (typeof replacement !== "string")
+          throw new OperationError(index, `"replace" must be a string`);
+        const matcher = textMatcher(find, {
+          regex: operation["regex"] === true,
+          ignoreCase: operation["ignoreCase"] === true,
+        });
+        if (typeof matcher === "string")
+          throw new OperationError(index, matcher);
+        const targets = this.targets(operation, index, true);
+        const changes = replaceText(
+          this.editor,
+          targets.map((element) => element.id),
+          matcher,
+          replacement,
+        );
+        for (const change of changes) {
+          const element = this.editor.store.get(change.id);
+          if (element) this.touchedPages.add(element.page);
+        }
+        this.replaced.push(...changes);
+        return;
+      }
+      case "group": {
+        const ids = operation["ids"];
+        if (!Array.isArray(ids) || ids.length < 2)
+          throw new OperationError(
+            index,
+            `"ids" must list two or more elements to group`,
+          );
+        const members = ids.map((id) => this.element(id, index));
+        const page = members[0]?.page as string;
+        if (members.some((member) => member.page !== page))
+          throw new OperationError(index, "group needs elements on one page.");
+        this.editor.setCurrentPage(page);
+        this.editor.selection.set(members.map((member) => member.id));
+        const id = this.editor.groupSelection();
+        if (!id)
+          throw new OperationError(
+            index,
+            "group needs two or more distinct elements on one page.",
+          );
+        const name = operation["name"];
+        if (typeof name === "string" && name.trim())
+          this.editor.apply([
+            { type: "updateVisual", id, visual: { layerName: name } },
+          ]);
+        this.record(operation, index, id, "group", page);
+        return;
+      }
+      case "ungroup": {
+        const group = this.element(operation["id"], index);
+        if (group.type !== "group")
+          throw new OperationError(
+            index,
+            `${group.id} is a ${group.type}, not a group.`,
+          );
+        this.editor.setCurrentPage(group.page);
+        this.editor.selection.set([group.id]);
+        this.editor.ungroupSelection();
+        this.touchedPages.add(group.page);
+        return;
+      }
       case "delete": {
         const element = this.element(operation["id"], index);
         this.editor.deleteElements([element.id]);
@@ -717,7 +1040,7 @@ class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, delete-page, add, connect, update, append, remove-item, move or delete.`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, scale, replace-text, group or ungroup.`,
         );
     }
   }
@@ -742,9 +1065,43 @@ export function applyBatch(
   );
   const editor = new Editor({ document: parsed.document });
   const batch = new Batch(editor);
+  const lastTouch = new Map<string, number>();
+  // The operation after which each unknown field (element id + path) first
+  // appeared, so a later edit of the same element does not take the blame.
+  const introducedBy = new Map<string, number>();
+  const unknownFields = (element: Element): string[] => {
+    const page = editor.store.getPage(element.page);
+    if (!page) return [];
+    return validateDocument({
+      ...parsed.document,
+      pages: [page],
+      elements: [element],
+    })
+      .filter((issue) => issue.code === "semantic.unknownField")
+      .map((issue) =>
+        JSON.stringify([
+          element.id,
+          issue.path.replace(/^elements\[0\]\./, ""),
+        ]),
+      );
+  };
+  let records = new Map(
+    editor.store.listElements().map((element) => [element.id, element]),
+  );
   operations.forEach((operation, index) => {
     try {
       batch.apply(operation, index);
+      const next = new Map(
+        editor.store.listElements().map((element) => [element.id, element]),
+      );
+      for (const [id, element] of next)
+        if (records.get(id) !== element) {
+          lastTouch.set(id, index);
+          if (records.get(id)?.semantic !== element.semantic)
+            for (const key of unknownFields(element))
+              if (!introducedBy.has(key)) introducedBy.set(key, index);
+        }
+      records = next;
     } catch (cause) {
       if (cause instanceof OperationError) throw cause;
       if (cause instanceof CommandError) {
@@ -778,9 +1135,8 @@ export function applyBatch(
       if (commands.length) editor.apply(commands, { placed });
     }
   const snapshot = editor.getSnapshot();
-  const issues = validateDocument(snapshot).filter(
-    (issue) => issue.severity === "error",
-  );
+  const validation = validateDocument(snapshot);
+  const issues = validation.filter((issue) => issue.severity === "error");
   if (issues.length)
     throw new Error(
       `The result is not a valid document:\n${issues
@@ -789,6 +1145,43 @@ export function applyBatch(
         )
         .join("\n")}`,
     );
+  const warningKey = (path: string, elements: readonly Element[]) => {
+    const match = /^elements\[(\d+)\]\.(.+)$/.exec(path);
+    const element = match && elements[Number(match[1])];
+    return element && match
+      ? {
+          element,
+          path: match[2] as string,
+          key: JSON.stringify([element.id, match[2]]),
+        }
+      : undefined;
+  };
+  const baseline = new Set(
+    parsed.issues
+      .filter((issue) => issue.code === "semantic.unknownField")
+      .map((issue) => warningKey(issue.path, parsed.document.elements)?.key),
+  );
+  const warnings: EditWarning[] = [];
+  for (const issue of validation) {
+    if (issue.code !== "semantic.unknownField") continue;
+    const item = warningKey(issue.path, snapshot.elements);
+    if (!item || baseline.has(item.key)) continue;
+    const operation =
+      introducedBy.get(item.key) ?? lastTouch.get(item.element.id);
+    if (operation === undefined) continue;
+    warnings.push({
+      operation,
+      op: String(operations[operation]?.op),
+      element: item.element.id,
+      type: item.element.type,
+      path: item.path,
+      code: issue.code,
+      message: issue.message,
+    });
+  }
+  warnings.sort(
+    (a, b) => a.operation - b.operation || a.path.localeCompare(b.path),
+  );
   const counts = new Map<
     string,
     { added: number; updated: number; removed: number }
@@ -812,8 +1205,10 @@ export function applyBatch(
   return {
     text: serializeDocument(snapshot),
     created: batch.created,
+    replaced: batch.replaced,
     counts,
     operations: operations.length,
+    warnings,
   };
 }
 
@@ -848,7 +1243,37 @@ export function editCommand(
     );
   }
 
-  const arrange = parsed.flags.has("--arrange");
+  return runOperations(io, path, operations, {
+    arrange: parsed.flags.has("--arrange"),
+    dryRun: parsed.flags.has("--dry-run"),
+    format,
+    ...(parsed.options.has("--snapshot")
+      ? { snapshot: parsed.options.get("--snapshot") as string }
+      : {}),
+  });
+}
+
+export interface RunOptions {
+  readonly arrange: boolean;
+  readonly dryRun: boolean;
+  readonly format: string;
+  /** Also write the result here, as a baseline for a later diff. */
+  readonly snapshot?: string;
+}
+
+/**
+ * Apply operations to the file at `path` and report them; the batch is
+ * re-applied when the file changes during the write.
+ */
+export function runOperations(
+  io: CommandIo,
+  path: string,
+  operations: readonly JsonObject[],
+  options: RunOptions,
+): CommandResult {
+  const { arrange, format } = options;
+  if (format !== "text" && format !== "json")
+    return fail(`Unsupported format "${format}". Choose text or json.`);
   let result: BatchResult | undefined;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let current: string;
@@ -870,7 +1295,7 @@ export function editCommand(
         `${cause instanceof Error ? cause.message : String(cause)}\nNothing was written.`,
       );
     }
-    if (parsed.flags.has("--dry-run")) break;
+    if (options.dryRun) break;
     let latest: string;
     try {
       latest = io.readText(path);
@@ -888,7 +1313,7 @@ export function editCommand(
         `Cannot write ${path}: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
     }
-    const snapshot = parsed.options.get("--snapshot");
+    const snapshot = options.snapshot;
     if (snapshot !== undefined)
       try {
         io.writeText(snapshot, result.text);
@@ -906,7 +1331,7 @@ export function editCommand(
       stderr: `${path} kept changing while the batch was applied (${MAX_ATTEMPTS} attempts); nothing was written. Retry later.\n`,
     };
 
-  const dryRun = parsed.flags.has("--dry-run");
+  const dryRun = options.dryRun;
   if (format === "json")
     return ok(
       `${JSON.stringify(
@@ -914,7 +1339,9 @@ export function editCommand(
           written: !dryRun,
           operations: result.operations,
           created: result.created,
+          ...(result.replaced.length ? { replaced: result.replaced } : {}),
           pages: Object.fromEntries(result.counts),
+          warnings: result.warnings,
         },
         null,
         2,
@@ -930,6 +1357,16 @@ export function editCommand(
       (item) =>
         `  created ${item.ref ? `@${item.ref} = ` : ""}${item.id} (${item.type})`,
     ),
+    ...result.replaced.map(
+      (item) =>
+        `  replaced ${item.id} ${item.path}: ${JSON.stringify(item.before)} -> ${JSON.stringify(item.after)}`,
+    ),
   ];
+  lines.push(
+    ...result.warnings.map(
+      (warning) =>
+        `  warning operation ${warning.operation} (${warning.op}): ${warning.element} (${warning.type}) ${warning.path}: ${warning.message} (${warning.code})`,
+    ),
+  );
   return ok(`${lines.join("\n")}\n`);
 }

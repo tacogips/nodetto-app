@@ -1,19 +1,8 @@
+import type { PageMode } from "@nodetto/ir";
 import { Tool, type ToolKind } from "./tools.ts";
 
-export type WorkspaceId =
-  | "app"
-  | "web"
-  | "erd"
-  | "class"
-  | "component"
-  | "sequence"
-  | "state"
-  | "flowchart"
-  | "flow"
-  | "bpmn"
-  | "breadboard"
-  | "pcb"
-  | "all";
+/** Editing modes are stored per page, so their IDs live in the IR. */
+export type WorkspaceId = PageMode;
 export interface Workspace {
   readonly id: WorkspaceId;
   readonly label: string;
@@ -83,6 +72,22 @@ export const WORKSPACES = [
       { tool: Tool.Dependency, label: "Dependency" },
       { tool: Tool.Realization, label: "Realization" },
       { tool: Tool.ComponentConnector, label: "Connector" },
+    ],
+  },
+  {
+    id: "usecase",
+    label: "UML use case",
+    design: false,
+    shapes: false,
+    tools: [
+      { tool: Tool.UseCaseActor, label: "Actor" },
+      { tool: Tool.UseCase, label: "Use case" },
+      { tool: Tool.UseCaseSystem, label: "System boundary" },
+      { tool: Tool.UseCaseAssociation, label: "Association" },
+      { tool: Tool.UseCaseInclude, label: "Include" },
+      { tool: Tool.UseCaseExtend, label: "Extend" },
+      { tool: Tool.UseCaseGeneralization, label: "Generalization" },
+      { tool: Tool.Package, label: "Package" },
     ],
   },
   {

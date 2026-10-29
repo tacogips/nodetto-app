@@ -37,7 +37,7 @@ const GENERAL = [
 /** Types typically drawn on each page kind (a guide, not an enforced rule). */
 const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
   freeform: GENERAL,
-  architecture: GENERAL,
+  architecture: [...GENERAL, "usecase.node", "usecase.relationship"],
   erd: [
     "erd.table",
     "erd.view",
@@ -55,6 +55,8 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "uml.interface",
     "uml.port",
     "uml.component-relationship",
+    "usecase.node",
+    "usecase.relationship",
     "text.note",
     "frame",
   ],
@@ -169,7 +171,7 @@ export function typesCommand(
         `${pageKind}: ${TYPICAL[pageKind].filter((name) => definitions.some((definition) => definition.type === name)).join(", ")}`,
     );
     return ok(
-      `Element types typically used per page kind:\n${lines.map((line) => `  ${line}`).join("\n")}\n\nRun "nodetto-cli types <type>" for its fields and an example.\n`,
+      `Element types typically used per page kind:\n${lines.map((line) => `  ${line}`).join("\n")}\n\nRun "nodetto-cli shapes <words>" for drawable shapes by shape ID, e.g. geo:actor (stick figure).\nRun "nodetto-cli types <type>" for its fields and an example.\n`,
     );
   }
 

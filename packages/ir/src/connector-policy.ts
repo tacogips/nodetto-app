@@ -7,6 +7,7 @@ export const CONNECTOR_ENDPOINT_TYPES: Readonly<
   "erd.relation": ["erd.table"],
   "uml.association": ["uml.class"],
   "state.transition": ["state.node"],
+  "usecase.relationship": ["usecase.node"],
   "sequence.message": ["sequence.participant"],
   "uml.component-relationship": ["uml.component", "uml.interface", "uml.port"],
 };
@@ -50,7 +51,7 @@ export function connectorEndpointIssues(
       issues.push({
         code: "connector.endpointType",
         field,
-        message: `${label} must connect to ${transition ? "a screen or popup frame" : type === "erd.relation" ? "a table" : type === "uml.association" ? "a UML class" : type === "state.transition" ? "a state node" : type === "sequence.message" ? "a sequence participant" : "a UML component, interface, or port"}.`,
+        message: `${label} must connect to ${transition ? "a screen or popup frame" : type === "erd.relation" ? "a table" : type === "uml.association" ? "a UML class" : type === "state.transition" ? "a state node" : type === "usecase.relationship" ? "a use-case actor, use case or system" : type === "sequence.message" ? "a sequence participant" : "a UML component, interface, or port"}.`,
       });
     // Prototype destinations may be screens on another document page.
     if (target.page !== page && (!transition || end === "from"))

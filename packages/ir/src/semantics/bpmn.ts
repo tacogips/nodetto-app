@@ -107,12 +107,14 @@ export interface BpmnEventSemantic {
   readonly parent?: ElementId;
 }
 export interface BpmnBoundaryEventSemantic {
+  readonly parent?: ElementId;
   readonly name?: string;
   readonly attachedTo: ElementId;
   readonly cancelActivity: boolean;
   readonly definitions: readonly BpmnEventDefinition[];
 }
 export interface BpmnGatewaySemantic {
+  readonly gatewayDirection?: string;
   readonly name?: string;
   readonly gatewayType: BpmnGatewayType;
   readonly markerVisible?: boolean;
@@ -133,6 +135,7 @@ export interface BpmnTextAnnotationSemantic {
   readonly parent?: ElementId;
 }
 export interface BpmnGroupSemantic {
+  readonly parent?: ElementId;
   readonly name?: string;
 }
 export interface BpmnSequenceFlowSemantic extends ConnectorRoutingSemantic {

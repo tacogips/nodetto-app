@@ -21,22 +21,37 @@ export function CompoundPathView(props: { element: Element }): JSX.Element {
             width={geometry().box.width}
             height={geometry().box.height}
           />
-          <path
-            data-smart-paint="svg"
-            d={geometry().path}
-            fill={
-              props.element.visual.style?.fillGradient
-                ? `url(#${gradientId(props.element.id)})`
-                : (props.element.visual.style?.fill ?? "#1d2a2e")
-            }
-            stroke={
-              props.element.visual.style?.strokeGradient
-                ? `url(#${strokeGradientId(props.element.id)})`
-                : (props.element.visual.style?.stroke ?? "none")
-            }
-            fill-rule={(props.element.semantic as PathSemantic).fillRule}
-            {...svgStyle(props.element.visual, props.element.id)}
-          />
+          <Show when={geometry().path}>
+            <path
+              data-smart-paint="svg"
+              d={geometry().path}
+              fill={
+                props.element.visual.style?.fillGradient
+                  ? `url(#${gradientId(props.element.id)})`
+                  : (props.element.visual.style?.fill ?? "#1d2a2e")
+              }
+              stroke={
+                props.element.visual.style?.strokeGradient
+                  ? `url(#${strokeGradientId(props.element.id)})`
+                  : (props.element.visual.style?.stroke ?? "none")
+              }
+              fill-rule={(props.element.semantic as PathSemantic).fillRule}
+              {...svgStyle(props.element.visual, props.element.id)}
+            />
+          </Show>
+          <Show when={geometry().openPath}>
+            <path
+              data-smart-paint="svg"
+              d={geometry().openPath}
+              stroke={
+                props.element.visual.style?.strokeGradient
+                  ? `url(#${strokeGradientId(props.element.id)})`
+                  : (props.element.visual.style?.stroke ?? "#1d2a2e")
+              }
+              {...svgStyle(props.element.visual, props.element.id)}
+              style={{ fill: "none" }}
+            />
+          </Show>
         </svg>
       )}
     </Show>

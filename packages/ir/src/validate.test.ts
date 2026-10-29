@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DocumentValidationError, type ValidationIssue } from "./issues.ts";
-import { type Document, elementsByPage } from "./types.ts";
+import { type Document, elementsByPage, pageModeOf } from "./types.ts";
 import {
   assertValidDocument,
   isValidDocument,
@@ -51,6 +51,27 @@ test("page SQL input dialect is optional and restricted to supported dialects", 
       (issue) => issue.path === "pages[0].sqlDialect",
     ),
   ).toBe(true);
+});
+
+test("page editing mode is optional and restricted to known modes", () => {
+  const doc = base();
+  for (const mode of [undefined, "flow", "usecase", "all"] as const)
+    expect(
+      isValidDocument({ ...doc, pages: [{ ...doc.pages[0], mode }] }),
+    ).toBe(true);
+  expect(
+    validateDocument({
+      ...doc,
+      pages: [{ ...doc.pages[0], mode: "paint" }],
+    } as unknown as Document).some((issue) => issue.path === "pages[0].mode"),
+  ).toBe(true);
+});
+
+test("a page opens in its dedicated, chosen or notation mode", () => {
+  expect(pageModeOf({ kind: "pcb", mode: "erd" })).toBe("pcb");
+  expect(pageModeOf({ kind: "erd", mode: "all" })).toBe("all");
+  expect(pageModeOf({ kind: "uml" })).toBe("class");
+  expect(pageModeOf({ kind: "freeform" })).toBeUndefined();
 });
 
 function codes(issues: readonly ValidationIssue[]): string[] {
@@ -616,5 +637,120 @@ describe("elementsByPage", () => {
       },
     ]);
     expect(elementsByPage(document).get("ghost")?.length).toBe(1);
+  });
+});
+
+describe("semantic.unknownField", () => {
+  function issues(type: string, semantic: unknown): readonly ValidationIssue[] {
+    return validateDocument(
+      withElements([
+        { ...base().elements[0]!, type, semantic },
+      ] as Document["elements"]),
+      { checkReferences: false },
+    );
+  }
+  test("warns for unknown fields on registered types without changing values", () => {
+    for (const [type, semantic] of [
+      ["uml.component", { name: "Ledger", kind: "actor" }],
+      ["node.generic", { label: "A", extra: 1 }],
+      ["shape.geo", { geo: "rect", extra: 1 }],
+      ["usecase.node", { name: "A", kind: "actor", extra: 1 }],
+      ["state.node", { name: "A", kind: "state", extra: 1 }],
+      ["text.note", { text: "A", extra: 1 }],
+    ] as const) {
+      const before = JSON.stringify(semantic);
+      const warnings = issues(type, semantic).filter(
+        (i) => i.code === "semantic.unknownField",
+      );
+      const key = type === "uml.component" ? "kind" : "extra";
+      expect(warnings).toEqual([
+        {
+          severity: "warning",
+          code: "semantic.unknownField",
+          path: `elements[0].semantic.${key}`,
+          message: `unknown semantic field for ${type}; preserved but ignored by this build`,
+        },
+      ]);
+      expect(JSON.stringify(semantic)).toBe(before);
+    }
+    expect(
+      issues("uml.component", { name: "Ledger", kind: "actor" }).filter(
+        (i) => i.severity === "error",
+      ),
+    ).toEqual([]);
+  });
+  test("walks child objects and array items, including own prototype-like keys", () => {
+    for (const [type, semantic, path] of [
+      [
+        "erd.table",
+        {
+          tableName: "A",
+          columns: [{ id: "c", name: "C", dataType: "text", x: 1 }],
+        },
+        "columns[0].x",
+      ],
+      [
+        "draw.path",
+        {
+          contours: [
+            {
+              points: [
+                { x: 0, y: 0 },
+                { x: 1, y: 0 },
+                { x: 1, y: 1 },
+              ],
+              x: 1,
+            },
+          ],
+        },
+        "contours[0].x",
+      ],
+    ] as const)
+      expect(
+        issues(type, semantic)
+          .filter((i) => i.code === "semantic.unknownField")
+          .map((i) => i.path),
+      ).toEqual([`elements[0].semantic.${path}`]);
+    const own = JSON.parse('{"__proto__":1,"constructor":2}');
+    expect(
+      issues("node.generic", own)
+        .filter((i) => i.code === "semantic.unknownField")
+        .map((i) => i.path),
+    ).toEqual([
+      "elements[0].semantic.__proto__",
+      "elements[0].semantic.constructor",
+    ]);
+  });
+  test("skips unregistered types, opaque objects and nested tuples", () => {
+    expect(issues("future.widget", { extra: 1 }).map((i) => i.code)).toContain(
+      "type.unknown",
+    );
+    for (const [type, semantic] of [
+      ["future.widget", { extra: 1 }],
+      ["group", { fabricationLayer: { arbitrary: 1 } }],
+      [
+        "pcb.zone",
+        {
+          filled: [
+            {
+              layer: "F.Cu",
+              polygons: [
+                [
+                  [0, 0],
+                  [1, 0],
+                  [1, 1],
+                ],
+              ],
+            },
+          ],
+        },
+      ],
+    ] as const) {
+      expect(
+        issues(type, semantic).filter(
+          (i) => i.code === "semantic.unknownField",
+        ),
+      ).toEqual([]);
+    }
   });
 });

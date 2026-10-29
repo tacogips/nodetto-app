@@ -1,4 +1,5 @@
 import { StateNodeView } from "./StateNodeView.tsx";
+import { UseCaseNodeView } from "./UseCaseNodeView.tsx";
 import { UiControlView } from "./UiControlView.tsx";
 import { isDatabaseObjectType } from "@nodetto/ir";
 import { DatabaseObjectView } from "./DatabaseObjectView.tsx";
@@ -197,6 +198,9 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
           </Match>
           <Match when={props.element.type === "state.node"}>
             <StateNodeView element={props.element} box={props.box} />
+          </Match>
+          <Match when={props.element.type === "usecase.node"}>
+            <UseCaseNodeView element={props.element} box={props.box} />
           </Match>
           <Match when={props.element.type === "shape.geo"}>
             <GeoShapeView element={props.element} box={props.box} />

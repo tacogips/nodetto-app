@@ -79,6 +79,22 @@ export function connectorDecoration(element: Element): ConnectorDecoration {
       ),
     };
   }
+  if (element.type === "usecase.relationship") {
+    const kind = readString(semantic, "kind");
+    const label = readString(semantic, "label") ?? "";
+    const stereotype =
+      kind === "include" ? "«include»" : kind === "extend" ? "«extend»" : "";
+    return {
+      start: null,
+      end:
+        kind === "generalization"
+          ? "triangle"
+          : stereotype
+            ? "openArrow"
+            : null,
+      label: [stereotype, label].filter(Boolean).join("\n"),
+    };
+  }
   if (element.type === "erd.relation") {
     return {
       start: "dot",
@@ -161,6 +177,10 @@ export function connectorDefaultDash(element: Element): string | undefined {
     readString(element.semantic, "kind") !== UmlComponentRelationship.Connector
   )
     return "6 4";
+  if (element.type === "usecase.relationship") {
+    const kind = readString(element.semantic, "kind");
+    if (kind === "include" || kind === "extend") return "6 4";
+  }
   if (
     element.type === "sequence.message" &&
     readString(element.semantic, "kind") === "return"

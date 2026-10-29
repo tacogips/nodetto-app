@@ -105,6 +105,55 @@ describe("semantic validation", () => {
     ]);
   });
 
+  test("validates open and closed contour contracts", () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 80, y: 30 },
+      { x: 50, y: 80 },
+    ];
+    const path = (contour: object) => ({
+      fillRule: "nonzero",
+      contours: [contour],
+    });
+    expectValid(
+      "draw.path",
+      path({ points: points.slice(0, 2), closed: false }),
+    );
+    expect(
+      validate(
+        "draw.path",
+        path({ points: points.slice(0, 1), closed: false }),
+      ),
+    ).toEqual([
+      {
+        severity: "error",
+        code: "path.points",
+        path: "semantic.contours[0].points",
+        message: "an open contour requires at least two points",
+      },
+    ]);
+    expect(validate("draw.path", path({ points: points.slice(0, 2) }))).toEqual(
+      [
+        {
+          severity: "error",
+          code: "path.points",
+          path: "semantic.contours[0].points",
+          message: "a closed contour requires at least three points",
+        },
+      ],
+    );
+    expectValid("draw.path", path({ points, closed: true }));
+    expect(validate("draw.path", path({ points, closed: "no" }))).toEqual([
+      {
+        severity: "error",
+        code: "type.boolean",
+        path: "semantic.contours[0].closed",
+        message: "expected a boolean",
+      },
+    ]);
+    expectValid("shape.geo", { geo: "actor" });
+  });
+
   test("validates editable compound path contours and controls", () => {
     expectValid("draw.path", {
       name: "Cutout",

@@ -220,6 +220,8 @@ corners of a route and **Crossings** makes a connector hop over (Arc jump) or
 break around (Gap) connectors painted beneath it. Both are paint-only, so they
 are copied by Copy style and exported to SVG, PNG, PDF and draw.io.
 
+The General palette includes Stick figure (`geo:actor`), with a centred label; its box is used for picking and connections. A `draw.path` contour with `closed: false` and at least two points is an unfilled stroke without arrowheads; handoff and mobile code omit open contours. Unknown semantic fields produce a `semantic.unknownField` warning and are preserved, never treated as errors.
+
 ## File saving
 
 Settings > Files > File saving switches between Automatic (the default) and Manual.
@@ -263,6 +265,17 @@ tabs within the viewer column. Pane corners have small collapse chevrons.
 General is the default mode and appears first in the mode selector. Its palette
 includes basic shapes, UML classes/components, ERD tables and sequence
 participants without switching modes; Freehand is available under More shapes.
+
+Each page remembers its own mode. Choosing a mode in the toolbar sets it for
+the current page and is saved with the document (it is not an undo step), and
+switching pages switches to that page's mode. A page that never chose one opens
+in its notation's mode (an ERD page in ERD, a sequence page in Sequence) or
+otherwise in the default mode from Settings > General > Default mode. BPMN,
+breadboard and PCB pages always open in their own mode.
+
+The search box at the top of the shape palette finds any shape, whatever the
+current mode, by name, shape ID or category: "actor" finds the sequence and
+use-case actors, and "uml" lists every UML shape. Escape clears the search.
 Settings opens a dialog with categories down the left: General, Appearance,
 Canvas, Snapping, Files and Shortcuts, plus Collaboration when cloud features
 are available. Grid/rulers, snapping, pane visibility, appearance and autosave

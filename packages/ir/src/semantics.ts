@@ -31,6 +31,8 @@ import type {
   SequenceActivationSemantic,
   StateNodeSemantic,
   StateTransitionSemantic,
+  UseCaseNodeSemantic,
+  UseCaseRelationshipSemantic,
 } from "./semantics/uml.ts";
 import type {
   FreehandSemantic,
@@ -93,6 +95,8 @@ export * from "./semantics/breadboard.ts";
 export interface SemanticByType {
   "state.node": StateNodeSemantic;
   "state.transition": StateTransitionSemantic;
+  "usecase.node": UseCaseNodeSemantic;
+  "usecase.relationship": UseCaseRelationshipSemantic;
   readonly "ui.control": UiControlSemantic;
   "design.token": DesignTokenSemantic;
   "design.guide": PageGuideSemantic;

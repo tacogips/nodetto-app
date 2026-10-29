@@ -35,6 +35,8 @@ const EDITABLE_FIELDS: Readonly<Record<string, EditableField>> = {
   "uml.class": "name",
   "state.node": "name",
   "state.transition": "trigger",
+  "usecase.node": "name",
+  "usecase.relationship": "label",
   [UmlComponentType.Component]: "name",
   [UmlComponentType.Interface]: "name",
   [UmlComponentType.Port]: "name",
@@ -66,6 +68,7 @@ export const OPTIONAL_LABEL_TYPES: ReadonlySet<string> = new Set([
   "erd.relation",
   "uml.association",
   UmlComponentType.Relationship,
+  "usecase.relationship",
   "sequence.message",
 ]);
 

@@ -24,6 +24,7 @@ import {
   type ToolKind,
 } from "./tools.ts";
 import type { WorkspaceId } from "./workspaces.ts";
+import { searchPaletteShapes } from "./shape-search.ts";
 import "./ShapePalette.css";
 
 export function ShapePalette(props: {
@@ -113,6 +114,8 @@ export function ShapePalette(props: {
     window.removeEventListener("pointercancel", cancelPointer, true);
     cancelDrag();
   });
+  const [query, setQuery] = createSignal("");
+  const results = () => searchPaletteShapes(query());
   const signals = createEditorSignals(props.editor);
   const readOnly = () => {
     signals.rev();
@@ -237,14 +240,48 @@ export function ShapePalette(props: {
           </Portal>
         )}
       </Show>
-      <For each={shapePaletteGroups(props.workspace)}>
-        {(group, index) => (
-          <details class="nodetto-palette-section" open={index() === 0}>
-            <summary>{group.label}</summary>
-            {tiles(group.items)}
-          </details>
-        )}
-      </For>
+      <input
+        type="search"
+        class="nodetto-palette-search"
+        placeholder="Search shapes"
+        aria-label="Search shapes"
+        title="Search every shape by name, shape ID or category, such as actor or uml"
+        value={query()}
+        onInput={(event) => setQuery(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && query()) {
+            event.preventDefault();
+            event.stopPropagation();
+            setQuery("");
+          }
+        }}
+      />
+      <Show
+        when={query().trim()}
+        fallback={
+          <For each={shapePaletteGroups(props.workspace)}>
+            {(group, index) => (
+              <details class="nodetto-palette-section" open={index() === 0}>
+                <summary>{group.label}</summary>
+                {tiles(group.items)}
+              </details>
+            )}
+          </For>
+        }
+      >
+        <Show
+          when={results().length}
+          fallback={
+            <p class="nodetto-palette-empty" role="status">
+              No shapes match.
+            </p>
+          }
+        >
+          <section class="nodetto-palette-results" aria-label="Matching shapes">
+            {tiles(results())}
+          </section>
+        </Show>
+      </Show>
       <div class="nodetto-palette-actions" role="group" aria-label="Grouping">
         {action("frameSelection", "Frame selection")}
         {action("group", "Group")}

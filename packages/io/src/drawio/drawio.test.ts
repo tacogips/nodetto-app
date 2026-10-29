@@ -372,7 +372,7 @@ describe("a compressed file saved by app.diagrams.net", async () => {
       "card",
       "callout",
       "callout", // Wedge callout
-      "person", // UML actor, approximated
+      "actor", // UML actor
       "rect", // Or gate
       "delay", // And gate
       "stored-data", // Data storage
@@ -403,9 +403,9 @@ describe("a compressed file saved by app.diagrams.net", async () => {
       "rect", // Switch
       "rect", // Corner
     ]);
-    expect(warnings.map((warning) => warning.message)).toContain(
-      'Shape "umlActor" was approximated as a person shape.',
-    );
+    expect(
+      warnings.some((warning) => warning.message.includes("umlActor")),
+    ).toBe(false);
   });
 
   test("an Alt+click flowchart keeps labels, paint and bound connectors", () => {
@@ -600,6 +600,7 @@ describe("exportDrawio", () => {
       "double-arrow",
       "right-triangle",
       "person",
+      "package",
       "document",
       "delay",
       "card",
@@ -666,4 +667,109 @@ describe("exportDrawio", () => {
       ),
     ).toBe(true);
   });
+});
+
+test("use-case diagrams export as draw.io UML actors, ellipses and folders", async () => {
+  const document = parseDocument(
+    await Bun.file(
+      new URL("../__fixtures__/usecase.jsonl", import.meta.url),
+    ).text(),
+  );
+  const system: Element = {
+    id: "system",
+    page: document.pages[0].id,
+    type: "usecase.node",
+    index: "z0",
+    semantic: { kind: "system", name: "System" },
+    visual: { x: 0, y: 0, width: 200, height: 150 },
+  };
+  const { xml, warnings } = exportDrawio({
+    ...document,
+    elements: [...document.elements, system],
+  });
+  expect(warnings).toEqual([]);
+  expect(xml).toContain("container=1");
+  expect(xml).toContain("shape=umlActor");
+  expect(xml).toMatch(/value="Borrow item" style="ellipse;/);
+  expect(xml).toContain("shape=folder");
+  expect(xml).toContain("«include»");
+  expect(xml).toContain("endArrow=block;endFill=0");
+  const imported = importDrawio(xml);
+  const reimported = imported.document;
+  expect(
+    imported.warnings.some((warning) =>
+      warning.message.includes("approximated"),
+    ),
+  ).toBe(false);
+  expect(
+    reimported.elements.some(
+      (element) =>
+        element.type === "shape.geo" &&
+        typeof element.semantic === "object" &&
+        element.semantic !== null &&
+        "geo" in element.semantic &&
+        element.semantic.geo === "actor",
+    ),
+  ).toBe(true);
+  expect(validateDocument(reimported)).toEqual([]);
+  expect(
+    reimported.elements.find((element) => element.id === "drawio-records")
+      ?.semantic,
+  ).toEqual({ geo: "package", label: "Records" });
+});
+
+test("geo actors round-trip without approximation", () => {
+  const document = {
+    schemaVersion: 1 as const,
+    id: "actor-doc",
+    title: "Actors",
+    pages: [{ id: "p", name: "Actors", kind: "freeform" as const }],
+    elements: [
+      {
+        id: "visitor",
+        page: "p",
+        type: "shape.geo",
+        index: "a0",
+        semantic: { geo: "actor", label: "Visitor" },
+        visual: { x: 0, y: 0, width: 60, height: 110 },
+      },
+    ],
+  };
+  const { xml } = exportDrawio(document);
+  expect(xml).toContain("shape=umlActor");
+  expect(xml).toContain("nodettoGeo=actor");
+  const imported = importDrawio(xml);
+  expect(imported.warnings).toEqual([]);
+  expect(byId(imported.document.elements, "drawio-visitor").semantic).toEqual({
+    geo: "actor",
+    label: "Visitor",
+  });
+});
+
+test("UML components, interfaces and ports export as native shapes", async () => {
+  const document = parseDocument(
+    await Bun.file(
+      new URL("../__fixtures__/uml-component.jsonl", import.meta.url),
+    ).text(),
+  );
+  const required = {
+    ...byId(document.elements, "interface"),
+    id: "required",
+    index: "a4",
+    semantic: { name: "Required", kind: "required" },
+  };
+  const { xml, warnings } = exportDrawio({
+    ...document,
+    elements: [...document.elements, required],
+  });
+  expect(xml).toContain("shape=component");
+  expect(xml).toContain("ellipse;");
+  expect(xml).toContain("shape=requiredInterface");
+  expect(
+    warnings.some((warning) =>
+      /uml\.(component|interface|port) was exported as a labelled rectangle/.test(
+        warning.message,
+      ),
+    ),
+  ).toBe(false);
 });

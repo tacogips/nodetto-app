@@ -12,6 +12,16 @@ export function layerName(element: Element): string {
     return `${String(data?.["kind"] ?? "State")} node`;
   if (element.type === "state.transition")
     return String(data?.["trigger"] || "Transition");
+  if (element.type === "usecase.node")
+    return String(
+      data?.["kind"] === "system"
+        ? "System boundary"
+        : data?.["kind"] === "actor"
+          ? "Actor"
+          : "Use case",
+    );
+  if (element.type === "usecase.relationship")
+    return `${String(data?.["kind"] ?? "association")} relationship`;
   if (element.type === "edge.generic" && data?.["prototype"] === true)
     return "Screen transition";
   if (element.type.startsWith("pcb.")) return pcbLayerName(element.type, data);

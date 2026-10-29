@@ -45,7 +45,20 @@ export const databaseObjectDefinitions: readonly ElementTypeDefinition[] =
         "dependsOn",
       ],
       children: {
-        columns: { keys: ["id", "name", "dataType"] },
+        columns: {
+          keys: [
+            "id",
+            "name",
+            "dataType",
+            "autoIncrement",
+            "comment",
+            "defaultExpression",
+            "generatedExpression",
+            "identityGeneration",
+            "nullable",
+            "pk",
+          ],
+        },
         parameters: { keys: ["id", "name", "dataType", "mode"] },
       },
     },

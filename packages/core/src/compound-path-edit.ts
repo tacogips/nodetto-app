@@ -21,13 +21,20 @@ function mapPoint(
   };
 }
 
-export function pathWorldContours(element: Element): FreehandPoint[][] {
+export interface PathWorldContour {
+  readonly points: readonly FreehandPoint[];
+  readonly closed: boolean;
+}
+
+export function pathWorldContours(element: Element): PathWorldContour[] {
   const geometry = compoundPathGeometry(element);
   if (!geometry) return [];
   const center = boxCenter(geometry.box);
   const rotation = element.visual.rotation ?? 0;
-  return geometry.contours.map((contour) =>
-    contour.map((point) =>
+  return geometry.contours.map((contour, index) => ({
+    closed:
+      (element.semantic as PathSemantic).contours[index]?.closed !== false,
+    points: contour.map((point) =>
       mapPoint(point, (local) => {
         const page = {
           x: local.x + geometry.box.x,
@@ -36,20 +43,23 @@ export function pathWorldContours(element: Element): FreehandPoint[][] {
         return rotation ? rotatePoint(page, center, rotation) : page;
       }),
     ),
-  );
+  }));
 }
 
 /** Rebase edited world-space path contours while retaining layer rotation. */
 export function planPathWorldContours(
   element: Element,
-  contours: readonly (readonly FreehandPoint[])[],
+  contours: readonly PathWorldContour[],
 ): Command[] {
   if (
     element.type !== "draw.path" ||
     !contours.length ||
     contours.length > 1024 ||
-    contours.some((contour) => contour.length < 3) ||
-    contours.reduce((total, contour) => total + contour.length, 0) > 20000
+    contours.some(
+      (contour) => contour.points.length < (contour.closed ? 3 : 2),
+    ) ||
+    contours.reduce((total, contour) => total + contour.points.length, 0) >
+      20000
   )
     return [];
   const current = compoundPathGeometry(element);
@@ -57,7 +67,7 @@ export function planPathWorldContours(
   const rotation = element.visual.rotation ?? 0;
   const center = boxCenter(current.box);
   const local = contours.map((contour) =>
-    contour.map((point) =>
+    contour.points.map((point) =>
       mapPoint(point, (world) =>
         rotation ? rotatePoint(world, center, -rotation) : world,
       ),
@@ -92,7 +102,8 @@ export function planPathWorldContours(
   const semantic: PathSemantic = {
     ...(element.semantic as PathSemantic),
     contours: local.map(
-      (contour): PathContour => ({
+      (contour, index): PathContour => ({
+        ...(contours[index]?.closed ? {} : { closed: false }),
         points: contour.map((point) =>
           mapPoint(point, (value) => ({
             x: value.x - minX,
@@ -135,7 +146,7 @@ export class PathAnchorDrag {
     element: Element;
     contour: number;
     index: number;
-    contours: FreehandPoint[][];
+    contours: PathWorldContour[];
     control?: "controlIn" | "controlOut";
   } | null = null;
   private readonly unsubscribes: (() => void)[];
@@ -143,7 +154,7 @@ export class PathAnchorDrag {
   constructor(
     private readonly editor: import("./editor.ts").Editor,
     private readonly preview: (
-      contours: readonly (readonly FreehandPoint[])[] | null,
+      contours: readonly PathWorldContour[] | null,
     ) => void,
   ) {
     this.unsubscribes = [
@@ -169,7 +180,7 @@ export class PathAnchorDrag {
     )
       return false;
     const contours = pathWorldContours(element);
-    const point = contours[contour]?.[index];
+    const point = contours[contour]?.points[index];
     if (!point || (control && !point[control])) return false;
     this.active = { pointer, element, contour, index, contours, control };
     this.preview(contours);
@@ -187,13 +198,16 @@ export class PathAnchorDrag {
       return;
     active.contours = active.contours.map((contour, contourIndex) =>
       contourIndex === active.contour
-        ? contour.map((previous, pointIndex) =>
-            pointIndex === active.index
-              ? active.control
-                ? { ...previous, [active.control]: { ...point } }
-                : moveStrokeAnchor(previous, point)
-              : previous,
-          )
+        ? {
+            ...contour,
+            points: contour.points.map((previous, pointIndex) =>
+              pointIndex === active.index
+                ? active.control
+                  ? { ...previous, [active.control]: { ...point } }
+                  : moveStrokeAnchor(previous, point)
+                : previous,
+            ),
+          }
         : contour,
     );
     this.preview(active.contours);
@@ -205,10 +219,10 @@ export class PathAnchorDrag {
     const active = this.active;
     this.cancel();
     if (!active) return;
-    const before = pathWorldContours(active.element)[active.contour]?.[
+    const before = pathWorldContours(active.element)[active.contour]?.points[
       active.index
     ];
-    const after = active.contours[active.contour]?.[active.index];
+    const after = active.contours[active.contour]?.points[active.index];
     const previous = active.control ? before?.[active.control] : before;
     const next = active.control ? after?.[active.control] : after;
     if (previous?.x === next?.x && previous?.y === next?.y) return;

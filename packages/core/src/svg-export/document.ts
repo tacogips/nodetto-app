@@ -39,6 +39,7 @@ import type { ShapeContext, ShapeUtilRegistry } from "../shape-util.ts";
 import { endpointReaderFor, resolveConnector } from "../shapes/connector.ts";
 import { freehandGeometry } from "../shapes/freehand.ts";
 import { stateNodeLabelBox } from "../shapes/state.ts";
+import { useCaseNodeLabelBox } from "../shapes/usecase.ts";
 import { umlComponentPaintBounds } from "../shapes/umlComponent.ts";
 import { PCB_BOARD_COLOR } from "../pcb-board/view.ts";
 import type { Store } from "../store.ts";
@@ -283,6 +284,10 @@ export function renderElementsSvg(
     }
     if (box && element.type === "state.node") {
       const label = stateNodeLabelBox(element, box);
+      if (label) boxes.push(label);
+    }
+    if (box && element.type === "usecase.node") {
+      const label = useCaseNodeLabelBox(element, box);
       if (label) boxes.push(label);
     }
     if (isEdge(element.type) && element.type.startsWith("bpmn.")) {

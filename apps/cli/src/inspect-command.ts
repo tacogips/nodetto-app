@@ -6,7 +6,7 @@
 // object, and no styling. It is the same idea as the accessibility-tree
 // outline agents read instead of a web page's HTML.
 
-import { type Box, Editor } from "@nodetto/core";
+import { type Box, Editor, findText, textMatcher } from "@nodetto/core";
 import {
   isDatabaseObjectType,
   shortPageId,
@@ -29,7 +29,14 @@ import {
 import { helpFor } from "./help.ts";
 import { shortIds } from "./ids.ts";
 
-const INSPECT_OPTIONS = new Set(["--page", "--format", "--type", "--ids"]);
+const INSPECT_OPTIONS = new Set([
+  "--page",
+  "--format",
+  "--type",
+  "--ids",
+  "--text",
+]);
+const INSPECT_FLAGS = new Set(["--regex", "--ignore-case"]);
 const LABEL_FIELDS = ["name", "tableName", "label", "text"] as const;
 const MAX_TEXT = 60;
 
@@ -220,7 +227,7 @@ function pageOutline(
   editor: Editor,
   page: Page,
   elements: readonly Element[],
-  typeFilter: string | undefined,
+  filter: (element: Element) => boolean,
   short: (id: string) => string,
 ): string[] {
   editor.setCurrentPage(page.id);
@@ -267,8 +274,7 @@ function pageOutline(
     children.set(parent, list);
   }
   const outlineContext: OutlineContext = { short, byId, bounds };
-  const matches = (element: Element): boolean =>
-    typeFilter === undefined || element.type.startsWith(typeFilter);
+  const matches = filter;
   const hasMatch = (element: Element): boolean =>
     matches(element) ||
     (children.get(element.id) ?? []).some((child) => hasMatch(child));
@@ -355,9 +361,18 @@ export function inspectCommand(
   io: CommandIo,
   args: readonly string[],
 ): CommandResult {
-  const parsed = parseArgs(args, INSPECT_OPTIONS, new Set());
+  const parsed = parseArgs(args, INSPECT_OPTIONS, INSPECT_FLAGS);
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("inspect")}`);
+  const textQuery = parsed.options.get("--text");
+  const matcher =
+    textQuery === undefined
+      ? undefined
+      : textMatcher(textQuery, {
+          regex: parsed.flags.has("--regex"),
+          ignoreCase: parsed.flags.has("--ignore-case"),
+        });
+  if (typeof matcher === "string") return fail(`--text: ${matcher}`);
   if (parsed.positional.length !== 1)
     return fail(
       `inspect expects exactly one document path.\n\n${helpFor("inspect")}`,
@@ -385,6 +400,11 @@ export function inspectCommand(
     pages = [page];
   }
   const typeFilter = parsed.options.get("--type");
+  // --type keeps elements whose type starts with the prefix; --text keeps
+  // elements whose labels, names or notes contain the text.
+  const filter = (element: Element): boolean =>
+    (typeFilter === undefined || element.type.startsWith(typeFilter)) &&
+    (matcher === undefined || findText(element, matcher).length > 0);
   const elementsOf = (page: Page): readonly Element[] =>
     document.elements.filter((element) => element.page === page.id);
 
@@ -394,10 +414,7 @@ export function inspectCommand(
       pages: pages.map((page) => ({
         ...page,
         shortId: shortPageId(page.id),
-        elements: elementsOf(page).filter(
-          (element) =>
-            typeFilter === undefined || element.type.startsWith(typeFilter),
-        ),
+        elements: elementsOf(page).filter(filter),
       })),
     };
     return ok(`${JSON.stringify(report, null, 2)}\n`, loaded.warnings);
@@ -413,7 +430,7 @@ export function inspectCommand(
     lines.push(
       `  page ${page.id} ${quote(page.name)} ${page.kind} (${elements.length} elements) [${shortPageId(page.id)}]`,
     );
-    lines.push(...pageOutline(editor, page, elements, typeFilter, short));
+    lines.push(...pageOutline(editor, page, elements, filter, short));
   }
   return ok(`${lines.join("\n")}\n`, loaded.warnings);
 }

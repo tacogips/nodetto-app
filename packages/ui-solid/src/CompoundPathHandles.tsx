@@ -1,11 +1,12 @@
 import {
   type Editor,
   PathAnchorDrag,
+  type PathWorldContour,
   pathWorldContours,
   strokePath,
   type Vec,
 } from "@nodetto/core";
-import type { Element, FreehandPoint } from "@nodetto/ir";
+import type { Element } from "@nodetto/ir";
 import {
   createMemo,
   createSignal,
@@ -22,7 +23,7 @@ export function CompoundPathHandles(props: {
   toPage: (event: PointerEvent) => Vec;
 }): JSX.Element {
   const [preview, setPreview] = createSignal<
-    readonly (readonly FreehandPoint[])[] | null
+    readonly PathWorldContour[] | null
   >(null);
   const source = createMemo(() => pathWorldContours(props.element));
   const drag = new PathAnchorDrag(props.editor, setPreview);
@@ -38,7 +39,7 @@ export function CompoundPathHandles(props: {
     drag.dispose();
   });
   const at = (contour: number, index: number) =>
-    (preview() ?? source())[contour]?.[index];
+    (preview() ?? source())[contour]?.points[index];
   return (
     <g
       onPointerMove={(event) => {
@@ -59,7 +60,7 @@ export function CompoundPathHandles(props: {
         {(contours) => (
           <path
             d={contours()
-              .map((contour) => strokePath(contour, true))
+              .map((contour) => strokePath(contour.points, contour.closed))
               .join(" ")}
             fill="none"
             stroke="#db6d28"
@@ -69,8 +70,8 @@ export function CompoundPathHandles(props: {
         )}
       </Show>
       <For each={source()}>
-        {(points, contourIndex) => (
-          <For each={points}>
+        {(contour, contourIndex) => (
+          <For each={contour.points}>
             {(_, pointIndex) => (
               <>
                 <For each={["controlIn", "controlOut"] as const}>

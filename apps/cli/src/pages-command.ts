@@ -1,4 +1,9 @@
-import { comparePageOrder, shortPageId, isPageKind } from "@nodetto/ir";
+import {
+  comparePageOrder,
+  isPageKind,
+  pageModeOf,
+  shortPageId,
+} from "@nodetto/ir";
 import {
   type CommandIo,
   type CommandResult,
@@ -37,15 +42,17 @@ export function pagesCommand(
       id: page.id,
       name: page.name,
       kind: page.kind,
+      /** The editing mode the app opens the page in; null is its default. */
+      mode: pageModeOf(page) ?? null,
     }))
     .filter((page) => kind === undefined || page.kind === kind);
   if (format === "json")
     return ok(`${JSON.stringify(pages, null, 2)}\n`, loaded.warnings);
   const lines = [
-    "PAGE\tSHORT ID\tKIND\tNAME\tFULL ID",
+    "PAGE\tSHORT ID\tKIND\tMODE\tNAME\tFULL ID",
     ...pages.map(
       (page) =>
-        `${page.number}\t${page.shortId}\t${page.kind}\t${JSON.stringify(page.name)}\t${page.id}`,
+        `${page.number}\t${page.shortId}\t${page.kind}\t${page.mode ?? "default"}\t${JSON.stringify(page.name)}\t${page.id}`,
     ),
   ];
   return ok(`${lines.join("\n")}\n`, loaded.warnings);

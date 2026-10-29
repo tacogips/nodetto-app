@@ -241,7 +241,7 @@ export const BPMN_EVENT = bpmnDefinition(
 export const BPMN_BOUNDARY_EVENT = bpmnDefinition(
   BPMN_TYPES.boundaryEvent.type,
   "node",
-  ["name", "attachedTo", "cancelActivity", "definitions"],
+  ["name", "attachedTo", "cancelActivity", "definitions", "parent"],
   ["attachedTo"],
   {
     optionalStrings: ["name"],
@@ -253,7 +253,7 @@ export const BPMN_BOUNDARY_EVENT = bpmnDefinition(
 export const BPMN_GATEWAY = bpmnDefinition(
   BPMN_TYPES.gateway.type,
   "node",
-  ["name", "gatewayType", "markerVisible", "parent"],
+  ["name", "gatewayType", "markerVisible", "parent", "gatewayDirection"],
   ["parent"],
   {
     optionalStrings: ["name"],
@@ -289,7 +289,7 @@ export const BPMN_TEXT_ANNOTATION = bpmnDefinition(
 export const BPMN_GROUP = bpmnDefinition(
   BPMN_TYPES.group.type,
   "annotation",
-  ["name"],
+  ["name", "parent"],
   [],
   {
     optionalStrings: ["name"],

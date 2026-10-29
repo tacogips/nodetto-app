@@ -385,6 +385,64 @@ export class PageWriter {
         );
         return;
       }
+      case "usecase.node": {
+        const kind = text(semantic["kind"]);
+        const entries: Entry[] =
+          kind === "actor"
+            ? [
+                ["shape", "umlActor"],
+                ["verticalLabelPosition", "bottom"],
+                ["verticalAlign", "top"],
+              ]
+            : kind === "system"
+              ? [
+                  ["rounded", 0],
+                  ["fillColor", "none"],
+                  ["verticalAlign", "top"],
+                  ["container", 1],
+                ]
+              : [];
+        this.vertex(
+          element,
+          box,
+          textToHtmlLabel(text(semantic["name"])),
+          formatStyle(kind === "usecase" ? ["ellipse"] : [], [
+            ...entries,
+            ...common,
+            ...paint,
+          ]),
+        );
+        return;
+      }
+      case "uml.component":
+      case "uml.interface":
+      case "uml.port": {
+        const entries: Entry[] =
+          element.type === "uml.component"
+            ? [
+                ["shape", "component"],
+                ["align", "left"],
+                ["spacingLeft", 36],
+              ]
+            : element.type === "uml.interface" &&
+                text(semantic["kind"]) === "required"
+              ? [["shape", "requiredInterface"]]
+              : element.type === "uml.port"
+                ? [["rounded", 0]]
+                : [];
+        const names =
+          element.type === "uml.interface" &&
+          text(semantic["kind"]) !== "required"
+            ? ["ellipse"]
+            : [];
+        this.vertex(
+          element,
+          box,
+          textToHtmlLabel(text(semantic["name"])),
+          formatStyle(names, [...entries, ...common, ...paint]),
+        );
+        return;
+      }
       default:
         this.fallback(element, "was exported as a labelled rectangle");
         this.vertex(
@@ -584,6 +642,26 @@ export class PageWriter {
           : kind === "dependency"
             ? { start: "none", end: "open", dashed: true, label }
             : { start: "none", end: "none", dashed: false, label };
+      }
+      case "usecase.relationship": {
+        const kind = text(semantic["kind"]);
+        const stereotype =
+          kind === "include"
+            ? "«include»"
+            : kind === "extend"
+              ? "«extend»"
+              : "";
+        return {
+          start: "none",
+          end:
+            kind === "generalization"
+              ? "triangle"
+              : stereotype
+                ? "open"
+                : "none",
+          dashed: stereotype !== "",
+          label: [stereotype, label].filter(Boolean).join("\n"),
+        };
       }
       case "state.transition":
         return {

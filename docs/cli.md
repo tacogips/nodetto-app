@@ -67,6 +67,9 @@ desktop app. `nodetto-cli --help` is a one-screen overview; `nodetto-cli help
 ```bash
 nodetto-cli inspect flow.jsonl                  # compact indented outline (or --format json)
 nodetto-cli types erd.table                     # fields, defaults and an example "add" op
+nodetto-cli shapes --category uml               # palette shapes by shape ID; words filter, e.g. shapes actor
+nodetto-cli draw flow.jsonl flowchart:decision --label "In stock?"   # one shape by its shape ID
+nodetto-cli draw flow.jsonl erd.foreign-key --from 01M4WD --to 01M4X2  # a connector shape
 nodetto-cli edit flow.jsonl --ops ops.json --snapshot .last.jsonl  # add/connect/update/..., all-or-nothing
 nodetto-cli diff .last.jsonl flow.jsonl         # what the person changed since the agent's last write
 nodetto-cli export flow.jsonl --page Flow --format png --output /tmp/flow.png
@@ -78,6 +81,27 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   with short unique ids, geometry and the identifying semantic fields (table
   columns, relation ends, labels) and no styling, which costs an agent far
   fewer tokens than the JSONL.
+- `shapes` lists every shape of the app's palette under its shape ID, grouped
+  by category (general, flowchart, UML class/component/use case/sequence/state,
+  ERD, BPMN, breadboard, PCB, artboards, UI controls, screens). Words filter by
+  ID, label, category or element type, `--category uml` selects every UML
+  category, and `--connectors`/`--no-connectors` select connectors or placed
+  shapes. `shapes <shape-id>` shows the element type and defaults it creates.
+- `draw <doc> <shape-id>` draws one shape the way the palette does, with the
+  shape's own defaults (a flowchart decision is a labelled diamond, an iPhone
+  artboard has the device size), `--label`, `--at x,y`, `--size WxH`,
+  `--right-of` or `--below`. Connector shapes take `--from` and `--to`. In
+  `edit` batches, `{"op":"add","shape":...}` and
+  `{"op":"connect","shape":...}` do the same.
+- `edit` also scales a page or chosen elements while keeping the layout
+  (`{"op":"scale","page":"p1","factor":1.25}`: positions, sizes and text sizes
+  together, paths and connectors following), replaces part of the display
+  text across the document (`{"op":"replace-text","find":"example.dev",
+  "replace":"example.info"}`, with `regex` and `ignoreCase`; `--dry-run`
+  previews every change), and groups or ungroups elements
+  (`{"op":"group","ids":[...]}`, `{"op":"ungroup","id":...}`).
+  `inspect --text <text>` lists the elements whose labels, names or notes
+  contain the text.
 - `edit` operations reference elements by unique id prefix or by `@ref` names
   given earlier in the batch; list items such as columns get generated ids, and
   ERD relation ends may name a column instead of its id. Validation errors name
@@ -116,8 +140,11 @@ ID, independently of display order. Legacy pages without valid unique order keys
 are assigned those keys on their first explicit ordering operation.
 
 Use `nodetto-cli pages mixed.jsonl` to list page numbers, short IDs, names,
-kinds and full IDs, or add `--format json` for scripts. `--kind erd` filters the
-listing. Numbers represent current display positions; use IDs in scripts.
+kinds, editing modes and full IDs, or add `--format json` for scripts. `--kind
+erd` filters the listing. Numbers represent current display positions; use IDs
+in scripts. Each page remembers the editing mode (tool palette) last chosen on
+it; `{"op":"set-page-mode","id":"<page>","mode":"usecase"}` changes it and
+`add-page` accepts `"mode"`.
 
 Every CLI `--page` option and edit page reference accepts a short ID, full ID,
 or exact name. A document with several pages requires `--page` unless
@@ -140,6 +167,8 @@ authoritative, and adding messages or reordering participants works with the
 same resolved geometry without rewriting the imported document on open.
 
 See [the design](../design-docs/specs/design-cli-ai-drawing.md).
+
+Use `nodetto-cli validate doc.jsonl --strict` to exit 3 when validation reports warnings. `edit` reports newly introduced `semantic.unknownField` warnings per operation, for example `warning operation 0 (add): <id> (uml.component) semantic.kind: unknown semantic field (semantic.unknownField)`. JSON output includes a `warnings` array with `operation`, `op`, `element`, `type`, `path`, `code`, and `message`. Draw a stick figure with `nodetto-cli draw doc.jsonl geo:actor --label "Visitor"`.
 
 ## MCP server
 

@@ -1,5 +1,6 @@
 // UML class, association and component definitions, sequence diagram
-// elements, and state machine nodes and transitions.
+// elements, state machine nodes and transitions, and use-case diagram
+// nodes and relationships.
 
 import {
   checkArray,
@@ -21,6 +22,8 @@ import {
   UML_INTERFACE_KINDS,
   UML_PORT_SIDES,
   UML_VISIBILITIES,
+  USECASE_NODE_KINDS,
+  USECASE_RELATIONSHIP_KINDS,
 } from "../semantics.ts";
 import {
   noReferences,
@@ -199,7 +202,12 @@ export const UML_COMPONENT_TYPES: readonly ElementTypeDefinition[] = [
     (type): ElementTypeDefinition => ({
       type,
       category: "node",
-      keyOrder: { keys: ["name", "kind", "owner", "side", "offset"] },
+      keyOrder: {
+        keys:
+          type === UmlComponentType.Interface
+            ? ["name", "kind", "owner", "side", "offset"]
+            : ["name", "owner", "side", "offset"],
+      },
       onReferenceDeleted: "cascade",
       references: (semantic) =>
         type === UmlComponentType.Port ? refFields(semantic, ["owner"]) : [],
@@ -376,6 +384,66 @@ export const STATE_TRANSITION: ElementTypeDefinition = {
           optional: true,
           allowEmpty: true,
         });
+      validateConnectorRouting(out, semantic, path);
+    }
+    return out;
+  },
+};
+
+export const USECASE_NODE: ElementTypeDefinition = {
+  type: "usecase.node",
+  category: "node",
+  keyOrder: { keys: ["name", "kind"] },
+  onReferenceDeleted: "detach",
+  references: noReferences,
+  validateSemantic(semantic, path) {
+    const out: ValidationIssue[] = [];
+    if (checkObject(out, semantic, path)) {
+      checkString(out, semantic["name"], `${path}.name`, {
+        allowEmpty: true,
+      });
+      checkEnum(out, semantic["kind"], `${path}.kind`, USECASE_NODE_KINDS);
+    }
+    return out;
+  },
+};
+
+export const USECASE_RELATIONSHIP: ElementTypeDefinition = {
+  type: "usecase.relationship",
+  category: "edge",
+  keyOrder: {
+    keys: [
+      "from",
+      "to",
+      "kind",
+      "label",
+      "routing",
+      "routingAxis",
+      "routingBend",
+      "routingAvoidObstacles",
+      "routingWaypoints",
+      "fromPort",
+      "toPort",
+    ],
+    children: { routingWaypoints: { keys: ["u", "v"] } },
+  },
+  onReferenceDeleted: "cascade",
+  references: (semantic) => refFields(semantic, ["from", "to"]),
+  validateSemantic(semantic, path) {
+    const out: ValidationIssue[] = [];
+    if (checkObject(out, semantic, path)) {
+      checkString(out, semantic["from"], `${path}.from`);
+      checkString(out, semantic["to"], `${path}.to`);
+      checkEnum(
+        out,
+        semantic["kind"],
+        `${path}.kind`,
+        USECASE_RELATIONSHIP_KINDS,
+      );
+      checkString(out, semantic["label"], `${path}.label`, {
+        optional: true,
+        allowEmpty: true,
+      });
       validateConnectorRouting(out, semantic, path);
     }
     return out;
