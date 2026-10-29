@@ -263,6 +263,17 @@ tabs within the viewer column. Pane corners have small collapse chevrons.
 General is the default mode and appears first in the mode selector. Its palette
 includes basic shapes, UML classes/components, ERD tables and sequence
 participants without switching modes; Freehand is available under More shapes.
+
+Each page remembers its own mode. Choosing a mode in the toolbar sets it for
+the current page and is saved with the document (it is not an undo step), and
+switching pages switches to that page's mode. A page that never chose one opens
+in its notation's mode (an ERD page in ERD, a sequence page in Sequence) or
+otherwise in the default mode from Settings > General > Default mode. BPMN,
+breadboard and PCB pages always open in their own mode.
+
+The search box at the top of the shape palette finds any shape, whatever the
+current mode, by name, shape ID or category: "actor" finds the sequence and
+use-case actors, and "uml" lists every UML shape. Escape clears the search.
 Settings opens a dialog with categories down the left: General, Appearance,
 Canvas, Snapping, Files and Shortcuts, plus Collaboration when cloud features
 are available. Grid/rulers, snapping, pane visibility, appearance and autosave

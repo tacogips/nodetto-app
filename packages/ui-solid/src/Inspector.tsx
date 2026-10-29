@@ -2,6 +2,7 @@ import { UiControlSection } from "./inspector/UiControlSection.tsx";
 import { DATABASE_OBJECT_LABELS, isDatabaseObjectType } from "@nodetto/ir";
 import { DatabaseObjectSection } from "./inspector/DatabaseObjectSection.tsx";
 import { StateSection } from "./inspector/StateSection.tsx";
+import { UseCaseSection } from "./inspector/UseCaseSection.tsx";
 import { UmlComponentType } from "@nodetto/ir";
 import { UmlComponentSection } from "./inspector/UmlComponentSection.tsx";
 // The Inspector: a right-hand panel that reads the selection and writes
@@ -193,6 +194,8 @@ export function Inspector(props: InspectorProps): JSX.Element {
       "uml.class": "Class",
       "state.node": "State",
       "state.transition": "State transition",
+      "usecase.node": "Use case",
+      "usecase.relationship": "Use-case relationship",
       "erd.relation": "Foreign key",
       "uml.association": "Association",
       "sequence.participant": "Participant",
@@ -295,6 +298,14 @@ export function Inspector(props: InspectorProps): JSX.Element {
             }
           >
             <StateSection editor={props.editor} element={element()} />
+          </Match>
+          <Match
+            when={
+              element().type === "usecase.node" ||
+              element().type === "usecase.relationship"
+            }
+          >
+            <UseCaseSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type === "uml.class"}>
             <UmlClassSection

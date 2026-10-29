@@ -11,10 +11,14 @@ import {
   type ArrangeMode,
   type Box,
   CommandError,
+  connectShape,
   Editor,
+  findShape,
   isFractionalKey,
   newElementId,
   planArrangement,
+  type ShapeCatalogueEntry,
+  shapeCreation,
 } from "@nodetto/core";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
 import {
@@ -22,8 +26,10 @@ import {
   getElementTypeDefinition,
   isKnownElementType,
   isPageKind,
+  isPageMode,
   isPlainObject,
   type KeyOrder,
+  PAGE_MODES,
   type Page,
   resolvePageQuery,
   validateDocument,
@@ -150,6 +156,10 @@ function number(value: Json, field: string, index: number): number {
   return value;
 }
 
+function unknownMode(mode: Json): string {
+  return `Unknown page mode "${String(mode)}". Choose ${PAGE_MODES.join(", ")}, or null to follow the page kind.`;
+}
+
 class Batch {
   readonly refs = new Map<string, string>();
   readonly created: Created[] = [];
@@ -186,8 +196,9 @@ class Batch {
   }
 
   page(query: Json, index: number): Page {
-    const value = text(query, "page", index);
     const pages = this.editor.store.listPages();
+    if (query === undefined && pages.length === 1) return pages[0] as Page;
+    const value = text(query, "page", index);
     const byRef = value.startsWith("@")
       ? this.refs.get(value.slice(1))
       : undefined;
@@ -320,6 +331,8 @@ class Batch {
 
   /** Create one element; place it relative to another or beside the page content. */
   add(operation: JsonObject, index: number): string {
+    if (operation["shape"] !== undefined)
+      return this.addShape(operation, index);
     const type = text(operation["type"], "type", index);
     if (!isKnownElementType(type))
       throw new OperationError(
@@ -392,6 +405,149 @@ class Batch {
     return id;
   }
 
+  private shape(operation: JsonObject, index: number): ShapeCatalogueEntry {
+    const id = text(operation["shape"], "shape", index);
+    const shape = findShape(id);
+    if (!shape)
+      throw new OperationError(
+        index,
+        `Unknown shape "${id}". Run "nodetto-cli shapes" for the shape IDs.`,
+      );
+    if (operation["type"] !== undefined)
+      throw new OperationError(index, `use either "shape" or "type", not both`);
+    return shape;
+  }
+
+  /**
+   * Draw a palette shape by its shape ID: the tool's own defaults (a
+   * flowchart decision is a labelled diamond, an iPhone artboard has the
+   * device size), then the operation's semantic and visual, then `label`
+   * in the shape's text field.
+   */
+  private addShape(operation: JsonObject, index: number): string {
+    const shape = this.shape(operation, index);
+    if (shape.connector)
+      throw new OperationError(
+        index,
+        `${shape.id} is a connector; use {"op":"connect","shape":"${shape.id}","from":...,"to":...}.`,
+      );
+    const creation = shapeCreation(shape.id);
+    if (!creation)
+      throw new OperationError(index, `${shape.id} cannot be placed.`);
+    const { shape: _shape, label, ...rest } = operation;
+    const semantic =
+      creation.semantic === undefined && operation["semantic"] === undefined
+        ? undefined
+        : deepMerge(creation.semantic ?? {}, operation["semantic"] ?? {});
+    const visual = isPlainObject(operation["visual"])
+      ? { ...(creation.visual ?? {}), ...operation["visual"] }
+      : (operation["visual"] ?? creation.visual);
+    const id =
+      creation.type === "sequence.participant"
+        ? this.addParticipant(rest, semantic, index)
+        : this.add(
+            {
+              ...rest,
+              type: creation.type,
+              ...(semantic === undefined ? {} : { semantic }),
+              ...(visual === undefined ? {} : { visual }),
+            },
+            index,
+          );
+    if (label !== undefined) {
+      const value = typeof label === "string" ? label : undefined;
+      if (value === undefined)
+        throw new OperationError(index, `"label" must be a string`);
+      if (this.editor.editableField(id)) this.editor.setText(id, value);
+      else {
+        // Shapes the canvas names in the inspector (sequence participants,
+        // pseudo-states) still take a label through their text field.
+        const element = this.editor.store.get(id);
+        const semantic = isPlainObject(element?.semantic)
+          ? element.semantic
+          : {};
+        const field = ["name", "label", "text"].find(
+          (key) => typeof semantic[key] === "string",
+        );
+        if (!field)
+          throw new OperationError(
+            index,
+            `${shape.id} has no text to label; set its fields with "semantic".`,
+          );
+        this.editor.apply([
+          {
+            type: "updateSemantic",
+            id,
+            semantic: { ...semantic, [field]: value },
+          },
+        ]);
+      }
+    }
+    return id;
+  }
+
+  /** Sequence participants take the next lifeline order on their page. */
+  private addParticipant(
+    operation: JsonObject,
+    semantic: Json,
+    index: number,
+  ): string {
+    const page = this.page(operation["page"], index);
+    this.editor.setCurrentPage(page.id);
+    const visual = isPlainObject(operation["visual"])
+      ? operation["visual"]
+      : {};
+    const content = this.editor.pageBounds(page.id);
+    const x =
+      typeof visual["x"] === "number"
+        ? visual["x"] + 80
+        : content
+          ? content.x + content.width + PLACE_GAP + 80
+          : 80;
+    const y =
+      typeof visual["y"] === "number"
+        ? visual["y"] + 28
+        : (content?.y ?? 0) + 28;
+    const kind = isPlainObject(semantic) ? semantic["kind"] : undefined;
+    const id = this.editor.createSequenceParticipant(
+      kind === "actor" || kind === "db" ? kind : "service",
+      { x, y },
+    );
+    const created = this.editor.store.get(id);
+    if (created && isPlainObject(semantic))
+      this.editor.apply([
+        {
+          type: "updateSemantic",
+          id,
+          semantic: deepMerge(created.semantic, semantic),
+        },
+      ]);
+    this.record(operation, index, id, "sequence.participant", page.id);
+    return id;
+  }
+
+  private record(
+    operation: JsonObject,
+    index: number,
+    id: string,
+    type: string,
+    page: string,
+  ): void {
+    const ref = operation["ref"];
+    if (typeof ref === "string") {
+      if (this.refs.has(ref))
+        throw new OperationError(index, `ref "${ref}" is already used.`);
+      this.refs.set(ref, id);
+    }
+    this.created.push({
+      ...(typeof ref === "string" ? { ref } : {}),
+      id,
+      type,
+      page,
+    });
+    this.touchedPages.add(page);
+  }
+
   /** Move an element so that its bounding box starts at (x, y). */
   private moveBoxTo(id: string, x: number, y: number): void {
     const element = this.editor.store.get(id);
@@ -456,6 +612,15 @@ class Batch {
         index,
         "connect needs two elements on the same page.",
       );
+    const shape =
+      operation["shape"] === undefined
+        ? undefined
+        : this.shape(operation, index);
+    if (shape && !shape.connector)
+      throw new OperationError(
+        index,
+        `${shape.id} is not a connector; use {"op":"add","shape":"${shape.id}"}.`,
+      );
     if (typeof operation["type"] === "string")
       return this.add(
         {
@@ -473,15 +638,18 @@ class Batch {
         index,
       );
     this.editor.setCurrentPage(from.page);
-    const id =
-      isPlainObject(operation["semantic"]) &&
-      operation["semantic"]["prototype"] === true
+    const id = shape
+      ? connectShape(this.editor, shape.id, from.id, to.id)
+      : isPlainObject(operation["semantic"]) &&
+          operation["semantic"]["prototype"] === true
         ? connectScreenTransition(this.editor, from.id, to.id)
         : this.editor.connectSmart(from.id, to.id);
     if (id === null)
       throw new OperationError(
         index,
-        `Cannot connect ${from.type} to ${to.type} here (a rule of this diagram kind forbids it, or an element is locked).`,
+        shape
+          ? `${shape.label} (${shape.id}) cannot connect ${from.type} to ${to.type}; it joins ${shape.type} endpoints of its own notation.`
+          : `Cannot connect ${from.type} to ${to.type} here (a rule of this diagram kind forbids it, or an element is locked).`,
       );
     const created = this.editor.store.get(id);
     if (!created)
@@ -565,9 +733,13 @@ class Batch {
             index,
             `Unknown page kind "${String(kind)}".`,
           );
+        const mode = operation["mode"];
+        if (mode !== undefined && !isPageMode(mode))
+          throw new OperationError(index, unknownMode(mode));
         const id = this.editor.createPage({
           name: text(operation["name"], "name", index),
           kind,
+          ...(mode === undefined ? {} : { mode }),
           ...(typeof operation["id"] === "string"
             ? { id: operation["id"] }
             : {}),
@@ -590,6 +762,14 @@ class Batch {
       case "rename-page": {
         const page = this.page(operation["id"], index);
         this.editor.renamePage(page.id, text(operation["name"], "name", index));
+        return;
+      }
+      case "set-page-mode": {
+        const page = this.page(operation["id"], index);
+        const mode = operation["mode"];
+        if (mode !== null && !isPageMode(mode))
+          throw new OperationError(index, unknownMode(mode));
+        this.editor.setPageMode(page.id, mode);
         return;
       }
       case "delete-page": {
@@ -717,7 +897,7 @@ class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, delete-page, add, connect, update, append, remove-item, move or delete.`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move or delete.`,
         );
     }
   }
@@ -848,7 +1028,37 @@ export function editCommand(
     );
   }
 
-  const arrange = parsed.flags.has("--arrange");
+  return runOperations(io, path, operations, {
+    arrange: parsed.flags.has("--arrange"),
+    dryRun: parsed.flags.has("--dry-run"),
+    format,
+    ...(parsed.options.has("--snapshot")
+      ? { snapshot: parsed.options.get("--snapshot") as string }
+      : {}),
+  });
+}
+
+export interface RunOptions {
+  readonly arrange: boolean;
+  readonly dryRun: boolean;
+  readonly format: string;
+  /** Also write the result here, as a baseline for a later diff. */
+  readonly snapshot?: string;
+}
+
+/**
+ * Apply operations to the file at `path` and report them; the batch is
+ * re-applied when the file changes during the write.
+ */
+export function runOperations(
+  io: CommandIo,
+  path: string,
+  operations: readonly JsonObject[],
+  options: RunOptions,
+): CommandResult {
+  const { arrange, format } = options;
+  if (format !== "text" && format !== "json")
+    return fail(`Unsupported format "${format}". Choose text or json.`);
   let result: BatchResult | undefined;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let current: string;
@@ -870,7 +1080,7 @@ export function editCommand(
         `${cause instanceof Error ? cause.message : String(cause)}\nNothing was written.`,
       );
     }
-    if (parsed.flags.has("--dry-run")) break;
+    if (options.dryRun) break;
     let latest: string;
     try {
       latest = io.readText(path);
@@ -888,7 +1098,7 @@ export function editCommand(
         `Cannot write ${path}: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
     }
-    const snapshot = parsed.options.get("--snapshot");
+    const snapshot = options.snapshot;
     if (snapshot !== undefined)
       try {
         io.writeText(snapshot, result.text);
@@ -906,7 +1116,7 @@ export function editCommand(
       stderr: `${path} kept changing while the batch was applied (${MAX_ATTEMPTS} attempts); nothing was written. Retry later.\n`,
     };
 
-  const dryRun = parsed.flags.has("--dry-run");
+  const dryRun = options.dryRun;
   if (format === "json")
     return ok(
       `${JSON.stringify(

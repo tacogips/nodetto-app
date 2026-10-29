@@ -6,6 +6,30 @@
   color: var(--nodetto-ink, #1d2a2e);
 }
 
+.nodetto-palette-search {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--app-chrome-line, #dfe3e6);
+  border-radius: var(--app-control-radius, 6px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.nodetto-palette-search:focus-visible {
+  outline: 2px solid var(--nodetto-accent, #335c67);
+  outline-offset: 1px;
+}
+
+.nodetto-palette-empty {
+  margin: 4px 2px 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 .nodetto-shape-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(62px, 1fr));

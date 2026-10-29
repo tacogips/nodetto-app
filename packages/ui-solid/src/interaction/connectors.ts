@@ -27,7 +27,12 @@ import {
   removeConnectorWaypoint,
   straightenConnectors,
 } from "../connector-routing.ts";
-import { Tool, componentRelationshipFor, typedConnectorFor } from "../tools.ts";
+import {
+  Tool,
+  componentRelationshipFor,
+  typedConnectorFor,
+  useCaseRelationshipFor,
+} from "../tools.ts";
 import type { InteractionContext } from "./context.ts";
 import { MANUAL_ROUTE_TYPES, boxCentre, selfConnects } from "./geometry.ts";
 import type { HitTesting } from "./hit-testing.ts";
@@ -109,6 +114,7 @@ export function createConnectorGestures(
       fromPort: port ?? nearestPort(from, point)?.id,
       from,
       componentKind: componentRelationshipFor(options.tool()),
+      useCaseKind: useCaseRelationshipFor(options.tool()),
       screenTransition,
       connectorType,
       logicalRelation: options.tool() === Tool.Relation,
@@ -329,8 +335,8 @@ export function createConnectorGestures(
     const canDrawFree =
       options.tool() === Tool.Connector ||
       gesture.fromPoint ||
-      !["erd.", "uml.", "state.", "sequence.", "bpmn."].some((prefix) =>
-        sourceType.startsWith(prefix),
+      !["erd.", "uml.", "state.", "usecase.", "sequence.", "bpmn."].some(
+        (prefix) => sourceType.startsWith(prefix),
       );
     const sourceUnder =
       !target && !gesture.fromPoint && targetUnder(point, []) === gesture.from;
@@ -340,6 +346,7 @@ export function createConnectorGestures(
       (gesture.fromPoint || !target) &&
       !gesture.screenTransition &&
       !gesture.componentKind &&
+      !gesture.useCaseKind &&
       (!gesture.connectorType || gesture.connectorType === "edge.generic");
     if (
       freeLine &&
@@ -394,15 +401,23 @@ export function createConnectorGestures(
               {},
               ports,
             )
-          : gesture.connectorType === "erd.relation"
-            ? editor.connectErdRelation(
+          : gesture.useCaseKind
+            ? editor.connectUseCase(
                 gesture.from,
                 target,
-                gesture.logicalRelation === true,
+                gesture.useCaseKind,
                 {},
                 ports,
               )
-            : editor.connectSmart(gesture.from, target, {}, ports);
+            : gesture.connectorType === "erd.relation"
+              ? editor.connectErdRelation(
+                  gesture.from,
+                  target,
+                  gesture.logicalRelation === true,
+                  {},
+                  ports,
+                )
+              : editor.connectSmart(gesture.from, target, {}, ports);
       if (created) {
         editor.selection.set([created]);
       }

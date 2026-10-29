@@ -14,6 +14,12 @@ export {
   type StateNodeKind,
   type StateNodeSemantic,
   type StateTransitionSemantic,
+  USECASE_NODE_KINDS,
+  USECASE_RELATIONSHIP_KINDS,
+  type UseCaseNodeKind,
+  type UseCaseNodeSemantic,
+  type UseCaseRelationshipKind,
+  type UseCaseRelationshipSemantic,
 } from "./semantics.ts";
 export { comparePageOrder } from "./page-order.ts";
 
@@ -185,11 +191,15 @@ export {
   type LayerEffect,
   type TextResizeMode,
   isPageKind,
+  isPageMode,
   isPlainObject,
   PAGE_KINDS,
+  PAGE_MODES,
   type Page,
+  pageModeOf,
   type PageId,
   type PageKind,
+  type PageMode,
   type UnknownRecord,
   type Visual,
   type VisualStyle,

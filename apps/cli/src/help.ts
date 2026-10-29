@@ -15,6 +15,8 @@ Look at a document
   nodetto-cli diff <old> <new>    What changed between two versions
 
 Draw and edit
+  nodetto-cli shapes [<words>]    Palette shapes by shape ID (--category uml)
+  nodetto-cli draw <doc> <shape>  Draw one shape or connector by its shape ID
   nodetto-cli edit <doc>          Apply add/update/move/delete operations (JSON)
   nodetto-cli arrange <doc>       Tidy the layout of one page
 
@@ -36,10 +38,8 @@ MCP server
   nodetto-cli authorize [folder]  Grant project-folder access for the Store CLI
 
 Run "nodetto-cli help <command>" or "nodetto-cli <command> --help" for details.
-Typical AI drawing loop: inspect -> types -> edit --snapshot -> export (look at
-the PNG) -> later, diff <snapshot> <doc> to see what the person changed -> repeat.
-The desktop app shows changes to an open file live and merges them with the
-human's own edits.`;
+AI loop: inspect -> shapes/types -> edit --snapshot -> export (look at the PNG)
+-> diff <snapshot> <doc> later; the app shows and merges the edits live.`;
 
 const EXIT_CODES = `Exit codes: 0 success, 1 out of date (--check), 2 usage or input error,
 3 warnings with --strict.`;
@@ -98,11 +98,15 @@ ${EXIT_CODES}`,
   pages: `Usage: nodetto-cli pages <doc.jsonl> [--format text|json] [--kind <page kind>]
 
 List pages in display order, including page number, stable short ID, full ID,
-name and diagram kind. The number is a current display position, not an ID.
+name, diagram kind and editing mode. The number is a current display position,
+not an ID. A page's mode is the tool palette the app shows on it; a page that
+never chose one follows its kind, and the edit operation set-page-mode
+changes it.
 
   --format  text (default) or json (an array of page summaries).
-  --kind    Only pages of this kind (erd, sequence, uml, freeform,
-            architecture or bpmn). Original display numbers are retained.
+  --kind    Only pages of this kind (freeform, erd, uml, sequence, state,
+            flowchart, architecture, bpmn, breadboard or pcb). Original
+            display numbers are retained.
 
 Short IDs are stable 11-character URL-safe aliases derived from stored page
 IDs. They survive renaming, reordering, saving and reopening. Full IDs and
@@ -154,9 +158,13 @@ Without a type, list the element types grouped by the page kinds that use them.
 With a type, print its semantic fields (name, type, required, default), its
 visual fields and a minimal "add" operation for nodetto-cli edit.
 
-  --kind     Only types typically drawn on this page kind
-             (freeform, erd, uml, sequence, architecture, bpmn).
+  --kind     Only types typically drawn on this page kind (freeform, erd,
+             uml, sequence, state, flowchart, architecture, bpmn, breadboard
+             or pcb).
   --format   text (default) or json.
+
+Palette shapes (a flowchart decision, a use-case actor, an iPhone artboard) are
+listed by "nodetto-cli shapes"; several shapes can share one element type.
 
 Example:
   nodetto-cli types erd.table
@@ -178,7 +186,9 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
    "semantic":{"tableName":"orders","columns":[{"name":"id","dataType":"uuid","pk":true}]}}
   {"op":"add","page":"p1","type":"node.generic","semantic":{"label":"Pay"},
    "place":{"rightOf":"@orders","gap":80,"align":"center"}}
+  {"op":"add","page":"p1","shape":"flowchart:decision","label":"Paid?","ref":"q"}
   {"op":"connect","from":"@a","to":"@b","label":"next"}
+  {"op":"connect","shape":"uml.component:dependency","from":"@api","to":"@db"}
   {"op":"connect","from":"@orders","to":"users","fromColumn":"user_id",
    "toColumn":"id","cardinality":"*:1"}
   {"op":"update","id":"t-users","semantic":{"tableName":"accounts"},"visual":{"x":40}}
@@ -189,6 +199,7 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"add-page","name":"Flow","kind":"bpmn","ref":"flow","after":"p1"}
   {"op":"move-page","id":"p3","before":"p2"}
   {"op":"rename-page","id":"p1","name":"Shop schema"}
+  {"op":"set-page-mode","id":"p1","mode":"erd"}
   {"op":"delete-page","id":"p2"}
 
   - "id", "from", "to" and place targets accept a unique id prefix, or "@ref"
@@ -199,6 +210,12 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     right of the page content, centred on the previous auto-placed element.
     place: one of rightOf, leftOf, below, above, with optional gap (default 80)
     and align "start" (default) or "center".
+  - add with "shape" instead of "type" draws a palette shape by its shape ID
+    (run "nodetto-cli shapes"): the shape's own defaults apply first, then
+    "semantic" and "visual", and "label" sets its text. connect with "shape"
+    uses that connector (for example erd.foreign-key or usecase:include) and
+    fails when it cannot join the two elements.
+  - "page" may be left out when the document has a single page.
   - connect: picks the connector the app's connect tool would: ERD relation
     (fromColumn/toColumn by name or id, cardinality default *:1), UML
     association or component connector, state transition, sequence message on
@@ -212,6 +229,10 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   - add-page appends the page unless it gives "before" or "after" (a page) or
     "order" (a base62 fractional key, compared with the pages' "order"
     fields); move-page takes the same fields to reorder an existing page.
+    add-page also takes "mode", and set-page-mode sets a page's editing mode
+    (the tool palette the app shows on it; null follows the page kind):
+    flow, app, web, erd, class, component, usecase, sequence, state,
+    flowchart, bpmn, breadboard, pcb or all.
 
   --arrange   Run Tidy layout on every page the batch touched.
   --dry-run   Validate and report without writing.
@@ -220,6 +241,64 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   --format    text (default) or json report on stdout.
 
 Exit codes: 0 applied, 2 usage, input or operation error, 4 the file kept
+changing during the write (retry later).`,
+
+  shapes: `Usage: nodetto-cli shapes [<words>...] [--category <category>] [--connectors|--no-connectors]
+                          [--format text|json]
+       nodetto-cli shapes <shape-id> [--format text|json]
+
+List the shapes of the app's palette under their shape IDs, grouped by
+category. Draw one with "nodetto-cli draw <doc> <shape-id>" or with
+{"op":"add","shape":"<shape-id>"} in nodetto-cli edit.
+
+  <words>          Only shapes whose ID, label, category or element type
+                   contains every word (case-insensitive), e.g. actor.
+  --category       Only this category, by ID or label: general, flowchart,
+                   uml-class, uml-component, uml-use-case, uml-sequence,
+                   uml-state, erd, bpmn, breadboard, pcb, artboard,
+                   ui-control or screen. A prefix before a hyphen selects a
+                   family: "uml" lists every UML category.
+  --connectors     Only connectors (drawn between two elements).
+  --no-connectors  Only shapes placed on their own.
+  --format         text (default) or json.
+
+With one shape ID, print what it creates: the element type, the semantic and
+visual defaults it starts from, and ready-to-use draw and edit commands.
+
+Examples:
+  nodetto-cli shapes --category uml
+  nodetto-cli shapes actor
+  nodetto-cli shapes usecase:actor
+
+${EXIT_CODES}`,
+
+  draw: `Usage: nodetto-cli draw <doc.jsonl> <shape-id> [--page <short-id|id|name>] [--label <text>]
+                        [--at <x>,<y>] [--size <width>x<height>] [--right-of <id>]
+                        [--below <id>] [--dry-run] [--format text|json]
+       nodetto-cli draw <doc.jsonl> <connector-shape-id> --from <id> --to <id> [--label <text>]
+
+Draw one palette shape by its shape ID ("nodetto-cli shapes" lists them), the
+way picking it from the app's palette does. It runs one nodetto-cli edit
+operation, so validation, atomic writing and live reload in the app are the
+same.
+
+  --page      Page to draw on; may be left out when the document has one page.
+  --label     The shape's text (its name, label or text field).
+  --at        Top-left corner in canvas units. Default: right of the page
+              content.
+  --size      Width and height, for example 200x80.
+  --right-of  Place 80 units right of this element (id prefix).
+  --below     Place 80 units below this element (id prefix).
+  --from/--to Elements a connector joins; required for connector shapes.
+  --dry-run   Validate and report without writing.
+  --format    text (default) or json report, as nodetto-cli edit prints.
+
+Examples:
+  nodetto-cli draw shop.jsonl usecase:actor --label Customer
+  nodetto-cli draw shop.jsonl usecase:usecase --label "Place order" --right-of 01M4WD
+  nodetto-cli draw shop.jsonl usecase:association --from 01M4WD --to 01M4X2
+
+Exit codes: 0 drawn, 2 usage, input or operation error, 4 the file kept
 changing during the write (retry later).`,
 
   diff: `Usage: nodetto-cli diff <before.jsonl> <after.jsonl> [--format text|json] [--exit-code]

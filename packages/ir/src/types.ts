@@ -38,6 +38,58 @@ export const PAGE_KINDS = [
 export type PageKind = (typeof PAGE_KINDS)[number];
 
 /**
+ * An editing mode chooses the tool palette shown while a page is open. A page
+ * remembers its own mode, so switching pages switches the palette too. Like a
+ * page kind, it never restricts which element types may live on the page.
+ */
+export const PAGE_MODES = [
+  "flow",
+  "app",
+  "web",
+  "erd",
+  "class",
+  "component",
+  "usecase",
+  "sequence",
+  "state",
+  "flowchart",
+  "bpmn",
+  "breadboard",
+  "pcb",
+  "all",
+] as const;
+
+export type PageMode = (typeof PAGE_MODES)[number];
+
+/** Pages of these kinds always open in their own mode. */
+const DEDICATED_PAGE_MODES: Readonly<Partial<Record<string, PageMode>>> = {
+  bpmn: "bpmn",
+  breadboard: "breadboard",
+  pcb: "pcb",
+};
+
+/** Notation pages open in their notation's mode until another is chosen. */
+const KIND_PAGE_MODES: Readonly<Partial<Record<string, PageMode>>> = {
+  erd: "erd",
+  uml: "class",
+  sequence: "sequence",
+  state: "state",
+  flowchart: "flowchart",
+};
+
+/**
+ * The mode a page opens in: a dedicated page's own mode, then the mode chosen
+ * on the page, then its kind's notation. Undefined means the app's default.
+ */
+export function pageModeOf(
+  page: Pick<Page, "kind" | "mode">,
+): PageMode | undefined {
+  return (
+    DEDICATED_PAGE_MODES[page.kind] ?? page.mode ?? KIND_PAGE_MODES[page.kind]
+  );
+}
+
+/**
  * Unknown fields carried through a parse/serialize round trip untouched.
  * Forward compatibility: a newer writer may add fields this build does not
  * model, and reserializing must not drop them.
@@ -335,6 +387,8 @@ export interface Page {
   readonly id: PageId;
   readonly name: string;
   readonly kind: PageKind;
+  /** Editing mode last chosen on this page; omitted follows the page kind. */
+  readonly mode?: PageMode;
   /** Optional base62 fractional ordering key; legacy pages fall back to ID order. */
   readonly order?: FractionalIndex;
   /** Document-token mode used by elements on this page; omitted is Default. */
@@ -384,6 +438,13 @@ export interface Document {
   /** Records whose `kind` is not document/page/element, preserved verbatim. */
   readonly unknownRecords?: readonly UnknownRecord[];
   readonly extensions?: Extensions;
+}
+
+export function isPageMode(value: unknown): value is PageMode {
+  return (
+    typeof value === "string" &&
+    (PAGE_MODES as readonly string[]).includes(value)
+  );
 }
 
 export function isPageKind(value: unknown): value is PageKind {

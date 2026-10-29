@@ -302,6 +302,7 @@ export const MANUAL_ROUTE_TYPES: ReadonlySet<string> = new Set([
   "erd.relation",
   "uml.association",
   "state.transition",
+  "usecase.relationship",
   UmlComponentType.Relationship,
 ]);
 

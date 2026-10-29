@@ -13,6 +13,7 @@ import type {
   ConnectorPort,
   ElementId,
   UmlComponentRelationshipKind,
+  UseCaseRelationshipKind,
 } from "@nodetto/ir";
 import type { Accessor } from "solid-js";
 import type { ToolKind } from "../tools.ts";
@@ -153,6 +154,7 @@ export type Gesture =
       readonly fromPort?: ConnectorPort;
       readonly from: ElementId;
       readonly componentKind?: UmlComponentRelationshipKind;
+      readonly useCaseKind?: UseCaseRelationshipKind;
       readonly connectorType?: string;
       readonly logicalRelation?: boolean;
       readonly screenTransition?: boolean;

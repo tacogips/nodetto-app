@@ -55,6 +55,8 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "uml.interface",
     "uml.port",
     "uml.component-relationship",
+    "usecase.node",
+    "usecase.relationship",
     "text.note",
     "frame",
   ],

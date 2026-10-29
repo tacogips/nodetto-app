@@ -20,7 +20,12 @@ workspace navigation available.
 - Design workspaces offer remaining artboard presets in a collapsed section;
   presets already visible in the primary grid are omitted there.
 - Changing mode immediately replaces the primary grid, even if a secondary
-  section was previously collapsed.
+  section was previously collapsed. The mode is stored on the current page, so
+  switching pages restores that page's palette.
+- A search box above the sections searches every palette shape, in any mode,
+  through the shared shape catalogue in `@nodetto/core` (shape ID, label,
+  category and element type). The CLI's `shapes` and `draw` commands use the
+  same catalogue and shape IDs.
 - Selecting a tile activates the existing canvas tool. Click the canvas to place
   a shape at its default size; resize with its handles. Existing connectors still
   connect shape endpoints. Placement returns to Select. Escape cancels the tool.

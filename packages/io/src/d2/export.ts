@@ -216,6 +216,7 @@ function shapeKind(element: Element): string | null {
           "stored-data": "stored_data",
           "direct-data": "queue",
           person: "person",
+          package: "package",
         } as Record<string, string>
       )[kind] ?? "rectangle"
     );

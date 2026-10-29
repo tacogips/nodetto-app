@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DocumentValidationError, type ValidationIssue } from "./issues.ts";
-import { type Document, elementsByPage } from "./types.ts";
+import { type Document, elementsByPage, pageModeOf } from "./types.ts";
 import {
   assertValidDocument,
   isValidDocument,
@@ -51,6 +51,27 @@ test("page SQL input dialect is optional and restricted to supported dialects", 
       (issue) => issue.path === "pages[0].sqlDialect",
     ),
   ).toBe(true);
+});
+
+test("page editing mode is optional and restricted to known modes", () => {
+  const doc = base();
+  for (const mode of [undefined, "flow", "usecase", "all"] as const)
+    expect(
+      isValidDocument({ ...doc, pages: [{ ...doc.pages[0], mode }] }),
+    ).toBe(true);
+  expect(
+    validateDocument({
+      ...doc,
+      pages: [{ ...doc.pages[0], mode: "paint" }],
+    } as unknown as Document).some((issue) => issue.path === "pages[0].mode"),
+  ).toBe(true);
+});
+
+test("a page opens in its dedicated, chosen or notation mode", () => {
+  expect(pageModeOf({ kind: "pcb", mode: "erd" })).toBe("pcb");
+  expect(pageModeOf({ kind: "erd", mode: "all" })).toBe("all");
+  expect(pageModeOf({ kind: "uml" })).toBe("class");
+  expect(pageModeOf({ kind: "freeform" })).toBeUndefined();
 });
 
 function codes(issues: readonly ValidationIssue[]): string[] {

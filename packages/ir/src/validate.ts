@@ -34,6 +34,7 @@ import {
   type Document,
   isPlainObject,
   PAGE_KINDS,
+  PAGE_MODES,
 } from "./types.ts";
 
 const VISUAL_NUMBER_FIELDS = [
@@ -733,6 +734,8 @@ export function validateDocument(
       }
       checkString(out, page["name"], `${path}.name`, { allowEmpty: true });
       checkEnum(out, page["kind"], `${path}.kind`, PAGE_KINDS);
+      if (page["mode"] !== undefined)
+        checkEnum(out, page["mode"], `${path}.mode`, PAGE_MODES);
       if (page["order"] !== undefined) {
         const order = page["order"];
         if (

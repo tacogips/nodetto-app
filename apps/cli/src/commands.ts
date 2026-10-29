@@ -36,6 +36,8 @@ import { helpFor, OVERVIEW } from "./help.ts";
 import { pagesCommand } from "./pages-command.ts";
 import { inspectCommand } from "./inspect-command.ts";
 import { typesCommand } from "./types-command.ts";
+import { shapesCommand } from "./shapes-command.ts";
+import { drawCommand } from "./draw-command.ts";
 import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
@@ -877,6 +879,10 @@ export function runCli(
       return editCommand(io, rest);
     case "types":
       return typesCommand(io, rest);
+    case "shapes":
+      return shapesCommand(io, rest);
+    case "draw":
+      return drawCommand(io, rest);
     case "pages":
       return pagesCommand(io, rest);
     case "inspect":

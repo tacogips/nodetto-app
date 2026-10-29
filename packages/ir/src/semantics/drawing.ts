@@ -47,6 +47,7 @@ export const GEO_KINDS = [
   "double-arrow",
   "right-triangle",
   "person",
+  "package",
 ] as const;
 export type GeoKind = (typeof GEO_KINDS)[number];
 

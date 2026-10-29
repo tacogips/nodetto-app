@@ -22,8 +22,8 @@ associations.
 ## Features
 
 - **Diagrams**: ER diagrams with PostgreSQL, MySQL and SQLite DDL export, UML
-  class and component diagrams, sequence diagrams, state machines, flowcharts
-  and BPMN operation flows. See [Editing diagrams](docs/editing.md).
+  class, component and use-case diagrams, sequence diagrams, state machines,
+  flowcharts and BPMN operation flows. See [Editing diagrams](docs/editing.md).
 - **Import and export**: Mermaid, draw.io, D2, BPMN XML, SVG, PNG, PDF and
   static websites. See [Import and export](docs/import-export.md).
 - **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,
@@ -54,6 +54,8 @@ MIT License.
 
 ```bash
 nodetto-cli inspect schema.jsonl
+nodetto-cli shapes --category uml
+nodetto-cli draw schema.jsonl usecase:actor --label Customer
 nodetto-cli export schema.jsonl --format png --output schema.png
 nodetto-cli ddl schema.jsonl --dialect postgresql --check schema.sql
 nodetto-cli gerber import board-gerbers.zip --output board.jsonl

@@ -12,6 +12,7 @@ const OMITTED_INTERFACE_TYPES = new Set([
   "erd.relation",
   "uml.association",
   "state.transition",
+  "usecase.relationship",
   UmlComponentType.Relationship,
   "sequence.message",
 ]);

@@ -134,6 +134,7 @@ export const DRAWIO_SHAPES: Readonly<Record<string, DrawioShape>> = {
   actor: { geo: "person" },
   umlActor: { geo: "person", approximate: true },
   mermaidPerson: { geo: "person" },
+  folder: { geo: "package" },
   wedgeCallout: { geo: "callout" },
   ext: { geo: "rect", approximate: true },
   note: { geo: "note" },

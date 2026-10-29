@@ -18,6 +18,7 @@ import { croppedImageBox } from "../image-crop.ts";
 import { compoundPathGeometry } from "../shapes/compound-path.ts";
 import { freehandGeometry } from "../shapes/freehand.ts";
 import { stateNodeNotation } from "../shapes/state.ts";
+import { useCaseNodeNotation } from "../shapes/usecase.ts";
 import {
   renderGeo,
   renderNode,
@@ -254,6 +255,10 @@ export function renderShape(
       return renderUmlComponent(element, box, theme);
     case "state.node":
       return stateNodeNotation(element, box)
+        .map((primitive) => renderNotationPrimitive(primitive))
+        .join("");
+    case "usecase.node":
+      return useCaseNodeNotation(element, box)
         .map((primitive) => renderNotationPrimitive(primitive))
         .join("");
     case "uml.class":

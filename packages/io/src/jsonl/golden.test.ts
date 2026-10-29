@@ -24,6 +24,7 @@ const GOLDEN = [
   "uml-component",
   "sequence",
   "state",
+  "usecase",
   "flowchart",
   "freeform",
   "image",

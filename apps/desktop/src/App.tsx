@@ -153,15 +153,27 @@ export function App(props: AppProps): JSX.Element {
       return undefined;
     }
   };
-  const [workspace, setWorkspace] = createSignal<WorkspaceId>(
+  // Pages remember their own mode; the preference is the mode for pages
+  // that never chose one.
+  const [defaultWorkspace, setDefaultWorkspace] = createSignal<WorkspaceId>(
     readWorkspacePreference(preferenceStorage()),
   );
+  const [workspace, setWorkspaceSignal] = createSignal<WorkspaceId>(
+    defaultWorkspace(),
+  );
   const simpleWorkspace = () => !workspaceById(workspace()).design;
-  const changeWorkspace = (id: WorkspaceId) => {
-    selectWorkspacePage(props.editor, id);
+  const setWorkspace = (id: WorkspaceId) => {
+    if (id === workspace()) return;
     setActiveTool("select");
     setContextMenu(null);
+    setWorkspaceSignal(id);
+  };
+  const changeWorkspace = (id: WorkspaceId) => {
+    selectWorkspacePage(props.editor, id);
     setWorkspace(id);
+  };
+  const changeDefaultWorkspace = (id: WorkspaceId) => {
+    setDefaultWorkspace(id);
     writeWorkspacePreference(preferenceStorage(), id);
   };
   const editorSignals = createEditorSignals(props.editor);
@@ -378,7 +390,7 @@ export function App(props: AppProps): JSX.Element {
     );
   };
 
-  followPageWorkspace(props, editorSignals.rev, workspace, setWorkspace);
+  followPageWorkspace(props, editorSignals.rev, defaultWorkspace, setWorkspace);
 
   onMount(() => {
     const launch = props.launchBackend;
@@ -592,8 +604,8 @@ export function App(props: AppProps): JSX.Element {
           onCanvasBackgroundChange={setCanvasBackground}
           pcbCanvasBackground={pcbCanvasBackground()}
           onPcbCanvasBackgroundChange={setPcbCanvasBackground}
-          workspace={workspace()}
-          onWorkspaceChange={changeWorkspace}
+          workspace={defaultWorkspace()}
+          onWorkspaceChange={changeDefaultWorkspace}
           showGrid={showGrid()}
           onShowGridChange={setShowGrid}
           showRulers={showRulers()}

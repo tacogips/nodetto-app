@@ -600,6 +600,7 @@ describe("exportDrawio", () => {
       "double-arrow",
       "right-triangle",
       "person",
+      "package",
       "document",
       "delay",
       "card",
@@ -666,4 +667,25 @@ describe("exportDrawio", () => {
       ),
     ).toBe(true);
   });
+});
+
+test("use-case diagrams export as draw.io UML actors, ellipses and folders", async () => {
+  const document = parseDocument(
+    await Bun.file(
+      new URL("../__fixtures__/usecase.jsonl", import.meta.url),
+    ).text(),
+  );
+  const { xml, warnings } = exportDrawio(document);
+  expect(warnings).toEqual([]);
+  expect(xml).toContain("shape=umlActor");
+  expect(xml).toMatch(/value="Borrow item" style="ellipse;/);
+  expect(xml).toContain("shape=folder");
+  expect(xml).toContain("«include»");
+  expect(xml).toContain("endArrow=block;endFill=0");
+  const reimported = importDrawio(xml).document;
+  expect(validateDocument(reimported)).toEqual([]);
+  expect(
+    reimported.elements.find((element) => element.id === "drawio-records")
+      ?.semantic,
+  ).toEqual({ geo: "package", label: "Records" });
 });

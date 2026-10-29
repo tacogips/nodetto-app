@@ -7,6 +7,7 @@ import type {
   FractionalIndex,
   PageId,
   PageKind,
+  PageMode,
   Visual,
   VisualStyle,
 } from "@nodetto/ir";
@@ -59,6 +60,7 @@ export interface CreatePageOptions {
   readonly id?: PageId;
   readonly name?: string;
   readonly kind?: PageKind;
+  readonly mode?: PageMode;
 }
 
 export type BpmnEditResult =

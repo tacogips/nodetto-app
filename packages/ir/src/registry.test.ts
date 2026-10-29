@@ -33,6 +33,8 @@ describe("registry contents", () => {
         ...DESIGN_TABLE_TYPES,
         "state.node",
         "state.transition",
+        "usecase.node",
+        "usecase.relationship",
         ...Object.values(UmlComponentType),
         "erd.view",
         "erd.materialized-view",

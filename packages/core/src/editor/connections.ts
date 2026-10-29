@@ -1,6 +1,6 @@
 // Connector rules by diagram type: which connector a drag between two
 // elements creates, and the validated ERD relation, UML component
-// relationship and port placements. Each one creates through the editor, so
+// relationship, use-case relationship and port placements. Each one creates through the editor, so
 // it is validated and undoable like any other edit.
 
 import {
@@ -9,6 +9,7 @@ import {
   UmlComponentRelationship,
   type UmlComponentRelationshipKind,
   UmlComponentType,
+  type UseCaseRelationshipKind,
 } from "@nodetto/ir";
 import type { Editor } from "../editor.ts";
 import type { Rng } from "../fractional.ts";
@@ -59,6 +60,15 @@ export function connectByType(
       applyOptions,
     );
   }
+  if (source.type === "usecase.node" && target.type === "usecase.node")
+    return connectUseCases(
+      editor,
+      from,
+      to,
+      "association",
+      applyOptions,
+      ports,
+    );
   if (source.type.startsWith("bpmn.") && target.type.startsWith("bpmn.")) {
     const result = editor.connectBpmn(from, to, undefined, applyOptions, ports);
     return result.ok ? result.id : null;
@@ -161,6 +171,37 @@ export function connectUmlComponents(
     return null;
   return editor.createElement(
     UmlComponentType.Relationship,
+    { page: source.page, semantic: { from, to, kind, ...ports } },
+    options,
+  );
+}
+
+/** Use-case relationships connect actors, use cases and systems only. */
+export function connectUseCases(
+  editor: Editor,
+  from: ElementId,
+  to: ElementId,
+  kind: UseCaseRelationshipKind,
+  options: ApplyOptions,
+  ports: ConnectorPorts,
+): ElementId | null {
+  const source = editor.store.get(from);
+  const target = editor.store.get(to);
+  const context = editor.createShapeContext();
+  if (
+    editor.readOnly ||
+    from === to ||
+    !source ||
+    !target ||
+    source.page !== target.page ||
+    source.type !== "usecase.node" ||
+    target.type !== "usecase.node" ||
+    context.isLocked?.(from) ||
+    context.isLocked?.(to)
+  )
+    return null;
+  return editor.createElement(
+    "usecase.relationship",
     { page: source.page, semantic: { from, to, kind, ...ports } },
     options,
   );

@@ -118,6 +118,16 @@ function elementBoundary(
       );
     }
   }
+  if (
+    element.type === "usecase.node" &&
+    (element.semantic as { kind?: string }).kind === "usecase"
+  )
+    return ellipseBoundaryIntersection(origin, target, {
+      x: box.x + 1,
+      y: box.y + 1,
+      width: Math.max(0, box.width - 2),
+      height: Math.max(0, box.height - 2),
+    });
   if (element.type === UmlComponentType.Interface) {
     return ellipseBoundaryIntersection(origin, target, {
       x: box.x + 2,

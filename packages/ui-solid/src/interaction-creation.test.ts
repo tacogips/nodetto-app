@@ -187,6 +187,10 @@ describe("creationFor", () => {
       Tool.Association,
       Tool.SequenceMessage,
       Tool.StateTransition,
+      Tool.UseCaseAssociation,
+      Tool.UseCaseInclude,
+      Tool.UseCaseExtend,
+      Tool.UseCaseGeneralization,
     ]);
     for (const tool of TOOLS) {
       expect(creationFor(tool) === null).toBe(gestures.has(tool));
@@ -311,6 +315,63 @@ describe("component mode pointer authoring", () => {
       interaction.dispose();
     });
   }
+});
+
+describe("use-case mode pointer authoring", () => {
+  for (const kind of [
+    "association",
+    "include",
+    "extend",
+    "generalization",
+  ] as const) {
+    const tool = `usecase:${kind}` as const;
+    test(`${tool} drags a typed relationship and refuses other endpoints`, () => {
+      const editor = new Editor();
+      const actor = editor.createElement("usecase.node", {
+        semantic: { name: "Member", kind: "actor" },
+        visual: { x: 0, y: 0 },
+      });
+      const useCase = editor.createElement("usecase.node", {
+        semantic: { name: "Borrow", kind: "usecase" },
+        visual: { x: 300, y: 0 },
+      });
+      editor.createElement("uml.class", { visual: { x: 600, y: 0 } });
+      const { interaction } = interactionFor(editor, tool);
+      interaction.onPointerDown(pointer({ clientX: 32, clientY: 56 }));
+      interaction.onPointerUp(pointer({ clientX: 380, clientY: 36 }));
+      const edge = editor.store
+        .listElements()
+        .find((item) => item.type === "usecase.relationship");
+      expect(edge?.semantic).toMatchObject({ from: actor, to: useCase, kind });
+      interaction.onPointerDown(pointer({ clientX: 32, clientY: 56 }));
+      interaction.onPointerUp(pointer({ clientX: 650, clientY: 50 }));
+      expect(
+        editor.store
+          .listElements()
+          .filter((item) => item.type === "usecase.relationship"),
+      ).toHaveLength(1);
+      editor.undo();
+      expect(editor.store.get(edge?.id ?? "")).toBeUndefined();
+      interaction.dispose();
+    });
+  }
+
+  test("node tools place each kind at its own default size", () => {
+    for (const [tool, width, height] of [
+      [Tool.UseCaseActor, 64, 112],
+      [Tool.UseCase, 160, 72],
+      [Tool.UseCaseSystem, 400, 320],
+    ] as const) {
+      const editor = new Editor();
+      const { interaction } = interactionFor(editor, tool);
+      interaction.onPointerDown(pointer({ clientX: 100, clientY: 100 }));
+      interaction.onPointerUp(pointer({ clientX: 100, clientY: 100 }));
+      const [placed] = editor.store.listElements();
+      expect(placed?.type).toBe("usecase.node");
+      expect(placed?.visual).toMatchObject({ width, height });
+      interaction.dispose();
+    }
+  });
 });
 
 test("palette drops share click creation, select the new element and remain one undo step", () => {

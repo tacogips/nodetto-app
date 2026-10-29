@@ -427,6 +427,7 @@ export function generateInterfaceCode(
       "erd.relation",
       "uml.association",
       UmlComponentType.Relationship,
+      "usecase.relationship",
       "sequence.message",
     ].includes(element.type),
   );

@@ -749,6 +749,27 @@ export function geoOutline(
       ]);
     case "person":
       return polygon(personPoints(width, height));
+    case "package": {
+      // UML package: a name tab on the top-left above the body rectangle.
+      const tabWidth = round(Math.min(width * 0.4, 96));
+      const tabHeight = round(Math.min(height * 0.2, 18));
+      return polygon(
+        [
+          [left, top],
+          [left + tabWidth, top],
+          [left + tabWidth, top + tabHeight],
+          [right, top + tabHeight],
+          [right, bottom],
+          [left, bottom],
+        ],
+        [
+          [
+            [left, top + tabHeight],
+            [left + tabWidth, top + tabHeight],
+          ],
+        ],
+      );
+    }
     default:
       return rectOutline(width, height);
   }

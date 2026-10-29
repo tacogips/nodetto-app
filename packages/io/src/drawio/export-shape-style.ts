@@ -323,6 +323,12 @@ export function geoStyle(
       return shape("mxgraph.basic.orthogonal_triangle");
     case "person":
       return shape("actor");
+    case "package":
+      return shape("folder", [
+        ["tabWidth", round(Math.min(box.width * 0.4, 96))],
+        ["tabHeight", round(Math.min(box.height * 0.2, 18))],
+        ["tabPosition", "left"],
+      ]);
   }
   return { names: [], entries: [["rounded", 0]] };
 }

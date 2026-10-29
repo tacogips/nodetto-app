@@ -21,6 +21,7 @@ import {
   type FrameSemantic,
   type PageId,
   type PageKind,
+  type PageMode,
   type Page,
   type ParticipantKind,
   isPlainObject,
@@ -29,6 +30,7 @@ import {
   type TextNoteSemantic,
   type TextResizeMode,
   type UmlComponentRelationshipKind,
+  type UseCaseRelationshipKind,
   type Visual,
 } from "@nodetto/ir";
 import {
@@ -92,6 +94,7 @@ import {
   connectByType,
   connectErdTables,
   connectUmlComponents,
+  connectUseCases,
   placeUmlPort,
 } from "./editor/connections.ts";
 import {
@@ -172,6 +175,7 @@ import type {
 } from "./shape-util.ts";
 import type { FramePresetKey } from "./shapes/frame.ts";
 import { createDefaultRegistry } from "./shapes/index.ts";
+import { USECASE_NODE_SIZES } from "./shapes/usecase.ts";
 import { Store, type StoreDiff } from "./store.ts";
 import {
   renderArtboardSvg,
@@ -804,9 +808,15 @@ export class Editor {
       type === "state.node" &&
       isPlainObject(options.semantic) &&
       options.semantic["kind"] !== "state";
+    const useCaseKind =
+      type === "usecase.node" && isPlainObject(options.semantic)
+        ? options.semantic["kind"]
+        : undefined;
     const defaultVisual = compactState
       ? { ...util.defaultVisual(), width: 32, height: 32 }
-      : util.defaultVisual();
+      : useCaseKind === "actor" || useCaseKind === "system"
+        ? { ...util.defaultVisual(), ...USECASE_NODE_SIZES[useCaseKind] }
+        : util.defaultVisual();
     const visual: Visual = { ...defaultVisual, ...(options.visual ?? {}) };
     const semantic =
       options.semantic === undefined
@@ -1607,6 +1617,18 @@ export class Editor {
     return true;
   }
 
+  /** Remember the editing mode chosen on a page; null forgets it. */
+  setPageMode(
+    id: PageId,
+    mode: PageMode | null,
+    applyOptions: ApplyOptions = {},
+  ): boolean {
+    const page = this.store.getPage(id);
+    if (!page || (page.mode ?? null) === mode) return false;
+    this.apply([{ type: "updatePage", id, page: { mode } }], applyOptions);
+    return true;
+  }
+
   /** Change ERD input syntax without changing the independently chosen export target. */
   setPageSqlDialect(
     id: PageId,
@@ -1785,6 +1807,17 @@ export class Editor {
     ports: ConnectorPorts = {},
   ): ElementId | null {
     return connectUmlComponents(this, from, to, kind, options, ports);
+  }
+
+  /** Use-case relationships connect actors, use cases and systems only. */
+  connectUseCase(
+    from: ElementId,
+    to: ElementId,
+    kind: UseCaseRelationshipKind,
+    options: ApplyOptions = {},
+    ports: ConnectorPorts = {},
+  ): ElementId | null {
+    return connectUseCases(this, from, to, kind, options, ports);
   }
 
   /** Click a component to attach a port to its nearest boundary. */

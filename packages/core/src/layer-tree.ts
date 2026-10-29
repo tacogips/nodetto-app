@@ -91,6 +91,10 @@ function searchTerms(element: Element): string[] {
       );
   } else if (element.type === "state.node") {
     terms.push(fields(semantic, ["kind"]));
+  } else if (element.type === "usecase.node") {
+    terms.push(fields(semantic, ["kind"]));
+  } else if (element.type === "usecase.relationship") {
+    terms.push(fields(semantic, ["kind"]));
   } else if (element.type === "uml.class") {
     for (const attribute of records(semantic.attributes))
       terms.push(`Attribute: ${fields(attribute, ["name", "type"])}`);

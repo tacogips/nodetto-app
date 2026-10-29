@@ -29,6 +29,16 @@ test("SQL input dialect is a page field through JSONL round trips", () => {
   }
 });
 
+test("page editing mode is a page field through JSONL round trips", () => {
+  const doc: Document = {
+    ...MINIMAL,
+    pages: [{ id: "p1", name: "Actors", kind: "uml", mode: "usecase" }],
+  };
+  const text = serializeDocument(doc);
+  expect(text).toContain('"pageKind":"uml","mode":"usecase"');
+  expect(parseDocument(text).pages).toEqual(doc.pages);
+});
+
 test("portable auto-increment metadata round-trips through JSONL", () => {
   const doc: Document = {
     ...MINIMAL,

@@ -21,10 +21,12 @@ import {
   connectorEndpointIssues,
   hasErrors,
   isPageKind,
+  isPageMode,
   isPlainObject,
   type Page,
   type PageId,
   type PageKind,
+  type PageMode,
   type ValidationIssue,
   type Visual,
   validateAccessibilityMetadata,
@@ -78,6 +80,7 @@ export type Command =
       readonly page: {
         readonly name?: string;
         readonly kind?: PageKind;
+        readonly mode?: PageMode | null;
         readonly tokenMode?: string | null;
         readonly sqlDialect?: Page["sqlDialect"] | null;
         readonly order?: FractionalIndex | null;
@@ -375,6 +378,8 @@ function validateNewPage(
   if (!isPageKind(page.kind)) {
     out.push(error("value.enum", "page.kind", "unknown page kind"));
   }
+  if (page.mode !== undefined && !isPageMode(page.mode))
+    out.push(error("value.enum", "page.mode", "unknown page mode"));
   if (
     page.sqlDialect !== undefined &&
     !["postgresql", "mysql", "sqlite"].includes(page.sqlDialect)
@@ -648,6 +653,11 @@ export function applyCommands(
             "updatePage: unknown page kind",
           );
         }
+        if (patch.mode != null && !isPageMode(patch.mode))
+          fail(
+            [error("value.enum", "page.mode", "unknown page mode")],
+            "updatePage: unknown page mode",
+          );
         if (
           patch.tokenMode !== undefined &&
           patch.tokenMode !== null &&
@@ -688,6 +698,7 @@ export function applyCommands(
           );
         }
         const {
+          mode: _oldPageMode,
           tokenMode: _oldMode,
           order: _oldOrder,
           sqlDialect: _oldDialect,
@@ -695,6 +706,13 @@ export function applyCommands(
         } = previous;
         pages.set(command.id, {
           ...base,
+          ...(patch.mode === null
+            ? {}
+            : patch.mode !== undefined
+              ? { mode: patch.mode }
+              : previous.mode === undefined
+                ? {}
+                : { mode: previous.mode }),
           ...(patch.sqlDialect === null
             ? {}
             : patch.sqlDialect !== undefined
@@ -724,6 +742,11 @@ export function applyCommands(
           page: {
             name: previous.name,
             kind: previous.kind,
+            // Only a mode change restores the mode, so undoing a rename never
+            // reverts a mode chosen outside the undo history.
+            ...(patch.mode === undefined
+              ? {}
+              : { mode: previous.mode ?? null }),
             tokenMode: previous.tokenMode ?? null,
             sqlDialect: previous.sqlDialect ?? null,
             order: previous.order ?? null,

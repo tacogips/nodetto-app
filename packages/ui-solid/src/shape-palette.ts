@@ -74,6 +74,13 @@ export const PALETTE_ICONS = {
   capacitor: "M3 16h10m0-10v20m5-20v20m0-10h11",
   transistor: "M9 7v18m0-9h8m-3-5l7-7m-7 17l7 7M18 11l-1-6 6 2m-6 11l-1 6 6-2",
   wire: "M3 25h9V8h14",
+  useCase: "M29 16a13 8 0 11-26 0 13 8 0 0126 0zM10 16h12",
+  systemBoundary:
+    "M3 3h26v26H3zM11 8h10M8 16a4 3 0 108 0 4 3 0 10-8 0zM16 23a4 3 0 108 0 4 3 0 10-8 0z",
+  association: "M4 28L28 4",
+  dashedArrow: "M4 28l3-3m3-3l3-3m3-3l3-3m3-3l6-6M20 4h8v8",
+  generalization: "M4 28l16.5-16.5M28 4l-10 5 5 5z",
+  package: "M3 5h11v5H3zM3 10h26v18H3z",
 } as const;
 
 export interface ShapePaletteItem {
@@ -120,6 +127,7 @@ export const COMMON_SHAPES: readonly ShapePaletteItem[] = [
     icon: "rightTriangle",
   },
   { tool: Tool.Person, label: "Person", icon: "person" },
+  { tool: Tool.Package, label: "Package", icon: "package" },
   { tool: Tool.Text, label: "Text", icon: "text" },
   { tool: Tool.Note, label: "Note", icon: "note" },
   { tool: Tool.Node, label: "Node", icon: "node" },
@@ -200,6 +208,21 @@ export const DIAGRAM_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.Dependency, label: "Dependency", icon: "edge" },
   { tool: Tool.Realization, label: "Realization", icon: "edge" },
   { tool: Tool.ComponentConnector, label: "Component connector", icon: "edge" },
+  { tool: Tool.UseCaseActor, label: "Actor", icon: "actor" },
+  { tool: Tool.UseCase, label: "Use case", icon: "useCase" },
+  {
+    tool: Tool.UseCaseSystem,
+    label: "System boundary",
+    icon: "systemBoundary",
+  },
+  { tool: Tool.UseCaseAssociation, label: "Association", icon: "association" },
+  { tool: Tool.UseCaseInclude, label: "Include", icon: "dashedArrow" },
+  { tool: Tool.UseCaseExtend, label: "Extend", icon: "dashedArrow" },
+  {
+    tool: Tool.UseCaseGeneralization,
+    label: "Generalization",
+    icon: "generalization",
+  },
   { tool: Tool.Table, label: "Table", icon: "table" },
   { tool: Tool.View, label: "View", icon: "view" },
   {
@@ -361,6 +384,18 @@ const PRIMARY_TOOLS = {
     Tool.StateTransition,
     Tool.Text,
   ],
+  usecase: [
+    Tool.UseCaseActor,
+    Tool.UseCase,
+    Tool.UseCaseSystem,
+    Tool.UseCaseAssociation,
+    Tool.UseCaseInclude,
+    Tool.UseCaseExtend,
+    Tool.UseCaseGeneralization,
+    Tool.Package,
+    Tool.Text,
+    Tool.Frame,
+  ],
   class: [Tool.Class, Tool.Association, Tool.Text, Tool.Frame],
   sequence: [
     Tool.Actor,
@@ -476,6 +511,11 @@ export function shapePaletteGroups(
     )
       return "Flowchart";
     if (tool.startsWith("state")) return "State transition";
+    if (
+      tool.startsWith("usecase:") ||
+      (id === "usecase" && tool === Tool.Package)
+    )
+      return "UML use case";
     if (DIAGRAM_SHAPES.some((item) => item.tool === tool)) return "UML";
     if (BPMN_SHAPES.some((item) => item.tool === tool)) return "BPMN";
     if (BREADBOARD_SHAPES.some((item) => item.tool === tool))

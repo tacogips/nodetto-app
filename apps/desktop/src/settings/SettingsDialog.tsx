@@ -178,7 +178,9 @@ export function SettingsDialog(props: SettingsDialogProps): JSX.Element {
           <h3>{categories().find((item) => item.id === category())?.label}</h3>
           <Show when={category() === "general"}>
             <label class="app-settings-row">
-              <span>Mode</span>
+              <span title="Pages that have not chosen a mode open in this one">
+                Default mode
+              </span>
               <select
                 aria-label="Default editing mode"
                 value={props.workspace}

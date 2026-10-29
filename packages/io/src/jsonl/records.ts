@@ -34,6 +34,7 @@ export const PAGE_RECORD_KEYS: readonly string[] = [
   "id",
   "name",
   "pageKind",
+  "mode",
   "order",
   "tokenMode",
   "sqlDialect",
