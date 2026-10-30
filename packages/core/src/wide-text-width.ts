@@ -43,8 +43,8 @@ export function isWideCodePoint(codePoint: number): boolean {
   let high = EAST_ASIAN_WIDE_RANGES.length / 2 - 1;
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
-    const start = EAST_ASIAN_WIDE_RANGES[mid * 2];
-    const end = EAST_ASIAN_WIDE_RANGES[mid * 2 + 1];
+    const start = EAST_ASIAN_WIDE_RANGES[mid * 2] as number;
+    const end = EAST_ASIAN_WIDE_RANGES[mid * 2 + 1] as number;
     if (codePoint < start) high = mid - 1;
     else if (codePoint > end) low = mid + 1;
     else return true;
