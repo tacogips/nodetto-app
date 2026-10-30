@@ -32,11 +32,15 @@ reports warnings, and usage or parse errors exit 2. In a checkout, run it with
 The executable embeds the shared diagram engine in Boa, a JavaScript interpreter written in Rust.
 The JS interpreter uses no QuickJS C runtime or FFI bindings.
 It needs no Node.js or Bun installation and uses no JIT. Bun bundles the shared
-engine at build time; the TypeScript CLI remains a reference for parity tests. `lint` checks BPMN
-and breadboard pages. It exits 0 when there are no
+engine at build time; the TypeScript CLI remains a reference for parity tests. `lint` checks BPMN,
+breadboard, architecture, freeform and flowchart pages. On architecture, freeform and flowchart pages it reports the text-layout warnings
+`label-overflow`, `label-collision` and `note-overflow` with measured and available sizes.
+East Asian wide and fullwidth characters are measured at 1 em, so the lint also reports lines that real fonts clip.
+It exits 0 when there are no
 error-level findings (warnings may still be printed), 1 when error-level
 findings exist, and 2 for usage, parse, or config errors; it has no `--strict`
-option. `bpmn import` and `bpmn export` exit 3 with `--strict` when they report
+option. A whole-page SVG, PNG or PDF export of an architecture, freeform or flowchart page prints the same findings as `warning:` lines on stderr.
+`bpmn import` and `bpmn export` exit 3 with `--strict` when they report
 warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
 `breadboard bom --check` and `breadboard netlist --check` exit 1 on drift;
 `breadboard bom`, `netlist`, `gerber` and `import`, and `gerber import` and

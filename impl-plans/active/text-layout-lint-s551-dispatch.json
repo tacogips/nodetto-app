@@ -1,0 +1,331 @@
+{
+  "taskId": "text-layout-lint-s551",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-551",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "none configured",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "a9728e640279a5a3ef20f7c36c46d0bcb08009f3",
+  "designDocPaths": [
+    "design-docs/specs/design-text-layout-lint.md",
+    "design-docs/user-qa/text-layout-lint.md",
+    "design-docs/specs/export.md",
+    "design-docs/specs/design-cli-ai-drawing.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/tll-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/text-layout-lint-s551",
+  "evidenceLayout": "Per-plan logs go under tmp/text-layout-lint-s551/<planId>/ (one attempt-<n>/ subdirectory per retry) and reconciliation output under tmp/text-layout-lint-s551/reconcile/. tmp/ is git-ignored (.gitignore line 41). No *.test.ts file may be written under tmp/.",
+  "reviewContext": {
+    "issueReference": "none (no GitHub issue supplied; request taken from runtimeVariables.workflowInput.requestedOutcome, session opus-terra-design-and-implement-review-loop-session-551)",
+    "userProblem": "Text layout problems on architecture pages (clipped node label lines, overlapping edge labels, notes running into the element below) are only visible in an exported PNG. nodetto-cli lint accepts only BPMN and breadboard pages (apps/cli/src/commands.ts:289 filter, LINT_NO_PAGES at :94), so lint --page <architecture page> fails, and validate and edit pass while text is visibly broken.",
+    "requiredOutcomes": [
+      "nodetto-cli lint doc.jsonl --page <architecture page> works: a clean page prints nothing and exits 0; crafted bad fixtures produce label-overflow, label-collision and note-overflow findings with element ids and measured vs available sizes; --format json uses the existing report shape (tll-01, tll-03).",
+      "Without --page, lint includes architecture pages alongside BPMN and breadboard pages; LINT_NO_PAGES becomes 'The document contains no BPMN, breadboard or architecture pages.' (tll-03).",
+      "nodetto-cli export --format svg|png|pdf of a whole architecture page prints the findings as 'warning: <ruleId> <elementId>: <message>' lines on stderr before the Wrote line; exported bytes and exit code are unchanged (tll-04).",
+      "Findings agree with the export renderer: a label that export wraps to fit is not reported; a clipped or spilling label line is reported; agreement is tested against renderPageSvg (tll-01).",
+      "Native CLI parity (mise run test-cli) passes with new text-layout cases that run, not skip; existing lint tests unchanged and passing; lint-ts and typecheck pass (tll-05, reconciliation).",
+      "Help text (help.ts overview, lint, export), docs/cli.md and design docs describe the three stable rule ids (tll-02, design docs)."
+    ],
+    "nonGoals": [
+      "Other page kinds (only architecture; user-qa Q1), real-font or CJK measurement (Q2), --element/HTML/Mermaid/D2/draw.io/code export warnings (Q3), new JSON fields, lint configuration or severity overrides, an export --strict flag (Q4).",
+      "Labels of usecase.node, state.node, BPMN, ERD, UML class and sequence elements; frame clipping (clipOf) modelling.",
+      "Any change to packages/io/src/bpmn, packages/core/src/svg-export/**, label-layout.ts, node-label.ts, shapes/connector/*, apps/cli/native/**, packages/io/src/__fixtures__/** or examples/**.",
+      "Version bumps, releases, pushes; server, auth or deployment code."
+    ],
+    "constraints": [
+      "Do not touch packages/io/src/bpmn (a parallel branch changes it); git diff --quiet a9728e6 on the renderer, bpmn, native and fixture paths must exit 0.",
+      "Findings are warnings only; lint exit codes unchanged (0 clean or warnings, 1 error findings, 2 usage/parse/config); BPMN and breadboard lint output and order unchanged.",
+      "Deterministic and Boa-friendly: no regex splitting in new lint code, labels laid out once, pair checks through an O(n log n) x sort-and-sweep prefilter; numbers formatted with String(Math.round(v*10)/10), never toFixed.",
+      "Test data are self-authored and generic (Payment gateway, HTTPS, gRPC, Audit log, Private network, Retry policy, Message queue) and name no external issue, customer, organisation, person, product or file.",
+      "Workers follow impl-plans/active/tll-00-overview.md 'Per-worker protocol' rules 1-9; bun tests with BUN_OPTIONS=--jsx-runtime=classic; cargo with CARGO_TERM_QUIET=true; no emojis; no tool attribution in commits."
+    ],
+    "designDecisionsAndRationale": [
+      "The lint calls the export's own layout functions and element boxes (nodeLabelLayout, boxLabelLayout, connectorLabelLayout/Backdrop, wrapTextLines, createShapeContext, registry getBounds), so a finding means the export draws the text clipped, spilling or covered (design 'Overview').",
+      "The only shared-code change is an additive estimatedTextWidth export in text-layout.ts; no renderer file changes, so export output is byte-identical by construction (design 'Module').",
+      "Rules are scoped to architecture pages via TEXT_LAYOUT_LINT_PAGE_KINDS; rules depend on element types, so widening later is one line but would add warnings to existing runs (user-qa Q1).",
+      "label-collision reports a label pair once on the later edge (painted over the earlier); endpoint nodes are not excluded because shapes paint above connectors; a body enclosing all route points (zone) is skipped (design 'Rule label-collision').",
+      "note-overflow uses the note's own paddingY as required clearance so flush auto-height stacks are clean (design 'Rule note-overflow').",
+      "Export appends layout warnings to loaded.warnings only in the whole-page svg/png/pdf branch after the svg===null guard (design 'CLI: nodetto-cli export').",
+      "The native CLI runs the same TS bundle in Boa, so no Rust change; parity is proven by tll-05 (design 'Native CLI')."
+    ],
+    "intentionalTradeoffs": [
+      "Estimated glyph advance (0.55 em) is the measurement model; real CJK glyph clipping in resvg PNG is not detected (user-qa Q2).",
+      "Frame clipping is not modelled; an element fully clipped by a frame can still be reported.",
+      "Mixed BPMN/breadboard plus architecture documents now include architecture pages in the lint report (extra page headers and JSON pages[] entries); BPMN/breadboard findings and order are unchanged.",
+      "Rotated elements are not body items and rotated notes get no proximity probe; the clipped-note check still applies in local space.",
+      "Message ordering ties use localeCompare, relied on only for ASCII messages with distinct prefixes; tll-05 parity covers Boa vs Bun."
+    ],
+    "supportedEdgeCases": [
+      "Label wrapped to fit (140x80 node) -> no finding; same label in 140x30 -> height finding with clipped-line count.",
+      "Box narrower than one glyph (24x60 node) -> width finding then height finding.",
+      "shape.geo label overflow uses 'spills outside the shape' / 'past the label padding' wording.",
+      "Two edges with coinciding label midpoints -> one finding on the later edge; edge label over an unrelated node -> finding naming 'node.generic <id>'.",
+      "Enclosing zone rectangle containing all route points -> no finding; rotated node under a label -> no finding.",
+      "Fixed-height note too short -> 'export drops <k> lines'; note text ending 3.8 above the next element -> 'Text ends 3.8 above'; element exactly paddingY below -> nothing.",
+      "Hidden elements, groups (children still linted), unlabelled edges and bpmn.* flows are skipped; findings deduplicated and sorted by element order, rule order, message.",
+      "300-node / 300-edge dense page lints deterministically and within the native per-launch budget."
+    ],
+    "outOfScopeEdgeCases": [
+      "Real-font (CJK) glyph widths exceeding the estimate (user-qa Q2).",
+      "Frame clipping via clipOf.",
+      "Freeform, flowchart, UML and other page kinds (user-qa Q1).",
+      "--element exports and non-svg/png/pdf export formats (user-qa Q3)."
+    ],
+    "reviewFindingsCarriedForward": [
+      "Low: tll-01 wording says shape.geo uses the buildElement default geo; actually the semantic is replaced and renderGeo falls back to 'rect'. Result unaffected.",
+      "Low: tll-05 should record rustc/cargo version and sha256 of target/release/nodetto-cli in impl-plans/progress/tll-05-native-parity.md as the artifact digest manifest.",
+      "Low: same-wave focused checks may load sibling-edited modules (wave 1 @nodetto/core index.ts; wave 2 commands.ts/export-command.ts); treat transient failures as pending-join per rule 8.",
+      "Low: textLayoutDenseDocument 'two builds are byte-equal' does not hold for fractional index strings with Math.random; no test asserts it, and lint results do not depend on it."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-text-layout-lint.md",
+      "design-docs/user-qa/text-layout-lint.md",
+      "design-docs/specs/export.md",
+      "design-docs/specs/design-cli-ai-drawing.md",
+      "impl-plans/active/tll-00-overview.md",
+      "impl-plans/active/tll-01-core-lint.md",
+      "impl-plans/active/tll-02-cli-help-docs.md",
+      "impl-plans/active/tll-03-cli-lint.md",
+      "impl-plans/active/tll-04-cli-export.md",
+      "impl-plans/active/tll-05-native-parity.md",
+      "apps/cli/src/commands.ts",
+      "apps/cli/src/export-command.ts",
+      "apps/cli/src/help.ts",
+      "packages/core/src/text-layout.ts",
+      "packages/core/src/label-layout.ts",
+      "packages/core/src/node-label.ts",
+      "packages/core/src/svg-export/text-note.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "tll-01-core-lint",
+      "planPath": "impl-plans/active/tll-01-core-lint.md",
+      "progressPath": "impl-plans/progress/tll-01-core-lint.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/text-layout-lint/rules.ts",
+        "packages/core/src/text-layout-lint/engine.ts",
+        "packages/core/src/text-layout-lint/index.ts",
+        "packages/core/src/text-layout-lint/rules.test.ts",
+        "packages/core/src/text-layout-lint/engine.test.ts",
+        "packages/core/src/text-layout.ts",
+        "packages/core/src/index.ts",
+        "apps/cli/src/__fixtures__/text-layout.ts",
+        "impl-plans/progress/tll-01-core-lint.md",
+        "tmp/text-layout-lint-s551/tll-01-core-lint"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "@nodetto/core exports TEXT_LAYOUT_LINT_RULE_IDS (label-overflow, label-collision, note-overflow), TEXT_LAYOUT_LINT_PAGE_KINDS ['architecture'], TextLayoutLintFinding, TextLayoutLintRuleId, lintTextLayoutPage(document, pageId) and estimatedTextWidth(text, fontSize, letterSpacing=0).",
+        "lintTextLayoutPage reuses the export's layout functions and boxes, skips what renderElementsSvg skips, uses an x sort-and-sweep for pair checks, dedupes and sorts by element order, rule order, message localeCompare.",
+        "Message templates match tll-01 exactly and numbers use String(Math.round(v*10)/10).",
+        "apps/cli/src/__fixtures__/text-layout.ts exports TEXT_LAYOUT_PAGE_ID, textLayoutCleanDocument, textLayoutProblemDocument, textLayoutDenseDocument and TEXT_LAYOUT_EXPECTED; the problem document yields exactly the 8 expected findings in order and the clean document yields 0 (fixture-check log).",
+        "rules.test.ts includes renderer agreement tests against exportPageSvg; no file under packages/core/src/svg-export, label-layout.ts, node-label.ts or shapes changes.",
+        "Progress log has pre/post sha256, intent snapshot, fixture-check output and ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s551/tll-01-core-lint",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/text-layout-lint > tmp/text-layout-lint-s551/tll-01-core-lint/core-lint.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/text-layout.test.ts packages/core/src/label-layout.test.ts packages/core/src/node-label.test.ts packages/core/src/svg-export.test.ts > tmp/text-layout-lint-s551/tll-01-core-lint/core-render.log 2>&1; echo \"exit=$?\"",
+        "bun tmp/text-layout-lint-s551/tll-01-core-lint/fixture-check.ts > tmp/text-layout-lint-s551/tll-01-core-lint/fixture-check.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/core/src/text-layout-lint packages/core/src/text-layout.ts packages/core/src/index.ts apps/cli/src/__fixtures__/text-layout.ts > tmp/text-layout-lint-s551/tll-01-core-lint/biome.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/text-layout-lint-s551/tll-01-core-lint/tsc.log 2>&1; echo \"exit=$?\"",
+        "git diff --quiet -- packages/core/src/svg-export packages/core/src/label-layout.ts packages/core/src/node-label.ts packages/core/src/shapes; echo \"exit=$?\"",
+        "grep -n 'export \\* from \"./text-layout-lint/index.ts\"' packages/core/src/index.ts",
+        "grep -n 'estimatedTextWidth' packages/core/src/index.ts"
+      ]
+    },
+    {
+      "planId": "tll-02-cli-help-docs",
+      "planPath": "impl-plans/active/tll-02-cli-help-docs.md",
+      "progressPath": "impl-plans/progress/tll-02-cli-help-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "docs/cli.md",
+        "impl-plans/progress/tll-02-cli-help-docs.md",
+        "tmp/text-layout-lint-s551/tll-02-cli-help-docs"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "help.ts overview line reads 'Lint BPMN, breadboard and architecture pages' with column alignment kept and no added lines (ai-commands.test.ts overview cap passes).",
+        "help lint describes architecture text-layout checks with rule ids label-overflow, label-collision and note-overflow, warnings only, measured vs available sizes, stable ids for check scripts, matching what export renders; Usage and Exit codes lines unchanged.",
+        "help export has one paragraph: whole architecture page SVG/PNG/PDF exports print 'warning: <rule-id> <element-id>: <message>' on stderr, output and exit code unchanged, see nodetto-cli help lint; no --strict mention.",
+        "docs/cli.md lint sentence says lint checks BPMN, breadboard and architecture pages and names the three rule ids; rest of the paragraph unchanged.",
+        "Plain ASCII text, no backticks or ${ inside template literals; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s551/tll-02-cli-help-docs",
+        "bun apps/cli/src/main.ts help lint > tmp/text-layout-lint-s551/tll-02-cli-help-docs/help-lint.txt 2>&1; echo \"exit=$?\"",
+        "grep -c -e label-overflow -e label-collision -e note-overflow -e architecture tmp/text-layout-lint-s551/tll-02-cli-help-docs/help-lint.txt",
+        "bun apps/cli/src/main.ts help export > tmp/text-layout-lint-s551/tll-02-cli-help-docs/help-export.txt 2>&1; echo \"exit=$?\"",
+        "grep -n 'warning: <rule-id>' tmp/text-layout-lint-s551/tll-02-cli-help-docs/help-export.txt",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/ai-commands.test.ts > tmp/text-layout-lint-s551/tll-02-cli-help-docs/ai-commands.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/help.ts > tmp/text-layout-lint-s551/tll-02-cli-help-docs/biome.log 2>&1; echo \"exit=$?\"",
+        "grep -n 'architecture pages' docs/cli.md"
+      ]
+    },
+    {
+      "planId": "tll-03-cli-lint",
+      "planPath": "impl-plans/active/tll-03-cli-lint.md",
+      "progressPath": "impl-plans/progress/tll-03-cli-lint.md",
+      "wave": 2,
+      "dependsOn": [
+        "tll-01-core-lint"
+      ],
+      "writePaths": [
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "apps/cli/src/text-layout-lint.test.ts",
+        "impl-plans/progress/tll-03-cli-lint.md",
+        "tmp/text-layout-lint-s551/tll-03-cli-lint"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "LINT_NO_PAGES is 'The document contains no BPMN, breadboard or architecture pages.'; the lint page filter includes TEXT_LAYOUT_LINT_PAGE_KINDS in document order; architecture pages route to lintTextLayoutPage mapped to {elementId, severity, message, ruleId}.",
+        "BPMN/breadboard routing, hasBpmn config discovery, pin handling, text table, summary and exit-code computation unchanged; breadboard-commands.test.ts changes only the two LINT_NO_PAGES strings (:150, :158).",
+        "text-layout-lint.test.ts covers: clean page empty stdout exit 0; clean JSON report; problem text with 8 rows and '8 problems (0 errors, 8 warnings)'; problem JSON equals TEXT_LAYOUT_EXPECTED and lintTextLayoutPage messages; freeform-only -> EXIT_ERROR with LINT_NO_PAGES; mixed BPMN+architecture with BPMN findings unchanged; --page Notes (freeform) -> EXIT_ERROR; determinism.",
+        "grep -c 'no BPMN or breadboard pages' prints 0 for commands.ts and breadboard-commands.test.ts; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s551/tll-03-cli-lint",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/bpmn-commands.test.ts apps/cli/src/commands.test.ts > tmp/text-layout-lint-s551/tll-03-cli-lint/focused.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/commands.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/text-layout-lint.test.ts > tmp/text-layout-lint-s551/tll-03-cli-lint/biome.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/text-layout-lint-s551/tll-03-cli-lint/tsc.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src > tmp/text-layout-lint-s551/tll-03-cli-lint/cli-all.log 2>&1; echo \"exit=$?\"",
+        "git diff -U0 apps/cli/src/breadboard-commands.test.ts",
+        "grep -c 'no BPMN or breadboard pages' apps/cli/src/commands.ts apps/cli/src/breadboard-commands.test.ts"
+      ]
+    },
+    {
+      "planId": "tll-04-cli-export",
+      "planPath": "impl-plans/active/tll-04-cli-export.md",
+      "progressPath": "impl-plans/progress/tll-04-cli-export.md",
+      "wave": 2,
+      "dependsOn": [
+        "tll-01-core-lint"
+      ],
+      "writePaths": [
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/text-layout-export.test.ts",
+        "impl-plans/progress/tll-04-cli-export.md",
+        "tmp/text-layout-lint-s551/tll-04-cli-export"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "In the svg/png/pdf branch after the svg===null guard, warnings = loaded.warnings plus, when elementId === undefined and page.kind is in TEXT_LAYOUT_LINT_PAGE_KINDS, 'warning: ${ruleId} ${elementId}: ${message}\\n' lines from lintTextLayoutPage(loaded.document, page.id); every later loaded.warnings use in that branch uses warnings.",
+        "drawio, mermaid, d2, code, html and attachment-failure paths unchanged; stdout, written bytes, exit codes and no --strict unchanged; export-command.test.ts passes unchanged.",
+        "text-layout-export.test.ts covers svg stdout byte-equal to Editor.exportPageSvg({padding:16, background:null}) with 8 warning lines; --output svg; png and pdf via fake backend with SVG byte-equal to the freeform variant; freeform variant, --element and clean document have no layout warnings; mermaid/d2 have none.",
+        "loaded.warnings before/after counts recorded; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s551/tll-04-cli-export",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/text-layout-export.test.ts apps/cli/src/export-command.test.ts apps/cli/src/html-export.test.ts > tmp/text-layout-lint-s551/tll-04-cli-export/focused.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/export-command.ts apps/cli/src/text-layout-export.test.ts > tmp/text-layout-lint-s551/tll-04-cli-export/biome.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/text-layout-lint-s551/tll-04-cli-export/tsc.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src > tmp/text-layout-lint-s551/tll-04-cli-export/cli-all.log 2>&1; echo \"exit=$?\"",
+        "grep -c 'loaded.warnings' apps/cli/src/export-command.ts"
+      ]
+    },
+    {
+      "planId": "tll-05-native-parity",
+      "planPath": "impl-plans/active/tll-05-native-parity.md",
+      "progressPath": "impl-plans/progress/tll-05-native-parity.md",
+      "wave": 3,
+      "dependsOn": [
+        "tll-03-cli-lint",
+        "tll-04-cli-export"
+      ],
+      "writePaths": [
+        "apps/cli/src/native-parity.test.ts",
+        "impl-plans/progress/tll-05-native-parity.md",
+        "tmp/text-layout-lint-s551/tll-05-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "One nativeTest block appended to native-parity.test.ts compares TS and native CLIs (cwd temp dir) for lint clean.jsonl, lint problem.jsonl (text, --format json, --page Architecture), export problem.jsonl --format svg (stdout and --output out.svg); native stderr contains 'warning: label-overflow node-clipped:'.",
+        "Native dense lint (textLayoutDenseDocument(300)) exits 0 within a 60000 ms spawn timeout, no 'panicked', stdout equals the TS JSON; test budget 180000 commented as launch count times per-launch budget.",
+        "Block skips without NODETTO_CLI_TEST_BINARY and runs (not skipped) under mise run test-cli; existing parity tests and budgets unchanged; no change under apps/cli/native, Cargo.toml or Cargo.lock.",
+        "Progress log records the test-cli log path, pass/fail counts, rustc/cargo versions and sha256 of target/release/nodetto-cli (artifact digest manifest), and ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s551/tll-05-native-parity",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s551/tll-05-native-parity/parity-skip.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run test-cli > tmp/text-layout-lint-s551/tll-05-native-parity/test-cli.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s551/tll-05-native-parity/biome.log 2>&1; echo \"exit=$?\"",
+        "git diff --quiet -- apps/cli/native; echo \"exit=$?\""
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "tll-01-core-lint",
+        "tll-02-cli-help-docs"
+      ],
+      [
+        "tll-03-cli-lint",
+        "tll-04-cli-export"
+      ],
+      [
+        "tll-05-native-parity"
+      ]
+    ],
+    "afterWave": [
+      "bunx tsc -p tsconfig.json --noEmit",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core apps/cli/src",
+      "rerun every gate recorded as pending-join in the joined wave's progress logs (overview rule 8)"
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Add a 'Text-layout lint' entry indexing tll-00..05 during finalization; not a worker task."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths. Fixture geometry or expected-finding mismatches belong to tll-01; LINT_NO_PAGES or lint report issues to tll-03; export stderr issues to tll-04; help or docs/cli.md text to tll-02; native parity mismatches are recorded by tll-05 and routed to 01, 03 or 04.",
+    "commitPolicy": "Commit each wave on main, staging explicit paths only. Never git add -A, never stage tmp/ or target/, never push (gitPush=false). No tool attribution in commit messages.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-text-layout-lint.md",
+        "design-docs/user-qa/text-layout-lint.md",
+        "design-docs/specs/export.md",
+        "design-docs/specs/design-cli-ai-drawing.md",
+        "impl-plans/active/tll-00-overview.md",
+        "impl-plans/active/text-layout-lint-s551-dispatch.json",
+        "impl-plans/README.md"
+      ]
+    },
+    "finalVerification": [
+      "mkdir -p tmp/text-layout-lint-s551/reconcile",
+      "bun run typecheck > tmp/text-layout-lint-s551/reconcile/typecheck.log 2>&1; echo \"exit=$?\"",
+      "mise run lint-ts > tmp/text-layout-lint-s551/reconcile/lint-ts.log 2>&1; echo \"exit=$?\"",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/text-layout-lint > tmp/text-layout-lint-s551/reconcile/core-lint.log 2>&1; echo \"exit=$?\"",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core apps/cli/src > tmp/text-layout-lint-s551/reconcile/tests.log 2>&1; echo \"exit=$?\"",
+      "CARGO_TERM_QUIET=true mise run check > tmp/text-layout-lint-s551/reconcile/check.log 2>&1; echo \"exit=$?\"",
+      "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run test-cli > tmp/text-layout-lint-s551/reconcile/test-cli.log 2>&1; echo \"exit=$?\"",
+      "git diff --quiet a9728e6 -- packages/io/src/bpmn packages/core/src/svg-export packages/core/src/label-layout.ts packages/core/src/node-label.ts apps/cli/native packages/io/src/__fixtures__; echo \"exit=$?\"",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  }
+}

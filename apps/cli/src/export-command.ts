@@ -14,6 +14,8 @@ import { encodeRasterDataUrl, isRasterAttachmentPath } from "@nodetto/ir";
 
 import {
   Editor,
+  lintTextLayoutPage,
+  TEXT_LAYOUT_LINT_PAGE_KINDS,
   exportHandoff,
   HANDOFF_FORMATS,
   type HandoffFormat,
@@ -330,11 +332,22 @@ export async function exportCommand(
   if (svg === null)
     return fail(`Page "${page.name}" has no visible content to export.`);
 
+  const warnings =
+    loaded.warnings +
+    (elementId === undefined && TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind)
+      ? lintTextLayoutPage(loaded.document, page.id)
+          .map(
+            (finding) =>
+              `warning: ${finding.ruleId} ${finding.elementId}: ${finding.message}\n`,
+          )
+          .join("")
+      : "");
+
   if (exportFormat === "svg") {
-    if (outputPath === undefined) return ok(svg, loaded.warnings);
+    if (outputPath === undefined) return ok(svg, warnings);
     const failure = writeOutput(io, outputPath, svg);
-    if (failure) return fail(`${loaded.warnings}${failure}`);
-    return ok("", `${loaded.warnings}Wrote ${outputPath}.\n`);
+    if (failure) return fail(`${warnings}${failure}`);
+    return ok("", `${warnings}Wrote ${outputPath}.\n`);
   }
 
   let bytes: Uint8Array;
@@ -383,7 +396,7 @@ export async function exportCommand(
             marginMm,
           });
   } catch (cause) {
-    return fail(`${loaded.warnings}Cannot export: ${describe(cause)}`);
+    return fail(`${warnings}Cannot export: ${describe(cause)}`);
   }
   const target = outputPath as string;
   if (!io.writeBytes)
@@ -391,7 +404,7 @@ export async function exportCommand(
   try {
     io.writeBytes(target, bytes);
   } catch (cause) {
-    return fail(`${loaded.warnings}Cannot write ${target}: ${describe(cause)}`);
+    return fail(`${warnings}Cannot write ${target}: ${describe(cause)}`);
   }
   const detail =
     exportFormat === "png"
@@ -399,6 +412,6 @@ export async function exportCommand(
       : `${PDF_PAGE_SIZES[pageSize]} page${note}`;
   return ok(
     "",
-    `${loaded.warnings}Wrote ${target} (page "${page.name}", ${detail}).\n`,
+    `${warnings}Wrote ${target} (page "${page.name}", ${detail}).\n`,
   );
 }

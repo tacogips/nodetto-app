@@ -17,7 +17,7 @@ export const MAX_AUTO_TEXT_SIZE = 1_000_000;
 const graphemeSegmenter = new Intl.Segmenter("und", {
   granularity: "grapheme",
 });
-function graphemes(text: string): string[] {
+export function graphemes(text: string): string[] {
   return Array.from(graphemeSegmenter.segment(text), (part) => part.segment);
 }
 
@@ -49,6 +49,14 @@ export function textOwnsAxis(
 
 function glyphAdvance(fontSize: number, letterSpacing: number): number {
   return Math.max(0.1, fontSize * AVERAGE_GLYPH_WIDTH + letterSpacing);
+}
+
+export function estimatedTextWidth(
+  text: string,
+  fontSize: number,
+  letterSpacing = 0,
+): number {
+  return graphemes(text).length * glyphAdvance(fontSize, letterSpacing);
 }
 
 /**

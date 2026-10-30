@@ -322,6 +322,11 @@ Behavior:
   for page "<name>" to <file>.` on stderr; document warnings and encoder
   warnings precede it on stderr. Warnings do not change the exit code.
 - Fonts are loaded only for PNG and PDF, and only when the SVG contains text.
+- An SVG, PNG or PDF export of a whole `architecture` page also prints
+  text-layout lint findings (`label-overflow`, `label-collision`,
+  `note-overflow`) as `warning: <rule-id> <element-id>: <message>` lines on
+  stderr, before the `Wrote` line. The exported bytes and the exit code do
+  not change. See `design-docs/specs/design-text-layout-lint.md`.
 
 Sidecar: `apps/cli/scripts/build-sidecar.ts` keeps `bun build --compile
 --minify`; the resvg `.wasm` is embedded through the file import. No native

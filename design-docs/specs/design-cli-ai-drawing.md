@@ -36,6 +36,12 @@ of one command.
   app's PDF export. The shared, framework-free helpers live in `@nodetto/core`
   (`export-geometry.ts`) and the app re-exports them.
 - SVG may go to stdout; PNG and PDF require `--output`.
+- Text problems on an architecture page are checked without looking at the
+  image. `nodetto-cli lint --page <page>` reports the text-layout rules
+  `label-overflow`, `label-collision` and `note-overflow` as warnings, with
+  measured and available sizes. A whole-page SVG, PNG or PDF export prints the
+  same findings as `warning:` lines on stderr. See
+  `design-docs/specs/design-text-layout-lint.md`.
 
 ### inspect
 

@@ -32,9 +32,48 @@ values name the pre-archive `active/` locations.
 `bpmn-render-fix-s360-dispatch.json`,
 `bpmn-export-ownership-s550-dispatch.json`). Of the BPMN operation-flow
 manifests, only s359 was the final dispatch. Their `planPath` values name
-the pre-archive `active/` locations.
+the pre-archive `active/` locations. The text-layout lint manifests
+(`text-layout-lint-s551-dispatch.json`, `text-layout-lint-s552-dispatch.json`,
+`text-layout-lint-s555-dispatch.json`, `text-layout-lint-s556-dispatch.json`)
+also stay in `active/`; s556 was the final dispatch.
 
 ## Completed
+
+Text-layout lint (sessions 551, 552, 555 and 556; design:
+`design-docs/specs/design-text-layout-lint.md`, owner decisions in
+`design-docs/user-qa/text-layout-lint.md`; no GitHub issue). `nodetto-cli
+lint` checks architecture, freeform and flowchart pages for
+`label-overflow`, `label-collision` and `note-overflow`, and whole-page SVG,
+PNG and PDF exports print the same findings as warnings without changing
+the output. Label and note width count East Asian Wide and Fullwidth
+graphemes at 1 em on the lint side only; export wrapping is unchanged.
+Plans 01-05 delivered the architecture-only lint (s551; plan 05 was
+blocked only by a binary-less parity run). Plans 06-08 started the
+revision (s552), and 07 and 08 were accepted. Plans 09-11 were superseded
+because their gates included a CLI command expected to fail until a later
+plan landed (s552, s555). Plan 12 then covered the core rules review, CLI
+lint and export, and the CLI test updates, and was accepted (s556). Plan
+13 (native parity for wide labels, freeform and flowchart pages) was
+blocked only by a binary-less skip run in its gate. Its parity run against
+the release binary passed (17 pass, 0 fail), and it was verified and
+archived by hand.
+
+| Plan | Scope |
+|---|---|
+| [tll-00-overview](completed/tll-00-overview.md) | Architecture-only lint: waves, ownership and final verification |
+| [tll-01-core-lint](completed/tll-01-core-lint.md) | Core rules and engine in `packages/core/src/text-layout-lint` |
+| [tll-02-cli-help-docs](completed/tll-02-cli-help-docs.md) | CLI help and `docs/cli.md` for the architecture-only lint |
+| [tll-03-cli-lint](completed/tll-03-cli-lint.md) | `lint` routing for architecture pages |
+| [tll-04-cli-export](completed/tll-04-cli-export.md) | Export layout warnings on stderr |
+| [tll-05-native-parity](completed/tll-05-native-parity.md) | Native CLI parity for lint and export, including dense pages |
+| [tll-06-overview](completed/tll-06-overview.md) | Revision overview for the Q1 page kinds and Q2 wide width (superseded by 12-13 for the CLI side) |
+| [tll-07-wide-width](completed/tll-07-wide-width.md) | Table-driven East Asian Wide/Fullwidth width in `packages/core/src/wide-text-width.ts` |
+| [tll-08-help-docs](completed/tll-08-help-docs.md) | Help and docs for the revised rules and page kinds |
+| [tll-09-core-rules](completed/tll-09-core-rules.md) | Superseded by tll-12 (core rule changes reviewed there) |
+| [tll-10-cli-lint-export](completed/tll-10-cli-lint-export.md) | Superseded by tll-12 |
+| [tll-11-native-parity](completed/tll-11-native-parity.md) | Superseded by tll-13 |
+| [tll-12-core-cli-lint-export](completed/tll-12-core-cli-lint-export.md) | Core rules review, CLI lint and export page kinds, CLI test updates |
+| [tll-13-native-parity](completed/tll-13-native-parity.md) | Native parity for wide labels, freeform and flowchart pages |
 
 BPMN export ownership (session 550; design:
 `design-docs/specs/design-bpmn.md` export ownership revision, sections 5.2,

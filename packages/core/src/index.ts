@@ -300,6 +300,7 @@ export {
   TEXT_NOTE_PADDING_Y,
   textOwnsAxis,
   wrapTextLines,
+  estimatedTextWidth,
 } from "./text-layout.ts";
 export {
   NO_SNAP,
@@ -368,6 +369,7 @@ export {
 export { createDefaultRegistry } from "./shapes/index.ts";
 export * from "./bpmn/index.ts";
 export * from "./breadboard/index.ts";
+export * from "./text-layout-lint/index.ts";
 export * from "./pcb-board/index.ts";
 export {
   NODE_DEFAULT_HEIGHT,

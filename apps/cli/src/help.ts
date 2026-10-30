@@ -26,7 +26,7 @@ Render
 Convert and check
   nodetto-cli ddl <doc>           Database DDL from an ERD page
   nodetto-cli format <doc>        Canonical JSONL formatting
-  nodetto-cli lint <doc|bpmn>     Lint BPMN and breadboard pages
+  nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, architecture, freeform and flowchart pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
   nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
@@ -392,6 +392,11 @@ Render one page exactly as the app's page export does.
 
 PNG text uses those fonts, so metrics can differ slightly from the app.
 
+SVG, PNG and PDF exports of a whole architecture, freeform or flowchart page
+print text-layout lint findings on stderr as
+warning: <rule-id> <element-id>: <message>. The exported output and exit code
+are unchanged. See nodetto-cli help lint.
+
 Example (check a drawing):
   nodetto-cli export flow.jsonl --page Flow --format png --output /tmp/flow.png
   nodetto-cli export mixed.jsonl --page Schema --format svg --output schema.svg
@@ -472,9 +477,22 @@ ${EXIT_CODES}`,
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
                         [--config <file>] [--format text|json]
 
-Lint BPMN and breadboard pages from a nodetto document or BPMN XML. Text output
-is empty when clean; --format json always prints a report. A .bpmnlintrc in the
-working directory is used when --config is not given and a BPMN page is linted.
+Lint BPMN, breadboard, architecture, freeform and flowchart pages from a
+nodetto document or BPMN XML.
+Text output is empty when clean; --format json always prints a report. A
+.bpmnlintrc in the working directory is used when --config is not given and a
+BPMN page is linted.
+
+Architecture, freeform and flowchart pages are checked for text layout with
+warning rules:
+label-overflow reports a node or shape label line clipped or spilling outside
+its box; label-collision reports an edge label box overlapping another edge
+label or an element; note-overflow reports note text cut off or running into
+or close to the element below. Messages give measured and available sizes.
+East Asian wide and fullwidth characters (CJK, kana, hangul, fullwidth forms)
+are measured at 1 em, so the lint reports lines that real fonts clip even when
+export geometry fits. These stable rule ids can be used in check scripts;
+findings match export geometry, except for that wide-character width.
 
 Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
 

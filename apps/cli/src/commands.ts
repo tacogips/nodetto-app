@@ -7,6 +7,8 @@ import {
   generateDatabaseDdl,
   lintBpmnPage,
   lintBreadboardPage,
+  lintTextLayoutPage,
+  TEXT_LAYOUT_LINT_PAGE_KINDS,
   parseLintConfig,
   recommendedLintConfig,
   type ArrangeMode,
@@ -91,7 +93,8 @@ interface ParsedArgs {
 const VALUE_OPTIONS = new Set(["--dialect", "--page", "--output", "--check"]);
 const ARRANGE_OPTIONS = new Set(["--mode", "--direction", "--page"]);
 const LINT_OPTIONS = new Set(["--page", "--config", "--format"]);
-const LINT_NO_PAGES = "The document contains no BPMN or breadboard pages.";
+const LINT_NO_PAGES =
+  "The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.";
 const BPMN_IMPORT_OPTIONS = new Set(["--output"]);
 const DRAWIO_IMPORT_OPTIONS = new Set(["--output"]);
 const BPMN_EXPORT_OPTIONS = new Set(["--page", "--output", "--check"]);
@@ -286,7 +289,10 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
   }
 
   const pages = document.pages.filter(
-    (page) => page.kind === "bpmn" || page.kind === "breadboard",
+    (page) =>
+      page.kind === "bpmn" ||
+      page.kind === "breadboard" ||
+      TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind),
   );
   if (!pages.length) return fail(LINT_NO_PAGES);
   const query = parsed.options.get("--page");
@@ -340,15 +346,24 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
               ruleId,
             }),
           )
-        : lintBreadboardPage(document, page.id).map(
-            ({ elementId, severity, message, ruleId, pin }) => ({
-              elementId,
-              severity,
-              message,
-              ruleId,
-              ...(pin === undefined ? {} : { pin }),
-            }),
-          ),
+        : page.kind === "breadboard"
+          ? lintBreadboardPage(document, page.id).map(
+              ({ elementId, severity, message, ruleId, pin }) => ({
+                elementId,
+                severity,
+                message,
+                ruleId,
+                ...(pin === undefined ? {} : { pin }),
+              }),
+            )
+          : lintTextLayoutPage(document, page.id).map(
+              ({ elementId, severity, message, ruleId }) => ({
+                elementId,
+                severity,
+                message,
+                ruleId,
+              }),
+            ),
   }));
   const allFindings = reports.flatMap((report) => report.findings);
   const errors = allFindings.filter(
