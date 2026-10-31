@@ -3,14 +3,19 @@
 - planId: sms-01-editor-facade
 - planPath: impl-plans/active/sms-01-editor-facade.md
 - progressPath: impl-plans/progress/sms-01-editor-facade.md
-- wave: 1 of 3 in session 575. It runs alone in its wave.
+- wave: 1 of 3 in session 579. It runs alone in its wave.
 - dependsOn: none. Base `b52e4dbe5509f739a3c1e996377ee2ac0e70059b`.
 - Design: `design-docs/specs/design-source-module-split.md`. Read
   "Invariants", "1. Editor facade", "4. Documentation", "5. Verification"
   (commands 1, 2 and 5-9) and "Rollout constraints".
-- Evidence directory: `tmp/source-module-split-s575/sms-01-editor-facade/`.
+- Evidence directory: `tmp/source-module-split-s579/sms-01-editor-facade/`.
   `tmp/` is git-ignored. Write only `.log` and `.txt` files there, never
   `.ts`, because `bun test` collects stray `.ts` copies under `tmp/`.
+- Write paths (manifest `impl-plans/active/source-module-split-s579-dispatch.json`):
+  the files in "File-level changes", `docs/development.md`, the progress
+  log, the evidence directory and `target/`. `target/` is the git-ignored
+  build output root (`artifactRoots: ["target"]`) that `mise run verify`
+  and `mise run test-cli` write to.
 
 ## Intent and context
 
@@ -226,21 +231,21 @@ evidence directory. Record the exit code and log path of each one in the
 progress log. Every gate must exit 0.
 
 - B1:
-  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s575/sms-01-editor-facade/baseline-bun-test.log 2>&1`.
+  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s579/sms-01-editor-facade/baseline-bun-test.log 2>&1`.
   Record the ` N pass`, ` N skip` and ` N fail` lines.
-- B2: `wc -l packages/core/src/editor.ts packages/core/src/editor/*.ts > tmp/source-module-split-s575/sms-01-editor-facade/baseline-wc.txt`.
+- B2: `wc -l packages/core/src/editor.ts packages/core/src/editor/*.ts > tmp/source-module-split-s579/sms-01-editor-facade/baseline-wc.txt`.
 - B3: `test -z "$(bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess 2>&1 | grep -E '^packages/core/src/(editor\.ts|editor/)')"`
   exits 0 on the base tree. If it does not, stop and report a blocker.
 - G1:
-  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s575/sms-01-editor-facade/verify.log 2>&1`
+  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s579/sms-01-editor-facade/verify.log 2>&1`
   exits 0. The log has ` 0 fail`, and its ` N pass` count is at least B1's
   pass count.
 - G2:
-  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s575/sms-01-editor-facade/test-cli.log 2>&1`
+  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s579/sms-01-editor-facade/test-cli.log 2>&1`
   exits 0, with ` 0 fail` in the log. Then, against the binary it built:
-  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s575/sms-01-editor-facade/native-parity.log 2>&1`
+  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s579/sms-01-editor-facade/native-parity.log 2>&1`
   exits 0, and
-  `grep -Ex ' *17 pass' tmp/source-module-split-s575/sms-01-editor-facade/native-parity.log`
+  `grep -Ex ' *17 pass' tmp/source-module-split-s579/sms-01-editor-facade/native-parity.log`
   exits 0. At this wave the parity tests are still in
   `apps/cli/src/native-parity.test.ts`, which the path filter matches. This
   gate runs the Boa engine with the new chain under the parity deadlines.

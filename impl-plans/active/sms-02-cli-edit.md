@@ -3,7 +3,7 @@
 - planId: sms-02-cli-edit
 - planPath: impl-plans/active/sms-02-cli-edit.md
 - progressPath: impl-plans/progress/sms-02-cli-edit.md
-- wave: 2 of 3 in session 575. It runs alone in its wave.
+- wave: 2 of 3 in session 579. It runs alone in its wave.
 - dependsOn: sms-01-editor-facade. The two plans touch no common source
   file. The dependency exists because this plan's gates load
   `packages/core` and build the release binary, so they need sms-01
@@ -12,8 +12,13 @@
 - Design: `design-docs/specs/design-source-module-split.md`. Read
   "Invariants", "2. `nodetto-cli edit`" (2.1-2.4), "4. Documentation",
   "5. Verification" (commands 1, 2, 5, 6 and 7) and "Rollout constraints".
-- Evidence directory: `tmp/source-module-split-s575/sms-02-cli-edit/`.
+- Evidence directory: `tmp/source-module-split-s579/sms-02-cli-edit/`.
   Write only `.log` and `.txt` files there.
+- Write paths (manifest `impl-plans/active/source-module-split-s579-dispatch.json`):
+  `apps/cli/src/edit-command.ts`, `apps/cli/src/edit/`,
+  `docs/development.md`, the progress log, the evidence directory and
+  `target/`. `target/` is the git-ignored build output root
+  (`artifactRoots: ["target"]`).
 
 ## Intent and context
 
@@ -215,23 +220,23 @@ Every gate must exit 0. Record each one's exit code and log path in the
 progress log.
 
 - B1:
-  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s575/sms-02-cli-edit/baseline-bun-test.log 2>&1`.
+  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s579/sms-02-cli-edit/baseline-bun-test.log 2>&1`.
   Record the ` N pass`, ` N skip` and ` N fail` lines.
-- B2: `wc -l apps/cli/src/edit-command.ts > tmp/source-module-split-s575/sms-02-cli-edit/baseline-wc.txt`.
+- B2: `wc -l apps/cli/src/edit-command.ts > tmp/source-module-split-s579/sms-02-cli-edit/baseline-wc.txt`.
 - G1:
-  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s575/sms-02-cli-edit/verify.log 2>&1`
+  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s579/sms-02-cli-edit/verify.log 2>&1`
   exits 0. The log has ` 0 fail`, and its pass count is at least B1's pass
   count plus the number of new tests.
-- G2: `BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > tmp/source-module-split-s575/sms-02-cli-edit/edit-unit.log 2>&1`
-  exits 0, and `grep -E '^ *[1-9][0-9]* pass$' tmp/source-module-split-s575/sms-02-cli-edit/edit-unit.log`
+- G2: `BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > tmp/source-module-split-s579/sms-02-cli-edit/edit-unit.log 2>&1`
+  exits 0, and `grep -E '^ *[1-9][0-9]* pass$' tmp/source-module-split-s579/sms-02-cli-edit/edit-unit.log`
   exits 0. The trailing slash keeps `edit-scale-text-group.test.ts` out of
   this run. Record the pass count; it must equal the number of new test
   cases.
 - G3:
-  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s575/sms-02-cli-edit/test-cli.log 2>&1`
+  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s579/sms-02-cli-edit/test-cli.log 2>&1`
   exits 0, with ` 0 fail`. Then
-  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s575/sms-02-cli-edit/native-parity.log 2>&1`
-  exits 0, and `grep -Ex ' *17 pass' tmp/source-module-split-s575/sms-02-cli-edit/native-parity.log`
+  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s579/sms-02-cli-edit/native-parity.log 2>&1`
+  exits 0, and `grep -Ex ' *17 pass' tmp/source-module-split-s579/sms-02-cli-edit/native-parity.log`
   exits 0. The `native edit handles refs, arrangement, snapshots and
   rollback` block runs the moved code in Boa.
 - G4:

@@ -7,6 +7,21 @@
 
 ## Active
 
+Source module split (sessions 575 and 579; design:
+`design-docs/specs/design-source-module-split.md`; no GitHub issue). The
+work splits `packages/core/src/editor.ts`, `apps/cli/src/edit-command.ts`
+and `apps/cli/src/native-parity.test.ts` into modules named for their
+responsibility, with no behavior change. There are three plans in serial
+waves:
+[sms-01-editor-facade](active/sms-01-editor-facade.md),
+[sms-02-cli-edit](active/sms-02-cli-edit.md) and
+[sms-03-native-parity](active/sms-03-native-parity.md).
+`source-module-split-s579-dispatch.json` is the dispatch manifest. It
+supersedes `source-module-split-s575-dispatch.json`, which was never
+dispatched: its plans had no `target` artifact root, and
+`docs/development.md` was not a write path. The s575 manifest moves to
+`completed/` together with the plans.
+
 Breadboard circuit pages overview:
 [breadboard-00-overview](active/breadboard-00-overview.md) lists waves
 1-7, ownership, gates and final verification. Its 18 plans are complete

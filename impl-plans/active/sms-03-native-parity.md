@@ -3,7 +3,7 @@
 - planId: sms-03-native-parity
 - planPath: impl-plans/active/sms-03-native-parity.md
 - progressPath: impl-plans/progress/sms-03-native-parity.md
-- wave: 3 of 3 in session 575. It runs alone in its wave and is the last
+- wave: 3 of 3 in session 579. It runs alone in its wave and is the last
   plan.
 - dependsOn: sms-02-cli-edit (which depends on sms-01-editor-facade). The
   parity gates build the release binary from the whole tree, so the
@@ -12,8 +12,13 @@
 - Design: `design-docs/specs/design-source-module-split.md`. Read
   "3. Native parity tests", "4. Documentation", "5. Verification" (commands
   1-9) and "Rollout constraints".
-- Evidence directory: `tmp/source-module-split-s575/sms-03-native-parity/`.
+- Evidence directory: `tmp/source-module-split-s579/sms-03-native-parity/`.
   Write only `.log` and `.txt` files there.
+- Write paths (manifest `impl-plans/active/source-module-split-s579-dispatch.json`):
+  `apps/cli/src/native-parity.test.ts` (deleted),
+  `apps/cli/src/native-parity/`, `apps/cli/native/README.md`, the progress
+  log, the evidence directory and `target/`. `target/` is the git-ignored
+  build output root (`artifactRoots: ["target"]`).
 
 ## Intent and context
 
@@ -139,32 +144,32 @@ Every gate must exit 0. Record each one's exit code and log path in the
 progress log.
 
 - B1:
-  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s575/sms-03-native-parity/baseline-bun-test.log 2>&1`.
+  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s579/sms-03-native-parity/baseline-bun-test.log 2>&1`.
   Record the summary lines.
 - B2: `test "$(grep -c '^nativeTest(' apps/cli/src/native-parity.test.ts)" -eq 17`
   exits 0.
 - G1 (design command 1):
-  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s575/sms-03-native-parity/verify.log 2>&1`
+  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s579/sms-03-native-parity/verify.log 2>&1`
   exits 0. The log has ` 0 fail`. Its pass count equals B1's, and its
   skip count equals B1's, because the same 17 blocks still skip there.
   Also record that the final pass count is at least sms-01's B1 pass count
   plus the tests that sms-02 added.
 - G2 (design command 2):
-  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s575/sms-03-native-parity/test-cli.log 2>&1`
+  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s579/sms-03-native-parity/test-cli.log 2>&1`
   exits 0, with ` 0 fail`.
 - G3 (design command 3):
-  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s575/sms-03-native-parity/native-parity.log 2>&1`
+  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s579/sms-03-native-parity/native-parity.log 2>&1`
   exits 0. Then
-  `grep -Ex ' *17 pass' tmp/source-module-split-s575/sms-03-native-parity/native-parity.log`
+  `grep -Ex ' *17 pass' tmp/source-module-split-s579/sms-03-native-parity/native-parity.log`
   exits 0, and
-  `test -z "$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s575/sms-03-native-parity/native-parity.log)"`
+  `test -z "$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s579/sms-03-native-parity/native-parity.log)"`
   exits 0.
 - G4 (design command 4):
   `test "$(cat apps/cli/src/native-parity/*.test.ts | grep -c '^nativeTest(')" -eq 17`
   exits 0.
 - G5: without the binary,
-  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s575/sms-03-native-parity/parity-skip.log 2>&1`
-  exits 0, and `grep -Ex ' *17 skip' tmp/source-module-split-s575/sms-03-native-parity/parity-skip.log`
+  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s579/sms-03-native-parity/parity-skip.log 2>&1`
+  exits 0, and `grep -Ex ' *17 skip' tmp/source-module-split-s579/sms-03-native-parity/parity-skip.log`
   exits 0. All blocks are collected and gated by `nativeTest`.
 - G6 (design command 5, full scope):
   `find packages/core/src/editor.ts packages/core/src/editor apps/cli/src/edit-command.ts apps/cli/src/edit apps/cli/src/native-parity -name '*.ts' -exec awk 'FNR == 701 { print FILENAME " exceeds 700 lines"; bad = 1 } END { exit bad }' {} +`
@@ -187,7 +192,7 @@ progress log.
 - G11: `grep -q 'apps/cli/src/native-parity/' apps/cli/native/README.md`
   exits 0.
 - G12: record, for the progress log,
-  `wc -l packages/core/src/editor.ts packages/core/src/editor/*.ts packages/core/src/editor/facade/*.ts apps/cli/src/edit-command.ts apps/cli/src/edit/*.ts apps/cli/src/edit/operations/*.ts apps/cli/src/native-parity/*.ts > tmp/source-module-split-s575/sms-03-native-parity/final-wc.txt`.
+  `wc -l packages/core/src/editor.ts packages/core/src/editor/*.ts packages/core/src/editor/facade/*.ts apps/cli/src/edit-command.ts apps/cli/src/edit/*.ts apps/cli/src/edit/operations/*.ts apps/cli/src/native-parity/*.ts > tmp/source-module-split-s579/sms-03-native-parity/final-wc.txt`.
   It exits 0 because every glob matches a file once all three plans are
   done.
 

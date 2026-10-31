@@ -5,6 +5,15 @@ Store build number from the app version". No GitHub issue; the request came
 as inline workflow input. This is a pure refactor. Behavior, CLI output, exit
 codes, JSONL bytes, export bytes and MCP responses do not change.
 
+Re-validated, 2026-10-31 (session 579) at 1b6b669 "Plan the split of the
+oversized editor, edit and parity sources". `git diff --stat b52e4db
+1b6b669` lists only this design, the three sms plans and the session-575
+manifest, so the source tree is the same as at b52e4db. Every b52e4db
+reference below (line counts, line numbers, commands 7 and 8) still holds.
+The session-575 run stopped before any code change because its dispatch
+manifest was wrong. The design was not the cause. The manifest rules
+under "Rollout constraints" fix that.
+
 ## Overview
 
 Three hand-written files are over 1000 lines:
@@ -248,7 +257,11 @@ these 17.
   and the `edit` modules (`edit-command.ts`, `edit/`, `edit/operations/`).
 - Completed design records that mention `native-parity.test.ts` stay as
   they are, because they describe work done before the split.
-  `impl-plans/README.md` gets its entry when the plans are archived.
+- `impl-plans/README.md`: while the plans run, its "Active" section lists
+  the three sms plans and the session-579 manifest. When the plans are
+  archived, that text is replaced by a "Completed" entry. The entry names
+  the archived session-575 manifest as superseded and the session-579
+  manifest as the final dispatch.
 
 ## 5. Verification
 
@@ -351,7 +364,11 @@ first step runs `BUN_OPTIONS=--jsx-runtime=classic bun test > baseline.log
 command 8. That command is expected to exit 0 at b52e4db, after f033691
 "Type the wide-range lookup for strict index access". If it does not, the
 plan stops and reports a blocker; it must not list a failing gate. The
-intake reports 17 native parity blocks at baseline.
+intake reports 17 native parity blocks at baseline. At 1b6b669, `grep -c
+'^nativeTest(' apps/cli/src/native-parity.test.ts` prints 17. The
+repo-wide `--noUncheckedIndexedAccess` error total (91 at 28c9ded) may be
+recorded in a progress log for reference. It is not a gate, because that
+command exits non-zero on the untouched tree. Command 8 is the gate.
 
 ## Rollout constraints
 
@@ -387,6 +404,34 @@ intake reports 17 native parity blocks at baseline.
   through the import graph. `apps/cli/native/build.rs` already reruns when
   anything under `apps/cli/src` or `packages/core/src` changes, so the new
   directories are picked up.
+- Dispatch manifest rules (session 579; these fix the session-575
+  manifest):
+  - Every plan declares `artifactRoots: ["target"]`. Commands 1 and 2
+    build into the git-ignored `target/`, including
+    `target/release/nodetto-cli`, which command 3 runs.
+  - Every file a plan's steps edit is in that plan's `writePaths`, not
+    only in `sharedPaths`. `docs/development.md` is a write path of both
+    sms-01 and sms-02. That is safe only because the two plans run in
+    separate serial waves, 1 then 2. `apps/cli/native/README.md` is a
+    write path of sms-03. Each plan's progress log and evidence directory
+    are also write paths.
+  - Evidence goes under `tmp/source-module-split-s579/<planId>/`.
+    `tmp/` is git-ignored (`.gitignore` line 41). Only `.log` and `.txt`
+    files go there. The plan bodies and the manifest name the same
+    evidence root. In the plan bodies, only the session-575 evidence paths
+    and session labels change; every other part of the plans is reused
+    as is.
+  - The manifest records `originalHead` 1b6b669 and the upstream
+    `origin/main`. Command 7 and the sms-01/sms-02 `git diff` gates keep
+    comparing against b52e4db, which has the same source tree.
+  - `impl-plans/active/source-module-split-s575-dispatch.json` is
+    superseded and never dispatched. At archival it moves to
+    `impl-plans/completed/` along with the three sms plans. The
+    session-579 manifest stays in `impl-plans/active/`, and its `planPath`
+    values keep naming the pre-archive `active/` locations, as the other
+    historical manifests there do. The orchestrator owns
+    `impl-plans/README.md`, the plans, this design and both manifests.
+    Workers do not edit them.
 - No version bump, tag or release. `gitPush` is false: commit locally only,
   with no push or merge.
 
@@ -429,3 +474,10 @@ intake reports 17 native parity blocks at baseline.
   17 blocks.
 - D6. Only helpers newly extracted from closures or inline code get focused
   tests. Functions that only move do not.
+- D7 (session 579). The design and the three plans are reused. Only the
+  dispatch manifest is rebuilt, following the rules under "Rollout
+  constraints". The superseded session-575 manifest is archived to
+  `completed/`, as the workflow input asks. This differs on purpose from
+  the README convention that historical manifests stay in `active/`. That
+  convention covers manifests that were dispatched, and the session-575
+  manifest never was.
