@@ -59,3 +59,22 @@ Implementation is complete; independent review and workflow finalization remain 
 The 13 source hashes in `final-hashes.txt` matched before and after this retry (`retry-final-hashes.log`, exit 0). No source edits were made. Fresh `bun run typecheck` exited 0 (`retry-typecheck.log`); `mise run verify` exited 0 with 2945 pass and 0 fail (`retry-verify.log`); `mise run test-cli` exited 0 with 172 pass and 0 fail (`retry-test-cli.log`). The size, editor-size, numbered-name, export/field order, strict, import and unchanged-file checks all exited 0 (`retry-size.log`, `retry-editor-size.log`, `retry-numbered.log`, `retry-export.log`, `retry-strict.log`, `retry-imports.log`, `retry-unchanged.log`); final line counts are in `retry-wc.log`. Exit codes are recorded in corresponding `.exit` files.
 
 The standalone native parity gate failed twice on the current source: `retry-native-parity.log` and `retry2-native-parity.log` each show 16 pass, 1 fail, with the golden-fixture test timing out at 95 seconds. Both command exits are 1; the required 17-pass grep exits 1 (`retry2-parity-count.log`), while the no-skip check exits 0 (`retry2-parity-skip.log`). The standalone 17-pass requirement remains unresolved despite the successful full CLI gate. Independent test-integrity and adversarial reviews and workflow finalization remain downstream.
+
+## Session 583 review
+
+Intent: review R1–R10 against design 1.2–1.4, preserve all public behavior and test integrity, and repair findings only within the assigned paths after fresh reads and pre/post hashes. Run the assigned gates and retain their evidence. Start hashes are in `tmp/source-module-split-s583/sms-01-editor-facade/start-hashes.txt`; all 13 session-579 source hashes matched (`hash-comparison.log`, exit 0). Formal independent review and finalization remain downstream.
+
+Baseline B1 exited 0 (2945 pass, 25 skip, 0 fail: `baseline-bun-test.log`); B2 exited 0 (`baseline-wc.txt`). Evidence paths below are under `tmp/source-module-split-s583/sms-01-editor-facade/`.
+
+- SMS01-R1: prototype member inventory `r1-members.txt` matches design 1.2; no duplicates found. Pass.
+- SMS01-R2: `r2-fields.txt` and runtime export comparison show fields in EditorCore and unchanged field order. Pass.
+- SMS01-R3: `r3-line-residue.txt` reviewed: residue consists of imports, class boundaries, visibility, header, frame helpers and formatting rewraps. Pass.
+- SMS01-R4: `r4-planners.txt`: type-only imports and parameter annotations only. Pass.
+- SMS01-R5: `r5-frame.txt`: guard order, short-circuit returns and distinct apply paths preserved. Pass.
+- SMS01-R6: `r6-visibility.txt`: each protected member is used by a later class. Pass.
+- SMS01-R7: `r7-imports.txt` and `imports.log`: import direction and module-level statements conform. Pass.
+- SMS01-R8: `r8-tests.txt` empty; fresh baseline and verify retain 2945 pass, 25 skip, 0 fail. Pass.
+- SMS01-R9: `r9-hashes.txt` matches prior source; current `test-cli.log` exited 1, 166 pass, 6 fail, including five parity timeouts and one MCP timeout. Load average was 87.94. Finding unresolved: retry the full gate once on an idle machine before disposition; do not assume machine load is the cause.
+- SMS01-R10: `r10-docs.txt` and editor header match design. Pass.
+
+No source repairs were made. `bun run typecheck`, `mise run verify`, size, filename, export/field order, strict editor index access, import direction, unchanged files and test-file diff checks exited 0 (`typecheck.log`, `verify.log`, `size.log`, `export.log`, `strict.log`, `imports.log`, `unchanged.log`). The binary-less collection exited 0 with 17 skip (`parity-collect.log`). The required CLI gate remains failed and its retry is pending. Formal review and finalization remain downstream.
