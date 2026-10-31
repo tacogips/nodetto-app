@@ -3,24 +3,28 @@
 - planId: sms-03-native-parity
 - planPath: impl-plans/active/sms-03-native-parity.md
 - progressPath: impl-plans/progress/sms-03-native-parity.md
-- wave: 3 of 3 in session 589. It runs alone in its wave and is the last
+- wave: 2 of 2 in session 598. It runs alone in its wave and is the last
   plan.
-- Source state: `apps/cli/src/native-parity.test.ts` and
-  `apps/cli/native/README.md` are byte-identical to b52e4db, so every line
-  number below still applies.
-- dependsOn: sms-02-cli-edit (which depends on sms-01-editor-facade). The
-  parity gates build the release binary from the whole tree, so the
-  earlier plans must be finished. This plan also runs the final combined
-  verification.
+- Source state: HEAD 99df8d4. `apps/cli/src/native-parity.test.ts` and
+  `apps/cli/native/README.md` are byte-identical to b52e4db
+  (`git diff --stat b52e4db 99df8d4 -- apps/cli/src/native-parity.test.ts apps/cli/native/README.md`
+  prints nothing), so every line number below still applies. The 17
+  `nativeTest(` lines are 53, 72, 115, 199, 253, 318, 397, 466, 547, 611,
+  659, 698, 737, 836, 881, 917 and 961. Each test name is a single-line
+  string on the next line.
+- dependsOn: sms-02-cli-edit (session 598 review and repair; sms-01 is an
+  accepted dependency). The parity gates build the release binary from
+  the whole tree, so sms-02 must be finished. This plan also runs the
+  final combined verification.
 - Design: `design-docs/specs/design-source-module-split.md`. Read
   "3. Native parity tests", "4. Documentation", "5. Verification" (commands
-  1-10), "Rollout constraints" and D11.
-- Evidence directory: `tmp/source-module-split-s589/sms-03-native-parity/`.
-  Write only `.log` and `.txt` files there. Baselines and the pre-delete
-  check go directly in it. The gate run goes in `final/` (the design's
-  `$d`). If it must be repeated after a fix, first `mv final` to
-  `attempt-<n>/`, then rerun into a fresh `final/`.
-- Write paths (manifest `impl-plans/active/source-module-split-s589-dispatch.json`):
+  1-11), "Rollout constraints" ("Session 598 dispatch"), D11 and D13.
+- Evidence directory: `tmp/source-module-split-s598/sms-03-native-parity/`.
+  Write only `.log` and `.txt` files there. Baselines go directly in it.
+  The pre-delete G15 run writes to `pre-delete/`. The gate run goes in
+  `final/` (the design's `$d`). If it must be repeated after a fix, first
+  `mv final` to `attempt-<n>/`, then rerun into a fresh `final/`.
+- Write paths (manifest `impl-plans/active/source-module-split-s598-dispatch.json`):
   `apps/cli/src/native-parity.test.ts` (deleted),
   `apps/cli/src/native-parity/`, `apps/cli/native/README.md`, the progress
   log, the evidence directory and `target/`. `target/` is the git-ignored
@@ -120,13 +124,15 @@ test-cli` (`bun test apps/cli/src` with the binary set) must still run all
   Import `expect` and `test` from `bun:test` in `harness.ts`.
 - Do not wrap blocks in `describe`. That would change the reported test
   names.
-- Before you delete the old file, pass G4 and a directory-only
-  collection check, so that no block is lost or duplicated. Run
-  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity/ > tmp/source-module-split-s589/sms-03-native-parity/pre-delete-collect.log 2>&1`
-  and then `grep -Ex ' *17 skip'` on that log. The trailing slash keeps
-  the old file out of this run. While the old file still exists, the
-  un-slashed G5 filter would report 34 skip. G5 itself runs only after the
-  deletion.
+- Before you delete the old file, pass G4 and G15 (with `pre-delete` in
+  place of `final` in G15's path), so that no block is lost, duplicated or
+  renamed. Both are static and run no test. Never run the parity tests
+  without the binary (`env -u NODETTO_CLI_TEST_BINARY ...`): that run only
+  skips, so it tests nothing, and the progress gate rejects it (design
+  D13).
+- Keep each test name on its own line right after `nativeTest(`, as a
+  single-line string with two-space indent. Do not let a formatter join
+  the name onto the `nativeTest(` line. G4 and G15 depend on this layout.
 - Never edit a test deadline, a timeout (including block 1's
   `goldenFixtures.length * 5000`), `mise.toml` or another test file to
   make a gate pass. Retry only through the G1, G2 and G13 loops. Run them
@@ -145,18 +151,20 @@ test-cli` (`bun test apps/cli/src` with the binary set) must still run all
 ## Steps
 
 1. Baseline, on the tree before any edit: B1 and B2.
-2. Create `harness.ts` and the five test files. Delete the old file. Edit
-   the README.
-3. Run G1-G14 into `final/`, with G13 directly after G2 (G1-G9 and G13
-   are the combined-tree final verification).
+2. Create `harness.ts` and the five test files. Run G4 and G15 into
+   `pre-delete/`. Only then delete the old file. Edit the README.
+3. Run G1-G4 and G6-G15 into `final/`, with G13 directly after G2 (G1-G9,
+   G13 and G15 are the combined-tree final verification). G5 no longer
+   exists.
 
 ## Tests
 
 No new test cases. The 17 blocks move unchanged. Evidence that nothing is
 lost:
 
-- the block count in the new files is 17 (G4);
-- without the binary, all 17 are reported as skipped (G5);
+- the block count in the new files is 17 (G4, static);
+- the 17 sorted test names equal those of the old file at 99df8d4 (G15,
+  static);
 - with the binary set by `mise run test-cli`, the run has ` 0 fail`, no
   skip line and the unchanged pass count of 183 (G2 and G3). So all 17
   blocks ran and passed on the release binary.
@@ -165,11 +173,12 @@ lost:
 
 Every gate must exit 0. Record each one's exit code and log path in the
 progress log. Below, `F` stands for
-`tmp/source-module-split-s589/sms-03-native-parity/final`; write the
-literal path in every command.
+`tmp/source-module-split-s598/sms-03-native-parity/final`; write the
+literal path in every command. No command in this plan runs the parity
+tests without the binary (design D13).
 
 - B1, with up to three attempts because `bun test` has deadlines too:
-  `sh -c 'd=tmp/source-module-split-s589/sms-03-native-parity; mkdir -p "$d"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic bun test > "$d/baseline-bun-test-$i.log" 2>&1 && cp "$d/baseline-bun-test-$i.log" "$d/baseline-bun-test.log" && exit 0; done; exit 1'`.
+  `sh -c 'd=tmp/source-module-split-s598/sms-03-native-parity; mkdir -p "$d"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic bun test > "$d/baseline-bun-test-$i.log" 2>&1 && cp "$d/baseline-bun-test-$i.log" "$d/baseline-bun-test.log" && exit 0; done; exit 1'`.
   Record the summary lines of `baseline-bun-test.log`.
 - B2: `test "$(grep -c '^nativeTest(' apps/cli/src/native-parity.test.ts)" -eq 17`
   exits 0.
@@ -180,7 +189,8 @@ literal path in every command.
   still skip there. B1 is expected to be ` 2956 pass` and ` 25 skip`:
   sms-01's 2945 plus the 11 tests from sms-02. So
   `grep -Ex ' *2956 pass' F/verify.log` and `grep -Ex ' *25 skip' F/verify.log`
-  both exit 0. If B1 differs, compare against B1 and record why.
+  both exit 0. If B1 differs (a sms-02 review correction added tests),
+  compare against B1 and record why.
 - G2 (design command 2, load-tolerant):
   `sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/test-cli-[123].log "$d/test-cli.log"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > "$d/test-cli-$i.log" 2>&1 && cp "$d/test-cli-$i.log" "$d/test-cli.log" && exit 0; done; exit 1' sh F`
   exits 0.
@@ -191,19 +201,17 @@ literal path in every command.
   - `grep -Ex ' *183 pass' F/test-cli.log`
 
   183 is the test-cli baseline: the ` N pass` line of
-  `tmp/source-module-split-s589/sms-02-cli-edit/final/test-cli.log`. This
-  plan adds no test. With the binary set, all 17 moved blocks run and
+  `tmp/source-module-split-s598/sms-02-cli-edit/final/test-cli.log`. If a
+  sms-02 correction added tests under `apps/cli/src`, use that log's
+  value instead and record why. This plan adds no test. With the binary set, all 17 moved blocks run and
   pass inside this run. If all three G2 attempts fail, the gate fails and
   is never waived as load. A missing or extra block, or a path error in a
   moved block, is a regression to fix in this plan.
-- G4 (design command 4):
+- G4 (design command 4, topic-file form; static):
   `test "$(cat apps/cli/src/native-parity/*.test.ts | grep -c '^nativeTest(')" -eq 17`
-  exits 0.
-- G5 (the collection check of design command 3): without the binary,
-  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > F/parity-collect.log 2>&1`
-  exits 0, and `grep -Ex ' *17 skip' F/parity-collect.log`
-  exits 0. All blocks are collected and gated by `nativeTest`. The path
-  filter now matches the `apps/cli/src/native-parity/` directory.
+  exits 0. It runs before the deletion (step 2) and in `final/`.
+- G5: removed in session 598 (design D13). The binary-less collection
+  check ran zero tests. G4 and G15 replace it.
 - G6 (design command 5, full scope):
   `find packages/core/src/editor.ts packages/core/src/editor apps/cli/src/edit-command.ts apps/cli/src/edit apps/cli/src/native-parity -name '*.ts' -exec awk 'FNR == 701 { print FILENAME " exceeds 700 lines"; bad = 1 } END { exit bad }' {} +`
   exits 0, and
@@ -238,17 +246,23 @@ literal path in every command.
   Do not create a git worktree yourself.
 - G14: `git diff --exit-code 9e6ccc7 -- mise.toml` exits 0 (no test
   deadline or timeout configuration changed).
+- G15 (design command 11, test names; static, runs no test):
+  `sh -c 'd="$1"; mkdir -p "$d" && git show 99df8d4c050d0e37620477ab1a043ec2ef830524:apps/cli/src/native-parity.test.ts | grep -A1 "^nativeTest(" | grep "^  \"" | sort > "$d/parity-names-before.txt" && cat apps/cli/src/native-parity/*.test.ts | grep -A1 "^nativeTest(" | grep "^  \"" | sort > "$d/parity-names-after.txt" && test "$(sort -u "$d/parity-names-before.txt" | wc -l)" -eq 17 && cmp "$d/parity-names-before.txt" "$d/parity-names-after.txt"' sh F`
+  exits 0. Run it in step 2 with `tmp/source-module-split-s598/sms-03-native-parity/pre-delete`
+  as the last argument, and again with `F`.
 
 ## Acceptance criteria
 
 - `apps/cli/src/native-parity/` holds `harness.ts` and the five topic test
   files, with 17 `nativeTest` blocks in total and the same names.
   `apps/cli/src/native-parity.test.ts` no longer exists.
-- G1-G14 exit 0, with logs in `final/`. G3 shows ` 183 pass`, ` 0 fail`
-  and no skip line in `final/test-cli.log`, G5 shows ` 17 skip`, and
-  G13's `final/cpu-time.log` shows a new user time at most 1.15 times the
-  reference. The progress log records which attempt went green for G1, G2
-  and G13.
+- G4 and G15 exited 0 in `pre-delete/` before the old file was deleted.
+- G1-G4 and G6-G15 exit 0, with logs in `final/`. G3 shows ` 183 pass`,
+  ` 0 fail` and no skip line in `final/test-cli.log`, G15's
+  `parity-names-before.txt` and `parity-names-after.txt` are identical
+  (17 lines), and G13's `final/cpu-time.log` shows a new user time at
+  most 1.15 times the reference. The progress log records which attempt
+  went green for G1, G2 and G13.
 - The README names the new location.
 - The progress log has the baseline, the gate results, the hashes, drift
   events and `final-wc.txt`.

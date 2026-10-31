@@ -7,7 +7,7 @@
 
 ## Active
 
-Source module split (sessions 575, 579, 583 and 589; design:
+Source module split (sessions 575, 579, 583, 589 and 598; design:
 `design-docs/specs/design-source-module-split.md`; no GitHub issue). The
 work splits `packages/core/src/editor.ts`, `apps/cli/src/edit-command.ts`
 and `apps/cli/src/native-parity.test.ts` into modules named for their
@@ -16,18 +16,23 @@ waves:
 [sms-01-editor-facade](active/sms-01-editor-facade.md),
 [sms-02-cli-edit](active/sms-02-cli-edit.md) and
 [sms-03-native-parity](active/sms-03-native-parity.md).
-sms-01 was implemented in 9ef8639 (session 579). Its review and repair
-runs in session 589. `source-module-split-s589-dispatch.json` is the
-dispatch manifest, with load-tolerant gates (three-attempt verify and
-test-cli loops plus a CPU-time check). It supersedes
-`source-module-split-s583-dispatch.json`, whose run stopped on
-load-bound test-cli deadline timeouts and which stays in `active/` as a
-dispatched manifest; `source-module-split-s579-dispatch.json`, whose
-review branch failed with a provider error; and
-`source-module-split-s575-dispatch.json`, which was never dispatched: its
-plans had no `target` artifact root, and `docs/development.md` was not a
-write path. The s575 and s579 manifests move to `completed/` together
-with the plans; the s583 and s589 manifests stay in `active/`.
+sms-01 (implemented in 9ef8639) passed both independent reviews in
+session 589. sms-02 was implemented in 99df8d4 (session 589); its review
+and repair, and the sms-03 split, run in session 598.
+`source-module-split-s598-dispatch.json` is the dispatch manifest, with
+load-tolerant gates (three-attempt verify and test-cli loops plus a
+CPU-time check) and static parity block and name checks in place of the
+zero-test collection check. Earlier manifests:
+`source-module-split-s589-dispatch.json` stopped on that zero-test
+collection check after sms-01 passed review and sms-02 was implemented;
+`source-module-split-s583-dispatch.json` stopped on load-bound test-cli
+deadline timeouts; `source-module-split-s579-dispatch.json` stopped when
+its review branch failed with a provider error; and
+`source-module-split-s575-dispatch.json` was never dispatched (its plans
+had no `target` artifact root, and `docs/development.md` was not a write
+path). When the work is finished, the three plans and all five manifests
+move to `completed/`, and the progress logs stay in `progress/` (design
+D15).
 
 Breadboard circuit pages overview:
 [breadboard-00-overview](active/breadboard-00-overview.md) lists waves
