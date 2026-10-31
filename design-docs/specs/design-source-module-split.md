@@ -30,6 +30,24 @@ D1-D6 are reused unchanged. Session 583 changes only the following:
 - The evidence root moves to `tmp/source-module-split-s583/`.
 - Both earlier manifests are archived (D10).
 
+Re-validated, 2026-10-31 (session 589) at 9e6ccc7 "Record the session 583
+load-bound test-cli attempt for sms-01". `git diff --stat 9ef8639 9e6ccc7`
+lists only this design, `impl-plans/README.md`, the three sms plans, the
+session-583 manifest and the sms-01 progress log, so the source tree is
+the same as at 9ef8639. At 9e6ccc7, `editor.ts` has 267 lines, the facade
+files have the counts in section 1.4, `edit-command.ts` has 1372 lines,
+`native-parity.test.ts` has 1012 lines, and `grep -c '^nativeTest('` on it
+prints 17. Session 583 stopped at the sms-01 test-cli gate: 166 pass and
+6 fail, all deadline timeouts, at a load average of 87.94. Sections 1-4,
+D1-D10 and the plans are reused. Session 589 changes only the following:
+
+- Commands 1 and 2 run inside a three-attempt retry loop, and a CPU-time
+  regression check (command 10) is added (D11). No test deadline or
+  timeout changes.
+- The evidence root moves to `tmp/source-module-split-s589/`, and the
+  session-589 manifest replaces the session-583 manifest as the final
+  dispatch (D12).
+
 ## Overview
 
 Three hand-written files are over 1000 lines:
@@ -216,6 +234,20 @@ also follow sections 1.2 and 1.3. After a fix, the sms-01 gates are run
 again. If the review finds nothing, sms-01 makes no source edit, and its
 gates pass on the unchanged tree.
 
+Session 589. Session 583 ran the checks above as R1-R10 and recorded them
+in `impl-plans/progress/sms-01-editor-facade.md`, with evidence under
+`tmp/source-module-split-s583/sms-01-editor-facade/`. R1-R8 and R10
+passed. R9, the test-cli gate, failed with deadline timeouts under load.
+That was a self-check by the implementer, so it does not replace the
+independent review. sms-01 may reuse the session-583 evidence only after
+it shows that the 13 source hashes in `final-hashes.txt` still match. It
+then runs every sms-01 gate fresh under the session-589 evidence root.
+R9 is settled by commands 2, 3 and 10 as defined in section 5. If all
+three test-cli attempts fail, that is a failed gate and not load to be
+waived. The plan then stops and reports a blocker. The workflow's
+independent test-integrity and adversarial review then covers the same
+section 1.4 items.
+
 ## 2. `nodetto-cli edit` (`apps/cli/src/edit-command.ts`)
 
 ### 2.1 Modules
@@ -318,26 +350,47 @@ these 17.
 - Completed design records that mention `native-parity.test.ts` stay as
   they are, because they describe work done before the split.
 - `impl-plans/README.md`: while the plans run, its "Active" section lists
-  the three sms plans and the session-583 manifest. When the plans are
+  the three sms plans and the session-589 manifest. When the plans are
   archived, that text is replaced by a "Completed" entry. The entry names
-  the archived session-575 and session-579 manifests as superseded and
-  `active/source-module-split-s583-dispatch.json` as the final dispatch
-  (D10). The links in the README must point at the files' actual
+  the archived session-575 and session-579 manifests as superseded,
+  `active/source-module-split-s583-dispatch.json` as the dispatched but
+  unfinished session-583 attempt, and
+  `active/source-module-split-s589-dispatch.json` as the final dispatch
+  (D10, D12). The links in the README must point at the files' actual
   locations.
 
 ## 5. Verification
 
 Every command below must exit 0 on a correct tree. Run them from the
-repository root.
+repository root. `$d` is the evidence directory of one gate run (section
+"Rollout constraints"). A plan that runs a gate set more than once (for
+example after the move, after deduplication, and at the end) gives each
+run its own `$d`, so no log is overwritten.
 
-1. `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify`
-   exits 0. Its bun summary has ` 0 fail`, and its pass count is at least
-   the baseline pass count plus the focused tests added in section 2.4.
-2. `CARGO_TERM_QUIET=true mise run test-cli` exits 0, with ` 0 fail` in its
-   bun summary. This builds `target/release/nodetto-cli`.
+1. `mise run verify`, load-tolerant (D11). This is one command that exits
+   0 on the first fully green attempt out of three:
+
+   ```sh
+   sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/verify-[123].log "$d/verify.log"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > "$d/verify-$i.log" 2>&1 && cp "$d/verify-$i.log" "$d/verify.log" && exit 0; done; exit 1' sh "$d"
+   ```
+
+   `$d/verify.log` is a copy of the green attempt. Its bun summary has
+   ` 0 fail`, and its pass count is at least the baseline pass count plus
+   the focused tests added in section 2.4.
+2. `mise run test-cli`, load-tolerant (D11), in the same form:
+
+   ```sh
+   sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/test-cli-[123].log "$d/test-cli.log"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > "$d/test-cli-$i.log" 2>&1 && cp "$d/test-cli-$i.log" "$d/test-cli.log" && exit 0; done; exit 1' sh "$d"
+   ```
+
+   `$d/test-cli.log` is a copy of the green attempt, with ` 0 fail` in its
+   bun summary. This builds `target/release/nodetto-cli`. The failed
+   attempts stay in `test-cli-1.log` and `test-cli-2.log` as evidence.
+   They are not waived. They are expected only when the machine is loaded,
+   and command 10 checks that separately.
 3. Native parity, redefined in session 583 (D9). Parity is verified only
    through command 2; there is no separate parity run against the binary.
-   With `test-cli.log` as the redirected output of command 2:
+   With `test-cli.log` as the green copy written by command 2:
    - `grep -E '^ *0 fail$' test-cli.log` exits 0;
    - `test -z "$(grep -E '^ *[1-9][0-9]* skip$' test-cli.log)"` exits 0;
    - the ` N pass` value in `test-cli.log` equals the plan's test-cli
@@ -433,6 +486,43 @@ repository root.
    console.log("facade imports ok");
    '
    ```
+10. CPU-time regression check (D11). Run it right after command 2, with no
+    source edit in between, so `target/release/nodetto-cli` is built from
+    the plan's final tree. The reference binary is
+    `/opt/homebrew/bin/nodetto-cli`, version 0.8.5. Tag `v0.8.5` is
+    f033691, an ancestor of b52e4db, and `git diff --stat v0.8.5 b52e4db --
+    apps/cli/src apps/cli/native packages/core/src packages/io/src` prints
+    nothing, so it runs the same CLI source as b52e4db. One attempt
+    measures the `/usr/bin/time -p` user time of `validate`, `format` and
+    `inspect` on every `packages/io/src/__fixtures__/*.jsonl`, first with
+    the reference binary and then with the new one. `format` without
+    `--write` prints to stdout and does not touch the fixtures. An attempt
+    passes when the new user time is at most 1.15 times the reference user
+    time. The command exits 0 on the first passing attempt out of three:
+
+    ```sh
+    bash -c '
+    d="$1"; base="$2"; want="${3-}"; new=target/release/nodetto-cli
+    [ -z "$want" ] || "$base" --version | grep -qF "$want" || { echo "reference binary is not $want"; exit 1; }
+    user() { /usr/bin/time -p bash -c "for f in packages/io/src/__fixtures__/*.jsonl; do for a in validate format inspect; do \"$1\" \"\$a\" \"\$f\" > /dev/null 2>&1; done; done" 2>&1 > /dev/null | awk "\$1 == \"user\" { print \$2 }"; }
+    mkdir -p "$d" && rm -f "$d"/cpu-time-[123].log "$d/cpu-time.log"
+    for i in 1 2 3; do
+      b="$(user "$base")"; n="$(user "$new")"
+      echo "attempt $i: reference $base user $b s; new $new user $n s" > "$d/cpu-time-$i.log"
+      awk -v b="$b" -v n="$n" "BEGIN { exit !(b > 0 && n > 0 && n <= b * 1.15) }" && cp "$d/cpu-time-$i.log" "$d/cpu-time.log" && exit 0
+    done
+    exit 1' bash "$d" /opt/homebrew/bin/nodetto-cli 0.8.5
+    ```
+
+    If `/opt/homebrew/bin/nodetto-cli` is missing or is not 0.8.5, the plan
+    builds the reference from b52e4db instead. It uses a `git worktree`
+    outside the repository, runs `mise run install` there and then
+    `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`, and
+    passes that worktree's `target/release/nodetto-cli` as the second
+    argument and no third argument, which skips the version check. The plan records which
+    reference it used. Session 583 measured about 42 s user time for both
+    binaries at 9ef8639, so a passing result is expected on a correct
+    tree.
 
 Baselines are recorded before any edit, on the untouched tree. Each plan's
 first step runs `BUN_OPTIONS=--jsx-runtime=classic bun test > baseline.log
@@ -459,24 +549,26 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
      `packages/core/src/editor/facade/*` (new), the planner parameter types
      in `editor/{paste,pages,sequence,bpmn,breadboard,connections}.ts`, and
      the editor paragraph in `docs/development.md`. Gates: commands 1, 2
-     (test-cli, for the Boa cost of the chain; review finding DR-L2), 3, 7, 8
-     and 9; command 5 limited to the editor paths, plus the `editor.ts` size
-     check; command 6 limited to `packages/core/src/editor`. In session 583
-     this plan is the review and repair pass of section 1.4. These gates
-     already pass at 9ef8639, so they show both that the existing
-     implementation holds and that any repair keeps it working. The
-     baseline is recorded fresh at 9ef8639. It must match the session-579
-     pre-edit counts (2945 pass, 25 skip, 0 fail), because sms-01 added no
-     tests.
+     (test-cli, for the Boa cost of the chain; review finding DR-L2), 3, 7,
+     8, 9 and 10; command 5 limited to the editor paths, plus the
+     `editor.ts` size check; command 6 limited to `packages/core/src/editor`.
+     Since session 583 this plan is the review and repair pass of section
+     1.4. Its gates pass at 9ef8639 once a test-cli attempt is green, so
+     they show both that the existing implementation holds and that any
+     repair keeps it working. The baseline is recorded fresh at 9e6ccc7
+     (the same source as 9ef8639). It must match the session-579 pre-edit
+     counts (2945 pass, 25 skip, 0 fail), because sms-01 added no tests.
   2. `sms-02-cli-edit` (depends on 1): `apps/cli/src/edit-command.ts`,
      `apps/cli/src/edit/**` (new, with the focused tests), and the edit
-     sentence in `docs/development.md`. Gates: commands 1, 2, 3 and 7;
+     sentence in `docs/development.md`. Gates: commands 1, 2, 3, 7 and 10;
      command 5 limited to the edit paths, plus the `edit-command.ts` size
-     check; command 6 limited to `apps/cli/src/edit`.
+     check; command 6 limited to `apps/cli/src/edit`. Its test-cli
+     baseline is the ` N pass` line of sms-01's final green
+     `test-cli.log` under the session-589 evidence root.
   3. `sms-03-native-parity` (depends on 2): `apps/cli/src/native-parity.test.ts`
      (removed), `apps/cli/src/native-parity/**` (new) and
      `apps/cli/native/README.md`. This is the last plan, so its gates are
-     commands 1-9 on the combined tree.
+     commands 1-10 on the combined tree.
 - Within plans 1 and 2, the move comes first: code is moved and only
   re-pointed (`this` becomes a `batch` parameter, imports change). Behavior-
   neutral deduplication (sections 1.3 and 2.3) is a separate step in the
@@ -488,40 +580,56 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
   directories are picked up.
 - Dispatch manifest rules. Session 579 wrote them to fix the session-575
   manifest. Session 583 revised them: the evidence root, the
-  `originalHead` and the archive rule changed.
+  `originalHead` and the archive rule changed. Session 589 revised them
+  again: the evidence root, the `originalHead`, the final manifest and
+  the load-tolerant gate forms (D11, D12) changed.
   - Every plan declares `artifactRoots: ["target"]`. Commands 1 and 2
     build into the git-ignored `target/`. Command 2 builds
     `target/release/nodetto-cli` and runs the parity blocks against it.
+    Command 10 reads that binary.
+  - Every verification command in the plans and in the manifest is the
+    exact form of section 5. Commands 1 and 2 appear only as the retry
+    loops, and command 10 always follows command 2. No command is
+    informational or expected to fail. No test deadline or timeout is
+    changed by any plan.
   - Every file a plan's steps edit is in that plan's `writePaths`, not
     only in `sharedPaths`. `docs/development.md` is a write path of both
     sms-01 and sms-02. That is safe only because the two plans run in
     separate serial waves, 1 then 2. `apps/cli/native/README.md` is a
     write path of sms-03. Each plan's progress log and evidence directory
     are also write paths.
-  - Evidence goes under `tmp/source-module-split-s583/<planId>/`.
+  - Evidence goes under `tmp/source-module-split-s589/<planId>/`, with
+    one subdirectory per gate run (the `$d` of section 5).
     `tmp/` is git-ignored (`.gitignore` line 41). Only `.log` and `.txt`
     files go there. The plan bodies and the manifest name the same
-    evidence root. The session-579 evidence under
-    `tmp/source-module-split-s579/` is kept, and sms-01 may read it. Only
-    these parts of the plan bodies change:
+    evidence root. The session-579 and session-583 evidence under
+    `tmp/source-module-split-s579/` and `tmp/source-module-split-s583/` is
+    kept, and sms-01 may read it. Only these parts of the plan bodies
+    change in session 589:
     - the evidence paths and the session labels;
-    - the standalone parity commands, which are replaced by command 3 as
-      redefined;
-    - the sms-01 steps, which become the section 1.4 review and repair.
-    Everything else in the plans is reused as is.
-  - The session-583 manifest is
-    `impl-plans/active/source-module-split-s583-dispatch.json`. It records
-    `originalHead` 9ef8639 and the upstream `origin/main`. Command 7 and the
+    - commands 1 and 2, which become the retry loops of section 5, and
+      the new command 10 after command 2;
+    - the "rerun test-cli once on an idle machine" instructions, which
+      are replaced by the retry loop (D11).
+    The session-583 changes (command 3 as redefined, sms-01 as the
+    section 1.4 review and repair) stay. Everything else in the plans is
+    reused as is.
+  - The session-589 manifest is
+    `impl-plans/active/source-module-split-s589-dispatch.json`. It records
+    `originalHead` 9e6ccc7 and the upstream `origin/main`. Command 7 and the
     sms-01/sms-02 `git diff` gates keep comparing against b52e4db. Since
-    b52e4db, the only source changes are the reviewed sms-01 edits.
-  - Archive (D10). After the final gates pass, the three sms plans move
-    to `impl-plans/completed/`, together with both superseded manifests:
-    `source-module-split-s575-dispatch.json` and
-    `source-module-split-s579-dispatch.json`. The session-583 manifest is
-    the final dispatch and stays in `impl-plans/active/`. Its `planPath`
-    values keep naming the pre-archive `active/` locations, as the other
-    historical manifests there do. The orchestrator owns
-    `impl-plans/README.md`, the plans, this design and all three
+    b52e4db, the only source changes are the sms-01 edits under review.
+  - Archive (D10, D12). After the final gates pass, the three sms plans
+    move to `impl-plans/completed/`, together with both superseded
+    manifests: `source-module-split-s575-dispatch.json` and
+    `source-module-split-s579-dispatch.json`. The session-589 manifest is
+    the final dispatch and stays in `impl-plans/active/`. The session-583
+    manifest was dispatched and also stays in `active/`, following the
+    README convention for dispatched manifests. The workflow input names
+    only the s575 and s579 manifests for archiving. The `planPath` values
+    of both manifests keep naming the pre-archive `active/` locations, as
+    the other historical manifests there do. The orchestrator owns
+    `impl-plans/README.md`, the plans, this design and all four
     manifests. Workers do not edit them.
 - No version bump, tag or release. `gitPush` is false: commit locally only,
   with no push or merge.
@@ -531,7 +639,8 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
 - The class chain adds prototype lookups to every `Editor` call. The chain
   is at most six levels deep, so a method lookup in Boa walks at most six
   shapes. That is small next to command planning. The `test-cli` parity
-  deadlines (command 2) would catch a regression.
+  deadlines (command 2) and the CPU-time check (command 10) would catch a
+  regression.
 - Field order and `useDefineForClassFields`. Section 1.3 rules this out
   (fields only in `EditorCore`), and command 7 compares
   `Object.keys(new Editor())`.
@@ -548,10 +657,18 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
   took 278.80 s, against 80.29 s in the passing `native-parity.log`. The
   source hashes were unchanged (`retry-final-hashes.log`), and test-cli
   passed with 172 pass and 0 fail on the same tree. Every block was about
-  3.5 times slower, which points to machine load, not to the chain. Even
-  so, the sms-01 review dispositions this explicitly. A test-cli failure
-  is never waived as load: rerun it on an idle machine, and if it still
-  fails, treat it as a regression.
+  3.5 times slower, which points to machine load, not to the chain. In
+  session 583, test-cli on the unchanged tree had 166 pass and 6 fail,
+  all deadline timeouts, at a load average of 87.94. The idle-machine
+  rerun rule is replaced in session 589 (D11). Commands 1 and 2 each get
+  up to three attempts, and a gate passes only on a fully green attempt
+  with every test run. If all three attempts fail, the gate fails and the
+  plan stops; it is never waived as load. Command 10 measures CPU time,
+  which load affects much less than wall-clock deadlines, so a real slowdown
+  of the native CLI still fails a gate even when a test-cli attempt passes
+  on a quiet moment. CPU time on macOS still varies with the core the
+  scheduler picks, so command 10 also gets three attempts with the
+  reference binary measured right before the new one.
 - Ordering inside `edit`. Handlers are moved, not rewritten. Golden parity
   tests, `ai-commands.test.ts` and `edit-scale-text-group.test.ts` cover the
   output and error text.
@@ -603,3 +720,19 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
   goes against the README convention for dispatched manifests. That is
   intentional. The convention is still met, because the session-583
   manifest, which drives the run to completion, stays in `active/`.
+  D12 names the session-589 manifest as the final dispatch instead.
+- D11 (session 589). Gates are load-tolerant, as the workflow input
+  requires. `mise run verify` and `mise run test-cli` each run inside a
+  three-attempt retry loop that passes on the first fully green attempt.
+  The green attempt's log is copied to `verify.log` or `test-cli.log`, so
+  the count checks in commands 1 and 3 read exactly one log. Command 10
+  adds a CPU-time check with a 15% limit against the 0.8.5 binary. Test
+  deadlines and timeouts are not changed. A retry does not weaken a test:
+  every test still has to pass within its unchanged deadline in one full
+  run.
+- D12 (session 589). The session-589 manifest
+  (`source-module-split-s589-dispatch.json`) is the final dispatch and
+  stays in `active/`. The session-583 manifest was dispatched and did not
+  finish. It is neither superseded-and-archived nor rewritten. It stays in
+  `active/` under the README convention, because the workflow input names
+  only the s575 and s579 manifests for archiving.

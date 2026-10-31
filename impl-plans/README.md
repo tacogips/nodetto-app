@@ -7,7 +7,7 @@
 
 ## Active
 
-Source module split (sessions 575 and 579; design:
+Source module split (sessions 575, 579, 583 and 589; design:
 `design-docs/specs/design-source-module-split.md`; no GitHub issue). The
 work splits `packages/core/src/editor.ts`, `apps/cli/src/edit-command.ts`
 and `apps/cli/src/native-parity.test.ts` into modules named for their
@@ -17,13 +17,17 @@ waves:
 [sms-02-cli-edit](active/sms-02-cli-edit.md) and
 [sms-03-native-parity](active/sms-03-native-parity.md).
 sms-01 was implemented in 9ef8639 (session 579). Its review and repair
-runs in session 583. `source-module-split-s583-dispatch.json` is the
-dispatch manifest. It supersedes `source-module-split-s579-dispatch.json`,
-whose review branch failed with a provider error, and
+runs in session 589. `source-module-split-s589-dispatch.json` is the
+dispatch manifest, with load-tolerant gates (three-attempt verify and
+test-cli loops plus a CPU-time check). It supersedes
+`source-module-split-s583-dispatch.json`, whose run stopped on
+load-bound test-cli deadline timeouts and which stays in `active/` as a
+dispatched manifest; `source-module-split-s579-dispatch.json`, whose
+review branch failed with a provider error; and
 `source-module-split-s575-dispatch.json`, which was never dispatched: its
 plans had no `target` artifact root, and `docs/development.md` was not a
-write path. Both superseded manifests move to `completed/` together with
-the plans; the s583 manifest stays in `active/`.
+write path. The s575 and s579 manifests move to `completed/` together
+with the plans; the s583 and s589 manifests stay in `active/`.
 
 Breadboard circuit pages overview:
 [breadboard-00-overview](active/breadboard-00-overview.md) lists waves

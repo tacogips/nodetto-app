@@ -3,8 +3,8 @@
 - planId: sms-02-cli-edit
 - planPath: impl-plans/active/sms-02-cli-edit.md
 - progressPath: impl-plans/progress/sms-02-cli-edit.md
-- wave: 2 of 3 in session 583. It runs alone in its wave.
-- dependsOn: sms-01-editor-facade, which is the session 583 review and
+- wave: 2 of 3 in session 589. It runs alone in its wave.
+- dependsOn: sms-01-editor-facade, which is the session 589 review and
   repair of the Editor chain committed in 9ef8639. The two plans touch no
   common source file. The dependency exists because this plan's gates
   load `packages/core` and build the release binary, so the sms-01 review
@@ -12,14 +12,18 @@
   after the other.
 - Design: `design-docs/specs/design-source-module-split.md`. Read
   "Invariants", "2. `nodetto-cli edit`" (2.1-2.4), "4. Documentation",
-  "5. Verification" (commands 1, 2, 3, 5, 6 and 7) and "Rollout
-  constraints".
+  "5. Verification" (commands 1, 2, 3, 5, 6, 7 and 10), "Rollout
+  constraints" and D11.
 - Source state: `apps/cli/src/edit-command.ts` is byte-identical to
-  b52e4db (`git diff --stat b52e4db 9ef8639 -- apps/cli/src/edit-command.ts`
+  b52e4db (`git diff --stat b52e4db 9e6ccc7 -- apps/cli/src/edit-command.ts`
   prints nothing), so every line number below still applies.
-- Evidence directory: `tmp/source-module-split-s583/sms-02-cli-edit/`.
-  Write only `.log` and `.txt` files there.
-- Write paths (manifest `impl-plans/active/source-module-split-s583-dispatch.json`):
+- Evidence directory: `tmp/source-module-split-s589/sms-02-cli-edit/`.
+  Write only `.log` and `.txt` files there. Baselines go directly in it.
+  The step 2 gate run goes in `move/` and the final gate run in `final/`
+  (each is the design's `$d`). If a gate run must be repeated after a
+  fix, first `mv` that subdirectory to `attempt-<n>/`, then rerun into a
+  fresh one.
+- Write paths (manifest `impl-plans/active/source-module-split-s589-dispatch.json`):
   `apps/cli/src/edit-command.ts`, `apps/cli/src/edit/`,
   `docs/development.md`, the progress log, the evidence directory and
   `target/`. `target/` is the git-ignored build output root
@@ -164,6 +168,10 @@ the retry loop, `edit/batch.ts` holds batch state and dispatch, and
   not add regex splitting of long strings, recursion, or per-operation
   closures that the old code did not have. The native Boa engine bundles
   these files.
+- Never edit a test deadline, a timeout, `mise.toml` or an existing test
+  file to make a gate pass. Retry only through the G1, G3 and G8 loops.
+  Run them exactly as written, through `sh -c` or `bash -c`, because a
+  bare `exit` in your own shell would end the session.
 
 ## Shared working directory protocol
 
@@ -179,15 +187,14 @@ the retry loop, `edit/batch.ts` holds batch state and dispatch, and
 1. Baseline, on the tree before any edit (sms-01 is already applied):
    B1 and B2 below.
 2. Move the code into the modules; `this.` becomes `batch.` in the
-   handlers. Build the re-exports. Pass G1 and G3-G7 with the counts from
-   before any test is added: verify ` 2945 pass` (B1) and test-cli
-   ` 172 pass` (B3). G2 is not run yet, because there is no test under
-   `apps/cli/src/edit/` at this point. Keep these logs under the `move-`
-   prefix, for example `move-verify.log`.
+   handlers. Build the re-exports. Pass G1, G3-G7 and G8 into `move/`,
+   with the counts from before any test is added: verify ` 2945 pass` (B1)
+   and test-cli ` 172 pass` (B3). G2 is not run yet, because there is no
+   test under `apps/cli/src/edit/` at this point.
 3. Deduplicate (items 1-3). Add `apply-batch.test.ts` and `report.test.ts`.
-   Pass G1-G7 with the final counts (2956, 11 and 183), using the log names
-   given in "Verification".
-4. Edit `docs/development.md`, then run G1.
+4. Edit `docs/development.md`.
+5. Run G1-G8 into `final/` with the final counts (2956, 11 and 183), G8
+   directly after G3.
 
 ## Tests to add
 
@@ -231,48 +238,49 @@ Build `Element` values as typed literals (`id`, `page`, `type`, `index`,
 ## Verification
 
 Every gate must exit 0. Record each one's exit code and log path in the
-progress log.
+progress log. Below, `F` stands for
+`tmp/source-module-split-s589/sms-02-cli-edit/final` (or `.../move` in
+step 2); write the literal path in every command.
 
-- B1:
-  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s583/sms-02-cli-edit/baseline-bun-test.log 2>&1`.
-  Record the ` N pass`, ` N skip` and ` N fail` lines. The expected values
-  are 2945 pass, 25 skip and 0 fail: the sms-01 final count, because
-  sms-01 adds no tests.
-- B2: `wc -l apps/cli/src/edit-command.ts > tmp/source-module-split-s583/sms-02-cli-edit/baseline-wc.txt`.
+- B1, with up to three attempts because `bun test` has deadlines too:
+  `sh -c 'd=tmp/source-module-split-s589/sms-02-cli-edit; mkdir -p "$d"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic bun test > "$d/baseline-bun-test-$i.log" 2>&1 && cp "$d/baseline-bun-test-$i.log" "$d/baseline-bun-test.log" && exit 0; done; exit 1'`.
+  From `baseline-bun-test.log`, record the ` N pass`, ` N skip` and
+  ` N fail` lines. The expected values are 2945 pass, 25 skip and 0 fail:
+  the sms-01 final count, because sms-01 adds no tests.
+- B2: `wc -l apps/cli/src/edit-command.ts > tmp/source-module-split-s589/sms-02-cli-edit/baseline-wc.txt`.
 - B3: the test-cli baseline is the ` N pass` line of
-  `tmp/source-module-split-s583/sms-01-editor-facade/test-cli.log`. The
-  expected value is 172. Record it; do not run test-cli again for the
-  baseline.
-- G1 (design command 1):
-  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s583/sms-02-cli-edit/verify.log 2>&1`
-  exits 0. `grep -E '^ *0 fail$' tmp/source-module-split-s583/sms-02-cli-edit/verify.log`
-  exits 0, and the ` N pass` line equals B1's pass count plus 11. With
-  the expected B1, that is
-  `grep -Ex ' *2956 pass' tmp/source-module-split-s583/sms-02-cli-edit/verify.log`,
+  `tmp/source-module-split-s589/sms-01-editor-facade/final/test-cli.log`,
+  the green copy from sms-01's G2. The expected value is 172. Record it;
+  do not run test-cli again for the baseline.
+- G1 (design command 1, load-tolerant):
+  `sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/verify-[123].log "$d/verify.log"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > "$d/verify-$i.log" 2>&1 && cp "$d/verify-$i.log" "$d/verify.log" && exit 0; done; exit 1' sh F`
+  exits 0. `grep -E '^ *0 fail$' F/verify.log` exits 0, and the
+  ` N pass` line equals B1's pass count plus 11 (in `move/`: B1's count).
+  With the expected B1, that is `grep -Ex ' *2956 pass' F/verify.log`,
   which exits 0. The skip count stays equal to B1's.
-- G2: `BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > tmp/source-module-split-s583/sms-02-cli-edit/edit-unit.log 2>&1`
-  exits 0, and `grep -Ex ' *11 pass' tmp/source-module-split-s583/sms-02-cli-edit/edit-unit.log`
-  exits 0. The trailing slash keeps `edit-scale-text-group.test.ts` out of
-  this run.
-- G3 (design commands 2 and 3; native parity is verified only through
-  test-cli):
-  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log 2>&1`
+- G2: `BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > F/edit-unit.log 2>&1`
+  exits 0, and `grep -Ex ' *11 pass' F/edit-unit.log` exits 0. The
+  trailing slash keeps `edit-scale-text-group.test.ts` out of this run.
+  These focused tests have no deadlines, so G2 is not retried.
+- G3 (design commands 2 and 3, load-tolerant; native parity is verified
+  only through test-cli):
+  `sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/test-cli-[123].log "$d/test-cli.log"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > "$d/test-cli-$i.log" 2>&1 && cp "$d/test-cli-$i.log" "$d/test-cli.log" && exit 0; done; exit 1' sh F`
   exits 0. Then all of these exit 0:
-  - `grep -E '^ *0 fail$' tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log`
-  - `test -z "$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log)"`
-  - `grep -Ex ' *183 pass' tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log`
-    (B3 plus 11)
+  - `grep -E '^ *0 fail$' F/test-cli.log`
+  - `test -z "$(grep -E '^ *[1-9][0-9]* skip$' F/test-cli.log)"`
+  - `grep -Ex ' *183 pass' F/test-cli.log` (B3 plus 11; in `move/`:
+    ` 172 pass`)
 
   Then the collection check, which runs no comparison:
-  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s583/sms-02-cli-edit/parity-collect.log 2>&1`
-  exits 0, and
-  `grep -Ex ' *17 skip' tmp/source-module-split-s583/sms-02-cli-edit/parity-collect.log`
-  exits 0. Inside test-cli, the `native edit handles refs, arrangement,
-  snapshots and rollback` block runs the moved code in Boa.
+  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > F/parity-collect.log 2>&1`
+  exits 0, and `grep -Ex ' *17 skip' F/parity-collect.log` exits 0.
+  Inside test-cli, the `native edit handles refs, arrangement, snapshots
+  and rollback` block runs the moved code in Boa.
 
-  If test-cli fails with a parity timeout, rerun it once on an idle
-  machine. If it fails again, it is a regression to fix. Never waive it
-  (design "Risks").
+  If all three attempts fail, the gate fails. It is never waived as load.
+  Read the failing attempt logs. A failure in an edit-related test or a
+  parity mismatch (as opposed to a deadline) is a regression to fix in
+  this plan.
 - G4:
   `find apps/cli/src/edit-command.ts apps/cli/src/edit -name '*.ts' -exec awk 'FNR == 701 { print FILENAME " exceeds 700 lines"; bad = 1 } END { exit bad }' {} +`
   exits 0.
@@ -281,7 +289,17 @@ progress log.
 - G7: design command 7 (export surface) exits 0 and prints
   `export surface unchanged`. Copy the command verbatim from the design.
   Also, `git diff --exit-code b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- apps/cli/src/commands.ts apps/cli/src/draw-command.ts apps/cli/src/ai-commands.test.ts`
-  exits 0.
+  exits 0, and `git diff --exit-code 9e6ccc7 -- mise.toml` exits 0.
+- G8 (design command 10, CPU time). Run it directly after G3, with no
+  source edit in between. Copy the multi-line `bash -c` command verbatim
+  from design section 5, command 10. Replace only the trailing `"$d"`
+  with the literal `F` path, and keep `/opt/homebrew/bin/nodetto-cli 0.8.5`
+  as the last two arguments. It exits 0. Record the reference and new user
+  times and their ratio from `F/cpu-time.log`. The bundled engine now
+  includes the moved `edit/` modules, so this is the check that the split
+  did not slow the CLI. If the reference binary is missing or not 0.8.5,
+  stop and record a blocker for the orchestrator. Do not create a git
+  worktree yourself.
 
 ## Acceptance criteria
 
@@ -289,11 +307,13 @@ progress log.
   values `parseOperations`, `deepMerge`, `applyBatch`, `editCommand`,
   `runOperations` and `EXIT_CONTENDED`, and the types `EditWarning` and
   `RunOptions`.
-- G1-G7 exit 0, with logs in the evidence directory. G1 shows
-  ` 2956 pass`, G2 shows ` 11 pass`, and G3 shows ` 183 pass`, ` 0 fail`,
-  no skip line and ` 17 skip` in the collection log. Each count is B1 or
-  B3 plus 11. If B1 or B3 differs from the expected value, use B1 + 11 or
-  B3 + 11 and record why.
+- G1-G8 exit 0, with logs in `final/`. G1 shows ` 2956 pass`, G2 shows
+  ` 11 pass`, and G3 shows ` 183 pass`, ` 0 fail`, no skip line and
+  ` 17 skip` in the collection log. Each count is B1 or B3 plus 11. If B1
+  or B3 differs from the expected value, use B1 + 11 or B3 + 11 and
+  record why. G8's `final/cpu-time.log` shows a new user time at most
+  1.15 times the reference.
+- The progress log records which attempt went green for G1, G3 and G8.
 - The two new test files contain every case listed above, with one
   `test(...)` per case.
 - The progress log has the baseline, the gate results, the hashes, drift
