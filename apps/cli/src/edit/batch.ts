@@ -1,0 +1,293 @@
+import {
+  type Box,
+  type Editor,
+  findShape,
+  type ShapeCatalogueEntry,
+  type TextReplacement,
+} from "@nodetto/core";
+import {
+  type Element,
+  getElementTypeDefinition,
+  isKnownElementType,
+  isPlainObject,
+  type Page,
+  resolvePageQuery,
+} from "@nodetto/ir";
+import { resolveId } from "../ids.ts";
+import {
+  OperationError,
+  requireText,
+  type Json,
+  type JsonObject,
+} from "./operation-input.ts";
+import type { Created } from "./types.ts";
+import {
+  addPage,
+  movePage,
+  renamePage,
+  setPageMode,
+  deletePage,
+} from "./operations/pages.ts";
+import { addElement } from "./operations/add.ts";
+import { connectElements } from "./operations/connect.ts";
+import {
+  editListField,
+  updateElement,
+  moveElement,
+  scaleElements,
+  replaceTextIn,
+  deleteElement,
+} from "./operations/elements.ts";
+import { groupElements, ungroupElement } from "./operations/groups.ts";
+
+export class Batch {
+  readonly refs = new Map<string, string>();
+  readonly created: Created[] = [];
+  readonly touchedPages = new Set<string>();
+  readonly replaced: TextReplacement[] = [];
+  /** The element auto placement put last on each page, to line up with. */
+  readonly lastPlaced = new Map<string, string>();
+
+  constructor(readonly editor: Editor) {}
+
+  private elementIds(): string[] {
+    return this.editor.store.listElements().map((element) => element.id);
+  }
+
+  element(query: Json, index: number): Element {
+    const value = requireText(query, "id", index);
+    const resolved = resolveId(value, this.elementIds(), this.refs);
+    if (!resolved.ok) {
+      const page = resolvePageQuery(
+        this.editor.store.listPages(),
+        value.startsWith("@")
+          ? (this.refs.get(value.slice(1)) ?? value)
+          : value,
+      );
+      throw new OperationError(
+        index,
+        page.ok
+          ? `"${value}" is a page, not an element; use rename-page, move-page or delete-page for pages.`
+          : resolved.message,
+      );
+    }
+    const element = this.editor.store.get(resolved.id);
+    if (!element) throw new OperationError(index, `No element ${resolved.id}.`);
+    return element;
+  }
+
+  page(query: Json, index: number): Page {
+    const pages = this.editor.store.listPages();
+    if (query === undefined && pages.length === 1) return pages[0] as Page;
+    const value = requireText(query, "page", index);
+    const byRef = value.startsWith("@")
+      ? this.refs.get(value.slice(1))
+      : undefined;
+    const resolved = resolvePageQuery(pages, byRef ?? value);
+    if (resolved.ok) return resolved.page;
+    throw new OperationError(index, resolved.message);
+  }
+
+  /** Replace "@ref" strings and id prefixes in reference fields with ids. */
+  resolveReferences(type: string, semantic: Json, index: number): Json {
+    const substitute = (value: Json): Json => {
+      if (typeof value === "string" && value.startsWith("@")) {
+        const id = this.refs.get(value.slice(1));
+        if (id === undefined)
+          throw new OperationError(index, `Unknown ref "${value}".`);
+        return id;
+      }
+      if (Array.isArray(value)) return value.map(substitute);
+      if (isPlainObject(value))
+        return Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, substitute(item)]),
+        );
+      return value;
+    };
+    let resolved = substitute(semantic);
+    if (type === "erd.relation" && isPlainObject(resolved)) {
+      const end = (value: Json): Json => {
+        if (!isPlainObject(value) || typeof value["table"] !== "string")
+          return value;
+        const table = this.element(value["table"], index);
+        const columns = isPlainObject(table.semantic)
+          ? table.semantic["columns"]
+          : undefined;
+        const column = value["column"];
+        if (typeof column === "string" && Array.isArray(columns)) {
+          const byId = columns.some(
+            (item) => isPlainObject(item) && item["id"] === column,
+          );
+          const byName = columns.find(
+            (item) => isPlainObject(item) && item["name"] === column,
+          );
+          if (
+            !byId &&
+            isPlainObject(byName) &&
+            typeof byName["id"] === "string"
+          )
+            return { ...value, table: table.id, column: byName["id"] };
+        }
+        return { ...value, table: table.id };
+      };
+      resolved = {
+        ...resolved,
+        from: end(resolved["from"]),
+        to: end(resolved["to"]),
+      };
+    } else if (isKnownElementType(type) && isPlainObject(resolved)) {
+      const definition = getElementTypeDefinition(type);
+      if (definition?.category === "edge") {
+        const edge: Record<string, Json> = { ...resolved };
+        for (const field of ["from", "to"] as const) {
+          const value = edge[field];
+          if (
+            type === "edge.generic" &&
+            edge[`${field}Point`] !== undefined &&
+            value === ""
+          )
+            delete edge[field];
+          else if (typeof value === "string")
+            edge[field] = this.element(value, index).id;
+        }
+        resolved = edge;
+      }
+    }
+    return resolved;
+  }
+
+  boundsOf(id: string): Box | null {
+    const element = this.editor.store.get(id);
+    if (!element) return null;
+    this.editor.setCurrentPage(element.page);
+    return this.editor.getBounds(id, this.editor.createShapeContext(1));
+  }
+
+  /**
+   * The elements an operation targets: "ids", or every element on "page".
+   * Without either, the single page; `wholeDocument` widens that to every
+   * page.
+   */
+  targets(
+    operation: JsonObject,
+    index: number,
+    wholeDocument: boolean,
+  ): Element[] {
+    const ids = operation["ids"];
+    if (ids !== undefined) {
+      if (operation["page"] !== undefined)
+        throw new OperationError(index, `use either "ids" or "page"`);
+      if (!Array.isArray(ids) || !ids.length)
+        throw new OperationError(index, `"ids" must be a non-empty array`);
+      return ids.map((id) => this.element(id, index));
+    }
+    if (operation["page"] === undefined && wholeDocument)
+      return [...this.editor.store.listElements()];
+    const page = this.page(operation["page"], index);
+    return [...this.editor.store.getPageElements(page.id)];
+  }
+
+  shape(operation: JsonObject, index: number): ShapeCatalogueEntry {
+    const id = requireText(operation["shape"], "shape", index);
+    const shape = findShape(id);
+    if (!shape)
+      throw new OperationError(
+        index,
+        `Unknown shape "${id}". Run "nodetto-cli shapes" for the shape IDs.`,
+      );
+    if (operation["type"] !== undefined)
+      throw new OperationError(index, `use either "shape" or "type", not both`);
+    return shape;
+  }
+
+  record(
+    operation: JsonObject,
+    index: number,
+    id: string,
+    type: string,
+    page: string,
+  ): void {
+    const ref = operation["ref"];
+    if (typeof ref === "string") {
+      if (this.refs.has(ref))
+        throw new OperationError(index, `ref "${ref}" is already used.`);
+      this.refs.set(ref, id);
+    }
+    this.created.push({
+      ...(typeof ref === "string" ? { ref } : {}),
+      id,
+      type,
+      page,
+    });
+    this.touchedPages.add(page);
+  }
+
+  /** Move an element so that its bounding box starts at (x, y). */
+  moveBoxTo(id: string, x: number, y: number): void {
+    const element = this.editor.store.get(id);
+    const box = this.boundsOf(id);
+    if (!element || !box) return;
+    const vx = typeof element.visual.x === "number" ? element.visual.x : box.x;
+    const vy = typeof element.visual.y === "number" ? element.visual.y : box.y;
+    this.editor.moveElements([
+      { id, x: Math.round(vx + x - box.x), y: Math.round(vy + y - box.y) },
+    ]);
+  }
+
+  apply(operation: JsonObject, index: number): void {
+    const op = operation["op"];
+    switch (op) {
+      case "add-page":
+        addPage(this, operation, index);
+        return;
+      case "move-page":
+        movePage(this, operation, index);
+        return;
+      case "rename-page":
+        renamePage(this, operation, index);
+        return;
+      case "set-page-mode":
+        setPageMode(this, operation, index);
+        return;
+      case "delete-page":
+        deletePage(this, operation, index);
+        return;
+      case "add":
+        addElement(this, operation, index);
+        return;
+      case "connect":
+        connectElements(this, operation, index);
+        return;
+      case "append":
+      case "remove-item":
+        editListField(this, operation, index, op);
+        return;
+      case "update":
+        updateElement(this, operation, index);
+        return;
+      case "move":
+        moveElement(this, operation, index);
+        return;
+      case "scale":
+        scaleElements(this, operation, index);
+        return;
+      case "replace-text":
+        replaceTextIn(this, operation, index);
+        return;
+      case "group":
+        groupElements(this, operation, index);
+        return;
+      case "ungroup":
+        ungroupElement(this, operation, index);
+        return;
+      case "delete":
+        deleteElement(this, operation, index);
+        return;
+      default:
+        throw new OperationError(
+          index,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, scale, replace-text, group or ungroup.`,
+        );
+    }
+  }
+}

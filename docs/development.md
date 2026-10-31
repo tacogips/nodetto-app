@@ -29,6 +29,8 @@ The `Editor` chain in `packages/core/src/editor/facade/` comprises
 `NotationEditing` for notation-specific operations. Planners in
 `packages/core/src/editor/*.ts` compute command plans without applying them;
 component and responsive-variant members stay in `editor.ts`.
+For `nodetto-cli edit`, `edit-command.ts` is the entry point and owns the retry loop.
+`edit/batch.ts` holds batch state and dispatch, while `edit/operations/` groups handlers by domain.
 
 ## Setup
 

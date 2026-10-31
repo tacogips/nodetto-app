@@ -78,3 +78,22 @@ Baseline B1 exited 0 (2945 pass, 25 skip, 0 fail: `baseline-bun-test.log`); B2 e
 - SMS01-R10: `r10-docs.txt` and editor header match design. Pass.
 
 No source repairs were made. `bun run typecheck`, `mise run verify`, size, filename, export/field order, strict editor index access, import direction, unchanged files and test-file diff checks exited 0 (`typecheck.log`, `verify.log`, `size.log`, `export.log`, `strict.log`, `imports.log`, `unchanged.log`). The binary-less collection exited 0 with 17 skip (`parity-collect.log`). The required CLI gate remains failed and its retry is pending. Formal review and finalization remain downstream.
+
+## Session 589 review
+
+Intent: review SMS01-R1 through SMS01-R10 against design sections 1.2–1.4, preserve behavior and test integrity, and repair findings only within assigned paths after fresh reads and hashes. Run the prescribed baseline and gates; formal independent review remains downstream.
+
+Baseline B1 passed on attempt 1 (2945 pass, 25 skip, 0 fail; `tmp/source-module-split-s589/sms-01-editor-facade/baseline-bun-test.log`); B2 exited 0 (`baseline-wc.txt`). All 13 session-579 source hashes matched (`start-hashes.txt`, `hash-comparison.log`, `r9-hashes.txt`); no source drift or repairs occurred. Evidence paths below are relative to `tmp/source-module-split-s589/sms-01-editor-facade/`.
+
+- SMS01-R1: prototype inventory matches design and has no duplicate members (`r1-members.txt`); pass.
+- SMS01-R2: fields and constructor are in EditorCore, requireAsset last; runtime field order matches (`r2-fields.txt`, `final/export.log`); pass.
+- SMS01-R3: inspected all residue; identical to session 583 (`r3-line-residue.txt`); differences are imports, class boundaries, visibility, header, frame helpers and token-preserving wraps; pass.
+- SMS01-R4: planner diff changes only type imports and parameter types (`r4-planners.txt`); pass.
+- SMS01-R5: frame guard and semantic checks, early returns and separate apply paths preserved (`r5-frame.txt`); pass.
+- SMS01-R6: each protected member is used by a later class (`r6-visibility.txt`); pass.
+- SMS01-R7: chain import direction and module statements conform (`r7-imports.txt`, `final/imports.log`); pass.
+- SMS01-R8: no changed test files; baseline and verify retain 2945 pass, 25 skip, 0 fail (`r8-tests.txt`, `baseline-bun-test.log`, `final/verify.log`); pass.
+- SMS01-R9: prior timeout finding, no change needed: current CLI gate and CPU gate pass and source hashes match; prior load is a plausible explanation, not a waiver (`r9-hashes.txt`, `final/test-cli.log`, `final/cpu-time.log`).
+- SMS01-R10: documentation paragraph and editor header match design (`r10-docs.txt`, `r5-frame.txt`); pass.
+
+Findings: no new findings or repairs. G1 and G2 passed on their first attempts, with 2945 pass / 25 skip / 0 fail and 172 pass / 0 fail / no skips respectively (`final/verify-1.log`, `final/test-cli-1.log`). G10 passed first attempt: reference 22.60 s, new 22.72 s, ratio 1.0054 (`final/cpu-time.log`). Binary-less collection passed with 17 skips (`final/parity-collect.log`). Typecheck passed (`final/typecheck.log`). Remaining size, filename, exports, strict editor typecheck, import, unchanged source/test/mise, and no-repair diff checks passed; individual exit codes and logs are in `final/checks-status.log` and the commands in `checks.txt`. Final counts are in `final-wc.txt`. Formal independent review and workflow finalization remain downstream.
