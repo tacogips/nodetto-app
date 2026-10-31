@@ -15,3 +15,19 @@ Intent: move parsing and types to `edit/operation-input.ts` and `edit/types.ts`,
 - Final test-cli: exit 0 on attempt 1, 183 pass, 0 fail, no skips, `final/test-cli.log`. CPU check: exit 0 on attempt 1, reference 20.62 s, new 21.97 s, ratio 1.0655, `final/cpu-time.log`. Collection: exit 0, 17 skip, `final/parity-collect.log`.
 - Count, size, filename and unchanged-file checks: exit 0, `final/checks.log`; export-surface comparison: exit 0, `final/export.log`. Final line counts: `final/wc.log` (entry point 156 lines; largest module 293 lines).
 - Formal test-integrity and adversarial reviews remain downstream.
+
+## Session 598
+
+B0: 14 hashes matched, exit 0, `tmp/source-module-split-s598/sms-02-cli-edit/start-hashes-check.log`. No drift. The existing module table remains the intent; no source correction was requested.
+B1: baseline bun test, attempt 1, exit 0: 2956 pass, 25 skip, 0 fail; `tmp/source-module-split-s598/sms-02-cli-edit/baseline-bun-test.log`.
+B2: line counts in `tmp/source-module-split-s598/sms-02-cli-edit/baseline-wc.txt`.
+B3: session 589 native baseline 183 pass in `tmp/source-module-split-s589/sms-02-cli-edit/final/test-cli.log`.
+
+G1: verify attempt 1 exit 0, 2956 pass, 25 skip, 0 fail; `tmp/source-module-split-s598/sms-02-cli-edit/final/verify.log`.
+G2: focused edit tests exit 0, 11 pass; `tmp/source-module-split-s598/sms-02-cli-edit/final/edit-unit.log`.
+G3: test-cli attempt 1 exit 0, 183 pass, 0 fail, no skips; `tmp/source-module-split-s598/sms-02-cli-edit/final/test-cli.log`.
+G4-G6: size and naming checks exit 0; G7: export comparison and unchanged dependent files and mise.toml exit 0; G9: static count 17 exit 0; G10: test integrity diff exit 0. Evidence: `tmp/source-module-split-s598/sms-02-cli-edit/final/static-checks.log` and `tmp/source-module-split-s598/sms-02-cli-edit/final/export.log`.
+G8: CPU attempt 1 exit 0; reference 28.28 s, new 26.44 s, ratio 0.935; `tmp/source-module-split-s598/sms-02-cli-edit/final/cpu-time.log`.
+Typecheck exit 0: `tmp/source-module-split-s598/sms-02-cli-edit/final/typecheck.log`. No source corrections; diff from 99df8d4 for CLI source and docs is empty. Final line counts are in `tmp/source-module-split-s598/sms-02-cli-edit/baseline-wc.txt` (facade 156, largest file 293). Independent test-integrity and adversarial reviews remain downstream.
+
+Continuation 1: the remaining individually listed static checks each exited 0; exact commands and exits are recorded in `tmp/source-module-split-s598/sms-02-cli-edit/final/individual-00.log` and `individual-03.log` through `individual-19.log` for the applicable checks. The export comparison uses TMPDIR under `target/sms-02-tmp`. Session-589 source hashes still match (`final/continuation-hashes.log`), and the CLI source/docs diff remains empty (`final/continuation-diff.log`). Previously recorded behavioral gates remain current; no source files changed. Formal reviews are pending downstream.

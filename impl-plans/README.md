@@ -7,33 +7,6 @@
 
 ## Active
 
-Source module split (sessions 575, 579, 583, 589 and 598; design:
-`design-docs/specs/design-source-module-split.md`; no GitHub issue). The
-work splits `packages/core/src/editor.ts`, `apps/cli/src/edit-command.ts`
-and `apps/cli/src/native-parity.test.ts` into modules named for their
-responsibility, with no behavior change. There are three plans in serial
-waves:
-[sms-01-editor-facade](active/sms-01-editor-facade.md),
-[sms-02-cli-edit](active/sms-02-cli-edit.md) and
-[sms-03-native-parity](active/sms-03-native-parity.md).
-sms-01 (implemented in 9ef8639) passed both independent reviews in
-session 589. sms-02 was implemented in 99df8d4 (session 589); its review
-and repair, and the sms-03 split, run in session 598.
-`source-module-split-s598-dispatch.json` is the dispatch manifest, with
-load-tolerant gates (three-attempt verify and test-cli loops plus a
-CPU-time check) and static parity block and name checks in place of the
-zero-test collection check. Earlier manifests:
-`source-module-split-s589-dispatch.json` stopped on that zero-test
-collection check after sms-01 passed review and sms-02 was implemented;
-`source-module-split-s583-dispatch.json` stopped on load-bound test-cli
-deadline timeouts; `source-module-split-s579-dispatch.json` stopped when
-its review branch failed with a provider error; and
-`source-module-split-s575-dispatch.json` was never dispatched (its plans
-had no `target` artifact root, and `docs/development.md` was not a write
-path). When the work is finished, the three plans and all five manifests
-move to `completed/`, and the progress logs stay in `progress/` (design
-D15).
-
 Breadboard circuit pages overview:
 [breadboard-00-overview](active/breadboard-00-overview.md) lists waves
 1-7, ownership, gates and final verification. Its 18 plans are complete
@@ -65,6 +38,39 @@ the pre-archive `active/` locations. The text-layout lint manifests
 also stay in `active/`; s556 was the final dispatch.
 
 ## Completed
+
+Source module split (sessions 575, 579, 583, 589 and 598; design:
+`design-docs/specs/design-source-module-split.md`; no GitHub issue). The
+work split `packages/core/src/editor.ts`, `apps/cli/src/edit-command.ts`
+and `apps/cli/src/native-parity.test.ts` into modules named for their
+responsibility, with no behavior change. `editor.ts` is now 267 lines over
+the `editor/facade/` chain, `edit-command.ts` is 156 lines over `edit/` and
+`edit/operations/`, and the 17 native parity blocks live in
+`apps/cli/src/native-parity/` (`harness.ts` plus documents, drawing,
+export, pcb and text-layout topic files). No file in these areas exceeds
+700 lines. sms-01 (9ef8639) passed both independent reviews in session
+589. sms-02 (99df8d4) and sms-03 passed their test-integrity and
+adversarial reviews and the serial integration review in session 598;
+sms-02 needed no repair. Final gates on the combined tree, each inside the
+three-attempt load-tolerant loop: `mise run verify` 2956 pass, 25 skip,
+0 fail; `mise run test-cli` 183 pass, 0 fail, no skip; CPU time within
+1.15x of nodetto-cli 0.8.5 (ratio 0.967). Parity blocks were counted and
+their names compared with 99df8d4 statically. The five dispatch manifests
+are in `completed/` with their pre-archive `active/` `planPath` values:
+`source-module-split-s575-dispatch.json` was never dispatched,
+`source-module-split-s579-dispatch.json` stopped on a provider error,
+`source-module-split-s583-dispatch.json` stopped on load-bound test-cli
+timeouts, `source-module-split-s589-dispatch.json` stopped on the
+zero-test collection check after sms-01 passed review and sms-02 was
+implemented, and `source-module-split-s598-dispatch.json` is the final
+dispatch. Progress logs stay in `progress/`. Evidence:
+`tmp/source-module-split-s598/<planId>/final/`.
+
+| Plan | Scope |
+|---|---|
+| [sms-01-editor-facade](completed/sms-01-editor-facade.md) | `Editor` facade chain in `packages/core/src/editor/facade/` with planners in `editor/*.ts` |
+| [sms-02-cli-edit](completed/sms-02-cli-edit.md) | `nodetto-cli edit` split into `edit/batch.ts`, `edit/apply-batch.ts`, `edit/report.ts` and `edit/operations/` |
+| [sms-03-native-parity](completed/sms-03-native-parity.md) | Native parity tests split into `apps/cli/src/native-parity/` topic files |
 
 Text-layout lint (sessions 551, 552, 555 and 556; design:
 `design-docs/specs/design-text-layout-lint.md`, owner decisions in

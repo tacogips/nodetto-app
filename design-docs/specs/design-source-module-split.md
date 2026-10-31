@@ -748,12 +748,14 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
     section 1.4 review and repair) stay. Everything else in the plans is
     reused as is.
   - The session-589 manifest is
-    `impl-plans/active/source-module-split-s589-dispatch.json`. It records
+    `impl-plans/completed/source-module-split-s589-dispatch.json` (archived
+    by D15). It records
     `originalHead` 9e6ccc7 and the upstream `origin/main`. Command 7 and the
     sms-01/sms-02 `git diff` gates keep comparing against b52e4db. Since
     b52e4db, the only source changes are the sms-01 edits under review.
   - The session-598 manifest is
-    `impl-plans/active/source-module-split-s598-dispatch.json`. It records
+    `impl-plans/completed/source-module-split-s598-dispatch.json` (archived
+    by D15). It records
     `originalHead` 99df8d4 and the upstream `origin/main`, and it lists
     sms-01 as an accepted dependency. Command 7 still compares against
     b52e4db. Since b52e4db, the only source changes are the sms-01 and

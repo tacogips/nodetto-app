@@ -21,6 +21,6 @@ limit. Documents should be treated as local application data, not arbitrary code
 `engine_tests.rs` contains host-boundary regression contracts. The first seven
 were committed and passed on QuickJS before migration. The same assertions pass
 on Boa; only the test evaluation adapter changed. Additional tests cover promise
-jobs and execution limits. `apps/cli/src/native-parity.test.ts` compares commands
+jobs and execution limits. `apps/cli/src/native-parity/` contains a shared harness and topic files for documents, drawing, export, PCB and text layout; it compares commands
 and exports against the shared TypeScript CLI and golden document fixtures;
 `mcp-stdio.test.ts` exercises the real transport with an MCP client.
