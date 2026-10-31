@@ -14,6 +14,22 @@ The session-575 run stopped before any code change because its dispatch
 manifest was wrong. The design was not the cause. The manifest rules
 under "Rollout constraints" fix that.
 
+Re-validated, 2026-10-31 (session 583) at 9ef8639 "Split the Editor facade
+into responsibility layers". That commit implemented sms-01 (section 1),
+but nobody reviewed it: the session-579 review branch failed with a
+provider error. `git diff --stat b52e4db 9ef8639 -- apps/cli/src/edit-command.ts
+apps/cli/src/native-parity.test.ts apps/cli/native/README.md
+packages/core/src/index.ts packages/core/src/editor/types.ts
+packages/core/src/editor/components.ts` prints nothing, so sections 2 and 3
+and the sms-02 and sms-03 line references still hold. Sections 1-4 and
+D1-D6 are reused unchanged. Session 583 changes only the following:
+
+- sms-01 gets a review and repair pass (section 1.4).
+- Command 3 is redefined so that native parity is verified only through
+  `mise run test-cli` (D9).
+- The evidence root moves to `tmp/source-module-split-s583/`.
+- Both earlier manifests are archived (D10).
+
 ## Overview
 
 Three hand-written files are over 1000 lines:
@@ -156,6 +172,50 @@ type.
 - The pieces are moved without rewriting them. Comments and section
   dividers move with their members.
 
+### 1.4 Review of the existing implementation (session 583)
+
+At 9ef8639, `editor.ts` has 267 lines and declares `class Editor extends
+NotationEditing`. It holds the private helpers `unlockedFrame` and
+`frameSemantic`. The facade files have these line counts: `core.ts` 531,
+`element-editing.ts` 226, `notation-editing.ts` 285, `page-editing.ts` 238
+and `selection-editing.ts` 397. The progress log
+`impl-plans/progress/sms-01-editor-facade.md` records that the gates
+passed in session 579: verify 2945 pass, 25 skip, 0 fail; test-cli 172
+pass, 0 fail; and the commands 5-9 checks. It also records a standalone
+parity rerun that timed out (D9).
+
+sms-01 is reviewed, not implemented again. The review looks at the diff
+`b52e4db..9ef8639` restricted to `packages/core/src` and
+`docs/development.md`, and checks each item in sections 1.2 and 1.3:
+
+- Member placement. Each member is in the class that the table in 1.2
+  names, and it is declared exactly once in the chain. No class overrides
+  a member and no class calls `super.`.
+- Fields. Only `EditorCore` declares fields and a constructor. The fields
+  keep the old declaration order, and `requireAsset` is the last field.
+- Visibility. A member is `protected` only when a later class in the chain
+  uses it.
+- Moved code. Each body is byte-identical to its b52e4db version, apart
+  from indentation and import changes. In the six retyped planners, only
+  the editor parameter's type annotation and its `import type` line differ
+  from b52e4db.
+- Deduplication. `unlockedFrame` runs the same checks in the same order as
+  the code it replaced and returns early in the same cases. So does
+  `frameSemantic`.
+- Imports and comments. Import direction follows command 9. The
+  `editor.ts` header comment and the `docs/development.md` paragraph say
+  what section 4 asks for.
+
+The review also checks test integrity. No test file under
+`packages/core`, `apps/` or `packages/ui-solid` changed between b52e4db
+and 9ef8639. The pass and skip counts equal the baseline recorded before
+the edit.
+
+A finding is fixed in place inside the sms-01 write paths. The fix must
+also follow sections 1.2 and 1.3. After a fix, the sms-01 gates are run
+again. If the review finds nothing, sms-01 makes no source edit, and its
+gates pass on the unchanged tree.
+
 ## 2. `nodetto-cli edit` (`apps/cli/src/edit-command.ts`)
 
 ### 2.1 Modules
@@ -258,10 +318,12 @@ these 17.
 - Completed design records that mention `native-parity.test.ts` stay as
   they are, because they describe work done before the split.
 - `impl-plans/README.md`: while the plans run, its "Active" section lists
-  the three sms plans and the session-579 manifest. When the plans are
+  the three sms plans and the session-583 manifest. When the plans are
   archived, that text is replaced by a "Completed" entry. The entry names
-  the archived session-575 manifest as superseded and the session-579
-  manifest as the final dispatch.
+  the archived session-575 and session-579 manifests as superseded and
+  `active/source-module-split-s583-dispatch.json` as the final dispatch
+  (D10). The links in the README must point at the files' actual
+  locations.
 
 ## 5. Verification
 
@@ -273,11 +335,25 @@ repository root.
    the baseline pass count plus the focused tests added in section 2.4.
 2. `CARGO_TERM_QUIET=true mise run test-cli` exits 0, with ` 0 fail` in its
    bun summary. This builds `target/release/nodetto-cli`.
-3. After step 2, against that binary:
-   `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > native-parity.log 2>&1`
-   exits 0; `grep -Ex ' *17 pass' native-parity.log` exits 0; and
-   `test -z "$(grep -E '^ *[1-9][0-9]* skip$' native-parity.log)"` exits
-   0. Bun's quiet agent mode prints only the summary lines (see
+3. Native parity, redefined in session 583 (D9). Parity is verified only
+   through command 2; there is no separate parity run against the binary.
+   With `test-cli.log` as the redirected output of command 2:
+   - `grep -E '^ *0 fail$' test-cli.log` exits 0;
+   - `test -z "$(grep -E '^ *[1-9][0-9]* skip$' test-cli.log)"` exits 0;
+   - the ` N pass` value in `test-cli.log` equals the plan's test-cli
+     baseline plus the new test cases the plan added under `apps/cli/src`.
+     That is 172 at 9ef8639, plus the section 2.4 cases after sms-02.
+
+   Command 2 sets `NODETTO_CLI_TEST_BINARY`, so `nativeTest` is `test`, and
+   every collected parity block runs against `target/release/nodetto-cli`.
+   With no failures and no skips, every one of those blocks passed. A
+   collection check, which does not run the parity comparison, shows that
+   exactly 17 blocks are collected:
+   `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > parity-collect.log 2>&1`
+   exits 0, and `grep -Ex ' *17 skip' parity-collect.log` exits 0. Before
+   sms-03, the path filter matches `apps/cli/src/native-parity.test.ts`.
+   After sms-03, it matches the `apps/cli/src/native-parity/` directory.
+   Bun's quiet agent mode prints only the summary lines (see
    design-text-layout-lint.md, "Native evidence format").
 4. Block count, which does not need a binary:
    `test "$(cat apps/cli/src/native-parity/*.test.ts | grep -c '^nativeTest(')" -eq 17`.
@@ -383,12 +459,18 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
      `packages/core/src/editor/facade/*` (new), the planner parameter types
      in `editor/{paste,pages,sequence,bpmn,breadboard,connections}.ts`, and
      the editor paragraph in `docs/development.md`. Gates: commands 1, 2
-     (test-cli, for the Boa cost of the chain; review finding DR-L2), 7, 8
+     (test-cli, for the Boa cost of the chain; review finding DR-L2), 3, 7, 8
      and 9; command 5 limited to the editor paths, plus the `editor.ts` size
-     check; command 6 limited to `packages/core/src/editor`.
+     check; command 6 limited to `packages/core/src/editor`. In session 583
+     this plan is the review and repair pass of section 1.4. These gates
+     already pass at 9ef8639, so they show both that the existing
+     implementation holds and that any repair keeps it working. The
+     baseline is recorded fresh at 9ef8639. It must match the session-579
+     pre-edit counts (2945 pass, 25 skip, 0 fail), because sms-01 added no
+     tests.
   2. `sms-02-cli-edit` (depends on 1): `apps/cli/src/edit-command.ts`,
      `apps/cli/src/edit/**` (new, with the focused tests), and the edit
-     sentence in `docs/development.md`. Gates: commands 1, 2 and 7;
+     sentence in `docs/development.md`. Gates: commands 1, 2, 3 and 7;
      command 5 limited to the edit paths, plus the `edit-command.ts` size
      check; command 6 limited to `apps/cli/src/edit`.
   3. `sms-03-native-parity` (depends on 2): `apps/cli/src/native-parity.test.ts`
@@ -404,34 +486,43 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
   through the import graph. `apps/cli/native/build.rs` already reruns when
   anything under `apps/cli/src` or `packages/core/src` changes, so the new
   directories are picked up.
-- Dispatch manifest rules (session 579; these fix the session-575
-  manifest):
+- Dispatch manifest rules. Session 579 wrote them to fix the session-575
+  manifest. Session 583 revised them: the evidence root, the
+  `originalHead` and the archive rule changed.
   - Every plan declares `artifactRoots: ["target"]`. Commands 1 and 2
-    build into the git-ignored `target/`, including
-    `target/release/nodetto-cli`, which command 3 runs.
+    build into the git-ignored `target/`. Command 2 builds
+    `target/release/nodetto-cli` and runs the parity blocks against it.
   - Every file a plan's steps edit is in that plan's `writePaths`, not
     only in `sharedPaths`. `docs/development.md` is a write path of both
     sms-01 and sms-02. That is safe only because the two plans run in
     separate serial waves, 1 then 2. `apps/cli/native/README.md` is a
     write path of sms-03. Each plan's progress log and evidence directory
     are also write paths.
-  - Evidence goes under `tmp/source-module-split-s579/<planId>/`.
+  - Evidence goes under `tmp/source-module-split-s583/<planId>/`.
     `tmp/` is git-ignored (`.gitignore` line 41). Only `.log` and `.txt`
     files go there. The plan bodies and the manifest name the same
-    evidence root. In the plan bodies, only the session-575 evidence paths
-    and session labels change; every other part of the plans is reused
-    as is.
-  - The manifest records `originalHead` 1b6b669 and the upstream
-    `origin/main`. Command 7 and the sms-01/sms-02 `git diff` gates keep
-    comparing against b52e4db, which has the same source tree.
-  - `impl-plans/active/source-module-split-s575-dispatch.json` is
-    superseded and never dispatched. At archival it moves to
-    `impl-plans/completed/` along with the three sms plans. The
-    session-579 manifest stays in `impl-plans/active/`, and its `planPath`
+    evidence root. The session-579 evidence under
+    `tmp/source-module-split-s579/` is kept, and sms-01 may read it. Only
+    these parts of the plan bodies change:
+    - the evidence paths and the session labels;
+    - the standalone parity commands, which are replaced by command 3 as
+      redefined;
+    - the sms-01 steps, which become the section 1.4 review and repair.
+    Everything else in the plans is reused as is.
+  - The session-583 manifest is
+    `impl-plans/active/source-module-split-s583-dispatch.json`. It records
+    `originalHead` 9ef8639 and the upstream `origin/main`. Command 7 and the
+    sms-01/sms-02 `git diff` gates keep comparing against b52e4db. Since
+    b52e4db, the only source changes are the reviewed sms-01 edits.
+  - Archive (D10). After the final gates pass, the three sms plans move
+    to `impl-plans/completed/`, together with both superseded manifests:
+    `source-module-split-s575-dispatch.json` and
+    `source-module-split-s579-dispatch.json`. The session-583 manifest is
+    the final dispatch and stays in `impl-plans/active/`. Its `planPath`
     values keep naming the pre-archive `active/` locations, as the other
     historical manifests there do. The orchestrator owns
-    `impl-plans/README.md`, the plans, this design and both manifests.
-    Workers do not edit them.
+    `impl-plans/README.md`, the plans, this design and all three
+    manifests. Workers do not edit them.
 - No version bump, tag or release. `gitPush` is false: commit locally only,
   with no push or merge.
 
@@ -448,7 +539,19 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
   (command 9). A violation shows up as "Class extends value undefined"
   when the module is evaluated, which commands 1 and 2 would hit.
 - Parity runs that pass with nothing run. Commands 3 and 4 require exactly
-  17 blocks and no skips when the binary is set.
+  17 collected blocks, and no skips and no failures in the test-cli run,
+  where the binary is set.
+- Parity deadlines under machine load. In session 579, the standalone
+  parity rerun timed out twice on the golden-fixture block (95 s budget).
+  The logs are in `tmp/source-module-split-s579/sms-01-editor-facade/`.
+  `retry2-native-parity.log` shows 16 pass and 1 fail, and the whole file
+  took 278.80 s, against 80.29 s in the passing `native-parity.log`. The
+  source hashes were unchanged (`retry-final-hashes.log`), and test-cli
+  passed with 172 pass and 0 fail on the same tree. Every block was about
+  3.5 times slower, which points to machine load, not to the chain. Even
+  so, the sms-01 review dispositions this explicitly. A test-cli failure
+  is never waived as load: rerun it on an idle machine, and if it still
+  fails, treat it as a regression.
 - Ordering inside `edit`. Handlers are moved, not rewritten. Golden parity
   tests, `ai-commands.test.ts` and `edit-scale-text-group.test.ts` cover the
   output and error text.
@@ -480,4 +583,23 @@ command exits non-zero on the untouched tree. Command 8 is the gate.
   `completed/`, as the workflow input asks. This differs on purpose from
   the README convention that historical manifests stay in `active/`. That
   convention covers manifests that were dispatched, and the session-575
-  manifest never was.
+  manifest never was. D10 supersedes the rule that the session-579
+  manifest stays in `active/`.
+- D8 (session 583). sms-01 is reviewed, not implemented again. The sms-01
+  plan becomes the section 1.4 review and repair pass. It keeps its write
+  paths and gates, and those gates pass at 9ef8639. sms-02 and sms-03 run
+  after it, in waves 2 and 3, unchanged except for D9 and the evidence
+  root.
+- D9 (session 583). Native parity is verified only through `mise run
+  test-cli` (command 3 as redefined), as the workflow input requires.
+  The standalone rerun against the binary was dropped. It ran the same 17
+  blocks a second time, and under load its timing made it fail although
+  the code had not changed. The block count is still fixed by command 4
+  and by the collection check in command 3, which does not run the
+  comparison.
+- D10 (session 583). The workflow input asks to archive the session-579
+  manifest together with the session-575 one, so both move to
+  `completed/`. The session-579 manifest was dispatched, and archiving it
+  goes against the README convention for dispatched manifests. That is
+  intentional. The convention is still met, because the session-583
+  manifest, which drives the run to completion, stays in `active/`.

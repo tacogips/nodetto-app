@@ -16,11 +16,14 @@ waves:
 [sms-01-editor-facade](active/sms-01-editor-facade.md),
 [sms-02-cli-edit](active/sms-02-cli-edit.md) and
 [sms-03-native-parity](active/sms-03-native-parity.md).
-`source-module-split-s579-dispatch.json` is the dispatch manifest. It
-supersedes `source-module-split-s575-dispatch.json`, which was never
-dispatched: its plans had no `target` artifact root, and
-`docs/development.md` was not a write path. The s575 manifest moves to
-`completed/` together with the plans.
+sms-01 was implemented in 9ef8639 (session 579). Its review and repair
+runs in session 583. `source-module-split-s583-dispatch.json` is the
+dispatch manifest. It supersedes `source-module-split-s579-dispatch.json`,
+whose review branch failed with a provider error, and
+`source-module-split-s575-dispatch.json`, which was never dispatched: its
+plans had no `target` artifact root, and `docs/development.md` was not a
+write path. Both superseded manifests move to `completed/` together with
+the plans; the s583 manifest stays in `active/`.
 
 Breadboard circuit pages overview:
 [breadboard-00-overview](active/breadboard-00-overview.md) lists waves

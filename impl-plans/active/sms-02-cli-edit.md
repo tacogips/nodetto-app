@@ -3,18 +3,23 @@
 - planId: sms-02-cli-edit
 - planPath: impl-plans/active/sms-02-cli-edit.md
 - progressPath: impl-plans/progress/sms-02-cli-edit.md
-- wave: 2 of 3 in session 579. It runs alone in its wave.
-- dependsOn: sms-01-editor-facade. The two plans touch no common source
-  file. The dependency exists because this plan's gates load
-  `packages/core` and build the release binary, so they need sms-01
-  finished. Both plans also edit `docs/development.md`, one after the
-  other.
+- wave: 2 of 3 in session 583. It runs alone in its wave.
+- dependsOn: sms-01-editor-facade, which is the session 583 review and
+  repair of the Editor chain committed in 9ef8639. The two plans touch no
+  common source file. The dependency exists because this plan's gates
+  load `packages/core` and build the release binary, so the sms-01 review
+  must be finished first. Both plans also edit `docs/development.md`, one
+  after the other.
 - Design: `design-docs/specs/design-source-module-split.md`. Read
   "Invariants", "2. `nodetto-cli edit`" (2.1-2.4), "4. Documentation",
-  "5. Verification" (commands 1, 2, 5, 6 and 7) and "Rollout constraints".
-- Evidence directory: `tmp/source-module-split-s579/sms-02-cli-edit/`.
+  "5. Verification" (commands 1, 2, 3, 5, 6 and 7) and "Rollout
+  constraints".
+- Source state: `apps/cli/src/edit-command.ts` is byte-identical to
+  b52e4db (`git diff --stat b52e4db 9ef8639 -- apps/cli/src/edit-command.ts`
+  prints nothing), so every line number below still applies.
+- Evidence directory: `tmp/source-module-split-s583/sms-02-cli-edit/`.
   Write only `.log` and `.txt` files there.
-- Write paths (manifest `impl-plans/active/source-module-split-s579-dispatch.json`):
+- Write paths (manifest `impl-plans/active/source-module-split-s583-dispatch.json`):
   `apps/cli/src/edit-command.ts`, `apps/cli/src/edit/`,
   `docs/development.md`, the progress log, the evidence directory and
   `target/`. `target/` is the git-ignored build output root
@@ -174,12 +179,21 @@ the retry loop, `edit/batch.ts` holds batch state and dispatch, and
 1. Baseline, on the tree before any edit (sms-01 is already applied):
    B1 and B2 below.
 2. Move the code into the modules; `this.` becomes `batch.` in the
-   handlers. Build the re-exports. Pass G1-G7.
+   handlers. Build the re-exports. Pass G1 and G3-G7 with the counts from
+   before any test is added: verify ` 2945 pass` (B1) and test-cli
+   ` 172 pass` (B3). G2 is not run yet, because there is no test under
+   `apps/cli/src/edit/` at this point. Keep these logs under the `move-`
+   prefix, for example `move-verify.log`.
 3. Deduplicate (items 1-3). Add `apply-batch.test.ts` and `report.test.ts`.
-   Pass G1-G7 again.
+   Pass G1-G7 with the final counts (2956, 11 and 183), using the log names
+   given in "Verification".
 4. Edit `docs/development.md`, then run G1.
 
 ## Tests to add
+
+Write exactly one `test(...)` per bullet below: 7 in
+`apply-batch.test.ts` and 4 in `report.test.ts`, 11 in total. The gate
+counts below depend on this number.
 
 `apps/cli/src/edit/apply-batch.test.ts`:
 
@@ -220,25 +234,45 @@ Every gate must exit 0. Record each one's exit code and log path in the
 progress log.
 
 - B1:
-  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s579/sms-02-cli-edit/baseline-bun-test.log 2>&1`.
-  Record the ` N pass`, ` N skip` and ` N fail` lines.
-- B2: `wc -l apps/cli/src/edit-command.ts > tmp/source-module-split-s579/sms-02-cli-edit/baseline-wc.txt`.
-- G1:
-  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s579/sms-02-cli-edit/verify.log 2>&1`
-  exits 0. The log has ` 0 fail`, and its pass count is at least B1's pass
-  count plus the number of new tests.
-- G2: `BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > tmp/source-module-split-s579/sms-02-cli-edit/edit-unit.log 2>&1`
-  exits 0, and `grep -E '^ *[1-9][0-9]* pass$' tmp/source-module-split-s579/sms-02-cli-edit/edit-unit.log`
+  `BUN_OPTIONS=--jsx-runtime=classic bun test > tmp/source-module-split-s583/sms-02-cli-edit/baseline-bun-test.log 2>&1`.
+  Record the ` N pass`, ` N skip` and ` N fail` lines. The expected values
+  are 2945 pass, 25 skip and 0 fail: the sms-01 final count, because
+  sms-01 adds no tests.
+- B2: `wc -l apps/cli/src/edit-command.ts > tmp/source-module-split-s583/sms-02-cli-edit/baseline-wc.txt`.
+- B3: the test-cli baseline is the ` N pass` line of
+  `tmp/source-module-split-s583/sms-01-editor-facade/test-cli.log`. The
+  expected value is 172. Record it; do not run test-cli again for the
+  baseline.
+- G1 (design command 1):
+  `BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/source-module-split-s583/sms-02-cli-edit/verify.log 2>&1`
+  exits 0. `grep -E '^ *0 fail$' tmp/source-module-split-s583/sms-02-cli-edit/verify.log`
+  exits 0, and the ` N pass` line equals B1's pass count plus 11. With
+  the expected B1, that is
+  `grep -Ex ' *2956 pass' tmp/source-module-split-s583/sms-02-cli-edit/verify.log`,
+  which exits 0. The skip count stays equal to B1's.
+- G2: `BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > tmp/source-module-split-s583/sms-02-cli-edit/edit-unit.log 2>&1`
+  exits 0, and `grep -Ex ' *11 pass' tmp/source-module-split-s583/sms-02-cli-edit/edit-unit.log`
   exits 0. The trailing slash keeps `edit-scale-text-group.test.ts` out of
-  this run. Record the pass count; it must equal the number of new test
-  cases.
-- G3:
-  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s579/sms-02-cli-edit/test-cli.log 2>&1`
-  exits 0, with ` 0 fail`. Then
-  `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity > tmp/source-module-split-s579/sms-02-cli-edit/native-parity.log 2>&1`
-  exits 0, and `grep -Ex ' *17 pass' tmp/source-module-split-s579/sms-02-cli-edit/native-parity.log`
-  exits 0. The `native edit handles refs, arrangement, snapshots and
-  rollback` block runs the moved code in Boa.
+  this run.
+- G3 (design commands 2 and 3; native parity is verified only through
+  test-cli):
+  `CARGO_TERM_QUIET=true mise run test-cli > tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log 2>&1`
+  exits 0. Then all of these exit 0:
+  - `grep -E '^ *0 fail$' tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log`
+  - `test -z "$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log)"`
+  - `grep -Ex ' *183 pass' tmp/source-module-split-s583/sms-02-cli-edit/test-cli.log`
+    (B3 plus 11)
+
+  Then the collection check, which runs no comparison:
+  `env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s583/sms-02-cli-edit/parity-collect.log 2>&1`
+  exits 0, and
+  `grep -Ex ' *17 skip' tmp/source-module-split-s583/sms-02-cli-edit/parity-collect.log`
+  exits 0. Inside test-cli, the `native edit handles refs, arrangement,
+  snapshots and rollback` block runs the moved code in Boa.
+
+  If test-cli fails with a parity timeout, rerun it once on an idle
+  machine. If it fails again, it is a regression to fix. Never waive it
+  (design "Risks").
 - G4:
   `find apps/cli/src/edit-command.ts apps/cli/src/edit -name '*.ts' -exec awk 'FNR == 701 { print FILENAME " exceeds 700 lines"; bad = 1 } END { exit bad }' {} +`
   exits 0.
@@ -255,8 +289,13 @@ progress log.
   values `parseOperations`, `deepMerge`, `applyBatch`, `editCommand`,
   `runOperations` and `EXIT_CONTENDED`, and the types `EditWarning` and
   `RunOptions`.
-- G1-G7 exit 0, with logs in the evidence directory.
-- The two new test files contain every case listed above.
+- G1-G7 exit 0, with logs in the evidence directory. G1 shows
+  ` 2956 pass`, G2 shows ` 11 pass`, and G3 shows ` 183 pass`, ` 0 fail`,
+  no skip line and ` 17 skip` in the collection log. Each count is B1 or
+  B3 plus 11. If B1 or B3 differs from the expected value, use B1 + 11 or
+  B3 + 11 and record why.
+- The two new test files contain every case listed above, with one
+  `test(...)` per case.
 - The progress log has the baseline, the gate results, the hashes, drift
   events, and the final `wc -l` for `edit-command.ts` and every file under
   `apps/cli/src/edit`.
