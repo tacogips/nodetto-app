@@ -10,7 +10,7 @@ import {
 } from "@nodetto/ir";
 import { copyElements, planPaste } from "../clipboard.ts";
 import type { Command } from "../commands.ts";
-import type { Editor } from "../editor.ts";
+import type { EditorCore } from "./facade/core.ts";
 import type { Rng } from "../fractional.ts";
 import type { IdSource } from "../ids.ts";
 import { planPageOrder } from "../page-order.ts";
@@ -92,7 +92,7 @@ export function planPageMove(
  * across through the clipboard path (ids remapped). `null` for unknown ids.
  */
 export function planDuplicatePage(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   idSource: IdSource,
   id: PageId,

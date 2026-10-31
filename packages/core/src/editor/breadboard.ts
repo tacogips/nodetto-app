@@ -24,7 +24,7 @@ import {
 import { snapBreadboardPoint } from "../breadboard/snap.ts";
 import type { BreadboardProbe } from "../breadboard/types.ts";
 import type { Command } from "../commands.ts";
-import type { Editor } from "../editor.ts";
+import type { EditorCore } from "./facade/core.ts";
 import { keyBetween, type Rng } from "../fractional.ts";
 import type { Vec } from "../geometry.ts";
 import type { Store } from "../store.ts";
@@ -49,7 +49,7 @@ export function sameBreadboardProbe(
  * `null` when the current page is not a breadboard.
  */
 export function buildBreadboardPart(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   type: BreadboardElementType,
   at: Vec,

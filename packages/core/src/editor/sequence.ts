@@ -12,7 +12,7 @@ import type {
   SequenceParticipantSemantic,
 } from "@nodetto/ir";
 import type { Command } from "../commands.ts";
-import type { Editor } from "../editor.ts";
+import type { EditorCore } from "./facade/core.ts";
 import {
   compareFractional,
   keyAfter,
@@ -66,7 +66,7 @@ export function nextParticipantOrder(
  * order. `null` when there is no unlocked neighbour to swap with.
  */
 export function planSequenceMove(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   id: ElementId,
   delta: -1 | 1,
@@ -144,7 +144,7 @@ export function planSequenceMove(
 
 /** A participant on the current page with its header centred on `centre`. */
 export function buildSequenceParticipant(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   kind: ParticipantKind,
   centre: Vec,
@@ -190,7 +190,7 @@ export function buildSequenceParticipant(
  * locked participant.
  */
 export function planSequenceActivation(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   participantId: ElementId,
 ): { readonly id: ElementId; readonly commands: Command[] } | null {
@@ -254,7 +254,7 @@ export function planSequenceActivation(
  * locked.
  */
 export function planSequenceMessage(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   source: Element,
   target: Element,

@@ -23,6 +23,13 @@ desktop client wires the two together, see
 [`apps/desktop/README.md`](../apps/desktop/README.md) for the canvas layout and
 the manual gesture checklist. `collab` is still a scaffold.
 
+The `Editor` chain in `packages/core/src/editor/facade/` comprises
+`EditorCore` for state and core operations, `ElementEditing` for elements,
+`SelectionEditing` for selections, `PageEditing` for pages and views, and
+`NotationEditing` for notation-specific operations. Planners in
+`packages/core/src/editor/*.ts` compute command plans without applying them;
+component and responsive-variant members stay in `editor.ts`.
+
 ## Setup
 
 ```bash

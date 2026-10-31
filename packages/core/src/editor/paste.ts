@@ -5,7 +5,7 @@
 import type { ElementId, FrameSemantic } from "@nodetto/ir";
 import { type ClipboardPayload, planPaste } from "../clipboard.ts";
 import type { Command } from "../commands.ts";
-import type { Editor } from "../editor.ts";
+import type { EditorCore } from "./facade/core.ts";
 import { frameParents } from "../frame-tree.ts";
 import type { Vec } from "../geometry.ts";
 import { groupOf, memberIdsOf } from "../group.ts";
@@ -37,7 +37,7 @@ export function topLevelAmong(
  * frame, in which case nothing is inserted.
  */
 export function planInsertCopies(
-  editor: Editor,
+  editor: EditorCore,
   idSource: IdSource,
   payload: ClipboardPayload,
   offset: Vec,

@@ -18,7 +18,7 @@ import {
 import { addBpmnLaneCommands } from "../bpmn/containment.ts";
 import { buildBpmnModel } from "../bpmn/model.ts";
 import type { Command } from "../commands.ts";
-import type { Editor } from "../editor.ts";
+import type { EditorCore } from "./facade/core.ts";
 import { compareFractional, keyBetween, type Rng } from "../fractional.ts";
 import type { IdSource } from "../ids.ts";
 import { referencesOf } from "../references.ts";
@@ -207,7 +207,7 @@ export function checkBpmnSemantic(
 
 /** A new lane under a participant or lane, stacked above its siblings. */
 export function planBpmnLane(
-  editor: Editor,
+  editor: EditorCore,
   rng: Rng,
   idSource: IdSource,
   parentId: ElementId,

@@ -11,7 +11,7 @@ import {
   UmlComponentType,
   type UseCaseRelationshipKind,
 } from "@nodetto/ir";
-import type { Editor } from "../editor.ts";
+import type { NotationEditing } from "./facade/notation-editing.ts";
 import type { Rng } from "../fractional.ts";
 import type { Vec } from "../geometry.ts";
 import {
@@ -29,7 +29,7 @@ import type { ApplyOptions } from "./types.ts";
  * `null` for the same cases `connect` refuses.
  */
 export function connectByType(
-  editor: Editor,
+  editor: NotationEditing,
   rng: Rng,
   from: ElementId,
   to: ElementId,
@@ -108,7 +108,7 @@ export function connectByType(
 
 /** Logical relations and enforced foreign keys share endpoint mappings. */
 export function connectErdTables(
-  editor: Editor,
+  editor: NotationEditing,
   from: ElementId,
   to: ElementId,
   logical: boolean,
@@ -147,7 +147,7 @@ export function connectErdTables(
 
 /** Component relationships never borrow class-association semantics. */
 export function connectUmlComponents(
-  editor: Editor,
+  editor: NotationEditing,
   from: ElementId,
   to: ElementId,
   kind: UmlComponentRelationshipKind,
@@ -178,7 +178,7 @@ export function connectUmlComponents(
 
 /** Use-case relationships connect actors, use cases and systems only. */
 export function connectUseCases(
-  editor: Editor,
+  editor: NotationEditing,
   from: ElementId,
   to: ElementId,
   kind: UseCaseRelationshipKind,
@@ -209,7 +209,7 @@ export function connectUseCases(
 
 /** Attach a port to the boundary of component `ownerId` nearest `point`. */
 export function placeUmlPort(
-  editor: Editor,
+  editor: NotationEditing,
   ownerId: ElementId,
   point: Vec,
 ): ElementId | null {
