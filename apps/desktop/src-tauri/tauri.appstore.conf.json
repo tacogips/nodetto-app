@@ -5,7 +5,6 @@
     "targets": ["app"],
     "externalBin": ["binaries/nodetto-cli"],
     "macOS": {
-      "bundleVersion": "1",
       "minimumSystemVersion": "12.0",
       "hardenedRuntime": false
     }

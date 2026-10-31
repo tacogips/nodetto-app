@@ -171,13 +171,21 @@ cp "$profile_source" "$runtime_profile"
 # validation requires every bundled file to be readable by non-root users.
 chmod 644 "$runtime_profile"
 
+# App Store Connect requires every upload's CFBundleVersion to exceed all
+# earlier ones, so derive it from the version: 0.8.5 becomes 805.
+IFS=. read -r version_major version_minor version_patch <<<"$product_version"
+[[ "$version_major.$version_minor.$version_patch" =~ ^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$ ]] || fail "version must be MAJOR.MINOR.PATCH with MINOR and PATCH below 100"
+store_build_version="$((10#$version_major * 10000 + 10#$version_minor * 100 + 10#$version_patch))"
+
 runtime_config="$work_dir/tauri.appstore.runtime.conf.json"
 jq -s \
   --arg entitlements "$runtime_entitlements" \
   --arg profile "$runtime_profile" \
+  --arg bundleVersion "$store_build_version" \
   'reduce .[] as $item ({}; . * $item) * {
     bundle: {
       macOS: {
+        bundleVersion: $bundleVersion,
         entitlements: $entitlements,
         files: {"embedded.provisionprofile": $profile}
       }
