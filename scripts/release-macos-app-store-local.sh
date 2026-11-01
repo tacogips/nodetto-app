@@ -284,6 +284,12 @@ xcrun productbuild \
 pkgutil --check-signature "$staged_pkg_path" | grep -F -- "$installer_identity" >/dev/null
 mv -f -- "$staged_pkg_path" "$pkg_path"
 
+# The Store-signed bundle cannot run outside the App Store; macOS reports it as
+# damaged if Launch Services opens it in place of the installed app.
+if [ -z "${NODETTO_APP_STORE_SOURCE_APP:-}" ]; then
+  rm -rf -- "$app_path"
+fi
+
 echo "Mac App Store package ready: $pkg_path"
 shasum -a 256 "$pkg_path"
 

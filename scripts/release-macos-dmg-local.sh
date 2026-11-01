@@ -59,6 +59,8 @@ fi
 require_command bun
 require_command codesign
 require_command ditto
+require_command unzip
+require_command zipinfo
 require_command git
 require_command gh
 require_command hdiutil
@@ -175,7 +177,22 @@ rmdir "$mount_dir"
 trap - EXIT
 
 app_zip_path="target/release/bundle/macos/Nodetto.app.zip"
-ditto -c -k --keepParent "$app_path" "$app_zip_path"
+# Without --norsrc/--noextattr, ditto stores extended attributes as AppleDouble
+# ._* entries inside the bundle. Archive Utility folds them back, but unzip and
+# most other extractors write them out as files, which breaks the code
+# signature seal and makes macOS report the app as damaged.
+rm -f "$app_zip_path"
+ditto -c -k --norsrc --noextattr --noqtn --noacl --keepParent "$app_path" "$app_zip_path"
+if zipinfo -1 "$app_zip_path" | grep -Eq '(^|/)(\._|__MACOSX/)'; then
+  echo "error: app ZIP contains AppleDouble entries" >&2
+  exit 1
+fi
+zip_check_dir="$(mktemp -d)"
+unzip -q "$app_zip_path" -d "$zip_check_dir"
+codesign --verify --deep --strict "$zip_check_dir/Nodetto.app"
+xcrun stapler validate "$zip_check_dir/Nodetto.app"
+spctl --assess --type execute "$zip_check_dir/Nodetto.app"
+rm -rf "$zip_check_dir"
 
 release_notes="Signed and notarized macOS app and DMG. The app bundles the nodetto-cli command line tool (Contents/MacOS/nodetto-cli)."
 if ! gh release view "$release_tag" >/dev/null 2>&1; then
