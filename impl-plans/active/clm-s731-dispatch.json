@@ -103,6 +103,16 @@
         {"findingId": "IR-CORE-STRICT-NODE-OVERLAP", "unmatchedPath": "packages/core/src/diagram-lint/node-overlap.ts", "decision": "Assigned to pending clm-09-wiring writePaths for an annotation-only fix with a production-core strict-check verification."},
         {"findingId": "IR-CLM06-STRICT-DISPOSITION", "unmatchedPath": "none (impl-plans/progress/clm-06-route-arrange.md is already a clm-06 writePath)", "decision": "Baseline disposition recorded in the clm-06 plan amendment; the strict check is not a clm-06 gate."}
       ]
+    },
+    {
+      "round": 2,
+      "date": "2026-11-04",
+      "reason": "integration-paths-outside-writePaths",
+      "previousCheckpointCommit": "cb03f7ea2f177e388319a1019e7fef3ac8cfaf6e",
+      "decisions": [
+        {"findingId": "IR-CLM02-SCOPE", "unmatchedPath": "impl-plans/active/clm-02-connector-edit-perf.md", "resolvedPaths": ["packages/core/src/commands.ts", "packages/core/src/editor/facade/core.ts"], "owner": "clm-02-connector-edit-perf", "decision": "Plan files are author-owned and must not be worker writePaths. The finding maps to packages/core/src/commands.ts and packages/core/src/editor/facade/core.ts, both in clm-02 writePaths since cb03f7e; resolved by the round-1 amendment, no further plan edit."},
+        {"findingId": "IR-CLM12-FREEROW", "unmatchedPath": "impl-plans/active/clm-12-bpmn-layered.md", "resolvedPaths": ["packages/core/src/arrange-layered-bpmn.ts"], "owner": "clm-12-bpmn-layered", "decision": "Plan files are author-owned and must not be worker writePaths. The finding maps to packages/core/src/arrange-layered-bpmn.ts, already in clm-12 writePaths; resolved by the design E2.1 free-row bullet and the clm-12 amendment in cb03f7e, no further plan edit."}
+      ]
     }
   ],
   "acceptedDependencies": [
