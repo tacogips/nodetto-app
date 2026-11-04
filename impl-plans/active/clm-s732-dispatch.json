@@ -104,6 +104,15 @@
         {"findingId": "none (clm-02 readiness blocker)", "unmatchedPath": "none", "owner": "clm-02-connector-edit-perf", "decision": "The clm-02 worker stopped because no workflow mode reached it. reviewContext.workflowMode and each pending plan now state issue-resolution explicitly."},
         {"findingId": "S5-CLM15-FULL-BUILD-GATE", "unmatchedPath": "none", "resolvedPaths": ["impl-plans/active/clm-s732-dispatch.json", "impl-plans/active/clm-15-bun-test-jsx.md", "impl-plans/active/clm-09-wiring.md"], "owner": "clm-15-bun-test-jsx, clm-09-wiring", "decision": "clm-15 no longer runs the Vite with-and-without comparison, because two full builds in wave 1 could fail on clm-02 or clm-12 edits in progress, and the bunfig.toml [test] table is read only by bun test. Two static checks replace it: bunfig.toml holds only a [test] table, and production code does not import the preload. clm-09, which runs alone in wave 3, gains one production-build gate writing under target/. A failure there traceable to bunfig.toml or the preload is a finding for clm-15. Plan IDs, waves, dependsOn and writePaths are unchanged."}
       ]
+    },
+    {
+      "round": 2,
+      "date": "2026-11-05",
+      "reason": "integration-paths-outside-writePaths",
+      "previousCheckpointCommit": "ff528ed26f64cbb89af920967b80146d8aed269d",
+      "decisions": [
+        {"findingId": "IR-S732-CLM12-PARENT-CONTRACT", "unmatchedPath": "impl-plans/active/clm-12-bpmn-layered.md", "resolvedPaths": ["impl-plans/active/clm-12-bpmn-layered.md"], "owner": "clm-12-bpmn-layered", "decision": "Round 1 recorded this path as author-owned and left it out of writePaths, and dispatch flagged the same path again. The file is now in clm-12 writePaths, which supersedes the round 1 statement for this one file. The listing is ownership and snapshot tracking only: the worker must not edit the file, and a new clm-12 verification command fails if it differs from HEAD. No other writePaths change, and the impl-plans/active directory itself is not listed."}
+      ]
     }
   ],
   "acceptedDependencies": [
@@ -275,18 +284,25 @@
         "packages/core/src/arrange-layered-bpmn.ts",
         "packages/core/src/arrange-layered-bpmn.test.ts",
         "impl-plans/progress/clm-12-bpmn-layered.md",
+        "impl-plans/active/clm-12-bpmn-layered.md",
         "tmp/clm-s732/clm-12-bpmn-layered",
         "target"
       ],
       "sharedPaths": [],
-      "sharedPathNotes": [],
+      "sharedPathNotes": [
+        {
+          "path": "impl-plans/active/clm-12-bpmn-layered.md",
+          "intendedEdit": "None. Listed for ownership and snapshot tracking only, per checkpoint amendment round 2. The worker reads this plan and never edits it; record any needed plan change as an amendment request."
+        }
+      ],
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
         "Free row follows design E2.1 with and without pools; a rerun returns empty lists in every case.",
         "Units under a non-leaf lane or directly under a pool with lanes land in the first leaf row, and units of collapsed pools are carried with the pool; none go to the free row.",
         "Regressions for nested lanes, collapsed pools, message flows, a free row beside pools, sub-processes, boundary events, shuffled order and validateDocument exist and pass.",
         "A unit directly under a non-leaf lane or a pool with lanes ends parented to the first leaf lane; parents of units already inside a leaf lane stay unchanged; the planner writes no semantic.parent; containment.ts and transaction.ts are not edited by this plan.",
-        "All verification commands exit 0 with at least 21 tests and 0 failures, and no .ts file remains under tmp/clm-s732/clm-12-bpmn-layered."
+        "All verification commands exit 0 with at least 21 tests and 0 failures, and no .ts file remains under tmp/clm-s732/clm-12-bpmn-layered.",
+        "The worker leaves impl-plans/active/clm-12-bpmn-layered.md unchanged from HEAD."
       ],
       "verification": [
         "bun test packages/core/src/arrange-layered-bpmn.test.ts",
@@ -295,7 +311,8 @@
         "bunx biome check packages/core/src/arrange-layered-bpmn.ts packages/core/src/arrange-layered-bpmn.test.ts",
         "grep -n 'export function planLayeredBpmn' packages/core/src/arrange-layered-bpmn.ts",
         "sh -c 'test \"$(grep -c \"^test(\" packages/core/src/arrange-layered-bpmn.test.ts)\" -ge 20'",
-        "sh -c '! find tmp/clm-s732/clm-12-bpmn-layered -name \"*.ts\" | grep -q .'"
+        "sh -c '! find tmp/clm-s732/clm-12-bpmn-layered -name \"*.ts\" | grep -q .'",
+        "git diff --quiet HEAD -- impl-plans/active/clm-12-bpmn-layered.md"
       ]
     },
     {

@@ -21,6 +21,9 @@ top of `b68036c`. New plan clm-15 owns the `bun test` JSX load failure, because
 | 2 | clm-11-container-carry | E1 CLI module and per-kind tests | clm-02 |
 | 3 | clm-09-wiring | Registration, BPMN dispatch, help, docs, parity, git e2e, final gates | clm-02, 11, 12, 15 |
 
+Round 2 (same date): clm-12 `writePaths` also lists its own plan file, for ownership and
+snapshot tracking only. The worker must not edit it. Waves and dependsOn are unchanged.
+
 ## Continuation 2 2026-11-05 (clm-s732) - authoritative
 
 Manifest: `impl-plans/active/clm-s732-dispatch.json`, base HEAD
