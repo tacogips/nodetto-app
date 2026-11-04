@@ -1,5 +1,177 @@
 # clm-02-connector-edit-perf
 
+## Continuation 2026-11-04 (clm-s731) - authoritative for the remaining work
+
+This section supersedes the header fields below (wave, writePaths,
+verification and evidence paths) for the clm-s731 run. The sections below it
+are history: the IR fields, resolver changes, `pointAlongRoute`,
+`connectorLabelBoxAt`, the same-side self-loop, the single-page fixture and
+its Bun and native tests are landed at HEAD 4d82d91 and accepted. Do not
+redo them.
+
+- wave: 1; dependsOn: none
+- Design: `design-docs/specs/design-cli-layout-merge-lint.md`, "A7
+  continuation: per-operation cost must be bounded by the edited page", E1
+  "Mechanics" (engine part), contracts in "Continuation contracts" (clm-02
+  block), Verification rows "A7 continuation" and E1 (engine).
+- writePaths (clm-s731):
+  - `packages/core/src/editor/transaction.ts`
+  - `packages/core/src/editor/types.ts`
+  - `packages/core/src/editor.ts`
+  - `packages/core/src/store.ts`
+  - `packages/core/src/constraints.ts`
+  - `packages/core/src/frame-translation.ts`
+  - `packages/core/src/frame-tree.ts`
+  - `packages/core/src/auto-layout.ts`
+  - `packages/core/src/text-layout.ts`
+  - `packages/core/src/text-styles.ts`
+  - `packages/core/src/color-tokens.ts`
+  - `packages/core/src/number-tokens.ts`
+  - `packages/core/src/aspect-ratio.ts`
+  - `packages/core/src/auto-component-refresh.ts`
+  - `packages/core/src/uml-ports.ts`
+  - `packages/core/src/manual-route-preservation.ts`
+  - `packages/core/src/bpmn/containment.ts`
+  - `packages/core/src/breadboard/board-carry.ts`
+  - `packages/core/src/pcb-board/follow.ts`
+  - `packages/core/src/keep-members.test.ts` (new)
+  - `packages/core/src/dirty-pages.test.ts` (new)
+  - `apps/cli/src/edit/apply-batch.ts`
+  - `apps/cli/src/__fixtures__/obstacle-routing-batch.ts`
+  - `apps/cli/src/__fixtures__/obstacle-routing-batch.multi-page.expected.jsonl` (new)
+  - `apps/cli/src/__fixtures__/obstacle-routing-batch.mixed-multi-page.expected.jsonl` (new)
+  - `apps/cli/src/edit-performance.test.ts`
+  - `apps/cli/src/native-parity/edit-performance.test.ts`
+  - `impl-plans/progress/clm-02-connector-edit-perf.md`
+  - `tmp/clm-s731/clm-02-connector-edit-perf`
+  - `target`
+- sharedPaths: none; artifactRoots: `target`
+- Read-only and never edited: `apps/cli/src/__fixtures__/obstacle-routing-batch.expected.jsonl`
+  (its git hash must stay `341fcd8654fc18d560c8895df1a05617a6b8ac39`),
+  `target/clm-baseline/nodetto-cli` (never delete; never `cargo clean`), and
+  every file owned by another clm-s731 plan (notably `bpmn/notation.ts`,
+  `arrange-*.ts`, `apps/cli/src/edit/batch.ts`, `operations/*.ts`).
+- Only files the profile shows are needed are edited; an untouched writePath
+  is fine. If the fix needs a file outside this list, stop and record an
+  amendment request in the progress log; do not edit it.
+
+### Part 1: multi-page fixtures and expected output (before any source change)
+
+- Extend `apps/cli/src/__fixtures__/obstacle-routing-batch.ts` with exported
+  builders `obstacleRoutingMultiPage()`, `obstacleRoutingMixedMultiPage()` and
+  `obstacleRoutingMixedSinglePage()` returning `{ document, operations }`
+  like `obstacleRoutingBatch()`. `obstacleRoutingBatch()` output must stay
+  byte-identical.
+  - multiPage: the single-page document plus a second page `Grid`
+    (`kind: "freeform"`) with 600 `node.generic` labelled `Widget000` to
+    `Widget599` on a 30 x 20 grid (fixed integer x/y/width/height, ids
+    deterministic), and 300 `edge.generic` between horizontal grid
+    neighbours (`routing: "orthogonal"`, `routingAvoidObstacles: true`).
+    Ops: the same 50 updates.
+  - mixedMultiPage: the multiPage document, ops in fixed interleaved order:
+    20 `move` of `state.node`, 3 `update` frame moves (`visual.x/y`), 50
+    connector updates setting `routingAvoidObstacles: true`.
+  - mixedSinglePage: the same mixed ops on the single-page document.
+- Capture expected output with the HEAD code before editing any source file:
+  run Bun `runCli edit` on multiPage and mixedMultiPage and write the two
+  `.expected.jsonl` files; record `git hash-object` of both. Cross-check with
+  `target/clm-baseline/nodetto-cli edit <doc> --ops <ops> --output <file>` (or
+  its stdout form) and `cmp` -> identical; record in the progress log.
+- Baseline timings with `/usr/bin/time -p` on the current HEAD release build
+  (`CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`) and on
+  `target/clm-baseline/nodetto-cli` for all four ops sets (single, multiPage,
+  mixedSingle, mixedMulti), written to
+  `tmp/clm-s731/clm-02-connector-edit-perf/baseline-timing.log`. Run docs from
+  `tmp/clm-s731/clm-02-connector-edit-perf/work/` (only .jsonl/.json data).
+
+### Part 2: profile, then dirty-page planning
+
+- Profile the multiPage and mixedMultiPage batches with Bun
+  (`bun --cpu-prof`) and record the top self-time and total-time frames in
+  the progress log. Confirm which of the design's listed sites dominate:
+  `planDerivedCommands` full snapshot sort/copy and `beforeLayout` copy,
+  `planConstraints` `frameParents` over every page, `planFrameTranslations`
+  over every page, the BPMN/breadboard/PCB guards that scan `listElements`,
+  token/style/layout planner scans, `applyBatch` per-op full maps.
+- Implement the design rule: per `editor.apply`, dirty pages = pages of
+  elements created/updated/deleted by permitted commands, plus pages touched
+  by page commands. Every derived planner considers only dirty pages and
+  must produce exactly the same commands, in the same order, as today.
+  Widen to the whole document (today's behavior) when: any page command is
+  permitted; a changed element is `design.token` or `design.text-style`; a
+  changed element is a component master read by `planAutoComponentRefresh`;
+  or a changed element's id is referenced by an element on another page
+  (registry `references(semantic)`).
+- Allowed techniques: page-scoped iteration (`store.getPageElements`),
+  page-scoped drafts or copy-on-write, per-batch memoization keyed by
+  unchanged inputs, store diffs instead of full maps in `applyBatch`. Not
+  allowed: changing planner order, changing command order within a page,
+  skipping a planner on a dirty page, relaxing validation.
+- Record each planner's trigger scope (same-page only or cross-page) as a
+  table in the progress log.
+
+### Part 3: `keepMembers` (E1 engine)
+
+- `packages/core/src/editor/types.ts:ApplyOptions` gains
+  `readonly keepMembers?: ReadonlySet<ElementId>`; `editor.ts` forwards it;
+  `DerivedPlanInput` gains `readonly keepMembers: ReadonlySet<ElementId> | undefined`.
+- `planFrameTranslations`: treat `keepMembers` like `placed` (pass the union).
+- `planConstraints(before, after, registry, onlyIds?, keep?)`: never move an
+  element in `keep`.
+- `planBpmnTranslations(before, after, keep?)`, `planBreadboardTranslations(before, draft, keep?)`:
+  skip ids in `keep`.
+- `planBpmnMembership(before, after, reparent?)`: re-evaluate the parent of
+  every id in `reparent` even if it did not move (same geometric rule).
+- Pass `keepMembers` at both `planFrameTranslations`/`planConstraints` call
+  sites in `planDerivedCommands`. `planReconciliation` is unchanged.
+- Without the option, every output is byte-identical.
+
+### Tests (input -> expected)
+
+- `apps/cli/src/edit-performance.test.ts`: single-page test unchanged; new
+  tests for multiPage and mixedMultiPage -> exit 0, output byte-identical to
+  the new expected files, each under 10000 ms.
+- `apps/cli/src/native-parity/edit-performance.test.ts`: the same two fixtures
+  with `NODETTO_CLI_TEST_BINARY`, each under 10000 ms (spawn timeout 60000,
+  test timeout 120000), output equal to the expected files. Existing
+  deadlines unchanged.
+- `packages/core/src/dirty-pages.test.ts`: a two-page document; an update on
+  page 1 leaves page 2 elements identical and produces the same commands as
+  the pre-change code for page 1 (compare against an expected command list
+  captured before the change); each widening case (design.token change,
+  design.text-style change, component master change, cross-page reference,
+  add-page) still updates the dependent element on page 2.
+- `packages/core/src/keep-members.test.ts`: per planner, with and without
+  `keepMembers`: frame move and frame resize with a constrained child; pool
+  move (lanes follow, tasks kept, tasks re-parented); lane height change
+  (sibling lane members still carried); sub-process move; board move. Without
+  the option, results equal the current behavior.
+
+### Verification (each must exit 0)
+
+1. `bun test apps/cli/src/edit-performance.test.ts apps/cli/src/edit/apply-batch.test.ts packages/core/src/dirty-pages.test.ts packages/core/src/keep-members.test.ts`
+2. `bun test packages/core/src/frame-translation.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/constraints.test.ts packages/core/src/auto-layout.test.ts packages/core/src/text-layout.test.ts packages/core/src/store-commands.test.ts packages/core/src/manual-route-preservation.test.ts packages/core/src/bpmn/containment.test.ts packages/core/src/bpmn/editor-bpmn.test.ts packages/core/src/breadboard/board.test.ts packages/core/src/breadboard/editor-breadboard.test.ts packages/core/src/pcb-board/follow.test.ts packages/core/src/svg-export.test.ts packages/io/src/jsonl/golden.test.ts`
+3. `bun test packages/core/src/editor.test.ts packages/core/src/editor-ux.test.ts apps/cli/src/commands.test.ts apps/cli/src/edit-frame-carry.test.ts`
+4. `bun run typecheck`
+5. `sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/native-[123].log "$d/native.log"; CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > "$d/native-build.log" 2>&1 || exit 1; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/edit-performance.test.ts > "$d/native-$i.log" 2>&1 && cp "$d/native-$i.log" "$d/native.log" && exit 0; done; exit 1' sh tmp/clm-s731/clm-02-connector-edit-perf/final`
+6. `grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s731/clm-02-connector-edit-perf/final/native.log` and `grep -E '^ *0 fail$' tmp/clm-s731/clm-02-connector-edit-perf/final/native.log`
+7. `sh -c 'test "$(git hash-object apps/cli/src/__fixtures__/obstacle-routing-batch.expected.jsonl)" = 341fcd8654fc18d560c8895df1a05617a6b8ac39'`
+8. `test -x target/clm-baseline/nodetto-cli`
+9. `bunx biome check <every edited TS file of this plan>` (list them explicitly in the progress log and the command).
+10. Manual timing (recorded, not a gate command): `/usr/bin/time -p target/release/nodetto-cli edit ...` for the four ops sets into `tmp/clm-s731/clm-02-connector-edit-perf/after-timing.log`; report user CPU for multiPage / single and mixedMulti / mixedSingle (target <= 1.5 each) and the ratio against the baseline binary.
+
+### Done criteria
+
+- Expected files captured before source edits, hashes recorded and unchanged
+  at the end; profile evidence and the planner scope table recorded.
+- Verification 1-9 exit 0; the manual ratios recorded. If a ratio exceeds 1.5,
+  record it as an unmet target with the profile showing the remaining cost;
+  do not mark the plan done.
+- `git status --short` shows only clm-s731 writePaths of this plan changed by
+  this plan.
+
+---
+
 - planId: clm-02-connector-edit-perf
 - planPath: impl-plans/active/clm-02-connector-edit-perf.md
 - progressPath: impl-plans/progress/clm-02-connector-edit-perf.md

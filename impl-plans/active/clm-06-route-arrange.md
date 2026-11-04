@@ -1,5 +1,120 @@
 # clm-06-route-arrange
 
+## Continuation 2026-11-04 (clm-s731) - authoritative
+
+This section supersedes the header fields below (wave, dependsOn,
+writePaths, evidence paths) and amends the Rules, Tests and Verification
+below. Nothing of this plan has landed yet; implement the whole plan
+(sections below) plus the E2 changes here.
+
+- wave: 1; dependsOn: none. clm-02's connector fields, `pointAlongRoute`,
+  `connectorLabelBoxAt` and the same-side self-loop, and clm-07's
+  `planLayered`/`columnFrames`/`LAYERED_PAGE_KINDS` are landed at HEAD.
+- Design additions: "Eligible pages" (revised), A2 targets (revised), A3
+  score with `isLabelObstacle`, A3 metrics, E2 table, E2.2, continuation
+  contracts (`ROUTE_PAGE_KINDS`, `bpmnFlowLabelBox`, `isLabelObstacle`),
+  Verification row E2.
+- writePaths (clm-s731):
+  - `packages/core/src/arrange-route.ts` (new)
+  - `packages/core/src/arrange-route.test.ts` (new)
+  - `packages/core/src/diagram-lint/metrics.ts` (new)
+  - `packages/core/src/diagram-lint/metrics.test.ts` (new)
+  - `packages/core/src/bpmn/notation.ts`
+  - `packages/core/src/bpmn/notation.test.ts`
+  - `packages/core/src/bpmn/svg-export-bpmn.test.ts`
+  - `apps/cli/src/arrange-modes.ts` (new)
+  - `apps/cli/src/arrange-modes.test.ts` (new)
+  - `apps/cli/src/lint-metrics.ts` (new)
+  - `apps/cli/src/lint-metrics.test.ts` (new)
+  - `impl-plans/progress/clm-06-route-arrange.md`
+  - `tmp/clm-s731/clm-06-route-arrange`
+  - `target`
+- sharedPaths: none; artifactRoots: `target`
+- sharedPathNotes: `packages/core/src/bpmn/notation.ts`: only the flow-label
+  anchor precedence inside `bpmnFlowDecoration` and the new export
+  `bpmnFlowLabelBox`; no other notation change.
+- Evidence directory: `tmp/clm-s731/clm-06-route-arrange/` (replaces
+  `tmp/clm-s725/...` everywhere below).
+
+### Amended rules
+
+- R2 (targets): `ROUTE_PAGE_KINDS = ["state", "flowchart", "freeform", "architecture", "uml", "erd", "bpmn"]`
+  (own constant; do not derive from `LAYERED_PAGE_KINDS`). `sequence.message`
+  is never a target. `erd.relation` and `bpmn.sequenceFlow`,
+  `bpmn.messageFlow`, `bpmn.association`, `bpmn.dataAssociation` are targets.
+- ERD: an end with `erdEndpointColumnIds(semantic[end]).length > 0` never gets
+  `fromPort`/`toPort`/positions written and is not in any spreading group (it
+  has no port). Table-level ends follow R4/R6. An ERD self relation: no
+  ports, no A5. Label text = `connectorDecoration(element).label`; empty ->
+  skip A3.
+- BPMN: A5 same-side self-loop applies. Label text = `semantic.name`; label
+  box = `bpmnFlowLabelBox` (below), never `connectorLabelBoxAt`. A flow with
+  `visual.labelBounds` is manual for labels: never write its
+  `labelPosition`; its box at `labelBounds` counts as a placed label.
+- R7 score obstacles and R8 metrics: use `isLabelObstacle(element)` exported
+  from `metrics.ts`: false for edges and for containing surfaces (`frame`,
+  `group`, `bpmn.participant` unless `semantic.collapsed === true`,
+  `bpmn.lane`, `bpmn.subProcess` with `semantic.expanded === true`,
+  `bpmn.group`); true otherwise. `planRoute` and `pageMetrics` both use it.
+- `notation.ts`:
+  - Anchor precedence in `bpmnFlowDecoration`: `visual.labelBounds` centre;
+    else, when `semantic.labelPosition` is a finite number,
+    `pointAlongRoute(points, clamp01(labelPosition))` (import from
+    `../shapes/connector/route.ts`); else `polylineMidpoint(points)`. No
+    `labelPosition` -> byte-identical primitives.
+  - `export function bpmnFlowLabelBox(element: Element, points: readonly Vec[], anchor: Vec): Box | null`:
+    null for empty `name`; lines = the same `wrapTextLines(name, 90, 11)`;
+    `w` = widest line by `estimatedTextWidth` (`../text-layout.ts`) at font
+    11; box `x = anchor.x - w / 2`, `y = anchor.y - 11 * 0.8`,
+    `width = w`, `height = 11 * 0.8 + (n - 1) * 13 + 11 * 0.2`. Name the
+    constants (font size 11, line height 13, ascent/descent ratios) once and
+    use them in both `bpmnFlowDecoration` and the helper.
+- `arrange-modes.ts`: route accepts `ROUTE_PAGE_KINDS`; layered accepts
+  `LAYERED_PAGE_KINDS` imported from `arrange-layered.ts` (clm-10 adds `erd`
+  there in parallel; do not test ERD layered here). `bpmn` with layered exits
+  2 with the supported-kinds message until clm-09 adds the BPMN dispatch.
+  sequence, breadboard, pcb -> exit 2 for both modes.
+
+### Added tests
+
+- `notation.test.ts`: `bpmn.sequenceFlow` named `Review order` on
+  [(0,0),(200,0)]: no `labelPosition` -> text at x=100 (unchanged);
+  `labelPosition` 0.2 -> x=40, 0.8 -> x=160; with `labelBounds` and
+  `labelPosition` -> `labelBounds` centre wins. `bpmnFlowLabelBox` for
+  `First row\nSecond row\nThird row\nFourth row` at y=100 -> y 91.2,
+  height 50 (covers baselines 100, 113, 126, 139).
+- `svg-export-bpmn.test.ts`: an existing BPMN fixture without
+  `labelPosition` -> SVG byte-identical to the pre-change output (capture
+  before editing); with `labelPosition: 0.2` the flow-label `<text>` x moves.
+- `arrange-route.test.ts`: BPMN flow label whose midpoint sits on a task ->
+  `labelPosition` written and the rendered anchor (`bpmnFlowDecoration`)
+  equals `pointAlongRoute` at that value; the four-line label with a task at
+  (80,130,40,12) under only the last line scores > 0 at that candidate; a
+  label inside only its pool and lane scores 0 (no write when 0.5 wins); flow
+  with `labelBounds` -> no `labelPosition` write; BPMN self-loop -> same-side
+  ports; ERD: column-anchored ends get no ports and are not spread,
+  table-level ends spread, self relation unchanged.
+- `metrics.test.ts`: BPMN label inside pool and lane only -> `labelOverlaps`
+  0; label over a task, a collapsed sub-process, another label or another
+  route -> > 0; scoring box equals metrics box (`bpmnFlowLabelBox`).
+- `arrange-modes.test.ts`: route on erd and bpmn pages -> exit 0; layered on
+  bpmn -> exit 2 with supported kinds; sequence -> exit 2 for both.
+
+### Amended verification (each must exit 0)
+
+1. `bun test packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/bpmn/notation.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts packages/core/src/connector-positions.test.ts`
+2. `bun test apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts`
+3. `bun run typecheck`
+4. `bunx biome check packages/core/src/arrange-route.ts packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/bpmn/notation.ts packages/core/src/bpmn/notation.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts apps/cli/src/arrange-modes.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-metrics.test.ts`
+5. `grep -n "export function bpmnFlowLabelBox" packages/core/src/bpmn/notation.ts` and `grep -n "export function isLabelObstacle" packages/core/src/diagram-lint/metrics.ts`
+6. Record the Bun wall time of the A7-fixture layered test in the progress log.
+
+Remove `packages/core/src/arrange-layered.test.ts` from verification 1 below
+(clm-10 owns and edits it in parallel). The "erd page -> exit 2" test below is
+replaced by the added arrange-modes tests above.
+
+---
+
 - planId: clm-06-route-arrange
 - planPath: impl-plans/active/clm-06-route-arrange.md
 - progressPath: impl-plans/progress/clm-06-route-arrange.md

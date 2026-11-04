@@ -47,3 +47,35 @@ the section named.
   with `--reset-manual` to recompute them after moving elements.
 - Alternative: add a marker field that records arrange-generated routing, so
   plain reruns recompute it. This needs another IR field.
+
+## Q7. `carryMembers:false` on a BPMN lane (E1) - open, default kept
+
+- Default: lanes are bands of their pool. With `carryMembers:false` only the
+  lane's `height` may change; an `x`, `y` or `width` change exits 2 with a
+  message pointing to the pool. Members of the lane keep their positions and
+  are re-parented by geometry.
+- Alternative: let the lane move freely and restack the pool's lanes around
+  it, which reorders lanes implicitly.
+
+## Q8. BPMN `--mode layered` placement (E2.1) - open, default kept
+
+- Default: lanes are rows in their existing order, BFS depth gives global
+  columns shared by all pools, and units in one lane and column stack
+  vertically. `--frames` and `--direction TB` exit 2 on BPMN pages.
+- Alternative: reorder lanes by first member rank, or support vertical pools.
+
+## Q9. `name:` matching and scope (F1) - open, default kept
+
+- Default: exact match after trimming, case-sensitive, against the C1 label
+  field. Scope is the op's page, the `from` element's page for `connect`
+  `to`, the edited element's page inside `semantic`, otherwise the whole
+  document. An exact id always wins over a name.
+- Alternative: case-insensitive or whitespace-collapsing matching, or always
+  limit to one page (needing a `page` field on every op).
+
+## Q10. `where` without `expect` (F2) - open, default kept
+
+- Default: zero matches is an error, any positive count is applied, and
+  `expect: 0` makes an idempotent no-op possible.
+- Alternative: require `expect` on every `delete` with `where`, to guard bulk
+  deletion.

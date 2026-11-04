@@ -7,6 +7,34 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
+## Continuation 2026-11-04 (clm-s731) - authoritative
+
+Manifest: `impl-plans/active/clm-s731-dispatch.json`. The clm-s725 manifest
+(`impl-plans/active/clm-s725-dispatch.json`) is stale and must not be
+dispatched. Landed and accepted at HEAD 4d82d91: clm-01, clm-03, clm-04,
+clm-07, clm-08, and the clm-02 IR/resolver/single-page work. Owner questions
+Q1 to Q10; implement each default.
+
+| Wave | Plan | Scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf (continuation) | A7 multi-page fixtures, profile, dirty-page planning; E1 engine `keepMembers` | - |
+| 1 | clm-06-route-arrange | A2-A5 with E2.2 BPMN/ERD rules, BPMN label anchor and `bpmnFlowLabelBox`, `isLabelObstacle`, metrics, `arrange-modes.ts`, `lint-metrics.ts` | - |
+| 1 | clm-10-layered-fixes | TB title band, precomputed frame ranks, `erd` in `LAYERED_PAGE_KINDS` | - |
+| 1 | clm-12-bpmn-layered | `planLayeredBpmn` (E2.1) | - |
+| 1 | clm-13-edit-selectors | F1-F3, F4 field rows, match report | - |
+| 1 | clm-14-lint-image-path | `documentRelativePath`, traversal tests | - |
+| 2 | clm-11-container-carry | `carry-members.ts`, E1 per-kind rules, update handler swap | clm-02 |
+| 3 | clm-09-wiring | shared files, BPMN dispatch, `matches` passthrough, help/docs, parity, git e2e, final gates | all above |
+
+Single owners within the continuation: `packages/core/src/bpmn/notation.ts`
+(clm-06), `packages/core/src/arrange-layered.ts` (clm-10),
+`apps/cli/src/edit/batch.ts` and `operations/*.ts` (clm-13 in wave 1, then
+clm-11 for the carry block in wave 2), `apps/cli/src/edit/apply-batch.ts`
+(clm-02 in wave 1, then clm-09 for one line), `apps/cli/src/arrange-modes.ts`
+(clm-06, then clm-09 for the BPMN dispatch), `apps/cli/src/lint-diagram.ts`
+(clm-14, then clm-09 for imports). Evidence root: `tmp/clm-s731/<planId>/`.
+The sections below are the clm-s725 history.
+
 ## Waves and ownership
 
 | Wave | Plan | Scope | dependsOn |

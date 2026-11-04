@@ -1,7 +1,11 @@
 # nodetto-cli: layered and route arranging, three-way merge, edit usability, lint additions
 
 Status: DESIGNED, 2026-11-04. Plan partition revised for maximum concurrency
-the same day (see "Plan partition"); behavior sections unchanged.
+the same day (see "Plan partition"). Extended the same day for the
+continuation run: A7 multi-page root cause, three integration fixes (A1 TB
+title band, A1 frame-order ranks, D3 path normalization), new groups E
+(container carry and page-kind coverage) and F (element selectors), and a
+continuation plan partition that replaces the clm-s725 one.
 
 Owner decisions: `design-docs/user-qa/cli-layout-merge-lint.md`. Each open
 question has a default that this design implements. A different answer
@@ -15,15 +19,17 @@ decisions stay as they are. This document adds only the behavior below.
 
 ## Overview
 
-Four groups of additive CLI behavior. They all run in the shared TypeScript
+Six groups of additive CLI behavior. They all run in the shared TypeScript
 engine, so the Bun CLI and the native CLI (Boa) behave the same.
 
 | Group | Adds |
 | --- | --- |
-| A arrange/routing | `arrange --mode layered`, `arrange --mode route`, edge label placement, port spreading, self-loop sides, `carryMembers:false` on frame `update`, edit performance with obstacle routing |
+| A arrange/routing | `arrange --mode layered`, `arrange --mode route`, edge label placement, port spreading, self-loop sides, `carryMembers:false` on frame `update`, edit performance with obstacle routing (single-page and multi-page documents) |
 | B merge | `nodetto-cli merge <base> <ours> <theirs> [--output]`, git merge driver setup, documented SVG export determinism |
 | C edit usability | `label` on `update`, unknown operation fields rejected with suggestions, collapsed repeated warnings, global `--quiet` |
 | D lint | `node-overlap` (ERD and other node pages), `image-missing`, `lint --fix` text wrapping, `lint --metrics` (crossings and label overlaps) |
+| E containers and page kinds | `carryMembers:false` for every carrying container kind on move and resize (E1); layered and route arranging, label placement, port spreading, self-loops and metrics on BPMN and ERD pages, with documented exclusions (E2) |
+| F element selectors | `name:<text>` references (F1), `where` with `expect` on `update` and `delete` (F2), the `select` operation (F3), and their validation, help and parity (F4) |
 
 ### Boundaries
 
@@ -103,9 +109,11 @@ Rules:
 
 ### Eligible pages
 
-`--mode layered` and `--mode route` accept pages of kind `state`, `flowchart`,
-`freeform`, `architecture` and `uml`. On any other kind (erd, sequence, bpmn,
-breadboard, pcb) they exit 2 with a message that names the supported kinds.
+Revised by E2. `--mode layered` accepts pages of kind `state`, `flowchart`,
+`freeform`, `architecture`, `uml` and `erd` (frames as columns, A1) and `bpmn`
+(pools and lanes as rows, E2.1). `--mode route` accepts the same seven kinds.
+On `sequence`, `breadboard` and `pcb` pages both modes exit 2 with a message
+that names the supported kinds. The exclusions and their reasons are in E2.
 `--mode tidy` and `--mode overlaps` are unchanged.
 
 ### CLI surface
@@ -160,6 +168,12 @@ Frame order:
   the column frames (short id, name, full id).
 - The frames that are not listed follow, ordered by the smallest member rank.
   Frames without members come last, in stable order.
+- Integration fix 2: the comparator never searches. Before sorting, one pass
+  over the ranked units computes each unit's column frame once (`ownerOf`
+  map) and records each frame's smallest member rank (`firstRank` map), and
+  the `--frames` positions are a `Map` from frame id to index. The comparator
+  and the per-column member lists read only these maps, so ordering is
+  O(F log F) after an O(U x depth) pass. The resulting order is unchanged.
 - Units in no frame form one free column without a box, placed after all
   frames.
 
@@ -180,8 +194,16 @@ Geometry, for `--direction LR` (default):
 - Members are moved with their positions in the `placed` set, so
   `planFrameTranslations` does not carry them a second time. Every member ends
   inside its frame, so geometric membership is unchanged.
-- `--direction TB` transposes this: frames become rows top to bottom, members
-  run left to right and are centred on the row axis.
+- `--direction TB` transposes the stacking only: frames become rows top to
+  bottom, members run left to right and are centred on the row axis.
+- Integration fix 1: the title band is never transposed, because the frame
+  renderer always draws the title at the top. In TB a framed row has width
+  `stack + 2 * FRAME_PADDING` and height `cross + 2 * FRAME_PADDING + title`,
+  the first member starts at `x + FRAME_PADDING`, and every member's y is
+  `y + title + FRAME_PADDING + (cross - member height) / 2`, rounded. `title`
+  is `FRAME_TITLE_BAND` (exported by `packages/core/src/shapes/frame.ts`) when
+  the frame shows its title, else 0. LR is unchanged: the band is added to
+  the height and the first member starts at `y + FRAME_PADDING + title`.
 
 After placement, layered runs the route stage (A2 to A5) on every connector of
 the page, with the same `--reset-manual` value.
@@ -191,9 +213,11 @@ the page, with the same `--reset-manual` value.
 - Moves no element. It only changes connector semantics.
 - Targets: every connector on the page whose two ends are attached to
   elements, or only `--ids`. Each `--ids` value is a unique id prefix of a
-  connector on the selected page; anything else exits 2. `erd.relation`,
-  `sequence.message` and `bpmn.*` are never targets, because their pages are
-  not eligible.
+  connector on the selected page; anything else exits 2. `sequence.message`
+  is never a target, because sequence pages are not eligible. `erd.relation`
+  and the BPMN connectors (`bpmn.sequenceFlow`, `bpmn.messageFlow`,
+  `bpmn.association`, `bpmn.dataAssociation`) are targets with the per-kind
+  rules in E2.2.
 - A manual connector is one with `routing: "manual"`, or with `fromPort` or
   `toPort` set. Values that an earlier arrange wrote count as manual too,
   because nodetto cannot tell who set them
@@ -234,8 +258,15 @@ the page, with the same `--reset-manual` value.
   label box is computed at that point on the resolved route, with the same
   layout as `connectorLabelBox`.
 - Score: the number of overlaps with the label boxes already placed, the boxes
-  of non-edge, non-frame, non-group elements (endpoints included), and the
-  route segments of other connectors. The first candidate that scores 0 wins.
+  of label obstacles (endpoints included), and the route segments of other
+  connectors. A label obstacle is every element that is not an edge and not a
+  containing surface. Containing surfaces are `frame`, `group`, and on BPMN
+  (E2.2) `bpmn.participant` unless `collapsed: true`, `bpmn.lane`,
+  `bpmn.subProcess` with `expanded: true`, and `bpmn.group`. A collapsed pool,
+  a collapsed sub-process, tasks, events, gateways, data objects and
+  annotations stay obstacles. One predicate, `isLabelObstacle(element)` in
+  `packages/core/src/diagram-lint/metrics.ts`, is used by both this score and
+  `lint --metrics`. The first candidate that scores 0 wins.
   Otherwise the lowest score wins, and ties go to the earlier candidate.
 - The field is written only when the result is not 0.5. A 0.5 result removes
   the field. `labelPosition` is not a manual setting: it is recomputed on every
@@ -301,9 +332,12 @@ the page, with the same `--reset-manual` value.
   descendants (`frameParents`) and passes them in the `placed` set, so
   `planFrameTranslations` skips them. Membership is geometric, so members that
   end up outside the moved box are no longer members. The help says so.
-- `carryMembers` must be a boolean. On an element that is not a frame it exits
-  2 ("carryMembers applies only to frames"). `move` does not take it.
-- Help (`edit`) documents the default and the opt-out.
+- `carryMembers` must be a boolean. `move` does not take it.
+- Superseded by E1 for the accepted element types, the resize behavior and
+  the error text: E1 generalizes this section to every carrying container
+  kind. The frame default and the frame opt-out described here stay as they
+  are.
+- Help (`edit`) documents the default and the opt-out per kind (E1 table).
 
 ### A7. Edit performance with obstacle routing
 
@@ -343,6 +377,94 @@ Required approach:
    - Existing deadlines are not relaxed.
    - Manual check: release binary CPU time (`/usr/bin/time -p`) of at most
      about 3 s, compared against the pre-change binary.
+
+### A7 continuation: per-operation cost must be bounded by the edited page
+
+Status at HEAD 4d82d91: the single-page fixture passes (native about 0.56 s,
+expected-output hash `341fcd8654fc18d560c8895df1a05617a6b8ac39`), and one
+duplicate full snapshot per operation was removed. The original report was not
+reproduced, because the fixture has one page.
+
+Owner evidence (native release binary, HEAD): the same 50-operation batch
+takes about 3.4 s when the document also holds a second, unrelated page of
+600 `node.generic` and 300 orthogonal, obstacle-avoiding `edge.generic`
+(973 elements in total). A mixed batch (20 state moves, 3 frame moves, 50
+connector updates) takes 5 to 6 s. Per-operation cost therefore scales with
+the whole document, including pages that the batch never touches.
+
+Page-unbounded work per operation found by reading the code (the plan
+confirms which of these dominate with a profile before changing them):
+
+- `planDerivedCommands` (`packages/core/src/editor/transaction.ts`): a full
+  sorted `store.getSnapshot()` (sort by `compareSnapshotOrder`), a full
+  `new Store(snapshot)` draft copy, a second full copy for `beforeLayout`,
+  feature scans over every element, and BPMN, breadboard and PCB guards that
+  scan `listElements()` of both stores.
+- `planConstraints` (`constraints.ts`): `frameParents` for every page with a
+  fresh context, and a visit of every element.
+- `planFrameTranslations` (`frame-translation.ts`): `frameParents` for every
+  page once any frame moves (the mixed batch).
+- `planAutoLayout`, `planTextResize`, the token and style planners and
+  `planManualRoutePreservation`: whole-document scans or snapshots.
+- `applyBatch` (`apps/cli/src/edit/apply-batch.ts`): two full element maps per
+  operation to find touched elements.
+
+Required behavior:
+
+- Dirty pages. For each `editor.apply`, the dirty pages are the pages of
+  every element that a permitted command creates, updates or deletes, plus
+  pages created, changed or deleted by page commands. Every derived planner
+  runs only on the dirty pages and produces exactly the commands it produces
+  today. Planner commands on a dirty page may make another page dirty only
+  through the cross-page cases below.
+- Cross-page dependencies widen the dirty set to the whole document for that
+  apply, exactly as today: a changed element that elements on other pages
+  depend on (`design.token`, `design.text-style`, a component master read by
+  `planAutoComponentRefresh`, or any element whose id another page references
+  through the registry's `references(semantic)`), and any page command. The
+  plan lists every planner and states whether its trigger reads only
+  same-page state, and adds a test per cross-page case.
+- No per-operation work may sort, copy, validate or build shape contexts for
+  elements of pages outside the dirty set. Cheap O(document) identity scans
+  are allowed only if the timing target is met with them.
+- Per-batch memoization keyed by unchanged inputs stays allowed (A7 step 3).
+- Unchanged: byte-identical output, operation-index errors, all-or-nothing
+  semantics, the concurrency re-apply, and planner command order on each
+  page.
+- Rust changes are still out of scope unless the profile shows a host cost.
+
+Fixtures (self-authored, extending `apps/cli/src/__fixtures__/obstacle-routing-batch.ts`):
+
+- `multiPage`: the single-page fixture plus a second `freeform` page `Grid`
+  with 600 `node.generic` (`Widget000` to `Widget599`, a 30 x 20 grid with
+  fixed integer geometry) and 300 `edge.generic` between grid neighbours,
+  each with `routing: "orthogonal"` and `routingAvoidObstacles: true`. The
+  ops are the same 50 updates.
+- `mixedMultiPage`: the `multiPage` document with 20 `move` of state nodes, 3
+  `update` frame moves (`visual.x`/`visual.y`) and 50 connector `update`
+  operations, in a fixed interleaved order.
+- `mixedSinglePage`: the same mixed ops on the single-page document, as the
+  timing reference.
+- Expected outputs `obstacle-routing-batch.multi-page.expected.jsonl` and
+  `obstacle-routing-batch.mixed-multi-page.expected.jsonl` are produced with
+  the pre-change code (Bun on HEAD before any A7 source edit) and checked
+  against `target/clm-baseline/nodetto-cli`. They are committed and never
+  regenerated after the fix. The single-page expected hash stays
+  `341fcd8654fc18d560c8895df1a05617a6b8ac39`.
+
+Tests and targets:
+
+- Bun (`apps/cli/src/edit-performance.test.ts`): each multi-page fixture is
+  byte-identical to its expected file and finishes in under 10 s.
+- Native (`apps/cli/src/native-parity/edit-performance.test.ts`): the same
+  fixtures with the release binary, under 10 s each (spawn timeout 60 s, test
+  timeout 120 s), byte-identical to Bun. 3-attempt retry on a deadline
+  timeout under load. Existing deadlines are not relaxed.
+- Target, checked manually with `/usr/bin/time -p` on the release binary and
+  recorded in the plan progress log: `multiPage` user CPU at most 1.5 x the
+  single-page fixture's, and `mixedMultiPage` at most 1.5 x
+  `mixedSinglePage`'s, on the same build. Both are also compared with
+  `target/clm-baseline/nodetto-cli`.
 
 ## B. Three-way merge
 
@@ -643,6 +765,22 @@ contains `image.raster`. Rules by page kind:
   Bun and native print the same bytes.
 - Embedded data URLs are skipped. The document directory is joined with `/`
   in TypeScript, without `node:path`.
+- Integration fix 3: the `exists` probe path comes from one pure helper,
+  `documentRelativePath(documentPath, src)` in `apps/cli/src/lint-diagram.ts`.
+  It splits the document directory on `/` (a plain string split of a short
+  path, not a document), drops empty and `.` segments, folds `name/..` pairs,
+  keeps leading `..` segments and a leading `/`, and appends `src`. `src` is
+  already free of `.`, `..`, `\` and a leading `/`, because
+  `isRelativeAttachmentPath` rejects those (and the IR rejects such an image
+  with `image.source` before lint runs). Containment stays where it is:
+  `io.readAttachment` (the confined reader) decides what may be read, and its
+  failure gives the fixed `cannot be read (...)` reason.
+- Traversal tests: a document opened as `../<dir>/doc.jsonl` and as
+  `<dir>/./doc.jsonl` reports a present image as clean and a missing one as
+  `file not found`; an attachment that is a symlink to a file outside the
+  document folder reports `cannot be read (outside the document folder, too
+  large, or unreadable)`; the helper has table tests for `a/b/../doc.jsonl`,
+  `./doc.jsonl`, `doc.jsonl`, `../x/doc.jsonl` and `/abs/doc.jsonl`.
 - It lives in the CLI lint layer (it needs `CommandIo`). It counts as an error,
   so lint exits 1, because export fails on a missing attachment.
 
@@ -654,8 +792,10 @@ contains `image.raster`. Rules by page kind:
     Points within 1 unit of an endpoint of either connector do not count, and
     collinear overlapping segment pairs count once.
   - `labelOverlaps`: the number of pairs of a label box against another label
-    box, a non-edge element box, or another connector's segment, using the
-    same boxes as A3.
+    box, a label obstacle box (`isLabelObstacle`, A3), or another
+    connector's segment, using the same label boxes as A3 (for BPMN flows,
+    `bpmnFlowLabelBox`, E2.2). A label that only lies inside its pool, lane
+    or expanded sub-process counts 0.
 - Text output: `metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s)`
   on stdout after the findings. JSON output: `metrics` on each page and as
   totals in `summary`.
@@ -664,11 +804,256 @@ contains `image.raster`. Rules by page kind:
 - The code is in `packages/core/src/diagram-lint/metrics.ts` and is shared with
   the A3 scoring, so the two measures agree.
 
+## E. Containers and page kinds
+
+### E1. `carryMembers:false` for every carrying container
+
+Container kinds in the IR (registry category `container`) and the other
+parent-child relations that move elements today:
+
+| Kind | Members | Default on move (`visual.x`/`y`, or `move`) | Default on resize (`width`/`height`) | `carryMembers:false` |
+| --- | --- | --- | --- | --- |
+| `frame` | geometric (`frameParents`), or explicit `semantic.memberIds` | descendants move by the same delta (`planFrameTranslations`) | members with `visual.constraints` follow (`planConstraints`); a frame with `semantic.layout` re-lays out its members (`planAutoLayout`) | box only; members keep absolute positions; geometric membership is re-evaluated (members outside the new box leave), explicit `memberIds` stay. On a frame with `semantic.layout` it exits 2: `carryMembers:false cannot be used on frame "<name>": it lays out its members ("layout"); remove "layout" first.` |
+| `bpmn.participant` (pool) | descendants by `semantic.parent` (`buildBpmnModel`) | descendants move (`planBpmnTranslations`); child lanes are re-laid out to the pool box (`planBpmnLaneLayout`) | child lanes are re-laid out | lanes still follow the pool (they are its bands, not free members); every non-lane descendant keeps its absolute position and is re-parented by the existing `planBpmnMembership` geometry rule |
+| `bpmn.lane` | descendants by `semantic.parent` | descendants move | a height change resizes the pool and restacks sibling lanes, whose own members move with them | non-lane descendants keep absolute positions and are re-parented. Only `height` may change: if the update changes the lane's `x`, `y` or `width`, it exits 2: `carryMembers:false on lane "<name>": a lane's x, y and width follow its pool; change the pool, or change only "height".` Sibling lanes moved by restacking still carry their own members |
+| `bpmn.subProcess` | descendants by `semantic.parent` | descendants move | none | descendants keep absolute positions and are re-parented |
+| `breadboard.board` | parts plugged into its holes | plugged parts move (`planBreadboardTranslations`) | none | parts keep absolute positions (they stay plugged only where a hole still lies under them) |
+| `group` | `semantic.memberIds` | a group has no box of its own; moving it moves its members | none | exits 2: `carryMembers does not apply to a group: a group has no box of its own; move its members, or ungroup it.` |
+
+Elements that are not containers never carry, and `carryMembers` on them
+exits 2: `carryMembers applies only to frame, bpmn.participant, bpmn.lane,
+bpmn.subProcess and breadboard.board; <type> does not move other elements.`
+This replaces the A6 text "carryMembers applies only to frames". It covers:
+
+- UML packages and architecture groups or zones. This IR has no package or
+  zone type: they are drawn either as a `frame` (which carries, row 1) or as
+  a `shape.geo` such as the `package` shape (which never carries).
+- `usecase.node` with `kind: "system"` and `bpmn.group`: boundaries without
+  members that never carry.
+- Attachments that always follow their host and are not members:
+  `uml.port` (`planUmlPorts`), `bpmn.boundaryEvent` (snapped to its host by
+  `planBpmnMembership`) and PCB tracks (`planPcbTrackFollow`).
+
+Mechanics:
+
+- Shared engine: `ApplyOptions` gains `keepMembers?: ReadonlySet<ElementId>`,
+  passed through `DerivedPlanInput`. `planFrameTranslations` treats it like
+  `placed`, `planConstraints`, `planBpmnTranslations` and
+  `planBreadboardTranslations` never move an element in it, and
+  `planBpmnMembership` re-evaluates the parent of every element in it even
+  though it did not move. Without the option every planner behaves exactly as
+  today (byte-identical).
+- CLI: a new `apps/cli/src/edit/carry-members.ts` validates the option and
+  collects the held set from the state before the update: frame
+  descendants (`frameParents`, transitively, as A6 does today), BPMN
+  descendants from `buildBpmnModel(...).descendantsOf` without `bpmn.lane`,
+  and for a board every other element on its page (a superset is safe: the
+  board planner moves only plugged parts). The `update` handler passes it as
+  `editor.apply(commands, { keepMembers })`. The A6 frame branch moves to this
+  module, so frames also hold members against `planConstraints` on resize.
+- With `where` (F2), the set is collected per matched element.
+- In one batch, held members keep positions set by earlier operations.
+
+### E2. Arrange and routing on every applicable page kind
+
+| Page kind | layered | route, labels, ports, self-loops | `lint --metrics` |
+| --- | --- | --- | --- |
+| state, flowchart, freeform, architecture, uml | A1 (frames as columns) | A2 to A5 | yes |
+| erd | A1 (frames as columns; units are `erd.table` and the database object types) | A2 to A5 with the ERD rules below | yes |
+| bpmn | E2.1 (pools and lanes as rows) | A2 to A5 with the BPMN rules below | yes |
+| sequence | excluded: participant order and message order are the diagram's meaning, and message geometry is derived from that order | excluded, same reason | no (not linted) |
+| breadboard | excluded: positions are physical holes and wires are electrical connections | excluded, same reason | no: wire crossings are physical, not a readability measure |
+| pcb | excluded: footprints and tracks are physical | excluded | no (not linted) |
+
+#### E2.1 Layered on BPMN pages
+
+- Rows: each `bpmn.participant` that is not collapsed is a row group, in its
+  current top-to-bottom order (by `visual.y`, ties by stable order). Its leaf
+  lanes, in model order, are its rows; a pool without lanes is one row.
+  Collapsed pools keep their height. Flow nodes in no pool form one free row
+  after all pools. Lane order is never changed. `--frames` and `--direction
+  TB` exit 2 on BPMN pages (pools are horizontal).
+- Units: flow nodes (tasks, events except boundary events, gateways, call
+  activities), sub-processes (moved as one with their contents), data objects,
+  data stores and text annotations. Elements inside a sub-process are not
+  units; a connector end inside one maps to the outermost sub-process, as an
+  end inside a group does in A1. A unit's row is its nearest lane (or pool)
+  ancestor. Boundary events follow their host. `bpmn.group` is left in place.
+- Traversal: the A1 traversal with `bpmn.startEvent` instead of the initial
+  state as the first start, over every BPMN connector whose ends map to
+  units. The layer of a unit is its BFS depth from the start of its search
+  (0 for each start); the visit index orders units inside a cell.
+- Geometry: layers are global columns shared by every pool, so message flows
+  stay vertical. Column `L` has the width of its widest unit, columns are
+  separated by `COLUMN_GAP = 120`, and units are centred in their column. A
+  cell (row, layer) stacks its units top to bottom by visit index with
+  `MEMBER_GAP = 60`. A row's height is its tallest cell plus `2 *
+  FRAME_PADDING`, at least 120. Every pool has the same width: the pool label
+  band of 30 plus `FRAME_PADDING`, all columns and gaps, and `FRAME_PADDING`.
+  Pools are stacked with gap 120. The origin is the integer top-left of the
+  current union of pools and units, so a rerun is a no-op.
+- Commands, in two applies, because `planBpmnTranslations` carries every
+  descendant whose position a command did not change: first the container
+  step (pool boxes and lane heights through `updateVisual`;
+  `planBpmnLaneLayout` restacks the lanes to the same values, so lane
+  invariants hold by construction, and units are carried), then the unit
+  step (absolute `updateVisual` positions for every unit; a sub-process's
+  contents are carried by the sub-process through the existing planner). Units end inside their own
+  row, so `planBpmnMembership` keeps their parents. This needs no
+  `keepMembers`, so the planner has no dependency on the E1 engine change.
+- Then the route stage runs on every BPMN connector of the page, as in A1.
+
+#### E2.2 Route rules per kind
+
+- BPMN: all four BPMN connector types are targets. The same-side self-loop
+  case (A5) applies to them. Ports follow the A2 offset rule for every type.
+- BPMN labels use their own rendering path, not the generic one:
+  `connectorDecoration` returns an empty label for BPMN flows and
+  `connectorLabelBox` returns null. The visible label comes from
+  `bpmnFlowDecoration` (`packages/core/src/bpmn/notation.ts`), which both the
+  canvas (`packages/ui-solid/src/shapes/ConnectorView.tsx`) and SVG export
+  (`packages/core/src/svg-export/connectors.ts`, `document.ts`) call. It
+  draws `semantic.name` wrapped by `wrapTextLines(name, 90, 11)` (font 11,
+  line height 13, `text-anchor: middle`), with the anchor at the centre of
+  `visual.labelBounds` when set, else at `polylineMidpoint(points)`. The
+  anchor is the horizontal centre and the first line's baseline: SVG export
+  (`packages/core/src/svg-export/notation.ts`) writes line i at
+  `y = anchor.y + i * 13`, and the canvas
+  (`packages/ui-solid/src/shapes/BpmnShapeView.tsx`) advances each later
+  line by `dy = 13`. Today it ignores `labelPosition`.
+  Required changes, all in `notation.ts`:
+  - Anchor precedence: `visual.labelBounds` centre (unchanged, the user's
+    placement); else, when `semantic.labelPosition` is a finite number,
+    `pointAlongRoute(points, labelPosition)` (clamped to [0, 1]); else
+    `polylineMidpoint(points)` (unchanged). A flow without `labelPosition`
+    renders byte-identically.
+  - New export `bpmnFlowLabelBox(element, points, anchor): Box | null`: null
+    when `name` is empty. Otherwise, with `n` wrapped lines and `w` the widest
+    line by `estimatedTextWidth` at font 11, the box is baseline-relative,
+    not centred vertically: `x = anchor.x - w / 2`, `width = w`,
+    `y = anchor.y - ASCENT`, and
+    `height = ASCENT + (n - 1) * 13 + DESCENT`, with the explicit estimates
+    `ASCENT = 11 * 0.8` and `DESCENT = 11 * 0.2` (font 11). The box covers the
+    first line's ascent through the last line's descent. The helper and
+    `bpmnFlowDecoration` share the wrapping, the font size and the line
+    height constants, so the box follows the rendered lines. The renderer's
+    baselines and coordinates do not change.
+  - A3 on BPMN flows scores candidates with `bpmnFlowLabelBox` on the
+    resolved route. A flow with `visual.labelBounds` counts as manually
+    placed: route mode never writes its `labelPosition`, and its label box
+    (at `labelBounds`) still counts as a placed label for other flows and in
+    metrics.
+  - Containing surfaces (A3) are never label obstacles on BPMN pages, so a
+    label that only lies inside its pool and lane scores 0; tasks, events,
+    gateways, collapsed sub-processes, collapsed pools, data objects,
+    annotations, other labels and other routes still count.
+- ERD: `erd.relation` is a target. An end anchored to columns
+  (`erdEndpointColumnIds` non-empty) ignores ports in the resolver, so route
+  mode never writes `fromPort`/`toPort` or a position for it, and such an end
+  takes no part in port spreading. A table-level end gets ports and spreading
+  as in A2 and A4. A self relation keeps its own ERD geometry: A5 does not
+  apply to it and no ports are written. Labels (A3) use the text
+  `connectorDecoration` returns; a relation without label text is skipped.
+- Every rule in A2 to A5 (manual detection, `--reset-manual`, idempotency,
+  determinism) applies unchanged.
+
+## F. Element selectors in `edit`
+
+### F1. `name:<text>` references
+
+- Accepted wherever an operation takes an element reference: `id`, `from`,
+  `to`, each item of `ids`, the `where` values `from`, `to` and `parent`, and
+  every reference field inside `semantic` that the type's registry
+  `references(semantic)` reports (for example `parent`, `attachedTo`,
+  `memberIds[i]`, edge `from`/`to`, ERD relation `table`). Other strings in
+  `semantic` are never resolved, so text that starts with `name:` stays text.
+- Resolution order for a reference string: an exact element id; then `@ref`;
+  then `name:<text>`; then a unique id prefix (today's rules). An exact id
+  always wins, so existing documents and op files behave as before.
+- Text of an element: the string value of its C1 label field (`labelField`).
+  An element without a label field has no text. Matching is exact after
+  trimming leading and trailing whitespace on both sides; it is
+  case-sensitive and does not normalize Unicode.
+- Scope: the op's `page` when the op has one; for `to` of `connect`, the page
+  of the resolved `from`; for references inside `semantic`, the page of the
+  element being updated or created; otherwise the whole document (one page
+  documents behave as "the page").
+- Exactly one match resolves. Zero or several matches fail the operation
+  (exit 2, nothing written):
+
+  ```text
+  operation 3 (update): "name:Approve" matches 2 elements:
+    a1b2c3 bpmn.task "Approve" on page "Orders"
+    d4e5f6 bpmn.task "Approve" on page "Returns"
+  Use an id, or "where" with "page".
+  ```
+
+  For zero matches the list holds the elements whose text contains `<text>`
+  case-insensitively (`no element named "Approve"; similar: ...`), or says
+  `no similar names`. Lists are in stable order, capped at 10 lines plus
+  `... and <n> more`.
+
+### F2. `where` and `expect` on `update` and `delete`
+
+- `where` is an object with optional keys `type`, `from`, `to`, `parent`,
+  `name` and `page`. All given keys must match (AND). It needs at least one
+  key; an unknown key exits 2 with the C2 suggestion format.
+  - `type`: exact element type.
+  - `from`, `to`: references (F1 rules); an element matches when its
+    endpoint reader (`endpointReaderFor`) gives that endpoint id. Only
+    connectors can match.
+  - `parent`: a reference; matches when the referenced element is the
+    element's direct container: its `semantic.parent` (BPMN), else its frame
+    parent (`frameParents`), else the group whose `memberIds` lists it.
+  - `name`: exact text, with the F1 matching rule.
+  - `page`: a page query as in `add`; limits the search to that page.
+    Without it the search covers the whole document.
+- `id` and `where` are mutually exclusive (`use either "id" or "where"`).
+- `expect` is an integer >= 0, allowed only with `where`. If the match count
+  differs, the operation fails with `operation <i> (<op>): where matched <n>
+  element(s), expected <e>:` and the candidate list (F1 format), and the whole
+  batch is aborted without writing. Without `expect`, zero matches is an error
+  and any positive count is accepted. `expect: 0` with zero matches is a
+  no-op.
+- `update` with `where` applies the same `semantic`, `visual`, `label` and
+  `carryMembers` to every match, one element after another in stable order.
+  `delete` with `where` deletes all matches in one command.
+- Matches are evaluated against the state after the earlier operations of
+  the batch, and again on the concurrency re-apply.
+- Reporting: every `where` or `select` operation adds
+  `operation <i> (<op>): matched <n> element(s)` to the text report and
+  `matches: [{operation, op, count, ids}]` to the JSON report. `--quiet` does
+  not hide these lines (they are results, not warnings).
+
+### F3. `select`
+
+- `{"op":"select","ref":"ok","id":"name:Approve"}` or
+  `{"op":"select","ref":"ok","where":{...},"expect":1}` binds one existing
+  element to `@ok` for later operations in the batch.
+- `ref` is required and must be unused (`ref "<r>" is already used.`).
+  Exactly one of `id` and `where`. With `where`, `expect` defaults to 1 and
+  any other value exits 2 (`select binds exactly one element; "expect" must
+  be 1`).
+- `select` changes nothing, so it does not mark its page as touched for
+  `edit --arrange`.
+
+### F4. Validation, help and parity
+
+- C2 table rows change to: `update`: op, id, where, expect, semantic, visual,
+  label, carryMembers; `delete`: op, id, where, expect; new `select`: op,
+  ref, id, where, expect. The `where` keys are checked the same way.
+- The unknown-op message lists `select`.
+- `edit` help documents `name:`, `where`, `expect`, `select`, the matching
+  rules, the report line and the E1 table. The MCP tool `nodetto_edit` takes
+  free-form `args` and `stdin` and uses `COMMAND_HELP.edit` as its
+  description, so it needs no schema change; the updated help reaches it.
+- Bun and native parity cover F1 to F3 in the CLI-level tests.
+
 ## Help and documentation
 
 | Where | Content |
 | --- | --- |
-| `apps/cli/src/help.ts` | OVERVIEW (`merge`, `--quiet`), `arrange` (modes, `--frames`, `--ids`, `--reset-manual`, manual-setting rule), `edit` (`label` on update with the mapping table, `carryMembers` and the default frame-move behavior, unknown-field rejection), `lint` (new rules, page table, `--fix`, `--metrics`), `merge` (usage, conflict policy, exit codes, git driver setup), `export` (determinism guarantee) |
+| `apps/cli/src/help.ts` | OVERVIEW (`merge`, `--quiet`), `arrange` (modes, `--frames`, `--ids`, `--reset-manual`, manual-setting rule, the E2 page-kind table with exclusion reasons, BPMN rows), `edit` (`label` on update with the mapping table, the E1 per-kind carry table, unknown-field rejection, `name:`, `where`, `expect`, `select`, match report lines), `lint` (new rules, page table, `--fix`, `--metrics` and its page kinds), `merge` (usage, conflict policy, exit codes, git driver setup), `export` (determinism guarantee) |
 | `docs/cli.md`, `README.md` | the same user-facing content, the git driver recipe, the SVG regeneration recipe |
 | `design-docs/specs/design-cli-ai-drawing.md` | a pointer to this document under edit and arrange |
 | `design-docs/specs/export.md` | the determinism guarantee in Goals and Rollout |
@@ -701,7 +1086,16 @@ deadline is relaxed.
 | D1 | ERD rectangle cases: coincident tables (identical bounds) give one finding naming both tables and the page; a table fully inside another gives one finding; a partial overlap gives one finding; touching tables (shared edge, zero area) give none. Each pair is reported once. A UML use-case system boundary containing a use case gives no finding, and two overlapping use cases inside it give one. Native parity in `lint-rules.test.ts` |
 | D2 | Latin word wrap, CJK punctuation breaks, line-start prohibition, hard split, idempotency, untouched non-overflow text, remaining height finding, JSON `fixes`, `.bpmn` rejected |
 | D3 | missing file, file outside the document folder, data URL skipped, error exit 1 |
-| Native parity | new topic files in `apps/cli/src/native-parity/`: `layout.test.ts` (arrange modes, A7 deadline), `merge.test.ts` (merge, git driver with the binary), `edit-usability.test.ts` (C1 to C3, A6), `lint-rules.test.ts` (D1 to D3, `--fix`, `--metrics`) |
+| A7 continuation | `multiPage` and `mixedMultiPage` byte-identical to committed pre-change expected files and under 10 s in Bun and native; dirty-page tests: an edit on page 1 leaves every planner's output for page 2 empty, and each cross-page case (token, text style, component master, cross-page reference, page command) still updates the other page; manual 1.5 x CPU ratio |
+| Fix 1 and 2 | TB: exact frame box and member y with and without `showTitle`, band at the top; LR unchanged; frame order unchanged on the existing tests with ranks precomputed |
+| Fix 3 | `documentRelativePath` table, `../` and `./` document paths, symlink escape reported by `readAttachment` |
+| E1 | per kind (frame, frame with explicit `memberIds`, frame with `layout` error, pool, lane height-only and the x/y/width error, sub-process, board, group error, non-container error): move and resize with `carryMembers:false` keep members (including members placed earlier in the batch), default still carries, BPMN members re-parented and lanes inside their pool, `validateDocument` clean |
+| E2 | ERD layered with frames; BPMN layered (rows, global columns, collapsed pool, free row, `--frames`/TB exit 2, idempotent rerun, lane invariants); route on BPMN (self-loop; label: a crafted collision moves the anchor rendered by `bpmnFlowDecoration` and in exported SVG to the chosen candidate, `bpmnFlowLabelBox` equals the box metrics use and spans the rendered baselines (four lines `First row` to `Fourth row` anchored at y=100 render baselines 100, 113, 126, 139 and give a box y from 91.2 to 141.2), a task at (80, 130, 40, 12) under only the last line counts as an overlap in both scoring and metrics, `labelBounds` still wins and blocks `labelPosition` writes, a flow without `labelPosition` gives byte-identical SVG; containment: a label inside only its pool and lane scores 0 and counts 0 in metrics, while overlap with a task, a collapsed sub-process, another label or another route counts) and ERD (column ends get no ports and are not spread, self relation unchanged); metrics on BPMN and ERD pages; sequence, breadboard and pcb exit 2 |
+| F1 | id first, `@ref`, `name:` unique, ambiguous (candidate list), zero (similar list), scope by page and by `from`, `semantic` reference fields resolved and plain text untouched |
+| F2 | `where` per key and AND, `expect` equal, `expect` mismatch aborts with nothing written, zero without `expect` errors, `expect: 0` no-op, update and delete over several matches, `id` with `where` error, report lines in text and JSON |
+| F3 | select by id and by where, then use of `@ref`; duplicate ref, `expect` other than 1, missing ref errors |
+| F4 | C2 rows and `where` keys, unknown-op list |
+| Native parity | new topic files in `apps/cli/src/native-parity/`: `layout.test.ts` (arrange modes incl. BPMN and ERD, A7 deadline), `merge.test.ts` (merge, git driver with the binary), `edit-usability.test.ts` (C1 to C3, A6, E1, F1 to F3), `lint-rules.test.ts` (D1 to D3, `--fix`, `--metrics`) |
 
 All fixtures are self-authored and neutral: widgets, orders, `Idle` and
 `Running`, `Stage0` to `Stage2`.
@@ -716,6 +1110,11 @@ All fixtures are self-authored and neutral: widgets, orders, `Idle` and
   - `add` with `type` applies `label` (C1, Q5).
   - Lint reports the new rules on pages it previously skipped (D1, D3).
   - Text warnings are collapsed (C3).
+  - `arrange --mode layered|route` accepts erd and bpmn pages (E2).
+  - `carryMembers` is accepted on BPMN containers and boards, and its error
+    text for other types changes (E1).
+  - Strings starting with `name:` in reference positions resolve by name
+    unless they are an exact id (F1).
   The existing tests and fixtures that pass extra operation fields are audited
   and fixed in the C plan.
 - Each plan sets `artifactRoots ["target"]` and lists every edited file,
@@ -726,6 +1125,12 @@ All fixtures are self-authored and neutral: widgets, orders, `Idle` and
 
 Revised 2026-11-04. It replaces the earlier four-wave partition, which
 serialized plans only to hand over the shared registration files.
+
+History: the subsections below ("Ownership rules" through "Verification per
+wave") are the clm-s725 partition. Its ownership rules and its contracts stay
+binding. Its waves are replaced by "Continuation partition" at the end of this
+document, and `impl-plans/active/clm-s725-dispatch.json` must not be
+dispatched again.
 
 ### Ownership rules
 
@@ -851,3 +1256,105 @@ and records it in its progress log; it never renames a contract.
   `merge-git.test.ts` with `NODETTO_CLI_TEST_BINARY` set, then the final gates
   (`mise run verify`, `mise run test-cli` with the 3-attempt deadline retry,
   and the `/usr/bin/time -p` comparison against the pre-change binary).
+
+## Continuation partition
+
+Landed at HEAD 4d82d91: clm-01, clm-03, clm-04, clm-07, clm-08 (accepted) and
+the clm-02 IR, resolver and single-page A7 work. The remaining work is split
+below. The ownership rules above still apply: feature plans write new modules
+with direct-import tests and never edit the shared registration files, which
+only clm-09 edits. The fresh manifest is
+`impl-plans/active/clm-s731-dispatch.json`.
+
+| Wave | Plan | Scope | Owned files (summary) | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf (continuation) | A7 continuation (profile, dirty-page planning, multi-page fixtures, Bun and native deadline tests) and the E1 engine option `keepMembers` in every carry planner (merged because both edit the same planner files) | `packages/core/src/editor/{transaction,types}.ts`, `packages/core/src/editor.ts` if `apply` forwards options, `packages/core/src/{store,constraints,frame-translation,frame-tree,auto-layout,text-layout,text-styles,color-tokens,number-tokens,aspect-ratio,auto-component-refresh,uml-ports,manual-route-preservation}.ts` as the profile requires, `packages/core/src/bpmn/containment.ts`, `packages/core/src/breadboard/board-carry.ts`, `packages/core/src/pcb-board/follow.ts` (guard only), new `packages/core/src/keep-members.test.ts`, `apps/cli/src/edit/apply-batch.ts`, `apps/cli/src/__fixtures__/obstacle-routing-batch*.{ts,jsonl}`, `apps/cli/src/edit-performance.test.ts`, `apps/cli/src/native-parity/edit-performance.test.ts` | - |
+| 1 | clm-06-route-arrange (now with E2 routing) | A2 to A5 route planner with the E2.2 BPMN and ERD rules, A3 scoring, metrics for every E2 page kind, the arrange-mode CLI module (A1 kinds plus erd; BPMN dispatch is added by clm-09) and the `lint --metrics` module | new `packages/core/src/arrange-route.ts`, new `packages/core/src/diagram-lint/metrics.ts`, new `apps/cli/src/arrange-modes.ts`, new `apps/cli/src/lint-metrics.ts`, their tests, `packages/core/src/bpmn/notation.ts` (label anchor and `bpmnFlowLabelBox` only), `packages/core/src/bpmn/notation.test.ts`, `packages/core/src/bpmn/svg-export-bpmn.test.ts` | - (clm-02 fields and clm-07 `planLayered` are landed) |
+| 1 | clm-10-layered-fixes | Fix 1 (TB title band), fix 2 (precomputed ranks), `erd` in `LAYERED_PAGE_KINDS` with ERD unit tests | `packages/core/src/arrange-layered.ts`, `packages/core/src/arrange-layered.test.ts` | - |
+| 1 | clm-12-bpmn-layered | E2.1 BPMN layered planner | new `packages/core/src/arrange-layered-bpmn.ts` and its test | - |
+| 1 | clm-13-edit-selectors | F1 to F3, F4 validation rows, match report formatting | new `apps/cli/src/edit/selectors.ts`, new `apps/cli/src/edit/operations/select.ts`, `apps/cli/src/edit/batch.ts`, `apps/cli/src/edit/operations/{elements,connect,add,groups}.ts`, `apps/cli/src/edit/operation-fields.ts`, `apps/cli/src/edit/report.ts`, `apps/cli/src/edit/types.ts`, their tests | - |
+| 1 | clm-14-lint-image-path | Fix 3 | `apps/cli/src/lint-diagram.ts`, `apps/cli/src/lint-diagram.test.ts` | - |
+| 2 | clm-11-container-carry | E1 CLI module, per-kind validation and tests, replacing the A6 branch in the `update` handler | new `apps/cli/src/edit/carry-members.ts` and its test, `apps/cli/src/edit/operations/elements.ts` (the carry block only), `apps/cli/src/edit-frame-carry.test.ts` | clm-02 (`keepMembers`) |
+| 3 | clm-09-wiring | Registration, `--quiet` extraction, collapsed warnings in `loadDocument` and `validate`, `arrange` registration including the BPMN dispatch in `arrange-modes.ts`, `lint --metrics` registration, `matches` passthrough in `apply-batch.ts`, help (E1 table, E2 table, F), docs, README, core re-exports, CLI-level and native parity tests, B2 git end-to-end test | the shared files, `apps/cli/src/arrange-modes.ts` (BPMN dispatch only), `apps/cli/src/edit/apply-batch.ts` (`matches` line only), `design-docs/specs/{design-cli-ai-drawing,export}.md` | every other plan |
+
+- clm-11 is in wave 2 only because it calls `keepMembers`. It edits
+  `elements.ts` after clm-13 has landed in wave 1; that file is not shared
+  within a wave.
+- clm-13 keeps match records on `Batch` (`batch.matches`) and makes
+  `BatchResult.matches` optional, so `apply-batch.ts` (clm-02) compiles before
+  clm-09 adds the one passthrough line. clm-13 tests the records and the
+  formatted lines by driving `Batch` directly.
+- `packages/core/src/bpmn/notation.ts` and its two tests are owned only by
+  clm-06 in the continuation; clm-12 reads the BPMN model, not the notation.
+- clm-06 rejects `bpmn` for `layered` until clm-09 adds the dispatch to
+  `planLayeredBpmn`; it routes BPMN and ERD pages itself.
+- If profiling shows that the A7 fix needs a file another wave-1 plan owns,
+  clm-02 stops and records an amendment rather than editing it.
+
+### Continuation contracts (fixed before wave 1)
+
+```ts
+// clm-02, packages/core/src/editor/types.ts and transaction.ts
+interface ApplyOptions { readonly keepMembers?: ReadonlySet<ElementId>; }
+interface DerivedPlanInput { readonly keepMembers: ReadonlySet<ElementId> | undefined; }
+export function planBpmnTranslations(before: Store, after: Store, keep?: ReadonlySet<ElementId>): Command[];
+export function planBpmnMembership(before: Store, after: Store, reparent?: ReadonlySet<ElementId>): Command[];
+export function planBreadboardTranslations(before: Store, draft: Store, keep?: ReadonlySet<ElementId>): Command[];
+// planConstraints gains an optional trailing `keep?: ReadonlySet<ElementId>`.
+
+// clm-12, packages/core/src/arrange-layered-bpmn.ts
+export function planLayeredBpmn(
+  store: Store, pageId: PageId, registry: ShapeUtilRegistry,
+): {
+  containerCommands: Command[]; // applied first
+  unitCommands: Command[];      // computed from the planned layout, applied second
+  placed: ReadonlySet<ElementId>;
+} | { error: string };
+
+// clm-06, packages/core/src/arrange-route.ts
+export const ROUTE_PAGE_KINDS: readonly PageKind[]; // A1 kinds, erd, bpmn
+
+// clm-06, packages/core/src/bpmn/notation.ts and diagram-lint/metrics.ts
+export function bpmnFlowLabelBox(element: Element, points: readonly Vec[], anchor: Vec): Box | null;
+export function isLabelObstacle(element: Element): boolean; // false for edges and containing surfaces (A3)
+
+// clm-11, apps/cli/src/edit/carry-members.ts
+export const CARRY_CONTAINER_TYPES: readonly string[]; // frame, bpmn.participant, bpmn.lane, bpmn.subProcess, breadboard.board
+export function heldMembers(
+  editor: Editor, element: Element, visual: unknown, index: number,
+): ReadonlySet<ElementId>; // throws OperationError with the E1 messages
+
+// clm-13, apps/cli/src/edit/selectors.ts and types.ts
+export interface MatchReport {
+  readonly operation: number; readonly op: string;
+  readonly count: number; readonly ids: readonly string[];
+}
+export function resolveElementReference(
+  batch: Batch, value: string, index: number, scopePage?: string,
+): Element; // exact id, @ref, name:, prefix
+export function matchWhere(batch: Batch, where: unknown, index: number): Element[];
+export function formatMatchLines(matches: readonly MatchReport[]): string[];
+// BatchResult gains `readonly matches?: readonly MatchReport[]`.
+
+// clm-14, apps/cli/src/lint-diagram.ts
+export function documentRelativePath(documentPath: string, src: string): string;
+```
+
+The names are binding, with the same rule as the earlier contracts: a plan
+may add an optional parameter and record it, never rename.
+
+### Continuation verification
+
+- Each wave-1 and wave-2 plan: `bun test <its own test files>` and
+  `bun run typecheck`; Rust untouched unless A7 records a host cost.
+- clm-02 also runs the native A7 tests with `NODETTO_CLI_TEST_BINARY` set to
+  the release binary it builds (3-attempt retry on a deadline timeout), the
+  existing frame, routing, golden and edit tests for byte identity, and the
+  manual `/usr/bin/time -p` ratios against the same build and against
+  `target/clm-baseline/nodetto-cli` (kept; never cleaned).
+- clm-09: all CLI-level and native parity tests with the binary set, then
+  `mise run verify` and `mise run test-cli` (3-attempt retry on native
+  deadline timeouts), and the manual timing of the obstacle-routing batches.
+- No plan lists a binary-less native command or an expected-to-fail command.
+  Every plan sets `artifactRoots ["target"]` and lists every edited file,
+  docs included, in `writePaths`.

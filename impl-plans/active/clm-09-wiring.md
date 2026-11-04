@@ -1,5 +1,89 @@
 # clm-09-wiring
 
+## Continuation 2026-11-04 (clm-s731) - authoritative
+
+This section supersedes the header fields below (wave, dependsOn,
+writePaths, evidence paths) and adds work. Everything below still applies
+except where amended here. Nothing of this plan has landed yet.
+
+- wave: 3; dependsOn: clm-02-connector-edit-perf, clm-06-route-arrange,
+  clm-10-layered-fixes, clm-11-container-carry, clm-12-bpmn-layered,
+  clm-13-edit-selectors, clm-14-lint-image-path (accepted dependencies
+  clm-01, clm-03, clm-04, clm-07, clm-08 are landed).
+- Design additions: E1 table (help), E2 table (help), F1-F4 (help, report,
+  parity), "Continuation partition" (clm-09 row), Verification rows E1, E2,
+  F1-F4, A7 continuation (final timing), "Native parity".
+- writePaths (clm-s731): every writePath listed below, plus
+  - `apps/cli/src/edit/apply-batch.ts` (one line: `matches: batch.matches`
+    in the returned `BatchResult`)
+  - `apps/cli/src/edit-command.ts` (only if the text/JSON report needs
+    `matches` passed through; record whether touched)
+  with `tmp/clm-s725/clm-09-wiring` replaced by
+  `tmp/clm-s731/clm-09-wiring`. sharedPaths: none; artifactRoots: `target`.
+- sharedPathNotes additions:
+  - `apps/cli/src/arrange-modes.ts`: add the BPMN layered dispatch only (call
+    `planLayeredBpmn`, apply `containerCommands` then `unitCommands` with
+    `{ placed }` through `editor.apply`, then the route stage), and switch
+    relative core imports to `@nodetto/core`.
+  - `apps/cli/src/lint-diagram.ts`: relative-import switch only (clm-14 owns
+    the logic).
+  - `apps/cli/src/edit/apply-batch.ts`: the one `matches` line only.
+
+### Added file-level changes
+
+- `packages/core/src/index.ts`: also export `planLayeredBpmn`,
+  `bpmnFlowLabelBox`, `isLabelObstacle`, `ROUTE_PAGE_KINDS` (if not already),
+  and switch `apps/cli/src/edit/carry-members.ts` relative core imports if any.
+- `help.ts` `edit`: the E1 per-kind table (text from design E1, including
+  the error rules and the "attachments always follow" note), `name:`,
+  `where` keys, `expect`, `select`, the match report line, resolution order
+  (exact id, @ref, name:, prefix). `arrange`: the E2 page-kind table with
+  exclusion reasons and the BPMN rows/columns rule (`--frames`/TB exit 2 on
+  BPMN). `lint --metrics`: supported page kinds.
+- `docs/cli.md` and `README.md`: the same content with neutral examples (the
+  design F2 delete example uses `Approve`/`Update status`).
+- MCP: no schema change (`nodetto_edit` uses free-form args and
+  `COMMAND_HELP.edit`); `mcp.test.ts` asserts the edit tool description
+  mentions `where` and `select`.
+
+### Added tests
+
+- `cli-wiring.test.ts`: `arrange --mode layered` on a BPMN page (exit 0, lane
+  invariants hold, rerun `--check` exit 0) and on an ERD page with frames;
+  `edit` with `where`/`expect` mismatch -> exit 2 and the file unchanged;
+  `edit` text report shows `operation <i> (delete): matched 1 element(s)`;
+  JSON report has `matches`; `--quiet` keeps match lines; `carryMembers:false`
+  on a pool through `runCli`.
+- `native-parity/edit-usability.test.ts`: add E1 (pool move with
+  `carryMembers:false`, lane x error), F1 (ambiguous name error text), F2
+  (expect mismatch, no write), F3 (select then update).
+- `native-parity/layout.test.ts`: add BPMN layered, BPMN route with a moved
+  label, ERD route, and `lint --metrics` on a BPMN page.
+- `native-parity/lint-rules.test.ts`: add the `../` document-path case from
+  clm-14.
+
+### Amended verification
+
+- Verification 1 adds `apps/cli/src/edit/selectors.test.ts apps/cli/src/edit/carry-members.test.ts apps/cli/src/edit-frame-carry.test.ts`.
+- Verification 2 adds `packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-bpmn.test.ts packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/keep-members.test.ts packages/core/src/dirty-pages.test.ts`.
+- Verification 4 runs with up to 3 attempts using the loop form from clm-02
+  continuation verification 5 (logs `native-1.log`..`native-3.log` under
+  `tmp/clm-s731/clm-09-wiring/final/`), followed by
+  `grep -E '^ *[1-9][0-9]* pass$'` and `grep -E '^ *0 fail$'` on the green log.
+- Verification 7 (`mise run test-cli`): up to 3 attempts, each attempt's log
+  under `tmp/clm-s731/clm-09-wiring/final/test-cli-<n>.log`.
+- Verification 8 timing: all four A7 ops sets (single, multiPage,
+  mixedSingle, mixedMulti from `apps/cli/src/__fixtures__/obstacle-routing-batch.ts`)
+  with `/usr/bin/time -p` for `target/release/nodetto-cli` and
+  `target/clm-baseline/nodetto-cli`, into
+  `tmp/clm-s731/clm-09-wiring/timing.log`; record user CPU ratios
+  multiPage/single and mixedMulti/mixedSingle (target <= 1.5).
+- Done criteria add: `grep -n "planLayeredBpmn" apps/cli/src/arrange-modes.ts`
+  and `grep -n "matches: batch.matches" apps/cli/src/edit/apply-batch.ts`
+  match.
+
+---
+
 - planId: clm-09-wiring
 - planPath: impl-plans/active/clm-09-wiring.md
 - progressPath: impl-plans/progress/clm-09-wiring.md
