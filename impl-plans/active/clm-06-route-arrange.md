@@ -100,6 +100,23 @@ below. Nothing of this plan has landed yet; implement the whole plan
 - `arrange-modes.test.ts`: route on erd and bpmn pages -> exit 0; layered on
   bpmn -> exit 2 with supported kinds; sequence -> exit 2 for both.
 
+### Amendment 2026-11-04 (integration-paths-outside-writePaths, round 1)
+
+- Finding IR-CLM06-STRICT-DISPOSITION. The integration review gave a baseline
+  disposition for `bun run typecheck --noUncheckedIndexedAccess`: exit 2, 99
+  diagnostics (`tmp/clm-s731/clm-06-route-arrange/resume-gate-6.log`).
+  - This command is not a clm-06 gate.
+  - None of the diagnostics is in a clm-06 production module (`arrange-route.ts`,
+    `diagram-lint/metrics.ts`, `bpmn/notation.ts`, `arrange-modes.ts`,
+    `lint-metrics.ts`).
+  - The hits in `bpmn/notation.test.ts` and `bpmn/svg-export-bpmn.test.ts` are
+    in pre-existing test code. Treat them as baseline.
+  - The one production-core hit (`diagram-lint/node-overlap.ts`) is now owned
+    by clm-09.
+- Do not block on this check. Record the disposition in the progress log,
+  rerun the gates listed below, and return a non-blocked result for review.
+- writePaths are unchanged.
+
 ### Amended verification (each must exit 0)
 
 1. `bun test packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/bpmn/notation.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts packages/core/src/connector-positions.test.ts`

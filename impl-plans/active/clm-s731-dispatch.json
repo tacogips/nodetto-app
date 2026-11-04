@@ -91,6 +91,20 @@
       "mise run verify may rewrite tracked apps/desktop/src-tauri/gen/schemas/*.json; commits stage explicit paths only."
     ]
   },
+  "amendments": [
+    {
+      "round": 1,
+      "date": "2026-11-04",
+      "reason": "integration-paths-outside-writePaths",
+      "previousCheckpointCommit": "0ae8168dfb4c943abcab3a3170aedb80a4fd0204",
+      "decisions": [
+        {"findingId": "IR-CLM02-SCOPE", "unmatchedPath": "impl-plans/active/clm-02-connector-edit-perf.md", "decision": "Plan amended (author-owned, not a worker writePath). clm-02 writePaths gain packages/core/src/commands.ts, packages/core/src/editor/facade/core.ts and packages/core/src/store-commands.test.ts; no other pending plan owns them."},
+        {"findingId": "IR-CLM12-FREEROW", "unmatchedPath": "impl-plans/active/clm-12-bpmn-layered.md", "decision": "Plan and design E2.1 amended (author-owned): the free row has no label band or padding; without pools column 0 starts at origin.x and the row top is origin.y. clm-12 writePaths unchanged (fix is in packages/core/src/arrange-layered-bpmn.ts)."},
+        {"findingId": "IR-CORE-STRICT-NODE-OVERLAP", "unmatchedPath": "packages/core/src/diagram-lint/node-overlap.ts", "decision": "Assigned to pending clm-09-wiring writePaths for an annotation-only fix with a production-core strict-check verification."},
+        {"findingId": "IR-CLM06-STRICT-DISPOSITION", "unmatchedPath": "none (impl-plans/progress/clm-06-route-arrange.md is already a clm-06 writePath)", "decision": "Baseline disposition recorded in the clm-06 plan amendment; the strict check is not a clm-06 gate."}
+      ]
+    }
+  ],
   "acceptedDependencies": [
     {"planId": "clm-01-merge", "planPath": "impl-plans/active/clm-01-merge.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "mergeDocumentVersions, VersionConflict, mergeCommand, MERGE_USAGE, export determinism test"},
     {"planId": "clm-03-lint-core", "planPath": "impl-plans/active/clm-03-lint-core.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "lintNodeOverlaps, wrapTextToWidth, planTextWrapFixes"},
@@ -109,6 +123,9 @@
         "packages/core/src/editor/transaction.ts",
         "packages/core/src/editor/types.ts",
         "packages/core/src/editor.ts",
+        "packages/core/src/commands.ts",
+        "packages/core/src/editor/facade/core.ts",
+        "packages/core/src/store-commands.test.ts",
         "packages/core/src/store.ts",
         "packages/core/src/constraints.ts",
         "packages/core/src/frame-translation.ts",
@@ -156,7 +173,7 @@
         "grep -E '^ *0 fail$' tmp/clm-s731/clm-02-connector-edit-perf/final/native.log",
         "sh -c 'test \"$(git hash-object apps/cli/src/__fixtures__/obstacle-routing-batch.expected.jsonl)\" = 341fcd8654fc18d560c8895df1a05617a6b8ac39'",
         "test -x target/clm-baseline/nodetto-cli",
-        "bunx biome check apps/cli/src/__fixtures__/obstacle-routing-batch.ts apps/cli/src/edit-performance.test.ts apps/cli/src/native-parity/edit-performance.test.ts packages/core/src/keep-members.test.ts packages/core/src/dirty-pages.test.ts packages/core/src/editor/transaction.ts packages/core/src/editor/types.ts"
+        "bunx biome check apps/cli/src/__fixtures__/obstacle-routing-batch.ts apps/cli/src/edit-performance.test.ts apps/cli/src/native-parity/edit-performance.test.ts packages/core/src/keep-members.test.ts packages/core/src/dirty-pages.test.ts packages/core/src/editor/transaction.ts packages/core/src/editor/types.ts packages/core/src/commands.ts packages/core/src/editor/facade/core.ts"
       ]
     },
     {
@@ -371,6 +388,7 @@
         "apps/cli/src/native-engine.ts",
         "apps/cli/src/mcp.ts",
         "packages/core/src/index.ts",
+        "packages/core/src/diagram-lint/node-overlap.ts",
         "apps/cli/src/merge-command.ts",
         "apps/cli/src/arrange-modes.ts",
         "apps/cli/src/lint-metrics.ts",
@@ -402,7 +420,8 @@
         {"path": "apps/cli/src/arrange-modes.ts", "intendedEdit": "BPMN layered dispatch (planLayeredBpmn, two applies, then route stage) and @nodetto/core import switch only."},
         {"path": "apps/cli/src/edit/apply-batch.ts", "intendedEdit": "Add matches: batch.matches to the returned BatchResult only."},
         {"path": "apps/cli/src/lint-diagram.ts", "intendedEdit": "Switch relative core imports to @nodetto/core only."},
-        {"path": "apps/cli/src/edit-command.ts", "intendedEdit": "Pass matches to the report only if needed; record whether touched."}
+        {"path": "apps/cli/src/edit-command.ts", "intendedEdit": "Pass matches to the report only if needed; record whether touched."},
+        {"path": "packages/core/src/diagram-lint/node-overlap.ts", "intendedEdit": "Amendment round 1 (IR-CORE-STRICT-NODE-OVERLAP): annotate the 'system' helper with an explicit boolean return type only; no behavior change."}
       ],
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
@@ -419,6 +438,8 @@
         "grep -E '^ *0 fail$' tmp/clm-s731/clm-09-wiring/final/native.log",
         "CARGO_TERM_QUIET=true mise run verify",
         "sh -c 'd=tmp/clm-s731/clm-09-wiring/final; mkdir -p \"$d\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && exit 0; done; exit 1'",
+        "bun test packages/core/src/diagram-lint/node-overlap.test.ts",
+        "sh -c 'mkdir -p tmp/clm-s731/clm-09-wiring/final; bun run typecheck --noUncheckedIndexedAccess > tmp/clm-s731/clm-09-wiring/final/strict.log 2>&1; ! grep -E \"^packages/core/src/\" tmp/clm-s731/clm-09-wiring/final/strict.log | grep -v \"\\.test\\.ts(\" | grep -q .'",
         "grep -n planLayeredBpmn apps/cli/src/arrange-modes.ts",
         "grep -n 'matches: batch.matches' apps/cli/src/edit/apply-batch.ts"
       ]

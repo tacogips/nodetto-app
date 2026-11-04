@@ -46,6 +46,33 @@ redo them.
   - `tmp/clm-s731/clm-02-connector-edit-perf`
   - `target`
 - sharedPaths: none; artifactRoots: `target`
+- Amendment 2026-11-04 (integration-paths-outside-writePaths, round 1), for
+  finding IR-CLM02-SCOPE. The worker blocked twice
+  (`tmp/clm-s731/clm-02-connector-edit-perf/readiness.log`) because two files
+  outside writePaths form the per-operation path:
+  - `packages/core/src/commands.ts:applyCommands` copies every element and page
+    into working maps on each call.
+  - `packages/core/src/editor/facade/core.ts` calls `planDerivedCommands` (it
+    passes `placed` at about line 301) and `applyCommands` on the live store.
+  Decisions:
+  - Both files are added to the clm-02 writePaths below. No other pending
+    plan owns either file.
+  - `applyCommands` may stop copying elements outside the pages its commands
+    touch (copy-on-write or page-scoped working maps). Results, command order,
+    `CommandResult` and diffs must stay identical.
+  - The facade forwards `ApplyOptions.keepMembers` into `DerivedPlanInput`,
+    next to `placed`.
+  - Existing coverage `packages/core/src/store-commands.test.ts` is added to
+    writePaths for new cases (multi-page apply leaves other pages' elements
+    identical, and the same CommandResult as before).
+  - Verification 2 already runs `store-commands.test.ts`. Biome (verification
+    9) must include `packages/core/src/commands.ts` and
+    `packages/core/src/editor/facade/core.ts`.
+  - The expected-output, byte-identity and "no file outside writePaths" rules
+    are unchanged.
+- writePaths added in round 1: `packages/core/src/commands.ts`,
+  `packages/core/src/editor/facade/core.ts`,
+  `packages/core/src/store-commands.test.ts`.
 - Read-only and never edited: `apps/cli/src/__fixtures__/obstacle-routing-batch.expected.jsonl`
   (its git hash must stay `341fcd8654fc18d560c8895df1a05617a6b8ac39`),
   `target/clm-baseline/nodetto-cli` (never delete; never `cargo clean`), and

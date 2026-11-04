@@ -29,6 +29,27 @@ except where amended here. Nothing of this plan has landed yet.
     the logic).
   - `apps/cli/src/edit/apply-batch.ts`: the one `matches` line only.
 
+### Amendment 2026-11-04 (integration-paths-outside-writePaths, round 1)
+
+- Finding IR-CORE-STRICT-NODE-OVERLAP:
+  `packages/core/src/diagram-lint/node-overlap.ts:97` reports TS7022 under
+  `noUncheckedIndexedAccess`. The `system` arrow function's inferred type
+  depends on its own use. This breaks the constraint that the core must
+  compile with that flag. The file was landed by accepted clm-03, and no
+  pending plan owned it.
+- Decision:
+  - Add `packages/core/src/diagram-lint/node-overlap.ts` to the clm-09
+    writePaths.
+  - The fix is annotation only: give `system` an explicit `boolean` return
+    type. No behavior change.
+- Added verification:
+  - `bun test packages/core/src/diagram-lint/node-overlap.test.ts` must pass
+    unchanged.
+  - `sh -c 'mkdir -p tmp/clm-s731/clm-09-wiring/final; bun run typecheck --noUncheckedIndexedAccess > tmp/clm-s731/clm-09-wiring/final/strict.log 2>&1; ! grep -E "^packages/core/src/" tmp/clm-s731/clm-09-wiring/final/strict.log | grep -v "\.test\.ts(" | grep -q .'`
+    must exit 0. It shows that no production `packages/core/src` file
+    reports a diagnostic. Test-file diagnostics are baseline and out of
+    scope.
+
 ### Added file-level changes
 
 - `packages/core/src/index.ts`: also export `planLayeredBpmn`,

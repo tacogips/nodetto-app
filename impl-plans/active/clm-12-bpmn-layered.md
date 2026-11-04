@@ -106,6 +106,36 @@ export function planLayeredBpmn(
 10. Idempotent: running on the result of applying both lists returns two empty
     lists.
 
+## Amendment 2026-11-04 (integration-paths-outside-writePaths, round 1)
+
+- Finding IR-CLM12-FREEROW: on a page with no pools, rule 6 offsets free-row
+  units by `POOL_LABEL + FRAME_PADDING` (x) and `FRAME_PADDING` (y) from an
+  origin derived from those same units, so every rerun moves them
+  (`tmp/clm-s731/clm-12-bpmn-layered/free-row-redispatch.log`: x = 70, 140,
+  210).
+- Decision (design E2.1, new "Free row" bullet): the free row has no box, so
+  it gets no label band and no padding.
+  - With pools: free-row units use the shared column x positions (the same
+    left edges as the pool columns), and the row top is `POOL_GAP` below the
+    last pool's bottom. Units stack from the row top, with no
+    `FRAME_PADDING`.
+  - Without pools: column 0's left edge is `origin.x` (no `POOL_LABEL` or
+    `FRAME_PADDING`), later columns follow with `COLUMN_GAP`, and the row top
+    is `origin.y`.
+  - Rule 6 is unchanged for pool rows.
+- writePaths are unchanged. The fix is in `packages/core/src/arrange-layered-bpmn.ts`.
+- Tests the worker must add, all from the plan's "Tests" list:
+  - Free-only page with one task at (0,0): the first run gives no commands
+    and the task stays at (0,0).
+  - Free-only page with a start event -> task chain: the second run returns
+    two empty lists.
+  - Free row alongside one pool: free units sit `POOL_GAP` below the pool and
+    are aligned to the pool columns, and a rerun gives empty lists.
+  - Also add every edge case listed in "Tests" that is still missing: nested
+    lanes, collapsed pool, two pools with a message flow, sub-process
+    contents, boundary event, shuffled creation order, validateDocument clean.
+- Done when verification 1-5 exit 0 and those tests exist.
+
 ## Pitfalls
 
 - Applying only one combined list would let `planBpmnTranslations` carry

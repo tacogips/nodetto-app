@@ -892,6 +892,12 @@ Mechanics:
   band of 30 plus `FRAME_PADDING`, all columns and gaps, and `FRAME_PADDING`.
   Pools are stacked with gap 120. The origin is the integer top-left of the
   current union of pools and units, so a rerun is a no-op.
+- Free row (clarified 2026-11-04, amendment round 1): it has no box, so it
+  gets no pool label band and no padding. With pools, its units use the shared
+  column x positions and its top is `POOL_GAP` below the last pool. Without
+  pools, column 0 starts at `origin.x` and the row top is `origin.y`, so a
+  page of only free units is laid out from its own top-left and a rerun moves
+  nothing.
 - Commands, in two applies, because `planBpmnTranslations` carries every
   descendant whose position a command did not change: first the container
   step (pool boxes and lane heights through `updateVisual`;
