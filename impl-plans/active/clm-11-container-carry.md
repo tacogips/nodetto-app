@@ -1,5 +1,8 @@
 # clm-11-container-carry
 
+Amendment 2026-11-05 (clm-s732, round 1): workflow mode is `issue-resolution` (manifest
+`workflowMode`). Scope, writePaths and dependsOn are unchanged.
+
 ## Continuation 2 2026-11-05 (clm-s732) - authoritative
 
 Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: nothing of this plan has

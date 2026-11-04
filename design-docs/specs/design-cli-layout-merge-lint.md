@@ -920,8 +920,12 @@ Mechanics:
   invariants hold by construction, and units are carried), then the unit
   step (absolute `updateVisual` positions for every unit; a sub-process's
   contents are carried by the sub-process through the existing planner). Units end inside their own
-  row, so `planBpmnMembership` keeps their parents. This needs no
-  `keepMembers`, so the planner has no dependency on the E1 engine change.
+  row, so `planBpmnMembership` keeps their parents, with two exceptions: a
+  unit directly under a non-leaf lane, and a unit directly under a pool with
+  lanes, land in a first leaf row, and that planner's existing geometry rule
+  makes that leaf lane their parent. The layered planner never writes
+  `semantic.parent`. This needs no `keepMembers`, so the planner has no
+  dependency on the E1 engine change.
 - Then the route stage runs on every BPMN connector of the page, as in A1.
 
 #### E2.2 Route rules per kind

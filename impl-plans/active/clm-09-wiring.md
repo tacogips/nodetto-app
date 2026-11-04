@@ -1,5 +1,24 @@
 # clm-09-wiring
 
+## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 1) - authoritative
+
+Workflow mode: `issue-resolution` (manifest `workflowMode`).
+
+- dependsOn is now clm-02-connector-edit-perf, clm-11-container-carry,
+  clm-12-bpmn-layered and clm-15-bun-test-jsx. clm-06-route-arrange is accepted: its
+  reviewed edits sit in the working tree on top of `b68036c` (source identity in the
+  manifest's `acceptedDependencies`), so treat them as landed and edit
+  `arrange-modes.test.ts` and `lint-metrics.test.ts` from their current content.
+- `mise run verify` runs plain `bun test`, which depends on clm-15. A `jsxDEV` error in
+  that gate is a finding for clm-15; do not fix it here.
+- Finding S5-CLM15-FULL-BUILD-GATE adds one production-build gate, which runs here because
+  this plan runs alone in wave 3:
+  `bun --cwd=apps/desktop run build --outDir ../../target/clm-s732-jsx/final --emptyOutDir`
+  must exit 0. A failure traceable to `bunfig.toml` or the preload is a finding for clm-15;
+  do not fix it here.
+- BPMN layered wiring tests must expect the clm-12 parent rule: a unit directly under a
+  non-leaf lane or directly under a pool with lanes ends parented to the first leaf lane.
+
 ## Continuation 2 2026-11-05 (clm-s732) - authoritative
 
 Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: nothing of this plan has

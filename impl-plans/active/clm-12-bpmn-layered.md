@@ -1,5 +1,45 @@
 # clm-12-bpmn-layered
 
+## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 1) - authoritative
+
+Workflow mode: `issue-resolution` (manifest `workflowMode`). Proceed with implementation.
+
+Finding IR-S732-CLM12-PARENT-CONTRACT: the contract contradicted itself.
+`planBpmnMembership` (`packages/core/src/bpmn/containment.ts`, read-only here) gives a
+moved element the deepest lane containing its centre. Leaf lanes fill their parent lane,
+so a unit sent to a first leaf row is always reparented to that leaf. The test
+`non-leaf lane member uses first leaf` therefore fails with expected `parent`, received
+`one` (`tmp/clm-s732/serial-reconcile/clm12-gate1.log`). A scratch probe that changed
+only that expectation passed 21 of 21 (`tmp/clm-s732/serial-reconcile/clm12-alt-contract-probe.log`).
+
+Decision (design E2.1 amended): the parent changes in exactly two first-leaf cases, and
+only through the existing geometry rule. The two cases are a unit directly under a
+non-leaf lane and a unit directly under a pool with lanes.
+
+Continue from the current working tree. The uncommitted planner and test edits are this
+plan's work: keep them, and do not restart or revert them.
+
+Ordered worker changes:
+
+1. In `packages/core/src/arrange-layered-bpmn.test.ts`, test `non-leaf lane member uses
+   first leaf`: change only the parent expectation from `"parent"` to `"one"`. Keep the
+   `visual.y` assertion and `noOp(e)`.
+2. Record the decision and the pre/post hashes in the progress log.
+3. Evidence layout: `tmp/` may not hold `.ts` files. Move
+   `tmp/clm-s732/clm-12-bpmn-layered/timing.ts` to `target/clm-s732-clm-12/timing.ts`,
+   and record that path in the progress log.
+
+Forbidden:
+
+- Editing `packages/core/src/bpmn/containment.ts` or `packages/core/src/editor/transaction.ts`.
+- Writing `semantic.parent` from the planner.
+- Removing or skipping the non-leaf test.
+- Changing a parent expectation for a unit that is already inside a leaf lane.
+
+Done when all manifest verification commands exit 0 with at least 21 tests and 0
+failures (the last command shows that no `.ts` file remains under this plan's evidence
+directory), and test-integrity and adversarial reviews have run on the result.
+
 ## Continuation 2 2026-11-05 (clm-s732) - authoritative
 
 Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`:
@@ -25,8 +65,8 @@ Fix the existing planner; do not rewrite it. Replace `tmp/clm-s731` with
    - A unit directly under a non-leaf lane -> the first leaf lane under that lane
      in model order.
    - A unit directly under a pool that has lanes -> the pool's first row.
-   In the second case `planBpmnMembership` may then set the lane as its parent;
-   this is the only allowed parent change. Record it in the progress log.
+   In both cases `planBpmnMembership` then sets that leaf lane as the unit's parent;
+   these are the only allowed parent changes. Record them in the progress log.
 3. Collapsed pools: a unit inside a collapsed pool is not a unit. It is carried
    with the pool and never goes to the free row. Add it to `placed`.
 4. Any further fix that a regression below reveals, inside this file only.
@@ -226,7 +266,9 @@ export function planLayeredBpmn(
   units that keep their coordinates; the two-step contract exists to prevent
   that. Tests must apply both lists in order through `Editor.apply`.
 - Lane order never changes. Never write `semantic.parent`; units end inside
-  their own row, so `planBpmnMembership` keeps parents (assert it).
+  their own row, so `planBpmnMembership` keeps parents (assert it), except in the
+  two first-leaf cases of the 2026-11-05 amendment, where the unit's parent becomes
+  that leaf lane.
 - Use indexed loops, `noUncheckedIndexedAccess`-safe access, and no per-point
   destructuring in loops.
 - Do not import or edit `arrange-modes.ts`, `notation.ts`,
@@ -242,7 +284,8 @@ and inspect the store.
   end -> layers 0..4 left to right; gateway branches share a column; each
   task lies inside its lane box; lanes stay inside the pool, stacked without
   gaps (lane.y = previous lane.y + height, lane.x = pool.x + 30).
-- Parents unchanged after apply (`semantic.parent` equal to before).
+- Parents of units already inside a leaf lane unchanged after apply
+  (`semantic.parent` equal to before).
 - Two pools with a message flow -> both pools same width; columns aligned
   (message-flow ends share a column x when they are at the same depth).
 - Collapsed pool -> keeps height, gets common width.

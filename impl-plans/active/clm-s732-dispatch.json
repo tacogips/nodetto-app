@@ -17,6 +17,7 @@
   "evidenceRoot": "tmp/clm-s732",
   "evidenceLayout": "Per-plan evidence under tmp/clm-s732/<planId>/ with gate runs under tmp/clm-s732/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/. Retry loops write <name>-1.log..<name>-3.log and copy the green attempt to <name>.log. tmp/ holds only .log, .txt, .json and .jsonl data, never binaries, .ts files or .cpuprofile files, and at most 300 files per plan. CPU profiles go to target/clm-s732-profile/. Cargo output goes to target/ (artifactRoots [\"target\"] in every plan); target/clm-baseline/nodetto-cli is the pre-change baseline binary and must never be deleted (no cargo clean).",
   "reviewContext": {
+    "workflowMode": "issue-resolution",
     "issueReference": "local-request:clm-continuation-2 (no GitHub issue; source is workflowInput.requestedOutcome of opus-terra-design-and-implement-review-loop-session-732)",
     "userProblem": "Edit batches scale with the whole document (A7 multi-page); route arrange and BPMN layered are committed but unaccepted or incomplete; carryMembers:false must work for every carrying container (E1); registration, help, docs, parity and the git merge driver end-to-end test are outstanding.",
     "requiredOutcomes": [
@@ -47,7 +48,9 @@
       {"decision": "clm-11 is in wave 2 only because it calls keepMembers from clm-02.", "rationale": "Real contract dependency."},
       {"decision": "clm-12 keeps units inside their pool for the unit-under-non-leaf-lane and unit-under-pool-with-lanes cases, and carries units of collapsed pools with the pool.", "rationale": "HEAD sends them to the free row, which contradicts the design's 'units end inside their own row'."},
       {"decision": "BPMN layered applies containerCommands then unitCommands.", "rationale": "planBpmnTranslations carries descendants whose positions a command did not change; two applies avoid a keepMembers dependency."},
-      {"decision": "BatchResult.matches is optional; clm-09 adds the one passthrough line in apply-batch.ts.", "rationale": "apply-batch.ts is owned by clm-02 in wave 1."}
+      {"decision": "BatchResult.matches is optional; clm-09 adds the one passthrough line in apply-batch.ts.", "rationale": "apply-batch.ts is owned by clm-02 in wave 1."},
+      {"decision": "A unit directly under a non-leaf lane or directly under a pool with lanes ends parented to the first leaf lane; the planner never writes semantic.parent and containment.ts stays out of clm-12 scope.", "rationale": "planBpmnMembership gives a moved element the deepest lane containing its centre. Changing it would alter editor behavior for every moved BPMN element."},
+      {"decision": "clm-15 fixes bun test JSX loading with a test-only bunfig preload that points .tsx files at the solid-js/h runtime.", "rationale": "Only bun test reads that key, so production output, tsconfig and dependencies stay unchanged. The six affected files use pure helpers, not compiled DOM output."}
     ],
     "intentionalTradeoffs": [
       "A page with cross-page links keeps today's cost when edited, in exchange for a simple and safe widening rule.",
@@ -77,6 +80,7 @@
       "impl-plans/active/clm-09-wiring.md",
       "impl-plans/active/clm-11-container-carry.md",
       "impl-plans/active/clm-12-bpmn-layered.md",
+      "impl-plans/active/clm-15-bun-test-jsx.md",
       "impl-plans/active/clm-s725-dispatch.json",
       "impl-plans/active/clm-s731-dispatch.json"
     ],
@@ -87,7 +91,21 @@
       "mise run verify may rewrite tracked apps/desktop/src-tauri/gen/schemas/*.json; commits stage explicit paths only."
     ]
   },
-  "amendments": [],
+  "amendments": [
+    {
+      "round": 1,
+      "date": "2026-11-05",
+      "reason": "integration-paths-outside-writePaths",
+      "previousCheckpointCommit": "b68036c68e97ccf4de9d4f1db159a1c14715f167",
+      "decisions": [
+        {"findingId": "IR-S732-CLM12-PARENT-CONTRACT", "unmatchedPath": "impl-plans/active/clm-12-bpmn-layered.md", "resolvedPaths": ["packages/core/src/arrange-layered-bpmn.test.ts", "impl-plans/progress/clm-12-bpmn-layered.md", "tmp/clm-s732/clm-12-bpmn-layered"], "owner": "clm-12-bpmn-layered", "decision": "Plan files are author-owned and must not be worker writePaths. The author amended the clm-12 plan and design E2.1 to allow the parent change in both first-leaf cases. The worker work maps to paths already in clm-12 writePaths. clm-12 writePaths are unchanged, and containment.ts stays out of clm-12 scope."},
+        {"findingId": "IR-S732-JSXDEV-UNOWNED-FINAL-GATE", "unmatchedPath": "packages/ui-solid/src/Toolbar.test.ts", "resolvedPaths": ["bunfig.toml", "packages/ui-solid/src/bun-test-jsx-preload.ts", "packages/ui-solid/src/Toolbar.test.ts", "packages/ui-solid/src/SelectionToolbar.test.ts", "packages/ui-solid/src/bpmn-palette.test.ts", "packages/ui-solid/src/canvas-rulers.test.ts", "packages/ui-solid/src/text-note-view.test.ts", "apps/desktop/src/history-shortcuts.test.ts"], "owner": "clm-15-bun-test-jsx", "decision": "New small wave-1 plan clm-15 owns the test-only load fix and the six affected test files. clm-09 now depends on it, because mise run verify runs plain bun test. No other plan is widened."},
+        {"findingId": "none (dispatch state)", "unmatchedPath": "none", "owner": "clm-06-route-arrange", "decision": "clm-06 is in successfulPlanIds, so it moves from plans to acceptedDependencies and leaves the clm-09 dependsOn list. Its reviewed edits stay uncommitted on top of b68036c, with source identity recorded."},
+        {"findingId": "none (clm-02 readiness blocker)", "unmatchedPath": "none", "owner": "clm-02-connector-edit-perf", "decision": "The clm-02 worker stopped because no workflow mode reached it. reviewContext.workflowMode and each pending plan now state issue-resolution explicitly."},
+        {"findingId": "S5-CLM15-FULL-BUILD-GATE", "unmatchedPath": "none", "resolvedPaths": ["impl-plans/active/clm-s732-dispatch.json", "impl-plans/active/clm-15-bun-test-jsx.md", "impl-plans/active/clm-09-wiring.md"], "owner": "clm-15-bun-test-jsx, clm-09-wiring", "decision": "clm-15 no longer runs the Vite with-and-without comparison, because two full builds in wave 1 could fail on clm-02 or clm-12 edits in progress, and the bunfig.toml [test] table is read only by bun test. Two static checks replace it: bunfig.toml holds only a [test] table, and production code does not import the preload. clm-09, which runs alone in wave 3, gains one production-build gate writing under target/. A failure there traceable to bunfig.toml or the preload is a finding for clm-15. Plan IDs, waves, dependsOn and writePaths are unchanged."}
+      ]
+    }
+  ],
   "acceptedDependencies": [
     {"planId": "clm-01-merge", "planPath": "impl-plans/active/clm-01-merge.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "mergeDocumentVersions, VersionConflict, mergeCommand, MERGE_USAGE, export determinism test"},
     {"planId": "clm-03-lint-core", "planPath": "impl-plans/active/clm-03-lint-core.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "lintNodeOverlaps, wrapTextToWidth, planTextWrapFixes"},
@@ -96,7 +114,8 @@
     {"planId": "clm-08-lint-cli", "planPath": "impl-plans/active/clm-08-lint-cli.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "lintDiagramPages, diagramLintApplies, LINT_NO_PAGES_MESSAGE, formatFixLines"},
     {"planId": "clm-10-layered-fixes", "planPath": "impl-plans/active/clm-10-layered-fixes.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "TB title band at the top, precomputed frame ranks, erd in LAYERED_PAGE_KINDS"},
     {"planId": "clm-13-edit-selectors", "planPath": "impl-plans/active/clm-13-edit-selectors.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "resolveElementReference, matchWhere, formatMatchLines, MatchReport, batch.matches, select op, OPERATION_FIELDS rows"},
-    {"planId": "clm-14-lint-image-path", "planPath": "impl-plans/active/clm-14-lint-image-path.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "documentRelativePath and traversal tests"}
+    {"planId": "clm-14-lint-image-path", "planPath": "impl-plans/active/clm-14-lint-image-path.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "documentRelativePath and traversal tests"},
+    {"planId": "clm-06-route-arrange", "planPath": "impl-plans/active/clm-06-route-arrange.md", "commit": "b68036c68e97ccf4de9d4f1db159a1c14715f167", "provides": "planRoute, pageMetrics, isLabelObstacle, bpmnFlowLabelBox, arrangeLayeredOrRoute, lintMetrics, plus G1-G11 coverage", "acceptedState": "Accepted by the clm-s732 branch review; edits are uncommitted working-tree changes on top of commit, identified by sourceIdentity (git hash-object). Native behavior is unobserved until clm-09 wires route mode.", "sourceIdentity": {"apps/cli/src/arrange-modes.test.ts": "9f4d9663644711155fa7668d68c43efaa8c9525f", "apps/cli/src/lint-metrics.test.ts": "333004b4f7974e241e09e1635b3ad944757adfe7", "impl-plans/progress/clm-06-route-arrange.md": "e8ea656af30d767e290c6f338424003162c54469", "packages/core/src/arrange-route.test.ts": "1fa3be60a030d63440127c280a286f19a1138925", "packages/core/src/arrange-route.ts": "587d9fff3666ac76129e5aa31a9a054ab2f0280f", "packages/core/src/diagram-lint/metrics.test.ts": "a115d25b51a28314c46f4ea8feedb78f8b0aa587"}}
   ],
   "plans": [
     {
@@ -203,44 +222,47 @@
       ]
     },
     {
-      "planId": "clm-06-route-arrange",
-      "planPath": "impl-plans/active/clm-06-route-arrange.md",
-      "progressPath": "impl-plans/progress/clm-06-route-arrange.md",
+      "planId": "clm-15-bun-test-jsx",
+      "planPath": "impl-plans/active/clm-15-bun-test-jsx.md",
+      "progressPath": "impl-plans/progress/clm-15-bun-test-jsx.md",
       "wave": 1,
       "dependsOn": [],
       "writePaths": [
-        "packages/core/src/arrange-route.ts",
-        "packages/core/src/arrange-route.test.ts",
-        "packages/core/src/diagram-lint/metrics.ts",
-        "packages/core/src/diagram-lint/metrics.test.ts",
-        "packages/core/src/bpmn/notation.ts",
-        "packages/core/src/bpmn/notation.test.ts",
-        "packages/core/src/bpmn/svg-export-bpmn.test.ts",
-        "apps/cli/src/arrange-modes.ts",
-        "apps/cli/src/arrange-modes.test.ts",
-        "apps/cli/src/lint-metrics.ts",
-        "apps/cli/src/lint-metrics.test.ts",
-        "impl-plans/progress/clm-06-route-arrange.md",
-        "tmp/clm-s732/clm-06-route-arrange",
+        "bunfig.toml",
+        "packages/ui-solid/src/bun-test-jsx-preload.ts",
+        "apps/desktop/src/history-shortcuts.test.ts",
+        "packages/ui-solid/src/bpmn-palette.test.ts",
+        "packages/ui-solid/src/text-note-view.test.ts",
+        "packages/ui-solid/src/canvas-rulers.test.ts",
+        "packages/ui-solid/src/Toolbar.test.ts",
+        "packages/ui-solid/src/SelectionToolbar.test.ts",
+        "impl-plans/progress/clm-15-bun-test-jsx.md",
+        "tmp/clm-s732/clm-15-bun-test-jsx",
         "target"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [
-        {"path": "packages/core/src/bpmn/notation.ts", "intendedEdit": "Only the flow-label anchor precedence in bpmnFlowDecoration and bpmnFlowLabelBox, if a gap test reveals a defect; nothing else."}
+        {"path": "packages/ui-solid/src/Toolbar.test.ts", "intendedEdit": "None expected. This and the other five test files may change only to update an expectation shown to be stale by an intentional production commit, recorded in the progress log; never to skip, delete or weaken a test."}
       ],
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
-        "Tests G1 to G11 from the plan exist and pass; any defect they reveal is fixed in the owned modules.",
-        "A2-A5 rules hold on state/flowchart/freeform/architecture/uml/erd/bpmn with the E2.2 rules; idempotent reruns; sequence, breadboard and pcb exit 2 for both modes.",
-        "BPMN default SVG stays byte-identical; containment-only labels score 0 and real collisions count, in scoring and metrics alike."
+        "The six listed test files load and report a positive test count with 0 failures.",
+        "Full bun test has no jsxDEV error.",
+        "bunfig.toml holds only a [test] table, production code does not import the preload, and tsconfig, Vite config, package manifests and bun.lock are unchanged."
       ],
       "verification": [
-        "bun test packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/bpmn/notation.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts packages/core/src/connector-positions.test.ts",
-        "bun test apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts",
+        "sh -c 'd=tmp/clm-s732/clm-15-bun-test-jsx/final; mkdir -p \"$d\"; bun test apps/desktop/src/history-shortcuts.test.ts packages/ui-solid/src/bpmn-palette.test.ts packages/ui-solid/src/text-note-view.test.ts packages/ui-solid/src/canvas-rulers.test.ts packages/ui-solid/src/Toolbar.test.ts packages/ui-solid/src/SelectionToolbar.test.ts > \"$d/six.log\" 2>&1'",
+        "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s732/clm-15-bun-test-jsx/final/six.log",
+        "grep -E '^ *0 fail$' tmp/clm-s732/clm-15-bun-test-jsx/final/six.log",
+        "sh -c 'grep -E \"across 6 files\" tmp/clm-s732/clm-15-bun-test-jsx/final/six.log && ! grep -q jsxDEV tmp/clm-s732/clm-15-bun-test-jsx/final/six.log'",
+        "sh -c 'd=tmp/clm-s732/clm-15-bun-test-jsx/final; bun test > \"$d/full.log\" 2>&1; ! grep -q jsxDEV \"$d/full.log\" && grep -Eq \"^ *[1-9][0-9]* pass$\" \"$d/full.log\"'",
+        "bun test apps/cli/src/edit/selectors.test.ts",
         "bun run typecheck",
-        "bunx biome check packages/core/src/arrange-route.ts packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/bpmn/notation.ts packages/core/src/bpmn/notation.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts apps/cli/src/arrange-modes.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-metrics.test.ts",
-        "grep -n 'export function bpmnFlowLabelBox' packages/core/src/bpmn/notation.ts",
-        "grep -n 'export function isLabelObstacle' packages/core/src/diagram-lint/metrics.ts"
+        "bunx biome check packages/ui-solid/src/bun-test-jsx-preload.ts",
+        "sh -c 'test \"$(grep -c \"^\\[\" bunfig.toml)\" = 1 && grep -q \"^\\[test\\]\" bunfig.toml'",
+        "sh -c '! grep -rn bun-test-jsx-preload packages/ui-solid/src/index.ts apps/desktop/src'",
+        "git diff --quiet HEAD -- tsconfig.base.json tsconfig.json apps/desktop/vite.config.ts mise.toml bun.lock package.json apps/desktop/package.json packages/ui-solid/package.json",
+        "grep -n 'bun-test-jsx-preload' bunfig.toml"
       ]
     },
     {
@@ -262,7 +284,9 @@
       "acceptanceCriteria": [
         "Free row follows design E2.1 with and without pools; a rerun returns empty lists in every case.",
         "Units under a non-leaf lane or directly under a pool with lanes land in the first leaf row, and units of collapsed pools are carried with the pool; none go to the free row.",
-        "Regressions for nested lanes, collapsed pools, message flows, a free row beside pools, sub-processes, boundary events, shuffled order and validateDocument exist and pass."
+        "Regressions for nested lanes, collapsed pools, message flows, a free row beside pools, sub-processes, boundary events, shuffled order and validateDocument exist and pass.",
+        "A unit directly under a non-leaf lane or a pool with lanes ends parented to the first leaf lane; parents of units already inside a leaf lane stay unchanged; the planner writes no semantic.parent; containment.ts and transaction.ts are not edited by this plan.",
+        "All verification commands exit 0 with at least 21 tests and 0 failures, and no .ts file remains under tmp/clm-s732/clm-12-bpmn-layered."
       ],
       "verification": [
         "bun test packages/core/src/arrange-layered-bpmn.test.ts",
@@ -270,7 +294,8 @@
         "bun run typecheck",
         "bunx biome check packages/core/src/arrange-layered-bpmn.ts packages/core/src/arrange-layered-bpmn.test.ts",
         "grep -n 'export function planLayeredBpmn' packages/core/src/arrange-layered-bpmn.ts",
-        "sh -c 'test \"$(grep -c \"^test(\" packages/core/src/arrange-layered-bpmn.test.ts)\" -ge 20'"
+        "sh -c 'test \"$(grep -c \"^test(\" packages/core/src/arrange-layered-bpmn.test.ts)\" -ge 20'",
+        "sh -c '! find tmp/clm-s732/clm-12-bpmn-layered -name \"*.ts\" | grep -q .'"
       ]
     },
     {
@@ -320,7 +345,7 @@
       "planPath": "impl-plans/active/clm-09-wiring.md",
       "progressPath": "impl-plans/progress/clm-09-wiring.md",
       "wave": 3,
-      "dependsOn": ["clm-02-connector-edit-perf", "clm-06-route-arrange", "clm-11-container-carry", "clm-12-bpmn-layered"],
+      "dependsOn": ["clm-02-connector-edit-perf", "clm-11-container-carry", "clm-12-bpmn-layered", "clm-15-bun-test-jsx"],
       "writePaths": [
         "apps/cli/src/commands.ts",
         "apps/cli/src/help.ts",
@@ -396,6 +421,7 @@
         "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/native-[123].log \"$d/native.log\"; CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > \"$d/native-build.log\" 2>&1 || exit 1; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/merge.test.ts apps/cli/src/native-parity/edit-usability.test.ts apps/cli/src/native-parity/lint-rules.test.ts apps/cli/src/native-parity/edit-performance.test.ts apps/cli/src/merge-git.test.ts > \"$d/native-$i.log\" 2>&1 && cp \"$d/native-$i.log\" \"$d/native.log\" && exit 0; done; exit 1' sh tmp/clm-s732/clm-09-wiring/final",
         "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s732/clm-09-wiring/final/native.log",
         "grep -E '^ *0 fail$' tmp/clm-s732/clm-09-wiring/final/native.log",
+        "bun --cwd=apps/desktop run build --outDir ../../target/clm-s732-jsx/final --emptyOutDir",
         "CARGO_TERM_QUIET=true mise run verify",
         "sh -c 'd=tmp/clm-s732/clm-09-wiring/final; mkdir -p \"$d\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && exit 0; done; exit 1'",
         "bun test packages/core/src/diagram-lint/node-overlap.test.ts",

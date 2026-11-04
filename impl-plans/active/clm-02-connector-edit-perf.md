@@ -1,5 +1,12 @@
 # clm-02-connector-edit-perf
 
+## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 1)
+
+Workflow mode: `issue-resolution` (manifest `workflowMode`, repeated in
+`reviewContext.workflowMode`). The first s732 dispatch of this plan stopped at readiness
+because its worker found no mode in its input, and it edited no source. Do not stop for
+that reason again: start Part 1. writePaths are unchanged.
+
 ## Continuation 2 2026-11-05 (clm-s732) - authoritative
 
 Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: only the s725 work

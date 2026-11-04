@@ -7,6 +7,20 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
+## Amendment 2026-11-05 (clm-s732, round 1) - authoritative
+
+Supersedes the table below. clm-06 is accepted; its reviewed edits are uncommitted on
+top of `b68036c`. New plan clm-15 owns the `bun test` JSX load failure, because
+`mise run verify` cannot pass without it.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | All of the A7 continuation and the E1 engine option `keepMembers` | - |
+| 1 | clm-12-bpmn-layered | Non-leaf parent expectation under the amended contract, evidence cleanup | - |
+| 1 | clm-15-bun-test-jsx | Six `bun test` files that fail to load with the `jsxDEV` error | - |
+| 2 | clm-11-container-carry | E1 CLI module and per-kind tests | clm-02 |
+| 3 | clm-09-wiring | Registration, BPMN dispatch, help, docs, parity, git e2e, final gates | clm-02, 11, 12, 15 |
+
 ## Continuation 2 2026-11-05 (clm-s732) - authoritative
 
 Manifest: `impl-plans/active/clm-s732-dispatch.json`, base HEAD
