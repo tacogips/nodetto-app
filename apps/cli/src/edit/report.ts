@@ -1,3 +1,4 @@
+import { formatMatchLines } from "./selectors.ts";
 import type { BatchResult } from "./types.ts";
 import { collapseWarnings } from "../warnings.ts";
 
@@ -13,6 +14,7 @@ export function formatEditReport(
         written: !dryRun,
         operations: result.operations,
         created: result.created,
+        ...(result.matches === undefined ? {} : { matches: result.matches }),
         ...(result.replaced.length ? { replaced: result.replaced } : {}),
         pages: Object.fromEntries(result.counts),
         warnings: result.warnings,
@@ -22,6 +24,7 @@ export function formatEditReport(
     )}\n`;
   const lines = [
     `${dryRun ? "Would apply" : "Applied"} ${result.operations} operation(s) to ${path}.`,
+    ...formatMatchLines(result.matches ?? []),
     ...[...result.counts].map(
       ([page, count]) =>
         `  page ${page}: +${count.added} ~${count.updated} -${count.removed}`,

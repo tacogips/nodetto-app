@@ -185,3 +185,47 @@ describe("BPMN SVG export", () => {
     expect(ty + localY).toBe(205.5);
   });
 });
+
+test("flow label positions move in exported SVG and midpoint stays unchanged", () => {
+  const start = element({
+    id: "from",
+    type: "bpmn.task",
+    semantic: { name: "Start" },
+    visual: { x: 0, y: 0, width: 80, height: 60 },
+  });
+  const end = element({
+    id: "to",
+    type: "bpmn.task",
+    semantic: { name: "End" },
+    visual: { x: 300, y: 0, width: 80, height: 60 },
+  });
+  const render = (labelPosition?: number) => {
+    const flow = element({
+      id: "flow",
+      type: "bpmn.sequenceFlow",
+      semantic: {
+        from: "from",
+        to: "to",
+        name: "Review order",
+        ...(labelPosition === undefined ? {} : { labelPosition }),
+      },
+    });
+    return (
+      renderPageSvg(
+        new Store(document([start, end, flow])),
+        createDefaultRegistry(),
+        TEST_PAGE.id,
+      ) ?? ""
+    );
+  };
+  const standard = render();
+  // Captured from checkpoint 0ae8168 before flow label positioning changed.
+  expect(standard).toBe(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="412" height="92" viewBox="-16 -16 412 92" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">\n<g data-layer="connectors"><g data-id="flow" data-type="bpmn.sequenceFlow"><line x1="80" y1="30" x2="300" y2="30" fill="none" stroke="#1d2a2e" stroke-width="1.5" /><polygon class="bpmn-sequence-arrow" fill="#000000" stroke="#000000" stroke-width="1.5" points="300,30 290,24.5 290,35.5" /><text class="bpmn-flow-label" fill="#000000" stroke="none" x="190" y="30" text-anchor="middle" font-size="11" xml:space="preserve"><tspan x="190" y="30">Review order</tspan></text></g></g>\n<g data-layer="shapes"><g data-id="from" data-type="bpmn.task"><g transform="translate(0 0)"><rect class="bpmn-activity-body" fill="#ffffff" stroke="#000000" stroke-width="2" x="0" y="0" width="80" height="60" rx="10" /><text class="bpmn-activity-label" fill="#000000" stroke="none" x="40" y="20.5" text-anchor="middle" font-size="11" xml:space="preserve"><tspan x="40" y="20.5">Start</tspan></text></g></g><g data-id="to" data-type="bpmn.task"><g transform="translate(300 0)"><rect class="bpmn-activity-body" fill="#ffffff" stroke="#000000" stroke-width="2" x="0" y="0" width="80" height="60" rx="10" /><text class="bpmn-activity-label" fill="#000000" stroke="none" x="40" y="20.5" text-anchor="middle" font-size="11" xml:space="preserve"><tspan x="40" y="20.5">End</tspan></text></g></g></g>\n</svg>\n',
+  );
+  expect(standard).toBe(render(0.5));
+  const x = (svg: string) =>
+    Number(svg.match(/<text class="bpmn-flow-label"[^>]*x="([\d.-]+)"/)?.[1]);
+  expect(Number.isFinite(x(standard))).toBe(true);
+  expect(x(render(0.2))).toBeLessThan(x(standard));
+});

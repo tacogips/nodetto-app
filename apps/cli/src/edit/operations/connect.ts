@@ -27,8 +27,12 @@ export function connectElements(
     typeof operation["label"] !== "string"
   )
     throw new OperationError(index, `"label" must be a string`);
-  const from = batch.element(operation["from"], index);
-  const to = batch.element(operation["to"], index);
+  const page =
+    operation["page"] === undefined
+      ? undefined
+      : batch.page(operation["page"], index).id;
+  const from = batch.element(operation["from"], index, page);
+  const to = batch.element(operation["to"], index, from.page);
   if (from.page !== to.page)
     throw new OperationError(
       index,
@@ -132,7 +136,12 @@ export function connectElements(
       {
         type: "updateSemantic",
         id,
-        semantic: deepMerge(created.semantic, patch),
+        semantic: batch.resolveReferences(
+          created.type,
+          deepMerge(created.semantic, patch),
+          index,
+          from.page,
+        ),
       },
     ]);
   batch.record(operation, index, id, created.type, from.page);

@@ -17,6 +17,7 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "op",
     "from",
     "to",
+    "page",
     "shape",
     "type",
     "id",
@@ -28,11 +29,21 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "toColumn",
     "cardinality",
   ],
-  update: ["op", "id", "semantic", "visual", "label", "carryMembers"],
+  update: [
+    "op",
+    "id",
+    "where",
+    "expect",
+    "semantic",
+    "visual",
+    "label",
+    "carryMembers",
+  ],
   append: ["op", "id", "field", "items"],
   "remove-item": ["op", "id", "field", "item"],
   move: ["op", "id", "x", "y"],
-  delete: ["op", "id"],
+  delete: ["op", "id", "where", "expect"],
+  select: ["op", "ref", "id", "where", "expect"],
   scale: ["op", "ids", "page", "factor", "origin"],
   "replace-text": [
     "op",
@@ -87,6 +98,14 @@ export function checkOperationFields(
       ? OPERATION_FIELDS[operation["op"]]
       : undefined;
   if (!fields) return;
+  checkFields(operation, fields, index);
+}
+
+export function checkFields(
+  operation: JsonObject,
+  fields: readonly string[],
+  index: number,
+): void {
   const errors = Object.keys(operation)
     .filter((field) => !fields.includes(field))
     .map((field) => {

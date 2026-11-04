@@ -13,14 +13,15 @@ import {
   type Page,
   resolvePageQuery,
 } from "@nodetto/ir";
-import { resolveId } from "../ids.ts";
+import { resolveElementReference } from "./selectors.ts";
+import { selectElement } from "./operations/select.ts";
 import {
   OperationError,
   requireText,
   type Json,
   type JsonObject,
 } from "./operation-input.ts";
-import type { Created } from "./types.ts";
+import type { Created, MatchReport } from "./types.ts";
 import { checkOperationFields } from "./operation-fields.ts";
 import {
   addPage,
@@ -42,6 +43,7 @@ import {
 import { groupElements, ungroupElement } from "./operations/groups.ts";
 
 export class Batch {
+  readonly matches: MatchReport[] = [];
   readonly refs = new Map<string, string>();
   readonly created: Created[] = [];
   readonly touchedPages = new Set<string>();
@@ -51,30 +53,13 @@ export class Batch {
 
   constructor(readonly editor: Editor) {}
 
-  private elementIds(): string[] {
-    return this.editor.store.listElements().map((element) => element.id);
-  }
-
-  element(query: Json, index: number): Element {
-    const value = requireText(query, "id", index);
-    const resolved = resolveId(value, this.elementIds(), this.refs);
-    if (!resolved.ok) {
-      const page = resolvePageQuery(
-        this.editor.store.listPages(),
-        value.startsWith("@")
-          ? (this.refs.get(value.slice(1)) ?? value)
-          : value,
-      );
-      throw new OperationError(
-        index,
-        page.ok
-          ? `"${value}" is a page, not an element; use rename-page, move-page or delete-page for pages.`
-          : resolved.message,
-      );
-    }
-    const element = this.editor.store.get(resolved.id);
-    if (!element) throw new OperationError(index, `No element ${resolved.id}.`);
-    return element;
+  element(query: Json, index: number, scopePage?: string): Element {
+    return resolveElementReference(
+      this,
+      requireText(query, "id", index),
+      index,
+      scopePage,
+    );
   }
 
   page(query: Json, index: number): Page {
@@ -90,7 +75,12 @@ export class Batch {
   }
 
   /** Replace "@ref" strings and id prefixes in reference fields with ids. */
-  resolveReferences(type: string, semantic: Json, index: number): Json {
+  resolveReferences(
+    type: string,
+    semantic: Json,
+    index: number,
+    scopePage?: string,
+  ): Json {
     const substitute = (value: Json): Json => {
       if (typeof value === "string" && value.startsWith("@")) {
         const id = this.refs.get(value.slice(1));
@@ -106,11 +96,36 @@ export class Batch {
       return value;
     };
     let resolved = substitute(semantic);
+    if (isKnownElementType(type) && isPlainObject(resolved)) {
+      const definition = getElementTypeDefinition(type);
+      for (const reference of definition?.references(resolved) ?? []) {
+        if (
+          !reference.id.startsWith("name:") ||
+          this.editor.store.get(reference.id)
+        )
+          continue;
+        const id = resolveElementReference(
+          this,
+          reference.id,
+          index,
+          scopePage,
+        ).id;
+        const path = reference.field.replace(/\[(\d+)\]/g, ".$1").split(".");
+        let target: unknown = resolved;
+        for (const part of path.slice(0, -1)) {
+          if (typeof target !== "object" || target === null) break;
+          target = (target as Record<string, unknown>)[part];
+        }
+        const last = path[path.length - 1];
+        if (typeof target === "object" && target !== null && last !== undefined)
+          (target as Record<string, unknown>)[last] = id;
+      }
+    }
     if (type === "erd.relation" && isPlainObject(resolved)) {
       const end = (value: Json): Json => {
         if (!isPlainObject(value) || typeof value["table"] !== "string")
           return value;
-        const table = this.element(value["table"], index);
+        const table = this.element(value["table"], index, scopePage);
         const columns = isPlainObject(table.semantic)
           ? table.semantic["columns"]
           : undefined;
@@ -149,7 +164,7 @@ export class Batch {
           )
             delete edge[field];
           else if (typeof value === "string")
-            edge[field] = this.element(value, index).id;
+            edge[field] = this.element(value, index, scopePage).id;
         }
         resolved = edge;
       }
@@ -285,10 +300,13 @@ export class Batch {
       case "delete":
         deleteElement(this, operation, index);
         return;
+      case "select":
+        selectElement(this, operation, index);
+        return;
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, scale, replace-text, group or ungroup.`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, select, scale, replace-text, group or ungroup.`,
         );
     }
   }

@@ -1,6 +1,7 @@
 import type { Element, ElementId } from "@nodetto/ir";
 import type { Box, Vec } from "../geometry.ts";
-import { wrapTextLines } from "../text-layout.ts";
+import { pointAlongRoute } from "../shapes/connector/route.ts";
+import { estimatedTextWidth, wrapTextLines } from "../text-layout.ts";
 
 export interface NotationPaint {
   readonly role: string;
@@ -853,6 +854,33 @@ function triangle(
   };
 }
 
+const FLOW_LABEL_FONT_SIZE = 11;
+const FLOW_LABEL_LINE_HEIGHT = 13;
+const FLOW_LABEL_ASCENT = 0.8;
+const FLOW_LABEL_DESCENT = 0.2;
+
+export function bpmnFlowLabelBox(
+  element: Element,
+  _points: readonly Vec[],
+  anchor: Vec,
+): Box | null {
+  const label = string(fields(element)["name"]);
+  if (!label) return null;
+  const lines = wrapTextLines(label, 90, FLOW_LABEL_FONT_SIZE);
+  const width = Math.max(
+    ...lines.map((line) => estimatedTextWidth(line, FLOW_LABEL_FONT_SIZE)),
+  );
+  return {
+    x: anchor.x - width / 2,
+    y: anchor.y - FLOW_LABEL_FONT_SIZE * FLOW_LABEL_ASCENT,
+    width,
+    height:
+      FLOW_LABEL_FONT_SIZE * FLOW_LABEL_ASCENT +
+      (lines.length - 1) * FLOW_LABEL_LINE_HEIGHT +
+      FLOW_LABEL_FONT_SIZE * FLOW_LABEL_DESCENT,
+  };
+}
+
 export function bpmnFlowDecoration(
   element: Element,
   points: readonly Vec[],
@@ -952,16 +980,22 @@ export function bpmnFlowDecoration(
           x: labelBounds.x + labelBounds.width / 2,
           y: labelBounds.y + labelBounds.height / 2,
         }
-      : polylineMidpoint(points);
+      : typeof data["labelPosition"] === "number" &&
+          Number.isFinite(data["labelPosition"])
+        ? pointAlongRoute(
+            points,
+            Math.max(0, Math.min(1, data["labelPosition"])),
+          )
+        : polylineMidpoint(points);
     out.push({
       kind: "text",
       role: "flow-label",
       x: anchor.x,
       y: anchor.y,
-      lines: wrapTextLines(label, 90, 11),
+      lines: wrapTextLines(label, 90, FLOW_LABEL_FONT_SIZE),
       anchor: "middle",
-      fontSize: 11,
-      lineHeight: 13,
+      fontSize: FLOW_LABEL_FONT_SIZE,
+      lineHeight: FLOW_LABEL_LINE_HEIGHT,
       fill: style?.color ?? "#000000",
       stroke: "none",
     });

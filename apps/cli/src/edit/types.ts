@@ -22,7 +22,15 @@ export interface EditWarning {
   readonly message: string;
 }
 
+export interface MatchReport {
+  readonly operation: number;
+  readonly op: string;
+  readonly count: number;
+  readonly ids: readonly string[];
+}
+
 export interface BatchResult {
+  readonly matches?: readonly MatchReport[];
   readonly warnings: readonly EditWarning[];
   readonly text: string;
   readonly created: readonly Created[];

@@ -1,0 +1,7 @@
+# clm-12 BPMN layered progress
+
+Implementation is incomplete. The planner and direct tests are present, but the free-only page cannot satisfy both the specified origin/column formulas and the no-op rerun criterion: a single task at (0, 0) moves to (70, 40), then (140, 80). See `tmp/clm-s731/clm-12-bpmn-layered/free-row-reproduction.log`. The geometry contract needs a decision for pages without pools. Nested lane geometry and collapsed pools, message flows, free rows alongside pools, subprocesses, boundary events, and document validation need direct regression coverage and any resulting fixes before completion.
+
+Fresh reads and edit intentions are in `tmp/clm-s731/clm-12-bpmn-layered/edit-{1,2,3,4,5}-intent.txt`. Initial source and test files and this log were absent. Planner hashes: initial `8dab16b46d9e5643f381b9945cf5ac02bdfd1f58`, after formatting `0eca7e8ed3bf072222d3aebf28f9d57f785261ed`, current `43703d01af3f38954be352c59a0623b20ee37f73`. Test hashes: initial `7fa56029265526241fbaffb1559afd3fbcc5c87f`, current `b860b94bd43857c699c2d8a01428dbad82211781`.
+
+Current shared-tree checks: planner 10 passed, containment/editor 15 passed, typecheck passed, scoped Biome passed, export grep passed; logs are in the evidence directory. Bun timing for 3 pools, 6 lanes, 60 units: 5.57 ms (`timing.ts`, `timing.log`). These checks do not establish all acceptance criteria. Formal review and wiring belong to downstream workflow steps.

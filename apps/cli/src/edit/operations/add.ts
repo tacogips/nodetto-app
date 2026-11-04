@@ -60,6 +60,7 @@ export function addElement(
             definition?.keyOrder,
           ),
           index,
+          page.id,
         );
   const id = batch.editor.createElement(type, {
     page: page.id,
@@ -158,7 +159,12 @@ function addParticipant(
       {
         type: "updateSemantic",
         id,
-        semantic: deepMerge(created.semantic, semantic),
+        semantic: batch.resolveReferences(
+          created.type,
+          deepMerge(created.semantic, semantic),
+          index,
+          page.id,
+        ),
       },
     ]);
   batch.record(operation, index, id, "sequence.participant", page.id);

@@ -20,6 +20,7 @@ export const LAYERED_PAGE_KINDS: readonly PageKind[] = [
   "freeform",
   "architecture",
   "uml",
+  "erd",
 ];
 export interface LayeredOptions {
   readonly direction: "LR" | "TB";
@@ -136,16 +137,29 @@ export function planLayered(
     while (parent && !frameIds.has(parent)) parent = parents.get(parent);
     return parent;
   };
-  const explicit = options.frameOrder ?? [];
+  const ownerOf = new Map<ElementId, ElementId | undefined>();
+  const firstRank = new Map<ElementId, number>();
+  const membersByOwner = new Map<ElementId | undefined, Element[]>();
+  for (const [index, unit] of ranked.entries()) {
+    ownerOf.set(unit.id, owner(unit.id));
+    const frameId = ownerOf.get(unit.id);
+    if (frameId !== undefined && !firstRank.has(frameId))
+      firstRank.set(frameId, index);
+    const members = membersByOwner.get(frameId) ?? [];
+    members.push(unit);
+    membersByOwner.set(frameId, members);
+  }
+  const explicitIndex = new Map<ElementId, number>();
+  for (const [index, id] of (options.frameOrder ?? []).entries())
+    if (!explicitIndex.has(id)) explicitIndex.set(id, index);
   const ordered = [...frames].sort((a, b) => {
-    const ai = explicit.indexOf(a.id);
-    const bi = explicit.indexOf(b.id);
-    if (ai >= 0 || bi >= 0) return ai < 0 ? 1 : bi < 0 ? -1 : ai - bi;
-    const ar = ranked.findIndex((u) => owner(u.id) === a.id);
-    const br = ranked.findIndex((u) => owner(u.id) === b.id);
+    const ai = explicitIndex.get(a.id);
+    const bi = explicitIndex.get(b.id);
+    if (ai !== undefined || bi !== undefined)
+      return ai === undefined ? 1 : bi === undefined ? -1 : ai - bi;
     return (
-      (ar < 0 ? Number.POSITIVE_INFINITY : ar) -
-        (br < 0 ? Number.POSITIVE_INFINITY : br) || compare(a.id, b.id)
+      (firstRank.get(a.id) ?? Number.POSITIVE_INFINITY) -
+        (firstRank.get(b.id) ?? Number.POSITIVE_INFINITY) || compare(a.id, b.id)
     );
   });
   const boxes = [...frames, ...units]
@@ -156,9 +170,9 @@ export function planLayered(
   const commands: Command[] = [];
   const placed = new Set<ElementId>();
   const columns: (Element | undefined)[] = [...ordered];
-  if (ranked.some((u) => !owner(u.id))) columns.push(undefined);
+  if (membersByOwner.has(undefined)) columns.push(undefined);
   for (const frame of columns) {
-    const members = ranked.filter((u) => owner(u.id) === frame?.id);
+    const members = membersByOwner.get(frame?.id) ?? [];
     const sizes = members
       .map((u) => context.boundsOf(u.id))
       .filter((b) => b !== null);
@@ -172,17 +186,24 @@ export function planLayered(
         ? FRAME_TITLE_BAND
         : 0;
     const width = Math.round(
-      lr ? cross + (frame ? 80 : 0) : stack + (frame ? 80 + title : 0),
+      lr ? cross + (frame ? 80 : 0) : stack + (frame ? 80 : 0),
     );
     const height = Math.round(
-      lr ? stack + (frame ? 80 + title : 0) : cross + (frame ? 80 : 0),
+      lr ? stack + (frame ? 80 + title : 0) : cross + (frame ? 80 + title : 0),
     );
-    let offset = frame ? 40 + title : 0;
+    let offset = frame ? 40 + (lr ? title : 0) : 0;
     for (const unit of members) {
       const box = context.boundsOf(unit.id);
       if (!box) continue;
       const nx = Math.round(x + (lr ? (width - box.width) / 2 : offset));
-      const ny = Math.round(y + (lr ? offset : (height - box.height) / 2));
+      const ny = Math.round(
+        y +
+          (lr
+            ? offset
+            : frame
+              ? title + 40 + (cross - box.height) / 2
+              : (height - box.height) / 2),
+      );
       const dx = nx - box.x;
       const dy = ny - box.y;
       for (const id of expandContainers(store, [unit.id], context).sort(

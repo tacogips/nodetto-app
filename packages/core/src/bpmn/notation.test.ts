@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { bpmnFlowDecoration, bpmnLabelBox, bpmnNotation } from "./notation.ts";
+import {
+  bpmnFlowDecoration,
+  bpmnFlowLabelBox,
+  bpmnLabelBox,
+  bpmnNotation,
+} from "./notation.ts";
 import {
   connectorDecoration,
   connectorDefaultDash,
@@ -527,4 +532,42 @@ describe("BPMN renderer-neutral notation", () => {
       ),
     ).toBe("1 4");
   });
+});
+
+test("flow labels use explicit positions and bounds, with baseline-relative boxes", () => {
+  const points = [
+    { x: 0, y: 100 },
+    { x: 200, y: 100 },
+  ];
+  const flow = (semantic: Record<string, unknown>, visual = {}) =>
+    element({
+      id: "flow",
+      type: "bpmn.sequenceFlow",
+      semantic: { name: "Review order", ...semantic },
+      visual: { x: 0, y: 0, width: 0, height: 0, ...visual },
+    });
+  const labelX = (item: ReturnType<typeof flow>) => {
+    const label = bpmnFlowDecoration(item, points, () => undefined).find(
+      (part) => part.role === "flow-label",
+    );
+    return label?.kind === "text" ? label.x : undefined;
+  };
+  expect(labelX(flow({}))).toBe(100);
+  expect(labelX(flow({ labelPosition: 0.2 }))).toBe(40);
+  expect(labelX(flow({ labelPosition: 0.8 }))).toBe(160);
+  expect(
+    labelX(
+      flow(
+        { labelPosition: 0.2 },
+        { labelBounds: { x: 70, y: 0, width: 20, height: 10 } },
+      ),
+    ),
+  ).toBe(80);
+  const box = bpmnFlowLabelBox(
+    flow({ name: "First row\nSecond row\nThird row\nFourth row" }),
+    points,
+    { x: 100, y: 100 },
+  );
+  expect(box?.y).toBeCloseTo(91.2);
+  expect(box?.height).toBeCloseTo(50);
 });

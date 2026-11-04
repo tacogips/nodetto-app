@@ -1,3 +1,13 @@
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { expect, test } from "bun:test";
 import { Editor } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
@@ -5,8 +15,10 @@ import {
   TEXT_LAYOUT_PAGE_ID,
   textLayoutProblemDocument,
 } from "./__fixtures__/text-layout.ts";
+import { readLocalAttachment } from "./attachments.ts";
 import {
   diagramLintApplies,
+  documentRelativePath,
   formatFixLines,
   lintDiagramPages,
 } from "./lint-diagram.ts";
@@ -137,4 +149,67 @@ test("fix writes once and rejects BPMN", () => {
   ).toBe("--fix needs a nodetto document");
   expect(writes).toBe(1);
   expect(serializeDocument(parseDocument(source))).toBe(source);
+});
+
+test("document relative paths normalize directory segments", () => {
+  const cases = [
+    ["a/b/../doc.jsonl", "img/x.png", "a/img/x.png"],
+    ["./doc.jsonl", "x.png", "x.png"],
+    ["doc.jsonl", "x.png", "x.png"],
+    ["../x/doc.jsonl", "y.png", "../x/y.png"],
+    ["/abs/doc.jsonl", "y.png", "/abs/y.png"],
+    ["a//b/./doc.jsonl", "y.png", "a/b/y.png"],
+    ["/../../doc.jsonl", "x.png", "/x.png"],
+    ["../../doc.jsonl", "x.png", "../../x.png"],
+  ];
+  for (const [documentPath, src, expected] of cases) {
+    expect(documentRelativePath(documentPath!, src!)).toBe(expected);
+  }
+});
+
+test("image checks normalize document paths and reject symlink escapes", () => {
+  const root = mkdtempSync(join(tmpdir(), "nodetto-image-lint-"));
+  try {
+    const directory = join(root, "document");
+    mkdirSync(join(directory, "assets"), { recursive: true });
+    writeFileSync(join(directory, "assets", "good.png"), "image");
+    writeFileSync(join(root, "outside.png"), "image");
+    symlinkSync(
+      join(root, "outside.png"),
+      join(directory, "assets", "link.png"),
+    );
+    const editor = new Editor();
+    editor.apply(
+      ["good", "missing", "link"].map((name) => ({
+        type: "createElement" as const,
+        element: editor.buildElement("image.raster", {
+          id: name,
+          semantic: { src: `assets/${name}.png`, alt: "Image" },
+          visual: { x: 0, y: 0, width: 100, height: 100 },
+        }),
+      })),
+    );
+    const io = {
+      readText: () => "",
+      writeText: () => {},
+      exists: existsSync,
+      readAttachment: readLocalAttachment,
+    };
+    const paths = [
+      `${relative(process.cwd(), root)}/document/../document/doc.jsonl`,
+      `${directory}/./doc.jsonl`,
+    ];
+    for (const path of paths) {
+      expect(
+        lintDiagramPages(io, path, editor.getSnapshot(), {
+          fix: false,
+        }).rows.map((row) => row.message),
+      ).toEqual([
+        'image src "assets/link.png" cannot be read (outside the document folder, too large, or unreadable)',
+        'image src "assets/missing.png" file not found',
+      ]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -46,13 +46,18 @@ test("handler operation reads are represented in their field rows", () => {
       "batch:record",
     ],
     connect: ["connect:connectElements", "batch:shape", "batch:record"],
-    update: ["elements:updateElement"],
+    update: [
+      "elements:updateElement",
+      "elements:updateOne",
+      "selectors:selectedWhere",
+    ],
+    select: ["select:selectElement", "selectors:selectedWhere"],
     append: ["elements:editListField"],
     "remove-item": ["elements:editListField"],
     move: ["elements:moveElement"],
     scale: ["elements:scaleElements", "batch:targets"],
     "replace-text": ["elements:replaceTextIn", "batch:targets"],
-    delete: ["elements:deleteElement"],
+    delete: ["elements:deleteElement", "selectors:selectedWhere"],
     group: ["groups:groupElements", "batch:record"],
     ungroup: ["groups:ungroupElement"],
     "add-page": ["pages:addPage", "pages:placePage"],
@@ -64,8 +69,8 @@ test("handler operation reads are represented in their field rows", () => {
   const reads = (spec: string): string[] => {
     const [file, name] = spec.split(":");
     const path =
-      file === "batch"
-        ? `${import.meta.dir}/batch.ts`
+      file === "batch" || file === "selectors"
+        ? `${import.meta.dir}/${file}.ts`
         : `${import.meta.dir}/operations/${file}.ts`;
     const source = ts.createSourceFile(
       path,

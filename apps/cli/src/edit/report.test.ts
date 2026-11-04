@@ -79,3 +79,14 @@ test("collapses matching text warnings but keeps JSON warnings", () => {
     JSON.parse(formatEditReport(repeated, "x", false, "json")).warnings,
   ).toHaveLength(2);
 });
+
+test("reports matches in text and JSON", () => {
+  const matches = [{ operation: 1, op: "update", count: 1, ids: ["one"] }];
+  expect(
+    formatEditReport({ ...result, matches }, "x", false, "text"),
+  ).toContain("operation 1 (update): matched 1 element(s)");
+  expect(
+    JSON.parse(formatEditReport({ ...result, matches }, "x", false, "json"))
+      .matches,
+  ).toEqual(matches);
+});

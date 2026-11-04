@@ -8,8 +8,10 @@ import {
   getElementTypeDefinition,
   isKnownElementType,
   isPlainObject,
+  type Element,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { selectedWhere } from "../selectors.ts";
 import { applyLabel } from "../label-field.ts";
 import {
   deepMerge,
@@ -77,7 +79,22 @@ export function updateElement(
   operation: JsonObject,
   index: number,
 ): void {
-  const element = batch.element(operation["id"], index);
+  if (
+    operation["semantic"] === undefined &&
+    operation["visual"] === undefined &&
+    operation["label"] === undefined
+  )
+    throw new OperationError(index, "update needs semantic, visual or label");
+  for (const element of selectedWhere(batch, operation, index, "update"))
+    updateOne(batch, element, operation, index);
+}
+
+function updateOne(
+  batch: Batch,
+  element: Element,
+  operation: JsonObject,
+  index: number,
+): void {
   const definition = definitionOf(element.type);
   const commands = [];
   if (operation["semantic"] !== undefined) {
@@ -88,6 +105,7 @@ export function updateElement(
         definition?.keyOrder,
       ),
       index,
+      element.page,
     );
     commands.push({
       type: "updateSemantic" as const,
@@ -237,8 +255,9 @@ export function deleteElement(
   operation: JsonObject,
   index: number,
 ): void {
-  const element = batch.element(operation["id"], index);
-  batch.editor.deleteElements([element.id]);
-  batch.touchedPages.add(element.page);
+  const elements = selectedWhere(batch, operation, index, "delete");
+  if (elements.length)
+    batch.editor.deleteElements(elements.map((element) => element.id));
+  for (const element of elements) batch.touchedPages.add(element.page);
   return;
 }

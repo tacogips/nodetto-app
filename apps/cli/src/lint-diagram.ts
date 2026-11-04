@@ -19,6 +19,28 @@ import { runOperations } from "./edit-command.ts";
 export const LINT_NO_PAGES_MESSAGE =
   "Document contains no BPMN, breadboard, architecture, freeform, flowchart, ERD, state or UML pages, or pages with images.";
 
+export function documentRelativePath(
+  documentPath: string,
+  src: string,
+): string {
+  const slash = documentPath.lastIndexOf("/");
+  const directory = slash < 0 ? "" : documentPath.slice(0, slash);
+  const absolute = documentPath.startsWith("/");
+  const segments: string[] = [];
+  for (const segment of directory.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (segments.length && segments[segments.length - 1] !== "..")
+        segments.pop();
+      else if (!absolute) segments.push(segment);
+    } else segments.push(segment);
+  }
+  const normalized = `${absolute ? "/" : ""}${segments.join("/")}`;
+  return normalized
+    ? `${normalized}${normalized === "/" ? "" : "/"}${src}`
+    : src;
+}
+
 export function diagramLintApplies(document: Document, page: Page): boolean {
   return (
     NODE_OVERLAP_PAGE_KINDS.includes(page.kind) ||
@@ -116,8 +138,7 @@ export function lintDiagramPages(
     for (const element of images) {
       const src = (element.semantic as Record<string, unknown>).src;
       if (!isRelativeAttachmentPath(src)) continue;
-      const slash = documentPath.lastIndexOf("/");
-      const joined = `${slash < 0 ? "" : documentPath.slice(0, slash + 1)}${src}`;
+      const joined = documentRelativePath(documentPath, src);
       let reason = "";
       if (io.exists?.(joined) === false) reason = "file not found";
       else

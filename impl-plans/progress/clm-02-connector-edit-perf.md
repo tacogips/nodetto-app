@@ -25,3 +25,9 @@
 - Corrected fractional port placement on elliptical outlines, including inset ellipses, and added a regression for a quarter-position initial-state port. `round3-ir-core.log` reports 161 pass, 0 fail. Existing midpoint behavior is unchanged.
 - Final native edit: real 0.58 s, user 0.54 s, sys 0.01 s; baseline user 0.58 s, ratio 0.93. Output matches the expected fixture, whose git hash remains `341fcd8654fc18d560c8895df1a05617a6b8ac39`. Native parity: 1 pass, 0 fail. The other required targeted suites, typecheck and Biome pass; logs use `round3-` in this plan's evidence directory.
 - The historical A7 cause remains unconfirmed. History establishes only that pre-checkpoint guards avoid the suspected route resolution on this fixture; it does not establish the version or document used in the original report. A representative reproduction or decision on the acceptance criterion is needed.
+
+## clm-s731 readiness blocker
+
+- The continuation matches the accepted A7/E1 design and has no declared predecessor. The pre-change baseline binary exists and the single-page fixture hash remains `341fcd8654fc18d560c8895df1a05617a6b8ac39`.
+- `packages/core/src/editor/facade/core.ts:305` calls `applyCommands` on the full live store. `packages/core/src/commands.ts:429-432` copies every element into a new map for each call, including elements on unrelated pages. The A7 design expressly forbids per-operation copies outside the dirty set. `commands.ts` and the facade are outside this plan's write paths; the plan requires an amendment when the fix needs an outside file. Request a checkpoint amendment authorizing the command-layer change and any necessary corresponding tests before proceeding. Evidence: `tmp/clm-s731/clm-02-connector-edit-perf/readiness.log`.
+- No implementation or baseline fixture capture has been performed. Completion, all behavioral gates, profile and timings remain outstanding; formal reviews remain downstream.
