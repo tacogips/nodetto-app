@@ -5,6 +5,7 @@ import {
   isPlainObject,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { applyLabel } from "../label-field.ts";
 import {
   deepMerge,
   fillIds,
@@ -66,6 +67,8 @@ export function addElement(
     ...(semantic === undefined ? {} : { semantic }),
     ...(visual === undefined ? {} : { visual }),
   });
+  if (operation["label"] !== undefined)
+    applyLabel(batch, id, operation["label"], index);
   if (isPlainObject(place)) placeRelative(batch, id, place, index);
   else if (autoPlace && content) {
     // Continue the row: right of everything, centred on the previous
@@ -121,33 +124,7 @@ function addShape(batch: Batch, operation: JsonObject, index: number): string {
           },
           index,
         );
-  if (label !== undefined) {
-    const value = typeof label === "string" ? label : undefined;
-    if (value === undefined)
-      throw new OperationError(index, `"label" must be a string`);
-    if (batch.editor.editableField(id)) batch.editor.setText(id, value);
-    else {
-      // Shapes the canvas names in the inspector (sequence participants,
-      // pseudo-states) still take a label through their text field.
-      const element = batch.editor.store.get(id);
-      const semantic = isPlainObject(element?.semantic) ? element.semantic : {};
-      const field = ["name", "label", "text"].find(
-        (key) => typeof semantic[key] === "string",
-      );
-      if (!field)
-        throw new OperationError(
-          index,
-          `${shape.id} has no text to label; set its fields with "semantic".`,
-        );
-      batch.editor.apply([
-        {
-          type: "updateSemantic",
-          id,
-          semantic: { ...semantic, [field]: value },
-        },
-      ]);
-    }
-  }
+  if (label !== undefined) applyLabel(batch, id, label, index);
   return id;
 }
 

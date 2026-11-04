@@ -1,6 +1,7 @@
 import { connectScreenTransition, connectShape } from "@nodetto/core";
 import { type Element, isPlainObject } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { applyLabel } from "../label-field.ts";
 import {
   deepMerge,
   type Json,
@@ -21,6 +22,11 @@ export function connectElements(
   operation: JsonObject,
   index: number,
 ): string {
+  if (
+    operation["label"] !== undefined &&
+    typeof operation["label"] !== "string"
+  )
+    throw new OperationError(index, `"label" must be a string`);
   const from = batch.element(operation["from"], index);
   const to = batch.element(operation["to"], index);
   if (from.page !== to.page)
@@ -45,7 +51,19 @@ export function connectElements(
         page: from.page,
         type: operation["type"],
         semantic: deepMerge(
-          { from: from.id, to: to.id },
+          {
+            from: from.id,
+            to: to.id,
+            ...(typeof operation["label"] === "string"
+              ? {
+                  [operation["type"] === "state.transition"
+                    ? "trigger"
+                    : operation["type"].startsWith("bpmn.")
+                      ? "name"
+                      : "label"]: operation["label"],
+                }
+              : {}),
+          },
           isPlainObject(operation["semantic"]) ? operation["semantic"] : {},
         ),
         ...(typeof operation["ref"] === "string"
@@ -68,6 +86,8 @@ export function connectElements(
         ? `${shape.label} (${shape.id}) cannot connect ${from.type} to ${to.type}; it joins ${shape.type} endpoints of its own notation.`
         : `Cannot connect ${from.type} to ${to.type} here (a rule of this diagram kind forbids it, or an element is locked).`,
     );
+  if (operation["label"] !== undefined)
+    applyLabel(batch, id, operation["label"], index);
   const created = batch.editor.store.get(id);
   if (!created)
     throw new OperationError(index, "The connector was not created.");
@@ -105,15 +125,6 @@ export function connectElements(
           : "*:1",
     };
   }
-  const label = operation["label"];
-  if (typeof label === "string")
-    patch[
-      created.type === "state.transition"
-        ? "trigger"
-        : created.type.startsWith("bpmn.")
-          ? "name"
-          : "label"
-    ] = label;
   if (isPlainObject(operation["semantic"]))
     patch = deepMerge(patch, operation["semantic"]) as Record<string, Json>;
   if (Object.keys(patch).length)

@@ -63,3 +63,19 @@ test("places nonempty replaced between created and pages in JSON", () => {
   ]);
   expect(parsed.replaced).toEqual(result.replaced);
 });
+
+test("collapses matching text warnings but keeps JSON warnings", () => {
+  const repeated = {
+    ...result,
+    warnings: [
+      result.warnings[0]!,
+      { ...result.warnings[0]!, element: "two", operation: 2 },
+    ],
+  };
+  expect(formatEditReport(repeated, "x", false, "text")).toContain(
+    "(and 1 more like this)",
+  );
+  expect(
+    JSON.parse(formatEditReport(repeated, "x", false, "json")).warnings,
+  ).toHaveLength(2);
+});

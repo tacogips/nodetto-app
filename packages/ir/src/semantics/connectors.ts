@@ -98,6 +98,9 @@ export interface ConnectorRoutingSemantic extends ConnectorPorts {
   readonly routingAxis?: ConnectorRoutingAxis;
   /** Position of the middle channel between endpoints; 0–1, default 0.5. */
   readonly routingBend?: number;
+  readonly labelPosition?: number;
+  readonly fromPortPosition?: number;
+  readonly toPortPosition?: number;
   /** Route around visible layers on the connector's page; default true. */
   readonly routingAvoidObstacles?: boolean;
   /** User-authored points for manual routes, stable as endpoints move together. */

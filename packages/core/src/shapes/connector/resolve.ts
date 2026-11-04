@@ -188,15 +188,29 @@ function computeConnector(
     typeof element.semantic === "object" && element.semantic !== null
       ? (element.semantic as Record<string, unknown>)
       : {};
+  const rawLabelPosition = semantic["labelPosition"];
+  const labelRatio =
+    typeof rawLabelPosition === "number" && Number.isFinite(rawLabelPosition)
+      ? Math.max(0, Math.min(1, rawLabelPosition))
+      : 0.5;
+  const route = (...args: Parameters<typeof withRoute>): ConnectorEndpoints => {
+    args[7] = labelRatio;
+    return withRoute(...args);
+  };
   const hasColumns = (end: string): boolean =>
     element.type === "erd.relation" &&
     erdEndpointColumnIds(semantic[end] as ErdEndpoint).length > 0;
   const fromPin = hasColumns("from")
     ? undefined
-    : pinnedPort(from, context, semantic["fromPort"]);
+    : pinnedPort(
+        from,
+        context,
+        semantic["fromPort"],
+        semantic["fromPortPosition"],
+      );
   const toPin = hasColumns("to")
     ? undefined
-    : pinnedPort(to, context, semantic["toPort"]);
+    : pinnedPort(to, context, semantic["toPort"], semantic["toPortPosition"]);
   if (
     element.type === "state.transition" &&
     ids.from === ids.to &&
@@ -217,11 +231,60 @@ function computeConnector(
       { x: fromCenter.x, y: top },
       context,
     );
-    return withRoute(start, end, fromBox, toBox, [
+    return route(start, end, fromBox, toBox, [
       start,
       { x: right, y: start.y },
       { x: right, y: top },
       { x: end.x, y: top },
+      end,
+    ]);
+  }
+  if (
+    ids.from === ids.to &&
+    element.type !== "erd.relation" &&
+    element.type !== "sequence.message" &&
+    fromPin &&
+    toPin &&
+    semantic["fromPort"] === semantic["toPort"]
+  ) {
+    const port = semantic["fromPort"];
+    const fromPosition = semantic["fromPortPosition"];
+    const toPosition = semantic["toPortPosition"];
+    const start =
+      pinnedPort(
+        from,
+        context,
+        port,
+        typeof fromPosition === "number" && Number.isFinite(fromPosition)
+          ? fromPosition
+          : 0.3,
+      ) ?? fromPin;
+    const end =
+      pinnedPort(
+        to,
+        context,
+        port,
+        typeof toPosition === "number" && Number.isFinite(toPosition)
+          ? toPosition
+          : 0.7,
+      ) ?? toPin;
+    const direction =
+      port === "top"
+        ? { x: 0, y: -1 }
+        : port === "right"
+          ? { x: 1, y: 0 }
+          : port === "bottom"
+            ? { x: 0, y: 1 }
+            : { x: -1, y: 0 };
+    const normal = rotatePoint(
+      direction,
+      { x: 0, y: 0 },
+      endpointRotation(from),
+    );
+    return route(start, end, fromBox, toBox, [
+      start,
+      { x: start.x + normal.x * 40, y: start.y + normal.y * 40 },
+      { x: end.x + normal.x * 40, y: end.y + normal.y * 40 },
       end,
     ]);
   }
@@ -255,7 +318,7 @@ function computeConnector(
       context,
       toRow,
     );
-    return withRoute(start, end, fromBox, toBox, [
+    return route(start, end, fromBox, toBox, [
       start,
       { x: right, y: start.y },
       { x: right, y: end.y },
@@ -265,19 +328,14 @@ function computeConnector(
   if (element.type === "sequence.message") {
     const y = sequenceMessageY(element, context);
     if (fromCenter.x === toCenter.x) {
-      return withRoute(
+      return route(
         { x: fromCenter.x, y },
         { x: fromCenter.x + 48, y },
         fromBox,
         toBox,
       );
     }
-    return withRoute(
-      { x: fromCenter.x, y },
-      { x: toCenter.x, y },
-      fromBox,
-      toBox,
-    );
+    return route({ x: fromCenter.x, y }, { x: toCenter.x, y }, fromBox, toBox);
   }
   if (semantic["routing"] === "manual") {
     const stored = manualWaypoints(semantic);
@@ -302,7 +360,7 @@ function computeConnector(
         context,
         toAnchor,
       );
-    return withRoute(
+    return route(
       start,
       end,
       fromBox,
@@ -457,7 +515,7 @@ function computeConnector(
     const hasMovableChannel = horizontal
       ? Math.abs(start.y - end.y) > 1e-9
       : Math.abs(start.x - end.x) > 1e-9;
-    return withRoute(
+    return route(
       start,
       end,
       fromBox,
@@ -478,5 +536,5 @@ function computeConnector(
     fromPin ?? resolvedBoundary(from, fromBox, toAnchor, context, fromAnchor);
   const end =
     toPin ?? resolvedBoundary(to, toBox, fromAnchor, context, toAnchor);
-  return withRoute(start, end, fromBox, toBox);
+  return route(start, end, fromBox, toBox);
 }

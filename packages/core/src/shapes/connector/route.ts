@@ -24,7 +24,7 @@ export interface ConnectorEndpoints {
   readonly toBox: Box;
 }
 
-function pointAlong(points: readonly Vec[], ratio: number): Vec {
+export function pointAlongRoute(points: readonly Vec[], ratio: number): Vec {
   const lengths = points.slice(1).map((point, index) => {
     const previous = points[index] as Vec;
     return Math.hypot(point.x - previous.x, point.y - previous.y);
@@ -55,6 +55,7 @@ export function withRoute(
   points: readonly Vec[] = [start, end],
   bend?: { readonly point: Vec; readonly axis: "x" | "y" },
   waypointPoints?: readonly Vec[],
+  labelRatio = 0.5,
 ): ConnectorEndpoints {
   const compact = points.filter(
     (point, index) =>
@@ -66,7 +67,7 @@ export function withRoute(
     start,
     end,
     points: compact,
-    labelPoint: pointAlong(compact, 0.5),
+    labelPoint: pointAlongRoute(compact, labelRatio),
     ...(bend ? { bendPoint: bend.point, bendAxis: bend.axis } : {}),
     ...(waypointPoints?.length ? { waypointPoints } : {}),
     fromBox,

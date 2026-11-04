@@ -240,8 +240,73 @@ export function pinnedPort(
   element: Element,
   context: ShapeContext,
   port: unknown,
+  position?: unknown,
 ): Vec | undefined {
   if (!CONNECTOR_PORTS.includes(port as ConnectorPort)) return undefined;
+  if (typeof position === "number" && Number.isFinite(position)) {
+    const box = context.boundsOf(element.id);
+    // Keep the same eligibility rules as the midpoint ports.
+    if (!box || connectionPorts(element, context).length === 0)
+      return undefined;
+    const center = boxCenter(box);
+    const fraction = Math.max(0, Math.min(1, position)) - 0.5;
+    const horizontal = port === "top" || port === "bottom";
+    const origin = horizontal
+      ? { x: center.x + fraction * box.width, y: center.y }
+      : { x: center.x, y: center.y + fraction * box.height };
+    const direction =
+      port === "top"
+        ? { x: 0, y: -1 }
+        : port === "right"
+          ? { x: 1, y: 0 }
+          : port === "bottom"
+            ? { x: 0, y: 1 }
+            : { x: -1, y: 0 };
+    const target = {
+      x: origin.x + direction.x * (box.width + 1),
+      y: origin.y + direction.y * (box.height + 1),
+    };
+    const rotation = endpointRotation(element);
+    const stateKind = (element.semantic as { kind?: string }).kind;
+    const ellipseInset =
+      element.type === "state.node" &&
+      (stateKind === "initial" || stateKind === "final")
+        ? 0
+        : element.type === "usecase.node" && stateKind === "usecase"
+          ? 1
+          : element.type === UmlComponentType.Interface
+            ? 2
+            : element.type === "shape.geo" &&
+                (element.semantic as GeoShapeSemantic).geo === "ellipse"
+              ? 1
+              : undefined;
+    if (ellipseInset !== undefined) {
+      const rx = Math.max(0, box.width / 2 - ellipseInset);
+      const ry = Math.max(0, box.height / 2 - ellipseInset);
+      if (rx > 0 && ry > 0) {
+        const offset = horizontal
+          ? Math.max(-rx, Math.min(rx, origin.x - center.x))
+          : Math.max(-ry, Math.min(ry, origin.y - center.y));
+        const normal = horizontal
+          ? ry * Math.sqrt(Math.max(0, 1 - (offset / rx) ** 2))
+          : rx * Math.sqrt(Math.max(0, 1 - (offset / ry) ** 2));
+        return rotatePoint(
+          horizontal
+            ? { x: center.x + offset, y: center.y + direction.y * normal }
+            : { x: center.x + direction.x * normal, y: center.y + offset },
+          center,
+          rotation,
+        );
+      }
+    }
+    return resolvedBoundary(
+      element,
+      box,
+      rotatePoint(target, center, rotation),
+      context,
+      rotatePoint(origin, center, rotation),
+    );
+  }
   return connectionPorts(element, context).find(
     (candidate) => candidate.id === port,
   )?.point;

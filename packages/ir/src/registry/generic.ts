@@ -9,7 +9,7 @@ import {
   checkObject,
   checkString,
 } from "../checks.ts";
-import { error, type ValidationIssue } from "../issues.ts";
+import { error, warning, type ValidationIssue } from "../issues.ts";
 import {
   ARROWHEADS,
   CONNECTOR_ROUTINGS,
@@ -80,6 +80,28 @@ export function validateConnectorRouting(
         "must be less than or equal to 1",
       ),
     );
+  for (const key of ["labelPosition", "fromPortPosition", "toPortPosition"]) {
+    const value = semantic[key];
+    if (
+      checkNumber(out, value, `${path}.${key}`, { optional: true, min: 0 }) &&
+      typeof value === "number" &&
+      value > 1
+    )
+      out.push(
+        error("value.max", `${path}.${key}`, "must be less than or equal to 1"),
+      );
+  }
+  for (const end of ["from", "to"]) {
+    const key = `${end}PortPosition`;
+    if (semantic[key] !== undefined && semantic[`${end}Port`] === undefined)
+      out.push(
+        warning(
+          "semantic.portPositionWithoutPort",
+          `${path}.${key}`,
+          "port position has no effect without a port",
+        ),
+      );
+  }
   checkBoolean(
     out,
     semantic["routingAvoidObstacles"],
@@ -139,6 +161,9 @@ export const GENERIC_EDGE: ElementTypeDefinition = {
       "routing",
       "routingAxis",
       "routingBend",
+      "labelPosition",
+      "fromPortPosition",
+      "toPortPosition",
       "routingAvoidObstacles",
       "routingWaypoints",
       "fromPort",

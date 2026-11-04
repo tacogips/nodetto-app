@@ -8,7 +8,7 @@
 // local value wins and the element is reported as a conflict.
 
 import type { Document, Element, Page } from "@nodetto/ir";
-import { isPlainObject } from "@nodetto/ir";
+import { getElementTypeDefinition, isPlainObject } from "@nodetto/ir";
 import type { StoreCommit } from "./store.ts";
 
 export interface MergeConflict {
@@ -204,4 +204,277 @@ export function isEmptyCommit(commit: StoreCommit): boolean {
     !commit.updatePages?.length &&
     !commit.removePages?.length
   );
+}
+
+export interface VersionConflict {
+  readonly kind: "document" | "page" | "element";
+  readonly id: string;
+  readonly type?: string;
+  readonly path?: string;
+  readonly reason:
+    | "field"
+    | "both-added"
+    | "deleted-in-ours"
+    | "deleted-in-theirs";
+  readonly base?: unknown;
+  readonly ours?: unknown;
+  readonly theirs?: unknown;
+}
+
+const compareVersionStrings = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0;
+
+/** Merge versions for the CLI while leaving the live editor merge unchanged. */
+export function mergeDocumentVersions(
+  base: Document,
+  ours: Document,
+  theirs: Document,
+): { document: Document; conflicts: VersionConflict[] } {
+  const conflicts: VersionConflict[] = [];
+  function value(
+    b: unknown,
+    o: unknown,
+    t: unknown,
+    record: Omit<VersionConflict, "reason">,
+    path: string,
+    added: boolean,
+  ): unknown {
+    if (same(o, t)) return o;
+    if (same(o, b)) return t;
+    if (same(t, b)) return o;
+    const objectBase =
+      added && b === undefined && isPlainObject(o) && isPlainObject(t) ? {} : b;
+    if (isPlainObject(objectBase) && isPlainObject(o) && isPlainObject(t)) {
+      const result: Record<string, unknown> = {};
+      const keys = [
+        ...new Set([
+          ...Object.keys(objectBase),
+          ...Object.keys(o),
+          ...Object.keys(t),
+        ]),
+      ].sort(compareVersionStrings);
+      for (const key of keys) {
+        const v = value(
+          objectBase[key],
+          o[key],
+          t[key],
+          record,
+          path ? `${path}.${key}` : key,
+          added,
+        );
+        if (v !== undefined) result[key] = v;
+      }
+      return result;
+    }
+    conflicts.push({
+      ...record,
+      path,
+      reason: added ? "both-added" : "field",
+      base: b,
+      ours: o,
+      theirs: t,
+    });
+    return o;
+  }
+  function records<T extends { readonly id: string }>(
+    kind: "page" | "element",
+    bs: readonly T[],
+    os: readonly T[],
+    ts: readonly T[],
+  ): T[] {
+    const bm = new Map(bs.map((x) => [x.id, x]));
+    const om = new Map(os.map((x) => [x.id, x]));
+    const tm = new Map(ts.map((x) => [x.id, x]));
+    const ids = [...new Set([...bm.keys(), ...om.keys(), ...tm.keys()])].sort(
+      compareVersionStrings,
+    );
+    const out: T[] = [];
+    for (const id of ids) {
+      const b = bm.get(id);
+      const o = om.get(id);
+      const t = tm.get(id);
+      if (!o && !t) continue;
+      const record = {
+        kind,
+        id,
+        ...(kind === "element"
+          ? { type: ((o ?? t ?? b) as unknown as Element).type }
+          : {}),
+      };
+      if (!b) {
+        if (o && t) out.push(value({}, o, t, record, "", true) as T);
+        else out.push((o ?? t) as T);
+      } else if (!o) {
+        if (t && !same(b, t))
+          conflicts.push({ ...record, reason: "deleted-in-ours" });
+      } else if (!t) {
+        if (!same(b, o)) {
+          out.push(o);
+          conflicts.push({ ...record, reason: "deleted-in-theirs" });
+        }
+      } else out.push(value(b, o, t, record, "", false) as T);
+    }
+    return out;
+  }
+  const pages = records("page", base.pages, ours.pages, theirs.pages);
+  const elements = records(
+    "element",
+    base.elements,
+    ours.elements,
+    theirs.elements,
+  );
+  const oursPages = new Map(ours.pages.map((p) => [p.id, p]));
+  const oursElements = new Map(ours.elements.map((e) => [e.id, e]));
+  const baseElements = new Map(base.elements.map((e) => [e.id, e]));
+  const theirsElements = new Map(theirs.elements.map((e) => [e.id, e]));
+  const addConflict = (c: VersionConflict) => {
+    if (
+      !conflicts.some(
+        (x) =>
+          x.kind === c.kind &&
+          x.id === c.id &&
+          x.reason === c.reason &&
+          x.path === c.path,
+      )
+    )
+      conflicts.push(c);
+  };
+  for (
+    let pass = 0;
+    pass <=
+    base.elements.length +
+      ours.elements.length +
+      theirs.elements.length +
+      ours.pages.length;
+    pass++
+  ) {
+    let changed = false;
+    const pageIds = new Set(pages.map((p) => p.id));
+    const elementIds = new Set(elements.map((e) => e.id));
+    for (const e of [...elements]) {
+      if (!pageIds.has(e.page)) {
+        const page = oursPages.get(e.page);
+        if (page && oursElements.has(e.id)) {
+          pages.push(page);
+          pageIds.add(page.id);
+          addConflict({
+            kind: "page",
+            id: page.id,
+            reason: "deleted-in-theirs",
+          });
+        } else {
+          elements.splice(elements.indexOf(e), 1);
+          elementIds.delete(e.id);
+          if (!same(baseElements.get(e.id), e))
+            addConflict({
+              kind: "element",
+              id: e.id,
+              type: e.type,
+              reason: "deleted-in-ours",
+            });
+        }
+        changed = true;
+        continue;
+      }
+      for (const ref of getElementTypeDefinition(e.type)?.references(
+        e.semantic,
+      ) ?? []) {
+        if (elementIds.has(ref.id)) continue;
+        if (
+          !baseElements.has(ref.id) &&
+          !oursElements.has(ref.id) &&
+          !theirsElements.has(ref.id)
+        )
+          continue;
+        const original = oursElements.get(ref.id);
+        if (original) {
+          elements.push(original);
+          elementIds.add(original.id);
+          addConflict({
+            kind: "element",
+            id: original.id,
+            type: original.type,
+            reason: "deleted-in-theirs",
+          });
+        } else {
+          elements.splice(elements.indexOf(e), 1);
+          elementIds.delete(e.id);
+          addConflict({
+            kind: "element",
+            id: e.id,
+            type: e.type,
+            reason: "deleted-in-ours",
+          });
+        }
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) break;
+  }
+  pages.sort((a, b) => compareVersionStrings(a.id, b.id));
+  elements.sort((a, b) => compareVersionStrings(a.id, b.id));
+  const header = { kind: "document" as const, id: ours.id };
+  const title = value(
+    base.title,
+    ours.title,
+    theirs.title,
+    header,
+    "title",
+    false,
+  ) as string;
+  const extensions = value(
+    base.extensions,
+    ours.extensions,
+    theirs.extensions,
+    header,
+    "extensions",
+    false,
+  ) as Document["extensions"];
+  const canonicalValue = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(canonicalValue);
+    if (!isPlainObject(v)) return v;
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(v).sort(compareVersionStrings))
+      result[key] = canonicalValue(v[key]);
+    return result;
+  };
+  const unknownKey = (r: NonNullable<Document["unknownRecords"]>[number]) =>
+    JSON.stringify([r.kind, canonicalValue(r.data)]);
+  const bm = new Map(
+    (base.unknownRecords ?? []).map((r) => [unknownKey(r), r]),
+  );
+  const om = new Map(
+    (ours.unknownRecords ?? []).map((r) => [unknownKey(r), r]),
+  );
+  const tm = new Map(
+    (theirs.unknownRecords ?? []).map((r) => [unknownKey(r), r]),
+  );
+  const unknownRecords = [...new Set([...om.keys(), ...tm.keys()])]
+    .filter((k) => !bm.has(k) || (om.has(k) && tm.has(k)))
+    .sort(compareVersionStrings)
+    .map(
+      (k) =>
+        (om.get(k) ?? tm.get(k)) as NonNullable<
+          Document["unknownRecords"]
+        >[number],
+    );
+  conflicts.sort(
+    (a, b) =>
+      compareVersionStrings(
+        String(["document", "page", "element"].indexOf(a.kind)),
+        String(["document", "page", "element"].indexOf(b.kind)),
+      ) ||
+      compareVersionStrings(a.id, b.id) ||
+      compareVersionStrings(a.path ?? "", b.path ?? ""),
+  );
+  const document: Document = {
+    ...ours,
+    title,
+    extensions,
+    pages,
+    elements,
+    unknownRecords,
+  };
+  return { document, conflicts };
 }

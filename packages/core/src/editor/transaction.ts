@@ -91,34 +91,33 @@ export interface DerivedPlanInput {
 /** The derived commands that follow `permitted` in the same transaction. */
 export function planDerivedCommands(input: DerivedPlanInput): Command[] {
   const { store, registry, context, permitted, placed } = input;
+  if (!permitted.length) return [];
+  const snapshot = store.getSnapshot();
   let derived: Command[] = [];
   if (
-    permitted.length &&
-    (store
-      .getSnapshot()
-      .elements.some(
-        (element) =>
-          element.type === UmlComponentType.Port ||
-          element.visual.colorTokens ||
-          element.visual.numberTokens ||
-          element.visual.textStyle ||
-          element.visual.aspectRatio !== undefined ||
-          element.visual.textResize === "auto-width" ||
-          element.visual.textResize === "auto-height" ||
-          (element.type === "frame" &&
-            (element.semantic as { layout?: unknown }).layout),
-      ) ||
-      permitted.some(
-        (command) =>
-          command.type === "updateSemantic" ||
-          command.type === "updateVisual" ||
-          command.type === "replaceVisual" ||
-          command.type === "deleteElements" ||
-          command.type === "deletePage" ||
-          command.type === "createElement",
-      ))
+    snapshot.elements.some(
+      (element) =>
+        element.type === UmlComponentType.Port ||
+        element.visual.colorTokens ||
+        element.visual.numberTokens ||
+        element.visual.textStyle ||
+        element.visual.aspectRatio !== undefined ||
+        element.visual.textResize === "auto-width" ||
+        element.visual.textResize === "auto-height" ||
+        (element.type === "frame" &&
+          (element.semantic as { layout?: unknown }).layout),
+    ) ||
+    permitted.some(
+      (command) =>
+        command.type === "updateSemantic" ||
+        command.type === "updateVisual" ||
+        command.type === "replaceVisual" ||
+        command.type === "deleteElements" ||
+        command.type === "deletePage" ||
+        command.type === "createElement",
+    )
   ) {
-    const draft = new Store(store.getSnapshot());
+    const draft = new Store(snapshot);
     applyCommands(draft, permitted);
     derived = [
       ...planTextStyles(draft, registry),

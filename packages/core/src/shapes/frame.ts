@@ -6,6 +6,8 @@ import {
 import type { ShapeUtil } from "../shape-util.ts";
 import type { FramePlatform, FrameSemantic, SafeAreaInsets } from "@nodetto/ir";
 
+export const FRAME_TITLE_BAND = 24;
+
 export interface FramePreset {
   readonly name: string;
   readonly width: number;
@@ -97,7 +99,7 @@ export const frameShapeUtil: ShapeUtil = {
           box.y +
             ((element.semantic as FrameSemantic).showTitle === false
               ? 8
-              : 24) ||
+              : FRAME_TITLE_BAND) ||
         point.y >= box.y + box.height - 8)
     );
   },

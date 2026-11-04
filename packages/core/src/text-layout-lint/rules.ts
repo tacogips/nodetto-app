@@ -313,3 +313,49 @@ export function pairFindings(
   }
   return results;
 }
+
+type TextWrapArea = {
+  field: "label" | "text";
+  width: number;
+  fontSize: number;
+  letterSpacing: number;
+};
+export function textWrapArea(item: Item): TextWrapArea | undefined {
+  const { element, box } = item;
+  const letterSpacing = element.visual.style?.letterSpacing ?? 0;
+  if (element.type === "text.note")
+    return {
+      field: "text",
+      width: Math.max(
+        1,
+        box.width - 2 * (element.visual.textPadding ?? TEXT_NOTE_PADDING_X),
+      ),
+      fontSize: element.visual.style?.fontSize ?? DEFAULT_SVG_THEME.fontSize,
+      letterSpacing,
+    };
+  if (element.type !== "node.generic" && element.type !== "shape.geo")
+    return undefined;
+  const label = readString(element.semantic, "label") ?? "";
+  const layout =
+    element.type === "node.generic"
+      ? nodeLabelLayout(label, {
+          ...element.visual,
+          width: box.width,
+          height: box.height,
+        })
+      : boxLabelLayout(
+          label,
+          box.width,
+          element.visual,
+          DEFAULT_SVG_THEME.fontSize,
+        );
+  return {
+    field: "label",
+    width:
+      element.type === "node.generic"
+        ? (layout as ReturnType<typeof nodeLabelLayout>).width
+        : box.width - 2 * TEXT_NOTE_PADDING_X,
+    fontSize: layout.fontSize,
+    letterSpacing,
+  };
+}

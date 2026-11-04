@@ -21,6 +21,7 @@ import {
   type JsonObject,
 } from "./operation-input.ts";
 import type { Created } from "./types.ts";
+import { checkOperationFields } from "./operation-fields.ts";
 import {
   addPage,
   movePage,
@@ -236,6 +237,7 @@ export class Batch {
 
   apply(operation: JsonObject, index: number): void {
     const op = operation["op"];
+    checkOperationFields(operation, index);
     switch (op) {
       case "add-page":
         addPage(this, operation, index);

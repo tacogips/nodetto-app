@@ -1,10 +1,16 @@
-import { planScale, replaceText, textMatcher } from "@nodetto/core";
+import {
+  frameParents,
+  planScale,
+  replaceText,
+  textMatcher,
+} from "@nodetto/core";
 import {
   getElementTypeDefinition,
   isKnownElementType,
   isPlainObject,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { applyLabel } from "../label-field.ts";
 import {
   deepMerge,
   fillIds,
@@ -99,9 +105,36 @@ export function updateElement(
       visual,
     });
   }
-  if (!commands.length)
-    throw new OperationError(index, "update needs semantic or visual");
-  batch.editor.apply(commands);
+  const carry = operation["carryMembers"];
+  if (carry !== undefined && typeof carry !== "boolean")
+    throw new OperationError(index, `"carryMembers" must be true or false`);
+  if (carry === false && element.type !== "frame")
+    throw new OperationError(index, "carryMembers applies only to frames");
+  if (!commands.length && operation["label"] === undefined)
+    throw new OperationError(index, "update needs semantic, visual or label");
+  let placed: Set<string> | undefined;
+  if (carry === false) {
+    batch.editor.setCurrentPage(element.page);
+    const parents = frameParents(
+      batch.editor.store,
+      element.page,
+      batch.editor.createShapeContext(1),
+    );
+    placed = new Set<string>();
+    for (const [child] of parents) {
+      let parent = parents.get(child);
+      while (parent) {
+        if (parent === element.id) {
+          placed.add(child);
+          break;
+        }
+        parent = parents.get(parent);
+      }
+    }
+  }
+  batch.editor.apply(commands, placed ? { placed } : undefined);
+  if (operation["label"] !== undefined)
+    applyLabel(batch, element.id, operation["label"], index);
   batch.touchedPages.add(element.page);
   return;
 }
@@ -172,6 +205,13 @@ export function replaceTextIn(
   const replacement = operation["replace"];
   if (typeof replacement !== "string")
     throw new OperationError(index, `"replace" must be a string`);
+  for (const field of ["regex", "ignoreCase"] as const) {
+    if (operation[field] !== undefined && typeof operation[field] !== "boolean")
+      throw new OperationError(
+        index,
+        `"${field}" must be true or false (true reads "find" as a regular expression)`,
+      );
+  }
   const matcher = textMatcher(find, {
     regex: operation["regex"] === true,
     ignoreCase: operation["ignoreCase"] === true,

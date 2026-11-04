@@ -1,4 +1,5 @@
 import type { BatchResult } from "./types.ts";
+import { collapseWarnings } from "../warnings.ts";
 
 export function formatEditReport(
   result: BatchResult,
@@ -35,9 +36,14 @@ export function formatEditReport(
     ),
   ];
   lines.push(
-    ...result.warnings.map(
-      (warning) =>
-        `  warning operation ${warning.operation} (${warning.op}): ${warning.element} (${warning.type}) ${warning.path}: ${warning.message} (${warning.code})`,
+    ...collapseWarnings(
+      result.warnings.map(
+        (warning) =>
+          `  warning operation ${warning.operation} (${warning.op}): ${warning.element} (${warning.type}) ${warning.path}: ${warning.message} (${warning.code})`,
+      ),
+      result.warnings.map(
+        (warning) => `${warning.code}|${warning.type}|${warning.path}`,
+      ),
     ),
   );
   return `${lines.join("\n")}\n`;

@@ -3,7 +3,7 @@
 // edge gets a small zone on its route midpoint so a label can be added there.
 
 import type { Element } from "@nodetto/ir";
-import type { Box } from "../../geometry.ts";
+import type { Box, Vec } from "../../geometry.ts";
 import {
   connectorLabelExtent,
   connectorLabelLayout,
@@ -31,7 +31,10 @@ export function connectorLabelBox(
     endpointReaderFor(element.type),
   );
   if (!resolved) return null;
-  const anchor = resolved.labelPoint;
+  return connectorLabelBoxAt(element, resolved.labelPoint);
+}
+
+export function connectorLabelBoxAt(element: Element, anchor: Vec): Box {
   const layout = connectorLabelLayout(
     connectorDecoration(element).label,
     element.visual,

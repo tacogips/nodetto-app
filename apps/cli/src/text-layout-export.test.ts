@@ -48,8 +48,11 @@ test("whole page SVG preserves bytes and reports ordered layout warnings", async
     findings.map(({ ruleId, elementId }) => ({ ruleId, elementId })),
   ).toEqual([...TEXT_LAYOUT_EXPECTED]);
   expect(findings).toHaveLength(8);
-  const warnings = findings
-    .map((f) => `warning: ${f.ruleId} ${f.elementId}: ${f.message}\n`)
+  const warnings = [findings[0], findings[3], findings[4], findings[6]]
+    .map(
+      (f, i) =>
+        `warning: ${f?.ruleId} ${f?.elementId}: ${f?.message}${[" (and 2 more like this)", "", " (and 1 more like this)", " (and 1 more like this)"][i]}\n`,
+    )
     .join("");
   const { io, text } = fixture(source);
   const stdout = await exportCommand(io, [...args, "--format", "svg"]);
@@ -73,8 +76,12 @@ test("PNG and PDF retain raster input and bytes while reporting warnings", async
   const architecture = fixture(textLayoutProblemDocument());
   const uml = fixture(textLayoutProblemDocument("uml"));
   const document = parseDocument(textLayoutProblemDocument());
-  const warnings = lintTextLayoutPage(document, TEXT_LAYOUT_PAGE_ID)
-    .map((f) => `warning: ${f.ruleId} ${f.elementId}: ${f.message}\n`)
+  const findings = lintTextLayoutPage(document, TEXT_LAYOUT_PAGE_ID);
+  const warnings = [findings[0], findings[3], findings[4], findings[6]]
+    .map(
+      (f, i) =>
+        `warning: ${f?.ruleId} ${f?.elementId}: ${f?.message}${[" (and 2 more like this)", "", " (and 1 more like this)", " (and 1 more like this)"][i]}\n`,
+    )
     .join("");
   for (const format of ["png", "pdf"]) {
     const options = [...args, "--format", format, "--output", `out.${format}`];

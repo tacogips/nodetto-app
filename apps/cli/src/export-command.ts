@@ -41,6 +41,7 @@ import {
   writeOutput,
 } from "./commands.ts";
 import { helpFor } from "./help.ts";
+import { collapseWarnings } from "./warnings.ts";
 import { resolveId } from "./ids.ts";
 
 const EXPORT_OPTIONS = new Set([
@@ -335,12 +336,19 @@ export async function exportCommand(
   const warnings =
     loaded.warnings +
     (elementId === undefined && TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind)
-      ? lintTextLayoutPage(loaded.document, page.id)
-          .map(
+      ? (() => {
+          const findings = lintTextLayoutPage(loaded.document, page.id);
+          const lines = findings.map(
             (finding) =>
-              `warning: ${finding.ruleId} ${finding.elementId}: ${finding.message}\n`,
-          )
-          .join("")
+              `warning: ${finding.ruleId} ${finding.elementId}: ${finding.message}`,
+          );
+          const keys = findings.map(
+            (finding) =>
+              `${finding.ruleId}|${loaded.document.elements.find((element) => element.id === finding.elementId)?.type ?? ""}`,
+          );
+          const collapsed = collapseWarnings(lines, keys);
+          return collapsed.length ? `${collapsed.join("\n")}\n` : "";
+        })()
       : "");
 
   if (exportFormat === "svg") {
