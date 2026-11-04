@@ -1,0 +1,386 @@
+{
+  "taskId": "sef-s733",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-733",
+  "implementationBranch": "style-export-fixes",
+  "baseBranch": "style-export-fixes",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "29f8691135fb6098a9496495f4a417e93ce0625e",
+  "designDocPaths": [
+    "design-docs/specs/design-style-export-fixes.md",
+    "design-docs/user-qa/style-export-fixes.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/sef-00-overview.md",
+  "evidenceRoot": "tmp/sef-s733",
+  "evidenceLayout": "Per-plan evidence under tmp/sef-s733/<planId>/ with gate runs under tmp/sef-s733/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/.",
+  "reviewContext": {
+    "issueReference": "none: authoritative inline workflowInput G1-G3",
+    "userProblem": "edit update rejects null and [] for strokeDashArray; raster and PDF export render some glyphs as tofu with no warning and lint has no glyph-missing finding; box-node labels are always vertically centered and unknown visual.style keys are silently accepted.",
+    "requiredOutcomes": [
+      "G1: null removes optional keys in update, [] for strokeDashArray means solid, required fields give a clear error; Bun and native tests.",
+      "G2: circled numbers 11-20 and wave dash render in PNG through fallback fonts on macOS; uncovered glyphs give an export warning with element id and code points and a lint glyph-missing finding on any page kind where coverage can be determined; native behaves the same; SVG unchanged.",
+      "G3: verticalAlign top, middle and bottom work in SVG, PNG, PDF, app canvas and lint geometry, middle is the default, existing documents are byte-identical; padding matches horizontal rules; unknown visual.style keys rejected with suggestions; help and docs updated.",
+      "Final: CARGO_TERM_QUIET=true mise run verify and CARGO_TERM_QUIET=true mise run test-cli pass, with a 3-attempt retry for native deadline timeouts, and CPU comparison against target/sef-baseline/nodetto-cli recorded."
+    ],
+    "nonGoals": [
+      "Changing core mergeVisual, document migration, schema version change, inspector or canvas text editor changes, handoff, HTML, Mermaid or D2 changes, full system font scan, text-run splitter, rejecting style keys in connect.",
+      "Relaxing any deadline; binary-less native parity; pushes, tags, releases; server, auth or deployment code."
+    ],
+    "constraints": [
+      "Neutral self-authored fixtures only.",
+      "Small localized hunks in apps/cli/src/help.ts, docs/cli.md, apps/cli/src/commands.ts and packages/core/src/index.ts.",
+      "Strict TS, noUncheckedIndexedAccess-safe core, Boa rules.",
+      "Native deadline tests use a 3-attempt retry and a CPU comparison; deadlines are never relaxed; every verification command must exit 0 and run tests.",
+      "Default behavior changes only where requested; additions are backward compatible with existing documents."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "G1 is implemented in the CLI edit layer (apps/cli/src/edit/visual-patch.ts); core updateVisual and mergeVisual do not change.",
+        "rationale": "Many app and core callers depend on core merge behavior. replaceVisual is already in the derived-command pipeline, and validation still runs after the merge."
+      },
+      {
+        "decision": "Lock-only update patches still emit updateVisual, with null mapped to false.",
+        "rationale": "permittedCommands only lets that exact shape reach a locked element, so explicit unlocking keeps working."
+      },
+      {
+        "decision": "Fallback fonts are a separate bounded FALLBACK_FONT_FILES list, loaded after the base faces and only when the base set lacks a needed glyph; FONT_FILES is unchanged.",
+        "rationale": "Documents covered by the base set keep today's raster output, and the full system scan is never added to a path that lacks it."
+      },
+      {
+        "decision": "Glyph coverage has its own page eligibility over all document pages; notation engines run only on notation pages.",
+        "rationale": "export can rasterize any page, and no notation rule gains a page kind. Non-notation pages without glyph rows stay out of the report, so existing output and failures do not change."
+      },
+      {
+        "decision": "Box labels honor verticalAlign only with the visual.style.boxLabelAlign marker, read through boxLabelVerticalAlign in label-layout.ts.",
+        "rationale": "Existing documents can already store verticalAlign with no effect, so the stored value alone cannot separate them from new requests. The marker keeps them byte-identical with no migration, and all surfaces read one function."
+      },
+      {
+        "decision": "Unknown visual.style keys are rejected by checkVisualStyleFields with its own ranking, using VISUAL_STYLE_KEY_ORDER plus extensions as the valid keys.",
+        "rationale": "The checkFields matcher cannot suggest verticalAlign for textVerticalAlign or valign, and a second key list would drift."
+      },
+      {
+        "decision": "The design's plan partition is refined into eight plans in two waves, with sef-08 owning the help and docs hunks.",
+        "rationale": "The owner requires maximum concurrency. Files, contracts and behavior do not change, and dependencies exist only for real contracts."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Partial visual.style patches now merge instead of replacing the stored object. This is the documented, requested behavior and changes results for callers relying on whole-object replacement.",
+      "Hand-written JSONL must include boxLabelAlign for verticalAlign to take effect on a box node, and draw.io imports stay centered while still storing and re-exporting alignment (user-qa Q1 default, open).",
+      "connect keeps accepting unknown visual.style keys (user-qa Q2 default, open).",
+      "Editing verticalAlign on a bound box removes its text-style link unless the patch sets textStyle, matching the app's typography edits.",
+      "No coverage result, warning or finding exists in the system-scan case (no FONT_FILES entry and no --font-dir), because scanning can take tens of seconds.",
+      "Accepted low residual risks: SEF1-STALE-WHERE-SNAPSHOT (impl-plans/active/sef-01-edit-visual-merge.md:53), SEF7-FIXTURE-RERUN (impl-plans/active/sef-07-glyph-export-lint.md) and SEF3-NATIVE-BASE-FACE (impl-plans/active/sef-03-font-coverage-host.md:147).",
+      "High residual risk until sef-03 runs: the per-character fallback, face order and macOS font paths are unconfirmed. sef-03 runs that gate first and must stop with a recorded blocker if it fails; a text-run splitter is not built."
+    ],
+    "supportedEdgeCases": [
+      "Null under a missing style or semantic parent is stripped by the merge; removing the last style key removes style.",
+      "[] for strokeDashArray also clears a stored dash, and an explicit dash in the same patch wins; add keeps rejecting [].",
+      "Removing a required semantic field gives: update cannot remove required field \"label\" of node.generic. Unknown element types skip this check.",
+      "Locked elements can still be unlocked with locked: false and locked: null.",
+      "Default-ignorable code points are skipped; ASCII-only text opens no font; unreadable fallback or --font-dir faces are skipped.",
+      "Code points no element contains are reported on a page-level warning line; a line lists at most 16 code points, then and N more.",
+      "Lint: ERD-only documents with glyph rows exit 0 with the finding; without rows they keep LINT_NO_PAGES; --page resolves among notation pages first, then to pages with glyph rows.",
+      "Legacy unbound, bound, detached and draw.io-imported boxes without the marker render byte-identically; a bound box can follow a text style with boxLabelAlign alone.",
+      "bottom alignment clamps free space to 0, so text that does not fit starts at the top padding.",
+      "A null value for an unknown visual.style key is also rejected; extensions stays accepted; add with a shape preset is covered."
+    ],
+    "outOfScopeEdgeCases": [
+      "Desktop app raster paths, which have no resvg, usvg or fontdb.",
+      "text.note and sequence participant layouts, inspector controls for box nodes, canvas text editor position, code handoff, HTML bundle, Mermaid and D2 output.",
+      "Documents only read or validated keep the existing unknown-field warning path.",
+      "Coverage work for SVG and non-raster export formats."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-style-export-fixes.md",
+      "design-docs/user-qa/style-export-fixes.md",
+      "impl-plans/active/sef-00-overview.md",
+      "impl-plans/active/sef-01-edit-visual-merge.md",
+      "impl-plans/active/sef-02-edit-style-keys.md",
+      "impl-plans/active/sef-03-font-coverage-host.md",
+      "impl-plans/active/sef-04-glyph-attribution.md",
+      "impl-plans/active/sef-05-box-label-layout.md",
+      "impl-plans/active/sef-06-edit-box-align-writes.md",
+      "impl-plans/active/sef-07-glyph-export-lint.md",
+      "impl-plans/active/sef-08-help-docs.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "sef-01-edit-visual-merge",
+      "planPath": "impl-plans/active/sef-01-edit-visual-merge.md",
+      "progressPath": "impl-plans/progress/sef-01-edit-visual-merge.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/edit/visual-patch.ts",
+        "apps/cli/src/edit/visual-patch.test.ts",
+        "apps/cli/src/edit/operation-input.ts",
+        "apps/cli/src/edit/operations/elements.ts",
+        "apps/cli/src/native-parity/style-edit.test.ts",
+        "impl-plans/progress/sef-01-edit-visual-merge.md",
+        "tmp/sef-s733/sef-01-edit-visual-merge",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "A dashed node.generic becomes solid with null and with []; other optional fields clear with null; partial style patches keep other keys.",
+        "Removing a required semantic field gives the required-field error; lock-only patches still reach locked elements; frame carry is unchanged."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit/visual-patch.test.ts",
+        "bun test apps/cli/src/edit apps/cli/src/edit-frame-carry.test.ts apps/cli/src/edit-scale-text-group.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/edit/visual-patch.ts apps/cli/src/edit/visual-patch.test.ts apps/cli/src/edit/operation-input.ts apps/cli/src/edit/operations/elements.ts apps/cli/src/native-parity/style-edit.test.ts",
+        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/style-edit.test.ts'"
+      ]
+    },
+    {
+      "planId": "sef-02-edit-style-keys",
+      "planPath": "impl-plans/active/sef-02-edit-style-keys.md",
+      "progressPath": "impl-plans/progress/sef-02-edit-style-keys.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/edit/operation-fields.ts",
+        "apps/cli/src/edit/operation-fields.test.ts",
+        "impl-plans/progress/sef-02-edit-style-keys.md",
+        "tmp/sef-s733/sef-02-edit-style-keys",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "add and update reject unknown visual.style keys, naming the key; textVerticalAlign and valign both suggest verticalAlign.",
+        "extensions stays valid; checkFields and connect are unchanged."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit/operation-fields.test.ts",
+        "bun test apps/cli/src/edit apps/cli/src/ai-commands.test.ts apps/cli/src/ai-features.test.ts apps/cli/src/commands.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/edit/operation-fields.ts apps/cli/src/edit/operation-fields.test.ts"
+      ]
+    },
+    {
+      "planId": "sef-03-font-coverage-host",
+      "planPath": "impl-plans/active/sef-03-font-coverage-host.md",
+      "progressPath": "impl-plans/progress/sef-03-font-coverage-host.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/render-profile.ts",
+        "apps/cli/src/raster-backend.ts",
+        "apps/cli/src/font-coverage.ts",
+        "apps/cli/src/font-coverage.test.ts",
+        "apps/cli/src/__fixtures__/test-font.ts",
+        "apps/cli/src/local-io.ts",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/scripts/build-engine.ts",
+        "apps/cli/native/src/render.rs",
+        "apps/cli/native/src/engine.rs",
+        "apps/cli/native/Cargo.toml",
+        "Cargo.lock",
+        "impl-plans/progress/sef-03-font-coverage-host.md",
+        "tmp/sef-s733/sef-03-font-coverage-host",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The macOS gate passes: required characters are covered, fallback renders distinct glyphs, and base-covered characters do not change with fallback on.",
+        "fontCoverage in Bun and native follows the design contract; rasterize and native.png take the fallback switch; FONT_FILES is unchanged."
+      ],
+      "verification": [
+        "bun test apps/cli/src/font-coverage.test.ts",
+        "CARGO_TERM_QUIET=true cargo test -p nodetto-cli render::",
+        "CARGO_TERM_QUIET=true cargo fmt --manifest-path apps/cli/native/Cargo.toml --check",
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/render-profile.ts apps/cli/src/raster-backend.ts apps/cli/src/font-coverage.ts apps/cli/src/font-coverage.test.ts apps/cli/src/__fixtures__/test-font.ts apps/cli/src/local-io.ts apps/cli/src/native-engine.ts apps/cli/scripts/build-engine.ts",
+        "bun test apps/cli/src/export-command.test.ts apps/cli/src/export-determinism.test.ts"
+      ]
+    },
+    {
+      "planId": "sef-04-glyph-attribution",
+      "planPath": "impl-plans/active/sef-04-glyph-attribution.md",
+      "progressPath": "impl-plans/progress/sef-04-glyph-attribution.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/glyph-coverage.ts",
+        "apps/cli/src/glyph-coverage.test.ts",
+        "impl-plans/progress/sef-04-glyph-attribution.md",
+        "tmp/sef-s733/sef-04-glyph-attribution",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "attributeMissingGlyphs, glyphRowsByPage and glyphMissingMessage match the pinned contracts.",
+        "ASCII-only documents never call coverage; the module has no node imports or regex split."
+      ],
+      "verification": [
+        "bun test apps/cli/src/glyph-coverage.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/glyph-coverage.ts apps/cli/src/glyph-coverage.test.ts",
+        "sh -c '! grep -nE \"node:|\\.split\\(/\" apps/cli/src/glyph-coverage.ts'"
+      ]
+    },
+    {
+      "planId": "sef-05-box-label-layout",
+      "planPath": "impl-plans/active/sef-05-box-label-layout.md",
+      "progressPath": "impl-plans/progress/sef-05-box-label-layout.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/types.ts",
+        "packages/ir/src/keyOrder.ts",
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/box-label-align.test.ts",
+        "packages/core/src/label-layout.ts",
+        "packages/core/src/label-layout.test.ts",
+        "packages/core/src/node-label.ts",
+        "packages/core/src/node-label.test.ts",
+        "packages/core/src/svg-export/paint.ts",
+        "packages/core/src/svg-export/basic-shapes.ts",
+        "packages/core/src/text-layout-lint/rules.ts",
+        "packages/core/src/text-layout-lint/box-label-align.test.ts",
+        "packages/core/src/index.ts",
+        "packages/ui-solid/src/shapes/GeoShapeView.tsx",
+        "packages/ui-solid/src/shapes/label-align-style.ts",
+        "packages/ui-solid/src/shapes/label-align-style.test.ts",
+        "apps/cli/src/box-label-compat.test.ts",
+        "impl-plans/progress/sef-05-box-label-layout.md",
+        "tmp/sef-s733/sef-05-box-label-layout",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Documents without the marker render byte-identically, including bound, detached and draw.io cases.",
+        "With the marker, top and bottom work in SVG, canvas and lint geometry for node.generic (padding 10) and shape.geo (padding 8); text.note and sequence participants are unchanged."
+      ],
+      "verification": [
+        "bun test packages/ir/src packages/core/src/label-layout.test.ts packages/core/src/node-label.test.ts packages/core/src/text-layout-lint packages/ui-solid/src/shapes/label-align-style.test.ts apps/cli/src/box-label-compat.test.ts",
+        "bun test packages/core/src packages/ui-solid/src/shapes packages/io/src",
+        "bun run typecheck",
+        "sh -c 'mkdir -p tmp/sef-s733/sef-05-box-label-layout/final; bun run typecheck --noUncheckedIndexedAccess > tmp/sef-s733/sef-05-box-label-layout/final/strict.log 2>&1; ! grep -qE \"^packages/core/src/(label-layout|node-label|svg-export/paint|svg-export/basic-shapes|text-layout-lint/rules|index)\\.ts\\(\" tmp/sef-s733/sef-05-box-label-layout/final/strict.log'",
+        "bunx biome check packages/ir/src/box-label-align.test.ts packages/core/src/label-layout.ts packages/core/src/label-layout.test.ts packages/core/src/node-label.ts packages/core/src/node-label.test.ts packages/core/src/svg-export/paint.ts packages/core/src/svg-export/basic-shapes.ts packages/core/src/text-layout-lint/rules.ts packages/core/src/text-layout-lint/box-label-align.test.ts packages/ui-solid/src/shapes/GeoShapeView.tsx packages/ui-solid/src/shapes/label-align-style.ts packages/ui-solid/src/shapes/label-align-style.test.ts apps/cli/src/box-label-compat.test.ts"
+      ]
+    },
+    {
+      "planId": "sef-06-edit-box-align-writes",
+      "planPath": "impl-plans/active/sef-06-edit-box-align-writes.md",
+      "progressPath": "impl-plans/progress/sef-06-edit-box-align-writes.md",
+      "wave": 2,
+      "dependsOn": [
+        "sef-01-edit-visual-merge",
+        "sef-02-edit-style-keys",
+        "sef-05-box-label-layout"
+      ],
+      "writePaths": [
+        "apps/cli/src/edit/visual-patch.ts",
+        "apps/cli/src/edit/box-label-align.test.ts",
+        "apps/cli/src/edit/operations/add.ts",
+        "apps/cli/src/native-parity/box-label.test.ts",
+        "impl-plans/progress/sef-06-edit-box-align-writes.md",
+        "tmp/sef-s733/sef-06-edit-box-align-writes",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "add and update write the marker per the design's table, for box types only; a bound box gets requested alignment with link removal or follows a style with boxLabelAlign alone.",
+        "Bun and native written documents and SVG are identical; PNG and PDF honor alignment."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit",
+        "bun test apps/cli/src/box-label-compat.test.ts apps/cli/src/edit-frame-carry.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/edit/visual-patch.ts apps/cli/src/edit/box-label-align.test.ts apps/cli/src/edit/operations/add.ts apps/cli/src/native-parity/box-label.test.ts",
+        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/box-label.test.ts'"
+      ]
+    },
+    {
+      "planId": "sef-07-glyph-export-lint",
+      "planPath": "impl-plans/active/sef-07-glyph-export-lint.md",
+      "progressPath": "impl-plans/progress/sef-07-glyph-export-lint.md",
+      "wave": 2,
+      "dependsOn": [
+        "sef-01-edit-visual-merge",
+        "sef-03-font-coverage-host",
+        "sef-04-glyph-attribution"
+      ],
+      "writePaths": [
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/glyph-commands.test.ts",
+        "apps/cli/src/native-parity/glyph.test.ts",
+        "apps/cli/src/__fixtures__/test-font.ts",
+        "impl-plans/progress/sef-07-glyph-export-lint.md",
+        "tmp/sef-s733/sef-07-glyph-export-lint",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "PNG and PDF load fallback only when needed and warn with element id and code points; SVG does no coverage work.",
+        "lint reports glyph-missing on any page kind without running notation engines there; documents with no missing glyphs keep today's output and errors; Bun and native match; CPU comparison recorded for lint, PNG export and a 300-node where-based edit update."
+      ],
+      "verification": [
+        "bun test apps/cli/src/glyph-commands.test.ts",
+        "bun test apps/cli/src/commands.test.ts apps/cli/src/export-command.test.ts apps/cli/src/export-determinism.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/bpmn-commands.test.ts apps/cli/src/lint-diagram.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/export-command.ts apps/cli/src/commands.ts apps/cli/src/glyph-commands.test.ts apps/cli/src/native-parity/glyph.test.ts",
+        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/glyph.test.ts apps/cli/src/native-parity/text-layout.test.ts apps/cli/src/native-parity/export.test.ts'",
+        "test -x target/sef-baseline/nodetto-cli"
+      ]
+    },
+    {
+      "planId": "sef-08-help-docs",
+      "planPath": "impl-plans/active/sef-08-help-docs.md",
+      "progressPath": "impl-plans/progress/sef-08-help-docs.md",
+      "wave": 2,
+      "dependsOn": [
+        "sef-01-edit-visual-merge",
+        "sef-02-edit-style-keys",
+        "sef-03-font-coverage-host",
+        "sef-04-glyph-attribution",
+        "sef-05-box-label-layout"
+      ],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "docs/cli.md",
+        "apps/cli/src/help-style-export.test.ts",
+        "impl-plans/progress/sef-08-help-docs.md",
+        "tmp/sef-s733/sef-08-help-docs",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Help and docs cover verticalAlign and the marker, the null and [] rule, visual merge behavior, unknown-key rejection, glyph-missing and lint --font-dir.",
+        "Changes are small localized hunks with no reformatting."
+      ],
+      "verification": [
+        "bun test apps/cli/src/help-style-export.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/mcp.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/help.ts apps/cli/src/help-style-export.test.ts",
+        "grep -n boxLabelAlign docs/cli.md",
+        "grep -n glyph-missing docs/cli.md",
+        "grep -n strokeDashArray docs/cli.md"
+      ]
+    }
+  ]
+}
