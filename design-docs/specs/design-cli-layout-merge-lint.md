@@ -1,6 +1,7 @@
 # nodetto-cli: layered and route arranging, three-way merge, edit usability, lint additions
 
-Status: DESIGNED, 2026-11-04
+Status: DESIGNED, 2026-11-04. Plan partition revised for maximum concurrency
+the same day (see "Plan partition"); behavior sections unchanged.
 
 Owner decisions: `design-docs/user-qa/cli-layout-merge-lint.md`. Each open
 question has a default that this design implements. A different answer
@@ -409,7 +410,8 @@ Output:
   treats any non-zero exit as a conflict.
 - `--quiet` does not hide conflict lines, because they are not warnings.
 - Registered in `runCli`, `COMMAND_HELP` (which makes the MCP tool
-  `nodetto_merge`), the OVERVIEW under "Convert and check", and the docs.
+  `nodetto_merge`), the OVERVIEW under "Convert and check", and the docs, by
+  the final wiring plan. The command logic lives in `apps/cli/src/merge-command.ts`.
 
 ### B2. Git merge driver
 
@@ -716,16 +718,136 @@ All fixtures are self-authored and neutral: widgets, orders, `Idle` and
   - Text warnings are collapsed (C3).
   The existing tests and fixtures that pass extra operation fields are audited
   and fixed in the C plan.
-- Suggested plan partition, to avoid write-path conflicts in `commands.ts`,
-  `help.ts`, `docs/cli.md` and the parity files:
-  - Wave 1 in parallel: (a) IR fields and resolver (`packages/ir`,
-    `packages/core/src/shapes/connector`); (b) A7 profiling and fix (core
-    editor or derived planning, a perf fixture, the native deadline test);
-    (c) the B merge engine and command (it owns `commands.ts`, `help.ts` and
-    the docs in this wave).
-  - Wave 2: C1 to C3 and A6 (edit, warnings, `--quiet`).
-  - Wave 3: A1 to A5 (arrange modes, using wave 1a).
-  - Wave 4: D1 to D3 and `--metrics` (lint, using the wave 3 metrics module).
-  - Each plan sets `artifactRoots ["target"]` and lists every edited file,
-    docs included, in `writePaths`.
+- Each plan sets `artifactRoots ["target"]` and lists every edited file,
+  docs included, in `writePaths`.
 - The work is local only, with no push.
+
+## Plan partition (maximum concurrency)
+
+Revised 2026-11-04. It replaces the earlier four-wave partition, which
+serialized plans only to hand over the shared registration files.
+
+### Ownership rules
+
+- Shared files, edited only by the final wiring plan: `apps/cli/src/commands.ts`,
+  `apps/cli/src/help.ts`, `apps/cli/src/main.ts`, `apps/cli/src/native-engine.ts`,
+  `apps/cli/src/mcp.ts` (only if `COMMAND_HELP` is not enough),
+  `packages/core/src/index.ts`, `docs/cli.md`, `README.md`,
+  `design-docs/specs/export.md`, and the CLI-level native parity topic files
+  `apps/cli/src/native-parity/{layout,merge,edit-usability,lint-rules}.test.ts`
+  plus `apps/cli/src/merge-git.test.ts`.
+- Feature plans write their logic in their own new modules and test them by
+  importing those modules directly (not through `runCli`). An existing
+  command (`edit`, `export`, `arrange --mode tidy`) may be driven through
+  `runCli` because that needs no registration change.
+- A feature-plan CLI module that needs a new core export imports it by
+  relative path (`../../../packages/core/src/<module>.ts`) until the wiring
+  plan adds the export to `packages/core/src/index.ts` and switches the
+  import to `@nodetto/core`. Type-only imports from `commands.ts`
+  (`CommandIo`, `CommandResult`) are allowed and do not edit it.
+- No two plans in the same wave share a write path. A dependency exists only
+  where a plan calls code another plan creates.
+
+### Plans and waves
+
+| Wave | Plan | Scope | Owned files (summary) | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-01-merge | B1 engine and command module, B3 determinism test and any core exporter fix | `packages/core/src/document-merge.ts`, new `apps/cli/src/merge-command.ts` and its test, new `apps/cli/src/export-determinism.test.ts`, core exporter files only if the audit finds nondeterminism | - |
+| 1 | clm-02-connector-edit-perf (merges the drafts clm-02 and clm-05, which both edit `shapes/connector/resolve.ts`) | IR connector fields, resolver (label position, port position, same-side self-loop), A7 profile and fix, A7 Bun and native deadline tests | `packages/ir/src/semantics/connectors.ts`, `packages/ir/src/registry/{generic,uml,erd,bpmn}.ts`, `packages/core/src/shapes/connector/{resolve,boundary,route,label-box}.ts`, `packages/core/src/{orthogonal-routing,frame-translation,frame-tree,manual-route-preservation}.ts`, `packages/core/src/editor/transaction.ts`, `apps/cli/src/edit/apply-batch.ts`, the A7 fixture, `apps/cli/src/edit-performance.test.ts`, `apps/cli/src/native-parity/edit-performance.test.ts` | - |
+| 1 | clm-03-lint-core | D1 rule, D2 wrapper and fix planner | new `packages/core/src/diagram-lint/node-overlap.ts`, new `packages/core/src/text-wrap.ts`, new `packages/core/src/text-layout-lint/fix.ts`, their tests | - |
+| 1 | clm-04-edit-usability | C1, C2, C3 module and its call sites outside shared files, A6 | new `apps/cli/src/edit/label-field.ts`, new `apps/cli/src/edit/operation-fields.ts`, new `apps/cli/src/warnings.ts`, `apps/cli/src/edit/batch.ts`, `apps/cli/src/edit/operations/*.ts`, `apps/cli/src/edit/report.ts`, `apps/cli/src/edit-command.ts`, `apps/cli/src/draw-command.ts`, `apps/cli/src/export-command.ts`, existing tests that pass now-unknown op fields | - |
+| 1 | clm-07-layered-core | A1 placement (pure core) | new `packages/core/src/arrange-layered.ts` and its test | - |
+| 2 | clm-06-route-arrange | A2 to A5 route planner, A3 scoring, metrics, the arrange-mode CLI module and the `lint --metrics` module | new `packages/core/src/arrange-route.ts`, new `packages/core/src/diagram-lint/metrics.ts`, new `apps/cli/src/arrange-modes.ts`, new `apps/cli/src/lint-metrics.ts`, their tests | clm-02 (connector fields and `connectorLabelBoxAt`, `pointAlongRoute`), clm-07 (`planLayered`) |
+| 2 | clm-08-lint-cli | Page selection, D1 wiring, D2 `--fix` write path, D3 `image-missing` | new `apps/cli/src/lint-diagram.ts` and its test | clm-03 (rule, wrapper, fix planner), clm-04 (`labelField`) |
+| 3 | clm-09-wiring | Registration, `--quiet` extraction in shared entry points, collapsed warnings in `loadDocument` and `validate`, help, docs, core re-exports, CLI-level and native parity tests, B2 git end-to-end test | the shared files listed above | every other plan |
+
+- Wave 2 exists only for real call dependencies. clm-04's A6 needs no core
+  change: the `update` handler collects descendants with the exported
+  `frameParents` and passes them as `editor.apply(commands, { placed })`, so it
+  does not touch clm-02's `transaction.ts` or `frame-translation.ts`.
+- C2 validation runs in `edit/batch.ts` before the per-op dispatch, not in
+  `apply-batch.ts` (owned by clm-02).
+- `lint-diagram.ts` (D2) applies its fixes through the existing exported
+  `applyBatch` API, whose signature clm-02 does not change.
+
+### Contracts (fixed before wave 1)
+
+```ts
+// clm-02, packages/ir/src/semantics/connectors.ts
+interface ConnectorRoutingSemantic {
+  labelPosition?: number; fromPortPosition?: number; toPortPosition?: number;
+}
+// clm-02, packages/core/src/shapes/connector/label-box.ts and route.ts
+export function connectorLabelBoxAt(element: Element, anchor: Vec): Box;
+export function pointAlongRoute(points: readonly Vec[], ratio: number): Vec;
+
+// clm-07, packages/core/src/arrange-layered.ts
+export interface LayeredOptions {
+  readonly direction: "LR" | "TB";
+  readonly frameOrder?: readonly ElementId[]; // already resolved column frame ids
+}
+export function planLayered(
+  store: Store, pageId: PageId, registry: ShapeUtilRegistry, options: LayeredOptions,
+): { commands: Command[]; placed: ReadonlySet<ElementId> } | { error: string };
+
+// clm-06, packages/core/src/arrange-route.ts and diagram-lint/metrics.ts
+export interface RouteOptions {
+  readonly targetIds?: readonly ElementId[]; readonly resetManual: boolean;
+}
+export function planRoute(
+  store: Store, pageId: PageId, registry: ShapeUtilRegistry, options: RouteOptions,
+): Command[];
+export interface PageMetrics { readonly edgeCrossings: number; readonly labelOverlaps: number; }
+export function pageMetrics(store: Store, pageId: PageId, registry: ShapeUtilRegistry): PageMetrics;
+
+// clm-03
+export interface NodeOverlapFinding {
+  readonly pageId: PageId; readonly elementId: ElementId; readonly otherId: ElementId;
+  readonly message: string; readonly width: number; readonly height: number;
+}
+export function lintNodeOverlaps(document: Document, pageId: PageId): NodeOverlapFinding[];
+export function wrapTextToWidth(text: string, width: number, fontSize: number): string;
+export interface TextWrapFix {
+  readonly pageId: PageId; readonly elementId: ElementId; readonly ruleId: string;
+  readonly field: string; readonly before: string; readonly after: string;
+}
+export function planTextWrapFixes(document: Document, pageId: PageId): TextWrapFix[];
+
+// clm-01, packages/core/src/document-merge.ts and apps/cli/src/merge-command.ts
+export interface VersionConflict {
+  readonly kind: "document" | "page" | "element"; readonly id: string;
+  readonly type?: string; readonly path?: string;
+  readonly reason: "field" | "both-added" | "deleted-in-ours" | "deleted-in-theirs";
+  readonly base?: unknown; readonly ours?: unknown; readonly theirs?: unknown;
+}
+export function mergeDocumentVersions(
+  base: Document, ours: Document, theirs: Document,
+): { document: Document; conflicts: VersionConflict[] };
+export function mergeCommand(io: CommandIo, args: readonly string[]): CommandResult;
+
+// clm-04, apps/cli/src/edit/label-field.ts and warnings.ts
+export function labelField(editor: Editor, element: Element): { field: string } | { error: string };
+export function collapseWarnings(lines: readonly string[]): string[];
+export function extractQuiet(args: readonly string[]): { args: string[]; quiet: boolean };
+
+// clm-06 and clm-08 CLI modules, called by commands.ts in clm-09
+export function arrangeLayeredOrRoute(io: CommandIo, args: readonly string[]): CommandResult;
+export function lintMetrics(document: Document, pageIds: readonly PageId[]): Map<PageId, PageMetrics>;
+export function lintDiagramPages(io: CommandIo, documentPath: string, document: Document,
+  options: { pageId?: PageId; fix: boolean }): DiagramLintResult;
+```
+
+The names above are binding. Exact parameter types follow the existing
+`Store`, `Document`, `Command`, `ShapeUtilRegistry`, `CommandIo` and
+`CommandResult` types. A plan that must add a parameter adds an optional one
+and records it in its progress log; it never renames a contract.
+
+### Verification per wave
+
+- Each feature plan: `bun test <its own test files>` and `bun run typecheck`.
+  clm-02 also runs the native A7 deadline test with
+  `NODETTO_CLI_TEST_BINARY` set to the release binary it builds.
+- clm-09: the CLI-level tests, the four native parity topic files and
+  `merge-git.test.ts` with `NODETTO_CLI_TEST_BINARY` set, then the final gates
+  (`mise run verify`, `mise run test-cli` with the 3-attempt deadline retry,
+  and the `/usr/bin/time -p` comparison against the pre-change binary).
