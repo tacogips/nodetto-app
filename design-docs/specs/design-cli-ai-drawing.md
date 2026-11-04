@@ -124,6 +124,23 @@ Operations (a JSON array; JSON Lines is also accepted):
 - The app shows "updated from disk +a ~u -r" after an outside change until the next
   local edit.
 
+### Layered and route arranging, merge, edit usability and lint additions (designed 2026-11-04)
+
+These are specified in `design-docs/specs/design-cli-layout-merge-lint.md`:
+
+- `arrange --mode layered|route`, with edge label placement, port spreading
+  and self-loop sides.
+- `carryMembers:false` on a frame `update`.
+- Edit performance with obstacle routing.
+- `nodetto-cli merge` as a git merge driver, and SVG export determinism.
+- `label` on `update`, unknown operation fields rejected, collapsed warnings
+  and the global `--quiet`.
+- `lint` rules `node-overlap` and `image-missing`, `lint --fix` and
+  `lint --metrics`.
+
+The edit batch semantics above are unchanged, except that unknown top-level
+operation fields are now rejected.
+
 ### Ids and names
 
 Page and element ids are assigned automatically, are opaque and never change;
