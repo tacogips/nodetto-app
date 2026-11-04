@@ -20,7 +20,7 @@
     "impl-plans/active/clm-09-arrange-cli.md"
   ],
   "evidenceRoot": "tmp/clm-s725",
-  "evidenceLayout": "Per-plan evidence under tmp/clm-s725/<planId>/ (baselines and progress evidence) with gate runs under tmp/clm-s725/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/ inside the plan directory. Retry loops write <name>-1.log..<name>-3.log and copy the green attempt to <name>.log. Reconciliation output goes under tmp/clm-s725/reconcile/. tmp/ is git-ignored; store only .log, .txt, .json and binaries there (clm-02 stores nodetto-cli-baseline), never .ts files, because bun test collects stray .ts files. Cargo output goes to the git-ignored target/, which every plan declares as artifactRoots [\"target\"].",
+  "evidenceLayout": "Per-plan evidence under tmp/clm-s725/<planId>/ (baselines and progress evidence) with gate runs under tmp/clm-s725/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/ inside the plan directory. Retry loops write <name>-1.log..<name>-3.log and copy the green attempt to <name>.log. Reconciliation output goes under tmp/clm-s725/reconcile/. tmp/ is git-ignored; store only .log, .txt and .json data there, never binaries or .ts files, because bun test collects stray .ts files. Cargo output goes to the git-ignored target/, which every plan declares as artifactRoots [\"target\"]; clm-02's pre-change baseline binary lives at target/clm-baseline/nodetto-cli (amendment round 1) and must survive until clm-09 (no cargo clean).",
   "reviewContext": {
     "issueReference": "none (inline workflowInput.requestedOutcome of workflow execution opus-terra-design-and-implement-review-loop-session-727; no GitHub issue supplied; design and draft plans from commit 7f52302)",
     "userProblem": "Users of nodetto-cli lack: deterministic layered and route-only arranging with label placement, port spreading and self-loop sides (A1-A5); a frame-move opt-out (A6); acceptable native performance when an edit batch enables routingAvoidObstacles on about 50 edges (over two minutes today, A7); a three-way JSONL merge usable as a git merge driver and a determinism guarantee for SVG export (B1-B3); update with label, rejection of unknown operation fields with suggestions, collapsed warnings and --quiet (C1-C3); and lint for ERD/node overlaps, --fix text wrapping with CJK breaking, and missing image references (D1-D3).",
@@ -67,6 +67,10 @@
       {
         "decision": "Contracts in clm-00 and the design are binding names; plans may add optional parameters or extra exports and record them in their progress logs.",
         "rationale": "Allows wave-2 plans to build against wave-1 contracts without renegotiation."
+      },
+      {
+        "decision": "Amendment 2026-11-04 round 1: clm-02's pre-change baseline binary moves to target/clm-baseline/nodetto-cli inside the declared artifact root (check becomes 'test -x target/clm-baseline/nodetto-cli'; clm-09 timing reads the same path); clm-07 gains packages/core/src/shapes/frame.ts in writePaths for one additive export FRAME_TITLE_BAND = 24 used by hitTest and arrange-layered.ts, plus frame.test.ts, biome and grep checks; accepted clm-01, clm-03, clm-04 and clm-08 are recorded as acceptedDependencies. No design change.",
+        "rationale": "Blocked plans clm-02-connector-edit-perf (baseline binary location was inside the source path tmp/clm-s725/clm-02-connector-edit-perf) and clm-07-layered-core (title-band API in shapes/frame.ts was outside writePaths; arrange-layered.ts copied 24). Both gaps are resolved: frame.ts is written only by clm-07, and clm-02 writePaths and artifactRoots are unchanged."
       }
     ],
     "intentionalTradeoffs": [
@@ -113,41 +117,33 @@
       "mise run verify may rewrite tracked apps/desktop/src-tauri/gen/schemas/*.json through the tauri build script; commits stage explicit paths only."
     ]
   },
-  "plans": [
+  "acceptedDependencies": [
     {
       "planId": "clm-01-merge",
       "planPath": "impl-plans/active/clm-01-merge.md",
-      "progressPath": "impl-plans/progress/clm-01-merge.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/document-merge.ts",
-        "packages/core/src/document-merge-versions.test.ts",
-        "apps/cli/src/merge-command.ts",
-        "apps/cli/src/merge-command.test.ts",
-        "apps/cli/src/export-determinism.test.ts",
-        "impl-plans/progress/clm-01-merge.md",
-        "tmp/clm-s725/clm-01-merge",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "packages/core/src/document-merge.ts exports VersionConflict and mergeDocumentVersions with the contract signatures; mergeDocuments results are unchanged and document-merge.test.ts passes unchanged.",
-        "apps/cli/src/merge-command.ts exports mergeCommand(io, args) and MERGE_USAGE; exit 0 clean, 1 on conflicts (result still written, ours kept), 2 for usage, read, parse, identity or validation errors (nothing written); conflict lines are sorted and use the design B1 formats.",
-        "export-determinism.test.ts proves byte-identical SVG export across TZ/LANG/cwd and export(doc) equals export(format(doc)).",
-        "Verification commands exit 0 and the progress log records logs under tmp/clm-s725/clm-01-merge/; git status shows only writePaths changed."
-      ],
-      "verification": [
-        "bun test packages/core/src/document-merge.test.ts packages/core/src/document-merge-versions.test.ts",
-        "bun test apps/cli/src/merge-command.test.ts apps/cli/src/export-determinism.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/document-merge.ts packages/core/src/document-merge-versions.test.ts apps/cli/src/merge-command.ts apps/cli/src/merge-command.test.ts apps/cli/src/export-determinism.test.ts",
-        "grep -n 'export function mergeDocumentVersions' packages/core/src/document-merge.ts",
-        "grep -n 'export function mergeCommand' apps/cli/src/merge-command.ts"
-      ]
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "VersionConflict and mergeDocumentVersions (packages/core/src/document-merge.ts); mergeCommand and MERGE_USAGE (apps/cli/src/merge-command.ts); export determinism test (apps/cli/src/export-determinism.test.ts). Implementation accepted in the shared working tree, uncommitted."
     },
+    {
+      "planId": "clm-03-lint-core",
+      "planPath": "impl-plans/active/clm-03-lint-core.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "NODE_OVERLAP_PAGE_KINDS, NodeOverlapFinding, lintNodeOverlaps (packages/core/src/diagram-lint/node-overlap.ts); wrapTextToWidth (packages/core/src/text-wrap.ts); planTextWrapFixes and TextWrapFix (packages/core/src/text-layout-lint/fix.ts). Implementation accepted in the shared working tree, uncommitted."
+    },
+    {
+      "planId": "clm-04-edit-usability",
+      "planPath": "impl-plans/active/clm-04-edit-usability.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "labelField and applyLabel (apps/cli/src/edit/label-field.ts); operation field checks (apps/cli/src/edit/operation-fields.ts); collapseWarnings, issueWarningKey, extractQuiet, applyQuiet (apps/cli/src/warnings.ts); update carryMembers:false. Implementation accepted in the shared working tree, uncommitted."
+    },
+    {
+      "planId": "clm-08-lint-cli",
+      "planPath": "impl-plans/active/clm-08-lint-cli.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "LINT_NO_PAGES_MESSAGE, diagramLintApplies, DiagramLintRow, DiagramLintResult, lintDiagramPages, formatFixLines (apps/cli/src/lint-diagram.ts). Implementation accepted in the shared working tree, uncommitted."
+    }
+  ],
+  "plans": [
     {
       "planId": "clm-02-connector-edit-perf",
       "planPath": "impl-plans/active/clm-02-connector-edit-perf.md",
@@ -184,7 +180,7 @@
       "sharedPathNotes": [],
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
-        "Baseline (Bun expected output and native /usr/bin/time -p with tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline) is recorded before any source change; the expected file hash is unchanged at the end.",
+        "Baseline (Bun expected output and native /usr/bin/time -p with target/clm-baseline/nodetto-cli, inside artifact root target; logs stay under tmp/clm-s725/clm-02-connector-edit-perf/) is recorded before any source change; the expected file hash is unchanged at the end.",
         "The confirmed A7 root cause is recorded and fixed with allowed techniques (per-batch memoisation, skipping inapplicable planners, avoiding per-operation full copies); output stays byte-identical; native edit of the fixture runs under 10000 ms wall time.",
         "ConnectorRoutingSemantic gains labelPosition, fromPortPosition and toPortPosition with [0,1] validation and the semantic.portPositionWithoutPort warning; keyOrder lists updated; connectorLabelBoxAt and pointAlongRoute are exported; same-side self-loop resolver case added; documents without the fields render byte-identically (no golden changes).",
         "Verification commands exit 0; the progress log has baseline timing, root cause, after CPU time and ratio."
@@ -200,122 +196,7 @@
         "bunx biome check packages/ir/src/semantics/connectors.ts packages/ir/src/registry/generic.ts packages/ir/src/registry/uml.ts packages/ir/src/registry/erd.ts packages/ir/src/registry/bpmn.ts packages/ir/src/connector-positions.test.ts packages/core/src/shapes/connector/resolve.ts packages/core/src/shapes/connector/boundary.ts packages/core/src/shapes/connector/route.ts packages/core/src/shapes/connector/label-box.ts packages/core/src/connector-positions.test.ts packages/core/src/orthogonal-routing.ts packages/core/src/frame-translation.ts packages/core/src/frame-tree.ts packages/core/src/manual-route-preservation.ts packages/core/src/editor/transaction.ts apps/cli/src/edit/apply-batch.ts apps/cli/src/__fixtures__/obstacle-routing-batch.ts apps/cli/src/edit-performance.test.ts apps/cli/src/native-parity/edit-performance.test.ts",
         "grep -n 'export function connectorLabelBoxAt' packages/core/src/shapes/connector/label-box.ts",
         "grep -n 'export function pointAlongRoute' packages/core/src/shapes/connector/route.ts",
-        "test -x tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline"
-      ]
-    },
-    {
-      "planId": "clm-03-lint-core",
-      "planPath": "impl-plans/active/clm-03-lint-core.md",
-      "progressPath": "impl-plans/progress/clm-03-lint-core.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/diagram-lint/node-overlap.ts",
-        "packages/core/src/diagram-lint/node-overlap.test.ts",
-        "packages/core/src/text-wrap.ts",
-        "packages/core/src/text-wrap.test.ts",
-        "packages/core/src/text-layout-lint/fix.ts",
-        "packages/core/src/text-layout-lint/fix.test.ts",
-        "packages/core/src/text-layout-lint/rules.ts",
-        "impl-plans/progress/clm-03-lint-core.md",
-        "tmp/clm-s725/clm-03-lint-core",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "NODE_OVERLAP_PAGE_KINDS, NodeOverlapFinding and lintNodeOverlaps exist with the contract signatures; pairs with intersection area > 1 are reported once, sorted, with frame/group parent and uml system exemptions; message format per plan.",
-        "wrapTextToWidth wraps per line with the space/CJK punctuation/wide-grapheme/hard-break preferences and the line-start prohibition; idempotent; unchanged text when it fits.",
-        "planTextWrapFixes and TextWrapFix exist; only width-caused label-overflow and note-overflow produce fixes; rules.ts changes are additive (textWrapArea) and existing text-layout-lint tests pass unchanged.",
-        "Verification commands exit 0 with logs under tmp/clm-s725/clm-03-lint-core/."
-      ],
-      "verification": [
-        "bun test packages/core/src/diagram-lint/node-overlap.test.ts packages/core/src/text-wrap.test.ts packages/core/src/text-layout-lint",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/diagram-lint/node-overlap.ts packages/core/src/diagram-lint/node-overlap.test.ts packages/core/src/text-wrap.ts packages/core/src/text-wrap.test.ts packages/core/src/text-layout-lint/fix.ts packages/core/src/text-layout-lint/fix.test.ts packages/core/src/text-layout-lint/rules.ts",
-        "grep -n 'export function lintNodeOverlaps' packages/core/src/diagram-lint/node-overlap.ts",
-        "grep -n 'export function planTextWrapFixes' packages/core/src/text-layout-lint/fix.ts"
-      ]
-    },
-    {
-      "planId": "clm-04-edit-usability",
-      "planPath": "impl-plans/active/clm-04-edit-usability.md",
-      "progressPath": "impl-plans/progress/clm-04-edit-usability.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "apps/cli/src/edit/batch.ts",
-        "apps/cli/src/edit/operation-fields.ts",
-        "apps/cli/src/edit/operation-fields.test.ts",
-        "apps/cli/src/edit/label-field.ts",
-        "apps/cli/src/edit/label-field.test.ts",
-        "apps/cli/src/edit/operations/elements.ts",
-        "apps/cli/src/edit/operations/add.ts",
-        "apps/cli/src/edit/operations/connect.ts",
-        "apps/cli/src/edit/operations/groups.ts",
-        "apps/cli/src/edit/operations/pages.ts",
-        "apps/cli/src/edit/report.ts",
-        "apps/cli/src/edit/report.test.ts",
-        "apps/cli/src/edit-frame-carry.test.ts",
-        "apps/cli/src/warnings.ts",
-        "apps/cli/src/warnings.test.ts",
-        "apps/cli/src/edit-command.ts",
-        "apps/cli/src/draw-command.ts",
-        "apps/cli/src/export-command.ts",
-        "apps/cli/src/shapes-command.ts",
-        "apps/cli/src/types-command.ts",
-        "apps/cli/src/ai-features.test.ts",
-        "apps/cli/src/ai-commands.test.ts",
-        "apps/cli/src/commands.test.ts",
-        "apps/cli/src/mcp.test.ts",
-        "apps/cli/src/mcp-stdio.test.ts",
-        "apps/cli/src/pages-command.test.ts",
-        "apps/cli/src/shape-lateral.test.ts",
-        "apps/cli/src/shapes-command.test.ts",
-        "apps/cli/src/edit-scale-text-group.test.ts",
-        "apps/cli/src/export-command.test.ts",
-        "apps/cli/src/text-layout-export.test.ts",
-        "apps/cli/src/native-parity/documents.test.ts",
-        "apps/cli/src/native-parity/drawing.test.ts",
-        "impl-plans/progress/clm-04-edit-usability.md",
-        "tmp/clm-s725/clm-04-edit-usability",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [
-        {
-          "path": "apps/cli/src/commands.test.ts",
-          "intendedEdit": "Existing test files in writePaths (ai-features, ai-commands, commands, mcp, mcp-stdio, pages-command, shape-lateral, shapes-command, edit-scale-text-group, export-command, text-layout-export, native-parity/documents, native-parity/drawing) change only where an operation passes a top-level field C2 now rejects or a warning assertion must reflect collapsing; each change is recorded in the progress log. clm-09 later edits ai-commands, commands, mcp and mcp-stdio tests in wave 3 (after this plan)."
-        },
-        {
-          "path": "apps/cli/src/edit/operations/groups.ts",
-          "intendedEdit": "groups.ts and pages.ts change only if the C2 audit shows a handler reads a field outside its table row."
-        },
-        {
-          "path": "apps/cli/src/shapes-command.ts",
-          "intendedEdit": "shapes-command.ts and types-command.ts change only if a printed example operation passes a field C2 rejects; invalid examples in help.ts are recorded as findings for clm-09."
-        }
-      ],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "labelField and applyLabel (edit/label-field.ts) and collapseWarnings, issueWarningKey, extractQuiet and applyQuiet (warnings.ts) exist with the contract signatures.",
-        "update accepts label (error text 'update needs semantic, visual or label'); add with type applies label; connect keeps semantic precedence; draw --label output is byte-identical.",
-        "checkOperationFields rejects unknown fields for every op before any editor command, naming the field, a suggestion (Levenshtein <= 2 or prefix) and the valid list; replace-text regex/ignoreCase boolean messages; the audited field table is recorded.",
-        "carryMembers: undefined keeps today's behavior; false on a frame moves only the frame; non-boolean or non-frame exits 2.",
-        "edit text warnings and export text-layout warnings collapse with '(and <n-1> more like this)'; JSON is unchanged.",
-        "Verification commands exit 0 with logs under tmp/clm-s725/clm-04-edit-usability/; every existing test change is recorded."
-      ],
-      "verification": [
-        "bun test apps/cli/src/edit apps/cli/src/edit-frame-carry.test.ts apps/cli/src/warnings.test.ts",
-        "bun test apps/cli/src/ai-features.test.ts apps/cli/src/pages-command.test.ts apps/cli/src/shape-lateral.test.ts apps/cli/src/shapes-command.test.ts apps/cli/src/edit-scale-text-group.test.ts apps/cli/src/export-command.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/commands.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/mcp.test.ts apps/cli/src/mcp-stdio.test.ts",
-        "bun run typecheck",
-        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/native-[123].log \"$d/native.log\"; CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > \"$d/native-build.log\" 2>&1 || exit 1; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/drawing.test.ts apps/cli/src/native-parity/documents.test.ts > \"$d/native-$i.log\" 2>&1 && cp \"$d/native-$i.log\" \"$d/native.log\" && exit 0; done; exit 1' sh tmp/clm-s725/clm-04-edit-usability/final",
-        "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s725/clm-04-edit-usability/final/native.log",
-        "grep -E '^ *0 fail$' tmp/clm-s725/clm-04-edit-usability/final/native.log",
-        "bunx biome check apps/cli/src/edit/batch.ts apps/cli/src/edit/operation-fields.ts apps/cli/src/edit/operation-fields.test.ts apps/cli/src/edit/label-field.ts apps/cli/src/edit/label-field.test.ts apps/cli/src/edit/operations/elements.ts apps/cli/src/edit/operations/add.ts apps/cli/src/edit/operations/connect.ts apps/cli/src/edit/operations/groups.ts apps/cli/src/edit/operations/pages.ts apps/cli/src/edit/report.ts apps/cli/src/edit/report.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/warnings.ts apps/cli/src/warnings.test.ts apps/cli/src/edit-command.ts apps/cli/src/draw-command.ts apps/cli/src/export-command.ts apps/cli/src/shapes-command.ts apps/cli/src/types-command.ts apps/cli/src/ai-features.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/commands.test.ts apps/cli/src/mcp.test.ts apps/cli/src/mcp-stdio.test.ts apps/cli/src/pages-command.test.ts apps/cli/src/shape-lateral.test.ts apps/cli/src/shapes-command.test.ts apps/cli/src/edit-scale-text-group.test.ts apps/cli/src/export-command.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/native-parity/documents.test.ts apps/cli/src/native-parity/drawing.test.ts",
-        "grep -n 'export function labelField' apps/cli/src/edit/label-field.ts",
-        "grep -n 'export function extractQuiet' apps/cli/src/warnings.ts"
+        "test -x target/clm-baseline/nodetto-cli"
       ]
     },
     {
@@ -327,24 +208,33 @@
       "writePaths": [
         "packages/core/src/arrange-layered.ts",
         "packages/core/src/arrange-layered.test.ts",
+        "packages/core/src/shapes/frame.ts",
         "impl-plans/progress/clm-07-layered-core.md",
         "tmp/clm-s725/clm-07-layered-core",
         "target"
       ],
       "sharedPaths": [],
-      "sharedPathNotes": [],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/shapes/frame.ts",
+          "intendedEdit": "Amendment round 1: additive export FRAME_TITLE_BAND = 24; hitTest uses it in place of its literal 24; no other change. arrange-layered.ts imports it; packages/core/src/index.ts is not edited."
+        }
+      ],
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
         "LAYERED_PAGE_KINDS, LayeredOptions, planLayered and columnFrames exist exactly as in the contract.",
         "Column frames, units, BFS rank, frame order, LR/TB geometry (COLUMN_GAP 120, MEMBER_GAP 60, FRAME_PADDING 40, title band from frame layout code) follow design A1; all written numbers are integers; members keep their frame parent; rerun plans nothing; shuffled creation order gives the same commands.",
+        "FRAME_TITLE_BAND is exported from packages/core/src/shapes/frame.ts and used by hitTest and arrange-layered.ts (no copied 24); the frame.ts diff shows only the export and the literal replacement; tests cover in-degree-0 start without an initial state, cycle-only start, disconnected components, exact TB transposition and shuffled creation order.",
         "No frames and non-column frameOrder ids return errors.",
         "Verification commands exit 0 with logs under tmp/clm-s725/clm-07-layered-core/."
       ],
       "verification": [
-        "bun test packages/core/src/arrange-layered.test.ts packages/core/src/arrange.test.ts",
+        "bun test packages/core/src/arrange-layered.test.ts packages/core/src/arrange.test.ts packages/core/src/frame.test.ts",
         "bun run typecheck",
-        "bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts",
-        "grep -n 'export function planLayered' packages/core/src/arrange-layered.ts"
+        "bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts packages/core/src/shapes/frame.ts",
+        "grep -n 'export function planLayered' packages/core/src/arrange-layered.ts",
+        "grep -n 'export const FRAME_TITLE_BAND' packages/core/src/shapes/frame.ts",
+        "sh -c '! grep -q \"? 24\" packages/core/src/arrange-layered.ts'"
       ]
     },
     {
@@ -383,36 +273,6 @@
         "bunx biome check packages/core/src/arrange-route.ts packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.ts packages/core/src/diagram-lint/metrics.test.ts apps/cli/src/arrange-modes.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-metrics.test.ts",
         "grep -n 'export function planRoute' packages/core/src/arrange-route.ts",
         "grep -n 'export function arrangeLayeredOrRoute' apps/cli/src/arrange-modes.ts"
-      ]
-    },
-    {
-      "planId": "clm-08-lint-cli",
-      "planPath": "impl-plans/active/clm-08-lint-cli.md",
-      "progressPath": "impl-plans/progress/clm-08-lint-cli.md",
-      "wave": 2,
-      "dependsOn": ["clm-03-lint-core", "clm-04-edit-usability"],
-      "writePaths": [
-        "apps/cli/src/lint-diagram.ts",
-        "apps/cli/src/lint-diagram.test.ts",
-        "impl-plans/progress/clm-08-lint-cli.md",
-        "tmp/clm-s725/clm-08-lint-cli",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "LINT_NO_PAGES_MESSAGE, diagramLintApplies, DiagramLintRow, DiagramLintResult, lintDiagramPages and formatFixLines exist with the contract signatures.",
-        "node-overlap rows (warning) on NODE_OVERLAP_PAGE_KINDS pages; image-missing errors with the exact 'file not found' and 'cannot be read (outside the document folder, too large, or unreadable)' reasons through CommandIo, data URLs skipped, no node:path.",
-        "fix: true applies planTextWrapFixes through runOperations atomically; a second run writes nothing; .bpmn paths return the error; nothing to fix gives written: false.",
-        "Existing lint tests pass unchanged; verification commands exit 0 with logs under tmp/clm-s725/clm-08-lint-cli/."
-      ],
-      "verification": [
-        "bun test apps/cli/src/lint-diagram.test.ts",
-        "bun test apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/bpmn-commands.test.ts",
-        "bun run typecheck",
-        "bunx biome check apps/cli/src/lint-diagram.ts apps/cli/src/lint-diagram.test.ts",
-        "grep -n 'export function lintDiagramPages' apps/cli/src/lint-diagram.ts"
       ]
     },
     {
@@ -487,7 +347,7 @@
         "packages/core/src/index.ts exports every new contract symbol and the four feature CLI modules import from @nodetto/core.",
         "help.ts, docs/cli.md and README.md describe every new command, mode, flag and field, the git merge driver recipe, SVG regeneration and the export determinism guarantee; design-docs/specs/export.md gains the Goals and Rollout bullets.",
         "cli-wiring, merge-git (real git, no skip) and the four new native parity topic files pass with NODETTO_CLI_TEST_BINARY set.",
-        "CARGO_TERM_QUIET=true mise run verify and mise run test-cli pass (3 attempts); the A7 fixture native edit CPU time is recorded against clm-02's baseline binary (target about 3 s CPU) in tmp/clm-s725/clm-09-wiring/final/timing.log."
+        "CARGO_TERM_QUIET=true mise run verify and mise run test-cli pass (3 attempts); the A7 fixture native edit CPU time is recorded against clm-02's baseline binary target/clm-baseline/nodetto-cli (target about 3 s CPU) in tmp/clm-s725/clm-09-wiring/final/timing.log."
       ],
       "verification": [
         "bun test apps/cli/src/cli-wiring.test.ts apps/cli/src/merge-git.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/commands.test.ts apps/cli/src/mcp.test.ts apps/cli/src/mcp-stdio.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts",
@@ -502,7 +362,7 @@
         "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/test-cli-[123].log \"$d/test-cli.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1' sh tmp/clm-s725/clm-09-wiring/final",
         "grep -E '^ *0 fail$' tmp/clm-s725/clm-09-wiring/final/test-cli.log",
         "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/clm-s725/clm-09-wiring/final/test-cli.log)\"",
-        "bash -c 'd=\"$1\"; base=\"$2\"; mkdir -p \"$d\"; w=\"$(mktemp -d)\"; W=\"$w\" bun -e \"const m = await import(process.cwd() + \\\"/apps/cli/src/__fixtures__/obstacle-routing-batch.ts\\\"); const f = m.obstacleRoutingBatch(); await Bun.write(process.env.W + \\\"/doc.jsonl\\\", f.document); await Bun.write(process.env.W + \\\"/ops.json\\\", f.operations);\" || exit 1; cpu() { awk \"\\$1 == \\\"user\\\" || \\$1 == \\\"sys\\\" { s += \\$2 } END { print s }\" \"$1\"; }; : > \"$d/timing.log\"; for i in 1 2 3; do cp \"$w/doc.jsonl\" \"$w/new.jsonl\"; /usr/bin/time -p target/release/nodetto-cli edit \"$w/new.jsonl\" --ops \"$w/ops.json\" > \"$w/new.out\" 2> \"$w/new.time\" || { cat \"$w/new.time\" >> \"$d/timing.log\"; exit 1; }; n=\"$(cpu \"$w/new.time\")\"; echo \"attempt $i: new user+sys $n s\" >> \"$d/timing.log\"; awk -v n=\"$n\" \"BEGIN { exit !(n > 0 && n <= 10) }\" && break; [ \"$i\" -lt 3 ] || exit 1; done; if [ -x \"$base\" ]; then cp \"$w/doc.jsonl\" \"$w/base.jsonl\"; /usr/bin/time -p \"$base\" edit \"$w/base.jsonl\" --ops \"$w/ops.json\" > \"$w/base.out\" 2> \"$w/base.time\"; b=\"$(cpu \"$w/base.time\")\"; echo \"baseline $base user+sys $b s; ratio new/base $(awk -v n=\"$n\" -v b=\"$b\" \"BEGIN { if (b > 0) print n / b; else print \\\"n/a\\\" }\")\" >> \"$d/timing.log\"; else echo \"verification gap: baseline binary $base missing; compare with tmp/clm-s725/clm-02-connector-edit-perf/baseline-native.log\" >> \"$d/timing.log\"; fi; cat \"$d/timing.log\"' bash tmp/clm-s725/clm-09-wiring/final tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline",
+        "bash -c 'd=\"$1\"; base=\"$2\"; mkdir -p \"$d\"; w=\"$(mktemp -d)\"; W=\"$w\" bun -e \"const m = await import(process.cwd() + \\\"/apps/cli/src/__fixtures__/obstacle-routing-batch.ts\\\"); const f = m.obstacleRoutingBatch(); await Bun.write(process.env.W + \\\"/doc.jsonl\\\", f.document); await Bun.write(process.env.W + \\\"/ops.json\\\", f.operations);\" || exit 1; cpu() { awk \"\\$1 == \\\"user\\\" || \\$1 == \\\"sys\\\" { s += \\$2 } END { print s }\" \"$1\"; }; : > \"$d/timing.log\"; for i in 1 2 3; do cp \"$w/doc.jsonl\" \"$w/new.jsonl\"; /usr/bin/time -p target/release/nodetto-cli edit \"$w/new.jsonl\" --ops \"$w/ops.json\" > \"$w/new.out\" 2> \"$w/new.time\" || { cat \"$w/new.time\" >> \"$d/timing.log\"; exit 1; }; n=\"$(cpu \"$w/new.time\")\"; echo \"attempt $i: new user+sys $n s\" >> \"$d/timing.log\"; awk -v n=\"$n\" \"BEGIN { exit !(n > 0 && n <= 10) }\" && break; [ \"$i\" -lt 3 ] || exit 1; done; if [ -x \"$base\" ]; then cp \"$w/doc.jsonl\" \"$w/base.jsonl\"; /usr/bin/time -p \"$base\" edit \"$w/base.jsonl\" --ops \"$w/ops.json\" > \"$w/base.out\" 2> \"$w/base.time\"; b=\"$(cpu \"$w/base.time\")\"; echo \"baseline $base user+sys $b s; ratio new/base $(awk -v n=\"$n\" -v b=\"$b\" \"BEGIN { if (b > 0) print n / b; else print \\\"n/a\\\" }\")\" >> \"$d/timing.log\"; else echo \"verification gap: baseline binary $base missing; compare with tmp/clm-s725/clm-02-connector-edit-perf/baseline-native.log\" >> \"$d/timing.log\"; fi; cat \"$d/timing.log\"' bash tmp/clm-s725/clm-09-wiring/final target/clm-baseline/nodetto-cli",
         "grep -n 'arrangeLayeredOrRoute' apps/cli/src/commands.ts",
         "grep -n 'lintDiagramPages' apps/cli/src/commands.ts",
         "grep -n 'extractQuiet' apps/cli/src/commands.ts",
@@ -514,8 +374,8 @@
   "reconciliation": {
     "owner": "orchestrator",
     "waves": [
-      ["clm-01-merge", "clm-02-connector-edit-perf", "clm-03-lint-core", "clm-04-edit-usability", "clm-07-layered-core"],
-      ["clm-06-route-arrange", "clm-08-lint-cli"],
+      ["clm-02-connector-edit-perf", "clm-07-layered-core"],
+      ["clm-06-route-arrange"],
       ["clm-09-wiring"]
     ],
     "afterWave": [

@@ -197,8 +197,8 @@ runs the final gates.
 7. `CARGO_TERM_QUIET=true mise run test-cli`, with up to 3 attempts on
    native deadline timeouts. Record each attempt.
 8. Run `/usr/bin/time -p target/release/nodetto-cli edit <A7 fixture doc> --ops <A7 ops>`
-   and the same with clm-02's
-   `tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline`, both into
+   and the same with clm-02's baseline binary
+   `target/clm-baseline/nodetto-cli` (amendment round 1), both into
    `tmp/clm-s725/clm-09-wiring/timing.log`. Record both CPU times and the
    ratio. The target is about 3 s of CPU time or less. If the baseline
    binary is missing, compare against clm-02's `baseline-native.log`

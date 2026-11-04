@@ -38,6 +38,26 @@
 - sharedPaths: none
 - artifactRoots: `target`
 
+## Amendment 2026-11-04 (blocked-wave-scope-or-contract, round 1)
+
+- Blocker: the baseline binary location
+  `tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline` sat inside a
+  source path. The shared-write protocol forbids binaries under source paths.
+- Decision: the pre-change baseline binary goes to
+  `target/clm-baseline/nodetto-cli`, inside the existing artifact root
+  `target`. writePaths and artifactRoots do not change. Logs
+  (`baseline-native.log`, `after-native.log`) stay as text files under
+  `tmp/clm-s725/clm-02-connector-edit-perf/`.
+- "Pre-change" means the current shared tree before any clm-02 source edit.
+  That tree already contains the accepted clm-01, clm-03, clm-04 and clm-08
+  changes, which is expected. Build the baseline first, before task 1's
+  expected-output capture changes anything.
+- Do not run `cargo clean` or delete `target/clm-baseline`. clm-09 reads it
+  for the final timing comparison.
+- Verification: the check `test -x tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline`
+  is replaced by `test -x target/clm-baseline/nodetto-cli`.
+- No design change.
+
 ## Intent and context
 
 Part 1 (A7): an `edit` batch of about 50 `update` operations that set
@@ -119,7 +139,8 @@ Context:
    - Run the edit with Bun and write the result to
      `obstacle-routing-batch.expected.jsonl`. Record its `git hash-object`.
    - `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`, then copy
-     the binary to `tmp/clm-s725/clm-02-connector-edit-perf/nodetto-cli-baseline`
+     the binary to `target/clm-baseline/nodetto-cli` (inside the declared
+     artifact root `target`; never under `tmp/`, which is a source path)
      and run
      `/usr/bin/time -p <baseline binary> edit <tmp doc> --ops <tmp ops>` into
      `baseline-native.log`. If it runs over 300 s, stop it and record

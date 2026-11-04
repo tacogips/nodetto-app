@@ -10,11 +10,42 @@
 - writePaths:
   - `packages/core/src/arrange-layered.ts` (new)
   - `packages/core/src/arrange-layered.test.ts` (new)
+  - `packages/core/src/shapes/frame.ts` (amendment round 1: additive export only)
   - `impl-plans/progress/clm-07-layered-core.md`
   - `tmp/clm-s725/clm-07-layered-core`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
+
+## Amendment 2026-11-04 (blocked-wave-scope-or-contract, round 1)
+
+- Blocker: the frame title-band height is an inline literal in
+  `packages/core/src/shapes/frame.ts:frameShapeUtil.hitTest` (`24` when
+  `showTitle !== false`, otherwise `8`). That file was outside writePaths, so
+  `arrange-layered.ts:169-172` copied `24`.
+- Decision: `packages/core/src/shapes/frame.ts` is added to writePaths for
+  one additive change:
+  - export `FRAME_TITLE_BAND = 24`;
+  - `hitTest` uses the constant instead of its literal `24`. The `8` edge
+    margins and every other line stay as they are, so behavior and rendering
+    are byte-identical.
+- `arrange-layered.ts` imports `FRAME_TITLE_BAND` from `./shapes/frame.ts`
+  and removes its copied `24`. Keep the existing rule: no title band when
+  `semantic.showTitle === false`.
+- No other pending plan writes `shapes/frame.ts`. clm-02 owns
+  `frame-translation.ts` and `frame-tree.ts`, which are different files, so
+  there is no same-wave write clash.
+- Do not edit `packages/core/src/index.ts` (clm-09 owns it). The import is
+  internal to core.
+- Coverage still owed, listed in Tests below:
+  - source (in-degree-0) start without an initial state;
+  - cycle-only start;
+  - disconnected components;
+  - exact TB transposition, comparing LR and TB geometry for the same input;
+  - shuffled creation order.
+- Verification adds `packages/core/src/frame.test.ts` (existing frame hit
+  test coverage must pass unchanged).
+- No design change.
 
 ## Intent and context
 
@@ -109,13 +140,24 @@ export function columnFrames(store: Store, pageId: PageId, registry: ShapeUtilRe
 
 ## Verification (each must exit 0)
 
-1. `bun test packages/core/src/arrange-layered.test.ts packages/core/src/arrange.test.ts`.
+1. `bun test packages/core/src/arrange-layered.test.ts packages/core/src/arrange.test.ts packages/core/src/frame.test.ts`.
 2. `bun run typecheck`.
-3. `bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts`.
+3. `bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts packages/core/src/shapes/frame.ts`.
+4. `grep -n "export const FRAME_TITLE_BAND" packages/core/src/shapes/frame.ts`
+   matches.
+5. `grep -c "? 24" packages/core/src/arrange-layered.ts` prints 0. grep exits
+   1 when there are no matches; record that as the expected outcome. Use
+   `! grep -q "? 24" packages/core/src/arrange-layered.ts` as the
+   exit-0 form.
 
 ## Done criteria
 
 - The contract signatures exist exactly as above, and the tests pass.
-- Verification 1 to 3 exit 0, with logs under
+- `FRAME_TITLE_BAND` is exported from `shapes/frame.ts` and used by both
+  `hitTest` and `arrange-layered.ts`. `git diff packages/core/src/shapes/frame.ts`
+  shows only the export and the one literal replacement.
+- Tests exist for the in-degree-0 start, the cycle-only start, disconnected
+  components, exact TB transposition and shuffled creation order.
+- Verification 1 to 5 exit 0, with logs under
   `tmp/clm-s725/clm-07-layered-core/`.
 - `git status --short` shows only writePaths changed.
