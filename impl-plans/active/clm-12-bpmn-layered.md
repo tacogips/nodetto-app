@@ -1,5 +1,89 @@
 # clm-12-bpmn-layered
 
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`:
+`arrange-layered-bpmn.ts` (262 lines) and 10 tests are committed. The free-row
+rule (amendment below) is not implemented, and the listed regressions are missing.
+Fix the existing planner; do not rewrite it. Replace `tmp/clm-s731` with
+`tmp/clm-s732` in every path below. Manifest:
+`impl-plans/active/clm-s732-dispatch.json`. wave: 1; dependsOn: none.
+
+### Remaining changes in `packages/core/src/arrange-layered-bpmn.ts`
+
+1. Free row, per design E2.1 and the amendment below:
+   - No `FRAME_PADDING` and no `MIN_ROW`: its height is its tallest cell stack.
+     Stacks start at the row top and shorter cells are centred within that
+     height.
+   - With pools: shared column x positions; top = `POOL_GAP` below the last
+     pool's bottom. At HEAD `free.y` already uses that y, but
+     `(row.height - stack) / 2` and `height + 80` still apply padding.
+   - Without pools: column 0's left edge is `origin.x` (HEAD uses
+     `originX + 70` for every row) and the top is `origin.y`.
+2. Row lookup. At HEAD, `rows.find((r) => r.id === (lane?.id ?? pool?.id)) ?? free`
+   sends a unit to the free row, outside its pool, in two cases. Fix both:
+   - A unit directly under a non-leaf lane -> the first leaf lane under that lane
+     in model order.
+   - A unit directly under a pool that has lanes -> the pool's first row.
+   In the second case `planBpmnMembership` may then set the lane as its parent;
+   this is the only allowed parent change. Record it in the progress log.
+3. Collapsed pools: a unit inside a collapsed pool is not a unit. It is carried
+   with the pool and never goes to the free row. Add it to `placed`.
+4. Any further fix that a regression below reveals, inside this file only.
+
+These three cases resolve what the design leaves unstated, and they keep its
+"Units end inside their own row". They do not change design geometry.
+
+### Non-goals
+
+- No `--frames`/TB handling and no dispatch; clm-09 owns both.
+- Do not edit `bpmn/containment.ts`, `bpmn/model.ts`, `editor/transaction.ts` or
+  `arrange-modes.ts`. If a regression needs a change in one of them, stop and record
+  an amendment request.
+
+### Tests to add (input -> expected)
+
+Keep the 10 existing tests. Add, applying `containerCommands` then `unitCommands`
+through `Editor.apply`:
+
+- Free-only page, one task at (0,0) -> no commands, task stays at (0,0).
+- Free-only page, start event -> task chain -> column 0 at origin.x, top at
+  origin.y, rerun returns two empty lists.
+- Free row with one pool -> free units `POOL_GAP` below the pool and aligned to the
+  pool's column x values; rerun returns empty lists.
+- Nested lanes: pool > lane > two leaf lanes -> rows are the leaf lanes, heights
+  stack without gaps, each lane inside its parent, and the parent lane height
+  equals the sum of its children; rerun empty.
+- Unit directly under a non-leaf lane, and directly under a pool with lanes -> inside
+  the first leaf row, never in the free row.
+- Collapsed pool -> keeps height, gets the common width, is stacked in y order; a
+  unit inside it keeps its offset from the pool.
+- Two pools with a message flow -> equal widths; the flow's ends at the same depth
+  share a column x.
+- Expanded sub-process with two inner tasks -> inner offsets from the sub-process
+  are unchanged; a connector end inside it maps to the sub-process.
+- Boundary event on a task -> still on the host boundary after apply; an edge from
+  it maps to the host.
+- Shuffled creation order on a two-pool page -> identical commands.
+- `validateDocument(editor.getSnapshot())` has no errors after each case above.
+
+### Pitfalls
+
+- Applying one combined list lets `planBpmnTranslations` carry units twice.
+- `planBpmnLaneLayout` skips a lane whose parent box changed and otherwise adds the
+  height delta to the parent, so a container step that changes only a nested lane's
+  height changes its ancestors' heights too. Rerun tests catch a mismatch.
+- `Editor.apply` is being edited by clm-02 in the same wave. A failure caused by
+  its in-progress edit is drift: record it, wait, rerun. Do not edit its files.
+
+### Done criteria (mechanical)
+
+- Manifest verification commands exit 0, with at least 20 tests in the file.
+- The progress log has the Bun timing for 3 pools, 6 lanes, 60 units and pre/post
+  hashes. `git status --short` shows only this plan's writePaths changed by it.
+
+---
+
 - planId: clm-12-bpmn-layered
 - planPath: impl-plans/active/clm-12-bpmn-layered.md
 - progressPath: impl-plans/progress/clm-12-bpmn-layered.md

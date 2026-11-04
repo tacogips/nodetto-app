@@ -1,5 +1,75 @@
 # clm-09-wiring
 
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: nothing of this plan has
+started; `impl-plans/progress/clm-09-wiring.md` does not exist. Scope is the s731
+section and the base plan below, plus the additions here. Replace `tmp/clm-s731` and
+`tmp/clm-s725` with `tmp/clm-s732` in every path. Manifest:
+`impl-plans/active/clm-s732-dispatch.json`.
+
+- wave: 3; dependsOn: clm-02-connector-edit-perf, clm-06-route-arrange,
+  clm-11-container-carry, clm-12-bpmn-layered. Accepted and landed: clm-01, 03, 04,
+  07, 08, 10, 13, 14.
+- This plan is the single owner of the shared files. It writes no feature logic,
+  apart from the BPMN dispatch and the lines listed below.
+
+### writePaths additions (pre-authorized)
+
+- `apps/cli/src/arrange-modes.test.ts`: the test at line 124 asserts that layered on
+  BPMN exits 2. The dispatch makes it exit 0, so this test must change here.
+- `apps/cli/src/lint-metrics.test.ts`, `apps/cli/src/lint-diagram.test.ts`,
+  `apps/cli/src/merge-command.test.ts`, `apps/cli/src/warnings.test.ts`,
+  `apps/cli/src/edit/report.test.ts`, `apps/cli/src/edit/carry-members.ts`,
+  `apps/cli/src/edit/apply-batch.test.ts`: import switches or assertions that wiring
+  intentionally changes only.
+- `apps/cli/src/native-parity/harness.ts`, `apps/cli/src/native-parity/documents.test.ts`,
+  `apps/cli/src/native-parity/drawing.test.ts`, `apps/cli/src/native-parity/text-layout.test.ts`,
+  `apps/cli/src/native-parity/edit-performance.test.ts`: only if `mise run test-cli`
+  shows that wiring changed an asserted output. Never relax a deadline.
+- `apps/cli/src/draw-command.ts`, `apps/cli/src/export-command.ts`: only for `--quiet`
+  or collapsed warnings, if `cli.ts` and `commands.ts` are not enough.
+- `packages/core/src/bpmn/index.ts`: only if `bpmnFlowLabelBox` is exported through it.
+- `apps/cli/src/__fixtures__/bpmn-layered.ts` (new): a builder for a BPMN page of 3
+  pools, 6 lanes and 60 units with neutral names, for the timing below and
+  `layout.test.ts`.
+
+Record every touched pre-authorized file in the progress log.
+
+### Added file-level changes
+
+- `arrange-modes.ts` BPMN dispatch: on a `bpmn` page with `--mode layered`, exit 2 for
+  `--frames` and for `--direction TB`, with a message saying pools are horizontal
+  (design E2.1). Otherwise call `planLayeredBpmn`, apply `containerCommands` then
+  `unitCommands` with `{ placed }`, then run the route stage. Add both command counts to
+  `count` so `--check` is correct. Add `bpmn` to the accepted kinds for layered only
+  through this branch; `LAYERED_PAGE_KINDS` keeps its value.
+- Production-core strict check: the `node-overlap.ts` annotation (round 1 below).
+- Native timing, recorded per design "Continuation 2 verification": `/usr/bin/time -p`
+  on the release binary for `arrange --mode route --page Grid` on the `multiPage`
+  fixture document and `arrange --mode layered` on the `bpmn-layered` fixture document,
+  with times and exit statuses in `tmp/clm-s732/clm-09-wiring/timing.log`. Write the
+  documents with an inline `bun -e` into `tmp/clm-s732/clm-09-wiring/work/` as `.jsonl`
+  data. There is no fixed threshold; a quadratic slowdown (doubling the units more than
+  triples the time) is a blocker to record against the owning plan.
+
+### Pitfalls
+
+- `mise run verify` may rewrite tracked `apps/desktop/src-tauri/gen/schemas/*.json`.
+  Restoring them is not this plan's job; commits stage explicit paths only.
+- `--quiet` must not hide match lines (F2), and `--strict --quiet` must still exit 3.
+- The MCP tool `nodetto_edit` takes free-form args and uses `COMMAND_HELP.edit`, so
+  there is no schema change: `mcp.test.ts` asserts that the description mentions `where`
+  and `select`, and the tool list includes `nodetto_merge`.
+- A defect in a feature module is a finding for the owning plan. Do not fix it here.
+
+### Done criteria (mechanical)
+
+- Manifest verification commands exit 0. The native command and `mise run test-cli`
+  use up to 3 attempts, each attempt's log kept.
+- `timing.log` has the four A7 ops sets against `target/clm-baseline/nodetto-cli` and
+  the two arrange timings.
+
 ## Continuation 2026-11-04 (clm-s731) - authoritative
 
 This section supersedes the header fields below (wave, dependsOn,

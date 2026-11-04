@@ -7,7 +7,31 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
-## Continuation 2026-11-04 (clm-s731) - authoritative
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Manifest: `impl-plans/active/clm-s732-dispatch.json`, base HEAD
+`29f8691135fb6098a9496495f4a417e93ce0625e`, evidence root `tmp/clm-s732/<planId>/`.
+The clm-s725 and clm-s731 manifests are stale and must not be dispatched. Accepted:
+clm-01, 03, 04, 07, 08, 10, 13, 14.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | All of the A7 continuation and the E1 engine option `keepMembers` | - |
+| 1 | clm-06-route-arrange | Coverage gaps G1 to G11 and any defects they reveal | - |
+| 1 | clm-12-bpmn-layered | Free-row rule, row lookup, collapsed pool contents, missing regressions | - |
+| 2 | clm-11-container-carry | E1 CLI module and per-kind tests | clm-02 |
+| 3 | clm-09-wiring | Registration, BPMN dispatch, help, docs, parity, git e2e, final gates | clm-02, 06, 11, 12 |
+
+Each plan's "Continuation 2" section is authoritative and states what has landed. The
+sections below it stay binding where not amended. Single owners in this run:
+`apps/cli/src/edit/batch.ts`, `apps/cli/src/edit/selectors.ts`,
+`apps/cli/src/edit/apply-batch.ts` and the core planner files (clm-02 in wave 1;
+clm-11 for defects only in wave 2; clm-09 for one `apply-batch.ts` line in wave 3);
+`apps/cli/src/edit/operations/elements.ts` (clm-11);
+`apps/cli/src/arrange-modes.ts` and `arrange-modes.test.ts` (clm-06, then clm-09).
+Keep evidence under 300 files per plan, because plan snapshots count them.
+
+## Continuation 2026-11-04 (clm-s731) - history
 
 Manifest: `impl-plans/active/clm-s731-dispatch.json`. The clm-s725 manifest
 (`impl-plans/active/clm-s725-dispatch.json`) is stale and must not be

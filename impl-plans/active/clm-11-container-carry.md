@@ -1,5 +1,42 @@
 # clm-11-container-carry
 
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: nothing of this plan has
+started. Scope and rules below are unchanged. Replace `tmp/clm-s731` with
+`tmp/clm-s732` in every path. Manifest: `impl-plans/active/clm-s732-dispatch.json`.
+
+- wave: 2; dependsOn: clm-02-connector-edit-perf only. The dependency is a real
+  call: `editor.apply(commands, { keepMembers })` does not type-check until clm-02
+  adds `ApplyOptions.keepMembers`. clm-13 has landed, so the A6 block is at
+  `apps/cli/src/edit/operations/elements.ts:126-153`. It is the only block replaced.
+- writePaths additions (pre-authorized):
+  - `apps/cli/src/edit/selectors.test.ts`: one `where` plus `carryMembers:false`
+    case, additive.
+  - `apps/cli/src/edit/operation-input.ts`: only if a validation helper is needed.
+  - For defects in `keepMembers` that the E1 tests reveal, smallest fix plus a case
+    in `packages/core/src/keep-members.test.ts`: `packages/core/src/bpmn/containment.ts`,
+    `packages/core/src/breadboard/board-carry.ts`,
+    `packages/core/src/frame-translation.ts`, `packages/core/src/constraints.ts`,
+    `packages/core/src/editor/transaction.ts`. No other plan writes these files in
+    wave 2. Without `keepMembers`, output must stay byte-identical. This replaces
+    the pitfall below that says to stop and record a finding against clm-02.
+- Extra pitfall: attachments are not members. `bpmn.boundaryEvent` on a moved
+  sub-process or task must end on its host boundary after `planBpmnMembership`,
+  even when `descendantsOf` returns it in the held set. If it does not, remove
+  boundary events attached to the updated element from the held set.
+- Extra tests:
+  - Expanded sub-process with a boundary event on itself, move with
+    `carryMembers:false` -> event on the new boundary, inner tasks unchanged.
+  - `where` matching two pools with `carryMembers:false` -> the held set is computed
+    per match, and tasks of both pools keep their positions.
+  - Resize of a pool and of a frame are separate cases from move in every kind where
+    the E1 table has a resize column.
+- Done criteria add: the E1 messages appear verbatim in `carry-members.ts`, and
+  manifest verification commands exit 0.
+
+---
+
 - planId: clm-11-container-carry
 - planPath: impl-plans/active/clm-11-container-carry.md
 - progressPath: impl-plans/progress/clm-11-container-carry.md

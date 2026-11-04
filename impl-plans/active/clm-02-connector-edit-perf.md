@@ -1,5 +1,193 @@
 # clm-02-connector-edit-perf
 
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: only the s725 work
+has landed (IR connector fields, resolver, single-page fixture, one snapshot
+reuse). The s731 worker stopped at readiness and edited nothing: no multi-page
+fixture, no profile, no dirty-page planning and no `keepMembers` exist. Implement
+Parts 1 to 3 of the s731 section below, as amended here. Every
+`tmp/clm-s731/...` path below becomes `tmp/clm-s732/...`. Do not dispatch the
+s731 manifest.
+
+- wave: 1; dependsOn: none. Manifest: `impl-plans/active/clm-s732-dispatch.json`.
+- Design: "A7 continuation", E1 "Mechanics", "Continuation contracts" (clm-02
+  block), "Continuation 2 partition" and "Continuation 2 verification".
+
+### Intent
+
+An `edit` batch's per-operation cost must be bounded by the edited page, with
+byte-identical output. Owner evidence (native release binary): the 50-op batch
+takes 0.56 s on one page and 3.4 s with an unrelated page of 973 elements; the
+mixed batch takes 5 to 6 s. Target: multi-page user CPU within 1.5x of the
+single-page counterpart on the same build.
+
+### Non-goals
+
+- No change to `applyCommands`' signature, atomicity, `CommandResult`
+  (`undo`/`redo` content and order) or `CommandError` messages.
+- No planner order change and no new CLI field. `carryMembers` routing in
+  `apps/cli/src/edit/operations/elements.ts` is clm-11's. Never edit that file,
+  `arrange-*.ts`, `bpmn/notation.ts` or the shared registration files.
+- No Rust. A host-side cost is a blocker to record.
+
+### writePaths additions (pre-authorized; edit only what the profile needs)
+
+The s731 list below stays, with `tmp/clm-s732/clm-02-connector-edit-perf`
+replacing the old evidence path. Added:
+
+- New module: `packages/core/src/editor/dirty-pages.ts`.
+- Core: `hit-test.ts`, `layer-state.ts`, `clipping.ts`, `frame-membership.ts`,
+  `orthogonal-routing.ts`, `shapes/connector/resolve.ts`, `bpmn/model.ts`,
+  `editor/facade/element-editing.ts`, `editor/facade/page-editing.ts`.
+- CLI: `apps/cli/src/edit/batch.ts`, `apps/cli/src/edit/selectors.ts`,
+  `apps/cli/src/edit/selectors.test.ts`, `apps/cli/src/edit/apply-batch.test.ts`.
+- Existing tests next to touched modules, additive cases only:
+  `packages/core/src/{hit-test,layer-state,clipping,frame-translation,frame-tree,frame-membership,constraints,auto-layout,text-layout,text-styles,color-tokens,number-tokens,aspect-ratio,manual-route-preservation,editor}.test.ts`,
+  `packages/core/src/bpmn/{containment,editor-bpmn}.test.ts`,
+  `packages/core/src/breadboard/{board,editor-breadboard}.test.ts`,
+  `packages/core/src/pcb-board/follow.test.ts`.
+
+The exact paths are in the manifest. Anything else needs an amendment.
+
+### Order of work
+
+1. Part 1 of the s731 section, before any A7 source edit: fixtures, both
+   expected files, the cross-check against `target/clm-baseline/nodetto-cli`
+   (that binary predates clm-13, so a match also confirms clm-13 left edit output
+   unchanged), and baseline timings. A difference is a blocker to record; never
+   regenerate an expected file.
+2. Profile (Part 2). Write `.cpuprofile` output under
+   `target/clm-s732-profile/`, not under `tmp/`. Record the top frames and the
+   per-planner scope table in the progress log.
+3. Implement the scoping below, then `keepMembers` (Part 3).
+
+### Decisions the implementation must follow
+
+All read sites at HEAD: `editor/transaction.ts:planDerivedCommands`,
+`commands.ts:applyCommands` (lines 429-436), `store.ts:getPageElements` (a full
+`elementMap` scan on each cache miss), `edit/apply-batch.ts` (lines 102-118).
+
+**Scoped stores, not edited planners.** `planDerivedCommands` keeps one code path
+and today's planner order. In a scoped apply, it passes planners a before-store
+and draft holding only the in-scope elements (all page records, so `listPages`
+is unchanged). Then every planner is bounded without being rewritten, and a
+filtered subsequence keeps today's command order. Add a `Store` method that
+returns a document with all pages and only the given pages' elements, in
+`compareSnapshotOrder` order. Build a scoped `ShapeContext` for
+`planManualRoutePreservation`; do not pass it the live-store context.
+
+**When an apply covers the whole document.** `editor/dirty-pages.ts` holds this
+decision (internal; not exported from `packages/core/src/index.ts`). Whole
+document, using today's stores, when any of these holds:
+
+1. Stale state: this is the first non-empty apply on this editor, or
+   `store.revision` or `registry.revision` differs from the values recorded at the
+   end of the previous successful apply. Undo, redo, `loadDocument`,
+   `reconcileDerivedState` and direct `applyCommands` all change the revision.
+2. Any page command is permitted: `createPage`, `updatePage`, `deletePage`.
+3. A changed element is `design.token`, `design.text-style` or a component
+   master read by `planAutoComponentRefresh`.
+4. A dirty page is cross-linked (below).
+5. A `createElement` id already exists in the store, or a created or updated
+   `semantic` references an id whose page is out of scope.
+
+Why rule 1 is required: `applyBatch` does not call `reconcileDerivedState`, and
+at HEAD the first apply runs `planTextResize`, `planAutoLayout`, the token
+planners and others over every page, so it normalizes stale derived values on
+pages the batch never touches. Skipping that would change output for such
+documents. After one whole-document apply, untouched pages are at the planners'
+fixed point, so later applies may skip them. This costs one pass per batch, not
+one per operation, so it satisfies "bounded per operation" and the byte-identity
+rule of the design.
+
+**Cross-linked page.** A page with at least one element that references an element
+on another page, in either direction, through the registry's
+`references(semantic)`, `visual.colorTokens`, `visual.numberTokens`,
+`visual.textStyle` or a component master or instance link. Read
+`auto-component-refresh.ts`, `color-tokens.ts`, `number-tokens.ts` and
+`text-styles.ts` for the exact fields. Build the set during each whole-document
+apply. Later, add pages when a changed element creates a link; never remove any.
+Widening more than needed is always safe; widening less is the bug to avoid.
+
+**`applyCommands` overlay.**
+
+- Replace the eager maps with read-through working state (`store.get`,
+  `store.getPage`) plus a local change log.
+- `deleteElements` and `deletePage` need the whole map. Materialize it by building
+  it from `store.listElements()` and then replaying the change log in order, so
+  iteration order equals today's. `expandDeletes` order feeds `undo`; a differently
+  ordered map changes `undo` content.
+- Deletes therefore stay O(document) for that one command. Record this in the
+  progress log.
+
+**Store index.** Keep a page-to-element-ids index, maintained in `loadDocument`
+and `commit`, including elements that change page, so `getPageElements` costs
+O(page log page). Sorted output must not change.
+
+**`applyBatch`.** Replace the per-operation full maps with
+`editor.store.subscribe`: keep `records` updated only for ids in each diff, and
+keep the `records.get(id) !== element` and `semantic` identity checks. Build the
+initial map once. Unsubscribe in a `finally`.
+
+**Prefix references.** `edit/selectors.ts:ordered` sorts the whole document for
+each non-exact reference, and fixtures with full ids never reach it. Time
+`multiPage` with its ops' ids rewritten through `shortIds` (`apps/cli/src/ids.ts`).
+If that is above 1.5x of the same rewrite on the single-page fixture, memoize the
+sorted id list on `Batch`, invalidated by diffs with `added`, `removed` or
+`pagesChanged`. Otherwise record the measurement and leave it.
+
+### Pitfalls
+
+- A scoped draft that throws where today's would not, or the reverse: rule 5
+  covers duplicate ids and out-of-scope references. An unknown id must raise
+  the same `CommandError` as today.
+- `permitted` empty returns `[]` and must not mark the editor as clean. A thrown
+  `CommandError` must not either.
+- Do not compute the scope from derived commands: derived commands stay inside
+  the scope by construction.
+- Boa rules: no regex split on documents, no per-point destructuring in hot loops.
+- `noUncheckedIndexedAccess`-safe array access in every new core line.
+- Keep `.log`, `.txt`, `.json` and `.jsonl` only under `tmp/`, and keep under 300
+  evidence files in total: the plan snapshot limit counts them. Reuse one log per
+  gate instead of one per edit.
+
+### Added tests (input -> expected)
+
+`packages/core/src/dirty-pages.test.ts`, in addition to the s731 list:
+
+- A page-2 text with `textResize: "auto-width"` and a stale stored width; first
+  update on page 1 -> the same commands as the HEAD code (capture before editing),
+  so page 2 is normalized once.
+- A second update on page 1 -> no command names a page-2 element, and page-2
+  element objects are identical (`toBe`).
+- Spy on `Store.prototype.getSnapshot` and `listElements`, recording `this.size`:
+  during the second apply, every `getSnapshot` call has `this.size` at most the
+  page-1 element count. `listElements` calls on the live store are at most the
+  recorded allowance listed in the progress log.
+- Undo the first apply, then update on page 1 -> a whole-document pass runs again
+  and the state equals the HEAD result.
+- One test each for rules 2, 3, 4 and 5, each confirming the other page updates
+  or the error text equals HEAD.
+
+`packages/core/src/store-commands.test.ts`:
+
+- Invalid second command -> store revision unchanged, no diff emitted.
+- `undo` and `redo` deep-equal captured HEAD values for update, create and
+  cross-page delete cascades.
+- `deletePage` on a multi-element page, and the last-page refusal, keep their messages.
+
+### Done criteria (mechanical)
+
+- Manifest verification commands all exit 0.
+- The progress log contains the lines `A7 ratio multiPage/single: <x>` and
+  `A7 ratio mixedMulti/mixedSingle: <x>`, both at most 1.5, from
+  `/usr/bin/time -p` on the same release build, plus the ratios against
+  `target/clm-baseline/nodetto-cli`. If a ratio exceeds 1.5, record the remaining
+  cost with a profile and report the plan as blocked. Do not mark it done and do
+  not write a passing line.
+- `git status --short` shows only this plan's writePaths changed by this plan.
+
 ## Continuation 2026-11-04 (clm-s731) - authoritative for the remaining work
 
 This section supersedes the header fields below (wave, writePaths,

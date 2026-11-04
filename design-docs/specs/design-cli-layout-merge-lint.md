@@ -408,6 +408,21 @@ confirms which of these dominate with a profile before changing them):
   `planManualRoutePreservation`: whole-document scans or snapshots.
 - `applyBatch` (`apps/cli/src/edit/apply-batch.ts`): two full element maps per
   operation to find touched elements.
+- `applyCommands` (`packages/core/src/commands.ts`), called by
+  `EditorCore.apply` (`packages/core/src/editor/facade/core.ts`) on the live
+  store: it copies every element and page of the document into working maps
+  on every call (added 2026-11-04, continuation 2).
+- `EditorCore.createShapeContext` (`facade/core.ts`): the cached context is
+  keyed by `store.revision`, so every apply builds a fresh context, and its
+  lazy whole-document caches (`layerStates` in `layer-state.ts`, `frameClips`
+  and `layerClipPolygons` in `clipping.ts`) are rebuilt on first use. The
+  profile decides whether these must become page-scoped.
+
+`applyCommands` keeps its exported signature, its atomicity (an invalid
+command leaves the store unchanged and emits no diff), its `CommandResult`
+(`undo`/`redo` content and order) and its `CommandError` messages; only its
+internal copying becomes bounded by the elements and pages the commands
+name. `arrange-route.ts` and other callers keep working unchanged.
 
 Required behavior:
 
@@ -1265,6 +1280,11 @@ and records it in its progress log; it never renames a contract.
 
 ## Continuation partition
 
+History: this is the clm-s731 partition. Its waves are replaced by
+"Continuation 2 partition" below; its contracts and single-owner notes stay
+binding, and `impl-plans/active/clm-s731-dispatch.json` must not be
+dispatched again.
+
 Landed at HEAD 4d82d91: clm-01, clm-03, clm-04, clm-07, clm-08 (accepted) and
 the clm-02 IR, resolver and single-page A7 work. The remaining work is split
 below. The ownership rules above still apply: feature plans write new modules
@@ -1364,3 +1384,73 @@ may add an optional parameter and record it, never rename.
 - No plan lists a binary-less native command or an expected-to-fail command.
   Every plan sets `artifactRoots ["target"]` and lists every edited file,
   docs included, in `writePaths`.
+
+## Continuation 2 partition
+
+Added 2026-11-04 for HEAD 29f8691. It replaces the waves of "Continuation
+partition". The ownership rules, all contracts and the single-owner notes
+above stay binding. The fresh manifest is
+`impl-plans/active/clm-s732-dispatch.json` with evidence root
+`tmp/clm-s732/`; the clm-s725 and clm-s731 manifests must not be dispatched
+again.
+
+State at HEAD 29f8691:
+
+- Landed and accepted: clm-01, clm-03, clm-04, clm-07, clm-08 (s725) and
+  clm-10, clm-13, clm-14 (s731). Fixes 1 to 3 and F1 to F3 are therefore in
+  the tree; F4 (help, docs, parity) remains with clm-09.
+- clm-02: only the s725 work (IR connector fields, resolver, single-page
+  fixture, one snapshot reuse) has landed. None of the A7 continuation and
+  none of the E1 engine option (`keepMembers`) exists yet.
+- clm-06: `arrange-route.ts`, `diagram-lint/metrics.ts`, the
+  `bpmn/notation.ts` label changes, `arrange-modes.ts` and `lint-metrics.ts`
+  with their tests are committed and their plan gates passed, but the plan
+  has not been reviewed or accepted.
+- clm-12: `arrange-layered-bpmn.ts` and 10 tests are committed. The free-row
+  rule clarified in E2.1 (amendment round 1) is not implemented, and the
+  regressions for nested lanes, collapsed pools, message flows, a free row
+  beside pools, sub-processes, boundary events and `validateDocument` are
+  missing.
+
+| Wave | Plan | Remaining scope | Owned files (summary) | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | A7 continuation in full (pre-change expected files, profile, dirty-page planning, page-bounded `applyCommands`, Bun and native deadline tests, manual ratios) and the E1 engine option `keepMembers` with its planner parameters | the clm-s731 list, plus `packages/core/src/commands.ts`, `packages/core/src/editor/facade/core.ts`, `packages/core/src/store-commands.test.ts` (checkpoint cb03f7e), and pre-authorized for the profile: `packages/core/src/hit-test.ts`, `packages/core/src/layer-state.ts`, `packages/core/src/clipping.ts`, `packages/core/src/editor/facade/element-editing.ts`, the tests next to each touched module | - |
+| 1 | clm-06-route-arrange | Close every gap against Verification rows A2 to A5, "A3 metrics" and E2 (route part) found by review; no new scope | the clm-s731 list unchanged | - |
+| 1 | clm-12-bpmn-layered | Free-row rule (with and without pools) and the missing regressions listed above, with any planner fixes they need | `packages/core/src/arrange-layered-bpmn.ts` and its test | - |
+| 2 | clm-11-container-carry | E1 CLI module and per-kind tests, unchanged scope | the clm-s731 list unchanged | clm-02 |
+| 3 | clm-09-wiring | Unchanged scope, plus the production-core strict check and the native timing of the new arrange modes (below) | the shared files, `packages/core/src/diagram-lint/node-overlap.ts` (annotation only), `apps/cli/src/arrange-modes.ts` (BPMN dispatch only), `apps/cli/src/edit/apply-batch.ts` (`matches` line only), `design-docs/specs/{design-cli-ai-drawing,export}.md` | every other plan |
+
+- clm-11's dependency is a real call dependency: `heldMembers` results are
+  passed as `editor.apply(commands, { keepMembers })`, which does not
+  type-check, and whose per-kind tests cannot pass, before clm-02 adds
+  `ApplyOptions.keepMembers` and the planner `keep`/`reparent` parameters.
+  No wave-1 plan edits `apps/cli/src/edit/operations/elements.ts`.
+- clm-02, clm-06 and clm-12 share no write path. clm-06 only calls
+  `applyCommands`, whose signature and results clm-02 keeps (A7
+  continuation), so clm-06 does not wait for clm-02.
+- If the A7 profile needs a file outside clm-02's list that another wave-1
+  plan owns, clm-02 records an amendment instead of editing it. A file that
+  no other plan owns and that sits next to a listed module is covered by the
+  pre-authorization above only when it is named in the manifest.
+
+### Continuation 2 verification
+
+The continuation verification above applies, with evidence under
+`tmp/clm-s732/<planId>/`, and these additions:
+
+- clm-02 produces the two multi-page expected files with HEAD 29f8691 code
+  before its first A7 source edit and checks them against
+  `target/clm-baseline/nodetto-cli` (output must be byte-identical; the
+  baseline binary is older than clm-13, so this check also confirms that the
+  landed selector work did not change edit output). A difference is a
+  blocker to record, not a reason to regenerate.
+- clm-09 runs the production-core strict check: `bun run typecheck
+  --noUncheckedIndexedAccess` with its full log kept, and the gate passes
+  when no diagnostic names a non-test file under `packages/core/src/`.
+  Existing test-file diagnostics are the recorded baseline.
+- `arrange --mode layered|route` is reachable from the native binary only
+  after clm-09 registers it, so clm-09 also times, with `/usr/bin/time -p`
+  on the release binary, `arrange --mode route` on the `multiPage` grid page
+  and `arrange --mode layered` on a BPMN page of 3 pools, 6 lanes and 60
+  units, and records the times and exit statuses (Boa rules). There is no
+  fixed threshold; a quadratic slowdown found here is a clm-09 blocker.

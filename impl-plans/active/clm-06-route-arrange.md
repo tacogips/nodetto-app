@@ -1,5 +1,90 @@
 # clm-06-route-arrange
 
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: `arrange-route.ts`,
+`diagram-lint/metrics.ts`, the `bpmn/notation.ts` label changes,
+`arrange-modes.ts`, `lint-metrics.ts` and their tests are committed, and their
+plan gates passed. The plan has not been reviewed or accepted. "Nothing of this
+plan has landed yet" in the s731 section below is out of date; do not rewrite
+these modules.
+
+- wave: 1; dependsOn: none. clm-02 is not a dependency: this plan only calls
+  `applyCommands` and `Editor.apply`, whose results clm-02 keeps.
+- Scope: close the gaps below against the design's Verification rows A2 to A5,
+  "A3 metrics" and E2 (route part), fixing any defect the new tests reveal in
+  owned files. No new scope.
+- writePaths: the s731 list below, with `tmp/clm-s732/clm-06-route-arrange` as the
+  evidence path. Manifest: `impl-plans/active/clm-s732-dispatch.json`.
+- The s731 rules, tests and amended verification below stay binding, except that
+  the "no ERD layered test here" note no longer applies, because clm-10 has landed.
+
+### Non-goals
+
+- No BPMN `layered` dispatch; clm-09 adds it, and until then the existing test
+  stays exit 2. No registration in `commands.ts`, `help.ts` or `index.ts`.
+- `bun run typecheck --noUncheckedIndexedAccess` is not a gate here (round 1
+  disposition below). The modules owned here must still add no new strict
+  diagnostics.
+- Do not edit `arrange-layered.ts` or any file of clm-02 or clm-12.
+
+### Gaps found by the coverage audit (file: situation -> expected)
+
+`packages/core/src/arrange-route.test.ts`:
+
+- G1 A2 regression: a `routing: "manual"` connector with non-empty
+  `routingWaypoints` whose straight path is blocked by a widget. With
+  `resetManual`, the resolved route crosses no obstacle clearance box and no
+  element moves. No current test asserts clearance.
+- G2 A3 generic path: on a state or freeform page, a label whose midpoint sits on
+  a blocking element -> `labelPosition` is not 0.5 and its box at
+  `connectorLabelBoxAt` overlaps nothing; another candidate blocked by an already
+  placed label is skipped. Only the BPMN path is covered today.
+- G3 A5 fallback: an element with all four sides used -> the self-loop takes the
+  side with the fewest ends, in the fixed order on ties.
+- G4 ERD labels: a relation with label text on a blocked midpoint -> `labelPosition`
+  moves; a relation with no label text -> no write.
+- G5 `labelBounds` as a placed label: flow A with `visual.labelBounds` over flow B's
+  midpoint -> B moves away and A has no `labelPosition` write.
+
+`packages/core/src/diagram-lint/metrics.test.ts`:
+
+- G6 A3 decrease: a crafted page where `labelOverlaps` is at least 1; after
+  applying `planRoute` it is lower.
+- G7 ERD metrics: an ERD page with crossing relations and a label on a table ->
+  both counts above 0, and a label inside a containing `frame` only -> 0.
+
+`apps/cli/src/arrange-modes.test.ts`:
+
+- G8 exclusions: breadboard and pcb pages -> exit 2 for both modes, and the
+  message names the supported kinds. Only sequence is covered today.
+- G9 ERD layered: ERD page with frames -> exit 0 and tables inside their frames;
+  without frames -> exit 2.
+- G10 flags: `--frames Stage1,Stage0` reverses the column order, `--direction TB`
+  gives rows, and the unknown-frame error lists the column frames. Assert these
+  explicitly if an existing test only checks the exit code.
+
+`apps/cli/src/lint-metrics.test.ts`:
+
+- G11 BPMN and ERD pages produce metric lines in page order.
+
+Boa audit, recorded in the progress log: no regex `split` on documents and no
+per-point destructuring in segment loops in `arrange-route.ts` and `metrics.ts`.
+Fix any hit in those files.
+
+### Pitfalls
+
+- If a gap test fails, fix the owned module, not the expected value, unless the
+  design says otherwise; quote the design row in the progress log.
+- A real defect in `Editor.apply` belongs to clm-02: record it, do not edit it.
+- Keep evidence under 300 files. One log per gate; do not write per-edit hash
+  files (the s731 run produced 274). Record pre/post hashes in the progress log.
+
+### Done criteria (mechanical)
+
+- Tests G1 to G11 exist and the manifest verification commands exit 0.
+- `git status --short` shows only this plan's writePaths changed by this plan.
+
 ## Continuation 2026-11-04 (clm-s731) - authoritative
 
 This section supersedes the header fields below (wave, dependsOn,
