@@ -83,6 +83,7 @@ export {
   type SizeDimension,
 } from "./align.ts";
 export { connectorBackdropIds } from "./backdrops.ts";
+export { containerPaintOrder, pagePaintOrder } from "./paint-order.ts";
 export {
   type ArrangeMode,
   type ArrangeOptions,

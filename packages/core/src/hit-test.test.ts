@@ -322,3 +322,51 @@ describe("shape context", () => {
     expect(context.resolve("a")?.id).toBe("a");
   });
 });
+
+describe("container paint order hit testing", () => {
+  const task = element({
+    id: "task",
+    type: "bpmn.task",
+    index: "a1",
+    semantic: { name: "Task" },
+    visual: { x: 40, y: 40, width: 60, height: 40 },
+  });
+  const lane = element({
+    id: "lane",
+    type: "bpmn.lane",
+    index: "a1",
+    semantic: { name: "Lane" },
+    visual: { x: 20, y: 20, width: 160, height: 120 },
+  });
+  const pool = element({
+    id: "pool",
+    type: "bpmn.participant",
+    index: "a2",
+    semantic: { name: "Pool" },
+    visual: { x: 0, y: 0, width: 200, height: 160 },
+  });
+  const flow = element({
+    id: "flow",
+    type: "bpmn.sequenceFlow",
+    index: "a3",
+    semantic: { from: "missing-a", to: "missing-b" },
+  });
+
+  test("a task is picked above a later pool without connectors", () => {
+    expect(pick(new Store(document([task, pool])), { x: 65, y: 60 })).toBe(
+      "task",
+    );
+  });
+
+  test("a lane is picked above its later pool with a connector", () => {
+    expect(
+      pick(new Store(document([lane, pool, flow])), { x: 65, y: 60 }),
+    ).toBe("lane");
+  });
+
+  test("a later pool remains picked above a task with a connector", () => {
+    expect(
+      pick(new Store(document([task, pool, flow])), { x: 65, y: 60 }),
+    ).toBe("pool");
+  });
+});

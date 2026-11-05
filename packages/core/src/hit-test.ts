@@ -30,6 +30,7 @@ import {
   booleanGeometryContains,
 } from "./boolean-operations.ts";
 import { groupOf } from "./group.ts";
+import { pagePaintOrder } from "./paint-order.ts";
 
 function insideBooleanAncestors(
   store: Store,
@@ -141,7 +142,7 @@ export function hitTestPoint(
 ): ElementId | null {
   const zoom = options.zoom ?? options.context?.zoom ?? 1;
   const context = options.context ?? createShapeContext(store, registry, zoom);
-  const elements: readonly Element[] = store.getPageElements(pageId);
+  const elements: readonly Element[] = pagePaintOrder(store, pageId, context);
   for (let i = elements.length - 1; i >= 0; i -= 1) {
     const element = elements[i] as Element;
     if (

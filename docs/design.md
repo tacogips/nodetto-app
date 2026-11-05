@@ -30,6 +30,9 @@ selection (Shift for multiple layers), collapsing and z-order controls.
 Dragging, nudging, copying, duplicating or deleting a selected artboard
 includes its contents and supports undo. Content belongs to the smallest
 enclosing artboard below it in z-order; moving content outside releases it.
+An artboard paints beneath content it encloses regardless of stored order, but
+ownership still requires the artboard to be below the content. For a covering
+panel, use a rectangle shape or group the frame with the content.
 Layer Hide/Show and Lock/Unlock controls persist in JSONL and synchronize
 through collaboration. Hidden artboards/groups hide descendants without
 overwriting their own visibility settings. Locked layers remain visible

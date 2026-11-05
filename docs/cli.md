@@ -103,7 +103,18 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   text across the document (`{"op":"replace-text","find":"example.dev",
   "replace":"example.info"}`, with `regex` and `ignoreCase`; `--dry-run`
   previews every change), and groups or ungroups elements
-  (`{"op":"group","ids":[...]}`, `{"op":"ungroup","id":...}`).
+  (`{"op":"group","ids":[...]}`, `{"op":"ungroup","id":...}`), or changes
+  stacking order (`{"op":"order","id":"@panel","to":"back"}`).
+  For `order`, select targets with `id` or `where`/`expect`; multiple targets
+  move as one block. Specify exactly one of `to` (`back`, `front`, `backward`,
+  `forward`), `before` (directly beneath an anchor), or `after` (directly above
+  it). Group members reorder within their group; ungrouped targets reorder on
+  the page with frame contents and group members. Frames and BPMN pools, lanes,
+  groups and expanded sub-processes paint beneath what they enclose: `front`
+  cannot lift them above their contents, and `back` cannot put enclosed content
+  behind them. Sending content behind its frame ends implicit ownership, so it
+  no longer moves with the frame. Painting beneath does not grant ownership;
+  order the frame `to: back` or `before` the node to give it ownership.
   `inspect --text <text>` lists the elements whose labels, names or notes
   contain the text.
 - `edit` operations reference elements by unique id prefix or by `@ref` names

@@ -10,6 +10,7 @@ import {
   insideClip,
   isGroup,
   overlapsVisibleElement,
+  pagePaintOrder,
   rotatePoint,
 } from "@nodetto/core";
 import {
@@ -139,7 +140,11 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
     excluded: readonly ElementId[],
   ): ElementId | null => {
     const context = editor.createShapeContext();
-    const elements = editor.store.getPageElements(editor.currentPageId);
+    const elements = pagePaintOrder(
+      editor.store,
+      editor.currentPageId,
+      context,
+    );
     for (let at = elements.length - 1; at >= 0; at -= 1) {
       const element = elements[at] as Element;
       if (context.isHidden?.(element.id) || context.isLocked?.(element.id))

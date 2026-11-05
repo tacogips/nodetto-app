@@ -13,7 +13,12 @@ import {
   seededRng,
   TEST_PAGE,
 } from "./test-helpers.ts";
-import { reorderCommands, targetOrder, type ZOrderAction } from "./z-order.ts";
+import {
+  relativeOrder,
+  reorderCommands,
+  targetOrder,
+  type ZOrderAction,
+} from "./z-order.ts";
 
 const RNG = seededRng(11);
 
@@ -257,6 +262,159 @@ describe("editor z-order actions", () => {
     const commands = reorderCommands(elements, ["b", "a"], RNG);
     expect(reorders(commands).map((command) => command.id)).not.toContain(
       "far",
+    );
+  });
+});
+
+describe("relativeOrder", () => {
+  const ids = ["a", "b", "c", "d"];
+  test("inserts moved ids as a block around the entire anchor block", () => {
+    const move = (m: string[], a: string[], side: "before" | "after") =>
+      relativeOrder(ids, new Set(m), new Set(a), side);
+    expect(move(["d"], ["b"], "before")).toEqual(["a", "d", "b", "c"]);
+    expect(move(["a"], ["c"], "after")).toEqual(["b", "c", "a", "d"]);
+    expect(move(["a", "c"], ["d"], "before")).toEqual(["b", "a", "c", "d"]);
+    expect(move(["d"], ["b", "c"], "before")).toEqual(["a", "d", "b", "c"]);
+    expect(move(["a"], ["b", "c"], "after")).toEqual(["b", "c", "a", "d"]);
+    expect(move(["a"], ["a"], "after")).toEqual(ids);
+  });
+});
+
+describe("orderElements", () => {
+  test("matches selection actions and preserves selection", () => {
+    for (const action of ["back", "front", "backward", "forward"] as const) {
+      const direct = stack();
+      const selected = stack();
+      direct.selection.set(["s2"]);
+      selected.selection.set(["s1"]);
+      expect(direct.orderElements(["s1"], { to: action })).toBe(
+        selected.reorderSelection(action),
+      );
+      expect(pageOrder(direct)).toEqual(pageOrder(selected));
+      expect(direct.selection.ids()).toEqual(new Set(["s2"]));
+    }
+  });
+
+  test("read-only mode reports no applied move", () => {
+    const editor = stack();
+    editor.setReadOnly(true);
+    expect(editor.orderElements(["s1"], { to: "front" })).toBe(false);
+    expect(pageOrder(editor)).toEqual(["s1", "s2", "s3"]);
+  });
+
+  test("moves frames and treats anchors as whole blocks", () => {
+    const make = () =>
+      makeEditor({
+        document: document([
+          element({
+            id: "f",
+            type: "frame",
+            index: "a1",
+            semantic: { memberIds: ["n"] },
+            visual: { x: 0, y: 0, width: 100, height: 100 },
+          }),
+          element({
+            id: "n",
+            type: "node.generic",
+            index: "a2",
+            semantic: {},
+            visual: { x: 10, y: 10 },
+          }),
+          element({
+            id: "x",
+            type: "node.generic",
+            index: "a3",
+            semantic: {},
+            visual: { x: 300, y: 0 },
+          }),
+        ]),
+      });
+    const front = make();
+    expect(front.orderElements(["f"], { to: "front" })).toBe(true);
+    expect(pageOrder(front)).toEqual(["x", "f", "n"]);
+    const before = make();
+    expect(before.orderElements(["x"], { before: "f" })).toBe(true);
+    expect(pageOrder(before)).toEqual(["x", "f", "n"]);
+    const after = make();
+    expect(after.orderElements(["x"], { before: "f" })).toBe(true);
+    expect(after.orderElements(["x"], { after: "f" })).toBe(true);
+    expect(pageOrder(after)).toEqual(["f", "n", "x"]);
+    expect(after.orderElements(["f"], { after: "n" })).toBe(false);
+  });
+
+  test("group moves update memberIds and preserve indexes and semantic fields", () => {
+    const editor = makeEditor({
+      document: document([
+        ...page(["a1", "a2", "a3"]),
+        element({
+          id: "g",
+          type: "group",
+          index: "a4",
+          semantic: { memberIds: ["A", "B", "C"], label: "group" },
+        }),
+      ]),
+    });
+    const indexes = editor.store
+      .getPageElements(TEST_PAGE.id)
+      .map((e) => e.index);
+    expect(editor.orderElements(["C"], { to: "back" })).toBe(true);
+    expect(editor.store.get("g")?.semantic).toEqual({
+      memberIds: ["C", "A", "B"],
+      label: "group",
+    });
+    expect(editor.orderElements(["C"], { after: "B" })).toBe(true);
+    expect(editor.orderElements(["C"], { before: "B" })).toBe(true);
+    expect(editor.store.get("g")?.semantic).toEqual({
+      memberIds: ["A", "C", "B"],
+      label: "group",
+    });
+    expect(
+      editor.store.getPageElements(TEST_PAGE.id).map((e) => e.index),
+    ).toEqual(indexes);
+  });
+
+  test("rejects invalid scopes and anchors and preserves no-op documents", () => {
+    const other = { id: "other", name: "Other", kind: "freeform" as const };
+    const editor = makeEditor({
+      document: document(
+        [
+          ...page(["a1", "a2", "a3"]),
+          element({
+            id: "g",
+            type: "group",
+            index: "a4",
+            semantic: { memberIds: ["A"] },
+          }),
+          element({
+            id: "h",
+            type: "group",
+            index: "a5",
+            semantic: { memberIds: ["B"] },
+          }),
+          element({
+            id: "far",
+            type: "node.generic",
+            page: "other",
+            index: "a1",
+            semantic: {},
+          }),
+        ],
+        [TEST_PAGE, other],
+      ),
+    });
+    const before = JSON.stringify(editor.store.getPageElements(TEST_PAGE.id));
+    expect(editor.orderElements([], { to: "front" })).toBe(false);
+    expect(editor.orderElements(["missing"], { to: "front" })).toBe(false);
+    expect(editor.orderElements(["A", "C"], { to: "front" })).toBe(false);
+    expect(editor.orderElements(["A", "B"], { to: "front" })).toBe(false);
+    expect(editor.orderElements(["C", "far"], { to: "front" })).toBe(false);
+    expect(editor.orderElements(["C"], { after: "far" })).toBe(false);
+    expect(editor.orderElements(["C"], { after: "A" })).toBe(false);
+    expect(editor.orderElements(["A"], { before: "B" })).toBe(false);
+    expect(editor.orderElements(["C"], { before: "C" })).toBe(false);
+    expect(stack().orderElements(["s3"], { to: "front" })).toBe(false);
+    expect(JSON.stringify(editor.store.getPageElements(TEST_PAGE.id))).toBe(
+      before,
     );
   });
 });

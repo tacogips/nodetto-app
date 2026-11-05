@@ -35,7 +35,12 @@ import {
 } from "../../frame-selection.ts";
 import type { Vec } from "../../geometry.ts";
 import { planGroup, planUngroup } from "../../group.ts";
-import { planZOrder, type ZOrderAction } from "../../z-order.ts";
+import {
+  planElementOrder,
+  planZOrder,
+  type ZOrderAction,
+  type ZOrderPlacement,
+} from "../../z-order.ts";
 import { ElementEditing } from "./element-editing.ts";
 
 export class SelectionEditing extends ElementEditing {
@@ -136,6 +141,24 @@ export class SelectionEditing extends ElementEditing {
     if (commands.length === 0) {
       return false;
     }
+    this.apply(commands, applyOptions);
+    return true;
+  }
+
+  orderElements(
+    ids: readonly ElementId[],
+    placement: ZOrderPlacement,
+    applyOptions: ApplyOptions = {},
+  ): boolean {
+    if (this.readOnly) return false;
+    const commands = planElementOrder(
+      this.store,
+      ids,
+      placement,
+      this.createShapeContext(),
+      this.rng,
+    );
+    if (commands.length === 0) return false;
     this.apply(commands, applyOptions);
     return true;
   }

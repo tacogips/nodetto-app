@@ -21,9 +21,37 @@ import {
   keyBetween,
   type Rng,
 } from "./fractional.ts";
+import { expandContainers } from "./frame-tree.ts";
+import { groupOf, memberIdsOf } from "./group.ts";
+import type { ShapeContext } from "./shape-util.ts";
 import type { Store } from "./store.ts";
 
 export type ZOrderAction = "front" | "forward" | "backward" | "back";
+export type ZOrderPlacement =
+  | { readonly to: ZOrderAction }
+  | { readonly before: ElementId }
+  | { readonly after: ElementId };
+
+/** Move selected ids as a block next to the remaining anchor block. */
+export function relativeOrder(
+  ordered: readonly ElementId[],
+  moved: ReadonlySet<ElementId>,
+  anchorBlock: ReadonlySet<ElementId>,
+  side: "before" | "after",
+): ElementId[] {
+  const picked = ordered.filter((id) => moved.has(id));
+  const rest = ordered.filter((id) => !moved.has(id));
+  const positions = rest.flatMap((id, index) =>
+    anchorBlock.has(id) ? [index] : [],
+  );
+  if (positions.length === 0) return [...ordered];
+  const at =
+    side === "before"
+      ? positions[0]
+      : (positions[positions.length - 1] ?? 0) + 1;
+  if (at === undefined) return [...ordered];
+  return [...rest.slice(0, at), ...picked, ...rest.slice(at)];
+}
 
 /**
  * `ordered` bottom to top, and the same ids reordered by `action`.
@@ -188,4 +216,89 @@ export function planZOrder(
     return [];
   }
   return reorderCommands(elements, targetOrder(ids, onPage, action), rng);
+}
+
+/** Plan an element-targeted move in page order or within one group. */
+export function planElementOrder(
+  store: Store,
+  ids: readonly ElementId[],
+  placement: ZOrderPlacement,
+  context: ShapeContext,
+  rng: Rng,
+): Command[] {
+  const first = ids[0] === undefined ? undefined : store.get(ids[0]);
+  if (!first) return [];
+  const group = groupOf(store, first.id);
+  for (const id of ids) {
+    const element = store.get(id);
+    if (
+      !element ||
+      element.page !== first.page ||
+      groupOf(store, id)?.id !== group?.id
+    )
+      return [];
+  }
+  const anchor =
+    "before" in placement
+      ? placement.before
+      : "after" in placement
+        ? placement.after
+        : null;
+  if (group) {
+    const ordered = memberIdsOf(group);
+    const moved = new Set(ids);
+    if (
+      anchor !== null &&
+      (moved.has(anchor) ||
+        !ordered.includes(anchor) ||
+        groupOf(store, anchor)?.id !== group.id)
+    )
+      return [];
+    const order =
+      "to" in placement
+        ? targetOrder(ordered, moved, placement.to)
+        : relativeOrder(
+            ordered,
+            moved,
+            new Set(anchor === null ? [] : [anchor]),
+            "before" in placement ? "before" : "after",
+          );
+    if (sameOrder(ordered, order)) return [];
+    return [
+      {
+        type: "updateSemantic",
+        id: group.id,
+        semantic: {
+          ...(group.semantic as Record<string, unknown>),
+          memberIds: order,
+        },
+      },
+    ];
+  }
+  const elements = store.getPageElements(first.page);
+  const ordered = elements.map((element) => element.id);
+  const moved = new Set(expandContainers(store, ids, context));
+  let order: ElementId[];
+  if ("to" in placement) {
+    order = targetOrder(ordered, moved, placement.to);
+  } else {
+    const anchorElement = anchor === null ? undefined : store.get(anchor);
+    if (
+      !anchorElement ||
+      anchorElement.page !== first.page ||
+      groupOf(store, anchorElement.id) ||
+      moved.has(anchorElement.id)
+    )
+      return [];
+    const anchorBlock = new Set(
+      expandContainers(store, [anchorElement.id], context),
+    );
+    order = relativeOrder(
+      ordered,
+      moved,
+      anchorBlock,
+      "before" in placement ? "before" : "after",
+    );
+  }
+  return reorderCommands(elements, order, rng);
 }

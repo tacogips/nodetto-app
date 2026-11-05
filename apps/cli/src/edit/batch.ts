@@ -14,6 +14,7 @@ import {
   resolvePageQuery,
 } from "@nodetto/ir";
 import { resolveElementReference } from "./selectors.ts";
+import { orderElements, orderOpHint } from "./operations/order.ts";
 import { selectElement } from "./operations/select.ts";
 import {
   OperationError,
@@ -300,13 +301,16 @@ export class Batch {
       case "delete":
         deleteElement(this, operation, index);
         return;
+      case "order":
+        orderElements(this, operation, index);
+        return;
       case "select":
         selectElement(this, operation, index);
         return;
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, select, scale, replace-text, group or ungroup.`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
         );
     }
   }

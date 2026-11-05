@@ -34,6 +34,7 @@ import { gradientId, strokeGradientId } from "../gradient.ts";
 import { memberIdsOf } from "../group.ts";
 import { createShapeContext } from "../hit-test.ts";
 import { croppedImageBox } from "../image-crop.ts";
+import { containerPaintOrder } from "../paint-order.ts";
 import { selfContained } from "../references.ts";
 import type { ShapeContext, ShapeUtilRegistry } from "../shape-util.ts";
 import { endpointReaderFor, resolveConnector } from "../shapes/connector.ts";
@@ -433,11 +434,6 @@ export function renderElementsSvg(
       body,
     );
   };
-  const roots = elements.filter(
-    (element) =>
-      (rendered.has(element.id) || groups.has(element.id)) &&
-      !groupParents.has(element.id),
-  );
   // Frames are surfaces: on a page with connectors they go beneath the
   // connector layer so their fill cannot hide the lines (see backdrops.ts).
   // Every rendered element counts towards "has connectors" (a connector
@@ -445,6 +441,11 @@ export function renderElementsSvg(
   const backdropIds = connectorBackdropIds(
     elements.filter((element) => rendered.has(element.id)),
     (id) => groupParents.has(id),
+  );
+  const roots = containerPaintOrder(elements, context, backdropIds).filter(
+    (element) =>
+      (rendered.has(element.id) || groups.has(element.id)) &&
+      !groupParents.has(element.id),
   );
   const backdrops = roots
     .filter((element) => backdropIds.has(element.id))

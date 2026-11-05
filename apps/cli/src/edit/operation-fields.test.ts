@@ -52,6 +52,7 @@ test("handler operation reads are represented in their field rows", () => {
       "selectors:selectedWhere",
     ],
     select: ["select:selectElement", "selectors:selectedWhere"],
+    order: ["order:orderElements", "selectors:selectedWhere"],
     append: ["elements:editListField"],
     "remove-item": ["elements:editListField"],
     move: ["elements:moveElement"],
