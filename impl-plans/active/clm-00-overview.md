@@ -7,7 +7,23 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
-## Continuation 3 2026-11-05 (clm-s736) - authoritative
+## Continuation 4 2026-11-05 (clm-s737) - authoritative
+
+Manifest: `impl-plans/active/clm-s737-dispatch.json`, source commit `c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence
+root `tmp/clm-s737/<planId>/`. The clm-s725, clm-s731, clm-s732 and clm-s736 manifests are stale and must not be
+dispatched. Supersedes every table below. Accepted and landed: clm-01, 03, 04, 06, 07, 08, 10, 12, 13, 14, 15. Each plan's
+"Continuation 4" section is authoritative for that plan.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | D3': marginal ratios, scoped validation, verified line reuse, timings | - |
+| 1 | clm-11-container-carry | E1 CLI module and per-kind tests | - |
+| 2 | clm-09-wiring | Registration, BPMN dispatch, help, docs, parity, git e2e, final gates | clm-02, clm-11 |
+
+Open owner decision: Q11 is blocking and has no default. No plan changes depth-one output or pins the conflict inputs in a
+test, and the run does not report depth-one containment as met for them. Q12 is closed, superseded by D3'.
+
+## Continuation 3 2026-11-05 (clm-s736) - superseded by Continuation 4
 
 Manifest: `impl-plans/active/clm-s736-dispatch.json`, base HEAD
 `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence root `tmp/clm-s736/<planId>/`. The clm-s725,

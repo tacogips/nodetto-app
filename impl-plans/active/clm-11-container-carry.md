@@ -1,6 +1,39 @@
 # clm-11-container-carry
 
-## Continuation 3 2026-11-05 (clm-s736) - authoritative
+## Continuation 4 2026-11-05 (clm-s737) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s737-dispatch.json`, source commit
+`c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence `tmp/clm-s737/clm-11-container-carry/`. wave: 1; dependsOn:
+none. clm-02 runs at the same time in the same working directory. Replace older `tmp/clm-s7xx` paths with
+`tmp/clm-s737`. Contract, rules, messages and tests below are unchanged and still binding.
+
+- Why there is no dependency now: `ApplyOptions.keepMembers` is at HEAD (`editor/types.ts`), forwarded in
+  `editor/facade/core.ts` and used by `editor/transaction.ts`. Under D3', clm-02 changes `applyBatch`, the
+  validator, the parser and the serializer, not `Editor.apply`, unless a marginal ratio fails.
+- Non-goals: do not edit `apps/cli/src/edit/apply-batch.ts`, `packages/core/src/editor/dirty-pages.ts`, or the
+  shared registration files. Help text is clm-09's. No default carry change. A defect in a clm-02-owned file is a
+  finding in the progress log.
+- `apps/cli/src/edit-frame-carry.test.ts:31` pins `carryMembers applies only to frames`. Change it to the E1
+  non-container message; this is the intended update.
+- `apps/cli/src/edit/operation-fields.ts` already lists `carryMembers`. Edit it only if a test proves a gap.
+- Shared with clm-02: `packages/core/src/frame-translation.ts` and `packages/core/src/editor/transaction.ts`. Edit
+  them only for a `keepMembers` defect an E1 test reveals, only in `keepMembers` branches. Read fresh before each
+  edit, record pre and post `git hash-object` in the progress log, and stop on unexpected drift. Without
+  `keepMembers`, output stays byte-identical.
+- Resize coverage: resize with `carryMembers:false` is tested for frame, pool, lane (height only), sub-process and
+  board. Group and non-container kinds are error cases only. "None" in the E1 table's default-on-resize column does not
+  exempt a kind. Tests to add in `apps/cli/src/edit/carry-members.test.ts`, on top of the list below:
+  - Expanded sub-process, width or height shrink that leaves one inner task outside -> task position unchanged, task
+    re-parented, `validateDocument` reports no errors.
+  - Sub-process top-left resize (x, y and width change) -> inner tasks unchanged.
+  - Board resize with `carryMembers:false` -> plugged parts keep their absolute positions. If the board's geometry
+    rejects the resize, assert that command's existing error and record it in the progress log; do not add board
+    behavior beyond the E1 table.
+- Done criteria: all manifest verification commands exit 0; one test per E1 kind on move, and a resize test for frame,
+  pool, lane (height only), sub-process and board; the E1 messages appear verbatim in `carry-members.ts`. This plan file
+  stays unchanged by the worker.
+
+## Continuation 3 2026-11-05 (clm-s736) - superseded by Continuation 4 where they differ
 
 Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
 base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence
@@ -54,8 +87,8 @@ started. Scope and rules below are unchanged. Replace `tmp/clm-s731` with
     `carryMembers:false` -> event on the new boundary, inner tasks unchanged.
   - `where` matching two pools with `carryMembers:false` -> the held set is computed
     per match, and tasks of both pools keep their positions.
-  - Resize of a pool and of a frame are separate cases from move in every kind where
-    the E1 table has a resize column.
+  - Resize of a pool and of a frame are separate cases from move. The full resize list is in
+    Continuation 4.
 - Done criteria add: the E1 messages appear verbatim in `carry-members.ts`, and
   manifest verification commands exit 0.
 

@@ -1,6 +1,33 @@
 # clm-09-wiring
 
-## Continuation 3 2026-11-05 (clm-s736) - authoritative
+## Continuation 4 2026-11-05 (clm-s737) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s737-dispatch.json`, source commit
+`c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence `tmp/clm-s737/clm-09-wiring/`. wave: 2; dependsOn:
+clm-02-connector-edit-perf, clm-11-container-carry. clm-12 is landed and accepted. This section overrides everything
+below where they differ. Replace older `tmp/clm-s7xx` paths with `tmp/clm-s737`, and older `target/clm-s7xx-jsx` with
+`target/clm-s737-jsx`. Scope is otherwise unchanged, including the Continuation 3 BPMN dispatch with `settleCommands`
+and the Q11 rules below. Nothing of this plan has started.
+
+- MCP: `apps/cli/src/mcp.ts` is not edited and is not in `writePaths`. The schema is a generic `args` and `stdin`
+  passthrough, and each `COMMAND_HELP` entry becomes a tool. `apps/cli/src/mcp.test.ts` gains one check: `nodetto_merge`
+  is listed, and the `nodetto_edit` description names `where`, `select` and `carryMembers`.
+- `apps/cli/src/edit/apply-batch.ts`: add only `matches: batch.matches` to the returned `BatchResult`. Keep clm-02's
+  scoped validation, `sourceLines` and `fullWrite` untouched.
+- Integration fixes 1 to 3 are in the tree. Do not change them; the listed tests confirm them.
+- Timing: `tmp/clm-s737/clm-09-wiring/timing.log` compares the six D3' inputs between the release binary and
+  `target/clm-s737-before/nodetto-cli` (input files from `tmp/clm-s737/clm-02-connector-edit-perf/inputs/`, a fresh
+  copy before each run, `/usr/bin/time -p`), and records the two arrange timings. `target/clm-baseline/nodetto-cli`
+  stays in place but is not the reference.
+- Q11: append this exact line to the progress log and the final report while Q11 is unanswered:
+  `Q11 open: depth-one containment not accepted for conflict inputs`. The E2 criterion is not reported as fully met for
+  those inputs. It blocks nothing in this plan.
+- Do not list or run a binary-less native parity command. Never relax a deadline. A defect in a feature module is a finding
+  for its owning plan.
+- Done criteria: all manifest verification commands exit 0, with logs and every attempt kept. This plan file stays
+  unchanged by the worker.
+
+## Continuation 3 2026-11-05 (clm-s736) - superseded by Continuation 4 where they differ
 
 Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
 base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence `tmp/clm-s736/clm-09-wiring/`.
