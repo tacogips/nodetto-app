@@ -167,14 +167,14 @@ test("export keeps attribution lines separate, scopes selections, and quiet remo
   );
 });
 
-test("glyph rows select ERD pages without changing notation selection or empty errors", () => {
+test("glyph rows select non-lint pages without changing notation selection or empty errors", () => {
   const editor = new Editor();
   const freeform = editor.createPage({ name: "Canvas", kind: "freeform" });
   const freeformNode = editor.createElement("node.generic", {
     semantic: { label: "Canvas widget" },
     visual: { width: 20, height: 10 },
   });
-  const erd = editor.createPage({ name: "Schema", kind: "erd" });
+  const sequencePage = editor.createPage({ name: "Schema", kind: "sequence" });
   const id = editor.createElement("node.generic", {
     semantic: { label: "Widget \u{F0000} with a long label" },
     visual: { width: 20, height: 10 },
@@ -220,7 +220,7 @@ test("glyph rows select ERD pages without changing notation selection or empty e
   expect(
     freeformFindings?.some((finding) => finding.ruleId === "glyph-missing"),
   ).toBe(false);
-  const row = report.pages.find((page) => page.pageId === erd);
+  const row = report.pages.find((page) => page.pageId === sequencePage);
   expect(row?.findings).toEqual([
     {
       elementId: id,
@@ -249,7 +249,7 @@ test("glyph rows select ERD pages without changing notation selection or empty e
   expect(
     noRows.pages.find((page) => page.pageId === freeform)?.findings,
   ).toEqual(freeformFindings);
-  expect(noRows.pages.some((page) => page.pageId === erd)).toBe(false);
+  expect(noRows.pages.some((page) => page.pageId === sequencePage)).toBe(false);
   expect(lint(covered, "--page", "Schema").exitCode).toBe(2);
   expect(lint(covered, "--page", "Schema").stderr).not.toContain(
     "contains no BPMN",
@@ -257,7 +257,7 @@ test("glyph rows select ERD pages without changing notation selection or empty e
 });
 
 test("non-notation documents preserve no-pages errors unless a selected page has glyph rows", () => {
-  for (const kind of ["erd", "uml"] as const) {
+  for (const kind of ["sequence", "pcb"] as const) {
     const { io, page, editor } = fixture();
     const snapshot = editor.getSnapshot();
     const onlyPage = {
@@ -280,10 +280,10 @@ test("non-notation documents preserve no-pages errors unless a selected page has
     for (const args of [[], ["--page", page], ["--page", "missing"]]) {
       const result = lint(covered, ...args);
       expect(result.exitCode).toBe(2);
-      expect(result.stderr).toContain("The document contains no BPMN");
+      expect(result.stderr).toContain("Document contains no BPMN");
     }
     const missing = lint(host, "--page", "missing");
     expect(missing.exitCode).toBe(2);
-    expect(missing.stderr).toContain("The document contains no BPMN");
+    expect(missing.stderr).toContain("Document contains no BPMN");
   }
 });
