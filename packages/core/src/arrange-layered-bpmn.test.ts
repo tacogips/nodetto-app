@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { validateDocument } from "@nodetto/ir";
+import { DEPTH_ONE_FIXTURES } from "./arrange-layered-bpmn.fixtures.ts";
 import { planLayeredBpmn } from "./arrange-layered-bpmn.ts";
 import { document, element, makeEditor } from "./test-helpers.ts";
 
@@ -86,6 +87,7 @@ function apply(editor: ReturnType<typeof fixture>) {
   const plan = planLayeredBpmn(editor.store, page.id, editor.registry);
   if ("error" in plan) throw new Error(plan.error);
   editor.apply(plan.containerCommands);
+  editor.apply(plan.settleCommands);
   editor.apply(plan.unitCommands);
   expect(
     validateDocument(editor.getSnapshot()).filter(
@@ -139,6 +141,7 @@ test("second planning is a no-op", () => {
   const plan = planLayeredBpmn(e.store, page.id, e.registry);
   if ("error" in plan) throw new Error(plan.error);
   expect(plan.containerCommands).toEqual([]);
+  expect(plan.settleCommands).toEqual([]);
   expect(plan.unitCommands).toEqual([]);
 });
 test("input element order does not affect the plan", () => {
@@ -156,6 +159,7 @@ test("empty page has empty commands", () => {
   const e = makeEditor({ document: document([], [page]) });
   expect(planLayeredBpmn(e.store, page.id, e.registry)).toEqual({
     containerCommands: [],
+    settleCommands: [],
     unitCommands: [],
     placed: new Set(),
   });
@@ -192,6 +196,7 @@ function noOp(e: ReturnType<typeof fixture>) {
   const p = planLayeredBpmn(e.store, page.id, e.registry);
   if ("error" in p) throw new Error(p.error);
   expect(p.containerCommands).toEqual([]);
+  expect(p.settleCommands).toEqual([]);
   expect(p.unitCommands).toEqual([]);
 }
 function pool(id: string, y: number, collapsed = false) {
@@ -224,6 +229,7 @@ test("single free task stays at its origin", () => {
   const e = custom([simpleTask("a", 0, 0)]);
   const p = apply(e);
   expect(p.containerCommands).toEqual([]);
+  expect(p.settleCommands).toEqual([]);
   expect(p.unitCommands).toEqual([]);
   noOp(e);
 });
@@ -472,5 +478,541 @@ test("interleaved nested lanes preserve leaf row order", () => {
       (unit?.visual.y ?? 0) + (unit?.visual.height ?? 0),
     ).toBeLessThanOrEqual((row?.visual.y ?? 0) + (row?.visual.height ?? 0));
   }
+  noOp(e);
+});
+
+function depthFixture(depth: number, unitWidth: number) {
+  const entries = [pool("p", 0)];
+  let parent = "p";
+  for (let d = 1; d <= depth; d++) {
+    entries.push(
+      element({
+        id: `l${d}`,
+        index: `a${d}`,
+        type: "bpmn.lane",
+        semantic: { name: `L${d}`, parent },
+        visual: { x: 30 * d, y: 0, width: 500 - 30 * d, height: 240 },
+      }),
+    );
+    parent = `l${d}`;
+  }
+  const t = simpleTask("t", 150, 50, parent);
+  entries.push({ ...t, visual: { ...t.visual, width: unitWidth, height: 40 } });
+  return custom(entries);
+}
+for (const depth of [1, 2, 3]) {
+  for (const unitWidth of [100, 20]) {
+    test(`depth ${depth} width ${unitWidth} has contained stable boxes`, () => {
+      const e = depthFixture(depth, unitWidth);
+      const plan = apply(e);
+      const width = unitWidth + 110 + 30 * (depth - 1);
+      expect(e.store.get("p")?.visual.width).toBe(width);
+      expect(e.store.get("t")?.visual.x).toBe(40 + 30 * depth);
+      for (let d = 1; d <= depth; d++) {
+        const box = e.store.get(`l${d}`)?.visual;
+        const parent = e.store.get(d === 1 ? "p" : `l${d - 1}`)?.visual;
+        expect(box?.x).toBe(30 * d);
+        expect(box?.width).toBe(width - 30 * d);
+        expect(box?.y).toBe(parent?.y);
+        expect(box?.height).toBe(parent?.height);
+      }
+      expect((e.store.get("t")?.semantic as { parent: string }).parent).toBe(
+        `l${depth}`,
+      );
+      if (depth === 1) {
+        expect(plan.settleCommands).toEqual([]);
+        for (const c of plan.containerCommands)
+          if (c.type === "updateVisual" && c.id === "l1") {
+            expect(c.visual).not.toHaveProperty("x");
+            expect(c.visual).not.toHaveProperty("y");
+            expect(c.visual).not.toHaveProperty("width");
+          }
+      }
+      noOp(e);
+    });
+  }
+}
+test("deepest pool sets the page-wide inset", () => {
+  const e = depthFixture(3, 100);
+  const other = [
+    pool("q", 500),
+    lane("shallow", "q", 500, "b1"),
+    simpleTask("u", 150, 540, "shallow"),
+  ];
+  const merged = custom([...e.store.getPageElements(page.id), ...other]);
+  apply(merged);
+  expect(merged.store.get("u")?.visual.x).toBe(130);
+  expect(merged.store.get("q")?.visual.width).toBe(270);
+  noOp(merged);
+});
+test("unchanged pool and coincident child settle after ancestor moves", () => {
+  const entries = [
+    element({
+      id: "p",
+      type: "bpmn.participant",
+      semantic: { name: "p", collapsed: false },
+      visual: { x: 0, y: 0, width: 240, height: 360 },
+    }),
+  ];
+  for (const [id, parent, x, y, width, height, index] of [
+    ["p1", "p", 30, 0, 210, 170, "a1"],
+    ["p2", "p", 30, 170, 210, 190, "a2"],
+    ["c1", "p2", 60, 170, 180, 70, "a3"],
+    ["c2", "p2", 60, 240, 180, 120, "a4"],
+  ] as const)
+    entries.push(
+      element({
+        id,
+        index,
+        type: "bpmn.lane",
+        semantic: { name: id, parent },
+        visual: { x, y, width, height },
+      }),
+    );
+  for (const [id, parent, y] of [
+    ["t1", "p1", 40],
+    ["t2", "c1", 185],
+    ["t3", "c2", 280],
+  ] as const) {
+    const t = simpleTask(id, 100, y, parent);
+    entries.push({ ...t, visual: { ...t.visual, height: 40 } });
+  }
+  const e = custom(entries);
+  const plan = apply(e);
+  expect(
+    plan.containerCommands.some(
+      (c) => c.type === "updateVisual" && c.id === "c2",
+    ),
+  ).toBe(false);
+  expect(
+    plan.settleCommands.some((c) => c.type === "updateVisual" && c.id === "c2"),
+  ).toBe(true);
+  for (const [id, y, height] of [
+    ["p1", 0, 120],
+    ["p2", 120, 240],
+    ["c1", 120, 120],
+    ["c2", 240, 120],
+  ] as const) {
+    expect(e.store.get(id)?.visual.y).toBe(y);
+    expect(e.store.get(id)?.visual.height).toBe(height);
+  }
+  expect(e.store.get("p")?.visual).toMatchObject({
+    x: 0,
+    y: 0,
+    width: 240,
+    height: 360,
+  });
+  for (const [id, x, width] of [
+    ["p1", 30, 210],
+    ["p2", 30, 210],
+    ["c1", 60, 180],
+    ["c2", 60, 180],
+  ] as const) {
+    expect(e.store.get(id)?.visual).toMatchObject({ x, width });
+  }
+  for (const [id, parent] of [
+    ["t1", "p1"],
+    ["t2", "c1"],
+    ["t3", "c2"],
+  ] as const)
+    expect((e.store.get(id)?.semantic as { parent: string }).parent).toBe(
+      parent,
+    );
+  noOp(e);
+});
+async function checkBaseline(name: string) {
+  const fixture = DEPTH_ONE_FIXTURES.find((item) => item.name === name);
+  if (!fixture) throw new Error(`Missing fixture ${name}`);
+  const e = fixture.build();
+  const plan = apply(e);
+  expect(plan.settleCommands).toEqual([]);
+  for (const c of plan.containerCommands)
+    if (c.type === "updateVisual" && e.store.get(c.id)?.type === "bpmn.lane") {
+      expect(c.visual).not.toHaveProperty("x");
+      expect(c.visual).not.toHaveProperty("y");
+      expect(c.visual).not.toHaveProperty("width");
+    }
+  expect(`${JSON.stringify(e.getSnapshot(), null, 1)}\n`).toBe(
+    await Bun.file(
+      new URL(
+        `./arrange-layered-bpmn.depth-one.${fixture.name}.expected.json`,
+        import.meta.url,
+      ),
+    ).text(),
+  );
+  for (const el of e.store.getPageElements(page.id)) {
+    const parentId = (el.semantic as { parent?: string }).parent;
+    if (!parentId) continue;
+    const parent = e.store.get(parentId);
+    if (!parent || !["bpmn.lane", "bpmn.participant"].includes(parent.type))
+      continue;
+    const a = el.visual;
+    const b = parent.visual;
+    expect(a.x ?? 0).toBeGreaterThanOrEqual(b.x ?? 0);
+    expect(a.y ?? 0).toBeGreaterThanOrEqual(b.y ?? 0);
+    expect((a.x ?? 0) + (a.width ?? 0)).toBeLessThanOrEqual(
+      (b.x ?? 0) + (b.width ?? 0),
+    );
+    expect((a.y ?? 0) + (a.height ?? 0)).toBeLessThanOrEqual(
+      (b.y ?? 0) + (b.height ?? 0),
+    );
+  }
+  noOp(e);
+}
+test("baseline two pools and message flow", () =>
+  checkBaseline("two-pools-message-flow"));
+test("baseline pool and free row", () =>
+  checkBaseline("pool-no-lanes-free-row"));
+test("baseline collapsed pool", () => checkBaseline("collapsed-pool"));
+test("baseline subprocess and boundary", () =>
+  checkBaseline("subprocess-boundary"));
+
+test("mismatched child heights settle to the planned parent span", () => {
+  const e = custom([
+    pool("p", 0),
+    lane("parent", "p", 0, "a1"),
+    lane("one", "parent", 0, "a2"),
+    lane("two", "parent", 80, "a3"),
+    simpleTask("a", 100, 30, "one"),
+    simpleTask("b", 100, 170, "two"),
+  ]);
+  apply(e);
+  const parent = e.store.get("parent")?.visual;
+  const one = e.store.get("one")?.visual;
+  const two = e.store.get("two")?.visual;
+  expect(two?.y).toBe((one?.y ?? 0) + (one?.height ?? 0));
+  expect(parent?.height).toBe((one?.height ?? 0) + (two?.height ?? 0));
+  expect((e.store.get("a")?.semantic as { parent: string }).parent).toBe("one");
+  expect((e.store.get("b")?.semantic as { parent: string }).parent).toBe("two");
+  noOp(e);
+});
+
+function depthThreeSiblings(mismatched: boolean) {
+  const poolWidth = mismatched ? 500 : 270;
+  const entries = [
+    element({
+      id: "p",
+      type: "bpmn.participant",
+      semantic: { name: "p", collapsed: false },
+      visual: { x: 0, y: 0, width: poolWidth, height: 480 },
+    }),
+  ];
+  const lanes = mismatched
+    ? ([
+        ["l1", "p", 30, 0, 470, 200, "a1"],
+        ["l2", "p", 30, 200, 470, 280, "a2"],
+        ["m1", "l2", 60, 200, 440, 50, "a3"],
+        ["m2", "l2", 60, 250, 440, 100, "a4"],
+        ["n1", "m2", 90, 250, 410, 30, "a5"],
+        ["n2", "m2", 90, 280, 410, 40, "a6"],
+      ] as const)
+    : ([
+        ["l1", "p", 30, 0, 240, 170, "a1"],
+        ["l2", "p", 30, 170, 240, 310, "a2"],
+        ["m1", "l2", 60, 170, 210, 70, "a3"],
+        ["m2", "l2", 60, 240, 210, 240, "a4"],
+        ["n1", "m2", 90, 240, 180, 120, "a5"],
+        ["n2", "m2", 90, 360, 180, 120, "a6"],
+      ] as const);
+  for (const [id, parent, x, y, width, height, index] of lanes)
+    entries.push(
+      element({
+        id,
+        index,
+        type: "bpmn.lane",
+        semantic: { name: id, parent },
+        visual: { x, y, width, height },
+      }),
+    );
+  const taskYs = mismatched ? [40, 205, 255, 285] : [40, 185, 280, 400];
+  for (const [i, parent] of ["l1", "m1", "n1", "n2"].entries()) {
+    const t = simpleTask(`t${i + 1}`, 130, taskYs[i] ?? 0, parent);
+    entries.push({ ...t, visual: { ...t.visual, height: 40 } });
+  }
+  return custom(entries);
+}
+function assertDepthThreeResult(e: ReturnType<typeof fixture>) {
+  for (const [id, x, y, width, height] of [
+    ["p", 0, 0, 270, 480],
+    ["l1", 30, 0, 240, 120],
+    ["l2", 30, 120, 240, 360],
+    ["m1", 60, 120, 210, 120],
+    ["m2", 60, 240, 210, 240],
+    ["n1", 90, 240, 180, 120],
+    ["n2", 90, 360, 180, 120],
+  ] as const)
+    expect(e.store.get(id)?.visual).toMatchObject({ x, y, width, height });
+  for (const [id, parent, y] of [
+    ["t1", "l1", 40],
+    ["t2", "m1", 160],
+    ["t3", "n1", 280],
+    ["t4", "n2", 400],
+  ] as const) {
+    const unit = e.store.get(id);
+    const laneBox = e.store.get(parent)?.visual;
+    expect(unit?.visual).toMatchObject({ x: 130, y, width: 100, height: 40 });
+    expect((unit?.semantic as { parent: string }).parent).toBe(parent);
+    const cx = (unit?.visual.x ?? 0) + (unit?.visual.width ?? 0) / 2;
+    const cy = (unit?.visual.y ?? 0) + (unit?.visual.height ?? 0) / 2;
+    expect(cx).toBeGreaterThanOrEqual(laneBox?.x ?? 0);
+    expect(cx).toBeLessThanOrEqual((laneBox?.x ?? 0) + (laneBox?.width ?? 0));
+    expect(cy).toBeGreaterThanOrEqual(laneBox?.y ?? 0);
+    expect(cy).toBeLessThanOrEqual((laneBox?.y ?? 0) + (laneBox?.height ?? 0));
+  }
+  noOp(e);
+}
+test("depth 3 siblings settle after ancestor moves", () => {
+  const e = depthThreeSiblings(false);
+  const plan = apply(e);
+  for (const id of ["m2", "n1", "n2"]) {
+    expect(
+      plan.containerCommands.some(
+        (c) => c.type === "updateVisual" && c.id === id,
+      ),
+    ).toBe(false);
+    expect(
+      plan.settleCommands.some((c) => c.type === "updateVisual" && c.id === id),
+    ).toBe(true);
+  }
+  assertDepthThreeResult(e);
+});
+test("depth 3 child heights that do not sum settle to plan", () => {
+  const e = depthThreeSiblings(true);
+  apply(e);
+  assertDepthThreeResult(e);
+});
+
+function subprocessTearFixture(clear: boolean) {
+  const entries = [
+    element({
+      id: "p",
+      type: "bpmn.participant",
+      semantic: { name: "p", collapsed: false },
+      visual: { x: 0, y: 0, width: 800, height: 800 },
+    }),
+  ];
+  for (const [id, parent, x, y, width, height, index] of [
+    ["a", "p", 30, 0, 770, 500, "a1"],
+    ["b", "p", 30, 500, 770, 300, "a2"],
+    ["a1", "a", 60, 0, 740, 500, "a3"],
+    ["b1", "b", 60, 500, 740, 300, "a4"],
+  ] as const)
+    entries.push(
+      element({
+        id,
+        index,
+        type: "bpmn.lane",
+        semantic: { name: id, parent },
+        visual: { x, y, width, height },
+      }),
+    );
+  for (const [id, parent, x, y] of [
+    ["sa", "a1", 100, 300],
+    ["sb", "b1", clear ? 500 : 100, 620],
+  ] as const) {
+    entries.push(
+      element({
+        id,
+        type: "bpmn.subProcess",
+        semantic: {
+          name: id,
+          parent,
+          expanded: true,
+          triggeredByEvent: false,
+          adHoc: false,
+          loop: "none",
+        },
+        visual: { x, y, width: 200, height: 100 },
+      }),
+    );
+    const inner = simpleTask(`${id}_in`, x + 10, y + 10, id);
+    entries.push({
+      ...inner,
+      visual: { ...inner.visual, width: 40, height: 20 },
+    });
+  }
+  return custom(entries);
+}
+test("nested lane restack refuses to tear subprocess contents", () => {
+  const e = subprocessTearFixture(false);
+  expect(
+    validateDocument(e.getSnapshot()).filter(
+      (issue) => issue.severity === "error",
+    ),
+  ).toEqual([]);
+  const before = JSON.stringify(e.getSnapshot());
+  const plan = planLayeredBpmn(e.store, page.id, e.registry);
+  expect(plan).toEqual({
+    error:
+      'arrange --mode layered cannot keep the contents of sub-process "sb" while restacking lanes: move it clear of the sub-processes in other lanes, then rerun.',
+  });
+  expect(JSON.stringify(e.getSnapshot())).toBe(before);
+  expect(plan).not.toHaveProperty("containerCommands");
+  expect(plan).not.toHaveProperty("settleCommands");
+  expect(plan).not.toHaveProperty("unitCommands");
+});
+test("nested lane restack preserves clear subprocess contents", () => {
+  const e = subprocessTearFixture(true);
+  apply(e);
+  const sub = e.store.get("sb");
+  const inner = e.store.get("sb_in");
+  expect((inner?.semantic as { parent: string }).parent).toBe("sb");
+  expect((inner?.visual.x ?? 0) - (sub?.visual.x ?? 0)).toBe(10);
+  expect((inner?.visual.y ?? 0) - (sub?.visual.y ?? 0)).toBe(10);
+  noOp(e);
+});
+
+function collapsedTearFixture(clear: boolean) {
+  const entries = [
+    element({
+      id: "p",
+      type: "bpmn.participant",
+      semantic: { name: "p", collapsed: false },
+      visual: { x: 0, y: 0, width: 800, height: 800 },
+    }),
+    element({
+      id: "a",
+      index: "a1",
+      type: "bpmn.lane",
+      semantic: { name: "a", parent: "p" },
+      visual: { x: 30, y: 0, width: 770, height: 800 },
+    }),
+    element({
+      id: "a1",
+      index: "a2",
+      type: "bpmn.lane",
+      semantic: { name: "a1", parent: "a" },
+      visual: { x: 60, y: 0, width: 740, height: 800 },
+    }),
+    element({
+      id: "sl",
+      type: "bpmn.subProcess",
+      semantic: {
+        name: "sl",
+        parent: "a1",
+        expanded: true,
+        triggeredByEvent: false,
+        adHoc: false,
+        loop: "none",
+      },
+      visual: { x: 100, y: clear ? 40 : 280, width: 200, height: 100 },
+    }),
+    element({
+      id: "q",
+      type: "bpmn.participant",
+      semantic: { name: "q", collapsed: true },
+      visual: { x: 0, y: 900, width: 800, height: 60 },
+    }),
+  ];
+  const inner = simpleTask("sl_in", 110, clear ? 50 : 290, "sl");
+  const task = simpleTask("t", 100, 920, "q");
+  entries.push(
+    { ...inner, visual: { ...inner.visual, width: 40, height: 20 } },
+    { ...task, visual: { ...task.visual, width: 40, height: 20 } },
+  );
+  return custom(entries);
+}
+test("nested lane restack refuses to tear collapsed pool contents", () => {
+  const e = collapsedTearFixture(false);
+  expect(
+    validateDocument(e.getSnapshot()).filter(
+      (issue) => issue.severity === "error",
+    ),
+  ).toEqual([]);
+  const before = JSON.stringify(e.getSnapshot());
+  const plan = planLayeredBpmn(e.store, page.id, e.registry);
+  expect(plan).toEqual({
+    error:
+      'arrange --mode layered cannot keep the contents of collapsed pool "q" at the planned pool width 340: move them so that their centres fit inside that width and clear of the sub-processes in other pools, then rerun.',
+  });
+  expect(JSON.stringify(e.getSnapshot())).toBe(before);
+  expect(plan).not.toHaveProperty("containerCommands");
+  expect(plan).not.toHaveProperty("settleCommands");
+  expect(plan).not.toHaveProperty("unitCommands");
+});
+test("nested lane restack preserves clear collapsed pool contents", () => {
+  const e = collapsedTearFixture(true);
+  apply(e);
+  expect(e.store.get("q")?.visual).toMatchObject({
+    x: 0,
+    y: 300,
+    width: 340,
+    height: 60,
+  });
+  expect(e.store.get("t")?.visual).toMatchObject({ x: 100, y: 320 });
+  expect((e.store.get("t")?.semantic as { parent: string }).parent).toBe("q");
+  const sub = e.store.get("sl");
+  const inner = e.store.get("sl_in");
+  expect((inner?.semantic as { parent: string }).parent).toBe("sl");
+  expect((inner?.visual.x ?? 0) - (sub?.visual.x ?? 0)).toBe(10);
+  expect((inner?.visual.y ?? 0) - (sub?.visual.y ?? 0)).toBe(10);
+  noOp(e);
+});
+
+function collapsedWidthFixture(x: number) {
+  const task = simpleTask("x", 100, 40, "a1");
+  const hidden = simpleTask("hidden", x, 420, "q");
+  return custom([
+    element({
+      id: "p",
+      type: "bpmn.participant",
+      semantic: { name: "p", collapsed: false },
+      visual: { x: 0, y: 0, width: 800, height: 240 },
+    }),
+    element({
+      id: "a",
+      index: "a1",
+      type: "bpmn.lane",
+      semantic: { name: "a", parent: "p" },
+      visual: { x: 30, y: 0, width: 770, height: 240 },
+    }),
+    element({
+      id: "a1",
+      index: "a2",
+      type: "bpmn.lane",
+      semantic: { name: "a1", parent: "a" },
+      visual: { x: 60, y: 0, width: 740, height: 240 },
+    }),
+    { ...task, visual: { ...task.visual, height: 40 } },
+    element({
+      id: "q",
+      type: "bpmn.participant",
+      semantic: { name: "q", collapsed: true },
+      visual: { x: 0, y: 400, width: 800, height: 100 },
+    }),
+    { ...hidden, visual: { ...hidden.visual, height: 40 } },
+  ]);
+}
+test("collapsed pool width refusal names remedies without subprocesses", () => {
+  const e = collapsedWidthFixture(500);
+  expect(
+    validateDocument(e.getSnapshot()).filter(
+      (issue) => issue.severity === "error",
+    ),
+  ).toEqual([]);
+  const before = JSON.stringify(e.getSnapshot());
+  const plan = planLayeredBpmn(e.store, page.id, e.registry);
+  expect(plan).toEqual({
+    error:
+      'arrange --mode layered cannot keep the contents of collapsed pool "q" at the planned pool width 240: move them so that their centres fit inside that width and clear of the sub-processes in other pools, then rerun.',
+  });
+  expect(JSON.stringify(e.getSnapshot())).toBe(before);
+  expect(plan).not.toHaveProperty("containerCommands");
+  expect(plan).not.toHaveProperty("settleCommands");
+  expect(plan).not.toHaveProperty("unitCommands");
+});
+test("collapsed pool contents fitted within planned width can be arranged", () => {
+  const e = collapsedWidthFixture(60);
+  apply(e);
+  expect(e.store.get("q")?.visual).toMatchObject({
+    x: 0,
+    y: 240,
+    width: 240,
+    height: 100,
+  });
+  expect(e.store.get("hidden")?.visual).toMatchObject({ x: 60, y: 260 });
+  expect((e.store.get("hidden")?.semantic as { parent: string }).parent).toBe(
+    "q",
+  );
   noOp(e);
 });

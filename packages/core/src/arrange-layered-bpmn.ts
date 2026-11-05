@@ -27,6 +27,7 @@ export function planLayeredBpmn(
 ):
   | {
       containerCommands: Command[];
+      settleCommands: Command[];
       unitCommands: Command[];
       placed: ReadonlySet<ElementId>;
     }
@@ -70,7 +71,13 @@ export function planLayeredBpmn(
     if (unit.type === "bpmn.subProcess")
       for (const id of model.descendantsOf(unit.id)) placed.add(id);
   }
-  if (!units.length) return { containerCommands: [], unitCommands: [], placed };
+  if (!units.length)
+    return {
+      containerCommands: [],
+      settleCommands: [],
+      unitCommands: [],
+      placed,
+    };
   const ids = new Set(units.map((e) => e.id));
   const unitOf = (id: ElementId): ElementId | undefined => {
     let e = model.get(id);
@@ -144,6 +151,8 @@ export function planLayeredBpmn(
   };
   const rows: Row[] = [];
   const poolRows = new Map<ElementId, Row[]>();
+  const poolLanes = new Map<ElementId, { lane: Element; depth: number }[]>();
+  let maxDepth = 0;
   for (const pool of pools) {
     if (field(pool, "collapsed") === true) {
       poolRows.set(pool.id, []);
@@ -166,13 +175,17 @@ export function planLayeredBpmn(
       children.set(parent, siblings);
     }
     const leaves: Element[] = [];
-    const visit = (parent: ElementId) => {
+    const ordered: { lane: Element; depth: number }[] = [];
+    const visit = (parent: ElementId, depth: number) => {
       for (const lane of children.get(parent) ?? []) {
-        if (children.has(lane.id)) visit(lane.id);
+        ordered.push({ lane, depth });
+        maxDepth = Math.max(maxDepth, depth);
+        if (children.has(lane.id)) visit(lane.id, depth + 1);
         else leaves.push(lane);
       }
     };
-    visit(pool.id);
+    visit(pool.id, 1);
+    poolLanes.set(pool.id, ordered);
     const group = (leaves.length ? leaves.map((e) => e.id) : [pool.id]).map(
       (id) => ({ id, pool, members: [], height: 120, y: 0 }) as Row,
     );
@@ -220,12 +233,19 @@ export function planLayeredBpmn(
     .filter((b): b is NonNullable<typeof b> => b !== null);
   const originX = Math.round(Math.min(...boxes.map((b) => b.x)));
   const originY = Math.round(Math.min(...boxes.map((b) => b.y)));
+  const inset = 30 * Math.max(1, maxDepth) + 40;
   const width = Math.round(
-    110 +
+    inset +
+      40 +
       widths.reduce((a, b) => a + b, 0) +
       Math.max(0, widths.length - 1) * 120,
   );
   const containerCommands: Command[] = [];
+  const planned: {
+    id: ElementId;
+    pool: Element;
+    visual: { x: number; y: number; width: number; height: number };
+  }[] = [];
   let y = originY;
   for (const pool of pools) {
     const group = poolRows.get(pool.id) ?? [];
@@ -245,6 +265,7 @@ export function planLayeredBpmn(
       )
     )
       containerCommands.push({ type: "updateVisual", id: pool.id, visual });
+    if (maxDepth >= 2) planned.push({ id: pool.id, pool, visual });
     const laneHeights = new Map<ElementId, number>();
     for (const row of group) {
       for (const ancestor of ancestors(row.id)) {
@@ -255,23 +276,56 @@ export function planLayeredBpmn(
           );
       }
     }
-    for (const [id, laneHeight] of laneHeights) {
-      if (model.get(id)?.visual.height !== laneHeight)
-        containerCommands.push({
-          type: "updateVisual",
-          id,
-          visual: { height: laneHeight },
-        });
-    }
+    if (maxDepth < 2)
+      for (const [id, laneHeight] of laneHeights) {
+        if (model.get(id)?.visual.height !== laneHeight)
+          containerCommands.push({
+            type: "updateVisual",
+            id,
+            visual: { height: laneHeight },
+          });
+      }
     for (const row of group) {
       row.y = y;
       y += row.height;
-      if (row.id !== pool.id && model.get(row.id)?.visual.height !== row.height)
+      if (
+        maxDepth < 2 &&
+        row.id !== pool.id &&
+        model.get(row.id)?.visual.height !== row.height
+      )
         containerCommands.push({
           type: "updateVisual",
           id: row.id,
           visual: { height: row.height },
         });
+    }
+    if (maxDepth >= 2) {
+      for (const { lane, depth } of poolLanes.get(pool.id) ?? []) {
+        const descendants = group.filter(
+          (row) =>
+            row.id === lane.id ||
+            ancestors(row.id).some((a) => a.id === lane.id),
+        );
+        const first = descendants[0];
+        if (!first) continue;
+        const box = {
+          x: originX + 30 * depth,
+          y: Math.round(first.y),
+          width: width - 30 * depth,
+          height: descendants.reduce((sum, row) => sum + row.height, 0),
+        };
+        planned.push({ id: lane.id, pool, visual: box });
+        if (
+          Object.entries(box).some(
+            ([k, v]) => lane.visual[k as keyof typeof lane.visual] !== v,
+          )
+        )
+          containerCommands.push({
+            type: "updateVisual",
+            id: lane.id,
+            visual: box,
+          });
+      }
     }
     if (!group.length) y += height;
     y += 120;
@@ -279,9 +333,31 @@ export function planLayeredBpmn(
   if (free.members.length) free.y = y;
   const draft = new Editor({ document: store.getSnapshot(), registry });
   if (containerCommands.length) draft.apply(containerCommands);
+  const differs = (item: (typeof planned)[number]) => {
+    const current = draft.store.get(item.id);
+    return (
+      !current ||
+      Object.entries(item.visual).some(
+        ([k, v]) => current.visual[k as keyof typeof current.visual] !== v,
+      )
+    );
+  };
+  const settleCommands: Command[] = planned.filter(differs).map((item) => ({
+    type: "updateVisual",
+    id: item.id,
+    visual: item.visual,
+  }));
+  if (settleCommands.length) draft.apply(settleCommands);
+  const unsettled = planned.find(differs);
+  if (unsettled) {
+    const name = field(unsettled.pool, "name");
+    return {
+      error: `arrange --mode layered cannot restack the lanes of pool "${typeof name === "string" ? name : unsettled.pool.id}": set its lane heights so that they fill the pool, then rerun.`,
+    };
+  }
   const unitCommands: Command[] = [];
   for (const row of rows) {
-    let x = originX + (pools.length ? 70 : 0);
+    let x = originX + (pools.length ? inset : 0);
     for (let layer = 0; layer < widths.length; layer++) {
       const columnWidth = widths[layer] ?? 0;
       const members = cells(row, layer);
@@ -305,5 +381,72 @@ export function planLayeredBpmn(
       x += columnWidth + 120;
     }
   }
-  return { containerCommands, unitCommands, placed };
+  if (maxDepth >= 2) {
+    if (unitCommands.length) draft.apply(unitCommands);
+    for (const unit of units) {
+      if (unit.type !== "bpmn.subProcess") continue;
+      const currentUnit = draft.store.get(unit.id);
+      for (const id of model.descendantsOf(unit.id)) {
+        const original = store.get(id);
+        const current = draft.store.get(id);
+        let changed = !original || !current || !currentUnit;
+        if (original && current && currentUnit) {
+          changed = field(original, "parent") !== field(current, "parent");
+          if (original.type !== "bpmn.boundaryEvent") {
+            for (const axis of ["x", "y"] as const) {
+              const before = original.visual[axis];
+              const after = current.visual[axis];
+              if (before === undefined || after === undefined) {
+                if (before !== after) changed = true;
+              } else if (
+                before - (unit.visual[axis] ?? 0) !==
+                after - (currentUnit.visual[axis] ?? 0)
+              )
+                changed = true;
+            }
+          }
+        }
+        if (changed) {
+          const name = field(unit, "name");
+          return {
+            error: `arrange --mode layered cannot keep the contents of sub-process "${typeof name === "string" ? name : unit.id}" while restacking lanes: move it clear of the sub-processes in other lanes, then rerun.`,
+          };
+        }
+      }
+    }
+    for (const pool of collapsed) {
+      const currentPool = draft.store.get(pool.id);
+      for (const id of model.descendantsOf(pool.id)) {
+        const original = store.get(id);
+        const current = draft.store.get(id);
+        let changed = !original || !current || !currentPool;
+        if (original && current && currentPool) {
+          changed = field(original, "parent") !== field(current, "parent");
+          if (
+            original.type !== "bpmn.lane" &&
+            original.type !== "bpmn.boundaryEvent"
+          ) {
+            for (const axis of ["x", "y"] as const) {
+              const before = original.visual[axis];
+              const after = current.visual[axis];
+              if (before === undefined || after === undefined) {
+                if (before !== after) changed = true;
+              } else if (
+                before - (pool.visual[axis] ?? 0) !==
+                after - (currentPool.visual[axis] ?? 0)
+              )
+                changed = true;
+            }
+          }
+        }
+        if (changed) {
+          const name = field(pool, "name");
+          return {
+            error: `arrange --mode layered cannot keep the contents of collapsed pool "${typeof name === "string" ? name : pool.id}" at the planned pool width ${width}: move them so that their centres fit inside that width and clear of the sub-processes in other pools, then rerun.`,
+          };
+        }
+      }
+    }
+  }
+  return { containerCommands, settleCommands, unitCommands, placed };
 }

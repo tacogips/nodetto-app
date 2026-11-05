@@ -35,3 +35,49 @@ The preceding claim that the leaf-order regression depends on restacking is supe
 Final-source checks: planner 23 pass, containment/editor 15 pass, typecheck, scoped Biome, symbol, test count, no TypeScript under evidence, and unchanged active plan all exit 0; see `tmp/clm-s732/clm-12-bpmn-layered/review-final-*.log`. The first typecheck failed on readonly fixture assignment and was repaired before these checks (`final-typecheck.log`). Shared-tree verification is point-in-time. Independent review is downstream.
 
 IR-S732-CLM12-LANE-RESTACK remains blocked until an author commits the rule 7 and E2.1 amendment allowing full top-down lane boxes; then assert containment at depths 1 through 3 and no-op rerun. IR-S732-CLM12-DEEP-INSET remains blocked until an author commits the rule 6 and E2.1 amendment specifying depth-dependent inset and pool width, retaining depth-one results and specifying depth-two results; then test depths 1 through 3. The checkpoint amendment budget is exhausted. No lane x, y, width or semantic parent commands were added.
+
+## Continuation 3 implementation
+
+The authoritative D1/D2 amendment supersedes the previous restack and inset blockers. The planner uses the page-wide depth inset and top-down full lane boxes at D >= 2, settles planned pool and lane boxes on the draft, and leaves depth-one commands unchanged. The two allowed first-leaf membership changes remain geometry-driven; the planner writes no semantic parent. Nested lane x and width now use 30 per depth, with unit x 100 at D=2 and 130 at D=3 for pool x=0. Depth-one examples retain x=70. Existing nested tests retain order and parent assertions.
+
+Baseline snapshots captured before planner edits from the d5b9bac archive with export-local resolutions and containment checks; provenance is `tmp/clm-s736/clm-12-bpmn-layered/capture-provenance.txt`. Hashes (git hash-object):
+
+- `packages/core/src/arrange-layered-bpmn.depth-one.collapsed-pool.expected.json`: `ada68bcc0e1916fa24b02706d75829c371fe0200`
+- `packages/core/src/arrange-layered-bpmn.depth-one.pool-no-lanes-free-row.expected.json`: `19dd4035b811c881ee717330cad018cc0cde4a8d`
+- `packages/core/src/arrange-layered-bpmn.depth-one.subprocess-boundary.expected.json`: `6a3ba5a6a8478d5c8f98e897191112c864793e3d`
+- `packages/core/src/arrange-layered-bpmn.depth-one.two-pools-message-flow.expected.json`: `d623a48616b80d9c00f8bb1a755b83b20c68b249`
+
+Fresh reads, intentions, and per-edit pre/post hashes are in `tmp/clm-s736/clm-12-bpmn-layered/`. Bun planner timing for 3 pools, 6 lanes and 60 units: 13.296 ms, `target/clm-s736-clm-12/timing.ts` and `tmp/clm-s736/clm-12-bpmn-layered/timing.log`. Verification runs on the shared tree; formal review and clm-09 wiring are downstream.
+
+Per-edit source hashes:
+
+- Edit 02: pre `2173202e9b429675e3ff7f0c10024601b3d9f636`; post `472afb86f08065c6fd021a9e5992f2e7a2b7e1de`.
+- Edit 03: pre `d5ec3dfd5215b28c0ef88e4c5c4e6b1b242ebce9`; post `f7a739f79d92e46f93088812f96e8263cf0b25db`.
+- Edit 04: pre `27209cebbe6eecc20392527d9c3c363c2a971961`; post `ab3ac8c3bdb1d56f303d007cf6be2bdca62f2f60`.
+- Edit 05: pre `f7a739f79d92e46f93088812f96e8263cf0b25db; ab3ac8c3bdb1d56f303d007cf6be2bdca62f2f60`; post `cecdd0e8eb27135691c0a80bf184c1dba5ea50a1; 3e07a8efa36bafc36a9baead1cc7123c66e81b36`.
+- Edit 06: pre `3e07a8efa36bafc36a9baead1cc7123c66e81b36`; post `b444f2cb8eb713411e453d24aa6fa407651d5d0f`.
+- Edit 07: pre `b444f2cb8eb713411e453d24aa6fa407651d5d0f`; post `49904c55aa7ceb940c5c1098dd1165779f467d54`.
+- Edit 08: pre `d55cdb8578f21484489b7ef6d8c8f0a6a96f2f9a`; post `2a780a8d581a89f2697b412ec4691ffafbdd0790`.
+- Edit 09: pre `49904c55aa7ceb940c5c1098dd1165779f467d54; cecdd0e8eb27135691c0a80bf184c1dba5ea50a1`; post `c1c9000ca7dd95e828283e52e8c05a1339f73471; c54a8f49af9b8780fdf0475ec3f33d0a2470a61c`.
+
+## Test-integrity depth-three revision
+
+TI-S736-CLM12-D3-MULTIROW: added sibling and non-summing depth-three lane cases, asserting planned boxes, settlement, task containment, parents and empty reruns. The depth-two coincident case now also asserts full boxes. The targeted suite ran 38 tests successfully. Test hash before: `c1c9000ca7dd95e828283e52e8c05a1339f73471`; after: `2444aa6ede5d92b4e8b868dfa963dbe3e9365a04`. Planner and capture fixtures remain unchanged. Fresh reads and intentions are in `tmp/clm-s736/clm-12-bpmn-layered/revision-*.txt`. Independent review remains downstream.
+
+## Adversarial subprocess revision
+
+ADV-S736-CLM12-SUBPROCESS-TEAR: for D >= 2, the planner checks the final draft for changed subprocess-descendant parents or non-boundary offsets and refuses with a specific error before returning commands. The valid tear reproduction and clear control pass; the suite has 40 tests. Planner pre-edit hash `c54a8f49af9b8780fdf0475ec3f33d0a2470a61c`; test pre-edit hash `2444aa6ede5d92b4e8b868dfa963dbe3e9365a04`; post-format hashes `73ccb2405aa9505cc3e1f0ab802fb6536e2d08c2; 79867293041d56411eb1c2d97e03f270ae78d2b7`. Edit intentions and snapshots are under `tmp/clm-s736/clm-12-bpmn-layered/adv-*`.
+
+Design note for the design author or serial integration reviewer: E2.1 should record this D >= 2 refusal when subprocess contents cannot be preserved; the design file is outside this plan's ownership. Strict D2 also preserves the analogous depth-one limitation, which remains open alongside Q11. Independent review is downstream.
+
+## Adversarial collapsed-pool revision
+
+ADV-S736-CLM12-COLLAPSED-TEAR: the D >= 2 draft guard also refuses changed collapsed-pool descendant parents or non-lane, non-boundary offsets. The valid reproduction and clear control pass; 42 layered tests pass. Planner pre-edit hash `73ccb2405aa9505cc3e1f0ab802fb6536e2d08c2`; test pre-edit hash `79867293041d56411eb1c2d97e03f270ae78d2b7`; post-format hashes `bac883cee840bbb671f2aa36b0142f2886d71d04; 05f14a0877a2fa6ce8927ae0a19ed743508dbdb8`. Fresh reads and intentions are in `tmp/clm-s736/clm-12-bpmn-layered/collapse-*`.
+
+Design note for the design author or serial integration reviewer: E2.1 should record or reject both the subprocess and collapsed-pool refusals; the design file is outside this plan's ownership. Strict depth-one identity also preserves the analogous collapsed-pool limitation. Independent review is downstream.
+
+## Collapsed-pool refusal wording revision
+
+ADV-S736-CLM12-COLLAPSED-REFUSAL-TEXT: the refusal now reports the planned width and both remedies. A member can fall outside the narrower common pool width or land transiently on a live subprocess; the design author or serial integration reviewer should consider both causes when recording the refusal in E2.1. The width-only reproduction and follow-the-advice control pass; the layered suite has 44 tests. Planner pre/post hashes `bac883cee840bbb671f2aa36b0142f2886d71d04` / `6d79f24919d72503156fb1129f29aa8c567784ce`; test pre/post hashes `05f14a0877a2fa6ce8927ae0a19ed743508dbdb8` / `f7fb1e924537129d809cf1a7adc1abd14f62a811`. Per-edit intent and snapshots are in `tmp/clm-s736/clm-12-bpmn-layered/refusal-*`. Independent review remains downstream.
+
+Q11 open: depth-one containment not accepted for conflict inputs
