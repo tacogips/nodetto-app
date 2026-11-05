@@ -205,6 +205,8 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"replace-text","find":"example.dev","replace":"example.info"}
   {"op":"group","ids":["@gw","@cache"],"ref":"edge","name":"Edge tier"}
   {"op":"ungroup","id":"@edge"}
+  {"op":"order","id":"@panel","to":"back"}
+  {"op":"order","id":"@panel","before":"@widget"}
   {"op":"add-page","name":"Flow","kind":"bpmn","ref":"flow","after":"p1"}
   {"op":"move-page","id":"p3","before":"p2"}
   {"op":"rename-page","id":"p1","name":"Shop schema"}
@@ -245,6 +247,15 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     --dry-run to preview.
   - group wraps two or more elements on one page in a group ("name" sets its
     layer name); ungroup dissolves a group and keeps its members.
+  - order selects targets with "id" or "where"/"expect"; multiple targets move
+    as one block. Specify exactly one of "to" ("back", "front", "backward",
+    "forward"), "before" (directly beneath the anchor), or "after" (directly
+    above). Group members reorder within their group; ungrouped targets reorder
+    on the page with frame contents and group members. Frames and BPMN pools,
+    lanes, groups and expanded sub-processes paint beneath what they enclose,
+    so front does not lift them above their contents and back does not put
+    enclosed content behind them. Sending content behind its frame also ends
+    implicit ownership, so it no longer moves with the frame.
   - Semantic fields an element type does not define are kept but reported as
     semantic.unknownField warnings naming the operation; --format json lists
     them under "warnings". The batch still applies.

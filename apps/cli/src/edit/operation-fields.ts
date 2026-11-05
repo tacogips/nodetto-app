@@ -45,6 +45,7 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
   move: ["op", "id", "x", "y"],
   delete: ["op", "id", "where", "expect"],
   select: ["op", "ref", "id", "where", "expect"],
+  order: ["op", "id", "where", "expect", "to", "before", "after"],
   scale: ["op", "ids", "page", "factor", "origin"],
   "replace-text": [
     "op",

@@ -876,8 +876,9 @@ consumers filter the z-ordered element list. The importer emits pools,
 then lanes, then process contents in document order (`import.ts` add
 order), so a pool is below its lanes and lanes are below an expanded
 sub-process, and lane headers still draw over the pool body. In the editor
-the existing z-order is kept as authored. No new layer, z-index or
-reordering is added.
+the existing z-order is kept as authored. This section adds no new layer or
+z-index. A surface stored above an element it encloses is painted beneath that
+element by the container paint-order rule in `design-z-order.md` section 2.
 
 Unchanged:
 - Tasks, events, gateways, call activities, collapsed sub-processes, data

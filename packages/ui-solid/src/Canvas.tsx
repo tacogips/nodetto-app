@@ -23,7 +23,11 @@ import { paletteDropInsideCanvas } from "./palette-drag.ts";
 // file drops, and the editor-wide navigation keys.
 
 import type { Box, Editor, Vec, ViewportSize } from "@nodetto/core";
-import { connectorBackdropIds, groupOf } from "@nodetto/core";
+import {
+  connectorBackdropIds,
+  containerPaintOrder,
+  groupOf,
+} from "@nodetto/core";
 import type { Element, ElementId } from "@nodetto/ir";
 import {
   CANVAS_DARK_CLASS,
@@ -218,13 +222,6 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       );
   });
 
-  const connectors = createMemo(() =>
-    elements().filter(
-      (element) =>
-        isConnector(element) && !groupOf(props.editor.store, element.id),
-    ),
-  );
-
   // Frames painted beneath the connector layer (see core backdrops.ts).
   const backdropIds = createMemo(() =>
     connectorBackdropIds(
@@ -233,12 +230,23 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     ),
   );
 
+  const paintElements = createMemo(() =>
+    containerPaintOrder(elements(), context(), backdropIds()),
+  );
+
+  const connectors = createMemo(() =>
+    paintElements().filter(
+      (element) =>
+        isConnector(element) && !groupOf(props.editor.store, element.id),
+    ),
+  );
+
   const backdropRoots = createMemo(() =>
-    elements().filter((element) => backdropIds().has(element.id)),
+    paintElements().filter((element) => backdropIds().has(element.id)),
   );
 
   const visualRoots = createMemo(() =>
-    elements().filter(
+    paintElements().filter(
       (element) =>
         !isConnector(element) &&
         !groupOf(props.editor.store, element.id) &&
