@@ -24,6 +24,8 @@ design implements.
 4. SVG output is byte-identical between the app and the CLI for the same page
    and the same options.
 
+- Text exports (SVG, Mermaid, D2 and draw.io) depend only on canonical content and referenced attachment bytes, independent of branch, time, time zone, locale, paths and Bun versus native. PNG and PDF depend on fonts.
+
 Non-goals: new SVG features, PDF/PNG determinism at the byte level, multi-page
 PDF, selection export from the CLI, a CLI `--check`/`--strict` mode for
 export, changes to the existing inspector PNG asset export behavior,
@@ -393,6 +395,8 @@ The sidecar check confirms the PNG signature and size and the PDF header and
 MediaBox of the two files.
 
 ## 8. Rollout constraints
+
+- Preserve text export determinism across branch, time, time zone, locale, working directory, absolute path and Bun versus native for equal canonical content and attachment bytes. PNG and PDF depend on fonts.
 
 - Implementation order: (1) a spike that proves PDFKit + svg-to-pdfkit and
   resvg-wasm load in Vite, in `bun test` and inside the compiled sidecar with

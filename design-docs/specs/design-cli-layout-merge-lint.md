@@ -1990,7 +1990,7 @@ wave 1 tracks need no handover from each other.
 ### Continuation 5 verification
 
 Rows "E1", "E2", "F1" to "F4", "B2", "B3", "C3", "D1" to "D3" and "Native parity" in
-"Verification" define the test content, as specified in `impl-plans/active/clm-09-wiring.md`.
+"Verification" define the test content, as specified in `impl-plans/completed/clm-09-wiring.md`.
 Evidence is under `tmp/clm-s740/<planId>/`. These additions and changes apply:
 
 - clm-09b adds one CLI-level refusal test: a BPMN page that gets an E2.1 `{ error }` exits

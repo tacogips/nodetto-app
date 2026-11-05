@@ -35,9 +35,53 @@ manifests, only s359 was the final dispatch. Their `planPath` values name
 the pre-archive `active/` locations. The text-layout lint manifests
 (`text-layout-lint-s551-dispatch.json`, `text-layout-lint-s552-dispatch.json`,
 `text-layout-lint-s555-dispatch.json`, `text-layout-lint-s556-dispatch.json`)
-also stay in `active/`; s556 was the final dispatch.
+also stay in `active/`; s556 was the final dispatch. The CLI layout, merge
+and lint manifests (`clm-s725-dispatch.json`, `clm-s731-dispatch.json`,
+`clm-s732-dispatch.json`, `clm-s736-dispatch.json`,
+`clm-s737-dispatch.json`, `clm-s740-dispatch.json`) also stay in `active/`
+with their pre-archive `planPath` values; s740 was the final dispatch and
+the earlier ones must not be dispatched again.
 
 ## Completed
+
+CLI layout, merge and lint (sessions 725, 731, 732, 736, 737 and 740;
+design: `design-docs/specs/design-cli-layout-merge-lint.md`; no GitHub
+issue). The work added `arrange --mode layered|route`, the `merge` command
+and Git merge driver, `lint --fix` and `lint --metrics`, the edit selectors
+`name:<text>`, `where`, `expect` and `select`, `carryMembers`, global
+`--quiet`, warning collapse, and page-scoped edit performance. Integration
+review accepted the combined tree. The final gate logs record `mise run
+verify` 3167 pass, 43 skip, 0 fail; `mise run test-cli` 289 pass, 0 fail;
+and native parity 20 pass, 0 fail. Native marginal
+ratios against the pre-change binary are batch 1.0000 and mixed 1.0303, and
+the 120-unit layered median is 1.93x the 60-unit median. There is no browser
+E2E suite. Owner question Q11 in `design-docs/user-qa/cli-layout-merge-lint.md`
+stays open and non-blocking: the current depth-one behavior is kept and
+documented, and E2 is not reported as fully met for its conflict inputs. An
+answer that changes depth-one behavior needs a new plan. Warnings from the
+Gerber, PCB and breadboard commands still print one per line. Progress logs
+stay in `progress/`. Evidence: `tmp/clm-s740/<planId>/`.
+
+| Plan | Scope |
+|---|---|
+| [clm-00-overview](completed/clm-00-overview.md) | Waves, ownership and continuation history |
+| [clm-01-merge](completed/clm-01-merge.md) | Three-way merge engine and `merge` command |
+| [clm-02-connector-edit-perf](completed/clm-02-connector-edit-perf.md) | Connector fields and page-scoped edit performance |
+| [clm-03-lint-core](completed/clm-03-lint-core.md) | Core diagram lint rules |
+| [clm-04-edit-usability](completed/clm-04-edit-usability.md) | Edit usability additions |
+| [clm-06-route-arrange](completed/clm-06-route-arrange.md) | `arrange --mode route` and lint metrics |
+| [clm-07-layered-core](completed/clm-07-layered-core.md) | Layered arrange core |
+| [clm-08-lint-cli](completed/clm-08-lint-cli.md) | Diagram lint CLI |
+| [clm-09-wiring](completed/clm-09-wiring.md) | Final gates, native timing and warning collapse repair |
+| [clm-09a-help-docs](completed/clm-09a-help-docs.md) | Full help and documentation |
+| [clm-09b-cli-tests](completed/clm-09b-cli-tests.md) | CLI-level and Git merge driver tests |
+| [clm-09c-native-parity](completed/clm-09c-native-parity.md) | Native parity tests |
+| [clm-10-layered-fixes](completed/clm-10-layered-fixes.md) | Layered title band, frame ranks and ERD support |
+| [clm-11-container-carry](completed/clm-11-container-carry.md) | `carryMembers` per container kind |
+| [clm-12-bpmn-layered](completed/clm-12-bpmn-layered.md) | BPMN layered arrange |
+| [clm-13-edit-selectors](completed/clm-13-edit-selectors.md) | Edit selectors |
+| [clm-14-lint-image-path](completed/clm-14-lint-image-path.md) | Lint image path normalization |
+| [clm-15-bun-test-jsx](completed/clm-15-bun-test-jsx.md) | `bun test` JSX load fix |
 
 Source module split (sessions 575, 579, 583, 589 and 598; design:
 `design-docs/specs/design-source-module-split.md`; no GitHub issue). The

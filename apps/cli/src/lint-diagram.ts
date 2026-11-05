@@ -5,14 +5,8 @@ import {
   type PageId,
 } from "@nodetto/ir";
 import { parseDocument } from "@nodetto/io";
-import {
-  lintNodeOverlaps,
-  NODE_OVERLAP_PAGE_KINDS,
-} from "@nodetto/core";
-import {
-  planTextWrapFixes,
-  type TextWrapFix,
-} from "@nodetto/core";
+import { lintNodeOverlaps, NODE_OVERLAP_PAGE_KINDS } from "@nodetto/core";
+import { planTextWrapFixes, type TextWrapFix } from "@nodetto/core";
 import type { CommandIo } from "./commands.ts";
 import { runOperations } from "./edit-command.ts";
 

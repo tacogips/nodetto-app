@@ -25,6 +25,9 @@ export async function runCliAsync(
   const [command, ...rest] = extracted.args;
   const handler = command === undefined ? undefined : ASYNC_COMMANDS[command];
   const wantsHelp = rest.includes("--help") || rest.includes("-h");
-  const result = handler && !wantsHelp ? await handler(io, rest) : runCli(extracted.args, io, version);
+  const result =
+    handler && !wantsHelp
+      ? await handler(io, rest)
+      : runCli(extracted.args, io, version);
   return extracted.quiet ? applyQuiet(command ?? "", result) : result;
 }

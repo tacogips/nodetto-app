@@ -73,6 +73,8 @@ Object.assign(globalThis, {
         : command === "open" && !help
           ? await openCommand(io, rest)
           : runCli(args, io, version);
-    return JSON.stringify(extracted.quiet ? applyQuiet(command ?? "", result) : result);
+    return JSON.stringify(
+      extracted.quiet ? applyQuiet(command ?? "", result) : result,
+    );
   },
 });

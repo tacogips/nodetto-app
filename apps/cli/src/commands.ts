@@ -37,9 +37,19 @@ import {
 import { helpFor, OVERVIEW } from "./help.ts";
 import { arrangeLayeredOrRoute } from "./arrange-modes.ts";
 import { mergeCommand } from "./merge-command.ts";
-import { diagramLintApplies, formatFixLines, lintDiagramPages, LINT_NO_PAGES_MESSAGE } from "./lint-diagram.ts";
+import {
+  diagramLintApplies,
+  formatFixLines,
+  lintDiagramPages,
+  LINT_NO_PAGES_MESSAGE,
+} from "./lint-diagram.ts";
 import { lintMetrics, formatMetricsLines } from "./lint-metrics.ts";
-import { applyQuiet, collapseWarnings, extractQuiet, issueWarningKey } from "./warnings.ts";
+import {
+  applyQuiet,
+  collapseWarnings,
+  extractQuiet,
+  issueWarningKey,
+} from "./warnings.ts";
 import { pagesCommand } from "./pages-command.ts";
 import { inspectCommand } from "./inspect-command.ts";
 import { typesCommand } from "./types-command.ts";
@@ -177,7 +187,12 @@ export function loadDocument(
   if (!result.ok) return `${path} is not a valid nodetto document:\n${report}`;
   return {
     document: result.document,
-    warnings: result.issues.length ? `${collapseWarnings(result.issues.map(formatIssue), result.issues.map((issue) => issueWarningKey(issue, result.document))).join("\n")}\n` : "",
+    warnings: result.issues.length
+      ? `${collapseWarnings(
+          result.issues.map(formatIssue),
+          result.issues.map((issue) => issueWarningKey(issue, result.document)),
+        ).join("\n")}\n`
+      : "",
     warningCount: result.issues.filter((issue) => issue.severity === "warning")
       .length,
   };
@@ -237,12 +252,16 @@ function warningLines(
     readonly elementId?: string;
   }[],
 ): string {
-  return warnings
-    .map((warning) => {
-      const subject = warning.xmlId ?? warning.elementId ?? "document";
-      const kind = warning.element ? `${warning.element} ` : "";
-      return `warning: ${kind}${subject}: ${warning.message}\n`;
-    })
+  const lines = warnings.map((warning) => {
+    const subject = warning.xmlId ?? warning.elementId ?? "document";
+    const kind = warning.element ? `${warning.element} ` : "";
+    return `warning: ${kind}${subject}: ${warning.message}`;
+  });
+  return collapseWarnings(
+    lines,
+    warnings.map((warning) => warning.message),
+  )
+    .map((line) => `${line}\n`)
     .join("");
 }
 
@@ -338,7 +357,9 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const diagram = lintDiagramPages(io, path, document, {
     fix: parsed.flags.has("--fix"),
     ...(query === undefined ? {} : { pageId: selectedPages[0]?.id }),
-    textLayoutPageIds: selectedPages.filter((page) => TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind)).map((page) => page.id),
+    textLayoutPageIds: selectedPages
+      .filter((page) => TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind))
+      .map((page) => page.id),
     format,
   });
   if (diagram.error) return fail(diagram.error);
@@ -347,7 +368,12 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     if (typeof reloaded === "string") return fail(reloaded);
     document = reloaded.document;
   }
-  const metrics = parsed.flags.has("--metrics") ? lintMetrics(document, selectedPages.map((page) => page.id)) : new Map();
+  const metrics = parsed.flags.has("--metrics")
+    ? lintMetrics(
+        document,
+        selectedPages.map((page) => page.id),
+      )
+    : new Map();
   const reports: {
     readonly page: Page;
     readonly findings: readonly LintFindingRow[];
@@ -382,7 +408,14 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
               }),
             ),
   }));
-  const combinedReports: { page: Page; findings: readonly LintFindingRow[] }[] = reports.map((report) => ({ ...report, findings: [...report.findings, ...diagram.rows.filter((row) => row.pageId === report.page.id)] }));
+  const combinedReports: { page: Page; findings: readonly LintFindingRow[] }[] =
+    reports.map((report) => ({
+      ...report,
+      findings: [
+        ...report.findings,
+        ...diagram.rows.filter((row) => row.pageId === report.page.id),
+      ],
+    }));
   const allFindings = combinedReports.flatMap((report) => report.findings);
   const errors = allFindings.filter(
     (finding) => finding.severity === "error",
@@ -394,7 +427,9 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       pages: combinedReports.map(({ page, findings }) => ({
         pageId: page.id,
         pageName: page.name,
-        ...(parsed.flags.has("--metrics") ? { metrics: metrics.get(page.id) ?? null } : {}),
+        ...(parsed.flags.has("--metrics")
+          ? { metrics: metrics.get(page.id) ?? null }
+          : {}),
         findings: findings.map((finding) => ({
           elementId: finding.elementId,
           severity: finding.severity,
@@ -406,7 +441,22 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
         })),
       })),
       ...(parsed.flags.has("--fix") ? { fixes: diagram.fixes } : {}),
-      summary: { problems: allFindings.length, errors, warnings, ...(parsed.flags.has("--metrics") ? { metrics: [...metrics.values()].reduce((sum, value) => ({ edgeCrossings: sum.edgeCrossings + value.edgeCrossings, labelOverlaps: sum.labelOverlaps + value.labelOverlaps }), { edgeCrossings: 0, labelOverlaps: 0 }) } : {}) },
+      summary: {
+        problems: allFindings.length,
+        errors,
+        warnings,
+        ...(parsed.flags.has("--metrics")
+          ? {
+              metrics: [...metrics.values()].reduce(
+                (sum, value) => ({
+                  edgeCrossings: sum.edgeCrossings + value.edgeCrossings,
+                  labelOverlaps: sum.labelOverlaps + value.labelOverlaps,
+                }),
+                { edgeCrossings: 0, labelOverlaps: 0 },
+              ),
+            }
+          : {}),
+      },
     };
     return {
       exitCode: errors ? EXIT_DRIFT : EXIT_OK,
@@ -416,7 +466,12 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
   }
   const fixLines = formatFixLines(diagram.fixes);
   const metricLines = formatMetricsLines(document, metrics);
-  if (!allFindings.length) return ok([fixLines, metricLines].filter(Boolean).join("\n") + (fixLines || metricLines ? "\n" : ""), stderr);
+  if (!allFindings.length)
+    return ok(
+      [fixLines, metricLines].filter(Boolean).join("\n") +
+        (fixLines || metricLines ? "\n" : ""),
+      stderr,
+    );
   const output = [...(fixLines ? [fixLines] : []), path];
   for (const { page, findings } of combinedReports) {
     if (!findings.length) continue;
@@ -519,7 +574,7 @@ function bpmnExport(io: CommandIo, args: readonly string[]): CommandResult {
   } catch (cause) {
     return fail(`${cause instanceof Error ? cause.message : String(cause)}`);
   }
-  const warnings = `${loaded.warnings}${report.warnings.map((warning) => `warning: ${warning.elementId ?? "document"}: ${warning.message}\n`).join("")}`;
+  const warnings = `${loaded.warnings}${warningLines(report.warnings)}`;
   if (parsed.flags.has("--strict") && report.warnings.length)
     return {
       exitCode: EXIT_WARNINGS,
@@ -588,11 +643,15 @@ function drawioCommand(io: CommandIo, args: readonly string[]): CommandResult {
       `Cannot import ${path}: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   }
-  const warnings = report.warnings
-    .map(
-      (warning) =>
-        `warning: ${warning.page}${warning.cell ? ` (${warning.cell})` : ""}: ${warning.message}\n`,
-    )
+  const warningText = report.warnings.map(
+    (warning) =>
+      `warning: ${warning.page}${warning.cell ? ` (${warning.cell})` : ""}: ${warning.message}`,
+  );
+  const warnings = collapseWarnings(
+    warningText,
+    report.warnings.map((warning) => warning.message),
+  )
+    .map((line) => `${line}\n`)
     .join("");
   if (parsed.flags.has("--strict") && report.warnings.length)
     return {
@@ -721,8 +780,11 @@ function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
     frameId = resolved.id;
   }
   const ddl = generateDatabaseDdl(editor, page.id, dialect, { frameId });
-  const warningText = ddl.warnings
-    .map((warning) => `warning: ${warning}\n`)
+  const warningText = collapseWarnings(
+    ddl.warnings.map((warning) => `warning: ${warning}`),
+    ddl.warnings,
+  )
+    .map((line) => `${line}\n`)
     .join("");
   const stderr = `${loaded.warnings}${warningText}`;
   if (parsed.flags.has("--strict") && ddl.warnings.length)
@@ -763,7 +825,11 @@ function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
 
 function arrangeCommand(io: CommandIo, args: readonly string[]): CommandResult {
   const options = new Set([...ARRANGE_OPTIONS, "--frames", "--ids"]);
-  const parsed = parseArgs(args, options, new Set(["--write", "--check", "--reset-manual"]));
+  const parsed = parseArgs(
+    args,
+    options,
+    new Set(["--write", "--check", "--reset-manual"]),
+  );
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("arrange")}`);
   if (parsed.positional.length !== 1)
@@ -773,11 +839,20 @@ function arrangeCommand(io: CommandIo, args: readonly string[]): CommandResult {
   if (parsed.flags.has("--write") && parsed.flags.has("--check"))
     return fail("--write and --check cannot be combined.");
   const mode = parsed.options.get("--mode") ?? "tidy";
-  if (mode === "layered" || mode === "route") return arrangeLayeredOrRoute(io, args);
+  if (mode === "layered" || mode === "route")
+    return arrangeLayeredOrRoute(io, args);
   if (mode !== "tidy" && mode !== "overlaps")
-    return fail(`Unsupported mode "${mode}". Choose tidy, overlaps, layered or route.`);
-  if (parsed.options.has("--frames") || parsed.options.has("--ids") || parsed.flags.has("--reset-manual"))
-    return fail("--frames, --ids and --reset-manual require layered or route mode.");
+    return fail(
+      `Unsupported mode "${mode}". Choose tidy, overlaps, layered or route.`,
+    );
+  if (
+    parsed.options.has("--frames") ||
+    parsed.options.has("--ids") ||
+    parsed.flags.has("--reset-manual")
+  )
+    return fail(
+      "--frames, --ids and --reset-manual require layered or route mode.",
+    );
   const direction = parsed.options.get("--direction") ?? "LR";
   if (direction !== "LR" && direction !== "TB")
     return fail(`Unsupported direction "${direction}". Choose LR or TB.`);
@@ -901,7 +976,11 @@ export function runCli(
   return extracted.quiet ? applyQuiet(command, result) : result;
 }
 
-function dispatchCli(args: readonly string[], io: CommandIo, version: string): CommandResult {
+function dispatchCli(
+  args: readonly string[],
+  io: CommandIo,
+  version: string,
+): CommandResult {
   const [command, ...rest] = args;
   if (command === "help") return ok(`${helpFor(rest[0])}\n`);
   if (

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const binary = process.env.NODETTO_CLI_TEST_BINARY;
@@ -23,5 +24,25 @@ export function compare(args: string[], cwd?: string, stdin?: string) {
   expect(actual.exitCode).toBe(expected.exitCode);
   expect(actual.stdout.toString()).toBe(expected.stdout.toString());
   expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+  return actual;
+}
+
+export function compareFile(
+  args: string[],
+  documentPath: string,
+  source: string,
+  cwd?: string,
+) {
+  writeFileSync(documentPath, source);
+  const expected = Bun.spawnSync([process.execPath, cliEntry, ...args], {
+    cwd,
+  });
+  const expectedFile = readFileSync(documentPath);
+  writeFileSync(documentPath, source);
+  const actual = Bun.spawnSync([binary as string, ...args], { cwd });
+  expect(actual.exitCode).toBe(expected.exitCode);
+  expect(actual.stdout.toString()).toBe(expected.stdout.toString());
+  expect(actual.stderr.toString()).toBe(expected.stderr.toString());
+  expect(readFileSync(documentPath)).toEqual(expectedFile);
   return actual;
 }

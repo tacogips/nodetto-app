@@ -17,14 +17,14 @@ Draw and edit
   nodetto-cli shapes [<words>]    Palette shapes by shape ID (--category uml)
   nodetto-cli draw <doc> <shape>  Draw one shape or connector by its shape ID
   nodetto-cli edit <doc>          Apply add/update/move/delete operations (JSON)
-  nodetto-cli arrange <doc>       Tidy the layout of one page
+  nodetto-cli arrange <doc>       Arrange one page: tidy, overlaps, layered or route
 Render
   nodetto-cli export <doc>        Export a page or selected artwork
 Convert and check
   nodetto-cli merge <base> <ours> <theirs>  Merge document versions
   nodetto-cli ddl <doc>           Database DDL from an ERD page
   nodetto-cli format <doc>        Canonical JSONL formatting
-  nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, architecture, freeform and flowchart pages
+  nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
   nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
@@ -179,6 +179,9 @@ ${EXIT_CODES}`,
   edit: `Usage: nodetto-cli edit <doc.jsonl> --ops <file.json|-> [--arrange] [--dry-run]
                         [--snapshot <file>] [--format text|json]
 
+--quiet suppresses warning lines; repeated warnings collapse as
+" (and <n> more like this)". --strict still exits 3 where supported.
+
 Apply a batch of operations through the editor's command layer, so the result is
 exactly what the app would produce. The batch is all-or-nothing: an invalid
 operation prints its index and reason and nothing is written. The document is
@@ -186,17 +189,43 @@ written atomically; if the file changed on disk while the batch was being
 applied (for example the human saved in the app), the batch is applied again
 to the new contents (up to three times) so no human edit is overwritten.
 
-References resolve by exact id, @ref, name:<text>, then unique id prefix. Names
-must match one element on the page; ambiguous and missing matches list candidates.
-update and delete accept where (type, from, to, parent, name) and expect an exact
-count. Mismatch aborts the batch without writing. Matched counts are reported.
-select binds an existing element: {"op":"select","ref":"ok","id":"name:Approve"}.
-Unknown operation fields are rejected with valid fields listed.
+References resolve exact id, @ref, name:<text>, then a unique id prefix.
+name: matches label text exactly, case-sensitively after trimming. Scope is the
+operation's page, the source page for connect's to, the element page for
+semantic references, or the whole document. Missing or ambiguous names list
+candidates. Reference fields inside semantic are resolved; other text is not.
+update and delete accept id or where (not both). where has at least one of
+page, type, from, to, parent and name; all keys must match. expect is an integer
+at least 0, only with where. Mismatch aborts without writing; zero matches
+without expect is an error, while expect:0 is a no-op.
+select requires a fresh ref and exactly one of id or where; where requires
+exactly one match (expect defaults to 1 and must be 1). It binds @ref without
+marking a page touched. Reports include operation <i> (<op>): matched <n>
+element(s), or JSON matches with operation, op, count and ids. --quiet never
+hides matches. Unknown operation fields are rejected with valid fields listed.
+Example: {"op":"delete","where":{"type":"bpmn.sequenceFlow",
+ "from":"name:Approve","to":"name:Update status"},"expect":1}
 
-carryMembers defaults to true on frames, BPMN pools, lanes, sub-processes and
-breadboard boards. Set carryMembers:false on move or resize to keep members in
-place. BPMN lane x/y/width changes and invalid pool geometry report errors;
-layout frames and groups reject this opt-out. Attachments always follow owners.
+update label maps: text.note -> text; frame -> name; node.generic -> label;
+state.node -> name; erd.table -> tableName; state.transition -> trigger;
+BPMN flows -> name; edge.generic -> label. label wins over semantic on update.
+
+carryMembers is a boolean on update; the default is true. Move and resize
+normally carry as follows; false keeps members at their absolute positions:
+  frame              descendants; resize also follows constraints; layout frames
+                     re-layout and reject false. Geometric membership is rechecked.
+  bpmn.participant   descendants; lanes follow the pool, other members re-parent.
+  bpmn.lane          descendants; height restacks siblings, which carry members.
+                     Non-lane members re-parent; x, y and width changes reject false.
+  bpmn.subProcess    descendants re-parent.
+  breadboard.board   plugged parts remain in place, plugged only if holes still align.
+  group              has no box; false is rejected. Other elements do not carry.
+UML packages and architecture groups/zones drawn as frames carry; shape.geo,
+usecase system boundaries and bpmn.group do not. Attachments always follow:
+uml.port, bpmn.boundaryEvent and PCB tracks follow their hosts.
+For a pool or lane with child lanes, false rejects heights below the lanes'
+minimum; pool width must be greater than 30 per lane depth and at least the
+nested lanes' extent. These geometry errors exit 2 without writing.
 
 Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"add","page":"p1","type":"erd.table","ref":"orders",
@@ -314,6 +343,9 @@ ${EXIT_CODES}`,
                         [--below <id>] [--dry-run] [--format text|json]
        nodetto-cli draw <doc.jsonl> <connector-shape-id> --from <id> --to <id> [--label <text>]
 
+--quiet suppresses warning lines; repeated warnings collapse as
+" (and <n> more like this)". --strict still exits 3 where supported.
+
 Draw one palette shape by its shape ID ("nodetto-cli shapes" lists them), the
 way picking it from the app's palette does. It runs one nodetto-cli edit
 operation, so validation, atomic writing and live reload in the app are the
@@ -365,7 +397,14 @@ ${EXIT_CODES}`,
                           [--mermaid-kind erDiagram|classDiagram|sequenceDiagram|stateDiagram-v2|flowchart]
                           [--code-format <output>]
 
+--quiet suppresses warning lines. Repeated document-load and text-layout
+warnings collapse as " (and <n> more like this)"; other format warnings print
+one per line. --strict still exits 3 where supported.
+
 Render one page exactly as the app's page export does.
+Text exports (SVG, Mermaid, D2, draw.io) depend only on canonical content and
+referenced attachment bytes, independent of branch, time, time zone, locale,
+working directory, absolute path and Bun or native. PNG and PDF depend on fonts.
 
   --format       svg, png, pdf, html, mermaid, d2, drawio or code (required).
                  html writes a website ZIP; code uses --element and --code-format;
@@ -423,6 +462,9 @@ ${EXIT_CODES}`,
                        [--check <file.sql>] [--strict]
                        [--frame <id|short-id|name>]
 
+--quiet suppresses warning lines; repeated warnings collapse as
+" (and <n> more like this)". --strict still exits 3 where supported.
+
 Print the deterministic schema DDL the editor's Database DDL panel generates for
 one ERD page. Without --page, the document must contain exactly one page with
 ERD tables.
@@ -455,30 +497,50 @@ changes only the display name; names are the human-facing key (for example,
 ${EXIT_CODES}`,
 
   merge: `Usage: nodetto-cli merge <base> <ours> <theirs> [--output <file>]
-Three-way merge keeps ours on conflict; arrays are atomic. Delete/change conflicts
-keep ours. Exit 0 for clean merge, 1 for conflicts and 2 for errors.
-Git driver: git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
-Use *.jsonl merge=nodetto in .gitattributes.
 
-${EXIT_CODES}`,
+Three-way merge keeps ours on conflict; arrays are atomic. If ours deleted a
+record changed by theirs it stays deleted; if theirs deleted ours' changed
+record ours stays. An integrity pass restores ours' missing pages and references
+or drops dangling records, then validates. Errors write nothing. Conflict lines
+on stderr are never hidden by --quiet; canonical output is written on conflict.
+
+Git driver (.gitattributes and once per clone):
+  *.jsonl merge=nodetto
+  git config merge.nodetto.name "nodetto three-way merge"
+  git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
+
+Exit codes: 0 clean, 1 conflicts (output written), 2 usage or input error.`,
 
   arrange: `Usage: nodetto-cli arrange <document.jsonl> [--mode tidy|overlaps|layered|route]
-                           [--direction LR|TB] [--page <short-id|id|name>]
-                           [--write] [--check]
+  [--direction LR|TB] [--page <short-id|id|name>] [--frames <id|name,...>]
+  [--ids <id,...>] [--reset-manual] [--write] [--check]
 
-Run the editor's Tidy layout (default) or Remove overlaps on one page and print
-the canonical result. Without --page, the document must have exactly one page.
+Tidy is the default; overlaps removes overlaps, layered lays out columns and
+route recomputes connectors. --direction applies to tidy and layered. --frames
+is layered only; --ids is route only; --reset-manual is layered or route only.
+Stored ports and routes count as manual and are preserved unless rerun with
+--reset-manual. --write rewrites the file; --check exits 1 if anything changes.
+Without --page the document must have exactly one page.
 
-  --mode       tidy (default), overlaps, layered or route.
-  --frames     ordered column frames for layered; --ids selects route connectors.
-  --reset-manual resets manual route settings. Existing manual settings are kept otherwise.
-  Layered and route support state, flowchart, freeform, architecture, UML, ERD
-  and BPMN. Sequence, breadboard and PCB have specialized layouts and are excluded.
-  BPMN pools and lanes form horizontal rows; --frames and TB are unsupported.
-  Nested lanes may have full boxes rewritten; lane order is preserved.
-  --direction  LR or TB layout direction for tidy.
-  --write      Rewrite the file in place.
-  --check      Exit 1 when arranging would move anything.
+Page kind                         layered / route / lint --metrics
+state, flowchart, freeform,       frames as columns / yes / yes
+architecture, uml, erd
+bpmn                              pools and lanes as rows / yes / yes
+sequence                          excluded: participant and message order define geometry
+breadboard                        excluded: physical holes and electrical wires
+pcb                               excluded: physical footprints and tracks
+ERD column ends get no ports and are not spread. On bpmn, columns are global;
+--frames and --direction TB exit 2 because pools are horizontal. Nested lanes
+may get full boxes rewritten and retain order. Layered refuses to write when
+lane heights cannot fill their pool, sub-process contents cannot be kept clear
+of sub-processes in other lanes, or collapsed pool contents cannot fit the
+planned width and clear sub-processes in other pools.
+With lanes nested at most one level, layered moves units and changes pool boxes
+and lane heights but keeps lane positions. A lane can end outside its pool when
+the pool box does not change; sub-process or collapsed pool contents can change
+parent or offset.
+Example: nodetto-cli arrange flow.jsonl --mode layered --frames Stage0 --write
+Example: nodetto-cli arrange flow.jsonl --mode route --ids edge1 --reset-manual
 
 ${EXIT_CODES}`,
 
@@ -493,6 +555,9 @@ ${EXIT_CODES}`,
 
   validate: `Usage: nodetto-cli validate <document.jsonl> [--strict]
 
+--quiet suppresses warning lines; repeated warnings collapse as
+" (and <n> more like this)". --strict still exits 3 where supported.
+
 Parse and validate a document; print warnings and errors and a one-line summary.
 Warnings include semantic.unknownField for a semantic field the element type
 does not define (kept, but ignored by this build). --strict exits 3 when there
@@ -501,11 +566,19 @@ are warnings.
 ${EXIT_CODES}`,
 
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
-                        [--config <file>] [--format text|json]
+                        [--config <file>] [--format text|json] [--fix] [--metrics]
 
---fix wraps text; --metrics reports edge crossings and label overlaps on supported pages.
+--fix wraps text using CJK break rules without resizing boxes; .bpmn exits 2.
+--metrics reports edge crossings and label overlaps and never changes the exit code.
+Text: metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s).
+JSON contains edgeCrossings and labelOverlaps per page and in summary.
+Metrics cover bpmn, erd, state, uml, flowchart, architecture and freeform.
+Rules: bpmn and breadboard: existing rules and image-missing; architecture and
+freeform: text layout and image-missing; flowchart: text layout, node-overlap
+and image-missing; erd, state and uml: node-overlap and image-missing; other
+pages with images: image-missing.
 node-overlap and image-missing rules cover diagram pages and attachments.
-Lint BPMN, breadboard, architecture, freeform and flowchart pages from a
+Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages from a
 nodetto document or BPMN XML.
 Text output is empty when clean; --format json always prints a report. A
 .bpmnlintrc in the working directory is used when --config is not given and a
@@ -533,6 +606,10 @@ Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
                                      [--page <short-id|id|name>] [--board <id>]
                                      [--outline board|used] [--strict]
        nodetto-cli breadboard import <file.kicad_sch|file.net> [--output <file.jsonl>] [--strict]
+
+--quiet suppresses warning lines. Repeated warnings from loading a document
+collapse as " (and <n> more like this)"; warnings from this command's own
+conversion print one per line. --strict still exits 3 where supported.
 
 Export a breadboard bill of materials or netlist, export a board as PCB
 fabrication files, or import a KiCad 6+ schematic/netlist into a new
@@ -566,6 +643,9 @@ ${EXIT_CODES}`,
        nodetto-cli bpmn export <document.jsonl> [--page <short-id|id|name>]
                                [--output <file.bpmn> | --check <file.bpmn>] [--strict]
 
+--quiet suppresses warning lines; repeated warnings collapse as
+" (and <n> more like this)". --strict still exits 3 where supported.
+
 Import or export BPMN 2.0 XML.
 
   --strict  Exit 3 when import or export reports warnings.
@@ -576,6 +656,10 @@ ${EXIT_CODES}`,
   gerber: `Usage: nodetto-cli gerber import <file|archive.zip>... [--output <doc.jsonl>]
                                  [--into <doc.jsonl>] [--page-name <name>] [--strict]
        nodetto-cli gerber export <doc.jsonl> --output <board.zip> [--page <page>] [--strict]
+
+--quiet suppresses warning lines. Repeated warnings from loading a document
+collapse as " (and <n> more like this)"; warnings from this command's own
+conversion print one per line. --strict still exits 3 where supported.
 
 Draw a board's fabrication files on a freeform page: Gerber RS-274X layers
 (copper, solder mask, silkscreen, paste, outline) and Excellon drill files,
@@ -611,6 +695,10 @@ ${EXIT_CODES}`,
        nodetto-cli pcb gerber <doc.jsonl> --output <file.zip>
                                [--page <short-id|id|name>] [--strict]
 
+--quiet suppresses warning lines. Repeated warnings from loading a document
+collapse as " (and <n> more like this)"; warnings from this command's own
+conversion print one per line. --strict still exits 3 where supported.
+
 Import a KiCad board as a PCB page, or export a PCB page as Gerber and drill
 files in a ZIP archive.
 
@@ -625,6 +713,10 @@ Examples:
 ${EXIT_CODES}`,
 
   drawio: `Usage: nodetto-cli drawio import <file.drawio> [--output <doc.jsonl>] [--strict]
+
+--quiet suppresses warning lines; repeated warnings collapse as
+" (and <n> more like this)".
+--strict still exits 3 where supported.
 
 Convert a draw.io (diagrams.net) file, compressed or not, into a nodetto
 document with one freeform page per diagram. Shapes without a nodetto

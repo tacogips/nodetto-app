@@ -86,31 +86,27 @@ This repository is the public half of Nodetto: the editor packages and the
 Tauri desktop app. The hosted cloud edition lives in a private repository. See
 [Development](docs/development.md) for the layout, tasks and release process.
 
+### Layout, selection, and merging
+
+`arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text; `lint --metrics` reports crossings and label overlaps. `--quiet` suppresses warnings.
+
+Edit references use `name:<text>`, ids and `@ref`. `update` and `delete` accept `where` with `page`, `type`, `from`, `to`, `parent`, `name`, and `expect`; `select` binds a `ref`. `label` updates display text. `carryMembers` controls frame, `bpmn.participant`, `bpmn.lane`, `bpmn.subProcess` and `breadboard.board` box updates. See the [CLI guide](docs/cli.md#layout-selection-and-merging) for per-kind tables and limitations.
+
+Set `*.jsonl merge=nodetto` in `.gitattributes`, then configure each clone:
+
+```sh
+git config merge.nodetto.name "nodetto three-way merge"
+git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
+```
+
+Treat SVG exports as build output and regenerate after merging, for example in an executable `.git/hooks/post-merge`:
+
+```sh
+#!/bin/sh
+nodetto-cli export flow.jsonl --page Flow --format svg --output flow.svg
+```
+
 ## License
 
 Nodetto is released under the [MIT License](LICENSE). The editor packages,
 desktop application and command-line tool use the same license.
-
-
-### Layout, selection, and merging
-
-`arrange --mode layered|route` supports state, flowchart, freeform, architecture,
-UML, ERD and BPMN. Sequence, breadboard and PCB use specialized layouts. BPMN
-pools and lanes form horizontal rows; `--frames` and `--direction TB` are not
-supported there. Nested lane boxes may be rewritten while preserving lane order.
-Use `--frames` for column order, `--ids` for route targets and `--reset-manual`
-to replace manual routes. `lint --fix` wraps text and `lint --metrics` reports
-edge crossings and label overlaps. `--quiet` suppresses warning lines.
-
-Edit references resolve exact id, `@ref`, `name:<text>`, then unique id prefix.
-`update` and `delete` accept `where` with type, from, to, parent or name, and
-`expect` enforces the match count without writing on mismatch. `select` binds
-an existing element to an `@ref`. Match counts appear in the report. On frames,
-BPMN pools, lanes, sub-processes and breadboard boards, `carryMembers` defaults
-to true; set it to false on move or resize to keep members in place. Invalid
-BPMN geometry, layout frames and groups report errors; attachments follow owners.
-
-For three-way merging, set `*.jsonl merge=nodetto` in `.gitattributes` and run
-`git config merge.nodetto.driver 'nodetto-cli merge %O %A %B --output %A'`.
-The merge retains ours for conflicts and treats arrays atomically; exit codes are
-0 for clean, 1 for conflict, and 2 for input errors.

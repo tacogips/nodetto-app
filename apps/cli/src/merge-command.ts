@@ -1,9 +1,6 @@
 import { validateDocument } from "@nodetto/ir";
 import { serializeDocument } from "@nodetto/io";
-import {
-  mergeDocumentVersions,
-  type VersionConflict,
-} from "@nodetto/core";
+import { mergeDocumentVersions, type VersionConflict } from "@nodetto/core";
 import {
   type CommandIo,
   type CommandResult,

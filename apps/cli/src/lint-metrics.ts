@@ -4,10 +4,7 @@ import {
   type Document,
   type PageId,
 } from "@nodetto/ir";
-import {
-  pageMetrics,
-  type PageMetrics,
-} from "@nodetto/core";
+import { pageMetrics, type PageMetrics } from "@nodetto/core";
 import { createDefaultRegistry } from "@nodetto/core";
 import { Store } from "@nodetto/core";
 

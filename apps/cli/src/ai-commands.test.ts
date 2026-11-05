@@ -412,3 +412,63 @@ test("export renders SVG to stdout and PNG and PDF to files", async () => {
   );
   expect(bad.exitCode).toBe(EXIT_ERROR);
 });
+
+test("layout, selection and merge help describes the CLI surface", () => {
+  for (const term of [
+    "--frames",
+    "--ids",
+    "--reset-manual",
+    "layered",
+    "route",
+    "sequence",
+    "breadboard",
+    "pcb",
+    "bpmn",
+    "--direction TB",
+    "outside its pool",
+  ])
+    expect(COMMAND_HELP.arrange).toContain(term);
+  for (const term of [
+    "name:",
+    "where",
+    "expect",
+    "select",
+    "carryMembers",
+    "matched",
+    "tableName",
+    "trigger",
+    "bpmn.lane",
+    "breadboard.board",
+    "at least",
+    "Attachments",
+  ])
+    expect(COMMAND_HELP.edit).toContain(term);
+  for (const term of [
+    "--fix",
+    "--metrics",
+    "node-overlap",
+    "image-missing",
+    "erd",
+    "state",
+    "uml",
+  ])
+    expect(COMMAND_HELP.lint).toContain(term);
+  for (const term of [
+    "merge=nodetto",
+    "merge.nodetto.driver",
+    "conflict",
+    "Exit codes:",
+  ])
+    expect(COMMAND_HELP.merge).toContain(term);
+  expect(COMMAND_HELP.merge).not.toContain("out of date");
+  expect(COMMAND_HELP.export).toContain("SVG");
+  expect(COMMAND_HELP.export).toContain("time zone");
+  expect(COMMAND_HELP.validate).toContain("--quiet");
+  expect(COMMAND_HELP.bpmn).toContain("repeated warnings collapse");
+  expect(COMMAND_HELP.drawio).toContain("repeated warnings collapse");
+  expect(COMMAND_HELP.drawio).toContain("--strict still exits 3");
+  expect(COMMAND_HELP.validate).toContain("more like this");
+  expect(OVERVIEW.split("\n").length).toBeLessThan(40);
+  for (const help of [OVERVIEW, ...Object.values(COMMAND_HELP)])
+    expect(help).not.toContain("Q11");
+});

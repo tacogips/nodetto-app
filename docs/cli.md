@@ -229,23 +229,76 @@ Stdout carries only MCP messages; disconnecting the client stops the server.
 
 ### Layout, selection, and merging
 
-`arrange --mode layered|route` supports state, flowchart, freeform, architecture,
-UML, ERD and BPMN. Sequence, breadboard and PCB use specialized layouts. BPMN
-pools and lanes form horizontal rows; `--frames` and `--direction TB` are not
-supported there. Nested lane boxes may be rewritten while preserving lane order.
-Use `--frames` for column order, `--ids` for route targets and `--reset-manual`
-to replace manual routes. `lint --fix` wraps text and `lint --metrics` reports
-edge crossings and label overlaps. `--quiet` suppresses warning lines.
+`arrange --mode tidy|overlaps|layered|route` accepts `--direction LR|TB` for tidy and layered, `--page`, `--write` and `--check` (exit 1 when anything would change). `--frames` orders layered columns; `--ids` selects route connectors; `--reset-manual` applies only to layered and route. Stored ports and routes count as manual and are preserved until reset. `edit --arrange` still runs tidy.
 
-Edit references resolve exact id, `@ref`, `name:<text>`, then unique id prefix.
-`update` and `delete` accept `where` with type, from, to, parent or name, and
-`expect` enforces the match count without writing on mismatch. `select` binds
-an existing element to an `@ref`. Match counts appear in the report. On frames,
-BPMN pools, lanes, sub-processes and breadboard boards, `carryMembers` defaults
-to true; set it to false on move or resize to keep members in place. Invalid
-BPMN geometry, layout frames and groups report errors; attachments follow owners.
+| Page kind | Layered | Route, labels, ports, loops | Metrics |
+| --- | --- | --- | --- |
+| state, flowchart, freeform, architecture, uml | Frames as columns | Yes | Yes |
+| erd | Frames as columns | Yes; column ends have no ports and are not spread | Yes |
+| bpmn | Pools and lanes as rows | Yes | Yes |
+| sequence | Excluded: participant and message order define geometry | Excluded, same reason | No |
+| breadboard | Excluded: physical holes and electrical wires | Excluded, same reason | No; crossings are physical |
+| pcb | Excluded: physical footprints and tracks | Excluded, same reason | No |
 
-For three-way merging, set `*.jsonl merge=nodetto` in `.gitattributes` and run
-`git config merge.nodetto.driver 'nodetto-cli merge %O %A %B --output %A'`.
-The merge retains ours for conflicts and treats arrays atomically; exit codes are
-0 for clean, 1 for conflict, and 2 for input errors.
+On BPMN pages columns are global; `--frames` and `--direction TB` exit 2 because pools are horizontal. Nested lanes may get full boxes rewritten and keep their order. Layered refuses to write if lane heights cannot fill the pool, if sub-process contents cannot remain clear of sub-processes in other lanes, or if collapsed pool contents cannot fit the planned width and clear sub-processes in other pools. When lanes are nested at most one level, it moves units and changes pool boxes and lane heights but keeps lane positions. A lane can end outside its pool when the pool box does not change, and sub-process or collapsed pool contents can change parent or offset.
+
+```sh
+nodetto-cli arrange flow.jsonl --mode layered --frames Stage0 --write
+nodetto-cli arrange flow.jsonl --mode route --ids edge1 --reset-manual
+nodetto-cli lint flow.jsonl --fix
+nodetto-cli lint flow.jsonl --metrics --format json
+```
+
+`lint --fix` wraps text using CJK break rules without resizing boxes and exits 2 on `.bpmn`. `--metrics` reports `edgeCrossings` and `labelOverlaps` per page and in the JSON summary, or `metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s)` in text; metrics never change exit codes.
+
+| Page kind | Lint rules |
+| --- | --- |
+| bpmn, breadboard | Existing kind rules and `image-missing` |
+| architecture, freeform | Text layout and `image-missing` |
+| flowchart | Text layout, `node-overlap`, `image-missing` |
+| erd, state, uml | `node-overlap`, `image-missing` |
+| Any other kind with images | `image-missing` |
+
+Edit references resolve exact id, `@ref`, `name:<text>`, then unique id prefix. Name matching is case-sensitive, exact after trimming, and scoped to the operation page, source page of a connect, the element page for semantic references, or the whole document. Missing or ambiguous names list candidates. `update` and `delete` accept either `id` or `where`: its `page`, `type`, `from`, `to`, `parent`, `name` keys combine with AND and at least one is required. `expect` is an integer at least zero, allowed only with `where`; a mismatch aborts without writing, zero matches without `expect` is an error, and `expect: 0` is a no-op. `select` binds one existing element using a fresh `ref` and either `id` or `where`; its `expect` defaults to and must be 1. Text reports `operation <i> (<op>): matched <n> element(s)` and JSON has `matches` with operation, op, count and ids. `--quiet` never hides matches. Unknown top-level fields are rejected with valid fields listed.
+
+```json
+{"op":"delete","where":{"type":"bpmn.sequenceFlow","from":"name:Approve","to":"name:Update status"},"expect":1}
+{"op":"select","ref":"ok","id":"name:Approve"}
+```
+
+`update` accepts `label`, applied after semantic fields: `text.note` → `text`, `frame` → `name`, `node.generic` → `label`, `state.node` → `name`, `erd.table` → `tableName`, `state.transition` → `trigger`, BPMN flows → `name`, `edge.generic` → `label`.
+
+`carryMembers` is a boolean on `update` and defaults to true. Setting it false on a box update retains members' absolute positions:
+
+| Kind | Default / false behavior |
+| --- | --- |
+| `frame` | Moves descendants; resize follows constraints or layout. False holds members, rechecks geometric membership and rejects layout frames. |
+| `bpmn.participant` | Moves descendants and relays lanes; false still moves lanes, holding and re-parenting other members. |
+| `bpmn.lane` | Moves descendants; height restacks siblings and carries their members. False holds non-lane descendants and re-parents them; changing x, y or width is rejected. |
+| `bpmn.subProcess` | Moves descendants; false holds and re-parents them. |
+| `breadboard.board` | Moves plugged parts; false holds them, retaining plugs only where holes still align. |
+| `group` | Has no box; false is rejected. |
+
+UML packages and architecture groups/zones drawn as frames carry; `shape.geo`, `usecase.node` system boundaries and `bpmn.group` do not. Other non-containers reject `carryMembers`. Attachments always follow their host: `uml.port`, `bpmn.boundaryEvent` and PCB tracks. Pool or lane updates with false reject heights below the child-lane minimum; pool width must exceed 30 per lane depth and fit nested lanes. Errors exit 2 without writing.
+
+Repeated document-load, validate, edit, draw and export text-layout warnings collapse as ` (and <n> more like this)`. Repeated BPMN import/export, draw.io import and DDL warnings also collapse. Gerber, PCB, breadboard and other export-format warnings print one per line. Global `--quiet` suppresses warnings, not matches, conflicts, errors or lint findings. `--strict --quiet` still exits 3 for warnings.
+
+For a Git merge driver, add to `.gitattributes` and configure each clone:
+
+```text
+*.jsonl merge=nodetto
+```
+
+```sh
+git config merge.nodetto.name "nodetto three-way merge"
+git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
+```
+
+`merge` keeps ours on conflicting fields and treats arrays atomically. Ours-deleted versus theirs-modified stays deleted; theirs-deleted versus ours-modified keeps ours. An integrity pass restores ours' missing pages and references or drops dangling records, then validates. Conflict lines go to stderr even with `--quiet`. Exit 0 means clean, 1 conflict with canonical output written, and 2 input or validation error with nothing written.
+
+SVG, Mermaid, D2 and draw.io text exports depend only on canonical content and referenced attachment bytes, independent of branch, time, time zone, locale, working directory, absolute path and Bun versus native. PNG and PDF depend on fonts. Treat generated SVG as build output and regenerate after merging; for example, an executable `.git/hooks/post-merge` can contain:
+
+```sh
+#!/bin/sh
+nodetto-cli export flow.jsonl --page Flow --format svg --output flow.svg
+```

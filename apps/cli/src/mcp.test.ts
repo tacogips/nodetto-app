@@ -101,8 +101,10 @@ test("MCP discovers every document command and documents every CLI option", asyn
       ].sort(),
     );
     expect(tools.some((tool) => tool.name === "nodetto_merge")).toBe(true);
-    const editDescription = tools.find((tool) => tool.name === "nodetto_edit")?.description ?? "";
-    for (const term of ["where", "select", "carryMembers"]) expect(editDescription).toContain(term);
+    const editDescription =
+      tools.find((tool) => tool.name === "nodetto_edit")?.description ?? "";
+    for (const term of ["where", "select", "carryMembers"])
+      expect(editDescription).toContain(term);
     for (const [command, help] of Object.entries(COMMAND_HELP)) {
       if (command === "mcp") continue;
       expect(

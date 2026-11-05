@@ -104,6 +104,11 @@ Each command must exit 0. See the manifest for the exact list. It runs `ai-comma
 `mcp-stdio.test.ts`, typecheck, Biome on the owned TS files, token greps on `help.ts`, `docs/cli.md` and `README.md`,
 the no-Q11 grep, and the check that `mcp.ts` is unchanged.
 
+## Implementation status
+
+- Implemented help, CLI guide, README, export guarantees and focused help assertions.
+- Manifest checks passed on the shared tree; formal reviews and final stable-tree gates remain downstream.
+
 ## Done criteria
 
 - All manifest verification commands exit 0.

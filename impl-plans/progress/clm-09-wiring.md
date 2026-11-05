@@ -14,8 +14,15 @@ Focused suites: focused-6.log: 104 pass, 0 fail; focused-7.log: 123 pass,
 strict-3.log includes out-of-scope test diagnostics. Earlier attempts remain in
 plan-local evidence. These checks do not establish full plan completion.
 
-Outstanding: full help and documentation, CLI-level and git end-to-end tests,
-native parity tests, all required manifest gates, native timing, final stable-tree
-verification and self-review of complete implementation. No completion is claimed.
+Continuation 5: accepted clm-09a, clm-09b and clm-09c changes are present. The C3-COLLAPSE-OWNER review explicitly adds feature logic and tests for BPMN import/export, draw.io import and DDL warnings to this plan; this is a scoped exception to the no-feature-logic and no-new-tests limits. Grouping uses message text; strict retains the real counts and quiet suppresses warning lines. Gerber, PCB and breadboard warnings remain per line. Repeated DDL warnings are tested using three duplicate table names.
+
+The combined diff was reviewed against the Continuation 5 partition. Documentation, CLI and native parity coverage are present; protected depth-one fixtures, planner, MCP and obstacle fixtures match originalHead. E2 is not fully met for Q11 conflict inputs. The final verification and timing evidence is under tmp/clm-s740/clm-09-wiring/. Formal independent review remains downstream.
+
+final A7 medians release: single1=0.57 multi1=1.02 single50=0.84 multi50=1.29 mixedSingle=0.90 mixedMulti=1.36
+final A7 medians before: single1=0.55 multi1=1.26 single50=0.79 multi50=1.53 mixedSingle=0.87 mixedMulti=1.77
+final A7 marginal ratio batch: 1.0000
+final A7 marginal ratio mixed: 1.0303
+final arrange route user: 8.60
+final arrange layered user: 60=1.23 120=2.37
 
 Q11 open: depth-one containment not accepted for conflict inputs
