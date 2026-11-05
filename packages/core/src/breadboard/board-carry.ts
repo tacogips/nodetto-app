@@ -22,6 +22,7 @@ function moved(before: Element, after: Element): boolean {
 export function planBreadboardTranslations(
   before: Store,
   draft: Store,
+  keep?: ReadonlySet<ElementId>,
 ): Command[] {
   const commands: Command[] = [];
   const shifted = new Set<ElementId>();
@@ -37,7 +38,12 @@ export function planBreadboardTranslations(
       boardHoles(priorBoard).map(({ pageX, pageY }) => pointKey(pageX, pageY)),
     );
     for (const prior of before.getPageElements(priorBoard.page)) {
-      if (prior.id === priorBoard.id || shifted.has(prior.id)) continue;
+      if (
+        prior.id === priorBoard.id ||
+        shifted.has(prior.id) ||
+        keep?.has(prior.id)
+      )
+        continue;
       const next = draft.get(prior.id);
       if (
         !next ||

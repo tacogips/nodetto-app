@@ -14,15 +14,10 @@ import { OperationError, requireText } from "./operation-input.ts";
 import type { MatchReport } from "./types.ts";
 
 function ordered(batch: Batch, page?: string): Element[] {
-  const pages = batch.editor.store.listPages();
-  const ranks = new Map(pages.map((p, i) => [p.id, i]));
-  return [...batch.editor.store.listElements()]
-    .filter((e) => page === undefined || e.page === page)
-    .sort(
-      (a, b) =>
-        (ranks.get(a.page) ?? 0) - (ranks.get(b.page) ?? 0) ||
-        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    );
+  return batch.orderedIds(page).flatMap((id) => {
+    const element = batch.editor.store.get(id);
+    return element ? [element] : [];
+  });
 }
 function textOf(batch: Batch, element: Element): string | undefined {
   const field = labelField(batch.editor, element);
@@ -77,11 +72,7 @@ export function resolveElementReference(
       `${JSON.stringify(value)} matches ${matches.length} elements:\n${candidateLines(batch, matches).join("\n")}\nUse an id, or "where" with "page".`,
     );
   }
-  const resolved = resolveId(
-    value,
-    ordered(batch, scopePage).map((e) => e.id),
-    batch.refs,
-  );
+  const resolved = resolveId(value, batch.orderedIds(scopePage), batch.refs);
   if (!resolved.ok) {
     const page = resolvePageQuery(
       batch.editor.store.listPages(),

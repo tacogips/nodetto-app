@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { Editor } from "../editor.ts";
+import { planRoute } from "../arrange-route.ts";
 import { connectorWaypointFromPage } from "../shapes/connector.ts";
 import { bpmnFlowLabelBox } from "../bpmn/notation.ts";
 import { createDefaultRegistry } from "../shapes/index.ts";
@@ -170,4 +171,82 @@ test("a tangential bend is not a crossing but a bend through a route is", () => 
   };
   expect(measure(100)).toBe(0);
   expect(measure(-100)).toBe(1);
+});
+
+test("routing reduces generic label overlaps", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 60 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 400, y: 0, width: 80, height: 60 },
+  });
+  editor.createElement("node.generic", {
+    visual: { x: 220, y: 18, width: 40, height: 24 },
+  });
+  editor.createElement("edge.generic", {
+    semantic: {
+      from: a,
+      to: b,
+      label: "Review",
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  const page = editor.store.listPages()[0]!.id;
+  const before = pageMetrics(editor.store, page, editor.registry).labelOverlaps;
+  expect(before).toBeGreaterThan(0);
+  editor.apply(
+    planRoute(editor.store, page, editor.registry, { resetManual: false }),
+  );
+  expect(
+    pageMetrics(editor.store, page, editor.registry).labelOverlaps,
+  ).toBeLessThan(before);
+});
+
+test("ERD metrics count crossings and table collisions but ignore containing frames", () => {
+  const table = (id: string, x: number, y: number) =>
+    box(id, "erd.table", x, y, 60, 56, { tableName: id, columns: [] });
+  const relation = (id: string, from: string, to: string, label: string) =>
+    element({
+      id,
+      type: "erd.relation",
+      semantic: {
+        from: { table: from },
+        to: { table: to },
+        cardinality: "1:*",
+        label,
+        fromPort: "right",
+        toPort: "left",
+        routing: "straight",
+      },
+    });
+  const a = table("a", 0, 100);
+  const b = table("b", 300, 100);
+  const c = table("c", 150, 0);
+  const d = table("d", 150, 200);
+  const horizontal = relation("ab", "a", "b", "Review");
+  const vertical = element({
+    id: "cd",
+    type: "erd.relation",
+    semantic: {
+      from: { table: "c" },
+      to: { table: "d" },
+      cardinality: "1:*",
+      label: "",
+      fromPort: "bottom",
+      toPort: "top",
+      routing: "straight",
+    },
+  });
+  const frame = box("frame", "frame", -100, -100, 600, 500);
+  expect(metrics([a, b, frame, horizontal]).labelOverlaps).toBe(0);
+  expect(
+    metrics([a, b, c, d, horizontal, vertical]).edgeCrossings,
+  ).toBeGreaterThan(0);
+  const obstacle = table("obstacle", 150, 100);
+  expect(metrics([a, b, obstacle, horizontal]).labelOverlaps).toBeGreaterThan(
+    0,
+  );
 });

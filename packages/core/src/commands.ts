@@ -306,7 +306,7 @@ function validateVisualFields(visual: Visual): ValidationIssue[] {
 }
 
 function validateNewElement(
-  working: ReadonlyMap<ElementId, Element>,
+  working: Pick<ReadonlyMap<ElementId, Element>, "has">,
   pages: ReadonlyMap<PageId, Page>,
   element: Element,
 ): ValidationIssue[] {
@@ -426,10 +426,35 @@ export function applyCommands(
   store: Store,
   commands: readonly Command[],
 ): CommandResult {
-  const working = new Map<ElementId, Element>();
-  for (const element of store.listElements()) {
-    working.set(element.id, element);
-  }
+  // Read unchanged elements from the store. Deletes need the complete ordered
+  // map for reference expansion, so materialize it only when one is requested.
+  const changes = new Map<ElementId, Element>();
+  let materialized: Map<ElementId, Element> | undefined;
+  const working = {
+    get(id: ElementId): Element | undefined {
+      return materialized
+        ? materialized.get(id)
+        : (changes.get(id) ?? store.get(id));
+    },
+    has(id: ElementId): boolean {
+      return materialized
+        ? materialized.has(id)
+        : changes.has(id) || store.has(id);
+    },
+    set(id: ElementId, element: Element): void {
+      if (materialized) materialized.set(id, element);
+      else changes.set(id, element);
+    },
+  };
+  const allElements = (): Map<ElementId, Element> => {
+    if (!materialized) {
+      materialized = new Map(
+        store.listElements().map((element) => [element.id, element]),
+      );
+      for (const [id, element] of changes) materialized.set(id, element);
+    }
+    return materialized;
+  };
   const pages = new Map<PageId, Page>();
   for (const page of store.listPages()) {
     pages.set(page.id, page);
@@ -478,15 +503,16 @@ export function applyCommands(
    * Shared by `deleteElements` and `deletePage`.
    */
   const removeElements = (seeds: readonly ElementId[]): Command[] => {
-    const before = new Map(working);
-    const expansion = expandDeletes(working, seeds);
+    const elements = allElements();
+    const before = new Map(elements);
+    const expansion = expandDeletes(elements, seeds);
     const restores: Command[] = [];
     for (const id of sortedIds(expansion.removed)) {
       const element = before.get(id);
       if (element) {
         restores.push({ type: "createElement", element });
       }
-      working.delete(id);
+      elements.delete(id);
       markRemove(id);
     }
     for (const id of sortedIds(expansion.detached.keys())) {
@@ -763,7 +789,7 @@ export function applyCommands(
           );
         }
         const onPage: ElementId[] = [];
-        for (const element of working.values()) {
+        for (const element of allElements().values()) {
           if (element.page === command.id) {
             onPage.push(element.id);
           }

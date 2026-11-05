@@ -4,6 +4,31 @@ import { serializeDocument } from "@nodetto/io";
 import { runOperations } from "../edit-command.ts";
 import { Batch } from "./batch.ts";
 
+test("prefix ordering cache tracks structural changes and reads current values", () => {
+  const editor = new Editor();
+  const first = editor.createElement("node.generic", {
+    id: "prefix-one",
+    semantic: { label: "Before" },
+  });
+  const batch = new Batch(editor);
+  const cached = batch.orderedIds();
+  expect(batch.element("prefix-o", 0).id).toBe(first);
+  editor.apply([
+    { type: "updateSemantic", id: first, semantic: { label: "After" } },
+  ]);
+  expect(batch.orderedIds()).toBe(cached);
+  expect(batch.element("name:After", 0).id).toBe(first);
+  const second = editor.createElement("node.generic", { id: "prefix-two" });
+  expect(batch.orderedIds()).not.toBe(cached);
+  expect(batch.element("prefix-t", 0).id).toBe(second);
+  editor.apply([{ type: "deleteElements", ids: [second] }]);
+  expect(() => batch.element("prefix-t", 0)).toThrow();
+  const beforePage = batch.orderedIds();
+  editor.createPage({ name: "Next" });
+  expect(batch.orderedIds()).not.toBe(beforePage);
+  batch.dispose();
+});
+
 test("names, where counts and select bind existing elements", () => {
   const editor = new Editor();
   const one = editor.createElement("node.generic", {

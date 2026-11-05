@@ -53,6 +53,7 @@ export function planConstraints(
   after: Store,
   registry: ShapeUtilRegistry,
   onlyIds?: ReadonlySet<ElementId>,
+  keep?: ReadonlySet<ElementId>,
 ): Command[] {
   if (
     !after
@@ -76,6 +77,7 @@ export function planConstraints(
     visited.add(id);
     const parentId = parents.get(id);
     if (parentId) visit(parentId);
+    if (keep?.has(id)) return;
     if (onlyIds && !onlyIds.has(id)) return;
     const parent = parentId ? after.get(parentId) : undefined;
     const child = after.get(id);

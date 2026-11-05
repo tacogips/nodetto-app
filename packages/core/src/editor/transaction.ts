@@ -84,13 +84,17 @@ export interface DerivedPlanInput {
   readonly context: ShapeContext;
   readonly permitted: readonly Command[];
   readonly placed: ReadonlySet<ElementId> | undefined;
+  readonly keepMembers: ReadonlySet<ElementId> | undefined;
   readonly rasterMaskSampler: RasterMaskSampler | undefined;
   readonly resolveAsset: (source: string) => string | undefined;
 }
 
 /** The derived commands that follow `permitted` in the same transaction. */
 export function planDerivedCommands(input: DerivedPlanInput): Command[] {
-  const { store, registry, context, permitted, placed } = input;
+  const { store, registry, context, permitted, placed, keepMembers } = input;
+  const held = keepMembers
+    ? new Set([...(placed ?? []), ...keepMembers])
+    : placed;
   if (!permitted.length) return [];
   const snapshot = store.getSnapshot();
   let derived: Command[] = [];
@@ -129,8 +133,8 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
       ...planNumberTokens(draft, registry),
       ...planTextResize(draft, registry),
       ...planAspectRatios(draft, registry),
-      ...planFrameTranslations(store, draft, registry, placed),
-      ...planConstraints(store, draft, registry),
+      ...planFrameTranslations(store, draft, registry, held),
+      ...planConstraints(store, draft, registry, undefined, keepMembers),
     ];
     if (
       store.listPages().some((page) => page.kind === "bpmn") ||
@@ -141,8 +145,8 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
       draft.listElements().some((element) => element.type.startsWith("bpmn."))
     ) {
       derived.push(...planBpmnLaneLayout(store, draft));
-      derived.push(...planBpmnTranslations(store, draft));
-      derived.push(...planBpmnMembership(store, draft));
+      derived.push(...planBpmnTranslations(store, draft, keepMembers));
+      derived.push(...planBpmnMembership(store, draft, keepMembers));
     }
     if (
       store.listPages().some((page) => page.kind === "breadboard") ||
@@ -154,7 +158,7 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
         .listElements()
         .some((element) => element.type.startsWith("breadboard."))
     ) {
-      derived.push(...planBreadboardTranslations(store, draft));
+      derived.push(...planBreadboardTranslations(store, draft, keepMembers));
     }
     if (
       store.listPages().some((page) => page.kind === "pcb") ||
@@ -173,10 +177,10 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
     derived.push(...constrainedAspect);
     if (constrainedAspect.length)
       derived.push(...planAutoLayout(draft, registry));
+    derived.push(...planFrameTranslations(beforeLayout, draft, registry, held));
     derived.push(
-      ...planFrameTranslations(beforeLayout, draft, registry, placed),
+      ...planConstraints(beforeLayout, draft, registry, undefined, keepMembers),
     );
-    derived.push(...planConstraints(beforeLayout, draft, registry));
     derived.push(...planUmlPorts(store, draft));
     derived.push(
       ...planManualRoutePreservation(store, draft, context, () =>

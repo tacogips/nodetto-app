@@ -50,8 +50,59 @@ export class Batch {
   readonly replaced: TextReplacement[] = [];
   /** The element auto placement put last on each page, to line up with. */
   readonly lastPlaced = new Map<string, string>();
+  private orderedIdsCache: readonly string[] | undefined;
+  private readonly orderedPageCache = new Map<string, readonly string[]>();
+  private readonly indexedPages = new Map<string, string>();
+  private readonly unsubscribe: () => void;
 
-  constructor(readonly editor: Editor) {}
+  constructor(readonly editor: Editor) {
+    this.unsubscribe = editor.store.subscribe((diff) => {
+      if (
+        diff.added.length ||
+        diff.removed.length ||
+        diff.pagesChanged ||
+        diff.updated.some(
+          (id) =>
+            this.indexedPages.has(id) &&
+            this.indexedPages.get(id) !== editor.store.get(id)?.page,
+        )
+      ) {
+        this.orderedIdsCache = undefined;
+        this.orderedPageCache.clear();
+        this.indexedPages.clear();
+      }
+    });
+  }
+
+  dispose(): void {
+    this.unsubscribe();
+  }
+
+  orderedIds(page?: string): readonly string[] {
+    if (!this.orderedIdsCache) {
+      const ranks = new Map(
+        this.editor.store.listPages().map((p, i) => [p.id, i]),
+      );
+      const elements = [...this.editor.store.listElements()];
+      elements.sort(
+        (a, b) =>
+          (ranks.get(a.page) ?? 0) - (ranks.get(b.page) ?? 0) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      );
+      for (const element of elements)
+        this.indexedPages.set(element.id, element.page);
+      this.orderedIdsCache = elements.map((element) => element.id);
+    }
+    if (page === undefined) return this.orderedIdsCache;
+    let ids = this.orderedPageCache.get(page);
+    if (!ids) {
+      ids = this.orderedIdsCache.filter(
+        (id) => this.indexedPages.get(id) === page,
+      );
+      this.orderedPageCache.set(page, ids);
+    }
+    return ids;
+  }
 
   element(query: Json, index: number, scopePage?: string): Element {
     return resolveElementReference(

@@ -10,6 +10,11 @@ import {
   resolveConnector,
 } from "./shapes/connector.ts";
 import { pointAlongRoute } from "./shapes/connector/route.ts";
+import {
+  boxesOverlap,
+  resolvedLabelBox,
+  segmentOverlapsBox,
+} from "./diagram-lint/metrics.ts";
 
 function semantic(editor: Editor, id: string): Record<string, unknown> {
   return editor.store.get(id)?.semantic as Record<string, unknown>;
@@ -243,11 +248,13 @@ test("BPMN label bounds are preserved when routing", () => {
     visual: { x: 300, y: 0, width: 80, height: 60 },
   });
   const id = editor.createElement("bpmn.sequenceFlow", {
-    semantic: { from: a, to: b, name: "Review order" },
+    semantic: { from: a, to: b, name: "Review order", labelPosition: 0.2 },
     visual: { labelBounds: { x: 150, y: 0, width: 40, height: 20 } },
   });
   editor.apply(route(editor));
-  expect(semantic(editor, id).labelPosition).toBeUndefined();
+  expect(semantic(editor, id).labelPosition).toBe(0.2);
+  editor.apply(route(editor, true));
+  expect(semantic(editor, id).labelPosition).toBe(0.2);
   expect(editor.store.get(id)?.visual.labelBounds).toEqual({
     x: 150,
     y: 0,
@@ -404,4 +411,261 @@ test("an unpinned non-target edge occupies the side used by its resolved route",
   expect(semantic(editor, edge)).toEqual(before);
   expect(semantic(editor, loop).fromPort).toBe("top");
   expect(semantic(editor, loop).toPort).toBe("top");
+});
+
+test("self-loop falls back to the least occupied side in tie order", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 300, y: 0, width: 80, height: 80 },
+  });
+  for (const side of ["right", "right", "top", "bottom", "left"]) {
+    editor.createElement("edge.generic", {
+      semantic: { from: a, to: b, fromPort: side },
+    });
+  }
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: a, to: a },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, loop).fromPort).toBe("top");
+  expect(semantic(editor, loop).toPort).toBe("top");
+  expect(route(editor)).toEqual([]);
+});
+
+test("reset manual route avoids a blocking widget and leaves visual geometry intact", () => {
+  const editor = new Editor();
+  const node = (x: number, y: number) =>
+    editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    });
+  const a = node(0, 0);
+  const b = node(400, 0);
+  const obstacle = node(200, 0);
+  const id = editor.createElement("edge.generic", {
+    semantic: {
+      from: a,
+      to: b,
+      routing: "manual",
+      routingWaypoints: [
+        connectorWaypointFromPage(
+          { x: 180, y: 140 },
+          { x: 40, y: 40 },
+          { x: 440, y: 40 },
+        ),
+      ],
+    },
+  });
+  const visuals = [a, b, obstacle].map((id) => editor.store.get(id)!.visual);
+  const resolve = () => {
+    const edge = editor.store.get(id)!;
+    return resolveConnector(
+      edge,
+      editor.createShapeContext(),
+      endpointReaderFor(edge.type),
+    )!.points;
+  };
+  const before = resolve();
+  editor.apply(route(editor));
+  expect(resolve()).toEqual(before);
+  editor.apply(route(editor, true));
+  expect(semantic(editor, id).routingWaypoints).toBeUndefined();
+  const points = resolve();
+  for (let i = 1; i < points.length; i++) {
+    expect(
+      segmentOverlapsBox(points[i - 1]!, points[i]!, {
+        x: 192,
+        y: -8,
+        width: 96,
+        height: 96,
+      }),
+    ).toBe(false);
+  }
+  expect([a, b, obstacle].map((id) => editor.store.get(id)!.visual)).toEqual(
+    visuals,
+  );
+  expect(route(editor)).toEqual([]);
+});
+
+test("ERD relation labels avoid obstacles while empty labels are skipped", () => {
+  const editor = new Editor();
+  const table = (x: number, y: number) =>
+    editor.createElement("erd.table", {
+      semantic: { tableName: "widgets", columns: [] },
+      visual: { x, y, width: 80, height: 60 },
+    });
+  const a = table(0, 0);
+  const b = table(400, 0);
+  editor.createElement("node.generic", {
+    visual: { x: 220, y: 18, width: 40, height: 24 },
+  });
+  const labeled = editor.createElement("erd.relation", {
+    semantic: {
+      from: { table: a },
+      to: { table: b },
+      cardinality: "1:*",
+      label: "Review",
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  const empty = editor.createElement("erd.relation", {
+    semantic: {
+      from: { table: a },
+      to: { table: b },
+      cardinality: "1:*",
+      label: "",
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, labeled).labelPosition).toBeDefined();
+  expect(semantic(editor, empty).labelPosition).toBeUndefined();
+  expect(route(editor)).toEqual([]);
+});
+
+test("BPMN manual label bounds reserve space for another flow", () => {
+  const editor = new Editor();
+  const node = (x: number, y: number) =>
+    editor.createElement("bpmn.task", {
+      visual: { x, y, width: 80, height: 60 },
+    });
+  const a = node(0, 0);
+  const b = node(400, 0);
+  const c = node(0, 120);
+  const d = node(400, 120);
+  const fixed = editor.createElement("bpmn.sequenceFlow", {
+    semantic: { from: c, to: d, name: "Reserved" },
+    visual: { labelBounds: { x: 220, y: 20, width: 40, height: 20 } },
+  });
+  const flow = editor.createElement("bpmn.sequenceFlow", {
+    semantic: {
+      from: a,
+      to: b,
+      name: "Review",
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, fixed).labelPosition).toBeUndefined();
+  expect(semantic(editor, flow).labelPosition).toBeDefined();
+  expect(route(editor)).toEqual([]);
+});
+
+test("generic labels avoid a blocking widget", () => {
+  const editor = new Editor();
+  const node = (x: number, y: number) =>
+    editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 60 },
+    });
+  const a = node(0, 0);
+  const b = node(400, 0);
+  const widget = editor.createElement("node.generic", {
+    visual: { x: 220, y: 18, width: 40, height: 24 },
+  });
+  const id = editor.createElement("edge.generic", {
+    semantic: {
+      from: a,
+      to: b,
+      label: "Review",
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  editor.apply(route(editor));
+  const position = semantic(editor, id).labelPosition as number;
+  expect(position).toBeDefined();
+  const edge = editor.store.get(id)!;
+  const points = resolveConnector(
+    edge,
+    editor.createShapeContext(),
+    endpointReaderFor(edge.type),
+  )!.points;
+  const label = resolvedLabelBox(
+    edge,
+    points,
+    pointAlongRoute(points, position),
+  )!;
+  expect(
+    boxesOverlap(label, editor.createShapeContext().boundsOf(widget)!),
+  ).toBe(false);
+  expect(route(editor)).toEqual([]);
+});
+
+test("generic placement skips a previously placed label", () => {
+  const editor = new Editor();
+  const node = (x: number) =>
+    editor.createElement("node.generic", {
+      visual: { x, y: 0, width: 80, height: 60 },
+    });
+  const a = node(0);
+  const b = node(400);
+  editor.createElement("node.generic", {
+    visual: { x: 220, y: 18, width: 40, height: 24 },
+  });
+  const fixed = editor.createElement("edge.generic", {
+    semantic: {
+      from: a,
+      to: b,
+      label: "Reserved",
+      labelPosition: 0.35,
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  const target = editor.createElement("edge.generic", {
+    semantic: {
+      from: a,
+      to: b,
+      label: "Review",
+      fromPort: "right",
+      toPort: "left",
+      routing: "straight",
+    },
+  });
+  const control = new Editor({ document: editor.getSnapshot() });
+  control.apply([
+    {
+      type: "updateSemantic",
+      id: fixed,
+      semantic: { ...semantic(control, fixed), label: "" },
+    },
+  ]);
+  control.apply(route(control, false, [target]));
+  expect(semantic(control, target).labelPosition).toBe(0.35);
+  editor.apply(route(editor, false, [target]));
+  expect(semantic(editor, fixed).labelPosition).toBe(0.35);
+  expect(semantic(editor, target).labelPosition).not.toBe(0.35);
+  expect(semantic(editor, target).labelPosition).not.toBeUndefined();
+  expect(route(editor, false, [target])).toEqual([]);
+});
+
+test("port spreading uses code-unit order for mixed-case ids", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 60 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 400, y: 0, width: 80, height: 60 },
+  });
+  editor.createElement("edge.generic", {
+    id: "alpha",
+    semantic: { from: a, to: b },
+  });
+  editor.createElement("edge.generic", {
+    id: "Zed",
+    semantic: { from: a, to: b },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, "Zed").fromPortPosition).toBe(0.3333);
+  expect(semantic(editor, "alpha").fromPortPosition).toBe(0.6667);
 });

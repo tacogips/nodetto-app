@@ -6,6 +6,7 @@ import {
   makeEditor,
   TEST_PAGE,
 } from "../../../packages/core/src/test-helpers.ts";
+import { erdTableBounds } from "../../../packages/core/src/shapes/erdTable.ts";
 import { arrangeLayeredOrRoute } from "./arrange-modes.ts";
 import { obstacleRoutingBatch } from "./__fixtures__/obstacle-routing-batch.ts";
 
@@ -127,8 +128,13 @@ test("route accepts ERD and BPMN; layered excludes BPMN and both exclude sequenc
   const bpmn = run(fixture("bpmn"), "--mode", "layered");
   expect(bpmn.exitCode).toBe(2);
   expect(bpmn.stderr).toContain("supports page kinds");
-  for (const mode of ["layered", "route"])
-    expect(run(fixture("sequence"), "--mode", mode).exitCode).toBe(2);
+  for (const kind of ["sequence", "breadboard", "pcb"] as const) {
+    for (const mode of ["layered", "route"]) {
+      const result = run(fixture(kind), "--mode", mode);
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain("supports page kinds");
+    }
+  }
 });
 
 test("layered completes the obstacle-routing fixture within its deadline", () => {
@@ -180,3 +186,126 @@ test("route preserves manual waypoints until reset", () => {
   expect(reset.routing).toBe("orthogonal");
   expect(reset.routingWaypoints).toBeUndefined();
 });
+
+test("layered reverses horizontal frame order", () => {
+  const f = fixture();
+  expect(
+    run(f, "--mode", "layered", "--frames", "Stage1,Stage0", "--write")
+      .exitCode,
+  ).toBe(0);
+  const result = parseDocument(f.text);
+  expect(result.elements.find((e) => e.id === "stage1")?.visual.x).toBeLessThan(
+    result.elements.find((e) => e.id === "stage0")?.visual.x ?? 0,
+  );
+});
+
+test("ERD layered keeps tables in frames and rejects pages without frames", () => {
+  const editor = makeEditor({
+    document: document([], [{ ...TEST_PAGE, kind: "erd" }]),
+  });
+  editor.createElement("frame", {
+    id: "stage",
+    semantic: { name: "Stage", memberIds: ["table"] },
+    visual: { x: 0, y: 0, width: 500, height: 500 },
+  });
+  editor.createElement("erd.table", {
+    id: "table",
+    semantic: { tableName: "widgets", columns: [] },
+    visual: { x: 30, y: 50, width: 100, height: 100 },
+  });
+  let text = serializeDocument(editor.getSnapshot());
+  const io = {
+    readText: () => text,
+    writeText: (_: string, value: string) => {
+      text = value;
+    },
+  };
+  expect(
+    arrangeLayeredOrRoute(io, ["doc.jsonl", "--mode", "layered", "--write"])
+      .exitCode,
+  ).toBe(0);
+  const elements = parseDocument(text).elements;
+  const frame = elements.find((e) => e.id === "stage")!.visual;
+  const tableElement = elements.find((e) => e.id === "table")!;
+  const table = erdTableBounds(tableElement.visual, tableElement.semantic);
+  expect(table.x!).toBeGreaterThanOrEqual(frame.x!);
+  expect(table.y!).toBeGreaterThanOrEqual(frame.y!);
+  expect(table.x! + table.width!).toBeLessThanOrEqual(frame.x! + frame.width!);
+  expect(table.y! + table.height!).toBeLessThanOrEqual(
+    frame.y! + frame.height!,
+  );
+  expect(run(fixture("erd"), "--mode", "layered").exitCode).toBe(2);
+});
+
+for (const mode of ["route", "layered"]) {
+  test(`reset manual remains stable through serialization in ${mode} mode`, () => {
+    const editor = makeEditor({
+      document: document([], [{ ...TEST_PAGE, kind: "state" }]),
+    });
+    editor.createElement("frame", {
+      id: "stage",
+      semantic: { name: "Stage", memberIds: ["a", "b", "c", "block"] },
+      visual: { x: 0, y: 0, width: 700, height: 500 },
+    });
+    for (const [id, x, y] of [
+      ["a", 20, 150],
+      ["b", 420, 50],
+      ["c", 420, 250],
+      ["block", 220, 100],
+    ] as const) {
+      editor.createElement("node.generic", {
+        id,
+        visual: { x, y, width: 80, height: 60 },
+      });
+    }
+    editor.createElement("edge.generic", {
+      id: "edge-a",
+      semantic: {
+        from: "a",
+        to: "b",
+        label: "Review order details and confirm the next step",
+      },
+    });
+    editor.createElement("edge.generic", {
+      id: "edge-b",
+      semantic: { from: "a", to: "b", label: "Approve" },
+    });
+    editor.createElement("bpmn.sequenceFlow", {
+      id: "manual-label",
+      semantic: { from: "c", to: "block", name: "Note", labelPosition: 0.2 },
+      visual: { labelBounds: { x: 600, y: 450, width: 40, height: 20 } },
+    });
+    let text = serializeDocument(editor.getSnapshot());
+    const io = {
+      readText: () => text,
+      writeText: (_: string, value: string) => {
+        text = value;
+      },
+    };
+    const args = ["doc.jsonl", "--mode", mode, "--reset-manual"];
+    const first = arrangeLayeredOrRoute(io, [...args, "--write"]);
+    expect(first.exitCode).toBe(0);
+    expect(first.stderr).not.toContain("0 layer update(s)");
+    const written = text;
+    const edges = parseDocument(written).elements.filter(
+      (element) => element.id === "edge-a" || element.id === "edge-b",
+    );
+    const data = edges.map((edge) => edge.semantic as Record<string, unknown>);
+    expect(data.map((item) => item.fromPortPosition).sort()).toEqual([
+      0.3333, 0.6667,
+    ]);
+    const manualLabel = parseDocument(written).elements.find(
+      (element) => element.id === "manual-label",
+    );
+    expect(
+      (manualLabel?.semantic as Record<string, unknown>).labelPosition,
+    ).toBe(0.2);
+    const check = arrangeLayeredOrRoute(io, [...args, "--check"]);
+    expect(check.exitCode).toBe(0);
+    expect(text).toBe(written);
+    const second = arrangeLayeredOrRoute(io, [...args, "--write"]);
+    expect(second.exitCode).toBe(0);
+    expect(second.stderr).toContain("0 layer update(s)");
+    expect(text).toBe(written);
+  });
+}

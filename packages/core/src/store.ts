@@ -80,6 +80,8 @@ export class Store {
   }
   private readonly pageMap = new Map<PageId, Page>();
   private readonly elementMap = new Map<ElementId, Element>();
+  private readonly pageElementIds = new Map<PageId, Set<ElementId>>();
+  private readonly layerFlagIds = new Set<ElementId>();
   private readonly listeners = new Set<StoreListener>();
   private readonly pageElements = new Map<PageId, readonly Element[]>();
 
@@ -106,6 +108,10 @@ export class Store {
     return this.elementMap.size;
   }
 
+  get hasLayerFlags(): boolean {
+    return this.layerFlagIds.size > 0;
+  }
+
   getPage(id: PageId): Page | undefined {
     return this.pageMap.get(id);
   }
@@ -128,10 +134,9 @@ export class Store {
     const cached = this.pageElements.get(pageId);
     if (cached) return cached;
     const out: Element[] = [];
-    for (const element of this.elementMap.values()) {
-      if (element.page === pageId) {
-        out.push(element);
-      }
+    for (const id of this.pageElementIds.get(pageId) ?? []) {
+      const element = this.elementMap.get(id);
+      if (element) out.push(element);
     }
     out.sort(compareElementOrder);
     this.pageElements.set(pageId, out);
@@ -151,6 +156,8 @@ export class Store {
     this.pageElements.clear();
     this.pageMap.clear();
     this.elementMap.clear();
+    this.pageElementIds.clear();
+    this.layerFlagIds.clear();
     this.meta = {
       schemaVersion: document.schemaVersion,
       id: document.id,
@@ -163,6 +170,7 @@ export class Store {
     }
     for (const element of document.elements) {
       this.elementMap.set(element.id, element);
+      this.indexElement(element);
     }
     this.emit({
       added: [...this.elementMap.keys()],
@@ -205,14 +213,23 @@ export class Store {
       pagesChanged = true;
     }
     for (const element of commit.insert ?? []) {
+      const previous = this.elementMap.get(element.id);
+      if (previous) this.pageElementIds.get(previous.page)?.delete(previous.id);
       this.elementMap.set(element.id, element);
+      this.indexElement(element);
       added.push(element.id);
     }
     for (const element of commit.update ?? []) {
+      const previous = this.elementMap.get(element.id);
+      if (previous) this.pageElementIds.get(previous.page)?.delete(previous.id);
       this.elementMap.set(element.id, element);
+      this.indexElement(element);
       updated.push(element.id);
     }
     for (const id of commit.remove ?? []) {
+      const previous = this.elementMap.get(id);
+      if (previous) this.pageElementIds.get(previous.page)?.delete(id);
+      this.layerFlagIds.delete(id);
       if (this.elementMap.delete(id)) {
         removed.push(id);
       }
@@ -254,6 +271,41 @@ export class Store {
       ...(this.meta.extensions ? { extensions: this.meta.extensions } : {}),
     };
     return snapshot;
+  }
+
+  /** A snapshot with all pages and only elements on the selected pages. */
+  getScopedSnapshot(pages: ReadonlySet<PageId>): Document {
+    const elements: Element[] = [];
+    for (const page of pages) {
+      for (const id of this.pageElementIds.get(page) ?? []) {
+        const element = this.elementMap.get(id);
+        if (element) elements.push(element);
+      }
+    }
+    elements.sort(compareSnapshotOrder);
+    return {
+      schemaVersion: this.meta.schemaVersion,
+      id: this.meta.id,
+      title: this.meta.title,
+      pages: this.listPages(),
+      elements,
+      ...(this.meta.unknownRecords
+        ? { unknownRecords: this.meta.unknownRecords }
+        : {}),
+      ...(this.meta.extensions ? { extensions: this.meta.extensions } : {}),
+    };
+  }
+
+  private indexElement(element: Element): void {
+    if (element.visual.hidden || element.visual.locked)
+      this.layerFlagIds.add(element.id);
+    else this.layerFlagIds.delete(element.id);
+    let ids = this.pageElementIds.get(element.page);
+    if (!ids) {
+      ids = new Set();
+      this.pageElementIds.set(element.page, ids);
+    }
+    ids.add(element.id);
   }
 
   private emit(diff: StoreDiff): void {

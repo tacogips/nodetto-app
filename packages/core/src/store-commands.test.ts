@@ -280,9 +280,63 @@ describe("delete cascade and detach", () => {
   });
 });
 
+describe("working overlay", () => {
+  test("updates do not enumerate the document", () => {
+    const store = storeWith([
+      element({ id: "a", type: "node.generic", semantic: { label: "a" } }),
+    ]);
+    store.listElements = () => {
+      throw new Error("unexpected full scan");
+    };
+    applyCommands(store, [{ type: "updateVisual", id: "a", visual: { x: 7 } }]);
+    expect(store.get("a")?.visual.x).toBe(7);
+  });
+
+  test("materializes prior writes before a cascade and preserves undo", () => {
+    const a = element({
+      id: "a",
+      type: "node.generic",
+      semantic: { label: "a" },
+    });
+    const b = element({
+      id: "b",
+      type: "node.generic",
+      semantic: { label: "b" },
+    });
+    const edge = element({
+      id: "e",
+      type: "edge.generic",
+      semantic: { from: "a", to: "b" },
+    });
+    const store = storeWith([a, b]);
+    const commands: Command[] = [
+      { type: "updateVisual", id: "a", visual: { x: 7 } },
+      { type: "createElement", element: edge },
+      { type: "deleteElements", ids: ["a"] },
+    ];
+    const result = applyCommands(store, commands);
+    expect(result.redo).toEqual(commands);
+    expect(result.undo).toEqual([
+      {
+        type: "createElement",
+        element: { ...a, visual: { ...a.visual, x: 7 } },
+      },
+      { type: "createElement", element: edge },
+      { type: "deleteElements", ids: ["e"] },
+      { type: "replaceVisual", id: "a", visual: a.visual },
+    ]);
+    expect(store.has("e")).toBe(false);
+    applyCommands(store, result.undo);
+    expect(store.getSnapshot().elements).toEqual(
+      storeWith([a, b]).getSnapshot().elements,
+    );
+  });
+});
+
 describe("atomicity", () => {
   function expectUnchanged(run: () => void, store: Store): CommandError {
     const before = store.getSnapshot();
+    const revision = store.revision;
     const diffs = collectDiffs(store);
     let caught: unknown;
     try {
@@ -292,6 +346,7 @@ describe("atomicity", () => {
     }
     expect(caught).toBeInstanceOf(CommandError);
     expect(store.getSnapshot()).toEqual(before);
+    expect(store.revision).toBe(revision);
     expect(diffs).toHaveLength(0);
     return caught as CommandError;
   }

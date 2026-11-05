@@ -51,13 +51,20 @@ export function planLayeredBpmn(
     }
     return result;
   };
+  const collapsed = elements.filter(
+    (e) => e.type === "bpmn.participant" && field(e, "collapsed") === true,
+  );
+  const carried = new Set(
+    collapsed.flatMap((pool) => model.descendantsOf(pool.id)),
+  );
   const units = elements.filter(
     (e) =>
       unitTypes.has(e.type) &&
+      !carried.has(e.id) &&
       !ancestors(e.id).some((a) => a.type === "bpmn.subProcess") &&
       context.boundsOf(e.id) !== null,
   );
-  const placed = new Set<ElementId>();
+  const placed = new Set<ElementId>(carried);
   for (const unit of units) {
     placed.add(unit.id);
     if (unit.type === "bpmn.subProcess")
@@ -150,9 +157,22 @@ export function planLayeredBpmn(
           e.type === "bpmn.lane" &&
           model.participantOf(e.id) === pool.id,
       );
-    const leaves = lanes.filter(
-      (lane) => !lanes.some((child) => model.parentOf(child.id) === lane.id),
-    );
+    const children = new Map<ElementId, Element[]>();
+    for (const lane of lanes) {
+      const parent = model.parentOf(lane.id);
+      if (!parent) continue;
+      const siblings = children.get(parent) ?? [];
+      siblings.push(lane);
+      children.set(parent, siblings);
+    }
+    const leaves: Element[] = [];
+    const visit = (parent: ElementId) => {
+      for (const lane of children.get(parent) ?? []) {
+        if (children.has(lane.id)) visit(lane.id);
+        else leaves.push(lane);
+      }
+    };
+    visit(pool.id);
     const group = (leaves.length ? leaves.map((e) => e.id) : [pool.id]).map(
       (id) => ({ id, pool, members: [], height: 120, y: 0 }) as Row,
     );
@@ -164,7 +184,13 @@ export function planLayeredBpmn(
     const chain = ancestors(unit.id);
     const pool = chain.find((e) => e.type === "bpmn.participant");
     const lane = chain.find((e) => e.type === "bpmn.lane");
-    const row = rows.find((r) => r.id === (lane?.id ?? pool?.id)) ?? free;
+    const group = pool ? (poolRows.get(pool.id) ?? []) : [];
+    const row =
+      rows.find((r) => r.id === lane?.id) ??
+      (lane
+        ? group.find((r) => ancestors(r.id).some((a) => a.id === lane.id))
+        : group[0]) ??
+      free;
     row.members.push(unit);
   }
   if (free.members.length) rows.push(free);
@@ -182,8 +208,11 @@ export function planLayeredBpmn(
   for (const row of rows)
     row.height = Math.round(
       Math.max(
-        120,
-        ...widths.map((_, layer) => stackHeight(cells(row, layer)) + 80),
+        row === free ? 0 : 120,
+        ...widths.map(
+          (_, layer) =>
+            stackHeight(cells(row, layer)) + (row === free ? 0 : 80),
+        ),
       ),
     );
   const boxes = [...pools, ...units]
@@ -216,6 +245,24 @@ export function planLayeredBpmn(
       )
     )
       containerCommands.push({ type: "updateVisual", id: pool.id, visual });
+    const laneHeights = new Map<ElementId, number>();
+    for (const row of group) {
+      for (const ancestor of ancestors(row.id)) {
+        if (ancestor.type === "bpmn.lane")
+          laneHeights.set(
+            ancestor.id,
+            (laneHeights.get(ancestor.id) ?? 0) + row.height,
+          );
+      }
+    }
+    for (const [id, laneHeight] of laneHeights) {
+      if (model.get(id)?.visual.height !== laneHeight)
+        containerCommands.push({
+          type: "updateVisual",
+          id,
+          visual: { height: laneHeight },
+        });
+    }
     for (const row of group) {
       row.y = y;
       y += row.height;
@@ -234,7 +281,7 @@ export function planLayeredBpmn(
   if (containerCommands.length) draft.apply(containerCommands);
   const unitCommands: Command[] = [];
   for (const row of rows) {
-    let x = originX + 70;
+    let x = originX + (pools.length ? 70 : 0);
     for (let layer = 0; layer < widths.length; layer++) {
       const columnWidth = widths[layer] ?? 0;
       const members = cells(row, layer);

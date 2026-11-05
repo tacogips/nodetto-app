@@ -78,3 +78,58 @@ test("metrics lines follow page order", () => {
     "metrics First: 1 edge crossing(s), 0 edge-label overlap(s)\nmetrics Second: 2 edge crossing(s), 3 edge-label overlap(s)",
   );
 });
+
+test("BPMN and ERD metrics are produced in page order", () => {
+  const bpmn = { id: "bpmn", name: "Flow", kind: "bpmn" as const, order: "a" };
+  const erd = { id: "erd", name: "Data", kind: "erd" as const, order: "b" };
+  const items = [
+    element({
+      id: "a",
+      page: bpmn.id,
+      type: "bpmn.task",
+      semantic: {},
+      visual: { x: 0, y: 0, width: 80, height: 60 },
+    }),
+    element({
+      id: "b",
+      page: bpmn.id,
+      type: "bpmn.task",
+      semantic: {},
+      visual: { x: 300, y: 0, width: 80, height: 60 },
+    }),
+    element({
+      id: "flow",
+      page: bpmn.id,
+      type: "bpmn.sequenceFlow",
+      semantic: { from: "a", to: "b", name: "Review" },
+    }),
+    element({
+      id: "c",
+      page: erd.id,
+      type: "erd.table",
+      semantic: { tableName: "widgets", columns: [] },
+      visual: { x: 0, y: 0, width: 100, height: 100 },
+    }),
+    element({
+      id: "d",
+      page: erd.id,
+      type: "erd.table",
+      semantic: { tableName: "orders", columns: [] },
+      visual: { x: 300, y: 0, width: 100, height: 100 },
+    }),
+    element({
+      id: "relation",
+      page: erd.id,
+      type: "erd.relation",
+      semantic: { from: { table: "c" }, to: { table: "d" } },
+    }),
+  ];
+  const doc = document(items, [erd, bpmn]);
+  const lines = formatMetricsLines(
+    doc,
+    lintMetrics(doc, [erd.id, bpmn.id]),
+  ).split("\n");
+  expect(lines).toHaveLength(2);
+  expect(lines[0]).toStartWith("metrics Flow:");
+  expect(lines[1]).toStartWith("metrics Data:");
+});

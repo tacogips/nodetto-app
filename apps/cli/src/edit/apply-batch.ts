@@ -99,42 +99,57 @@ export function applyBatch(
         ]),
       );
   };
-  let records = new Map(
+  const records = new Map(
     editor.store.listElements().map((element) => [element.id, element]),
   );
-  operations.forEach((operation, index) => {
-    try {
-      batch.apply(operation, index);
-      const next = new Map(
-        editor.store.listElements().map((element) => [element.id, element]),
-      );
-      for (const [id, element] of next)
-        if (records.get(id) !== element) {
-          lastTouch.set(id, index);
-          if (records.get(id)?.semantic !== element.semantic)
-            for (const key of unknownFields(element))
-              if (!introducedBy.has(key)) introducedBy.set(key, index);
+  const changedIds = new Set<string>();
+  const unsubscribe = editor.store.subscribe((diff) => {
+    for (const id of diff.added) changedIds.add(id);
+    for (const id of diff.updated) changedIds.add(id);
+    for (const id of diff.removed) changedIds.add(id);
+  });
+  try {
+    operations.forEach((operation, index) => {
+      try {
+        batch.apply(operation, index);
+        for (const id of changedIds) {
+          const element = editor.store.get(id);
+          if (!element) {
+            records.delete(id);
+            continue;
+          }
+          if (records.get(id) !== element) {
+            lastTouch.set(id, index);
+            if (records.get(id)?.semantic !== element.semantic)
+              for (const key of unknownFields(element))
+                if (!introducedBy.has(key)) introducedBy.set(key, index);
+          }
+          records.set(id, element);
         }
-      records = next;
-    } catch (cause) {
-      if (cause instanceof OperationError) throw cause;
-      if (cause instanceof CommandError) {
-        const details = cause.issues
-          .filter((issue) => issue.severity === "error")
-          .map(issueLine);
+        changedIds.clear();
+      } catch (cause) {
+        if (cause instanceof OperationError) throw cause;
+        if (cause instanceof CommandError) {
+          const details = cause.issues
+            .filter((issue) => issue.severity === "error")
+            .map(issueLine);
+          throw new OperationError(
+            index,
+            details.length
+              ? `invalid element:\n  ${details.join("\n  ")}\nRun "nodetto-cli types <type>" for the expected fields.`
+              : cause.message,
+          );
+        }
         throw new OperationError(
           index,
-          details.length
-            ? `invalid element:\n  ${details.join("\n  ")}\nRun "nodetto-cli types <type>" for the expected fields.`
-            : cause.message,
+          cause instanceof Error ? cause.message : String(cause),
         );
       }
-      throw new OperationError(
-        index,
-        cause instanceof Error ? cause.message : String(cause),
-      );
-    }
-  });
+    });
+  } finally {
+    unsubscribe();
+    batch.dispose();
+  }
   if (arrange)
     for (const pageId of batch.touchedPages) {
       if (!editor.store.getPage(pageId)) continue;

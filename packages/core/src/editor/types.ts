@@ -35,6 +35,8 @@ export interface ApplyOptions {
    * Moving or refitting their frame does not carry them a second time.
    */
   readonly placed?: ReadonlySet<ElementId>;
+  /** Members whose absolute positions should remain unchanged. */
+  readonly keepMembers?: ReadonlySet<ElementId>;
 }
 
 export interface CreateElementOptions {

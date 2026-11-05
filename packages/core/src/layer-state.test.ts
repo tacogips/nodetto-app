@@ -141,3 +141,49 @@ test("visibility queries never route connectors on unrelated pages", () => {
   });
   expect(editor.createShapeContext().isHidden?.("child")).toBe(true);
 });
+
+test("layer flag summary follows edits, deletion, undo and document replacement", () => {
+  const editor = fixture();
+  expect(editor.store.hasLayerFlags).toBe(false);
+  editor.apply([
+    { type: "updateVisual", id: "frame", visual: { hidden: true } },
+  ]);
+  expect(editor.store.hasLayerFlags).toBe(true);
+  expect(editor.createShapeContext().isHidden?.("child")).toBe(true);
+  editor.apply([
+    { type: "updateVisual", id: "child", visual: { locked: true } },
+  ]);
+  editor.apply([
+    { type: "updateVisual", id: "frame", visual: { hidden: false } },
+  ]);
+  expect(editor.store.hasLayerFlags).toBe(true);
+  expect(editor.createShapeContext().isLocked?.("child")).toBe(true);
+  editor.apply([
+    { type: "updateVisual", id: "child", visual: { locked: false } },
+  ]);
+  expect(editor.store.hasLayerFlags).toBe(false);
+  editor.undo();
+  expect(editor.store.hasLayerFlags).toBe(true);
+  editor.apply([
+    {
+      type: "updateVisual",
+      id: "child",
+      visual: { locked: false, hidden: true },
+    },
+  ]);
+  editor.apply([{ type: "deleteElements", ids: ["child"] }]);
+  expect(editor.store.hasLayerFlags).toBe(false);
+  editor.store.loadDocument(
+    document([
+      element({
+        id: "hidden",
+        type: "node.generic",
+        semantic: { label: "x" },
+        visual: { hidden: true },
+      }),
+    ]),
+  );
+  expect(editor.store.hasLayerFlags).toBe(true);
+  editor.store.loadDocument(document());
+  expect(editor.store.hasLayerFlags).toBe(false);
+});

@@ -60,6 +60,21 @@ const resetFields = [
   "labelPosition",
 ] as const;
 const round = (value: number) => Math.round(value * 10000) / 10000;
+const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+function equalSemantic(a: Record<string, unknown>, b: unknown): boolean {
+  if (!b || typeof b !== "object") return false;
+  const other = b as Record<string, unknown>;
+  const keys = Object.keys(a).sort(compare);
+  const otherKeys = Object.keys(other).sort(compare);
+  return (
+    keys.length === otherKeys.length &&
+    keys.every(
+      (key, i) =>
+        key === otherKeys[i] &&
+        JSON.stringify(a[key]) === JSON.stringify(other[key]),
+    )
+  );
+}
 function isEdge(element: Element): boolean {
   return getElementTypeDefinition(element.type)?.category === "edge";
 }
@@ -96,7 +111,7 @@ export function planRoute(
   const edges = draft
     .getPageElements(pageId)
     .filter(isEdge)
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort((a, b) => compare(a.id, b.id));
   const selected = options.targetIds ? new Set(options.targetIds) : undefined;
   const data = new Map<string, Record<string, unknown>>();
   const targets = new Set<string>();
@@ -115,7 +130,15 @@ export function planRoute(
     const next = { ...(edge.semantic as Record<string, unknown>) };
     if (options.resetManual) {
       next["routing"] = "orthogonal";
-      for (const key of resetFields) delete next[key];
+      for (const key of resetFields) {
+        if (
+          key === "labelPosition" &&
+          edge.type.startsWith("bpmn.") &&
+          edge.visual.labelBounds
+        )
+          continue;
+        delete next[key];
+      }
     }
     if (
       !manual(next) &&
@@ -241,8 +264,8 @@ export function planRoute(
     group.sort(
       (a, b) =>
         a.projection - b.projection ||
-        a.edge.id.localeCompare(b.edge.id) ||
-        a.end.localeCompare(b.end),
+        compare(a.edge.id, b.edge.id) ||
+        compare(a.end, b.end),
     );
     const fixed = group
       .filter((item) => !item.movable)
@@ -344,7 +367,7 @@ export function planRoute(
   const portCommands: Command[] = [];
   for (const edge of edges) {
     const next = data.get(edge.id);
-    if (next && JSON.stringify(next) !== JSON.stringify(edge.semantic))
+    if (next && !equalSemantic(next, edge.semantic))
       portCommands.push({
         type: "updateSemantic",
         id: edge.id,
@@ -445,7 +468,7 @@ export function planRoute(
     if (
       targets.has(edge.id) &&
       original &&
-      JSON.stringify(semantic) !== JSON.stringify(original.semantic)
+      !equalSemantic(semantic, original.semantic)
     )
       commands.push({ type: "updateSemantic", id: edge.id, semantic });
   }

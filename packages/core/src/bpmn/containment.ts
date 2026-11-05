@@ -172,7 +172,11 @@ export function planBpmnLaneLayout(before: Store, after: Store): Command[] {
   return commands;
 }
 
-export function planBpmnTranslations(before: Store, after: Store): Command[] {
+export function planBpmnTranslations(
+  before: Store,
+  after: Store,
+  keep?: ReadonlySet<ElementId>,
+): Command[] {
   const commands: Command[] = [];
   const beforeDoc = before.getSnapshot();
   const containers = bpmnElements(before).filter((element) =>
@@ -201,7 +205,7 @@ export function planBpmnTranslations(before: Store, after: Store): Command[] {
     const dx = (nextContainer.visual.x ?? 0) - (prior.visual.x ?? 0);
     const dy = (nextContainer.visual.y ?? 0) - (prior.visual.y ?? 0);
     for (const id of model.descendantsOf(container.id)) {
-      if (shifted.has(id)) continue;
+      if (shifted.has(id) || keep?.has(id)) continue;
       const old = before.get(id);
       const next = after.get(id);
       if (
@@ -227,7 +231,11 @@ export function planBpmnTranslations(before: Store, after: Store): Command[] {
   return commands;
 }
 
-export function planBpmnMembership(before: Store, after: Store): Command[] {
+export function planBpmnMembership(
+  before: Store,
+  after: Store,
+  reparent?: ReadonlySet<ElementId>,
+): Command[] {
   const commands: Command[] = [];
   const bpmnPageIds = new Set(
     after
@@ -281,6 +289,7 @@ export function planBpmnMembership(before: Store, after: Store): Command[] {
     const old = before.get(element.id);
     if (
       old &&
+      !reparent?.has(element.id) &&
       old.visual.x === element.visual.x &&
       old.visual.y === element.visual.y
     )

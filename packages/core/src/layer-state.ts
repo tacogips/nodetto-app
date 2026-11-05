@@ -8,11 +8,7 @@ import type { Store } from "./store.ts";
 export function layerStates(store: Store, context: ShapeContext) {
   // Without authored flags, no ancestor can contribute inherited state. Avoid
   // geometry (and connector routing) just to establish that every layer is visible.
-  if (
-    !store
-      .listElements()
-      .some((element) => element.visual.hidden || element.visual.locked)
-  )
+  if (!store.hasLayerFlags)
     return {
       isHidden: (_id: ElementId) => false,
       isLocked: (_id: ElementId) => false,

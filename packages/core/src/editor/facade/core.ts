@@ -22,6 +22,7 @@ import {
   type CommandResult,
 } from "../../commands.ts";
 import { sameBreadboardProbe } from "../../editor/breadboard.ts";
+import { crossLinkedPages, dirtyPages } from "../../editor/dirty-pages.ts";
 import { emptyDocument, PAGE_SWITCH_DIFF } from "../../editor/pages.ts";
 import {
   HISTORY_DIFF,
@@ -57,6 +58,9 @@ import { USECASE_NODE_SIZES } from "../../shapes/usecase.ts";
 import { Store, type StoreDiff } from "../../store.ts";
 
 export class EditorCore {
+  private lastApplyStoreRevision: number | undefined;
+  private lastApplyRegistryRevision: number | undefined;
+  private linkedPages = new Set<PageId>();
   readonly assets = new AssetCache();
   private readonlyMode = false;
 
@@ -293,16 +297,39 @@ export class EditorCore {
     if (this.readOnly) return { undo: [], redo: [] };
     const context = this.createShapeContext();
     const permitted = permittedCommands(this.store, context, commands);
+    const pages =
+      this.lastApplyStoreRevision === this.store.revision &&
+      this.lastApplyRegistryRevision === this.registry.revision
+        ? dirtyPages(this.store, permitted, this.linkedPages)
+        : undefined;
+    const planningStore = pages
+      ? new Store(this.store.getScopedSnapshot(pages))
+      : this.store;
+    const planningContext = pages
+      ? createShapeContext(
+          planningStore,
+          this.registry,
+          context.zoom,
+          this.rasterMaskSampler,
+          this.assets.resolve,
+        )
+      : context;
     const derived = planDerivedCommands({
-      store: this.store,
+      store: planningStore,
       registry: this.registry,
-      context,
+      context: planningContext,
       permitted,
       placed: options.placed,
+      keepMembers: options.keepMembers,
       rasterMaskSampler: this.rasterMaskSampler,
       resolveAsset: this.assets.resolve,
     });
     const result = applyCommands(this.store, [...permitted, ...derived]);
+    if (permitted.length) {
+      if (!pages) this.linkedPages = crossLinkedPages(this.store);
+      this.lastApplyStoreRevision = this.store.revision;
+      this.lastApplyRegistryRevision = this.registry.revision;
+    }
     if (options.history !== "ignore") {
       this.history.push(result);
     }
