@@ -12,9 +12,14 @@ function fontOptions(fontDir: string | undefined, fallback: boolean) {
   const files = FONT_FILES.filter((path) => existsSync(path));
   const dirs = fontDir === undefined ? [] : [fontDir];
   if (!files.length && !dirs.length) return { loadSystemFonts: true };
-  const family = (prefix: string, fallback: string) =>
-    files.some((path) => path.includes(prefix)) ? prefix : fallback;
-  const sans = family("Helvetica", family("DejaVuSans", "Arial"));
+  // Match on the file name, but return the family name the font declares.
+  const family = (file: string, name: string, fallback: string) =>
+    files.some((path) => path.includes(file)) ? name : fallback;
+  const sans = family(
+    "Helvetica",
+    "Helvetica",
+    family("DejaVuSans", "DejaVu Sans", "Arial"),
+  );
   return {
     loadSystemFonts: false,
     fontFiles: [
@@ -24,7 +29,11 @@ function fontOptions(fontDir: string | undefined, fallback: boolean) {
     fontDirs: dirs,
     defaultFontFamily: sans,
     sansSerifFamily: sans,
-    monospaceFamily: family("Menlo", family("DejaVuSansMono", "Consolas")),
+    monospaceFamily: family(
+      "Menlo",
+      "Menlo",
+      family("DejaVuSansMono", "DejaVu Sans Mono", "Consolas"),
+    ),
   };
 }
 

@@ -67,7 +67,7 @@ pub fn png(
     let sans = if files.iter().any(|p| p.contains("Helvetica")) {
         "Helvetica"
     } else if files.iter().any(|p| p.contains("DejaVuSans")) {
-        "DejaVuSans"
+        "DejaVu Sans"
     } else {
         "Arial"
     };
@@ -75,7 +75,7 @@ pub fn png(
     fonts.set_monospace_family(if files.iter().any(|p| p.contains("Menlo")) {
         "Menlo"
     } else if files.iter().any(|p| p.contains("DejaVuSansMono")) {
-        "DejaVuSansMono"
+        "DejaVu Sans Mono"
     } else {
         "Consolas"
     });
