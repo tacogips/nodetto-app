@@ -91,3 +91,69 @@ Final file hashes (HEAD before this plan, then current):
 - Native per-planner attribution has not been obtained. Source inspection identifies repeated sorted snapshots as a candidate, but does not establish native cost or whether the target is reachable while retaining rule 1. Manual route preservation skips the fixture's non-manual routes. No speculative source change was made. A native instrumented build or equivalent per-phase profile is required before an owner decision.
 - Manifest gates were rerun: gates 1-3 and 5-12 and 15 passed; gates 13-14 (ratio checks) failed. Gate 4 (`bun run typecheck`) failed on readonly assignments in sibling-owned `packages/core/src/arrange-layered-bpmn.test.ts:442-445`. Logs: `tmp/clm-s732/clm-02-connector-edit-perf/redispatch-gates/gate-*.log`. All three expected fixture hashes remain unchanged.
 - Progress log before this append: `80e850a783b30e30f73b4408991d124dc4367c9e`. The plan remains blocked pending native attribution and the target decision or a measured compliant fix; the sibling typecheck failure also needs its owner.
+
+## s737 clm-02 redispatch: partial implementation
+
+- Before-binary provenance check passed; reuse `target/clm-s737-before/nodetto-cli`, without rebuilding it. Log: `tmp/clm-s737/clm-02-connector-edit-perf/provenance-check.log`.
+- Added optional `elementPages` validation scope, keeping global page and duplicate-ID checks and original element indices. Regression covers scoped issues, an out-of-scope duplicate and a malformed page.
+- Source edit hashes: `packages/ir/src/validate.ts` pre `518d27c72627c976dd1f9796f88f145d4740d56e`, post `4bfb55cc8246aa3bd8bd2a3448ddc0de311bc77a`; `packages/ir/src/validate.test.ts` pre `a0d94520f6eec3b3382d3b8c7356e54e3687bd7e`, post `4eab08c5fc090bb8ea1e6cac51706cc5e37a433f`. Scoped Biome format then changed these respectively to `a487f1f82b267e51d300c3720ebdf5ce4d1f1c45` and `e8f5a3623349d5acb419b2b3a6e839812c888246`.
+- Focused `bun test packages/ir/src/validate.test.ts`: 87 pass, 0 fail; `bun run typecheck` and `bunx biome check packages/ir/src/validate.ts packages/ir/src/validate.test.ts`: exit 0. Logs under `tmp/clm-s737/clm-02-connector-edit-perf/`.
+- Incomplete: source-line verification and parsing/serialization, batch integration, remaining tests, native measurements and all manifest gates. Finding `S737-W1-CLM02-NOT-IMPLEMENTED` remains unresolved; no completion or timing claim is made.
+
+## s737 continuation: source lines and scoped batch validation
+
+- The before binary was reused after the provenance check. The after release binary bundles the current shared tree, including clm-11 work. Every run and its `/usr/bin/time -p` output is in `tmp/clm-s737/clm-02-connector-edit-perf/final/timing.log`; each input was copied afresh before timing.
+before A7 medians: single1=0.36 multi1=0.82 single50=0.53 multi50=0.99 mixedSingle=0.59 mixedMulti=1.02
+after A7 medians: single1=0.34 multi1=0.68 single50=0.60 multi50=0.80 mixedSingle=0.57 mixedMulti=0.88
+before A7 marginal ratio batch: 1.0000
+before A7 marginal ratio mixed: 0.8696
+after A7 marginal ratio batch: 0.4615
+after A7 marginal ratio mixed: 0.8696
+A7 fixed cost multi 1-op: before 0.82 after 0.68
+
+- Implemented identity-keyed source lines with conservative canonical verification, scoped diff tracking through arrangement, full-write differential seam, and one-operation fixture. Added serializer reuse proof, normalization, migration, differential, frozen-batch, identity and native parity tests. Per-edit intents and fresh reads are in `tmp/clm-s737/clm-02-connector-edit-perf/`.
+- Source hashes (pre -> post; formatting transitions recorded separately):
+  - `packages/io/src/jsonl/source-lines.ts`: absent -> `87565a825d12e185e8dbdcefc5951cb1822c69b9` -> `06402c48025173f0902836182f9c474ccec24881`.
+  - `packages/io/src/jsonl/parse.ts`: `f6b1a6f0beb3216fe15bbd66f551e4c40b52a20f` -> `4514f99f6b3038cc3b69e5e10cced01438ad17f1` -> `9f7cb9e4ce0f4cf84cc2a36b244db527421668ac`.
+  - `packages/io/src/jsonl/serialize.ts`: `ea347030edd88186c3f140ef6b9eea05f3731ac5` -> `8760bbdaf16f99ecc7ebf34718f0d2dae67a300b` -> `1ee37993ad6b8df497dfa646e23d6c9ca66df023`.
+  - `apps/cli/src/edit/apply-batch.ts`: `03530e9fb38b5e3430712fefd40e8a5aec62a816` -> `97d0610fb5b8c2d936ab1d481b970ad075d90d06` -> `fb99d7db26b6468604e215617cadb5b7f01c8eb1`.
+  - `apps/cli/src/__fixtures__/obstacle-routing-batch.ts`: `e34e7b5b923967ea536f860025c98bd782cc13de` -> `ca995a3d0ddcefa5448d415aa8b80a3fb32a7671`.
+  - `apps/cli/src/native-parity/edit-performance.test.ts`: `314a9afce7b0568e517e060f0868d5ccdaa8b3a5` -> `5f9a4613f2903b97131c12c1751c10f733971103` -> `b03586c744ac078b2171c54f4adc6dee7d844f0a`.
+  - `apps/cli/src/edit/apply-batch.test.ts`: `0152771494176d8bf1f517c31eb2c31247e5d657` -> `8fefc53c41800e02f45de4b1c264155ef198753a` -> `cb7a218c2436172475c8367e1ff83cbfcfcb03ae` -> `de034512a47c9adc3d19a59e72ba4389266a3b4f` -> `2cdd6a5668b0e899d0e8c335c323c95cd1f62a32` -> `be71a1019ea113022e7019b5458d155f5be0e224` -> `db467717971d876495492f6ae53bbaa3325ee5a7` -> `bcf6ba092148ee0e9078a47a31dc40bdcae65a56` -> `54c5afb8aca40c9eef53bca4076133bc2397fc32`.
+  - `packages/io/src/jsonl/source-lines.test.ts`: absent -> `fefa5ca8b8eeeeb655da0b27e270b236e4edeb90` -> `5fdc4541c90766b4254c4a07308e5191a884f6dd` -> `3361138766de5d243a74f79bd863c7f380fbfb9d` -> `373fae2b3afe3dc6cb095bd7d747dda9f6cd0c26` -> `37317304b969152a3c4769ca1cafb6e6bd78d76b` -> `938940b1164565f9be0834e8f2f1225a6c21feac` -> `e5ba00acee98da8703a4b1afd2e367487def41f3` -> `53f077fa1d915d1b8b8bedb44572f851faa0f363` -> `a45f1214c1f6687ef93690ce4371d407b9f0d8f5` -> `331163c1fb8446e3dbc8313bbf5d8093f635c517`.
+- Final verification is in progress; review decisions remain downstream.
+
+### s737 final verification record
+
+- Manifest Bun suites: 107, 368, and 52 tests passed respectively; typecheck and the exact manifest Biome check passed. Logs: `final/current-gate-1.log` through `final/current-gate-5.log` under this plan's evidence directory.
+- Native release build and parity gate passed on the first attempt: 7 tests, 0 failures. Logs: `final/native-build.log`, `final/native-1.log`, `final/native.log`, and `final/native-gate.log`.
+- Manifest mechanical checks 6-19 passed, including all three expected hashes, both binaries, provenance, ratios, API wiring, unchanged Cargo files and plan file. Logs: `final/mechanical-6.log` through `final/mechanical-19.log`.
+- The differential invalid-operation case is rejected by the command before post-batch validation; validator tests exercise scoped errors and original indices directly. Formal test-integrity, adversarial and integration review decisions are downstream.
+- Previous progress append hash: `e6950f64d8508eee0cb5b21a40f515aae55fd2fa` -> `501e637dd541fd987b6ab663a247f5aed3729b00`.
+- Staleness proof added: `packages/io/src/jsonl/source-lines.test.ts` `331163c1fb8446e3dbc8313bbf5d8093f635c517` -> `dd64221030562164b9fc769666e3ca7fb221ecc0` -> formatted `3b9c70b032664d75eb39cbbfa5296d96d3ede530`. The current serializer suite (368 pass), typecheck and Biome gate passed again in `final/last-gate-1.log` through `final/last-gate-3.log`. Other gates and native binary are unaffected by this test-only addition.
+- Previous progress append hash: `501e637dd541fd987b6ab663a247f5aed3729b00` -> `6da9bd61e71c136d49f2f5451fb9ce375c5634af`.
+
+## Test-integrity revision S737-CLM02-TI-POST-BATCH-ERROR
+
+- Pre-edit `apps/cli/src/edit/apply-batch.test.ts` hash: `54c5afb8aca40c9eef53bca4076133bc2397fc32` (matches review). Add a visual.x invalid-value differential with explicit post-batch error assertions.
+- Correction to the earlier fallback note: the `missing` case fails in selector resolution, while an update with `visual.x: "abc"` reaches post-batch validation. The differential now checks identical errors in both modes and explicitly asserts the optimized error contains `The result is not a valid document` and `visual.x`.
+- Test hash: `54c5afb8aca40c9eef53bca4076133bc2397fc32` -> `ec53436544cfa1387e3dc6cfad00659aa1f23a6b` -> formatted `2609e5feb85703b0a5db7d3276290e974006a722`. Scoped Biome, manifest suite (107 pass, 0 fail, 1297 assertions), typecheck, full scoped Biome and Cargo/plan diff all passed; logs `final/ti-final-1.log` through `final/ti-final-6.log`. The five production hashes remain as specified by the review, in `final/ti-final-6.log`.
+- Integration review must rerun native parity and attributed timing against the combined stable tree: the sibling `apps/cli/src/edit/carry-members.ts` changed after the earlier native run, and the earlier timing log does not identify binary digests.
+- Progress hash before prior revision append: `b79d460d467bd0f550d0f2bdb1b08646f0f05d1c` -> `f6bc92072e4e14e5c72f42433fecc39937c41f74`.
+
+## Integration feedback: export scan and attributed timing
+
+- Removed only `target/clm-s737-before/src` after verifying the before binary SHA-256 `e4dedd48a17e326338daeb97f0a8bc3d019cf4541ddc30ccd7c4d11533a3100d`; the digest remained unchanged. Plain `bun test`: 3151 pass, 0 fail; native CLI suite: 259 pass, 0 fail. Logs: `final/review-bun-all.log`, `final/review-build.log`, `final/review-cli-1.log`.
+- paired rounds, 11 or more; before SHA-256 e4dedd48a17e326338daeb97f0a8bc3d019cf4541ddc30ccd7c4d11533a3100d; after SHA-256 5e155b320928f13d675780b968b175e7f2e5637f266e305db29c060f5f2f9770; earlier values remain on record. All runs and load readings: `final/timing-paired.log`.
+before A7 medians: single1=0.47 multi1=1.10 single50=0.71 multi50=1.39 mixedSingle=0.76 mixedMulti=1.39
+after A7 medians: single1=0.47 multi1=0.84 single50=0.70 multi50=1.11 mixedSingle=0.75 mixedMulti=1.16
+before A7 marginal ratio batch: 1.2083
+before A7 marginal ratio mixed: 1.0000
+after A7 marginal ratio batch: 1.1739
+after A7 marginal ratio mixed: 1.1429
+A7 fixed cost multi 1-op: before 1.10 after 0.84
+
+- Progress pre-edit git hash-object: `6015d482113a38b0f5efa38e854b00488c00676f`; post-edit hash recorded in plan-local `final/progress-review-hashes.log`.
+
+- Current-tree manifest verification: all 20 commands exited 0, including three Bun suites (56, 187, 26 pass), native parity (4 pass), typecheck, Biome, three fixture hashes, provenance and the ratio gate. Individual exact commands and complete logs are indexed in `final/review-manifest-results.json`; native output is `final/native.log`. `final/review-artifacts.log` confirms export absence, unchanged before digest, no target paths in plain test output, nonempty paired timing log and unchanged after digest. Final formal reviews and downstream wiring remain pending.
+- Progress hash before this append: `9e620684b1979f5b0ed4061493f264dad6d9bb88`; post-append hash is in `final/progress-gates-hash.log`.

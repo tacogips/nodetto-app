@@ -8,11 +8,11 @@ import { parseDocument } from "@nodetto/io";
 import {
   lintNodeOverlaps,
   NODE_OVERLAP_PAGE_KINDS,
-} from "../../../packages/core/src/diagram-lint/node-overlap.ts";
+} from "@nodetto/core";
 import {
   planTextWrapFixes,
   type TextWrapFix,
-} from "../../../packages/core/src/text-layout-lint/fix.ts";
+} from "@nodetto/core";
 import type { CommandIo } from "./commands.ts";
 import { runOperations } from "./edit-command.ts";
 

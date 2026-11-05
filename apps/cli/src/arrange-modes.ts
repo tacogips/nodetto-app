@@ -1,15 +1,16 @@
 import { Editor } from "@nodetto/core";
+import { planLayeredBpmn } from "@nodetto/core";
 import { getElementTypeDefinition, type Element, type Page } from "@nodetto/ir";
 import { serializeDocument } from "@nodetto/io";
 import {
   columnFrames,
   LAYERED_PAGE_KINDS,
   planLayered,
-} from "../../../packages/core/src/arrange-layered.ts";
+} from "@nodetto/core";
 import {
   planRoute,
   ROUTE_PAGE_KINDS,
-} from "../../../packages/core/src/arrange-route.ts";
+} from "@nodetto/core";
 import {
   type CommandIo,
   type CommandResult,
@@ -95,12 +96,21 @@ export function arrangeLayeredOrRoute(
   else page = "The document has several pages; choose one with --page.";
   if (typeof page === "string") return fail(page);
   const kinds = mode === "layered" ? LAYERED_PAGE_KINDS : ROUTE_PAGE_KINDS;
-  if (!kinds.includes(page.kind))
+  if (!kinds.includes(page.kind) && !(mode === "layered" && page.kind === "bpmn"))
     return fail(`Mode ${mode} supports page kinds: ${kinds.join(", ")}.`);
   const editor = new Editor({ document: loaded.document });
   const resetManual = parsed.flags.has("--reset-manual");
   let count = 0;
-  if (mode === "layered") {
+  if (mode === "layered" && page.kind === "bpmn") {
+    if (parsed.options.has("--frames") || direction === "TB")
+      return fail("BPMN pools are horizontal; --frames and --direction TB are not supported.");
+    const result = planLayeredBpmn(editor.store, page.id, editor.registry);
+    if ("error" in result) return fail(result.error);
+    for (const commands of [result.containerCommands, result.settleCommands, result.unitCommands]) {
+      count += commands.length;
+      if (commands.length) editor.apply(commands, { placed: result.placed });
+    }
+  } else if (mode === "layered") {
     const requested = parsed.options.get("--frames");
     const order =
       requested === undefined

@@ -3,7 +3,7 @@ import { serializeDocument } from "@nodetto/io";
 import {
   mergeDocumentVersions,
   type VersionConflict,
-} from "../../../packages/core/src/document-merge.ts";
+} from "@nodetto/core";
 import {
   type CommandIo,
   type CommandResult,

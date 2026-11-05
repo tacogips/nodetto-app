@@ -20,6 +20,7 @@ import {
   VISUAL_STYLE_KEY_ORDER,
   type Visual,
 } from "@nodetto/ir";
+import type { SourceLine, SourceLines } from "./source-lines.ts";
 import { setField } from "./objects.ts";
 import {
   DOCUMENT_KIND,
@@ -36,6 +37,7 @@ const BOM = "\uFEFF";
 const VISUAL_KEYS: readonly string[] = VISUAL_KEY_ORDER.keys;
 
 export interface ParseOptions {
+  readonly keepSourceLines?: boolean;
   /** Run document validation after migration. Default `true`. */
   readonly validate?: boolean;
   /** Migration chain override; defaults to the registered chain. */
@@ -48,6 +50,7 @@ export type ParseResult =
   | {
       readonly ok: true;
       readonly document: Document;
+      readonly sourceLines?: SourceLines;
       readonly issues: readonly ValidationIssue[];
     }
   | {
@@ -138,6 +141,7 @@ function pushLineError(
 
 interface Collected {
   readonly issues: ValidationIssue[];
+  readonly sourceLines?: Map<object, SourceLine>;
   readonly pages: Page[];
   readonly elements: Element[];
   readonly unknownRecords: UnknownRecord[];
@@ -145,9 +149,10 @@ interface Collected {
   documentLine?: number;
 }
 
-function collect(text: string): Collected {
+function collect(text: string, keepSourceLines = false): Collected {
   const collected: Collected = {
     issues: [],
+    ...(keepSourceLines ? { sourceLines: new Map<object, SourceLine>() } : {}),
     pages: [],
     elements: [],
     unknownRecords: [],
@@ -232,6 +237,7 @@ function collect(text: string): Collected {
         page["extensions"] = extensions;
       }
       collected.pages.push(page as unknown as Page);
+      collected.sourceLines?.set(page, { line: raw, record: parsed });
       continue;
     }
 
@@ -252,6 +258,7 @@ function collect(text: string): Collected {
         element["extensions"] = extensions;
       }
       collected.elements.push(element as unknown as Element);
+      collected.sourceLines?.set(element, { line: raw, record: parsed });
       continue;
     }
 
@@ -316,7 +323,7 @@ export function parseDocumentResult(
   text: string,
   options: ParseOptions = {},
 ): ParseResult {
-  const collected = collect(text);
+  const collected = collect(text, options.keepSourceLines);
   const issues = collected.issues;
   const snapshot = buildSnapshot(collected);
 
@@ -345,7 +352,17 @@ export function parseDocumentResult(
       return { ok: false, issues };
     }
   }
-  return { ok: true, document, issues };
+  return {
+    ok: true,
+    document,
+    issues,
+    ...(collected.sourceLines
+      ? {
+          sourceLines:
+            migrated === snapshot ? collected.sourceLines : new Map(),
+        }
+      : {}),
+  };
 }
 
 /**

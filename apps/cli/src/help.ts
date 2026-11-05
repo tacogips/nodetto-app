@@ -13,17 +13,15 @@ Look at a document
   nodetto-cli types [<type>]      Element types and the fields each one takes
   nodetto-cli validate <doc>      Check that a document parses and is valid
   nodetto-cli diff <old> <new>    What changed between two versions
-
 Draw and edit
   nodetto-cli shapes [<words>]    Palette shapes by shape ID (--category uml)
   nodetto-cli draw <doc> <shape>  Draw one shape or connector by its shape ID
   nodetto-cli edit <doc>          Apply add/update/move/delete operations (JSON)
   nodetto-cli arrange <doc>       Tidy the layout of one page
-
 Render
   nodetto-cli export <doc>        Export a page or selected artwork
-
 Convert and check
+  nodetto-cli merge <base> <ours> <theirs>  Merge document versions
   nodetto-cli ddl <doc>           Database DDL from an ERD page
   nodetto-cli format <doc>        Canonical JSONL formatting
   nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, architecture, freeform and flowchart pages
@@ -36,6 +34,8 @@ Convert and check
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
   nodetto-cli authorize [folder]  Grant project-folder access for the Store CLI
+
+Global --quiet suppresses warning lines.
 
 Run "nodetto-cli help <command>" or "nodetto-cli <command> --help" for details.
 AI loop: inspect -> shapes/types -> edit --snapshot -> export (look at the PNG)
@@ -185,6 +185,18 @@ operation prints its index and reason and nothing is written. The document is
 written atomically; if the file changed on disk while the batch was being
 applied (for example the human saved in the app), the batch is applied again
 to the new contents (up to three times) so no human edit is overwritten.
+
+References resolve by exact id, @ref, name:<text>, then unique id prefix. Names
+must match one element on the page; ambiguous and missing matches list candidates.
+update and delete accept where (type, from, to, parent, name) and expect an exact
+count. Mismatch aborts the batch without writing. Matched counts are reported.
+select binds an existing element: {"op":"select","ref":"ok","id":"name:Approve"}.
+Unknown operation fields are rejected with valid fields listed.
+
+carryMembers defaults to true on frames, BPMN pools, lanes, sub-processes and
+breadboard boards. Set carryMembers:false on move or resize to keep members in
+place. BPMN lane x/y/width changes and invalid pool geometry report errors;
+layout frames and groups reject this opt-out. Attachments always follow owners.
 
 Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"add","page":"p1","type":"erd.table","ref":"orders",
@@ -442,14 +454,28 @@ changes only the display name; names are the human-facing key (for example,
 
 ${EXIT_CODES}`,
 
-  arrange: `Usage: nodetto-cli arrange <document.jsonl> [--mode tidy|overlaps]
+  merge: `Usage: nodetto-cli merge <base> <ours> <theirs> [--output <file>]
+Three-way merge keeps ours on conflict; arrays are atomic. Delete/change conflicts
+keep ours. Exit 0 for clean merge, 1 for conflicts and 2 for errors.
+Git driver: git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
+Use *.jsonl merge=nodetto in .gitattributes.
+
+${EXIT_CODES}`,
+
+  arrange: `Usage: nodetto-cli arrange <document.jsonl> [--mode tidy|overlaps|layered|route]
                            [--direction LR|TB] [--page <short-id|id|name>]
                            [--write] [--check]
 
 Run the editor's Tidy layout (default) or Remove overlaps on one page and print
 the canonical result. Without --page, the document must have exactly one page.
 
-  --mode       tidy (default) or overlaps.
+  --mode       tidy (default), overlaps, layered or route.
+  --frames     ordered column frames for layered; --ids selects route connectors.
+  --reset-manual resets manual route settings. Existing manual settings are kept otherwise.
+  Layered and route support state, flowchart, freeform, architecture, UML, ERD
+  and BPMN. Sequence, breadboard and PCB have specialized layouts and are excluded.
+  BPMN pools and lanes form horizontal rows; --frames and TB are unsupported.
+  Nested lanes may have full boxes rewritten; lane order is preserved.
   --direction  LR or TB layout direction for tidy.
   --write      Rewrite the file in place.
   --check      Exit 1 when arranging would move anything.
@@ -477,6 +503,8 @@ ${EXIT_CODES}`,
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
                         [--config <file>] [--format text|json]
 
+--fix wraps text; --metrics reports edge crossings and label overlaps on supported pages.
+node-overlap and image-missing rules cover diagram pages and attachments.
 Lint BPMN, breadboard, architecture, freeform and flowchart pages from a
 nodetto document or BPMN XML.
 Text output is empty when clean; --format json always prints a report. A

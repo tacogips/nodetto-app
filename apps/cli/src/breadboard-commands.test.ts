@@ -140,11 +140,11 @@ test("lint JSON includes pin only when a breadboard finding has one", () => {
 
 test("lint reports the combined no-page message", () => {
   const uml =
-    '{"kind":"document","schemaVersion":1,"id":"doc-uml","title":"Classes"}\n{"kind":"page","id":"page-uml","name":"Classes","pageKind":"uml"}\n';
+    '{"kind":"document","schemaVersion":1,"id":"doc-uml","title":"Classes"}\n{"kind":"page","id":"page-uml","name":"Classes","pageKind":"sequence"}\n';
   const result = cli(["lint", "free.jsonl"], memoryIo({ "free.jsonl": uml }));
   expect(result.exitCode).toBe(EXIT_ERROR);
   expect(result.stderr).toContain(
-    "The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.",
+    "Document contains no BPMN, breadboard, architecture, freeform, flowchart, ERD, state or UML pages, or pages with images.",
   );
   const selected = cli(
     ["lint", "free.jsonl", "--page", "missing"],
@@ -152,7 +152,7 @@ test("lint reports the combined no-page message", () => {
   );
   expect(selected.exitCode).toBe(EXIT_ERROR);
   expect(selected.stderr).toContain(
-    "The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.",
+    "Document contains no BPMN, breadboard, architecture, freeform, flowchart, ERD, state or UML pages, or pages with images.",
   );
 });
 

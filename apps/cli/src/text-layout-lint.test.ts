@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { Editor, lintTextLayoutPage } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
-import { EXIT_ERROR, EXIT_OK, runCli } from "./commands.ts";
+import { EXIT_OK, runCli } from "./commands.ts";
 import {
   TEXT_LAYOUT_EXPECTED,
   TEXT_LAYOUT_PAGE_ID,
@@ -114,12 +114,9 @@ test("freeform and flowchart pages are lintable and selectable", () => {
   expect(result.stdout).toBe("");
 });
 
-test("other page kinds are not lintable or selectable", () => {
+test("UML pages are lintable and selectable", () => {
   const result = lint(textLayoutProblemDocument("uml"));
-  expect(result.exitCode).toBe(EXIT_ERROR);
-  expect(result.stderr).toContain(
-    "The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.",
-  );
+  expect(result.exitCode).toBe(EXIT_OK);
   const editor = new Editor({
     document: parseDocument(textLayoutProblemDocument()),
   });
@@ -129,7 +126,7 @@ test("other page kinds are not lintable or selectable", () => {
     "--page",
     "Classes",
   );
-  expect(selected.exitCode).toBe(EXIT_ERROR);
+  expect(selected.exitCode).toBe(EXIT_OK);
   expect(selected.stdout).toBe("");
 });
 

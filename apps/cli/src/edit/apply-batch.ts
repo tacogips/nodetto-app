@@ -65,8 +65,9 @@ export function applyBatch(
   documentText: string,
   operations: readonly JsonObject[],
   arrange: boolean,
+  options: { fullWrite?: boolean } = {},
 ): BatchResult {
-  const parsed = parseDocumentResult(documentText);
+  const parsed = parseDocumentResult(documentText, { keepSourceLines: true });
   if (!parsed.ok)
     throw new Error(
       `The document is not a valid nodetto document:\n${parsed.issues
@@ -103,7 +104,16 @@ export function applyBatch(
     editor.store.listElements().map((element) => [element.id, element]),
   );
   const changedIds = new Set<string>();
+  const elementPages = new Set<string>();
+  let pagesChanged = false;
   const unsubscribe = editor.store.subscribe((diff) => {
+    pagesChanged ||= diff.pagesChanged;
+    for (const id of [...diff.added, ...diff.updated, ...diff.removed]) {
+      const oldPage = before.get(id)?.page;
+      const newPage = editor.store.get(id)?.page;
+      if (oldPage) elementPages.add(oldPage);
+      if (newPage) elementPages.add(newPage);
+    }
     for (const id of diff.added) changedIds.add(id);
     for (const id of diff.updated) changedIds.add(id);
     for (const id of diff.removed) changedIds.add(id);
@@ -146,23 +156,26 @@ export function applyBatch(
         );
       }
     });
+    if (arrange)
+      for (const pageId of batch.touchedPages) {
+        if (!editor.store.getPage(pageId)) continue;
+        const { commands, placed } = planArrangement(
+          editor.store,
+          pageId,
+          editor.createShapeContext(1),
+          { mode: "tidy" as ArrangeMode },
+        );
+        if (commands.length) editor.apply(commands, { placed });
+      }
   } finally {
     unsubscribe();
     batch.dispose();
   }
-  if (arrange)
-    for (const pageId of batch.touchedPages) {
-      if (!editor.store.getPage(pageId)) continue;
-      const { commands, placed } = planArrangement(
-        editor.store,
-        pageId,
-        editor.createShapeContext(1),
-        { mode: "tidy" as ArrangeMode },
-      );
-      if (commands.length) editor.apply(commands, { placed });
-    }
   const snapshot = editor.getSnapshot();
-  const validation = validateDocument(snapshot);
+  const validation = validateDocument(
+    snapshot,
+    options.fullWrite || pagesChanged ? {} : { elementPages },
+  );
   const issues = validation.filter((issue) => issue.severity === "error");
   if (issues.length)
     throw new Error(
@@ -203,7 +216,13 @@ export function applyBatch(
   );
   const counts = countPageChanges(before, after);
   return {
-    text: serializeDocument(snapshot),
+    text: options.fullWrite
+      ? serializeDocument(snapshot)
+      : serializeDocument(snapshot, {
+          validate: false,
+          sourceLines: parsed.sourceLines,
+        }),
+    matches: batch.matches,
     created: batch.created,
     replaced: batch.replaced,
     counts,

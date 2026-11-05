@@ -7,9 +7,9 @@ import {
 import {
   pageMetrics,
   type PageMetrics,
-} from "../../../packages/core/src/diagram-lint/metrics.ts";
-import { createDefaultRegistry } from "../../../packages/core/src/shapes/index.ts";
-import { Store } from "../../../packages/core/src/store.ts";
+} from "@nodetto/core";
+import { createDefaultRegistry } from "@nodetto/core";
+import { Store } from "@nodetto/core";
 
 export function lintMetrics(
   document: Document,

@@ -35,6 +35,11 @@ import {
   type ValidationIssue,
 } from "@nodetto/ir";
 import { helpFor, OVERVIEW } from "./help.ts";
+import { arrangeLayeredOrRoute } from "./arrange-modes.ts";
+import { mergeCommand } from "./merge-command.ts";
+import { diagramLintApplies, formatFixLines, lintDiagramPages, LINT_NO_PAGES_MESSAGE } from "./lint-diagram.ts";
+import { lintMetrics, formatMetricsLines } from "./lint-metrics.ts";
+import { applyQuiet, collapseWarnings, extractQuiet, issueWarningKey } from "./warnings.ts";
 import { pagesCommand } from "./pages-command.ts";
 import { inspectCommand } from "./inspect-command.ts";
 import { typesCommand } from "./types-command.ts";
@@ -93,8 +98,6 @@ interface ParsedArgs {
 const VALUE_OPTIONS = new Set(["--dialect", "--page", "--output", "--check"]);
 const ARRANGE_OPTIONS = new Set(["--mode", "--direction", "--page"]);
 const LINT_OPTIONS = new Set(["--page", "--config", "--format"]);
-const LINT_NO_PAGES =
-  "The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.";
 const BPMN_IMPORT_OPTIONS = new Set(["--output"]);
 const DRAWIO_IMPORT_OPTIONS = new Set(["--output"]);
 const BPMN_EXPORT_OPTIONS = new Set(["--page", "--output", "--check"]);
@@ -174,7 +177,7 @@ export function loadDocument(
   if (!result.ok) return `${path} is not a valid nodetto document:\n${report}`;
   return {
     document: result.document,
-    warnings: report ? `${report}\n` : "",
+    warnings: result.issues.length ? `${collapseWarnings(result.issues.map(formatIssue), result.issues.map((issue) => issueWarningKey(issue, result.document))).join("\n")}\n` : "",
     warningCount: result.issues.filter((issue) => issue.severity === "warning")
       .length,
   };
@@ -244,7 +247,7 @@ function warningLines(
 }
 
 function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
-  const parsed = parseArgs(args, LINT_OPTIONS, new Set());
+  const parsed = parseArgs(args, LINT_OPTIONS, new Set(["--fix", "--metrics"]));
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("lint")}`);
   if (parsed.positional.length !== 1)
@@ -292,19 +295,20 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     (page) =>
       page.kind === "bpmn" ||
       page.kind === "breadboard" ||
-      TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind),
+      TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind) ||
+      diagramLintApplies(document, page),
   );
-  if (!pages.length) return fail(LINT_NO_PAGES);
+  if (!pages.length) return fail(LINT_NO_PAGES_MESSAGE);
   const query = parsed.options.get("--page");
   let selectedPages: readonly Page[];
   if (query !== undefined) {
-    const selected = selectPage(document, query, pages, LINT_NO_PAGES);
+    const selected = selectPage(document, query, pages, LINT_NO_PAGES_MESSAGE);
     if (typeof selected === "string") return fail(selected);
     selectedPages = [selected];
   } else {
     selectedPages = pages;
   }
-  if (!selectedPages.length) return fail(LINT_NO_PAGES);
+  if (!selectedPages.length) return fail(LINT_NO_PAGES_MESSAGE);
 
   let config = recommendedLintConfig();
   const hasBpmn = selectedPages.some((page) => page.kind === "bpmn");
@@ -331,6 +335,19 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     }
   }
 
+  const diagram = lintDiagramPages(io, path, document, {
+    fix: parsed.flags.has("--fix"),
+    ...(query === undefined ? {} : { pageId: selectedPages[0]?.id }),
+    textLayoutPageIds: selectedPages.filter((page) => TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind)).map((page) => page.id),
+    format,
+  });
+  if (diagram.error) return fail(diagram.error);
+  if (diagram.written) {
+    const reloaded = loadDocument(io, path);
+    if (typeof reloaded === "string") return fail(reloaded);
+    document = reloaded.document;
+  }
+  const metrics = parsed.flags.has("--metrics") ? lintMetrics(document, selectedPages.map((page) => page.id)) : new Map();
   const reports: {
     readonly page: Page;
     readonly findings: readonly LintFindingRow[];
@@ -365,7 +382,8 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
               }),
             ),
   }));
-  const allFindings = reports.flatMap((report) => report.findings);
+  const combinedReports: { page: Page; findings: readonly LintFindingRow[] }[] = reports.map((report) => ({ ...report, findings: [...report.findings, ...diagram.rows.filter((row) => row.pageId === report.page.id)] }));
+  const allFindings = combinedReports.flatMap((report) => report.findings);
   const errors = allFindings.filter(
     (finding) => finding.severity === "error",
   ).length;
@@ -373,9 +391,10 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
   if (format === "json") {
     const report = {
       input: path,
-      pages: reports.map(({ page, findings }) => ({
+      pages: combinedReports.map(({ page, findings }) => ({
         pageId: page.id,
         pageName: page.name,
+        ...(parsed.flags.has("--metrics") ? { metrics: metrics.get(page.id) ?? null } : {}),
         findings: findings.map((finding) => ({
           elementId: finding.elementId,
           severity: finding.severity,
@@ -386,7 +405,8 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
             : {}),
         })),
       })),
-      summary: { problems: allFindings.length, errors, warnings },
+      ...(parsed.flags.has("--fix") ? { fixes: diagram.fixes } : {}),
+      summary: { problems: allFindings.length, errors, warnings, ...(parsed.flags.has("--metrics") ? { metrics: [...metrics.values()].reduce((sum, value) => ({ edgeCrossings: sum.edgeCrossings + value.edgeCrossings, labelOverlaps: sum.labelOverlaps + value.labelOverlaps }), { edgeCrossings: 0, labelOverlaps: 0 }) } : {}) },
     };
     return {
       exitCode: errors ? EXIT_DRIFT : EXIT_OK,
@@ -394,9 +414,11 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       stderr,
     };
   }
-  if (!allFindings.length) return ok("", stderr);
-  const output = [path];
-  for (const { page, findings } of reports) {
+  const fixLines = formatFixLines(diagram.fixes);
+  const metricLines = formatMetricsLines(document, metrics);
+  if (!allFindings.length) return ok([fixLines, metricLines].filter(Boolean).join("\n") + (fixLines || metricLines ? "\n" : ""), stderr);
+  const output = [...(fixLines ? [fixLines] : []), path];
+  for (const { page, findings } of combinedReports) {
     if (!findings.length) continue;
     if (reports.length > 1) output.push(`page ${page.name} (${page.id})`);
     const columns = findings.map((finding) => [
@@ -422,6 +444,7 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     "",
     `${allFindings.length} ${allFindings.length === 1 ? "problem" : "problems"} (${errors} errors, ${warnings} warnings)`,
   );
+  if (metricLines) output.push(metricLines);
   return {
     exitCode: errors ? EXIT_DRIFT : EXIT_OK,
     stdout: `${output.join("\n")}\n`,
@@ -739,11 +762,8 @@ function ddlCommand(io: CommandIo, args: readonly string[]): CommandResult {
 }
 
 function arrangeCommand(io: CommandIo, args: readonly string[]): CommandResult {
-  const parsed = parseArgs(
-    args,
-    ARRANGE_OPTIONS,
-    new Set(["--write", "--check"]),
-  );
+  const options = new Set([...ARRANGE_OPTIONS, "--frames", "--ids"]);
+  const parsed = parseArgs(args, options, new Set(["--write", "--check", "--reset-manual"]));
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("arrange")}`);
   if (parsed.positional.length !== 1)
@@ -753,8 +773,11 @@ function arrangeCommand(io: CommandIo, args: readonly string[]): CommandResult {
   if (parsed.flags.has("--write") && parsed.flags.has("--check"))
     return fail("--write and --check cannot be combined.");
   const mode = parsed.options.get("--mode") ?? "tidy";
+  if (mode === "layered" || mode === "route") return arrangeLayeredOrRoute(io, args);
   if (mode !== "tidy" && mode !== "overlaps")
-    return fail(`Unsupported mode "${mode}". Choose tidy or overlaps.`);
+    return fail(`Unsupported mode "${mode}". Choose tidy, overlaps, layered or route.`);
+  if (parsed.options.has("--frames") || parsed.options.has("--ids") || parsed.flags.has("--reset-manual"))
+    return fail("--frames, --ids and --reset-manual require layered or route mode.");
   const direction = parsed.options.get("--direction") ?? "LR";
   if (direction !== "LR" && direction !== "TB")
     return fail(`Unsupported direction "${direction}". Choose LR or TB.`);
@@ -872,6 +895,13 @@ export function runCli(
   io: CommandIo,
   version: string,
 ): CommandResult {
+  const extracted = extractQuiet(args);
+  const command = extracted.args[0] ?? "";
+  const result = dispatchCli(extracted.args, io, version);
+  return extracted.quiet ? applyQuiet(command, result) : result;
+}
+
+function dispatchCli(args: readonly string[], io: CommandIo, version: string): CommandResult {
   const [command, ...rest] = args;
   if (command === "help") return ok(`${helpFor(rest[0])}\n`);
   if (
@@ -885,6 +915,8 @@ export function runCli(
       return fail(
         `mcp takes no options. Start the stdio server with nodetto-cli mcp.\n\n${helpFor("mcp")}`,
       );
+    case "merge":
+      return mergeCommand(io, rest);
     case "ddl":
       return ddlCommand(io, rest);
     case "arrange":

@@ -28,7 +28,9 @@ test("frame carries members by default and can leave them in place", () => {
         { op: "update", id: node, visual: {}, carryMembers: false },
         2,
       ),
-    ).toThrow("carryMembers applies only to frames");
+    ).toThrow(
+      "carryMembers applies only to frame, bpmn.participant, bpmn.lane, bpmn.subProcess and breadboard.board; node.generic does not move other elements.",
+    );
     expect(() =>
       batch.apply(
         { op: "update", id: frame, visual: {}, carryMembers: "no" },

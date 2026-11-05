@@ -225,3 +225,27 @@ write SVG, PNG, PDF, and HTML ZIP output with the same CLI options. Binary
 exports are written to `--output` on the local filesystem. The server has
 the same local file access and desktop launching capability as the CLI.
 Stdout carries only MCP messages; disconnecting the client stops the server.
+
+
+### Layout, selection, and merging
+
+`arrange --mode layered|route` supports state, flowchart, freeform, architecture,
+UML, ERD and BPMN. Sequence, breadboard and PCB use specialized layouts. BPMN
+pools and lanes form horizontal rows; `--frames` and `--direction TB` are not
+supported there. Nested lane boxes may be rewritten while preserving lane order.
+Use `--frames` for column order, `--ids` for route targets and `--reset-manual`
+to replace manual routes. `lint --fix` wraps text and `lint --metrics` reports
+edge crossings and label overlaps. `--quiet` suppresses warning lines.
+
+Edit references resolve exact id, `@ref`, `name:<text>`, then unique id prefix.
+`update` and `delete` accept `where` with type, from, to, parent or name, and
+`expect` enforces the match count without writing on mismatch. `select` binds
+an existing element to an `@ref`. Match counts appear in the report. On frames,
+BPMN pools, lanes, sub-processes and breadboard boards, `carryMembers` defaults
+to true; set it to false on move or resize to keep members in place. Invalid
+BPMN geometry, layout frames and groups report errors; attachments follow owners.
+
+For three-way merging, set `*.jsonl merge=nodetto` in `.gitattributes` and run
+`git config merge.nodetto.driver 'nodetto-cli merge %O %A %B --output %A'`.
+The merge retains ours for conflicts and treats arrays atomically; exit codes are
+0 for clean, 1 for conflict, and 2 for input errors.

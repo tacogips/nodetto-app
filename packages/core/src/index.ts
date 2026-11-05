@@ -765,3 +765,15 @@ export {
   textMatcher,
   type TextReplacement,
 } from "./text-replace.ts";
+
+export { mergeDocumentVersions, type VersionConflict } from "./document-merge.ts";
+export { planLayered, columnFrames, LAYERED_PAGE_KINDS, type LayeredOptions } from "./arrange-layered.ts";
+export { planLayeredBpmn } from "./arrange-layered-bpmn.ts";
+export { planRoute, ROUTE_PAGE_KINDS, type RouteOptions } from "./arrange-route.ts";
+export { pageMetrics, isLabelObstacle, type PageMetrics } from "./diagram-lint/metrics.ts";
+export { lintNodeOverlaps, NODE_OVERLAP_PAGE_KINDS, type NodeOverlapFinding } from "./diagram-lint/node-overlap.ts";
+export { planTextWrapFixes, type TextWrapFix } from "./text-layout-lint/fix.ts";
+
+export { bpmnFlowLabelBox } from "./bpmn/notation.ts";
+export { wrapTextToWidth } from "./text-wrap.ts";
+export { buildBpmnModel } from "./bpmn/model.ts";

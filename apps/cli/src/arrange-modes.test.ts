@@ -122,12 +122,11 @@ test("route limits changes to selected connectors and validates options", () => 
   expect(run(f, "--mode", "layered", "--ids", "edge0").exitCode).toBe(2);
 });
 
-test("route accepts ERD and BPMN; layered excludes BPMN and both exclude sequence", () => {
+test("route and layered accept BPMN; both exclude sequence", () => {
   for (const kind of ["erd", "bpmn"] as const)
     expect(run(fixture(kind), "--mode", "route").exitCode).toBe(0);
   const bpmn = run(fixture("bpmn"), "--mode", "layered");
-  expect(bpmn.exitCode).toBe(2);
-  expect(bpmn.stderr).toContain("supports page kinds");
+  expect(bpmn.exitCode).toBe(0);
   for (const kind of ["sequence", "breadboard", "pcb"] as const) {
     for (const mode of ["layered", "route"]) {
       const result = run(fixture(kind), "--mode", mode);
