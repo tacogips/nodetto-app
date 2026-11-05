@@ -33,3 +33,14 @@ box labels stay centered.
   accepting them silently.
 - Alternative: also reject in `connect`. This is one more entry in the check, and
   it would turn currently accepted batches into errors.
+
+## Q3. Face of base-covered characters in a run with a fallback glyph (G2, "Font sets") - open, default kept
+
+The request says "per-character font fallback". The renderer replaces all glyphs in a
+text run when one fallback face covers the run, so `A` next to U+246A in one `<text>`
+renders in the fallback face.
+
+- Default: accept this for runs containing a fallback glyph. Those runs show tofu today.
+  Documents needing no fallback, and runs with no fallback glyph, stay byte-identical.
+- Alternative: build a text-run splitter so base-covered characters keep their face.
+  This is new export work, currently out of scope, and needs owner authorization.

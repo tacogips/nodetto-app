@@ -77,9 +77,9 @@ for typography edits (`packages/core/src/editor/style-text.ts:162-187`).
 
 `apps/cli/src/native-parity/box-label.test.ts`, using `nativeTest` and one copy per runtime as in `style-edit.test.ts`:
 
-- `add` and `update` batches for both box types -> same exit codes, stderr and written bytes.
+- `add` and `update` batches for both box types -> same exit codes and stderr. Written documents compare as set out in "Amendment 2026-11-05" below.
 - `compare(["export", doc, "--format", "svg"], cwd)` on the results -> equal.
-- PNG and PDF export with top and bottom -> exit 0 in both, valid signature, and different bytes from a no-marker copy.
+- PNG and PDF export with top and bottom -> exit 0 in both and a valid signature. The "different bytes from a no-marker copy" check follows the same amendment.
 - `style.valign` batch -> same error in both.
 
 ## Verification (each must exit 0)
@@ -95,3 +95,30 @@ for typography edits (`packages/core/src/editor/style-text.ts:162-187`).
 - Verification 1-5 exit 0 with logs recorded.
 - `grep -n "withBoxLabelAlign" apps/cli/src/edit/operations/add.ts` matches.
 - Progress log complete.
+
+## Amendment 2026-11-05 (blocked-wave-scope-or-contract, round 1)
+
+Blocker: exact Bun and native written-document parity failed on `add`, so the native SVG, PNG and PDF assertions never ran. Evidence: `tmp/sef-s733/sef-06-edit-box-align-writes/native.log`, where the same elements got `index` values `x`, `y` and `5`, `7`. Each `Editor` takes its random source from `options.rng ?? Math.random` (`packages/core/src/editor/facade/core.ts:131`).
+
+Decision: this is expected behavior of a generated value, not a defect. The parity contract changes; `writePaths` do not.
+
+Written-document parity in `apps/cli/src/native-parity/box-label.test.ts`:
+
+- Batches containing `add`: parse each JSONL line, remove `index` from records with `kind` `element`, then require equal records in equal order. Also require `node` to sort before `shape` in both documents, so relative order stays checked.
+- Batches with only `update` on a seed document that holds explicit element indexes: raw written bytes must be equal. This keeps a strict byte check for the path this plan changes. Write that seed from one `serializeDocument` result and copy it to both runtimes.
+- Do not normalize any other field.
+
+Raster difference check:
+
+- Bun PDF bytes differ between runs of one document (`tmp/sef-s733/serial-reconcile/wave-002/bun-pdf-determinism-probe.log`), so a Bun PDF difference proves nothing.
+- Assert marked versus no-marker difference for Bun PNG, native PNG and native PDF. For Bun PDF assert exit 0 and the signature only.
+
+Not allowed:
+
+- Do not edit `packages/core/src/editor/facade/core.ts` or add an `rng` option, CLI flag or environment variable to make indexes deterministic.
+- Do not weaken the update-only byte check or the SVG `compare` assertions.
+- Do not relax the 60000 ms test deadline.
+
+The resume criterion also requires completing this plan's test list. Check `apps/cli/src/edit/box-label-align.test.ts` against "Tests" above line by line and add any missing case, including `boxLabelAlign: null` keeping the stored value, `textStyle` with `verticalAlign` in one patch, `updateTextStyle` moving a following label, and `add` with a `shape` preset. Record the mapping in the progress log.
+
+The formal test-integrity and adversarial reviews run after these gates pass.

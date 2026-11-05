@@ -37,15 +37,22 @@ query in both hosts, and the fallback switch on rasterize. sef-07 calls them fro
 
 ## Gate: run first
 
-The design depends on the usvg and resvg-js per-character fallback walking faces in load order. This
-was not confirmed at design time. As the first implementation step, write the macOS tests marked
-GATE below and run them.
+The gate checks the rendering rules in the design section "Font sets". A text run is the shaped text
+of one SVG `<text>` element.
+
+- No fallback needed: a document with all glyphs in the base set keeps today's fonts and bytes.
+- Run with no fallback glyph: it keeps its face and bytes when another run needs fallback.
+- Run with a fallback glyph: every glyph a loaded face has must render. It may render wholly in the
+  fallback face when that face covers the run. Do not assert a specific face for its base-covered
+  characters.
+
+As the first implementation step, write the macOS tests marked GATE below and run them.
 
 - If a listed macOS font path does not exist, adjust `FALLBACK_FONT_FILES` from what `ls` shows in
   `/System/Library/Fonts` and `/System/Library/Fonts/Supplemental`, and record it.
-- If a required character cannot be covered by a bounded font list, or if fallback does not render
-  through the fallback faces, or if a base-covered character changes with fallback on: stop and record
-  a blocker. Do not build a text-run splitter or a system scan.
+- If a required character cannot be covered by a bounded font list, or if Bun or native breaks one of
+  these rules or leaves tofu for a covered glyph: stop and record a blocker. Do not build a text-run
+  splitter, custom font resolver or system scan.
 
 ## Non-goals
 
@@ -138,6 +145,9 @@ glyph, neutral name `NodettoFixture`. It must also load in resvg and fontdb; sef
 - GATE, macOS only (`test.skipIf(process.platform !== "darwin")`): circled numbers 1 to 20, U+301C and U+FF5E -> `missing` empty.
 - GATE, macOS only: `rasterize` with `fallback: true` on SVGs with U+246A and U+246B -> different bytes.
 - GATE, macOS only: an SVG with "A" and U+4E2D gives identical bytes with `fallback` true and false.
+- GATE, macOS only: a base-covered `<text>` beside a separate `<text>` holding U+246A, positioned outside the viewBox -> identical bytes with `fallback` true and false.
+- GATE, macOS only: `A` plus U+246A in one `<text>`, and `A` plus U+246B in the same position, with `fallback: true` -> different bytes, so the fallback glyph is not tofu.
+- GATE, macOS only: export a `node.generic` with a two-line label through `new Editor({document}).exportPageSvg(...)`, once as `Idle`, newline, U+246A and once as `Idle`, newline, `X`. Rewrite each root `viewBox` and `height` so only the `Idle` line shows, and rasterize with `fallback: true` -> identical bytes. This shows the other line keeps its face.
 
 `apps/cli/native/src/render.rs` tests:
 
@@ -145,6 +155,12 @@ glyph, neutral name `NodettoFixture`. It must also load in resvg and fontdb; sef
 - ASCII-only -> `needsFallback` false, `missing` empty.
 - U+200B only -> same.
 - GATE, `#[cfg(target_os = "macos")]`: `png` with `fallback` true on SVGs with U+246A and U+246B -> different bytes.
+- GATE, `#[cfg(target_os = "macos")]`: "A" and U+4E2D -> identical bytes with `fallback` true and false.
+- GATE, `#[cfg(target_os = "macos")]`: a base-covered `<text>` beside a separate `<text>` holding U+246A outside the viewBox -> identical bytes with `fallback` true and false.
+- GATE, `#[cfg(target_os = "macos")]`: `A` plus U+246A against `A` plus U+246B in one `<text>`, with `fallback` true -> different bytes.
+- GATE, `#[cfg(target_os = "macos")]`: two `<text>` elements written as label lines, with the second holding U+246A or `X` and cropped out by the viewBox -> identical bytes with `fallback` true.
+
+Native mixed-run measurement: with `A` plus U+246A, `fallback` true and a viewBox showing only `A`, compare to plain `A` and record in the progress log whether the bytes differ. Either result is allowed, because the rules do not fix the face of `A`. Record it.
 
 ## Verification (each must exit 0)
 
@@ -162,4 +178,14 @@ glyph, neutral name `NodettoFixture`. It must also load in resvg and fontdb; sef
 - `git diff Cargo.lock` shows no added `[[package]]`.
 - `grep -c "node:" apps/cli/src/native-engine.ts` prints 0.
 - `FONT_FILES` unchanged: `git diff apps/cli/src/render-profile.ts` only adds lines.
-- Progress log records final font paths and gate results.
+- Progress log records final font paths, gate results and the native mixed-run measurement.
+
+## Amendment 2026-11-05 (blocked-wave-scope-or-contract, round 1)
+
+Blocker SEF3-ADV-MIXED-RUN-FACE: with fallback on, a base-covered character in a text run that also needs a fallback glyph changes face. The old gate required a stop in that case.
+
+Decision: the accepted design revision replaces that requirement with the text-run rules in "Gate: run first" (design section "Font sets", user-qa Q3). This amendment records that revision. The gate, acceptance criterion and tests above are updated. Plan IDs, waves, dependencies and `writePaths` do not change, and `writePaths` already cover the new tests.
+
+Existing production code should need no change, because the rules match the observed behavior. Change it only if a new test shows a rule is broken and the fix stays inside `writePaths`; otherwise stop and report. Keep `FONT_FILES` unchanged, and do not weaken the existing gate tests or byte-identity checks.
+
+Earlier worker notes saying a design amendment is missing are superseded once this text is committed. Check the committed plan before stopping.

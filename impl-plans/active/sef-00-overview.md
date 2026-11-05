@@ -31,6 +31,13 @@ A file owned in both waves is edited only at that plan's wave:
 - `apps/cli/src/edit/visual-patch.ts`: sef-01, then sef-06.
 - `apps/cli/src/__fixtures__/test-font.ts`: sef-03, then sef-07 if the fixture needs a repair.
 
+## Amendment 2026-11-05 (blocked-wave-scope-or-contract, round 1)
+
+Accepted so far: sef-01, sef-02, sef-04 and sef-05. Pending: sef-03, sef-06, sef-07 and sef-08. Plan IDs, waves, dependencies and `writePaths` do not change.
+
+- sef-06: the written-document parity contract now excludes the generated `index` on `add` batches, and the Bun PDF difference check is dropped. See that plan's amendment.
+- sef-03: the accepted design revision replaces the base-face requirement with text-run rules (design section "Font sets", user-qa Q3). A document needing no fallback and a run with no fallback glyph stay byte-identical. A run containing a fallback glyph may render wholly in the fallback face. The sef-03 gate and tests are updated, and a text-run splitter stays out of scope. SEF3-ADV-MIXED-RUN-FACE stays open until sef-03 passes those tests and its reviews. sef-07 and sef-08 stay held behind sef-03.
+
 ## Pinned contracts
 
 ```ts

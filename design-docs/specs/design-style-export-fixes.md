@@ -1,6 +1,8 @@
 # Style clearing, raster glyph fallback and box-label vertical alignment
 
-Status: DESIGNED, 2026-11-05.
+Status: DESIGNED, 2026-11-05. Revised the same day after implementation: "Font sets"
+now states the text-run rules, because usvg replaces a whole run when one fallback
+face covers it. Accepted plans sef-01, sef-02, sef-04 and sef-05 are unaffected.
 
 Owner decisions: `design-docs/user-qa/style-export-fixes.md`. Each question has
 a default that this design implements. A different answer changes only the
@@ -137,14 +139,32 @@ The macOS paths must be confirmed on a Mac during implementation. The macOS
 coverage test below fails if the list does not cover the required characters.
 
 Fallback faces load only when the base set lacks a needed glyph, and they load
-after the base faces. This has three effects:
+after the base faces. The full system scan is never added to a path that does
+not already have it.
 
-- A document whose glyphs are all in the base set renders with exactly today's
-  font set, so its raster output cannot change.
-- Characters the base set covers keep their current face in documents that do
-  need fallback, provided the usvg per-character fallback walks faces in load
-  order. The implementer must confirm this (see "Verification gaps").
-- The full system scan is never added to a path that does not already have it.
+Rendering rules, where a text run is the shaped text of one SVG `<text>` element:
+
+- **No fallback needed.** A document whose glyphs are all in the base set renders
+  with exactly today's font set, so its raster output cannot change.
+- **Run with no fallback glyph.** It keeps its face and bytes when another run in
+  the document needs fallback.
+- **Run with a fallback glyph.** Every missing glyph must render when a loaded face
+  has it. If one fallback face covers the whole run, the whole run may render in
+  that face. Otherwise only the missing glyphs come from the fallback face.
+
+The third rule follows the library. `usvg-0.48.1/src/text/layout.rs:1379-1383`
+replaces all of a run's glyphs when the fallback shaping matches every glyph, and
+otherwise copies only the missing ones. The Bun reproduction shows the same result:
+`A` next to U+246A changes face, while a separate `A` element stays byte-identical
+(`tmp/sef-s733/sef-03-font-coverage-host/mixed-run-reproduction.log` and
+`separate-element-reproduction.log`).
+
+These runs show tofu today, so the third rule changes only text that is already
+broken. Node and geo labels write one `<text>` per wrapped line
+(`packages/core/src/svg-export/basic-shapes.ts:134`,
+`packages/core/src/svg-export/paint.ts:267`), so other lines of a label should keep
+their face. The tests below confirm this. A text-run splitter or custom font resolver
+is out of scope (user-qa Q3).
 
 ### Coverage contract
 
@@ -478,6 +498,18 @@ All fixtures are self-authored, with neutral labels such as `Idle` and `Running`
 - On macOS only (`skipIf` elsewhere): circled numbers 1 to 20, U+301C and U+FF5E
   report nothing missing, and the PNGs for two different characters such as U+246A
   and U+246B differ. Identical bytes would mean tofu.
+- Rendering rules, on macOS only, in Bun and native:
+  - `A` plus U+4E2D, with both glyphs in the base set -> identical bytes with fallback
+    on and off.
+  - A base-covered `<text>` beside a separate `<text>` holding U+246A, with the second
+    clipped out of the image -> identical bytes with fallback on and off.
+  - `A` plus U+246A in one `<text>` -> the U+246A glyph is not tofu: images for U+246A
+    and U+246B in that position differ. This characterizes the third rule. It does not
+    assert a specific face for `A`.
+  - An exported two-line label with U+246A on one line -> the other line's pixels match
+    the same label with that line's U+246A replaced by ASCII, or the difference is
+    reported as a stop under "Verification gaps".
+  - Native mixed-run behavior is recorded in the progress log.
 - Injected `io.fontCoverage` tests:
   - `needsFallback` reaches `rasterize`
   - ASCII-only text passes `false`
@@ -528,10 +560,12 @@ registry were blocked. So:
 
 - G1 and G2 root causes come from reading code and were not reproduced.
 - The fallback font paths and their coverage are unconfirmed.
-- The usvg and resvg-js per-character fallback, including its face order, is
-  unconfirmed. The first G2 implementation step must confirm it with the macOS PNG
-  test. If it does not hold, stop and report rather than building a text-run
-  splitter, which this design does not include.
+- The fallback mechanism is confirmed from usvg source for native, and by the Bun
+  reproduction log for Bun. The resvg-js source was not inspected, and native
+  mixed-run rendering has not been measured.
+- sef-03 must measure and record native mixed-run behavior. If native or Bun leaves
+  tofu for a covered glyph, or breaks a rule in "Font sets", stop and report rather
+  than building a text-run splitter, which this design does not include.
 
 ## Rollout constraints
 
@@ -539,6 +573,10 @@ registry were blocked. So:
   style keys, and deep-merged `visual` patches in `update`.
 - No document migration and no schema version change. Documents without
   `boxLabelAlign` render byte-identically.
+- The sef-03 Gate and acceptance criterion, and the fallback text in sef-00 and the
+  manifest, must be updated to the rules in "Font sets" and committed before sef-03 is
+  dispatched again, because its workers stop if the committed text still requires the
+  old gate. Plan IDs, waves, dependencies and `writePaths` stay unchanged.
 - Editing `verticalAlign` on a bound box removes that element's text-style link, as the
   app already does for typography edits.
 - A sibling branch from the same base changes edit selectors and lint wiring. Expect
