@@ -93,3 +93,21 @@ test("SVG export draws each wrapped edge and shape label line separately", () =>
   expect(svg).toMatch(/<rect [^>]*fill="#fffdf8"[^>]*\/><text [^>]*>charges</);
   expect(svg).toMatch(/stroke="#fffdf8"[^>]*paint-order="stroke"[^>]*>card</);
 });
+
+test("box alignment is opt-in and clamps overflow", async () => {
+  const { boxLabelVerticalAlign, alignedLabelTop } = await import(
+    "./label-layout.ts"
+  );
+  for (const verticalAlign of ["top", "middle", "bottom"] as const) {
+    expect(boxLabelVerticalAlign({ style: { verticalAlign } })).toBe("middle");
+    expect(
+      boxLabelVerticalAlign({ style: { verticalAlign, boxLabelAlign: true } }),
+    ).toBe(verticalAlign);
+  }
+  expect(boxLabelVerticalAlign({ style: { boxLabelAlign: true } })).toBe(
+    "middle",
+  );
+  expect(alignedLabelTop("top", 100, 20, 10)).toBe(10);
+  expect(alignedLabelTop("bottom", 100, 20, 10)).toBe(70);
+  expect(alignedLabelTop("bottom", 30, 50, 10)).toBe(10);
+});

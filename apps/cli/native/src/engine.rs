@@ -121,7 +121,16 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             let svg = string(args, 0, ctx)?;
             let scale = args.get_or_undefined(1).to_number(ctx)? as f32;
             let fonts = optional_string(args, 2, ctx)?;
-            byte_value(render::png(svg, scale, fonts).map_err(host_error)?, ctx)
+            byte_value(
+                render::png(svg, scale, fonts, args.get_or_undefined(3).to_boolean())
+                    .map_err(host_error)?,
+                ctx,
+            )
+        }
+        "fontCoverage" => {
+            let text = string(args, 0, ctx)?;
+            let fonts = optional_string(args, 1, ctx)?;
+            Ok(js_string!(render::font_coverage(&text, fonts).map_err(host_error)?).into())
         }
         "pdf" => {
             let png = bytes(args.get_or_undefined(0), ctx)?;
@@ -214,7 +223,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
     .map_err(|e| e.to_string())?;
     ctx.eval(Source::from_bytes(r#"
         globalThis.native = Object.fromEntries([
-          'path','readText','readBytes','exists','writeBytes','attachment','open','png','pdf',
+          'path','readText','readBytes','exists','writeBytes','attachment','open','png','pdf','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };

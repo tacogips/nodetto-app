@@ -1,4 +1,5 @@
 import type { Visual } from "@nodetto/ir";
+import { alignedLabelTop, boxLabelVerticalAlign } from "./label-layout.ts";
 import { NODE_DEFAULT_WIDTH, NODE_DEFAULT_HEIGHT } from "./shapes/node.ts";
 import { wrapTextLines } from "./text-layout.ts";
 
@@ -14,12 +15,16 @@ export function nodeLabelLayout(label: string, visual: Visual) {
     fontSize,
     visual.style?.letterSpacing ?? 0,
   );
+  const align = boxLabelVerticalAlign(visual);
   return {
     lines,
     fontSize,
     lineHeight,
     width,
     height,
-    top: Math.max(0, (height - lines.length * lineHeight) / 2),
+    top:
+      align === "middle"
+        ? Math.max(0, (height - lines.length * lineHeight) / 2)
+        : alignedLabelTop(align, height, lines.length * lineHeight, 10),
   };
 }

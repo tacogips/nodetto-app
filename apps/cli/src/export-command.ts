@@ -43,6 +43,10 @@ import {
 import { helpFor } from "./help.ts";
 import { collapseWarnings } from "./warnings.ts";
 import { resolveId } from "./ids.ts";
+import {
+  attributeMissingGlyphs,
+  glyphMissingMessage,
+} from "./glyph-coverage.ts";
 
 const EXPORT_OPTIONS = new Set([
   "--format",
@@ -92,6 +96,7 @@ export interface RasterBackend {
     svg: string,
     scale: number,
     fontDir: string | undefined,
+    fallback?: boolean,
   ): Promise<Uint8Array>;
   pngToPdf(
     png: Uint8Array,
@@ -333,7 +338,7 @@ export async function exportCommand(
   if (svg === null)
     return fail(`Page "${page.name}" has no visible content to export.`);
 
-  const warnings =
+  let warnings =
     loaded.warnings +
     (elementId === undefined && TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind)
       ? (() => {
@@ -387,6 +392,27 @@ export async function exportCommand(
       }
     }
     svg = snapSvgFrameToPixels(svg, scale);
+    const coverage = io.fontCoverage?.(svg, parsed.options.get("--font-dir"));
+    if (coverage?.missing.length) {
+      const target =
+        elementId === undefined ? undefined : editor.store.get(elementId);
+      const elements = loaded.document.elements.filter(
+        (element) =>
+          element.page === page.id &&
+          (target === undefined ||
+            target.type === "frame" ||
+            target.type === "group" ||
+            element.id === target.id),
+      );
+      const { rows, unattributed } = attributeMissingGlyphs(
+        elements,
+        new Set(coverage.missing),
+      );
+      for (const row of rows)
+        warnings += `warning: glyph-missing ${row.elementId}: ${glyphMissingMessage(row.codePoints)}\n`;
+      if (unattributed.length)
+        warnings += `warning: glyph-missing page ${page.id}: ${glyphMissingMessage(unattributed)}\n`;
+    }
     const snapped = svgRasterDimensions(svg);
     pixels = rasterDimensions(snapped.width, snapped.height, scale);
     const renderer = backend ?? (await import("./raster-backend.ts"));
@@ -394,6 +420,7 @@ export async function exportCommand(
       svg,
       scale,
       parsed.options.get("--font-dir"),
+      coverage?.needsFallback === true,
     );
     bytes =
       exportFormat === "png"

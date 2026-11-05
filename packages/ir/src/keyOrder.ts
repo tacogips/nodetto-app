@@ -54,6 +54,7 @@ export const VISUAL_STYLE_KEY_ORDER: KeyOrder = {
     "textAlign",
     "textDecoration",
     "verticalAlign",
+    "boxLabelAlign",
     "effects",
     "shadow",
   ],

@@ -40,6 +40,11 @@ It exits 0 when there are no
 error-level findings (warnings may still be printed), 1 when error-level
 findings exist, and 2 for usage, parse, or config errors; it has no `--strict`
 option. A whole-page SVG, PNG or PDF export of an architecture, freeform or flowchart page prints the same findings as `warning:` lines on stderr.
+`lint --font-dir <dir>` adds fonts for coverage. `glyph-missing` is a warning
+naming the element and code points on any page kind where coverage can be
+determined. A document with no lintable page and no missing glyph keeps the
+existing error.
+
 `bpmn import` and `bpmn export` exit 3 with `--strict` when they report
 warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
 `breadboard bom --check` and `breadboard netlist --check` exit 1 on drift;
@@ -122,11 +127,29 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   netlists and PCB Gerber ZIPs use `breadboard bom`, `breadboard netlist` and
   `breadboard gerber`. `drawio import`, `bpmn import`, `breadboard import`
   and `gerber import` convert those files to JSONL.
+  PNG and PDF load fallback fonts when base fonts lack a glyph. When coverage
+  can be determined, a glyph no font has produces `warning: glyph-missing
+  <id>: ...` on stderr with code points. SVG is unchanged.
 - The desktop app applies outside changes to an open file live, keeping the
   camera and selection. With unsaved local edits it merges three ways at element
   and field level (a move and a rename of the same table both survive) and
   autosaves the result; only the same field changed on both sides, or a file that
   now holds a different document, raises the "File changed on disk" banner.
+
+In `edit update`, `visual` and `semantic` objects deep-merge, arrays replace,
+and null removes a key; removing a required field is an error. For
+`strokeDashArray`, `[]` means solid: it removes both `strokeDashArray` and
+`dash` unless the patch sets `dash`. Null removes only `strokeDashArray`, so a
+stored `dash` still applies; `add` rejects `[]`. Unknown `visual.style` keys in
+`add` and `update` are rejected with suggestions.
+
+For `node.generic` and `shape.geo` labels, `visual.style.verticalAlign` accepts
+`top`, `middle` (default), or `bottom`. `add` and `update` write
+`boxLabelAlign: true` with it; without that marker the label stays centered,
+so hand-written JSONL must include the marker. Setting `verticalAlign` on a box
+bound to a text style removes its link unless the patch also sets `textStyle`.
+`boxLabelAlign: true` alone keeps the link and follows the style value;
+`verticalAlign: null` removes both keys.
 
 The app's **Export** dialog has a **Page** selector showing each page's name and
 kind. Formats are grouped into Artwork, Diagram source, and Web & developer

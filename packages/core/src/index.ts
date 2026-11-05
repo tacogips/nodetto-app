@@ -710,7 +710,9 @@ export {
 export { nodeLabelLayout } from "./node-label.ts";
 export {
   BOX_LABEL_FONT_SIZE,
+  alignedLabelTop,
   boxLabelLayout,
+  boxLabelVerticalAlign,
   CONNECTOR_LABEL_FONT_SIZE,
   CONNECTOR_LABEL_GAP,
   CONNECTOR_LABEL_WIDTH,

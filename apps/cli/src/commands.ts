@@ -46,6 +46,7 @@ import { breadboardCommand } from "./breadboard-command.ts";
 import { gerberCommand } from "./gerber-command.ts";
 import { pcbCommand } from "./pcb-command.ts";
 import { MIN_PREFIX, shortIds, type Resolution } from "./ids.ts";
+import { glyphMissingMessage, glyphRowsByPage } from "./glyph-coverage.ts";
 
 /** Result of one command: text for stdout/stderr plus a process exit code. */
 export interface CommandResult {
@@ -67,6 +68,13 @@ export const USAGE = OVERVIEW;
 
 /** Reads and writes go through this seam so commands stay testable. */
 export interface CommandIo {
+  /** Query raster font coverage without a system font scan. */
+  fontCoverage?(
+    text: string,
+    fontDir: string | undefined,
+  ):
+    | { readonly needsFallback: boolean; readonly missing: readonly number[] }
+    | undefined;
   readText(path: string): string;
   /** Binary input (ZIP archives); required only by commands that read bytes. */
   readBytes?(path: string): Uint8Array;
@@ -92,7 +100,7 @@ interface ParsedArgs {
 
 const VALUE_OPTIONS = new Set(["--dialect", "--page", "--output", "--check"]);
 const ARRANGE_OPTIONS = new Set(["--mode", "--direction", "--page"]);
-const LINT_OPTIONS = new Set(["--page", "--config", "--format"]);
+const LINT_OPTIONS = new Set(["--page", "--config", "--format", "--font-dir"]);
 const LINT_NO_PAGES =
   "The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.";
 const BPMN_IMPORT_OPTIONS = new Set(["--output"]);
@@ -294,15 +302,33 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       page.kind === "breadboard" ||
       TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind),
   );
-  if (!pages.length) return fail(LINT_NO_PAGES);
+  const notationIds = new Set(pages.map((page) => page.id));
+  const glyphRows = glyphRowsByPage(document, (text) =>
+    io.fontCoverage?.(text, parsed.options.get("--font-dir")),
+  );
   const query = parsed.options.get("--page");
   let selectedPages: readonly Page[];
   if (query !== undefined) {
-    const selected = selectPage(document, query, pages, LINT_NO_PAGES);
-    if (typeof selected === "string") return fail(selected);
+    let selected = pages.length
+      ? selectPage(document, query, pages, LINT_NO_PAGES)
+      : LINT_NO_PAGES;
+    if (typeof selected === "string") {
+      const firstError = selected;
+      const fallback = selectPage(
+        document,
+        query,
+        document.pages,
+        LINT_NO_PAGES,
+      );
+      if (typeof fallback === "string" || !glyphRows.get(fallback.id)?.length)
+        return fail(firstError);
+      selected = fallback;
+    }
     selectedPages = [selected];
   } else {
-    selectedPages = pages;
+    selectedPages = document.pages.filter(
+      (page) => notationIds.has(page.id) || glyphRows.get(page.id)?.length,
+    );
   }
   if (!selectedPages.length) return fail(LINT_NO_PAGES);
 
@@ -336,34 +362,43 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     readonly findings: readonly LintFindingRow[];
   }[] = selectedPages.map((page) => ({
     page,
-    findings:
-      page.kind === "bpmn"
-        ? lintBpmnPage(document, page.id, config, context).map(
-            ({ elementId, severity, message, ruleId }) => ({
-              elementId,
-              severity,
-              message,
-              ruleId,
-            }),
-          )
-        : page.kind === "breadboard"
-          ? lintBreadboardPage(document, page.id).map(
-              ({ elementId, severity, message, ruleId, pin }) => ({
-                elementId,
-                severity,
-                message,
-                ruleId,
-                ...(pin === undefined ? {} : { pin }),
-              }),
-            )
-          : lintTextLayoutPage(document, page.id).map(
+    findings: [
+      ...(notationIds.has(page.id)
+        ? page.kind === "bpmn"
+          ? lintBpmnPage(document, page.id, config, context).map(
               ({ elementId, severity, message, ruleId }) => ({
                 elementId,
                 severity,
                 message,
                 ruleId,
               }),
-            ),
+            )
+          : page.kind === "breadboard"
+            ? lintBreadboardPage(document, page.id).map(
+                ({ elementId, severity, message, ruleId, pin }) => ({
+                  elementId,
+                  severity,
+                  message,
+                  ruleId,
+                  ...(pin === undefined ? {} : { pin }),
+                }),
+              )
+            : lintTextLayoutPage(document, page.id).map(
+                ({ elementId, severity, message, ruleId }) => ({
+                  elementId,
+                  severity,
+                  message,
+                  ruleId,
+                }),
+              )
+        : []),
+      ...(glyphRows.get(page.id) ?? []).map((row) => ({
+        elementId: row.elementId,
+        severity: "warning" as const,
+        ruleId: "glyph-missing",
+        message: glyphMissingMessage(row.codePoints),
+      })),
+    ],
   }));
   const allFindings = reports.flatMap((report) => report.findings);
   const errors = allFindings.filter(

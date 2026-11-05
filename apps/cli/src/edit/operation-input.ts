@@ -46,11 +46,12 @@ export function parseOperations(text: string): readonly JsonObject[] {
 
 /** Objects merge key by key, arrays and scalars replace, null removes a key. */
 export function deepMerge(base: Json, patch: Json): Json {
-  if (!isPlainObject(base) || !isPlainObject(patch)) return patch;
-  const result: Record<string, Json> = { ...base };
+  if (!isPlainObject(patch)) return patch;
+  const source = isPlainObject(base) ? base : {};
+  const result: Record<string, Json> = { ...source };
   for (const [key, value] of Object.entries(patch)) {
     if (value === null) delete result[key];
-    else result[key] = deepMerge(base[key], value);
+    else result[key] = deepMerge(source[key], value);
   }
   return result;
 }
