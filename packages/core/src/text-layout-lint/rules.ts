@@ -1,6 +1,10 @@
 import type { Element, ElementId, PageKind } from "@nodetto/ir";
 import type { Box, Vec } from "../geometry.ts";
-import { boxLabelLayout } from "../label-layout.ts";
+import {
+  alignedLabelTop,
+  boxLabelLayout,
+  boxLabelVerticalAlign,
+} from "../label-layout.ts";
 import { nodeLabelLayout } from "../node-label.ts";
 import { textNoteText } from "../shapes/textNote.ts";
 import { readString } from "../svg-export/markup.ts";
@@ -95,10 +99,17 @@ export function labelOverflow(item: Item): TextLayoutLintFinding[] {
     }
   }
   const height = layout.lines.length * layout.lineHeight;
-  if (height > box.height + EPS) {
-    const top = node
-      ? (layout as ReturnType<typeof nodeLabelLayout>).top
-      : (box.height - height) / 2;
+  const align = boxLabelVerticalAlign(element.visual);
+  const top = node
+    ? (layout as ReturnType<typeof nodeLabelLayout>).top
+    : align === "middle"
+      ? (box.height - height) / 2
+      : alignedLabelTop(align, box.height, height, TEXT_NOTE_PADDING_X);
+  if (
+    align === "middle"
+      ? height > box.height + EPS
+      : top + height > box.height + EPS
+  ) {
     const clipped = layout.lines.filter(
       (_, i) => top + (i + 1) * layout.lineHeight > box.height + EPS,
     ).length;

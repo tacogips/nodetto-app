@@ -15,6 +15,7 @@ pdf-writer = "0.15"
 png = "0.18"
 rand = "0.10"
 resvg = "0.48"
+skrifa = "0.44"
 rmcp = { version = "3.5", features = ["server", "transport-io"] }
 boa_engine = { version = "0.22", default-features = false }
 serde = { version = "1", features = ["derive"] }

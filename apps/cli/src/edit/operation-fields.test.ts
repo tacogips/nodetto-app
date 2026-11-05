@@ -7,6 +7,45 @@ import { runOperations } from "../edit-command.ts";
 import { Batch } from "./batch.ts";
 import { checkOperationFields, OPERATION_FIELDS } from "./operation-fields.ts";
 
+test("validates visual style keys for add and update", () => {
+  const check = (op: string, style: unknown, extra = {}) =>
+    checkOperationFields({ op, visual: { style }, ...extra }, 0);
+  expect(() => check("update", { valign: 1 })).toThrow(
+    'Did you mean "verticalAlign"?',
+  );
+  expect(() => check("add", { textVerticalAlign: "top" })).toThrow(
+    'Did you mean "verticalAlign"?',
+  );
+  expect(() => check("add", { valign: 1 }, { shape: "rectangle" })).toThrow(
+    'unknown visual.style key "valign"',
+  );
+  try {
+    check("update", { align: 1 });
+    throw new Error("expected rejection");
+  } catch (error) {
+    expect(String(error)).toContain('"textAlign"');
+    expect(String(error)).toContain('"verticalAlign"');
+  }
+  try {
+    check("update", { bogusxyz: 1, otherxyz: null });
+    throw new Error("expected rejection");
+  } catch (error) {
+    expect(String(error)).toContain('unknown visual.style key "bogusxyz"');
+    expect(String(error)).toContain('unknown visual.style key "otherxyz"');
+    expect(String(error)).toContain("Valid style keys: fill");
+    expect(String(error)).not.toContain("Did you mean");
+  }
+  expect(() => check("update", { valign: null })).toThrow(
+    'unknown visual.style key "valign"',
+  );
+  expect(() =>
+    check("add", { fill: "#112233", verticalAlign: "top", extensions: {} }),
+  ).not.toThrow();
+  expect(() => check("connect", { valign: 1 })).not.toThrow();
+  expect(() => checkOperationFields({ op: "add", visual: 3 }, 0)).not.toThrow();
+  expect(() => check("update", 3)).not.toThrow();
+});
+
 test("unknown fields are rejected for every operation", () => {
   for (const [op, fields] of Object.entries(OPERATION_FIELDS)) {
     expect(() => checkOperationFields({ op, bogus: true }, 0)).toThrow(

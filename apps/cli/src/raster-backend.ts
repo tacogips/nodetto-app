@@ -6,9 +6,9 @@ import {
   svgRasterDimensions,
 } from "@nodetto/core";
 
-import { FONT_FILES } from "./render-profile.ts";
+import { FALLBACK_FONT_FILES, FONT_FILES } from "./render-profile.ts";
 
-function fontOptions(fontDir: string | undefined) {
+function fontOptions(fontDir: string | undefined, fallback: boolean) {
   const files = FONT_FILES.filter((path) => existsSync(path));
   const dirs = fontDir === undefined ? [] : [fontDir];
   if (!files.length && !dirs.length) return { loadSystemFonts: true };
@@ -17,7 +17,10 @@ function fontOptions(fontDir: string | undefined) {
   const sans = family("Helvetica", family("DejaVuSans", "Arial"));
   return {
     loadSystemFonts: false,
-    fontFiles: [...files],
+    fontFiles: [
+      ...files,
+      ...(fallback ? FALLBACK_FONT_FILES.filter(existsSync) : []),
+    ],
     fontDirs: dirs,
     defaultFontFamily: sans,
     sansSerifFamily: sans,
@@ -30,13 +33,14 @@ export async function rasterize(
   svg: string,
   scale: number,
   fontDir: string | undefined,
+  fallback = false,
 ): Promise<Uint8Array> {
   const viewport = svgRasterDimensions(svg);
   rasterDimensions(viewport.width, viewport.height, scale);
   const { Resvg } = await import("@resvg/resvg-js");
   const rendered = new Resvg(svg, {
     fitTo: { mode: "zoom", value: scale },
-    font: fontOptions(fontDir),
+    font: fontOptions(fontDir, fallback),
   }).render();
   return rendered.asPng();
 }

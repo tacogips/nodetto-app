@@ -249,7 +249,19 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     semantic.unknownField warnings naming the operation; --format json lists
     them under "warnings". The batch still applies.
   - update deep-merges objects; arrays are replaced whole (use append and
-    remove-item for single list items); null removes a key.
+    remove-item for single list items); null removes a key. This applies to
+    visual and semantic; removing a required field is an error.
+  - update style.strokeDashArray: [] means solid: it removes strokeDashArray
+    and dash unless the patch sets dash. null removes only strokeDashArray,
+    so a stored dash still applies. add rejects an empty strokeDashArray.
+  - add and update reject unknown visual.style keys and suggest valid keys.
+  - visual.style.verticalAlign (top, middle, bottom; default middle) positions
+    node.generic and shape.geo labels. add and update write boxLabelAlign: true
+    with it. Without the marker box labels stay centered; handwritten JSONL
+    must include it. Setting verticalAlign on a box bound to a text style
+    removes its link unless the patch sets textStyle. boxLabelAlign: true alone
+    keeps the link and follows the style value; verticalAlign: null removes both
+    keys.
   - List items that need ids (columns, indexes, attributes) get generated ids.
   - add-page appends the page unless it gives "before" or "after" (a page) or
     "order" (a base62 fractional key, compared with the pages' "order"
@@ -390,6 +402,9 @@ Render one page exactly as the app's page export does.
   --font-dir     Extra directory of fonts for PNG and PDF (for example CJK
                  fonts). Common system sans and mono faces are always loaded.
 
+PNG and PDF load fallback fonts when base fonts lack a glyph. If no font has
+a glyph, stderr reports warning: glyph-missing <id>: with its code points
+where coverage can be determined. SVG is unchanged.
 PNG text uses those fonts, so metrics can differ slightly from the app.
 
 SVG, PNG and PDF exports of a whole architecture, freeform or flowchart page
@@ -475,13 +490,16 @@ are warnings.
 ${EXIT_CODES}`,
 
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
-                        [--config <file>] [--format text|json]
+                        [--config <file>] [--format text|json] [--font-dir <dir>]
 
 Lint BPMN, breadboard, architecture, freeform and flowchart pages from a
 nodetto document or BPMN XML.
 Text output is empty when clean; --format json always prints a report. A
 .bpmnlintrc in the working directory is used when --config is not given and a
-BPMN page is linted.
+BPMN page is linted. --font-dir adds fonts for glyph coverage. glyph-missing
+is a warning naming the element and code points on any page kind where coverage
+can be determined. A document with no lintable page and no missing glyph keeps
+the existing error.
 
 Architecture, freeform and flowchart pages are checked for text layout with
 warning rules:

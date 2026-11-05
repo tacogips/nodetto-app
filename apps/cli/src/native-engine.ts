@@ -16,11 +16,26 @@ declare const native: {
   readStdin(): string;
   attachment(document: string, path: string): Uint8Array;
   open(path: string, app: string | undefined, link: string | undefined): void;
-  png(svg: string, scale: number, fontDir: string | undefined): Uint8Array;
+  png(
+    svg: string,
+    scale: number,
+    fontDir: string | undefined,
+    fallback: boolean,
+  ): Uint8Array;
+  fontCoverage(text: string, fontDir: string | undefined): string;
   pdf(png: Uint8Array, layout: string): Uint8Array;
 };
 
 const io = {
+  fontCoverage: (text: string, fontDir: string | undefined) =>
+    (JSON.parse(
+      native.fontCoverage(
+        text,
+        fontDir === undefined ? undefined : native.path(fontDir),
+      ),
+    ) ?? undefined) as
+      | { readonly needsFallback: boolean; readonly missing: readonly number[] }
+      | undefined,
   readText: (path: string) => native.readText(native.path(path)),
   readBytes: (path: string) =>
     new Uint8Array(native.readBytes(native.path(path))),
@@ -52,12 +67,13 @@ Object.assign(globalThis, {
     const result =
       command === "export" && !help
         ? await exportCommand(io, rest, {
-            rasterize: async (svg, scale, fontDir) =>
+            rasterize: async (svg, scale, fontDir, fallback) =>
               new Uint8Array(
                 native.png(
                   svg,
                   scale,
                   fontDir === undefined ? undefined : native.path(fontDir),
+                  fallback ?? false,
                 ),
               ),
             pngToPdf: async (png, width, height, options) =>

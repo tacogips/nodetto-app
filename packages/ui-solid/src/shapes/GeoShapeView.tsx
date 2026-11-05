@@ -17,6 +17,7 @@ import {
 import type { Element, GeoKind, GeoShapeSemantic } from "@nodetto/ir";
 import { createMemo, For, type JSX, Match, Show, Switch } from "solid-js";
 import { SvgFillGradient } from "./SvgFillGradient.tsx";
+import { geoLabelAlignStyle } from "./label-align-style.ts";
 import { labelStyle, svgStyle } from "./visual.ts";
 
 export interface GeoShapeViewProps {
@@ -139,7 +140,15 @@ export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
       <div
         class="nodetto-label"
         data-smart-text
-        style={labelStyle(props.element.visual)}
+        style={{
+          ...labelStyle(props.element.visual),
+          ...geoLabelAlignStyle(
+            props.element.visual,
+            props.box.height,
+            label().lines.length,
+            label().lineHeight,
+          ),
+        }}
       >
         <span
           class="nodetto-label-lines"

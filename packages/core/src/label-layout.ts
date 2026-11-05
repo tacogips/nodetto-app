@@ -11,6 +11,26 @@ import {
   wrapTextLines,
 } from "./text-layout.ts";
 
+export function boxLabelVerticalAlign(
+  visual: Visual,
+): "top" | "middle" | "bottom" {
+  return visual.style?.boxLabelAlign === true
+    ? (visual.style.verticalAlign ?? "middle")
+    : "middle";
+}
+
+export function alignedLabelTop(
+  align: "top" | "middle" | "bottom",
+  height: number,
+  contentHeight: number,
+  padding: number,
+): number {
+  if (align === "top") return padding;
+  if (align === "bottom")
+    return padding + Math.max(0, height - 2 * padding - contentHeight);
+  return Math.max(0, (height - contentHeight) / 2);
+}
+
 export const BOX_LABEL_FONT_SIZE = 13;
 export const CONNECTOR_LABEL_FONT_SIZE = 11;
 /** Edge labels wrap at this width, centred on the route midpoint. */

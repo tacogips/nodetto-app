@@ -46,3 +46,23 @@ test("multiline generic nodes round trip, undo and export the same wrapped lines
   editor.redo();
   expect(editor.store.get(node.id)?.semantic).toEqual(updated.semantic);
 });
+
+test("node vertical alignment requires the marker", () => {
+  const base = { width: 100, height: 100 };
+  expect(
+    nodeLabelLayout("Widget", { ...base, style: { verticalAlign: "top" } }).top,
+  ).toBe(nodeLabelLayout("Widget", base).top);
+  expect(nodeLabelLayout("Widget", base).top).toBeCloseTo(42.2);
+  expect(
+    nodeLabelLayout("Widget", {
+      ...base,
+      style: { verticalAlign: "top", boxLabelAlign: true },
+    }).top,
+  ).toBe(10);
+  expect(
+    nodeLabelLayout("Widget", {
+      ...base,
+      style: { verticalAlign: "bottom", boxLabelAlign: true },
+    }).top,
+  ).toBeCloseTo(74.4);
+});

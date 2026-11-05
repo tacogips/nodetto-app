@@ -1,3 +1,4 @@
+import { VISUAL_STYLE_KEY_ORDER } from "@nodetto/ir";
 import { OperationError, type JsonObject } from "./operation-input.ts";
 
 export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
@@ -99,6 +100,50 @@ export function checkOperationFields(
       : undefined;
   if (!fields) return;
   checkFields(operation, fields, index);
+  if (operation["op"] === "add" || operation["op"] === "update")
+    checkVisualStyleFields(operation, index);
+}
+
+function checkVisualStyleFields(operation: JsonObject, index: number): void {
+  const visual = operation["visual"];
+  if (!visual || typeof visual !== "object" || Array.isArray(visual)) return;
+  const style = (visual as JsonObject)["style"];
+  if (!style || typeof style !== "object" || Array.isArray(style)) return;
+  const valid = [...VISUAL_STYLE_KEY_ORDER.keys, "extensions"];
+  const errors = Object.keys(style)
+    .filter((key) => !valid.includes(key))
+    .map((key) => {
+      const name = key.toLowerCase();
+      const suggestions = valid
+        .map((candidate, order) => {
+          const lower = candidate.toLowerCase();
+          let position = 0;
+          for (const char of lower) if (char === name[position]) position++;
+          return {
+            candidate,
+            order,
+            score: distance(name, lower),
+            matches:
+              position === name.length ||
+              name.includes(lower) ||
+              lower.includes(name),
+          };
+        })
+        .filter(({ score, matches }) => score <= 2 || matches)
+        .sort((a, b) => a.score - b.score || a.order - b.order)
+        .slice(0, 3)
+        .map(({ candidate }) => `"${candidate}"`);
+      const hint =
+        suggestions.length === 1
+          ? suggestions[0]
+          : `${suggestions.slice(0, -1).join(", ")} or ${suggestions.at(-1)}`;
+      return `unknown visual.style key "${key}".${suggestions.length ? ` Did you mean ${hint}?` : ""}`;
+    });
+  if (errors.length)
+    throw new OperationError(
+      index,
+      `${errors.join(" ")} Valid style keys: ${valid.join(", ")}.`,
+    );
 }
 
 export function checkFields(

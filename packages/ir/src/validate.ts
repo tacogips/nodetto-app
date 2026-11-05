@@ -659,6 +659,9 @@ function validateVisual(
     ["top", "middle", "bottom"],
     { optional: true },
   );
+  checkBoolean(out, style["boxLabelAlign"], `${path}.style.boxLabelAlign`, {
+    optional: true,
+  });
   warnUnknownFields(
     out,
     style,

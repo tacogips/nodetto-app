@@ -1,7 +1,7 @@
 // Only the shared editor engine is bundled. Native CLI releases embed this
 // portable JS as data and interpret it without JIT or external JS runtimes.
 import { RASTER_LIMITS } from "@nodetto/core";
-import { FONT_FILES } from "../src/render-profile.ts";
+import { FALLBACK_FONT_FILES, FONT_FILES } from "../src/render-profile.ts";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 const root = resolve(import.meta.dir, "..");
@@ -42,6 +42,7 @@ await Bun.write(
   resolve(output, "render-profile.json"),
   JSON.stringify({
     fonts: FONT_FILES,
+    fallbackFonts: FALLBACK_FONT_FILES,
     limits: RASTER_LIMITS,
   }),
 );

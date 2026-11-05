@@ -12,7 +12,7 @@ import {
   sampleGradient,
   strokeGradientId,
 } from "../gradient.ts";
-import { boxLabelLayout } from "../label-layout.ts";
+import { alignedLabelTop, boxLabelLayout } from "../label-layout.ts";
 import { strokeDashCss } from "../stroke-dash.ts";
 import { type Attrs, fmt, tag, text, wrap } from "./markup.ts";
 import { type SvgTheme, TEXT_PADDING } from "./theme.ts";
@@ -238,6 +238,7 @@ export function centredLabel(
   label: string,
   visual: Visual,
   theme: SvgTheme,
+  verticalAlign: "top" | "middle" | "bottom" = "middle",
 ): string {
   if (label === "") {
     return "";
@@ -251,9 +252,18 @@ export function centredLabel(
         : box.x + box.width / 2;
   const layout = boxLabelLayout(label, box.width, visual, theme.fontSize);
   const top =
-    box.y +
-    box.height / 2 -
-    ((layout.lines.length - 1) * layout.lineHeight) / 2;
+    verticalAlign === "middle"
+      ? box.y +
+        box.height / 2 -
+        ((layout.lines.length - 1) * layout.lineHeight) / 2
+      : box.y +
+        alignedLabelTop(
+          verticalAlign,
+          box.height,
+          layout.lines.length * layout.lineHeight,
+          TEXT_PADDING,
+        ) +
+        layout.lineHeight / 2;
   return layout.lines
     .map((line, index) =>
       line === ""

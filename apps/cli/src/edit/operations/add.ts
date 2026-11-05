@@ -6,6 +6,7 @@ import {
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
 import { applyLabel } from "../label-field.ts";
+import { withBoxLabelAlign } from "../visual-patch.ts";
 import {
   deepMerge,
   fillIds,
@@ -37,6 +38,25 @@ export function addElement(
   const visual = operation["visual"];
   if (visual !== undefined && !isPlainObject(visual))
     throw new OperationError(index, `"visual" must be an object`);
+  let addVisual = isPlainObject(visual)
+    ? withBoxLabelAlign(type, visual, undefined)
+    : visual;
+  if (
+    (type === "node.generic" || type === "shape.geo") &&
+    isPlainObject(addVisual) &&
+    isPlainObject(addVisual["style"])
+  ) {
+    const style = Object.fromEntries(
+      Object.entries(addVisual["style"]).filter(
+        ([key, value]) =>
+          !(
+            (key === "verticalAlign" || key === "boxLabelAlign") &&
+            value === null
+          ),
+      ),
+    );
+    addVisual = { ...addVisual, style };
+  }
   const place = operation["place"];
   if (place !== undefined && !isPlainObject(place))
     throw new OperationError(index, `"place" must be an object`);
@@ -66,7 +86,7 @@ export function addElement(
     page: page.id,
     ...(typeof operation["id"] === "string" ? { id: operation["id"] } : {}),
     ...(semantic === undefined ? {} : { semantic }),
-    ...(visual === undefined ? {} : { visual }),
+    ...(addVisual === undefined ? {} : { visual: addVisual }),
   });
   if (operation["label"] !== undefined)
     applyLabel(batch, id, operation["label"], index);

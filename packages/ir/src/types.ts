@@ -269,6 +269,8 @@ export interface VisualStyle {
     | "line-through"
     | "underline line-through";
   readonly verticalAlign?: "top" | "middle" | "bottom";
+  /** Enables vertical alignment for box labels. */
+  readonly boxLabelAlign?: boolean;
   readonly extensions?: Extensions;
 }
 

@@ -11,6 +11,7 @@ import {
   type Element,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { nullPaths, visualPatchCommand } from "../visual-patch.ts";
 import { selectedWhere } from "../selectors.ts";
 import { applyLabel } from "../label-field.ts";
 import {
@@ -98,12 +99,33 @@ function updateOne(
   const definition = definitionOf(element.type);
   const commands = [];
   if (operation["semantic"] !== undefined) {
+    const semantic = fillIds(
+      deepMerge(element.semantic, operation["semantic"]),
+      definition?.keyOrder,
+    );
+    const paths = nullPaths(operation["semantic"]);
+    if (definition && paths.length) {
+      const issues = definition.validateSemantic(semantic, "semantic");
+      for (const path of paths) {
+        const prefix = `semantic.${path}`;
+        if (
+          issues.some(
+            (issue) =>
+              issue.severity === "error" &&
+              (issue.path === prefix ||
+                issue.path.startsWith(`${prefix}.`) ||
+                issue.path.startsWith(`${prefix}[`)),
+          )
+        )
+          throw new OperationError(
+            index,
+            `update cannot remove required field "${path}" of ${element.type}`,
+          );
+      }
+    }
     const merged = batch.resolveReferences(
       element.type,
-      fillIds(
-        deepMerge(element.semantic, operation["semantic"]),
-        definition?.keyOrder,
-      ),
+      semantic,
       index,
       element.page,
     );
@@ -117,11 +139,7 @@ function updateOne(
   if (visual !== undefined) {
     if (!isPlainObject(visual))
       throw new OperationError(index, `"visual" must be an object`);
-    commands.push({
-      type: "updateVisual" as const,
-      id: element.id,
-      visual,
-    });
+    commands.push(visualPatchCommand(element, visual, index));
   }
   const carry = operation["carryMembers"];
   if (carry !== undefined && typeof carry !== "boolean")

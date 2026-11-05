@@ -8,6 +8,7 @@ import { nodeLabelLayout } from "../node-label.ts";
 import { geoOutline } from "../shapes/geo-outline.ts";
 import { geoFlipOf } from "../shapes/outline.ts";
 import { fmt, readString, tag, text, wrap } from "./markup.ts";
+import { boxLabelVerticalAlign } from "../label-layout.ts";
 import { centredLabel, styled, textStyled } from "./paint.ts";
 import { STROKE_WIDTH, type SvgTheme } from "./theme.ts";
 
@@ -89,6 +90,7 @@ export function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
       readString(element.semantic, "label"),
       element.visual,
       theme,
+      boxLabelVerticalAlign(element.visual),
     )
   );
 }

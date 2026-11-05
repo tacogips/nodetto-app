@@ -19,3 +19,14 @@ export const FONT_FILES: readonly string[] = [
   "C:\\Windows\\Fonts\\consola.ttf",
   "C:\\Windows\\Fonts\\YuGothR.ttc",
 ];
+
+/** Bounded additional faces, loaded only when a glyph is absent from the base set. */
+export const FALLBACK_FONT_FILES: readonly string[] = [
+  "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+  "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+  "/System/Library/Fonts/Apple Symbols.ttf",
+  "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+  "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+  "C:\\Windows\\Fonts\\msgothic.ttc",
+  "C:\\Windows\\Fonts\\seguisym.ttf",
+];
