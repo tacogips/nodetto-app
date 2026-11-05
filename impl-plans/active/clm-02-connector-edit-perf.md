@@ -1,5 +1,105 @@
 # clm-02-connector-edit-perf
 
+## Continuation 3 2026-11-05 (clm-s736) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
+base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence
+`tmp/clm-s736/clm-02-connector-edit-perf/`, CPU profiles under `target/clm-s736-profile/`.
+wave: 1; dependsOn: none. This section overrides everything below where they differ. Replace
+`tmp/clm-s732` and `tmp/clm-s731` with `tmp/clm-s736` in older sections. Design: "A7 decision
+D3" in `design-docs/specs/design-cli-layout-merge-lint.md`.
+
+### Intent
+
+Close IR-S732-CLM02-A7-RATIO under owner decision D3. Parts 1 to 3 below are committed
+(fixtures and expected files, dirty-page planning, page-bounded `applyCommands`,
+`keepMembers`); do not redo them. Current native user CPU: single 0.54 s, multi 1.24 s (2.30x),
+mixed single 0.72 s, mixed multi 1.33 s (1.85x). Bun profiles do not predict Boa costs, so
+measure in Boa first.
+
+### Order of work
+
+1. Attribution.
+   - Write a probe entry at `target/clm-a7-probe/probe.ts` that runs the fixtures from
+     `apps/cli/src/__fixtures__/obstacle-routing-batch.ts` through the same steps as
+     `apps/cli/src/edit/apply-batch.ts:applyBatch`, with a timer per phase. To time planners
+     individually, call them in the order of
+     `packages/core/src/editor/transaction.ts:planDerivedCommands`. Do not instrument tracked
+     source.
+   - Bundle it: `bun build --target browser --format iife` into `target/clm-a7-probe/`.
+   - Host it in a temporary `apps/cli/native/examples/clm-a7-probe.rs`. Imitate the Boa setup and
+     the `TextEncoder` and `Intl` polyfills in `apps/cli/native/src/engine.rs`, and expose a
+     Rust-side clock. `boa_engine` is already a normal dependency of `nodetto-cli`, so
+     `Cargo.toml` and `Cargo.lock` stay unchanged. Run it with
+     `CARGO_TERM_QUIET=true cargo run --release -p nodetto-cli --example clm-a7-probe`.
+   - Phases: see the design list. Measured phases must cover at least 90% of the probe's total
+     per fixture; otherwise split the largest phase.
+2. Classify each phase as (a), (b) or (c), per the design. Write the table to
+   `tmp/clm-s736/clm-02-connector-edit-perf/phase-table.txt` and the progress log.
+3. Remove all class (a) and (b) work, one change at a time, rerunning the probe. Candidates to
+   check, not conclusions: repeated `getSnapshot` sorting, the two `new Store` copies in
+   `planDerivedCommands`, the extra store in `EditorCore.apply`, `createShapeContext` on the
+   live store per apply, `dirtyPages` per command, and the two maps for `countPageChanges`.
+4. Delete `apps/cli/native/examples/` entirely. Probe files under `target/` may stay; never `cargo
+   clean`, because `target/clm-baseline/nodetto-cli` must survive.
+5. Final measurement on one release build: five `/usr/bin/time -p` runs per fixture, one after
+   another (single, multiPage, mixedSingle, mixedMulti), and five runs of the single fixture
+   with `target/clm-baseline/nodetto-cli` in the same session. Log all runs to
+   `tmp/clm-s736/clm-02-connector-edit-perf/final/timing.log`.
+6. Append to the progress log, exactly:
+   `A7 ratio multiPage/single: <x>`, `A7 ratio mixedMulti/mixedSingle: <x>` and
+   `A7 ratio single/baselineSingle: <x>`, each a decimal from median user CPU. Do not write these
+   lines before the final measurement.
+7. Replace `Pending.` under "A7 attribution record" in the design with the build id, four medians,
+   both ratios, the phase table with classes, what was removed, and one line:
+   `A7 outcome: met` or `A7 outcome: accepted-irreducible`. Edit nothing else in the design.
+
+### Outcome rules (from D3)
+
+- Both ratios at most 1.5: `A7 outcome: met`.
+- Either above 1.5, both at most 2.0, no class (a) or (b) work left, and the gap is class (c):
+  `A7 outcome: accepted-irreducible`, with the evidence and reason in the record and progress
+  log. This does not block.
+- Either above 2.0 with no class (a) or (b) work left: stop and report a blocker finding with
+  the phase table, citing user-QA Q12. Write no outcome line. Do not raise the ceiling.
+- `A7 ratio single/baselineSingle` above 1.1 is a defect to fix, because a slower denominator
+  would make the ratio meaningless.
+
+This replaces the "report as blocked above 1.5" text in the older done criteria.
+
+### Invariants
+
+- Expected file hashes never change: `341fcd8654fc18d560c8895df1a05617a6b8ac39` (single),
+  `872e266430b5a59930a4f87474869514a2c126cc` (multi), `4f5c88d5b1c4bc44c3afbd743fb76089bb0d34aa`
+  (mixed multi). Never regenerate them.
+- Class (c) work stays: input parsing and validation, whole-result validation and serialization,
+  and the first-apply whole-document pass. Skipping any of them changes accepted behavior.
+- `applyCommands` signature, atomicity, `CommandResult` and messages; operation-index errors;
+  all-or-nothing semantics; concurrency re-apply; planner order; and `keepMembers` all stay.
+- No deadline changes and no fixture changes to fit a ratio.
+
+### Non-goals
+
+- No edit to `apps/cli/src/edit/operations/elements.ts`, `arrange-*.ts`, `bpmn/notation.ts` or the
+  shared registration files. No Rust apart from the temporary example.
+- `packages/core/src/bpmn/containment.ts` is listed only for a `keepMembers` defect found in review
+  of this plan. If attribution calls for a D3 edit there, record an amendment request instead;
+  clm-12 tests read it in this wave.
+
+### Tests to add (input -> expected)
+
+Only what the removals need, in the tests next to the touched module:
+
+- Each removal -> the expected-file tests stay byte-identical, and the `Store.prototype` spy in
+  `packages/core/src/dirty-pages.test.ts` is tightened if the allowance drops.
+- A shared or skipped computation -> a case that changes its input between two applies and gets the
+  fresh result, so no stale value is reused.
+
+### Done criteria (mechanical)
+
+All manifest verification commands exit 0. `git status --short` shows only this plan's writePaths
+changed by it. `apps/cli/native/examples` does not exist. Keep under 300 evidence files.
+
 ## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 1)
 
 Workflow mode: `issue-resolution` (manifest `workflowMode`, repeated in

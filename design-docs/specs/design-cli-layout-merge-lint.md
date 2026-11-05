@@ -5,11 +5,15 @@ the same day (see "Plan partition"). Extended the same day for the
 continuation run: A7 multi-page root cause, three integration fixes (A1 TB
 title band, A1 frame-order ranks, D3 path normalization), new groups E
 (container carry and page-kind coverage) and F (element selectors), and a
-continuation plan partition that replaces the clm-s725 one.
+continuation plan partition that replaces the clm-s725 one. Revised
+2026-11-05 for continuation 3: owner decisions D1 and D2 (E2.1 lane boxes and
+depth-dependent inset), D3 (A7 attribution and ratio ceiling), and the
+"Continuation 3 partition", which replaces the earlier waves.
 
 Owner decisions: `design-docs/user-qa/cli-layout-merge-lint.md`. Each open
-question has a default that this design implements. A different answer
-changes only the section named in that question.
+question has a default that this design implements, except Q11, which is
+blocking and has none. A different answer changes only the section named in
+that question.
 
 Baseline: `design-docs/specs/design-cli-ai-drawing.md` (commands, edit
 batches, live co-editing merge), `design-docs/specs/design-text-layout-lint.md`
@@ -479,7 +483,78 @@ Tests and targets:
   recorded in the plan progress log: `multiPage` user CPU at most 1.5 x the
   single-page fixture's, and `mixedMultiPage` at most 1.5 x
   `mixedSinglePage`'s, on the same build. Both are also compared with
-  `target/clm-baseline/nodetto-cli`.
+  `target/clm-baseline/nodetto-cli`. Owner decision D3 below sets when a ratio
+  above 1.5 x is accepted.
+
+### A7 decision D3: attribute first, then remove, then decide
+
+Status at HEAD d5b9bac: user CPU on one release build is single 0.54 s, multi
+1.24 s (2.30 x), mixed single 0.72 s, mixed multi 1.33 s (1.85 x). Earlier runs
+in the same log measured single 0.92 s, so timings vary by run. No native
+per-phase attribution exists yet: Bun profiles do not predict Boa costs.
+
+Order of work:
+
+1. Attribution. Write a probe entry under `target/clm-a7-probe/` that runs the
+   fixtures through the same steps as `applyBatch`, with a timer around each
+   phase. Bundle it with `bun build --target browser --format iife`. Run it in a
+   temporary `apps/cli/native/examples/clm-a7-probe.rs` that hosts the bundle in
+   Boa, provides `TextEncoder` and `Intl` polyfills, and exposes a clock from
+   Rust. Tracked source is not instrumented, and `Cargo.toml` and `Cargo.lock`
+   do not change.
+   - Phases: parse with validation, `Editor` construction, the first apply and
+     later applies separately, and inside an apply `createShapeContext`,
+     `permittedCommands`, `dirtyPages`, `getScopedSnapshot` and the scoped
+     `Store`, each planner in `planDerivedCommands`, and `applyCommands`; then
+     per-operation bookkeeping in `applyBatch`, and final snapshot, validation,
+     warnings, change counts and serialization.
+   - Run all four fixtures. Measured phases must cover at least 90% of the
+     probe's total time for each fixture; otherwise split the largest phase and
+     measure again.
+2. Classification. For each phase, record its time on the single-page and
+   multi-page fixture and one class:
+   - (a) Document-wide work repeated per operation. This is forbidden by "A7
+     continuation" and must be removed.
+   - (b) Document-wide work done once per batch that can be skipped, shared or
+     done once instead of several times with byte-identical output. Remove it.
+   - (c) Document-wide work required by an accepted rule: parsing and validating
+     the input, validating and serializing the whole result, and the
+     first-apply whole-document pass that normalizes stale derived values.
+3. Removal. Remove what classes (a) and (b) identify, for example repeated sorted
+   full-document snapshots. The expected hashes stay
+   `341fcd8654fc18d560c8895df1a05617a6b8ac39` (single),
+   `872e266430b5a59930a4f87474869514a2c126cc` (multi) and
+   `4f5c88d5b1c4bc44c3afbd743fb76089bb0d34aa` (mixed multi), and expected files
+   are never regenerated.
+4. Cleanup. Delete the probe harness and the `examples` directory; nothing from
+   the probe stays in the tree. Evidence keeps the phase tables, not the harness.
+
+Measurement: five `/usr/bin/time -p` runs per fixture on one release build, one
+after another, using the median user CPU; all runs are logged. The single-page
+median may not exceed 1.1 x the same-session median of
+`target/clm-baseline/nodetto-cli`, so that a ratio cannot improve by slowing the
+denominator.
+
+Outcome rules, applied to both ratios:
+
+- Both at most 1.5 x: met.
+- Either above 1.5 x and both at most 2.0 x: accepted only if the remaining
+  phase table shows no class (a) or (b) work left and the gap is class (c). The
+  evidence and the reason go in the progress log and in the "A7 attribution
+  record" below. This acceptance does not block the plan.
+- Either above 2.0 x after all class (a) and (b) work is gone: the owner's
+  decision does not cover this. The plan stops and reports a blocker finding
+  with the phase table (user-QA Q12). It does not raise the ceiling, and it does
+  not change a fixture to fit the ratio.
+- Absolute deadlines and existing deadline tests are never relaxed.
+
+### A7 attribution record
+
+clm-02 is the only writer of this subsection, and fills it in when the work
+lands: build id, four median timings, both ratios, the phase table with classes,
+what was removed, and which outcome rule applied.
+
+Pending.
 
 ## B. Three-way merge
 
@@ -903,23 +978,93 @@ Mechanics:
   separated by `COLUMN_GAP = 120`, and units are centred in their column. A
   cell (row, layer) stacks its units top to bottom by visit index with
   `MEMBER_GAP = 60`. A row's height is its tallest cell plus `2 *
-  FRAME_PADDING`, at least 120. Every pool has the same width: the pool label
-  band of 30 plus `FRAME_PADDING`, all columns and gaps, and `FRAME_PADDING`.
+  FRAME_PADDING`, at least 120. Every pool has the same width: the column inset
+  (D2 below), all columns and gaps, and `FRAME_PADDING`.
   Pools are stacked with gap 120. The origin is the integer top-left of the
   current union of pools and units, so a rerun is a no-op.
+- Depth-dependent inset (owner decision D2). A lane directly under a pool has
+  depth 1, and each nesting level adds 1. `D` is the deepest leaf lane of any
+  non-collapsed pool on the page, or 0 without lanes. Columns are global, so one
+  `D` applies to the whole page, including a shallower pool beside a deeper one.
+  - Column inset `I = POOL_LABEL * max(1, D) + FRAME_PADDING`, which is 70 for
+    `D` up to 1, 100 for `D = 2` and 130 for `D = 3`.
+  - Column 0's left edge is `origin.x + I`. Pool width is
+    `I + sum(column widths) + (L - 1) * COLUMN_GAP + FRAME_PADDING`.
+  - Every column therefore starts at least `FRAME_PADDING` inside every leaf
+    lane, so a narrow unit's centre lies in its own leaf and
+    `planBpmnMembership` never re-parents it.
+  - Worked example, one column 100 wide, pool at x = 0: `D = 1` gives pool width
+    210, lane x 30 and width 180, unit x 70. `D = 2` gives pool width 240, lanes
+    x 30 and 60 with widths 210 and 180, unit x 100. `D = 3` gives pool width
+    270, lanes x 30, 60 and 90 with widths 240, 210 and 180, unit x 130. With a
+    single unit of width 20 at `D = 3`: pool width 190, lane widths 160, 130 and
+    100, unit x 130, centre 140 inside the leaf (x 90 to 190).
 - Free row (clarified 2026-11-04, amendment round 1): it has no box, so it
   gets no pool label band and no padding. With pools, its units use the shared
   column x positions and its top is `POOL_GAP` below the last pool. Without
   pools, column 0 starts at `origin.x` and the row top is `origin.y`, so a
   page of only free units is laid out from its own top-left and a rerun moves
   nothing.
-- Commands, in two applies, because `planBpmnTranslations` carries every
+- Lane boxes (owner decision D1), on pages with `D` of at least 2; pages with `D`
+  up to 1 follow "Depth-one byte identity" below. The container step writes a
+  full top-down box (`x`, `y`, `width`, `height`) through `updateVisual` for every
+  lane of a non-collapsed pool whose planned box differs from its current one. Each box
+  uses the same formula as `planBpmnLaneLayout`, so that planner reproduces the
+  same values: `x = parent.x + 30`, `width = parent.width - 30`, children stack
+  without gaps from `parent.y`, and a parent's height is the sum of its
+  children's. Lanes stay inside their pool, keep their order and keep
+  containment at depths 1 to 3. The planner still never writes
+  `semantic.parent`, and `bpmn/containment.ts` does not change. Lanes of a
+  collapsed pool are not written. D1 applies to this planner only: the E1 rule
+  that `carryMembers:false` on a lane allows only `height` changes is unchanged.
+- Settling, on pages with `D` of at least 2; `settleCommands` is empty otherwise.
+  Three existing planner behaviors can still move a lane away from its
+  plan in the container apply. `planBpmnLaneLayout` adds a height delta to a
+  parent whose box did not change, when the input's child heights do not sum to
+  that parent's height. `planBpmnTranslations` carries a descendant whose box
+  happens to equal its old box while an ancestor moves (for example, a second
+  pool moves down and one of its lanes ends at its old absolute position). And a
+  last child takes the remaining height. So the planner applies
+  `containerCommands` to its draft and compares every pool and lane box with the
+  plan. Each differing box gets a full-box `updateVisual` in `settleCommands`,
+  top-down, and that list is applied once to the draft. Any box that still
+  differs returns `{ error: 'arrange --mode layered cannot restack the lanes of
+  pool "<name>": set its lane heights so that they fill the pool, then rerun.' }`
+  and nothing is written. Unit positions are computed after this step.
+- Depth-one byte identity (owner decision D2, strict). For a page with `D` up to
+  1, the written document stays byte-identical to the output of the HEAD d5b9bac
+  planner, on every input. These pages keep HEAD's container commands (pool boxes
+  and lane heights), with no lane `x`, `y` or `width` writes and no settling.
+  Identity applies to the document, not to the command lists. No exception to
+  this is approved.
+- Open conflict between D2 and the depth-one containment requirement (BLOCKING,
+  user-QA Q11). The acceptance criteria also require containment tests at depth 1,
+  and some valid depth-one inputs cannot satisfy both. Reproduced in design review
+  on HEAD d5b9bac: a pool (x, y, width, height) = (0, 0, 210, 240), lanes
+  (30, 0, 180, 140) and (30, 140, 180, 100) parented to it, and tasks
+  (70, 40, 100, 40) and (70, 170, 100, 40), one per lane. The input validates
+  cleanly. Both rows plan to height 120, so the pool box does not change,
+  `bpmn/containment.ts` skips the restack, and the second lane ends at
+  (30, 140, 180, 120), 20 past the pool's bottom. Containment needs its `y` to be
+  120, which changes the output bytes.
+  - Until the owner answers Q11, no change to depth-one output may be dispatched
+    or accepted, and the criterion "containment at depth 1" stays open and
+    reported for inputs of this kind. No test pins these inputs either way: not
+    as an expected file, and not as an accepted overflow.
+  - Proposal, not approved: let D1 take priority by applying lane boxes and
+    settling at every depth. Its exact boundary is in Q11. If the owner approves
+    it, an owner-approved scope amendment records that boundary here and its
+    matching gates before clm-12 implements it.
+  - If the owner keeps strict D2, the rule above stands, and the incompatible
+    containment requirement is reported as an accepted limitation for those
+    inputs.
+- Commands, in up to three applies, because `planBpmnTranslations` carries every
   descendant whose position a command did not change: first the container
-  step (pool boxes and lane heights through `updateVisual`;
-  `planBpmnLaneLayout` restacks the lanes to the same values, so lane
-  invariants hold by construction, and units are carried), then the unit
+  step (pool boxes and lane boxes through `updateVisual` as stated above, and units are
+  carried), then `settleCommands` when non-empty, then the unit
   step (absolute `updateVisual` positions for every unit; a sub-process's
-  contents are carried by the sub-process through the existing planner). Units end inside their own
+  contents are carried by the sub-process through the existing planner). A rerun
+  returns three empty lists. Units end inside their own
   row, so `planBpmnMembership` keeps their parents, with two exceptions: a
   unit directly under a non-leaf lane, and a unit directly under a pool with
   lanes, land in a first leaf row, and that planner's existing geometry rule
@@ -1111,7 +1256,8 @@ deadline is relaxed.
 | D1 | ERD rectangle cases: coincident tables (identical bounds) give one finding naming both tables and the page; a table fully inside another gives one finding; a partial overlap gives one finding; touching tables (shared edge, zero area) give none. Each pair is reported once. A UML use-case system boundary containing a use case gives no finding, and two overlapping use cases inside it give one. Native parity in `lint-rules.test.ts` |
 | D2 | Latin word wrap, CJK punctuation breaks, line-start prohibition, hard split, idempotency, untouched non-overflow text, remaining height finding, JSON `fixes`, `.bpmn` rejected |
 | D3 | missing file, file outside the document folder, data URL skipped, error exit 1 |
-| A7 continuation | `multiPage` and `mixedMultiPage` byte-identical to committed pre-change expected files and under 10 s in Bun and native; dirty-page tests: an edit on page 1 leaves every planner's output for page 2 empty, and each cross-page case (token, text style, component master, cross-page reference, page command) still updates the other page; manual 1.5 x CPU ratio |
+| A7 continuation | `multiPage` and `mixedMultiPage` byte-identical to committed pre-change expected files and under 10 s in Bun and native; dirty-page tests: an edit on page 1 leaves every planner's output for page 2 empty, and each cross-page case (token, text style, component master, cross-page reference, page command) still updates the other page; native phase table and the D3 outcome rules on five-run median CPU ratios; the "A7 attribution record" is filled in; the probe harness is gone from the tree |
+| D1, D2 | Depths 1, 2 and 3, each also with a narrow unit (width 20): the worked-example boxes; every lane inside its parent and pool, siblings stacked without gaps in model order, parent height equal to the sum of its children; every unit's parent is its own leaf lane with its centre inside it; a rerun returns three empty lists; `validateDocument` clean. A shallow pool beside a deep pool uses the page-wide inset. Regressions at `D` of at least 2: lane heights change with an unchanged pool box; a lane whose box coincides with its old box while its pool moves; child heights that do not sum to the parent. Depth-one identity and containment: committed expected files captured from HEAD d5b9bac code before the first planner edit (two pools with lanes and a message flow; pool without lanes plus a free row; collapsed pool; sub-process with a boundary event), never regenerated. Containment is asserted on every one of them; a candidate fixture whose HEAD output breaks containment is not captured and is reported under Q11. Depth-one conflict inputs stay untested and open until Q11 is answered, and the answer adds their gate |
 | Fix 1 and 2 | TB: exact frame box and member y with and without `showTitle`, band at the top; LR unchanged; frame order unchanged on the existing tests with ranks precomputed |
 | Fix 3 | `documentRelativePath` table, `../` and `./` document paths, symlink escape reported by `readAttachment` |
 | E1 | per kind (frame, frame with explicit `memberIds`, frame with `layout` error, pool, lane height-only and the x/y/width error, sub-process, board, group error, non-container error): move and resize with `carryMembers:false` keep members (including members placed earlier in the batch), default still carries, BPMN members re-parented and lanes inside their pool, `validateDocument` clean |
@@ -1337,7 +1483,8 @@ export function planLayeredBpmn(
   store: Store, pageId: PageId, registry: ShapeUtilRegistry,
 ): {
   containerCommands: Command[]; // applied first
-  unitCommands: Command[];      // computed from the planned layout, applied second
+  settleCommands: Command[];    // applied second when non-empty (continuation 3, E2.1)
+  unitCommands: Command[];      // computed from the planned layout, applied last
   placed: ReadonlySet<ElementId>;
 } | { error: string };
 
@@ -1390,6 +1537,9 @@ may add an optional parameter and record it, never rename.
   docs included, in `writePaths`.
 
 ## Continuation 2 partition
+
+History: its waves are replaced by "Continuation 3 partition" below, and
+`impl-plans/active/clm-s732-dispatch.json` must not be dispatched again.
 
 Added 2026-11-04 for HEAD 29f8691. It replaces the waves of "Continuation
 partition". The ownership rules, all contracts and the single-owner notes
@@ -1458,3 +1608,65 @@ The continuation verification above applies, with evidence under
   and `arrange --mode layered` on a BPMN page of 3 pools, 6 lanes and 60
   units, and records the times and exit statuses (Boa rules). There is no
   fixed threshold; a quadratic slowdown found here is a clm-09 blocker.
+
+## Continuation 3 partition
+
+Added 2026-11-05 for HEAD d5b9bac. It replaces the waves above. The ownership
+rules, contracts and single-owner notes above stay binding, as amended by D1 to
+D3. The fresh manifest is `impl-plans/active/clm-s736-dispatch.json` with evidence
+root `tmp/clm-s736/`; the clm-s725, clm-s731 and clm-s732 manifests must not be
+dispatched again.
+
+State at HEAD d5b9bac:
+
+- Landed: clm-01, 03, 04, 06, 07, 08, 10, 13, 14, 15. In the tree: fix 1
+  (`FRAME_TITLE_BAND` in `arrange-layered.ts`), fix 2 (`firstRank`), fix 3
+  (`documentRelativePath` in `lint-diagram.ts`), F1 to F3 (`edit/selectors.ts`,
+  `operations/select.ts`) and the E2 route part (`ROUTE_PAGE_KINDS`).
+- clm-02: dirty pages, scoped planning and fixtures are committed, and
+  `ApplyOptions.keepMembers` reaches the planners. Open: IR-S732-CLM02-A7-RATIO,
+  resolved by D3.
+- clm-12: free row, first-leaf routing and leaf order are committed. Open:
+  IR-S732-CLM12-LANE-RESTACK (D1) and IR-S732-CLM12-DEEP-INSET (D2), which are
+  implemented and verified together.
+- clm-11: only the core `keep-members.test.ts` exists. `edit/carry-members.ts` is
+  absent, and the A6 frame-only branch is still in `operations/elements.ts`.
+- clm-09: not started. `arrange-modes.ts` has no BPMN dispatch.
+
+| Wave | Plan | Remaining scope | Added write paths | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | D3 in full | this design file (only the "A7 attribution record"), `apps/cli/native/examples/clm-a7-probe.rs` (temporary), `apps/cli/src/edit/report.ts`, `packages/core/src/hit-test.ts`, `packages/core/src/layer-state.ts`, `packages/core/src/clipping.ts`, `packages/core/src/frame-translation.ts`, `packages/core/src/frame-tree.ts`, `packages/io/src/jsonl/`, `packages/ir/src/validate.ts`, and the tests next to each | - |
+| 1 | clm-12-bpmn-layered | D1 and settling on pages with `D` of at least 2, the D2 inset, strict depth-one identity, and the D1, D2 verification row. No depth-one output change without the Q11 amendment. The plan's rules 6 and 7 are revised to match before dispatch | the depth-one expected files, next to the planner test | - |
+| 2 | clm-11-container-carry | E1 CLI module and per-kind tests, unchanged scope | `packages/core/src/keep-members.test.ts`, plus the core planner files already pre-authorized for `keepMembers` defects | clm-02 |
+| 3 | clm-09-wiring | Unchanged scope, plus applying `settleCommands` in the BPMN dispatch, counting all three lists for `--check`, and expecting the D2 inset in wiring tests | none beyond its existing list | clm-02, clm-11, clm-12 |
+
+- clm-11's dependency is a contract need, not a file handover. The option exists
+  at HEAD, but D3 may still change `Editor.apply` and the scoped planning that
+  `keepMembers` passes through, and E1's per-kind tests must verify the accepted
+  behavior. This also matches the owner's stated order and the limit of two waves
+  before wiring.
+- clm-02 and clm-12 share no write path. clm-12 reads `bpmn/containment.ts`, and
+  clm-02's fixtures have no BPMN page, so D3 has no reason to edit it. If
+  attribution says otherwise, clm-02 records an amendment.
+- Each plan lists its own plan file in `writePaths` for ownership tracking only,
+  as clm-12 did in clm-s732, and must leave it unchanged. Plan revisions for D1 to
+  D3 land before dispatch.
+
+### Continuation 3 verification
+
+The continuation verifications above apply, with evidence under
+`tmp/clm-s736/<planId>/`, and these additions:
+
+- clm-12 captures the depth-one expected files from HEAD d5b9bac code before its
+  first planner edit, and records their hashes. A difference found after that is
+  a defect to fix, never a reason to regenerate.
+- Q11 is blocking. Until the owner answers it, the run may not report the
+  depth-one containment criterion as met for the conflict inputs in E2.1. clm-12
+  and clm-09 report it as open with a reference to Q11, and no gate treats a
+  proposed exception as accepted.
+- clm-02's ratio gate command exits 0 only under the D3 outcome rules: both ratios
+  at most 2.0 x, and, when either is above 1.5 x, a filled-in "A7 attribution
+  record". Another gate confirms that `apps/cli/native/examples` does not exist.
+- clm-09 runs the final gates. `mise run test-cli` keeps the 3-attempt retry, and
+  the manual native timing of the obstacle-routing fixtures is compared with
+  `target/clm-baseline/nodetto-cli`.

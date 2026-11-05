@@ -1,5 +1,38 @@
 # clm-09-wiring
 
+## Continuation 3 2026-11-05 (clm-s736) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
+base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence `tmp/clm-s736/clm-09-wiring/`.
+wave: 3; dependsOn: clm-02-connector-edit-perf, clm-11-container-carry, clm-12-bpmn-layered. This
+section overrides everything below where they differ. Replace `tmp/clm-s732`, `tmp/clm-s731` and
+`tmp/clm-s725` with `tmp/clm-s736`, and `target/clm-s732-jsx` with `target/clm-s736-jsx`, in older
+sections. clm-06 and clm-15 are landed in commit `d5b9bac`, so older text calling them uncommitted
+is stale, and clm-15 is no longer a dependency. Nothing of this plan has started.
+
+Changes to the scope below:
+
+- `apps/cli/src/arrange-modes.ts` BPMN dispatch: `planLayeredBpmn` now returns `settleCommands`.
+  Apply `containerCommands`, then `settleCommands` when non-empty, then `unitCommands`, each with
+  `{ placed }`, then the route stage. Add all three counts to `count`, so `--check` is correct. A
+  returned `{ error }` exits 2 with that text, and nothing is written. This replaces "two applies".
+- Wiring and parity tests for BPMN layered expect the D2 inset on nested lanes
+  (`I = POOL_LABEL * max(1, D) + FRAME_PADDING`, page-wide) and full lane boxes at `D` of at
+  least 2. Add one CLI-level test for `D = 3` with a width-20 unit: the unit keeps its leaf parent, and
+  `--check` exits 0 after `--write`.
+- `apps/cli/src/help.ts` and `docs/cli.md`: state that layered arrange on BPMN pages may rewrite
+  full lane boxes on nested lanes, and keeps lane order.
+
+Blocking owner decision Q11 (`design-docs/user-qa/cli-layout-merge-lint.md`):
+
+- Do not add a depth-one change or a test pinning the Q11 reproduction either way.
+- If Q11 is still unanswered when this plan finishes, the final report and the progress log must
+  both contain this exact line, and this criterion must not be reported as met:
+  `Q11 open: depth-one containment not accepted for conflict inputs`
+
+Invariants: no feature logic beyond the dispatch and the listed lines, no relaxed deadline, and no
+binary-less native command. A defect in a feature module is a finding for its owning plan.
+
 ## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 1) - authoritative
 
 Workflow mode: `issue-resolution` (manifest `workflowMode`).

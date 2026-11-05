@@ -7,6 +7,30 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
+## Continuation 3 2026-11-05 (clm-s736) - authoritative
+
+Manifest: `impl-plans/active/clm-s736-dispatch.json`, base HEAD
+`d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence root `tmp/clm-s736/<planId>/`. The clm-s725,
+clm-s731 and clm-s732 manifests are stale and must not be dispatched. Supersedes every table below.
+Accepted and landed: clm-01, 03, 04, 06, 07, 08, 10, 13, 14, 15. Each plan's "Continuation 3" section
+is authoritative for that plan.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | D3: native attribution, removal, ratio outcome, attribution record | - |
+| 1 | clm-12-bpmn-layered | D1 and settling at `D` of at least 2, D2 inset, strict depth-one identity | - |
+| 2 | clm-11-container-carry | E1 CLI module and per-kind tests | clm-02 |
+| 3 | clm-09-wiring | Registration, BPMN dispatch, help, docs, parity, git e2e, final gates | clm-02, 11, 12 |
+
+Open owner decisions: Q11 is blocking and has no default. Until it is answered, no plan changes
+depth-one output, no plan pins the conflict inputs in a test, and the run does not report depth-one
+containment as met for them. Q12 applies only if an A7 ratio stays above 2.0x.
+
+Each plan lists its own plan file in `writePaths` for ownership tracking only. Workers must leave it
+unchanged, and a verification command checks that. Single writer of the "A7 attribution record"
+subsection of the design: clm-02. In the shared working rules below, use `tmp/clm-s736/<planId>/` for
+evidence.
+
 ## Amendment 2026-11-05 (clm-s732, round 1) - authoritative
 
 Supersedes the table below. clm-06 is accepted; its reviewed edits are uncommitted on

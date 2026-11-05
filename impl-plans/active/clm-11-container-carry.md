@@ -1,5 +1,26 @@
 # clm-11-container-carry
 
+## Continuation 3 2026-11-05 (clm-s736) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
+base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence
+`tmp/clm-s736/clm-11-container-carry/`. wave: 2; dependsOn: clm-02-connector-edit-perf. Replace
+`tmp/clm-s732` and `tmp/clm-s731` with `tmp/clm-s736` below. Scope, rules, messages and tests
+below are unchanged.
+
+- Status at HEAD: `packages/core/src/keep-members.test.ts` (5 tests) exists and
+  `ApplyOptions.keepMembers` reaches the planners. `apps/cli/src/edit/carry-members.ts` does not
+  exist, and the A6 block is still at `apps/cli/src/edit/operations/elements.ts:126-153`. Start
+  there; there is no progress log yet.
+- Why it waits for clm-02: D3 may still change `Editor.apply` and the scoped planning that
+  `keepMembers` passes through, and these tests must verify the accepted behavior. If a test fails
+  only because a scoped apply dropped a held member, that is a defect fixed here under the
+  pre-authorized core paths, with a case in `keep-members.test.ts`.
+- Owner decision D1 does not change E1: `planLayeredBpmn` may write lane boxes, but `update` with
+  `carryMembers:false` on a lane still allows only `height`.
+- Do not change the default carry, and do not edit `arrange-layered-bpmn.ts` or the shared
+  registration files. Help text is clm-09's.
+
 Amendment 2026-11-05 (clm-s732, round 1): workflow mode is `issue-resolution` (manifest
 `workflowMode`). Scope, writePaths and dependsOn are unchanged.
 

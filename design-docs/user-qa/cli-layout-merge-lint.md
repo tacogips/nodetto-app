@@ -79,3 +79,50 @@ the section named.
   `expect: 0` makes an idempotent no-op possible.
 - Alternative: require `expect` on every `delete` with `where`, to guard bulk
   deletion.
+
+## Q11. Depth-one byte identity against lane containment (D1, D2) - open, BLOCKING, owner decision required
+
+There is no default for this question. D2 stays strict until the owner answers.
+
+- Conflict: D2 requires depth-one results to stay byte-identical to the current
+  output, and the acceptance criteria also require containment tests at depth 1.
+  Some valid inputs cannot satisfy both.
+- Reproduction, run in design review on HEAD d5b9bac:
+  - Pool (x, y, width, height) = (0, 0, 210, 240).
+  - Lanes (30, 0, 180, 140) and (30, 140, 180, 100), both parented to the pool.
+  - Tasks (70, 40, 100, 40) in the first lane and (70, 170, 100, 40) in the second.
+  - The input validates cleanly. Applying `containerCommands` then `unitCommands`
+    leaves the second lane at (30, 140, 180, 120), which ends 20 past the pool's
+    bottom. Containment needs its `y` to be 120, which changes the output bytes.
+- Effect until answered: depth-one output does not change, the depth-one
+  containment criterion stays open for inputs of this kind, and no test pins them.
+  Pages with lanes nested 2 or more levels deep are not affected.
+
+Option A (proposal, not approved): D1 takes priority on these inputs.
+
+- Boundary: a depth-one page's output differs from HEAD only when the HEAD output
+  breaks the lane rules in E2.1: lane heights change with an unchanged pool box, a
+  lane is carried out of place while an ancestor moves, or the input's lane boxes
+  do not follow the formula. All other depth-one output stays byte-identical.
+- Gates: the depth-one expected files stay unchanged and are not regenerated, and
+  the input above gets a test expecting the second lane at (30, 120, 180, 120),
+  with an empty rerun.
+
+Option B: keep D2 strict on every depth-one page.
+
+- Overflowing lanes stay on those inputs, and the depth-one containment criterion
+  is narrowed by owner decision to inputs whose current output already satisfies
+  containment. The limitation is documented and reported.
+
+Either answer is recorded as a scope amendment in design E2.1 before clm-12
+implements or accepts it.
+
+## Q12. A7 ratio above the 2.0 x ceiling (D3) - open, default kept
+
+- Context: D3 accepts up to 2.0 x when the gap is irreducible, and does not say
+  what happens if an irreducible gap stays above 2.0 x. The current single-page
+  ratio is 2.30 x.
+- Default: clm-02 stops and reports a blocker finding with the native phase table.
+  The ceiling is not raised and fixtures are not changed. The owner then decides.
+- Alternative: accept any ratio backed by attribution evidence, relying on the
+  absolute deadlines alone.
