@@ -13,7 +13,7 @@ import { serializeDocument } from "@nodetto/io";
 import { buildTestFont } from "../__fixtures__/test-font.ts";
 import { binary, cliEntry, compare, nativeTest } from "./harness.ts";
 
-function document(label: string, kind: "erd" | "freeform") {
+function document(label: string, kind: "sequence" | "freeform") {
   const editor = new Editor();
   const page = editor.createPage({ name: "Widgets", kind });
   const id = editor.createElement("node.generic", {
@@ -37,7 +37,7 @@ nativeTest(
   () => {
     const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-glyph-"));
     try {
-      const missing = document("Widget \u{F0000}", "erd");
+      const missing = document("Widget \u{F0000}", "sequence");
       writeFileSync(join(cwd, "missing.jsonl"), missing.source);
       for (const format of ["png", "pdf"]) {
         const result = compare(
@@ -96,11 +96,9 @@ nativeTest(
         ["lint", "missing.jsonl", "--font-dir", "fonts"],
         cwd,
       );
-      // An ERD with no glyph rows retains the existing no-pages error.
+      // A page kind that lint skips, with no glyph rows, keeps the no-pages error.
       expect(covered.exitCode).toBe(2);
-      expect(covered.stderr.toString()).toContain(
-        "The document contains no BPMN",
-      );
+      expect(covered.stderr.toString()).toContain("Document contains no BPMN");
       expect(covered.stderr.toString()).not.toContain("Unknown option");
       expect(covered.stdout.toString()).not.toContain("glyph-missing");
       const ascii = document("Widget", "freeform");
