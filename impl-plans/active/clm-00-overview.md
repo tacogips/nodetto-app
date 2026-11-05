@@ -7,7 +7,23 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
-## Continuation 4 2026-11-05 (clm-s737) - authoritative
+## Continuation 5 2026-11-05 (clm-s740) - authoritative
+
+Manifest: `impl-plans/active/clm-s740-dispatch.json`, source commit `235b8c84f3d47734077901aeb9313eed895f6e8f`, evidence
+root `tmp/clm-s740/<planId>/`. Every earlier clm manifest is stale and must not be dispatched. Supersedes every table
+below. Every clm plan except clm-09 is accepted and landed.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-09a-help-docs | Full help and docs | - |
+| 1 | clm-09b-cli-tests | CLI-level tests, git driver end-to-end test, wiring gaps | - |
+| 1 | clm-09c-native-parity | Native parity topic files, BPMN fixture, native wiring gaps | - |
+| 2 | clm-09-wiring | Final gates, native timing, stable-tree verification, self-review | clm-09a, clm-09b, clm-09c |
+
+Open owner question: Q11 stays open but blocks nothing. No plan changes depth-one output or pins the conflict inputs in a
+test, the behavior is documented, and the final report keeps the exact Q11 line.
+
+## Continuation 4 2026-11-05 (clm-s737) - superseded by Continuation 5
 
 Manifest: `impl-plans/active/clm-s737-dispatch.json`, source commit `c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence
 root `tmp/clm-s737/<planId>/`. The clm-s725, clm-s731, clm-s732 and clm-s736 manifests are stale and must not be

@@ -11,11 +11,14 @@ depth-dependent inset), D3 (A7 attribution and ratio ceiling), and the
 "Continuation 3 partition", which replaces the earlier waves. Revised again
 2026-11-05 for continuation 4: owner decision D3' replaces D3 ("A7 decision
 D3'"), and the "Continuation 4 partition" replaces the continuation 3 waves.
+Revised again 2026-11-05 for continuation 5: the owner's Q11 direction (keep
+depth-one behavior, document it, do not block), the as-built E1 geometry errors
+and E2.1 refusals, and the "Continuation 5 partition" for finishing clm-09.
 
 Owner decisions: `design-docs/user-qa/cli-layout-merge-lint.md`. Each open
-question has a default that this design implements, except Q11, which is
-blocking and has none. A different answer changes only the section named in
-that question.
+question has a default that this design implements. Q11 has no chosen option,
+but the owner directed that current depth-one behavior stays and that Q11 blocks
+nothing. A different answer changes only the section named in that question.
 
 Baseline: `design-docs/specs/design-cli-ai-drawing.md` (commands, edit
 batches, live co-editing merge), `design-docs/specs/design-text-layout-lint.md`
@@ -1104,6 +1107,20 @@ Mechanics:
   module, so frames also hold members against `planConstraints` on resize.
 - With `where` (F2), the set is collected per matched element.
 - In one batch, held members keep positions set by earlier operations.
+- A `bpmn.boundaryEvent` attached to the updated container is not held: it is an
+  attachment and follows its host.
+
+As-built geometry errors (clm-11, exit 2, nothing written), in addition to the
+table above. With `carryMembers:false` on a pool or lane that has child lanes:
+
+- A changed height below what the lanes need:
+  `carryMembers:false on "<name>": its lanes need a height of at least <n>; shrink the lanes first.`
+- A changed pool width at or below 30 per lane depth:
+  `carryMembers:false on "<name>": its lanes need a width greater than <n>.`
+- A changed pool width that nested lanes do not fit:
+  `carryMembers:false on "<name>": its nested lanes need a width of at least <n>.`
+
+A non-boolean value exits 2: `"carryMembers" must be true or false`.
 
 ### E2. Arrange and routing on every applicable page kind
 
@@ -1198,8 +1215,8 @@ Mechanics:
   and lane heights), with no lane `x`, `y` or `width` writes and no settling.
   Identity applies to the document, not to the command lists. No exception to
   this is approved.
-- Open conflict between D2 and the depth-one containment requirement (BLOCKING,
-  user-QA Q11). The acceptance criteria also require containment tests at depth 1,
+- Open conflict between D2 and the depth-one containment requirement (user-QA Q11,
+  not blocking since continuation 5). The acceptance criteria also require containment tests at depth 1,
   and some valid depth-one inputs cannot satisfy both. Reproduced in design review
   on HEAD d5b9bac: a pool (x, y, width, height) = (0, 0, 210, 240), lanes
   (30, 0, 180, 140) and (30, 140, 180, 100) parented to it, and tasks
@@ -1208,17 +1225,33 @@ Mechanics:
   `bpmn/containment.ts` skips the restack, and the second lane ends at
   (30, 140, 180, 120), 20 past the pool's bottom. Containment needs its `y` to be
   120, which changes the output bytes.
-  - Until the owner answers Q11, no change to depth-one output may be dispatched
-    or accepted, and the criterion "containment at depth 1" stays open and
+  - Owner direction for continuation 5: keep current depth-one behavior, document
+    it, and do not block on Q11. Until Q11 gets a final answer, no change to
+    depth-one output may be dispatched or accepted, and the criterion "containment at depth 1" stays open and
     reported for inputs of this kind. No test pins these inputs either way: not
     as an expected file, and not as an accepted overflow.
   - Proposal, not approved: let D1 take priority by applying lane boxes and
     settling at every depth. Its exact boundary is in Q11. If the owner approves
     it, an owner-approved scope amendment records that boundary here and its
     matching gates before clm-12 implements it.
-  - If the owner keeps strict D2, the rule above stands, and the incompatible
-    containment requirement is reported as an accepted limitation for those
-    inputs.
+  - While strict D2 stands, the incompatible containment requirement is documented
+    for users ("Help and documentation") and reported as a limitation for those
+    inputs, using the exact line in "Continuation 5 verification".
+- As-built refusals at `D` of at least 2 (clm-12). Each returns `{ error }`, exits 2
+  and writes nothing. These are in addition to the restack refusal above:
+  - A sub-process whose contents would change parent or relative offset (boundary
+    events excepted), for example by landing on a sub-process in another lane:
+    `arrange --mode layered cannot keep the contents of sub-process "<name>" while
+    restacking lanes: move it clear of the sub-processes in other lanes, then rerun.`
+  - A collapsed pool whose descendants would change parent or relative offset (lanes
+    and boundary events excepted), because a member falls outside the narrower
+    planned width or lands transiently on a live sub-process:
+    `arrange --mode layered cannot keep the contents of collapsed pool "<name>" at
+    the planned pool width <width>: move them so that their centres fit inside that
+    width and clear of the sub-processes in other pools, then rerun.`
+  - These guards do not run at `D` up to 1, because D2 keeps that output unchanged.
+    The contents of a sub-process or collapsed pool can therefore change parent or
+    offset there, alongside the Q11 lane limitation.
 - Commands, in up to three applies, because `planBpmnTranslations` carries every
   descendant whose position a command did not change: first the container
   step (pool boxes and lane boxes through `updateVisual` as stated above, and units are
@@ -1386,6 +1419,7 @@ Mechanics:
 | --- | --- |
 | `apps/cli/src/help.ts` | OVERVIEW (`merge`, `--quiet`), `arrange` (modes, `--frames`, `--ids`, `--reset-manual`, manual-setting rule, the E2 page-kind table with exclusion reasons, BPMN rows), `edit` (`label` on update with the mapping table, the E1 per-kind carry table, unknown-field rejection, `name:`, `where`, `expect`, `select`, match report lines), `lint` (new rules, page table, `--fix`, `--metrics` and its page kinds), `merge` (usage, conflict policy, exit codes, git driver setup), `export` (determinism guarantee) |
 | `docs/cli.md`, `README.md` | the same user-facing content, the git driver recipe, the SVG regeneration recipe |
+| `apps/cli/src/help.ts`, `docs/cli.md` (BPMN layered limits) | under `arrange`: nested lanes may get full boxes rewritten and keep their order; the three E2.1 refusals in plain words; and this limitation, in substance: "On a BPMN page whose lanes are nested at most one level, layered arrange moves units and changes pool boxes and lane heights, but keeps lane positions. A lane can end outside its pool when the pool box does not change, and the contents of a sub-process or collapsed pool can change parent or offset." Under `edit`: the E1 geometry errors. No user-facing text names Q11 |
 | `design-docs/specs/design-cli-ai-drawing.md` | a pointer to this document under edit and arrange |
 | `design-docs/specs/export.md` | the determinism guarantee in Goals and Rollout |
 | `apps/cli/src/mcp.ts` | no change. Its schema is the generic `args` and `stdin` passthrough, so new `edit` fields and ops need no schema edit, and each `COMMAND_HELP` entry becomes a `nodetto_<command>` tool with that help as its description. `mcp.test.ts` gains a check that `nodetto_merge` is listed and that the `nodetto_edit` description names `where`, `select` and `carryMembers` |
@@ -1839,6 +1873,9 @@ The continuation verifications above apply, with evidence under
 
 ## Continuation 4 partition
 
+History: its waves are replaced by "Continuation 5 partition" below, and
+`impl-plans/active/clm-s737-dispatch.json` must not be dispatched again.
+
 Added 2026-11-05 for HEAD c548457. It replaces the waves above. The ownership rules,
 contracts and single-owner notes above stay binding, as amended by D1, D2 and D3'.
 The fresh manifest is `impl-plans/active/clm-s737-dispatch.json` with evidence root
@@ -1901,3 +1938,76 @@ The continuation verifications above apply, with evidence under
   retry and `/usr/bin/time -p` CPU comparison against
   `target/clm-s737-before/nodetto-cli`, and manual native timing of the obstacle-routing
   fixtures. No deadline is relaxed.
+
+## Continuation 5 partition
+
+Added 2026-11-05 for HEAD 235b8c8. It replaces the waves above and finishes clm-09
+only. There is no redesign: the ownership rules, contracts and decisions D1, D2 and
+D3' stay binding. The fresh manifest is `impl-plans/active/clm-s740-dispatch.json`
+with evidence root `tmp/clm-s740/`. All earlier clm manifests must not be dispatched
+again.
+
+State at HEAD 235b8c8:
+
+- Landed and accepted: every clm plan except clm-09.
+- clm-09 is in the tree: registration, BPMN dispatch with `settleCommands`, diagram
+  lint and metrics, sync and async `--quiet`, warning collapse, `matches`, core
+  exports and MCP assertions.
+- Help and docs are initial only. For example, the `arrange` and `lint` usage lines
+  omit the new flags, `edit` has no E1 per-kind table or label mapping, and
+  `export.md` has no determinism bullets.
+- These planned files are absent: `cli-wiring.test.ts`, `merge-git.test.ts`,
+  `__fixtures__/bpmn-layered.ts` and the four `native-parity` topic files.
+
+Every feature is reachable through the registered commands at this HEAD, so the three
+wave 1 tracks need no handover from each other.
+
+| Wave | Plan | Scope | Owned write paths | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-09a-help-docs | "Help and documentation" in full, except `mcp.ts` (no change) and `impl-plans/` | `apps/cli/src/help.ts`, `docs/cli.md`, `README.md`, `design-docs/specs/export.md`, `design-docs/specs/design-cli-ai-drawing.md`, `apps/cli/src/ai-commands.test.ts`, `apps/cli/src/mcp.test.ts` | - |
+| 1 | clm-09b-cli-tests | CLI-level tests and the git driver end-to-end test, plus wiring gaps they expose | `apps/cli/src/cli-wiring.test.ts`, `apps/cli/src/merge-git.test.ts`, `apps/cli/src/commands.ts`, `cli.ts`, `main.ts`, `warnings.ts`, `merge-command.ts`, `arrange-modes.ts`, `lint-metrics.ts`, `lint-diagram.ts`, `edit-command.ts`, `draw-command.ts`, `export-command.ts`, `packages/core/src/index.ts` (missing exports only), and their existing tests for intentional assertion updates, plus `commands.test.ts`, `mcp-stdio.test.ts`, `text-layout-lint.test.ts` and `breadboard-commands.test.ts` | - |
+| 1 | clm-09c-native-parity | The four native parity topic files and their fixture, plus native-only wiring gaps | `apps/cli/src/__fixtures__/bpmn-layered.ts`, `apps/cli/src/native-parity/layout.test.ts`, `merge.test.ts`, `edit-usability.test.ts`, `lint-rules.test.ts`, `apps/cli/src/native-engine.ts`, and, only if an asserted output changed, `native-parity/harness.ts`, `documents.test.ts`, `drawing.test.ts`, `text-layout.test.ts`, `edit-performance.test.ts` | - |
+| 2 | clm-09-wiring | Final gates, native timing, stable-tree verification, self-review and the progress log | `impl-plans/progress/clm-09-wiring.md`, plus the union of the wave 1 paths, used only to fix a gate failure within wiring scope | clm-09a, clm-09b, clm-09c |
+
+- clm-09-wiring's dependency is real: final gates and timing must run on the complete,
+  stable tree.
+- Fixture: only clm-09c and the timing use `bpmn-layered.ts`. `cli-wiring.test.ts`
+  writes its documents inline. No wave 1 track imports another track's new file.
+- Help assertions: clm-09a owns them in `ai-commands.test.ts` and `mcp.test.ts`. A help
+  assertion elsewhere that its text breaks is fixed in wave 2.
+- Native builds: in wave 1 only clm-09c builds the release binary and runs native tests,
+  so wave 1 has one cargo build and no deadline test competing with another track.
+  clm-09b runs `merge-git.test.ts` on the Bun path in wave 1, and wave 2 runs it with the
+  binary after a fresh rebuild. `target/clm-baseline` and `target/clm-s737-before` stay in
+  place.
+- A defect in a feature module stays a finding for its owning plan. Only listed wiring
+  changes are allowed.
+- The manifest is the concrete write list for each plan. It can add wiring paths for the
+  same purpose, such as `apps/cli/src/edit/report.ts`.
+- `apps/desktop/src-tauri/gen/schemas/*.json` may be rewritten by `mise run verify` and
+  is never staged.
+
+### Continuation 5 verification
+
+Rows "E1", "E2", "F1" to "F4", "B2", "B3", "C3", "D1" to "D3" and "Native parity" in
+"Verification" define the test content, as specified in `impl-plans/active/clm-09-wiring.md`.
+Evidence is under `tmp/clm-s740/<planId>/`. These additions and changes apply:
+
+- clm-09b adds one CLI-level refusal test: a BPMN page that gets an E2.1 `{ error }` exits
+  2 and leaves the file unchanged.
+- Q11: no test pins the reproduction either way, and no depth-one output changes. The D1,
+  D2 row is otherwise unchanged. The clm-09-wiring progress log and final report contain
+  this exact line, and the E2 criterion is not reported as fully met for those inputs. The
+  line blocks nothing:
+  `Q11 open: depth-one containment not accepted for conflict inputs`
+- Final gates in clm-09-wiring, in this order, on the stable tree: rebuild the release
+  binary; native parity with `NODETTO_CLI_TEST_BINARY` set and more than 0 tests run; the
+  git driver test with the binary; `bun run typecheck`; the production-core
+  `--noUncheckedIndexedAccess` gate; the desktop production build; `mise run verify`; and
+  `mise run test-cli`. Native deadline tests and `mise run test-cli` get up to 3 attempts,
+  with every attempt's log kept. No deadline is relaxed.
+- Timing in `tmp/clm-s740/clm-09-wiring/timing.log`, using `/usr/bin/time -p`: the six D3'
+  inputs from `tmp/clm-s737/clm-02-connector-edit-perf/inputs/`, each from a fresh copy,
+  on the release binary and `target/clm-s737-before/nodetto-cli`; and the two arrange
+  timings. A marginal ratio above 1.5, or a quadratic arrange slowdown, is a finding for
+  the owning plan.

@@ -80,9 +80,11 @@ changes only the section named.
 - Alternative: require `expect` on every `delete` with `where`, to guard bulk
   deletion.
 
-## Q11. Depth-one byte identity against lane containment (D1, D2) - open, BLOCKING, owner decision required
+## Q11. Depth-one byte identity against lane containment (D1, D2) - open, not blocking, current behavior kept
 
-There is no default for this question. D2 stays strict until the owner answers.
+Owner direction, continuation 5 (2026-11-05): keep the current depth-one behavior,
+document it, and do not block on this question. Neither option below is chosen as a
+final answer. D2 stays strict until the owner gives one.
 
 - Conflict: D2 requires depth-one results to stay byte-identical to the current
   output, and the acceptance criteria also require containment tests at depth 1.
@@ -114,8 +116,8 @@ Option B: keep D2 strict on every depth-one page.
   is narrowed by owner decision to inputs whose current output already satisfies
   containment. The limitation is documented and reported.
 
-Either answer is recorded as a scope amendment in design E2.1 before clm-12
-implements or accepts it.
+A final answer is recorded as a scope amendment in design E2.1 before any depth-one
+output changes.
 
 ## Q12. A7 ratio above the 2.0 x ceiling (D3) - closed, superseded by D3'
 
