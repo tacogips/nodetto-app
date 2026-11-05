@@ -1,3 +1,4 @@
+import { applyQuiet, extractQuiet } from "./warnings.ts";
 // Build-time entry point for the shared diagram engine embedded in the Rust
 // executable. It imports no Node/Bun APIs; OS operations belong to Rust.
 import { runCli } from "./commands.ts";
@@ -61,7 +62,8 @@ const io = {
 Object.assign(globalThis, {
   nodettoHelp: JSON.stringify({ overview: OVERVIEW, commands: COMMAND_HELP }),
   nodettoRun: async (input: string, version: string) => {
-    const args = JSON.parse(input) as string[];
+    const extracted = extractQuiet(JSON.parse(input) as string[]);
+    const args = extracted.args;
     const [command, ...rest] = args;
     const help = rest.includes("--help") || rest.includes("-h");
     const result =
@@ -87,6 +89,8 @@ Object.assign(globalThis, {
         : command === "open" && !help
           ? await openCommand(io, rest)
           : runCli(args, io, version);
-    return JSON.stringify(result);
+    return JSON.stringify(
+      extracted.quiet ? applyQuiet(command ?? "", result) : result,
+    );
   },
 });

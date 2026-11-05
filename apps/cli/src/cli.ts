@@ -2,6 +2,7 @@
 // need to await (rendering), behind one dispatcher.
 
 import { type CommandIo, type CommandResult, runCli } from "./commands.ts";
+import { applyQuiet, extractQuiet } from "./warnings.ts";
 import { openCommand } from "./open-command.ts";
 import { exportCommand } from "./export-command.ts";
 
@@ -20,9 +21,13 @@ export async function runCliAsync(
   io: CommandIo,
   version: string,
 ): Promise<CommandResult> {
-  const [command, ...rest] = args;
+  const extracted = extractQuiet(args);
+  const [command, ...rest] = extracted.args;
   const handler = command === undefined ? undefined : ASYNC_COMMANDS[command];
   const wantsHelp = rest.includes("--help") || rest.includes("-h");
-  if (handler && !wantsHelp) return handler(io, rest);
-  return runCli(args, io, version);
+  const result =
+    handler && !wantsHelp
+      ? await handler(io, rest)
+      : runCli(extracted.args, io, version);
+  return extracted.quiet ? applyQuiet(command ?? "", result) : result;
 }

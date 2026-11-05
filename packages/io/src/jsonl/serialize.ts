@@ -13,6 +13,11 @@ import {
   type Visual,
 } from "@nodetto/ir";
 import { compareStrings, stringifyCanonical } from "./canonical.ts";
+import {
+  acceptElementLine,
+  acceptPageLine,
+  type SourceLines,
+} from "./source-lines.ts";
 import { setField } from "./objects.ts";
 import {
   DOCUMENT_KIND,
@@ -25,6 +30,7 @@ import {
 } from "./records.ts";
 
 export interface SerializeOptions {
+  readonly sourceLines?: SourceLines;
   /**
    * Validate before writing and throw on errors. On by default: writing an
    * invalid document to a user's file is worse than failing loudly.
@@ -169,10 +175,14 @@ export function serializeDocument(
   const lines: string[] = [documentLine(document)];
 
   for (const page of [...document.pages].sort(comparePages)) {
-    lines.push(pageLine(page));
+    const source = options.sourceLines?.get(page);
+    lines.push(source && acceptPageLine(source) ? source.line : pageLine(page));
   }
   for (const element of [...document.elements].sort(compareElements)) {
-    lines.push(elementLine(element));
+    const source = options.sourceLines?.get(element);
+    lines.push(
+      source && acceptElementLine(source) ? source.line : elementLine(element),
+    );
   }
 
   const unknown = document.unknownRecords ?? [];

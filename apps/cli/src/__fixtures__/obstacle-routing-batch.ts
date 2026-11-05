@@ -218,3 +218,8 @@ export function obstacleRoutingMixedMultiPage(): {
     operations: mixedOperations(),
   };
 }
+
+export function oneOpOperations(): string {
+  const operations = JSON.parse(obstacleRoutingBatch().operations) as unknown[];
+  return JSON.stringify(operations.slice(0, 1));
+}

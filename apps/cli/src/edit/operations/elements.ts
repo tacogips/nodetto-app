@@ -1,9 +1,4 @@
-import {
-  frameParents,
-  planScale,
-  replaceText,
-  textMatcher,
-} from "@nodetto/core";
+import { planScale, replaceText, textMatcher } from "@nodetto/core";
 import {
   getElementTypeDefinition,
   isKnownElementType,
@@ -12,6 +7,7 @@ import {
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
 import { nullPaths, visualPatchCommand } from "../visual-patch.ts";
+import { heldMembers } from "../carry-members.ts";
 import { selectedWhere } from "../selectors.ts";
 import { applyLabel } from "../label-field.ts";
 import {
@@ -144,31 +140,13 @@ function updateOne(
   const carry = operation["carryMembers"];
   if (carry !== undefined && typeof carry !== "boolean")
     throw new OperationError(index, `"carryMembers" must be true or false`);
-  if (carry === false && element.type !== "frame")
-    throw new OperationError(index, "carryMembers applies only to frames");
   if (!commands.length && operation["label"] === undefined)
     throw new OperationError(index, "update needs semantic, visual or label");
-  let placed: Set<string> | undefined;
-  if (carry === false) {
-    batch.editor.setCurrentPage(element.page);
-    const parents = frameParents(
-      batch.editor.store,
-      element.page,
-      batch.editor.createShapeContext(1),
-    );
-    placed = new Set<string>();
-    for (const [child] of parents) {
-      let parent = parents.get(child);
-      while (parent) {
-        if (parent === element.id) {
-          placed.add(child);
-          break;
-        }
-        parent = parents.get(parent);
-      }
-    }
-  }
-  batch.editor.apply(commands, placed ? { placed } : undefined);
+  const keepMembers =
+    carry === false
+      ? heldMembers(batch.editor, element, visual, index)
+      : undefined;
+  batch.editor.apply(commands, keepMembers ? { keepMembers } : undefined);
   if (operation["label"] !== undefined)
     applyLabel(batch, element.id, operation["label"], index);
   batch.touchedPages.add(element.page);

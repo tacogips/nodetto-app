@@ -754,3 +754,46 @@ describe("semantic.unknownField", () => {
     }
   });
 });
+
+test("scoped element validation retains global duplicate checks and indices", () => {
+  const doc = base();
+  const element = doc.elements[0];
+  const scoped = {
+    ...doc,
+    pages: [...doc.pages, { id: "p2", name: "Other", kind: "erd" }],
+    elements: [
+      {
+        ...element,
+        page: "p2",
+        semantic: { tableName: "other", columns: [], extra: true },
+      },
+      {
+        ...element,
+        id: "t2",
+        semantic: { tableName: "current", columns: [], extra: true },
+      },
+      { ...element, page: "p2" },
+      { ...element, id: "t3", page: 7 },
+    ],
+  } as unknown as Document;
+  const full = validateDocument(scoped);
+  const actual = validateDocument(scoped, { elementPages: new Set(["p1"]) });
+  expect(actual).toEqual(
+    full.filter(
+      (issue) =>
+        !issue.path.startsWith("elements[0].") &&
+        (!issue.path.startsWith("elements[2].") ||
+          issue.code === "id.duplicate"),
+    ),
+  );
+  expect(
+    actual.some((issue) => issue.path === "elements[1].semantic.extra"),
+  ).toBe(true);
+  expect(
+    actual.some(
+      (issue) =>
+        issue.path === "elements[2].id" && issue.code === "id.duplicate",
+    ),
+  ).toBe(true);
+  expect(actual.some((issue) => issue.path === "elements[3].page")).toBe(true);
+});

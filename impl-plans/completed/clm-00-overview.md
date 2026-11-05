@@ -7,7 +7,39 @@
   Implement each default.
 - This overview is not dispatched and has no write paths.
 
-## Continuation 3 2026-11-05 (clm-s736) - authoritative
+## Continuation 5 2026-11-05 (clm-s740) - authoritative
+
+Manifest: `impl-plans/active/clm-s740-dispatch.json`, source commit `235b8c84f3d47734077901aeb9313eed895f6e8f`, evidence
+root `tmp/clm-s740/<planId>/`. Every earlier clm manifest is stale and must not be dispatched. Supersedes every table
+below. Every clm plan except clm-09 is accepted and landed.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-09a-help-docs | Full help and docs | - |
+| 1 | clm-09b-cli-tests | CLI-level tests, git driver end-to-end test, wiring gaps | - |
+| 1 | clm-09c-native-parity | Native parity topic files, BPMN fixture, native wiring gaps | - |
+| 2 | clm-09-wiring | Final gates, native timing, stable-tree verification, self-review | clm-09a, clm-09b, clm-09c |
+
+Open owner question: Q11 stays open but blocks nothing. No plan changes depth-one output or pins the conflict inputs in a
+test, the behavior is documented, and the final report keeps the exact Q11 line.
+
+## Continuation 4 2026-11-05 (clm-s737) - superseded by Continuation 5
+
+Manifest: `impl-plans/active/clm-s737-dispatch.json`, source commit `c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence
+root `tmp/clm-s737/<planId>/`. The clm-s725, clm-s731, clm-s732 and clm-s736 manifests are stale and must not be
+dispatched. Supersedes every table below. Accepted and landed: clm-01, 03, 04, 06, 07, 08, 10, 12, 13, 14, 15. Each plan's
+"Continuation 4" section is authoritative for that plan.
+
+| Wave | Plan | Remaining scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | D3': marginal ratios, scoped validation, verified line reuse, timings | - |
+| 1 | clm-11-container-carry | E1 CLI module and per-kind tests | - |
+| 2 | clm-09-wiring | Registration, BPMN dispatch, help, docs, parity, git e2e, final gates | clm-02, clm-11 |
+
+Open owner decision: Q11 is blocking and has no default. No plan changes depth-one output or pins the conflict inputs in a
+test, and the run does not report depth-one containment as met for them. Q12 is closed, superseded by D3'.
+
+## Continuation 3 2026-11-05 (clm-s736) - superseded by Continuation 4
 
 Manifest: `impl-plans/active/clm-s736-dispatch.json`, base HEAD
 `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence root `tmp/clm-s736/<planId>/`. The clm-s725,

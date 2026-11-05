@@ -94,7 +94,7 @@ export function lintNodeOverlaps(
         Math.min(a.box.y + a.box.height, b.box.y + b.box.height) -
         Math.max(a.box.y, b.box.y);
       if (width <= 0 || height <= 0 || width * height <= 1) continue;
-      const system = (v: typeof a) =>
+      const system: (v: NonNullable<typeof a>) => boolean = (v) =>
         v.element.type === "usecase.node" &&
         (v.element.semantic as Record<string, unknown>).kind === "system";
       if (

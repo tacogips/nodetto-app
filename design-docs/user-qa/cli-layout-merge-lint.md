@@ -1,8 +1,8 @@
 # CLI layout, merge and lint additions: owner decisions
 
-Design: `design-docs/specs/design-cli-layout-merge-lint.md`. All questions are
-open. The design implements each default. A different answer changes only
-the section named.
+Design: `design-docs/specs/design-cli-layout-merge-lint.md`. Questions are open
+unless marked otherwise. The design implements each default. A different answer
+changes only the section named.
 
 ## Q1. Text-layout rules on ERD, state and UML pages (D, page selection) - open, default kept
 
@@ -80,9 +80,11 @@ the section named.
 - Alternative: require `expect` on every `delete` with `where`, to guard bulk
   deletion.
 
-## Q11. Depth-one byte identity against lane containment (D1, D2) - open, BLOCKING, owner decision required
+## Q11. Depth-one byte identity against lane containment (D1, D2) - open, not blocking, current behavior kept
 
-There is no default for this question. D2 stays strict until the owner answers.
+Owner direction, continuation 5 (2026-11-05): keep the current depth-one behavior,
+document it, and do not block on this question. Neither option below is chosen as a
+final answer. D2 stays strict until the owner gives one.
 
 - Conflict: D2 requires depth-one results to stay byte-identical to the current
   output, and the acceptance criteria also require containment tests at depth 1.
@@ -114,10 +116,15 @@ Option B: keep D2 strict on every depth-one page.
   is narrowed by owner decision to inputs whose current output already satisfies
   containment. The limitation is documented and reported.
 
-Either answer is recorded as a scope amendment in design E2.1 before clm-12
-implements or accepts it.
+A final answer is recorded as a scope amendment in design E2.1 before any depth-one
+output changes.
 
-## Q12. A7 ratio above the 2.0 x ceiling (D3) - open, default kept
+## Q12. A7 ratio above the 2.0 x ceiling (D3) - closed, superseded by D3'
+
+Owner decision D3' replaces the whole-command ratio and its ceiling with the marginal
+per-operation ratio ("A7 decision D3'" in the design), so this question no longer
+applies. A marginal ratio above 1.5 x is a defect for clm-02 to fix, or a blocker
+finding. The original text is kept as history.
 
 - Context: D3 accepts up to 2.0 x when the gap is irreducible, and does not say
   what happens if an irreducible gap stays above 2.0 x. The current single-page

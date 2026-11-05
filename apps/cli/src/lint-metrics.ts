@@ -4,12 +4,9 @@ import {
   type Document,
   type PageId,
 } from "@nodetto/ir";
-import {
-  pageMetrics,
-  type PageMetrics,
-} from "../../../packages/core/src/diagram-lint/metrics.ts";
-import { createDefaultRegistry } from "../../../packages/core/src/shapes/index.ts";
-import { Store } from "../../../packages/core/src/store.ts";
+import { pageMetrics, type PageMetrics } from "@nodetto/core";
+import { createDefaultRegistry } from "@nodetto/core";
+import { Store } from "@nodetto/core";
 
 export function lintMetrics(
   document: Document,

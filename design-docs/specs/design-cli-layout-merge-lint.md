@@ -8,12 +8,17 @@ title band, A1 frame-order ranks, D3 path normalization), new groups E
 continuation plan partition that replaces the clm-s725 one. Revised
 2026-11-05 for continuation 3: owner decisions D1 and D2 (E2.1 lane boxes and
 depth-dependent inset), D3 (A7 attribution and ratio ceiling), and the
-"Continuation 3 partition", which replaces the earlier waves.
+"Continuation 3 partition", which replaces the earlier waves. Revised again
+2026-11-05 for continuation 4: owner decision D3' replaces D3 ("A7 decision
+D3'"), and the "Continuation 4 partition" replaces the continuation 3 waves.
+Revised again 2026-11-05 for continuation 5: the owner's Q11 direction (keep
+depth-one behavior, document it, do not block), the as-built E1 geometry errors
+and E2.1 refusals, and the "Continuation 5 partition" for finishing clm-09.
 
 Owner decisions: `design-docs/user-qa/cli-layout-merge-lint.md`. Each open
-question has a default that this design implements, except Q11, which is
-blocking and has none. A different answer changes only the section named in
-that question.
+question has a default that this design implements. Q11 has no chosen option,
+but the owner directed that current depth-one behavior stays and that Q11 blocks
+nothing. A different answer changes only the section named in that question.
 
 Baseline: `design-docs/specs/design-cli-ai-drawing.md` (commands, edit
 batches, live co-editing merge), `design-docs/specs/design-text-layout-lint.md`
@@ -479,14 +484,14 @@ Tests and targets:
   fixtures with the release binary, under 10 s each (spawn timeout 60 s, test
   timeout 120 s), byte-identical to Bun. 3-attempt retry on a deadline
   timeout under load. Existing deadlines are not relaxed.
-- Target, checked manually with `/usr/bin/time -p` on the release binary and
-  recorded in the plan progress log: `multiPage` user CPU at most 1.5 x the
-  single-page fixture's, and `mixedMultiPage` at most 1.5 x
-  `mixedSinglePage`'s, on the same build. Both are also compared with
-  `target/clm-baseline/nodetto-cli`. Owner decision D3 below sets when a ratio
-  above 1.5 x is accepted.
+- Target: superseded. The timing target and its measurement are defined by
+  "A7 decision D3'" below. The whole-command ratios are no longer a target.
 
 ### A7 decision D3: attribute first, then remove, then decide
+
+Superseded by "A7 decision D3'". This section is history: its probe harness,
+phase table, whole-command ratios, 2.0 x ceiling, `single/baselineSingle` limit
+and outcome lines do not apply. The three expected hashes in step 3 stay binding.
 
 Status at HEAD d5b9bac: user CPU on one release build is single 0.54 s, multi
 1.24 s (2.30 x), mixed single 0.72 s, mixed multi 1.33 s (1.85 x). Earlier runs
@@ -550,11 +555,170 @@ Outcome rules, applied to both ratios:
 
 ### A7 attribution record
 
-clm-02 is the only writer of this subsection, and fills it in when the work
-lands: build id, four median timings, both ratios, the phase table with classes,
-what was removed, and which outcome rule applied.
+Not used. D3' records timings in the clm-02 progress log and requires no
+attribution record, so this subsection stays empty.
 
-Pending.
+### A7 decision D3': marginal per-operation cost and page-scoped writing
+
+Owner decision, replacing D3. Owner measurement on the native release binary at
+edb9ad2, user CPU:
+
+| Document | `validate` | `edit`, 1 op | `edit`, 50 ops | Marginal cost of 49 ops |
+| --- | --- | --- | --- | --- |
+| single page | 0.79 s | 0.86 s | 1.37 s | 0.51 s |
+| multi page (17 x larger file) | 1.17 s | 2.33 s | 2.93 s | 0.60 s (1.18 x) |
+
+Per-operation work is already page-bounded. Loading, validating, serializing and
+writing a 17 x larger file is inherently document-sized, so the whole-command
+ratio was the wrong metric. Absolute values vary between sessions (the clm-02
+log has lower numbers on another run), so only same-session values are compared.
+
+#### Acceptance (a): marginal cost
+
+- New fixture data: `oneOpOperations`, the first `update` of the 50-op list,
+  exported from `apps/cli/src/__fixtures__/obstacle-routing-batch.ts` and applied
+  to both the single-page and the multi-page document.
+- Six inputs: single 1 op, multi 1 op, single 50 ops, multi 50 ops, mixed single,
+  mixed multi. Five `/usr/bin/time -p` runs each on one release build, one after
+  another, using the median user CPU. All runs are logged.
+- `batch ratio = (multi 50 ops - multi 1 op) / (single 50 ops - single 1 op)`
+- `mixed ratio = (mixed multi - multi 1 op) / (mixed single - single 1 op)`
+- Both ratios must be at most 1.5. A ratio above 1.5 means per-operation work
+  that is not page-bounded, which "A7 continuation" forbids: clm-02 profiles the
+  batch and removes it. If it cannot, it reports a blocker finding with the
+  measurements. It does not raise the limit or change a fixture.
+
+#### Acceptance (b1): post-batch validation covers only changed pages
+
+Validation calls in the `edit` path at HEAD:
+
+| Call | When | D3' |
+| --- | --- | --- |
+| `parseDocumentResult` -> `validateDocument` | input, once per attempt | unchanged |
+| `unknownFields`, `apply-batch.ts:89` | per changed element, on a one-element document | unchanged: already bounded by the element |
+| `validateDocument(snapshot)`, `apply-batch.ts:165` | post-batch, whole document | scoped to changed pages |
+| `assertValidDocument`, `serialize.ts:166` | post-batch, the same snapshot again | skipped on this path with the existing `{ validate: false }` |
+
+The last call can never throw on this path, because line 165 throws first on the
+same snapshot. `serializeDocument` keeps validating by default for every other
+caller.
+
+Changed pages:
+
+- `applyBatch` records them for the whole batch from `store.subscribe` diffs. For
+  an added or updated id: the page of the current element, and the pre-batch page
+  from `before`. For a removed id: the pre-batch page.
+- A diff with `pagesChanged` makes the batch whole-document, which also covers
+  `loadDocument`.
+- Tracking must include the `--arrange` applies, which run after today's
+  `unsubscribe()`.
+- `dirtyPages()` is deliberately not the source. It is a per-apply planning
+  estimate that returns `undefined` for the first apply of every batch (no prior
+  `lastApplyStoreRevision`), so it would keep every batch whole-document. The
+  diffs also include derived changes that planning produced on other pages.
+
+Scoped validator: `ValidateOptions.elementPages?: ReadonlySet<string>` in
+`packages/ir/src/validate.ts`. Without it, behavior is unchanged. With it:
+
+- The document fields and every page record are still checked.
+- The id set, `elementById` and the `id.duplicate` check still scan all elements.
+- `validateElement` and the reference checks run only for elements whose `page`
+  is in the set. An element whose `page` is not a string is always in scope.
+- Issue paths keep the element's index in `document.elements`, because
+  `unknownFieldKey` reads `snapshot.elements` by that index. Issues on in-scope
+  elements are identical to full validation, in the same relative order.
+
+Why this cannot miss cross-page breakage, from `validate.ts` at HEAD: errors on an
+element depend only on that element and the set of page ids, and page changes are
+whole-document. Every check that reads another element (`connectorEndpointIssues`,
+`reference.dangling`, `bpmn.parentType`, `bpmn.attachedToType`) emits only
+warnings. `applyBatch` uses only errors and `semantic.unknownField` warnings, and
+drops unknown-field keys already in the parse baseline, which covers every
+untouched element. So error text, warnings and written bytes do not change, and no
+widening by `crossLinkedPages` is needed.
+
+#### Acceptance (b2): serialization reuses verified source lines
+
+The only source of an untouched element's canonical text without re-stringifying
+it is its input line, and input may be hand-written or otherwise non-canonical. A
+line is therefore reused only when it is proven equal to what the writer would
+produce. Everything else goes through the writer, line by line, so a non-canonical
+input still gives the same output as today.
+
+Contract:
+
+- `ParseOptions.keepSourceLines?: boolean` makes the `ok` result carry an opaque
+  `sourceLines`, keyed by the parsed `Page` and `Element` objects. It is empty when
+  a migration ran (`migrated !== snapshot`).
+- `SerializeOptions.sourceLines` is passed to `serializeDocument`. Without it, every
+  caller behaves as today. `applyBatch` is the only caller that passes it.
+- Lookup is by object identity, so a changed element or page, which is always a new
+  object, cannot find a line. `Store.loadDocument` keeps the parsed objects, commits
+  replace objects, and a search of `packages/core/src` and `apps/cli/src/edit` found
+  no in-place `semantic` or `visual` assignment. A freeze test guards this.
+- The document line, unknown records and record sort order always use today's code.
+
+A new module `packages/io/src/jsonl/source-lines.ts`, next to the writer and using
+the same `KeyOrder` values, accepts a source line only if all of these hold,
+otherwise the writer is used:
+
+1. `JSON.stringify(parsedRecord) === line`. This rejects whitespace, a CR, number
+   and escape spellings, duplicate keys and promoted integer-like keys.
+2. For elements: `semantic` is a plain object, and `visual` is absent or a non-empty
+   plain object whose `style` is absent or a non-empty plain object. The writer adds
+   a missing `semantic` and drops an empty `visual` or `style`, so such lines differ.
+3. At every depth, keys follow the writer's order for the same `KeyOrder`
+   (`elementRecordOrder(keyOrder)`, `PAGE_RECORD_ORDER`, and nested `children`):
+   declared keys in declared order, then the rest ascending by code unit.
+4. Each declared coordinate equals `roundCoordinate(value)`.
+
+The check may reject a canonical line, which only costs time. It must never accept
+a line the writer would write differently. Rejected alternative: reusing input lines
+unverified, which would stop normalizing non-canonical input and break byte identity.
+
+Test seam: `applyBatch` gains an optional last parameter
+`{ fullWrite?: boolean }`, for tests only and not exposed as a CLI flag. It selects
+full validation and full serialization.
+
+#### Tests and timings
+
+- Differential (`apply-batch.test.ts`): `fullWrite` on and off give identical `text`,
+  `warnings`, `counts` and thrown error text, for the single, multi-page and mixed
+  fixtures, `--arrange`, element delete, page delete, page create, a token update, a
+  delete of an element referenced from another page, and an error on a changed page.
+- Serializer (`packages/io/src/jsonl/source-lines.test.ts`): reuse output equals
+  `serializeDocument(snapshot)` for every expected fixture, and with these input
+  variants: padded whitespace, CRLF, BOM, reordered keys, unrounded coordinate, `-0`,
+  `1.0`, escaped string spelling, duplicate key, integer-like key, `__proto__` key,
+  a field named `extensions`, unknown fields, unknown record, absent `semantic`, empty
+  `visual`, empty `style`, unknown element type, and a migrated older document (empty
+  `sourceLines`, via an injected migration). Each non-canonical variant asserts the
+  writer's normalized output, not the raw line. One test asserts that a canonical line
+  is accepted, so that reuse cannot silently turn into a no-op.
+- Staleness: an edited element and page get new text, and neighbours on the same
+  page keep theirs.
+- Freeze: the three fixture batches run through `Batch` on a deep-frozen parsed
+  document, proving no in-place mutation on these paths.
+- Validator (`packages/ir/src/validate.test.ts`): `elementPages` gives the full issue
+  list filtered to in-scope elements, with original indices. Without the option the
+  list is unchanged.
+- Expected hashes stay `341fcd8654fc18d560c8895df1a05617a6b8ac39`,
+  `872e266430b5a59930a4f87474869514a2c126cc` and
+  `4f5c88d5b1c4bc44c3afbd743fb76089bb0d34aa`. Expected files are never regenerated.
+- Deadlines in `edit-performance.test.ts` (Bun and native) stay as they are.
+- Timings: before any clm-02 source edit, build the release binary from c548457 and
+  copy it to `target/clm-s737-before/nodetto-cli`, which gives known provenance.
+  `target/clm-baseline/nodetto-cli` stays in place and is not the reference. Run the
+  six inputs on both binaries in one session, and append to the progress log:
+  - the six medians for each binary, labelled `before` and `after`
+  - `A7 marginal ratio batch: <x>` and `A7 marginal ratio mixed: <x>` for each binary
+  - `A7 fixed cost multi 1-op: before <x> after <y>`
+
+  The gate is both `after` ratios at most 1.5 and `y` lower than `x`. D3' sets no
+  other absolute target. A `y` that is not lower is a finding against b1 or b2.
+
+Not in D3': the Boa probe harness, the attribution record, other document-wide
+costs such as the `JSON.stringify` comparison in `countPageChanges`, and Rust changes.
 
 ## B. Three-way merge
 
@@ -943,6 +1107,20 @@ Mechanics:
   module, so frames also hold members against `planConstraints` on resize.
 - With `where` (F2), the set is collected per matched element.
 - In one batch, held members keep positions set by earlier operations.
+- A `bpmn.boundaryEvent` attached to the updated container is not held: it is an
+  attachment and follows its host.
+
+As-built geometry errors (clm-11, exit 2, nothing written), in addition to the
+table above. With `carryMembers:false` on a pool or lane that has child lanes:
+
+- A changed height below what the lanes need:
+  `carryMembers:false on "<name>": its lanes need a height of at least <n>; shrink the lanes first.`
+- A changed pool width at or below 30 per lane depth:
+  `carryMembers:false on "<name>": its lanes need a width greater than <n>.`
+- A changed pool width that nested lanes do not fit:
+  `carryMembers:false on "<name>": its nested lanes need a width of at least <n>.`
+
+A non-boolean value exits 2: `"carryMembers" must be true or false`.
 
 ### E2. Arrange and routing on every applicable page kind
 
@@ -1037,8 +1215,8 @@ Mechanics:
   and lane heights), with no lane `x`, `y` or `width` writes and no settling.
   Identity applies to the document, not to the command lists. No exception to
   this is approved.
-- Open conflict between D2 and the depth-one containment requirement (BLOCKING,
-  user-QA Q11). The acceptance criteria also require containment tests at depth 1,
+- Open conflict between D2 and the depth-one containment requirement (user-QA Q11,
+  not blocking since continuation 5). The acceptance criteria also require containment tests at depth 1,
   and some valid depth-one inputs cannot satisfy both. Reproduced in design review
   on HEAD d5b9bac: a pool (x, y, width, height) = (0, 0, 210, 240), lanes
   (30, 0, 180, 140) and (30, 140, 180, 100) parented to it, and tasks
@@ -1047,17 +1225,33 @@ Mechanics:
   `bpmn/containment.ts` skips the restack, and the second lane ends at
   (30, 140, 180, 120), 20 past the pool's bottom. Containment needs its `y` to be
   120, which changes the output bytes.
-  - Until the owner answers Q11, no change to depth-one output may be dispatched
-    or accepted, and the criterion "containment at depth 1" stays open and
+  - Owner direction for continuation 5: keep current depth-one behavior, document
+    it, and do not block on Q11. Until Q11 gets a final answer, no change to
+    depth-one output may be dispatched or accepted, and the criterion "containment at depth 1" stays open and
     reported for inputs of this kind. No test pins these inputs either way: not
     as an expected file, and not as an accepted overflow.
   - Proposal, not approved: let D1 take priority by applying lane boxes and
     settling at every depth. Its exact boundary is in Q11. If the owner approves
     it, an owner-approved scope amendment records that boundary here and its
     matching gates before clm-12 implements it.
-  - If the owner keeps strict D2, the rule above stands, and the incompatible
-    containment requirement is reported as an accepted limitation for those
-    inputs.
+  - While strict D2 stands, the incompatible containment requirement is documented
+    for users ("Help and documentation") and reported as a limitation for those
+    inputs, using the exact line in "Continuation 5 verification".
+- As-built refusals at `D` of at least 2 (clm-12). Each returns `{ error }`, exits 2
+  and writes nothing. These are in addition to the restack refusal above:
+  - A sub-process whose contents would change parent or relative offset (boundary
+    events excepted), for example by landing on a sub-process in another lane:
+    `arrange --mode layered cannot keep the contents of sub-process "<name>" while
+    restacking lanes: move it clear of the sub-processes in other lanes, then rerun.`
+  - A collapsed pool whose descendants would change parent or relative offset (lanes
+    and boundary events excepted), because a member falls outside the narrower
+    planned width or lands transiently on a live sub-process:
+    `arrange --mode layered cannot keep the contents of collapsed pool "<name>" at
+    the planned pool width <width>: move them so that their centres fit inside that
+    width and clear of the sub-processes in other pools, then rerun.`
+  - These guards do not run at `D` up to 1, because D2 keeps that output unchanged.
+    The contents of a sub-process or collapsed pool can therefore change parent or
+    offset there, alongside the Q11 lane limitation.
 - Commands, in up to three applies, because `planBpmnTranslations` carries every
   descendant whose position a command did not change: first the container
   step (pool boxes and lane boxes through `updateVisual` as stated above, and units are
@@ -1225,8 +1419,10 @@ Mechanics:
 | --- | --- |
 | `apps/cli/src/help.ts` | OVERVIEW (`merge`, `--quiet`), `arrange` (modes, `--frames`, `--ids`, `--reset-manual`, manual-setting rule, the E2 page-kind table with exclusion reasons, BPMN rows), `edit` (`label` on update with the mapping table, the E1 per-kind carry table, unknown-field rejection, `name:`, `where`, `expect`, `select`, match report lines), `lint` (new rules, page table, `--fix`, `--metrics` and its page kinds), `merge` (usage, conflict policy, exit codes, git driver setup), `export` (determinism guarantee) |
 | `docs/cli.md`, `README.md` | the same user-facing content, the git driver recipe, the SVG regeneration recipe |
+| `apps/cli/src/help.ts`, `docs/cli.md` (BPMN layered limits) | under `arrange`: nested lanes may get full boxes rewritten and keep their order; the three E2.1 refusals in plain words; and this limitation, in substance: "On a BPMN page whose lanes are nested at most one level, layered arrange moves units and changes pool boxes and lane heights, but keeps lane positions. A lane can end outside its pool when the pool box does not change, and the contents of a sub-process or collapsed pool can change parent or offset." Under `edit`: the E1 geometry errors. No user-facing text names Q11 |
 | `design-docs/specs/design-cli-ai-drawing.md` | a pointer to this document under edit and arrange |
 | `design-docs/specs/export.md` | the determinism guarantee in Goals and Rollout |
+| `apps/cli/src/mcp.ts` | no change. Its schema is the generic `args` and `stdin` passthrough, so new `edit` fields and ops need no schema edit, and each `COMMAND_HELP` entry becomes a `nodetto_<command>` tool with that help as its description. `mcp.test.ts` gains a check that `nodetto_merge` is listed and that the `nodetto_edit` description names `where`, `select` and `carryMembers` |
 | `impl-plans/` | the plans for this design |
 
 ## Verification
@@ -1256,7 +1452,8 @@ deadline is relaxed.
 | D1 | ERD rectangle cases: coincident tables (identical bounds) give one finding naming both tables and the page; a table fully inside another gives one finding; a partial overlap gives one finding; touching tables (shared edge, zero area) give none. Each pair is reported once. A UML use-case system boundary containing a use case gives no finding, and two overlapping use cases inside it give one. Native parity in `lint-rules.test.ts` |
 | D2 | Latin word wrap, CJK punctuation breaks, line-start prohibition, hard split, idempotency, untouched non-overflow text, remaining height finding, JSON `fixes`, `.bpmn` rejected |
 | D3 | missing file, file outside the document folder, data URL skipped, error exit 1 |
-| A7 continuation | `multiPage` and `mixedMultiPage` byte-identical to committed pre-change expected files and under 10 s in Bun and native; dirty-page tests: an edit on page 1 leaves every planner's output for page 2 empty, and each cross-page case (token, text style, component master, cross-page reference, page command) still updates the other page; native phase table and the D3 outcome rules on five-run median CPU ratios; the "A7 attribution record" is filled in; the probe harness is gone from the tree |
+| A7 continuation | `multiPage` and `mixedMultiPage` byte-identical to committed pre-change expected files and under 10 s in Bun and native; dirty-page tests: an edit on page 1 leaves every planner's output for page 2 empty, and each cross-page case (token, text style, component master, cross-page reference, page command) still updates the other page |
+| A7 D3' | "Tests and timings" under "A7 decision D3'": differential `fullWrite`, serializer variants, staleness, freeze and validator tests; both native marginal ratios at most 1.5; multi-page 1-op median lower than before; timings in the progress log |
 | D1, D2 | Depths 1, 2 and 3, each also with a narrow unit (width 20): the worked-example boxes; every lane inside its parent and pool, siblings stacked without gaps in model order, parent height equal to the sum of its children; every unit's parent is its own leaf lane with its centre inside it; a rerun returns three empty lists; `validateDocument` clean. A shallow pool beside a deep pool uses the page-wide inset. Regressions at `D` of at least 2: lane heights change with an unchanged pool box; a lane whose box coincides with its old box while its pool moves; child heights that do not sum to the parent. Depth-one identity and containment: committed expected files captured from HEAD d5b9bac code before the first planner edit (two pools with lanes and a message flow; pool without lanes plus a free row; collapsed pool; sub-process with a boundary event), never regenerated. Containment is asserted on every one of them; a candidate fixture whose HEAD output breaks containment is not captured and is reported under Q11. Depth-one conflict inputs stay untested and open until Q11 is answered, and the answer adds their gate |
 | Fix 1 and 2 | TB: exact frame box and member y with and without `showTitle`, band at the top; LR unchanged; frame order unchanged on the existing tests with ranks precomputed |
 | Fix 3 | `documentRelativePath` table, `../` and `./` document paths, symlink escape reported by `readAttachment` |
@@ -1611,6 +1808,9 @@ The continuation verification above applies, with evidence under
 
 ## Continuation 3 partition
 
+History: its waves are replaced by "Continuation 4 partition" below, and
+`impl-plans/active/clm-s736-dispatch.json` must not be dispatched again.
+
 Added 2026-11-05 for HEAD d5b9bac. It replaces the waves above. The ownership
 rules, contracts and single-owner notes above stay binding, as amended by D1 to
 D3. The fresh manifest is `impl-plans/active/clm-s736-dispatch.json` with evidence
@@ -1670,3 +1870,144 @@ The continuation verifications above apply, with evidence under
 - clm-09 runs the final gates. `mise run test-cli` keeps the 3-attempt retry, and
   the manual native timing of the obstacle-routing fixtures is compared with
   `target/clm-baseline/nodetto-cli`.
+
+## Continuation 4 partition
+
+History: its waves are replaced by "Continuation 5 partition" below, and
+`impl-plans/active/clm-s737-dispatch.json` must not be dispatched again.
+
+Added 2026-11-05 for HEAD c548457. It replaces the waves above. The ownership rules,
+contracts and single-owner notes above stay binding, as amended by D1, D2 and D3'.
+The fresh manifest is `impl-plans/active/clm-s737-dispatch.json` with evidence root
+`tmp/clm-s737/`. The clm-s725, clm-s731, clm-s732 and clm-s736 manifests must not be
+dispatched again.
+
+State at HEAD c548457:
+
+- Landed: clm-01, 03, 04, 06, 07, 08, 10, 12, 13, 14, 15.
+- The three integration fixes are in the tree, each with test cases: fix 1 in
+  `arrange-layered.ts` with "TB reserves the title band at the top" in
+  `arrange-layered.test.ts`, fix 2 (`firstRank`), and fix 3 (`documentRelativePath`
+  with cases in `lint-diagram.test.ts`). This was confirmed by reading the code. They
+  need no new work and are confirmed by clm-09's final gates.
+- clm-02: dirty pages, scoped planning, fixtures and `keepMembers` are committed.
+  Open: all of D3'.
+- clm-11: only the core `keep-members.test.ts` exists. `edit/carry-members.ts` is
+  absent, and the A6 frame-only branch is still in `operations/elements.ts`.
+- clm-09: not started. `merge`, `--quiet` and `--metrics` are absent from
+  `commands.ts`, `main.ts`, `native-engine.ts` and `help.ts`, and no git driver test
+  or doc exists.
+
+| Wave | Plan | Remaining scope | Write paths (additions and limits) | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-02-connector-edit-perf | D3' in full: (a), (b1), (b2), timings | `apps/cli/src/edit/apply-batch.ts` and test, `packages/ir/src/validate.ts` and `validate.test.ts`, `packages/io/src/jsonl/parse.ts`, `serialize.ts`, new `source-lines.ts` and test, `apps/cli/src/__fixtures__/obstacle-routing-batch.ts`, `apps/cli/src/edit-performance.test.ts`, `apps/cli/src/native-parity/edit-performance.test.ts`. Only if a marginal ratio is above 1.5: the core files already listed for clm-02, under the shared note below | - |
+| 1 | clm-11-container-carry | E1 CLI module and per-kind tests, unchanged scope | As in the clm-11 plan: `apps/cli/src/edit/carry-members.ts` and test, `operations/elements.ts` (carry block), `operation-fields.ts`, `edit-frame-carry.test.ts`, `selectors.test.ts`, `operation-input.ts`, `keep-members.test.ts`, and the core planner files for `keepMembers` defects. Not `apply-batch.ts` | - |
+| 2 | clm-09-wiring | Unchanged scope, including the BPMN dispatch with `settleCommands` | Its existing list plus `apps/cli/src/mcp.test.ts` | clm-02, clm-11 |
+
+- clm-11 no longer depends on clm-02. The contract it uses is at HEAD
+  (`ApplyOptions.keepMembers` in `editor/types.ts`, forwarded in `facade/core.ts`, used
+  by `transaction.ts`). The old reason for waiting was that D3 might change
+  `Editor.apply`. D3' changes only `applyBatch`, the validator, the parser and the
+  serializer.
+- `apply-batch.ts` is not shared in wave 1. clm-11 reaches `keepMembers` through
+  `editor.apply` in `operations/elements.ts`, and held members are not an `applyBatch`
+  concern. clm-09 adds its `matches` line in wave 2.
+- Shared note: `packages/core/src/frame-translation.ts` and
+  `packages/core/src/editor/transaction.ts` are in both wave-1 `writePaths`, because
+  clm-02 may need them if the mixed ratio is above 1.5 and clm-11 may need them for a
+  `keepMembers` defect. clm-11 edits only `keepMembers` branches and clm-02 only
+  page-bounding logic. Neither is expected to edit them, and neither changes behavior
+  without `keepMembers`.
+- clm-09's dependencies are real: its parity tests and help assert E1 messages and D3'
+  behavior, and its final gates need both plans in the tree.
+- Plan files stay unchanged by workers, as in continuation 3. Plan revisions for D3'
+  land before dispatch.
+
+### Continuation 4 verification
+
+The continuation verifications above apply, with evidence under
+`tmp/clm-s737/<planId>/`, and these changes:
+
+- clm-02's gate is the D3' gate. The continuation 3 ratio gate, the `single/baselineSingle`
+  limit and the `apps/cli/native/examples` gate no longer apply.
+- Q11 stays blocking with the rules above. clm-09 still reports the exact line
+  `Q11 open: depth-one containment not accepted for conflict inputs` while it is
+  unanswered. Q11 blocks no plan in this partition, and the E2 criterion is not
+  reported as fully met for those inputs.
+- clm-09 runs the final gates: `mise run verify`, `mise run test-cli` with the 3-attempt
+  retry and `/usr/bin/time -p` CPU comparison against
+  `target/clm-s737-before/nodetto-cli`, and manual native timing of the obstacle-routing
+  fixtures. No deadline is relaxed.
+
+## Continuation 5 partition
+
+Added 2026-11-05 for HEAD 235b8c8. It replaces the waves above and finishes clm-09
+only. There is no redesign: the ownership rules, contracts and decisions D1, D2 and
+D3' stay binding. The fresh manifest is `impl-plans/active/clm-s740-dispatch.json`
+with evidence root `tmp/clm-s740/`. All earlier clm manifests must not be dispatched
+again.
+
+State at HEAD 235b8c8:
+
+- Landed and accepted: every clm plan except clm-09.
+- clm-09 is in the tree: registration, BPMN dispatch with `settleCommands`, diagram
+  lint and metrics, sync and async `--quiet`, warning collapse, `matches`, core
+  exports and MCP assertions.
+- Help and docs are initial only. For example, the `arrange` and `lint` usage lines
+  omit the new flags, `edit` has no E1 per-kind table or label mapping, and
+  `export.md` has no determinism bullets.
+- These planned files are absent: `cli-wiring.test.ts`, `merge-git.test.ts`,
+  `__fixtures__/bpmn-layered.ts` and the four `native-parity` topic files.
+
+Every feature is reachable through the registered commands at this HEAD, so the three
+wave 1 tracks need no handover from each other.
+
+| Wave | Plan | Scope | Owned write paths | dependsOn |
+| --- | --- | --- | --- | --- |
+| 1 | clm-09a-help-docs | "Help and documentation" in full, except `mcp.ts` (no change) and `impl-plans/` | `apps/cli/src/help.ts`, `docs/cli.md`, `README.md`, `design-docs/specs/export.md`, `design-docs/specs/design-cli-ai-drawing.md`, `apps/cli/src/ai-commands.test.ts`, `apps/cli/src/mcp.test.ts` | - |
+| 1 | clm-09b-cli-tests | CLI-level tests and the git driver end-to-end test, plus wiring gaps they expose | `apps/cli/src/cli-wiring.test.ts`, `apps/cli/src/merge-git.test.ts`, `apps/cli/src/commands.ts`, `cli.ts`, `main.ts`, `warnings.ts`, `merge-command.ts`, `arrange-modes.ts`, `lint-metrics.ts`, `lint-diagram.ts`, `edit-command.ts`, `draw-command.ts`, `export-command.ts`, `packages/core/src/index.ts` (missing exports only), and their existing tests for intentional assertion updates, plus `commands.test.ts`, `mcp-stdio.test.ts`, `text-layout-lint.test.ts` and `breadboard-commands.test.ts` | - |
+| 1 | clm-09c-native-parity | The four native parity topic files and their fixture, plus native-only wiring gaps | `apps/cli/src/__fixtures__/bpmn-layered.ts`, `apps/cli/src/native-parity/layout.test.ts`, `merge.test.ts`, `edit-usability.test.ts`, `lint-rules.test.ts`, `apps/cli/src/native-engine.ts`, and, only if an asserted output changed, `native-parity/harness.ts`, `documents.test.ts`, `drawing.test.ts`, `text-layout.test.ts`, `edit-performance.test.ts` | - |
+| 2 | clm-09-wiring | Final gates, native timing, stable-tree verification, self-review and the progress log | `impl-plans/progress/clm-09-wiring.md`, plus the union of the wave 1 paths, used only to fix a gate failure within wiring scope | clm-09a, clm-09b, clm-09c |
+
+- clm-09-wiring's dependency is real: final gates and timing must run on the complete,
+  stable tree.
+- Fixture: only clm-09c and the timing use `bpmn-layered.ts`. `cli-wiring.test.ts`
+  writes its documents inline. No wave 1 track imports another track's new file.
+- Help assertions: clm-09a owns them in `ai-commands.test.ts` and `mcp.test.ts`. A help
+  assertion elsewhere that its text breaks is fixed in wave 2.
+- Native builds: in wave 1 only clm-09c builds the release binary and runs native tests,
+  so wave 1 has one cargo build and no deadline test competing with another track.
+  clm-09b runs `merge-git.test.ts` on the Bun path in wave 1, and wave 2 runs it with the
+  binary after a fresh rebuild. `target/clm-baseline` and `target/clm-s737-before` stay in
+  place.
+- A defect in a feature module stays a finding for its owning plan. Only listed wiring
+  changes are allowed.
+- The manifest is the concrete write list for each plan. It can add wiring paths for the
+  same purpose, such as `apps/cli/src/edit/report.ts`.
+- `apps/desktop/src-tauri/gen/schemas/*.json` may be rewritten by `mise run verify` and
+  is never staged.
+
+### Continuation 5 verification
+
+Rows "E1", "E2", "F1" to "F4", "B2", "B3", "C3", "D1" to "D3" and "Native parity" in
+"Verification" define the test content, as specified in `impl-plans/completed/clm-09-wiring.md`.
+Evidence is under `tmp/clm-s740/<planId>/`. These additions and changes apply:
+
+- clm-09b adds one CLI-level refusal test: a BPMN page that gets an E2.1 `{ error }` exits
+  2 and leaves the file unchanged.
+- Q11: no test pins the reproduction either way, and no depth-one output changes. The D1,
+  D2 row is otherwise unchanged. The clm-09-wiring progress log and final report contain
+  this exact line, and the E2 criterion is not reported as fully met for those inputs. The
+  line blocks nothing:
+  `Q11 open: depth-one containment not accepted for conflict inputs`
+- Final gates in clm-09-wiring, in this order, on the stable tree: rebuild the release
+  binary; native parity with `NODETTO_CLI_TEST_BINARY` set and more than 0 tests run; the
+  git driver test with the binary; `bun run typecheck`; the production-core
+  `--noUncheckedIndexedAccess` gate; the desktop production build; `mise run verify`; and
+  `mise run test-cli`. Native deadline tests and `mise run test-cli` get up to 3 attempts,
+  with every attempt's log kept. No deadline is relaxed.
+- Timing in `tmp/clm-s740/clm-09-wiring/timing.log`, using `/usr/bin/time -p`: the six D3'
+  inputs from `tmp/clm-s737/clm-02-connector-edit-perf/inputs/`, each from a fresh copy,
+  on the release binary and `target/clm-s737-before/nodetto-cli`; and the two arrange
+  timings. A marginal ratio above 1.5, or a quadratic arrange slowdown, is a finding for
+  the owning plan.

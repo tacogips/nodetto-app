@@ -1,6 +1,168 @@
 # clm-02-connector-edit-perf
 
-## Continuation 3 2026-11-05 (clm-s736) - authoritative
+## Continuation 4 2026-11-05 (clm-s737) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s737-dispatch.json`, source
+commit `c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence `tmp/clm-s737/clm-02-connector-edit-perf/`,
+CPU profiles under `target/clm-s737-profile/`. wave: 1; dependsOn: none. clm-11 runs at the same time
+in the same working directory. This section overrides everything below where they differ. Design:
+"A7 decision D3'" in `design-docs/specs/design-cli-layout-merge-lint.md`.
+
+### Intent and context
+
+Owner decision D3' replaces D3. Per-operation work is already page-bounded (owner: 1.18x marginal);
+the whole-command ratio is the wrong metric. Do three things: (a) prove the marginal ratios natively
+for both batches, (b1) stop validating untouched pages after the batch, (b2) stop re-stringifying
+untouched records when writing. Output stays byte-identical.
+
+### Non-goals
+
+- No Boa probe harness, phase table, attribution record or `apps/cli/native/examples`. No edit to the
+  design. No whole-command ratio gate and no `single/baselineSingle` limit.
+- No `countPageChanges` change, no Rust, no CLI flag, no change to any other `serializeDocument` or
+  `validateDocument` caller, and no change to parse-time validation.
+- Do not edit `operations/elements.ts`, `carry-members.ts`, `bpmn/containment.ts`,
+  `breadboard/board-carry.ts`, `constraints.ts`, `keep-members.test.ts` or `selectors.test.ts` (clm-11
+  owns them), or any shared registration file (clm-09 owns them). If a ratio fix needs a clm-11 file,
+  stop and record an amendment request.
+- Do not add the `matches` line to `apply-batch.ts`; that is clm-09's.
+
+### File-level changes
+
+1. `packages/ir/src/validate.ts`: add `ValidateOptions.elementPages?: ReadonlySet<string>`, as the
+   design's "Scoped validator" states. Keep the first loop over all elements for the id set,
+   `elementById` and `id.duplicate`; skip only `validateElement` and the reference block for out-of-scope
+   elements. Imitate `validateDocument`'s existing `readField` access.
+2. `packages/io/src/jsonl/source-lines.ts` (new):
+   `export interface SourceLine { readonly line: string; readonly record: Record<string, unknown> }`,
+   `export type SourceLines = ReadonlyMap<object, SourceLine>`, and one acceptance function each for
+   elements and pages, implementing rules 1 to 4 of design b2. Use `elementRecordOrder` and
+   `PAGE_RECORD_ORDER` from `records.ts`, `roundCoordinate` from `canonical.ts`, and `getField` for child
+   orders, as `canonical.ts:childOrder` does. It must not import `serialize.ts`.
+3. `packages/io/src/jsonl/parse.ts`: add `ParseOptions.keepSourceLines?: boolean` and
+   `sourceLines?: SourceLines` on the `ok` result. `collect` records `{ line: raw, record: parsed }`
+   for each page and element object it pushes. Return an empty map when `migrated !== snapshot`.
+4. `packages/io/src/jsonl/serialize.ts`: add `SerializeOptions.sourceLines?: SourceLines`. For each page
+   and element: use the source line if present and accepted, otherwise `pageLine` or `elementLine`. Sort
+   order, document line and unknown records stay as they are.
+5. `apps/cli/src/edit/apply-batch.ts`: signature
+   `applyBatch(documentText, operations, arrange, options: { fullWrite?: boolean } = {})`. Parse with
+   `keepSourceLines`. Track changed pages with a store subscription that stays active through the
+   `arrange` loop and is released in a `finally`. Unless `fullWrite`: call
+   `validateDocument(snapshot, { elementPages })` when no diff had `pagesChanged`, and
+   `serializeDocument(snapshot, { validate: false, sourceLines })`. With `fullWrite`, use today's two
+   calls exactly.
+6. `apps/cli/src/__fixtures__/obstacle-routing-batch.ts`: add `export function oneOpOperations(): string`,
+   a JSON array holding only the first operation of `obstacleRoutingBatch().operations`.
+
+### Pitfalls
+
+- Today's listener is released at `apply-batch.ts:150`, before the arrange loop at `:153`. Scope tracked
+  only by that listener would miss arrange changes.
+- Use store diffs, never `dirtyPages()`: it has no result on the first apply of a batch.
+- Keep each issue's real `elements[i]` index. `unknownFieldKey` reads `snapshot.elements` by it, so
+  renumbering attaches warnings to the wrong element.
+- For a removed id read the page from `before`; `store.get(id)` is already empty. An update can move an
+  element between pages, so record both the current and the pre-batch page.
+- The verifier checks the raw parsed record, not the `Element`. A record with no `semantic` is valid
+  input, and the writer adds `"semantic":{}`, so it must be rejected.
+- The verifier may reject but must never wrongly accept. When unsure, reject.
+- `edit` overwrites its document. Copy a fresh input before every timed run, outside the timed command.
+- Boa: no regex split on whole documents, no per-point destructuring in hot loops.
+- `target/clm-baseline/nodetto-cli` must survive. Never run `cargo clean`.
+
+### Before binary (do this before any source edit)
+
+clm-11 edits the same tree and `apps/cli/native/build.rs` bundles from its own repository root, so never
+build the reference from the working tree:
+
+1. Into an empty `target/clm-s737-before/src`, extract
+   `git archive c5484577164daf4c4f5b57d888e1b291f84d7867`.
+2. Copy third-party dependencies into its `node_modules` with
+   `cp -RL node_modules/.bun/polygon-clipping@0.15.7/node_modules/. <export>/node_modules/`, adding others
+   only if the bundle names them as missing. Copy nothing under `@nodetto`.
+3. Write `tmp/clm-s737/clm-02-connector-edit-perf/before-provenance.txt` with the line
+   `commit c5484577164daf4c4f5b57d888e1b291f84d7867`, then one `resolved @nodetto/core <absolute path>` line
+   each for core, ir and io, from `Bun.resolveSync` run in the export directory. Every path must be inside
+   `target/clm-s737-before/src/`. If not, stop with a finding; do not fall back to the working tree.
+4. In the export directory run `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli` with
+   `CARGO_TARGET_DIR` set to the absolute path of `target/clm-s737-before/cargo`, and copy the binary to
+   `target/clm-s737-before/nodetto-cli`.
+
+### Timings
+
+Inputs under `tmp/clm-s737/clm-02-connector-edit-perf/inputs/` (outside `final/`, because clm-09 reads them and a
+repeated gate run moves `final/`) as `.jsonl` and `.json` data, written
+with an inline `bun -e` from the fixture functions: single 1 op and multi 1 op (`oneOpOperations` on the
+`obstacleRoutingBatch` and `obstacleRoutingMultiPage` documents), single 50 ops, multi 50 ops, mixed single,
+mixed multi. Build the after binary with `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`,
+retrying if clm-11's edits break the bundle mid-edit. In one session, run
+`/usr/bin/time -p <binary> edit <copy> --ops <ops>` five times per input per binary, and log every run to
+`tmp/clm-s737/clm-02-connector-edit-perf/final/timing.log`. Then append these exact lines to the progress
+log, using medians of user CPU:
+
+- `before A7 medians: single1=<x> multi1=<x> single50=<x> multi50=<x> mixedSingle=<x> mixedMulti=<x>`
+- `after A7 medians: ...` in the same form
+- `before A7 marginal ratio batch: <x>`, `before A7 marginal ratio mixed: <x>`
+- `after A7 marginal ratio batch: <x>`, `after A7 marginal ratio mixed: <x>`
+- `A7 fixed cost multi 1-op: before <x> after <y>`
+
+Formulas are in the design. If an after ratio is above 1.5: profile, remove the page-unbounded work under
+this plan's core paths, and measure again; if that fails, report a blocker with the measurements. If `y` is
+not lower than `x`, that is a finding against b1 or b2. Never raise the limit or change a fixture.
+
+### Tests (input -> expected)
+
+- `apps/cli/src/edit/apply-batch.test.ts`, `fullWrite` on and off -> identical `text`, `warnings`, `counts`
+  and thrown error text, for: single, multi-page and mixed fixtures; `arrange` true; element delete; page
+  delete; page create; a token update; delete of an element referenced from another page; a new unknown
+  semantic field on a changed element, with an old unknown field on an untouched page staying unreported. For
+  an error on a changed page, use an op that reaches the post-batch check; if commands reject every such
+  input first, test the error through the validator instead and say so in the progress log.
+- `packages/io/src/jsonl/source-lines.test.ts`, reuse against `serializeDocument(snapshot)` -> equal for
+  every expected fixture and for each design variant (padded whitespace, CRLF, BOM, reordered keys, unrounded
+  coordinate, `-0`, `1.0`, escaped string spelling, duplicate key, integer-like key, `__proto__` key, field
+  named `extensions`, unknown fields, unknown record, absent `semantic`, empty `visual`, empty `style`, unknown
+  element type, migrated document through an injected migration -> empty `sourceLines`).
+- Same file: a canonical line -> accepted, asserted on the acceptance function. An edited element and page ->
+  new text, while same-page neighbours keep theirs.
+- Same file, map population: a canonical expected fixture parsed with `keepSourceLines` -> `sourceLines.size`
+  equals pages plus elements; `sourceLines.get(document.elements[i])?.line` equals that element's input line, and
+  likewise for a page. A map keyed by the raw parsed record instead of the `Page` or `Element` must fail this.
+- Same file, serializer sentinel: replace one untouched element's entry with a self-consistent `{ line, record }`,
+  where `line` is canonical and differs in one neutral semantic value and `record` is `JSON.parse(line)` ->
+  `serializeDocument(document, { validate: false, sourceLines })` contains that line. This proves the writer used
+  the map; byte-equality tests cannot, because they pass with zero reused lines.
+- `apps/cli/src/edit/apply-batch.test.ts`, object identity: parse the multi-page fixture and run a one-element update
+  on the first page through `Editor` and `Batch` -> every grid-page element in `editor.getSnapshot()` is the same
+  object (`toBe`) as its parsed element. If this fails because an apply rewrites unchanged elements, line reuse is
+  not happening on real batches: treat it as a finding to fix, and do not weaken the test.
+- Freeze, in `apply-batch.test.ts`: the three fixture batches through `Batch` on a deep-frozen parsed document
+  -> no throw.
+- `packages/ir/src/validate.test.ts`: `elementPages` -> the full issue list filtered to in-scope elements with
+  original indices; without the option -> unchanged; an out-of-scope duplicate id -> still `id.duplicate`.
+- `apps/cli/src/native-parity/edit-performance.test.ts`: a non-canonical input edited natively and with Bun ->
+  identical bytes, normalized by the writer.
+
+### Invariants
+
+Expected hashes stay `341fcd8654fc18d560c8895df1a05617a6b8ac39`, `872e266430b5a59930a4f87474869514a2c126cc` and
+`4f5c88d5b1c4bc44c3afbd743fb76089bb0d34aa`; never regenerate them. Deadlines stay. Operation-index errors,
+all-or-nothing semantics and the concurrency re-apply stay. `applyCommands` and `keepMembers` behavior stay.
+
+### Shared files and working rules
+
+`packages/core/src/frame-translation.ts` and `packages/core/src/editor/transaction.ts` are shared with clm-11.
+Edit them only if a ratio is above 1.5 and only for page-bounding logic. Read fresh before each edit, record pre
+and post `git hash-object` in your progress log, and stop on unexpected drift. Other core paths are also only for
+a ratio above 1.5.
+
+### Done criteria
+
+All manifest verification commands exit 0 and the progress log has the timing lines. Only this plan's paths were
+changed by it. This plan file stays unchanged by the worker.
+
+## Continuation 3 2026-11-05 (clm-s736) - superseded by Continuation 4 where they differ
 
 Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
 base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence

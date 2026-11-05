@@ -745,6 +745,8 @@ export interface ValidateOptions {
    * Enabled by default; turn it off when validating a partial fragment.
    */
   readonly checkReferences?: boolean;
+  /** Limit element and reference checks to these pages; global checks still run. */
+  readonly elementPages?: ReadonlySet<string>;
 }
 
 /**
@@ -838,7 +840,14 @@ export function validateDocument(
   const elementById = new Map<string, unknown>();
   for (const [i, element] of elements.entries()) {
     const path = `elements[${i}]`;
-    validateElement(out, element, path, pageIds);
+    const page = readField(element, "page");
+    if (
+      !options.elementPages ||
+      typeof page !== "string" ||
+      options.elementPages.has(page)
+    ) {
+      validateElement(out, element, path, pageIds);
+    }
     const id = readField(element, "id");
     if (typeof id === "string") {
       if (!elementById.has(id)) {
@@ -855,6 +864,13 @@ export function validateDocument(
 
   if (options.checkReferences !== false) {
     for (const [i, element] of elements.entries()) {
+      const page = readField(element, "page");
+      if (
+        options.elementPages &&
+        typeof page === "string" &&
+        !options.elementPages.has(page)
+      )
+        continue;
       const type = readField(element, "type");
       if (typeof type !== "string") {
         continue;
