@@ -48,7 +48,8 @@
       {"decision": "Self-message label text is left-aligned at labelStartX through an optional ConnectorEndpoints field.", "rationale": "Centred labels use an estimated width, and real fonts could run back over the loop (design section 4)."},
       {"decision": "Every layout rule adds sequenceMessageExtent or a self-message count, which is zero without self-messages.", "rationale": "This keeps documents without self-messages byte-identical (design section 5)."},
       {"decision": "The export viewBox adds one box per labelled self-message, sized at 1.15 em per character plus positive letter spacing.", "rationale": "A label on the rightmost lifeline would otherwise clip; the bound is a clipping bound, not an average (design section 6)."},
-      {"decision": "Delivery uses seq-self-01-contract alone in wave 1, plans 02 to 05 in wave 2, then plans 06 and 07 in wave 3.", "rationale": "Plans depend only on the contract, and this gives 2 waves before wiring. It refines the design section 11 table; ownership and contracts stay consistent (plan review finding SEQ-SELF-L2-WAVE-DIVERGENCE)."}
+      {"decision": "Delivery uses seq-self-01-contract alone in wave 1, plans 02 to 05 in wave 2, then plans 06 and 07 in wave 3.", "rationale": "Plans depend only on the contract, and this gives 2 waves before wiring. It refines the design section 11 table; ownership and contracts stay consistent (plan review finding SEQ-SELF-L2-WAVE-DIVERGENCE)."},
+      {"decision": "Amendment 2026-11-06 round 1: seq-self-01-contract also owns packages/core/src/sequence-authoring.test.ts and replaces only the line 154 null assertion with the accepted self-connect behavior; seq-self-04-authoring keeps the file and extends it afterwards, ordered by dependsOn.", "rationale": "Blocked plan: seq-self-01-contract. Resolved gap: the existing assertion that a participant self-connect returns null contradicted the accepted connect rule, and the file was outside that plan's writePaths. No design change."}
     ],
     "intentionalTradeoffs": [
       "An export can have unused space on the right, up to the 1.15 em bound, when a self-message label is the rightmost content (design section 6).",
@@ -95,7 +96,17 @@
       "SEQ-SELF-L6-TIMING-ORDER: the seq-self-06-cli timing fixture must assign each message a distinct semantic.order, because the sequence.message default is a1; otherwise the rows and the omitted-geometry path are not exercised."
     ]
   },
-  "amendments": [],
+  "amendments": [
+    {
+      "round": 1,
+      "date": "2026-11-06",
+      "reason": "blocked-wave-scope-or-contract",
+      "previousCheckpointCommit": "2e2b985a977f44c27abe5df9f23c29b461bd7be1",
+      "blockedPlanIds": ["seq-self-01-contract"],
+      "paths": ["packages/core/src/sequence-authoring.test.ts"],
+      "decision": "Add the test file to seq-self-01-contract writePaths so it can replace the line 154 null assertion, which contradicts the accepted connect rule. seq-self-04-authoring keeps the file and edits it afterwards, ordered by dependsOn. No design change."
+    }
+  ],
   "acceptedDependencies": [],
   "plans": [
     {
@@ -112,6 +123,7 @@
         "packages/core/src/shapes/connector/resolve.ts",
         "packages/core/src/editor/connections.ts",
         "packages/core/src/connector-policy.test.ts",
+        "packages/core/src/sequence-authoring.test.ts",
         "apps/cli/src/sequence-self-golden.test.ts",
         "apps/cli/src/__fixtures__/sequence-golden",
         "impl-plans/progress/seq-self-01-contract.md",
@@ -119,18 +131,22 @@
         "target"
       ],
       "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/sequence-authoring.test.ts", "intendedEdit": "Replace only the line 154 null assertion with the accepted self-connect behavior (amendment round 1); seq-self-04-authoring extends the file afterwards."}
+      ],
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
         "Golden files and target/seq-self-baseline/nodetto-cli exist, and both cmp checks pass.",
         "All geometry exports exist with the exact names and values.",
-        "connectSmart(p, p) returns a message whose route has four points."
+        "connectSmart(p, p) returns a message whose route has four points.",
+        "The aggregate bun test command exits 0, and sequence-authoring.test.ts differs only by the amended assertion."
       ],
       "verification": [
         "sh -c 'target/seq-self-baseline/nodetto-cli export packages/io/src/__fixtures__/sequence.jsonl --format svg | cmp - apps/cli/src/__fixtures__/sequence-golden/io-sequence.expected.svg'",
         "sh -c 'target/seq-self-baseline/nodetto-cli export apps/cli/src/__fixtures__/sequence-golden/omitted-geometry.jsonl --format svg | cmp - apps/cli/src/__fixtures__/sequence-golden/omitted-geometry.expected.svg'",
         "bun test packages/core/src/sequence-layout.test.ts packages/core/src/sequence-self-route.test.ts packages/core/src/connector-policy.test.ts packages/core/src/sequence-authoring.test.ts packages/core/src/svg-export.test.ts apps/cli/src/sequence-self-golden.test.ts",
         "bun run typecheck",
-        "bunx biome check packages/core/src/sequence-layout.ts packages/core/src/sequence-layout.test.ts packages/core/src/sequence-self-route.test.ts packages/core/src/shapes/connector/route.ts packages/core/src/shapes/connector/resolve.ts packages/core/src/editor/connections.ts packages/core/src/connector-policy.test.ts apps/cli/src/sequence-self-golden.test.ts"
+        "bunx biome check packages/core/src/sequence-layout.ts packages/core/src/sequence-layout.test.ts packages/core/src/sequence-self-route.test.ts packages/core/src/shapes/connector/route.ts packages/core/src/shapes/connector/resolve.ts packages/core/src/editor/connections.ts packages/core/src/connector-policy.test.ts packages/core/src/sequence-authoring.test.ts apps/cli/src/sequence-self-golden.test.ts"
       ]
     },
     {
@@ -205,7 +221,7 @@
       "artifactRoots": ["target"],
       "acceptanceCriteria": [
         "The next message after a self-message sits 32 + 52 below it, and lifelines and activations cover the loop.",
-        "Existing authoring tests pass unedited, and pitch without self-messages stays 52."
+        "Existing authoring tests, as plan 01 left them, pass unedited, and pitch without self-messages stays 52."
       ],
       "verification": [
         "bun test packages/core/src/sequence-authoring.test.ts",

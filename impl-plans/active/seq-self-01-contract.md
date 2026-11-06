@@ -152,6 +152,26 @@ Each command must exit 0.
 - `git diff 1e8f43d224d7b43e200eb2229e7be17b39ca033c --stat` shows no file outside this plan's writePaths, apart from
   the committed design and plan documents.
 
+## Amendment 2026-11-06 (blocked-wave-scope-or-contract, round 1)
+
+Blocker: `packages/core/src/sequence-authoring.test.ts:154` asserts that a participant self-connect returns null. That contradicts the accepted connect rule, and the file was outside this plan's writePaths.
+
+Decision: this plan now also owns `packages/core/src/sequence-authoring.test.ts`. Plan 04 edits the same file afterwards, ordered by its `dependsOn`. The plan's author missed this assertion; the design is unchanged.
+
+Resume from the current working tree. All other work in this plan is done, so make only this change:
+
+1. In the test "leaves existing ER, UML and generic specialization behavior intact", replace only the line 154 assertion. The new assertion: `editor.connectSmart(participant, participant)` returns an id whose element has type `sequence.message`, with `from` and `to` equal to `participant`. Change no other test, title or import, and do not add new self-message tests to this file; plan 04 adds those.
+2. Record the file's before and after sha256 in the progress log.
+3. Rerun every command in Verification, adding `packages/core/src/sequence-authoring.test.ts` to the biome check. Record each exit status and complete log path, including the aggregate suite, which must now exit 0.
+
+Do not:
+
+- Rerun Step 1. The sources now hold changed code, so its `git diff --quiet` precondition no longer applies, and a rebuilt binary or recaptured golden would stop being pre-change evidence.
+- Rebuild or replace `target/seq-self-baseline/nodetto-cli`. Confirm `shasum -a 256 target/seq-self-baseline/nodetto-cli` still equals the digest in the progress log. On a mismatch, stop and report it.
+- Weaken the connect rule to satisfy the old assertion.
+
+Added acceptance criterion: the aggregate `bun test` command in Verification exits 0, and `git diff 2e2b985a977f44c27abe5df9f23c29b461bd7be1 -- packages/core/src/sequence-authoring.test.ts` shows only the amended assertion.
+
 ## Working rules
 
 Before each edit, read the file fresh and record its sha256 in the progress log; record it again afterwards. If a file

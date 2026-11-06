@@ -65,7 +65,11 @@ If a failure comes from a file another wave 2 plan owns, read it fresh, re-run o
 ## Acceptance criteria
 
 - All test cases exist and pass.
-- The diff of `sequence-authoring.test.ts` only adds lines (`git diff --numstat` shows 0 deletions for it).
+- This plan only adds lines to `sequence-authoring.test.ts`. In `git diff 2e2b985a977f44c27abe5df9f23c29b461bd7be1 -- packages/core/src/sequence-authoring.test.ts`, the only removed line is plan 01's amended self-connect assertion.
+
+## Amendment 2026-11-06 (blocked-wave-scope-or-contract, round 1)
+
+Plan 01 replaced the old `connectSmart(participant, participant)` null assertion in `sequence-authoring.test.ts` before this plan starts, because it contradicted the accepted connect rule. Read the file fresh and keep that assertion as plan 01 left it. "Existing tests" and "existing expectations" in this plan mean the file as plan 01 left it. Ownership passes to this plan through `dependsOn`, so the two plans never edit the file at the same time.
 
 ## Working rules
 
