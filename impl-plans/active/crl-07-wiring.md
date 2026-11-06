@@ -60,6 +60,30 @@ Decisions:
 
 No design change. Plan id, scope, acceptance criteria and existing verification commands are unchanged, apart from added verification 8.
 
+## Amendment 2026-11-06 (blocked-wave-scope-or-contract, round 2)
+
+Blocker: the native parity gate (verification 4) exited 1 with 15 pass and 2 fail, evidence fingerprint `db73444dfc87eaaf224a029e2bf97b57d89854514e8046fc59eba79286547b8c`, log `tmp/crl-s749/crl-07-wiring/native-attempt.log`.
+
+Findings:
+
+- `bun test <path>` treats a path as a filter that matches anywhere in the discovery tree, and it does not skip `target`. The filter `apps/cli/src/native-parity/layout.test.ts` therefore also selected `target/crl-baseline/src/apps/cli/src/native-parity/layout.test.ts`.
+- Both failures come from that archived copy. It expects the old metrics line without `overlapping segment pair(s)`, so the failures say nothing about the current code.
+- The same mechanism applies to `bun test apps/cli/src` in `mise run test-cli` and to bare `bun test` in `mise run verify`. Those two gates were not run, so this part is reasoned from the first result. Changing only verification 4 to a `./` path would not fix them.
+- Outside `target/crl-baseline/src`, `target` and `tmp` hold no file matching a Bun test name pattern (checked with `find`, excluding `node_modules`).
+
+Decisions:
+
+1. Baseline storage. `target/crl-baseline/src` is a disposable build input, not part of the audit. The audit is the progress log record, the binary `target/crl-baseline/nodetto-cli`, and commit `1e8f43d224d7b43e200eb2229e7be17b39ca033c`, from which the source can be regenerated.
+2. Do this first, before any other gate. Check that `shasum -a 256 target/crl-baseline/nodetto-cli` equals the recorded `c8f5c9049d8877d9e277e55c97ec4f76012b6adf6f7201a3440368f1aad2afa0`, run `rm -rf target/crl-baseline/src`, check the digest again, and record the command, its exit code and both digests under "Baseline audit" in the progress log. Do not rebuild while the digest matches. Keep `target/crl-baseline/nodetto-cli` and `target/crl-baseline/build`.
+3. If the digest does not match, follow the baseline steps under "CPU comparison and timing", including step 4, and record again.
+4. Do not change these to work around discovery: `bunfig.toml`, `mise.toml`, `package.json`, the verification command strings, or the archived test files. Do not skip or delete any test outside `target/crl-baseline/src`.
+5. A native result counts only if its log shows no `target/crl-baseline` path. If such a path appears, stop and find out why before reading the result.
+6. Continue from the working tree. The partial edits recorded in the progress log are uncommitted and stay in place, so do not restart them. Move the existing `tmp/crl-s749/crl-07-wiring/final/` to `attempt-<n>/` before repeating gates.
+7. Work still owed, none of it blocked by a dependency: fixture repair (3 segment overlaps and 2 label overlaps remain, and `lint --fix` leaves those 2 label overlaps), the remaining tests in "Tests", native timing and CPU ratios, and verification 1 to 9 on final source. Amendment round 1 decision 6 still governs the overlap repair. A documented bound needs the connector ids involved and the geometric reason, and "no free position was found" is not a reason on its own.
+8. The shared amendment budget (2 rounds) is now used up, so another blocked wave ends this workflow. Stop only for a blocker as defined in round 1 decision 5, and report the failing command, log path, and the file and symbol involved.
+
+No design change. Plan id, write paths and acceptance criteria are unchanged. Added: baseline step 4, verification 9 and two done criteria.
+
 ## Intent and context
 
 Connects the core modules to the CLI, documents everything, and measures acceptance on the fixture in both CLIs.
@@ -158,8 +182,9 @@ Baseline, built once:
 1. `git archive 1e8f43d224d7b43e200eb2229e7be17b39ca033c` into `target/crl-baseline/src`.
 2. `bun install --frozen-lockfile` there, then `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli --manifest-path target/crl-baseline/src/Cargo.toml --target-dir target/crl-baseline/build`.
 3. Copy the binary to `target/crl-baseline/nodetto-cli`.
+4. Record the sha256, then `rm -rf target/crl-baseline/src`, so its test files stay out of Bun test discovery. Only this subdirectory is removed.
 
-Audit record, in `impl-plans/progress/crl-07-wiring.md`: the source commit, the `bun --version` and `cargo --version` output, the exact archive, install and build commands with exit codes, and the sha256 of `target/crl-baseline/nodetto-cli` (`shasum -a 256`). Reuse an existing binary only when its sha256 equals the recorded value. Otherwise rebuild it and record again.
+Audit record, in `impl-plans/progress/crl-07-wiring.md`: the source commit, the `bun --version` and `cargo --version` output, the exact archive, install, build and removal commands with exit codes, and the sha256 of `target/crl-baseline/nodetto-cli` (`shasum -a 256`). Reuse an existing binary only when its sha256 equals the recorded value. Otherwise rebuild it and record again.
 
 Measure with three `/usr/bin/time -p` runs each, baseline and current, on the batch and mixed fixtures used by `apps/cli/src/native-parity/edit-performance.test.ts`. Record user seconds and mean ratios. Then time the current binary on layered then route with the fixture from `bun apps/cli/src/__fixtures__/connector-arrange.ts`, on a copy, target a few seconds total. Record numbers in the progress log. A result above a few seconds is a repair item (hot loops first), not a reason to relax anything.
 
@@ -173,10 +198,13 @@ Measure with three `/usr/bin/time -p` runs each, baseline and current, on the ba
 6. `CARGO_TERM_QUIET=true mise run verify` -> exit 0, with the log kept.
 7. `CARGO_TERM_QUIET=true mise run test-cli` -> exit 0, native parity not skipped. Retry up to 3 attempts on a deadline timeout.
 8. `bun test packages/core/src/arrange-route.test.ts packages/core/src/arrange-route-lanes.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-order.test.ts packages/core/src/connector-label-placement.test.ts apps/cli/src/connector-arrange-route.test.ts` -> 0 fail, with or without serial repairs.
+9. `test ! -e target/crl-baseline/src` -> exit 0, which shows the archived source is out of test discovery.
 
 ## Done criteria
 
-- Verification 1-8 exit 0 with complete logs recorded.
+- Verification 1-9 exit 0 with complete logs recorded. Verification 4, 6 and 7 write `tmp/crl-s749/crl-07-wiring/final/native.log`, `final/verify.log` and `final/test-cli.log`.
+- `grep -l "target/crl-baseline" tmp/crl-s749/crl-07-wiring/final/native.log tmp/crl-s749/crl-07-wiring/final/verify.log tmp/crl-s749/crl-07-wiring/final/test-cli.log` lists no file.
+- The "Baseline audit" section of the progress log records the removal command, its exit code, and the digest before and after removal, both equal to the recorded value.
 - The progress log holds the amendment readback hashes for `arrange-route.ts` and `arrange-route-lanes.ts`, with any drift noted.
 - `grep -n "segmentOverlaps" apps/cli/src/commands.ts apps/cli/src/help.ts docs/cli.md` matches in each file.
 - `grep -n "set-page-routing" apps/cli/src/help.ts docs/cli.md` matches in each file.

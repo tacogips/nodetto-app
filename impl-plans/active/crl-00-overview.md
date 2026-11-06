@@ -139,7 +139,8 @@ An absent key in `LabelFields` means the field is removed from the semantic.
 - No state-changing git commands: no commit, stash, checkout, reset, branch or worktree.
   Read-only git commands are fine.
 - No broad formatting. Run Biome only on your own files.
-- Never run `cargo clean`. Never delete `target/crl-baseline`.
+- Never run `cargo clean`. Never delete `target/crl-baseline`. The one exception is crl-07, which
+  removes only `target/crl-baseline/src` as its plan specifies.
 - Every fixture, id, label and comment is self-authored and neutral (`Idle`, `Running`, widgets,
   orders). Never mention external issue numbers, organizations, reporters or downstream products.
 - No emojis. Cargo commands use `CARGO_TERM_QUIET=true`.
@@ -195,3 +196,13 @@ work is uncommitted on the shared working tree over checkpoint
 `d4843e58b679160142ac07225bcf4b4519f17433`. crl-07 has an empty `dependsOn`, and its write paths gain
 the sibling test files for serial repair. Details are in `impl-plans/active/crl-07-wiring.md`. No
 design change.
+
+## Amendment 2026-11-06 (blocked-wave-scope-or-contract, round 2)
+
+The crl-07 native parity gate also selected archived tests under `target/crl-baseline/src`, because
+a `bun test` path is a filter over a discovery tree that includes `target`. The baseline storage
+contract now removes that source directory once the baseline digest is recorded. The audit stays in
+the crl-07 progress log, with `target/crl-baseline/nodetto-cli` and commit
+`1e8f43d224d7b43e200eb2229e7be17b39ca033c`. Repository test configuration and verification command
+strings do not change. Details are in `impl-plans/active/crl-07-wiring.md`. No design change. This
+uses the second and last amendment round.
