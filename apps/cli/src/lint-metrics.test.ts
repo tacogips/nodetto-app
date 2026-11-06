@@ -71,11 +71,11 @@ test("metrics lines follow page order", () => {
   };
   const doc = document([], [second, first]);
   const metrics = new Map([
-    [second.id, { edgeCrossings: 2, labelOverlaps: 3 }],
-    [first.id, { edgeCrossings: 1, labelOverlaps: 0 }],
+    [second.id, { edgeCrossings: 2, labelOverlaps: 3, segmentOverlaps: 4 }],
+    [first.id, { edgeCrossings: 1, labelOverlaps: 0, segmentOverlaps: 0 }],
   ]);
   expect(formatMetricsLines(doc, metrics)).toBe(
-    "metrics First: 1 edge crossing(s), 0 edge-label overlap(s)\nmetrics Second: 2 edge crossing(s), 3 edge-label overlap(s)",
+    "metrics First: 1 edge crossing(s), 0 edge-label overlap(s), 0 overlapping segment pair(s)\nmetrics Second: 2 edge crossing(s), 3 edge-label overlap(s), 4 overlapping segment pair(s)",
   );
 });
 

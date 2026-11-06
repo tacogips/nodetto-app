@@ -797,3 +797,24 @@ describe("coordinate rounding", () => {
     );
   });
 });
+
+test("page connector routing round trips in canonical order", () => {
+  const doc: Document = {
+    ...MINIMAL,
+    pages: [
+      {
+        id: "p",
+        name: "Page",
+        kind: "erd",
+        sqlDialect: "mysql",
+        connectorRouting: {
+          routing: "orthogonal",
+          routingAvoidObstacles: true,
+        },
+      },
+    ],
+  };
+  const text = serializeDocument(doc);
+  expect(text).toContain('"sqlDialect":"mysql","connectorRouting":');
+  expect(serializeDocument(parseDocument(text))).toBe(text);
+});

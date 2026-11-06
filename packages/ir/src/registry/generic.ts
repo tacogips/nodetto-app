@@ -1,3 +1,4 @@
+import { MAX_ROUTING_LANE } from "../semantics/connectors.ts";
 // Generic node and edge definitions, plus the arrowhead and connector
 // routing validators shared by every edge-like element type.
 
@@ -80,6 +81,25 @@ export function validateConnectorRouting(
         "must be less than or equal to 1",
       ),
     );
+  const lane = semantic["routingLane"];
+  if (
+    checkNumber(out, lane, `${path}.routingLane`, {
+      optional: true,
+      integer: true,
+      min: 0,
+    }) &&
+    typeof lane === "number" &&
+    lane > MAX_ROUTING_LANE
+  )
+    out.push(
+      error(
+        "value.max",
+        `${path}.routingLane`,
+        `must be less than or equal to ${MAX_ROUTING_LANE}`,
+      ),
+    );
+  for (const key of ["labelOffsetX", "labelOffsetY"])
+    checkNumber(out, semantic[key], `${path}.${key}`, { optional: true });
   for (const key of ["labelPosition", "fromPortPosition", "toPortPosition"]) {
     const value = semantic[key];
     if (
@@ -161,7 +181,10 @@ export const GENERIC_EDGE: ElementTypeDefinition = {
       "routing",
       "routingAxis",
       "routingBend",
+      "routingLane",
       "labelPosition",
+      "labelOffsetX",
+      "labelOffsetY",
       "fromPortPosition",
       "toPortPosition",
       "routingAvoidObstacles",

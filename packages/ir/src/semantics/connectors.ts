@@ -73,6 +73,7 @@ export type PrototypeOverflow = (typeof PROTOTYPE_OVERFLOWS)[number];
 export const CONNECTOR_ROUTINGS = ["straight", "orthogonal", "manual"] as const;
 export type ConnectorRouting = (typeof CONNECTOR_ROUTINGS)[number];
 export const MAX_CONNECTOR_WAYPOINTS = 32;
+export const MAX_ROUTING_LANE = 8;
 export const CONNECTOR_ROUTING_AXES = [
   "auto",
   "horizontal",
@@ -99,6 +100,9 @@ export interface ConnectorRoutingSemantic extends ConnectorPorts {
   /** Position of the middle channel between endpoints; 0–1, default 0.5. */
   readonly routingBend?: number;
   readonly labelPosition?: number;
+  readonly routingLane?: number;
+  readonly labelOffsetX?: number;
+  readonly labelOffsetY?: number;
   readonly fromPortPosition?: number;
   readonly toPortPosition?: number;
   /** Route around visible layers on the connector's page; default true. */

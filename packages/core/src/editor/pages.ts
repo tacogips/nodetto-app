@@ -114,6 +114,9 @@ export function planDuplicatePage(
     ...(source.mode ? { mode: source.mode } : {}),
     order: ordering.order,
     ...(source.tokenMode ? { tokenMode: source.tokenMode } : {}),
+    ...(source.connectorRouting
+      ? { connectorRouting: source.connectorRouting }
+      : {}),
   };
   const payload = copyElements(
     editor.store,

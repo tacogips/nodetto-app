@@ -486,8 +486,9 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
                 (sum, value) => ({
                   edgeCrossings: sum.edgeCrossings + value.edgeCrossings,
                   labelOverlaps: sum.labelOverlaps + value.labelOverlaps,
+                  segmentOverlaps: sum.segmentOverlaps + value.segmentOverlaps,
                 }),
-                { edgeCrossings: 0, labelOverlaps: 0 },
+                { edgeCrossings: 0, labelOverlaps: 0, segmentOverlaps: 0 },
               ),
             }
           : {}),

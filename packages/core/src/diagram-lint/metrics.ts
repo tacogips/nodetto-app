@@ -18,6 +18,7 @@ import type { Store } from "../store.ts";
 export interface PageMetrics {
   readonly edgeCrossings: number;
   readonly labelOverlaps: number;
+  readonly segmentOverlaps: number;
 }
 
 export function isLabelObstacle(element: Element): boolean {
@@ -105,6 +106,74 @@ export function labelOverlapScore(
 function cross(ax: number, ay: number, bx: number, by: number): number {
   return ax * by - ay * bx;
 }
+// Count collinear segment pairs with more than one unit of shared length.
+export function countRouteOverlaps(
+  a: readonly Vec[],
+  b: readonly Vec[],
+): number {
+  const bounds = (points: readonly Vec[]) => {
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (const p of points) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX, minY, maxX, maxY };
+  };
+  const aa = bounds(a);
+  const bb = bounds(b);
+  const eps = 1e-9;
+  if (
+    aa.maxX + eps < bb.minX ||
+    bb.maxX + eps < aa.minX ||
+    aa.maxY + eps < bb.minY ||
+    bb.maxY + eps < aa.minY
+  )
+    return 0;
+  let count = 0;
+  for (let i = 1; i < a.length; i++) {
+    const p = a[i - 1];
+    const q = a[i];
+    if (!p || !q) continue;
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const length = Math.hypot(dx, dy);
+    if (length === 0) continue;
+    for (let j = 1; j < b.length; j++) {
+      const r = b[j - 1];
+      const s = b[j];
+      if (!r || !s) continue;
+      if (
+        Math.max(p.x, q.x) + eps < Math.min(r.x, s.x) ||
+        Math.max(r.x, s.x) + eps < Math.min(p.x, q.x) ||
+        Math.max(p.y, q.y) + eps < Math.min(r.y, s.y) ||
+        Math.max(r.y, s.y) + eps < Math.min(p.y, q.y)
+      )
+        continue;
+      const sx = s.x - r.x;
+      const sy = s.y - r.y;
+      if (
+        Math.hypot(sx, sy) === 0 ||
+        Math.abs(cross(dx, dy, sx, sy)) >= eps ||
+        Math.abs(cross(r.x - p.x, r.y - p.y, dx, dy)) >= eps
+      )
+        continue;
+      const t0 = ((r.x - p.x) * dx + (r.y - p.y) * dy) / length;
+      const t1 = ((s.x - p.x) * dx + (s.y - p.y) * dy) / length;
+      if (
+        Math.min(length, Math.max(t0, t1)) - Math.max(0, Math.min(t0, t1)) >
+        1
+      )
+        count++;
+    }
+  }
+  return count;
+}
+
 function nearEndpoint(point: Vec, points: readonly Vec[]): boolean {
   const first = points[0];
   const last = points[points.length - 1];
@@ -214,6 +283,7 @@ export function pageMetrics(
   }
   let edgeCrossings = 0;
   let labelOverlaps = 0;
+  let segmentOverlaps = 0;
   for (let i = 0; i < edges.length; i += 1) {
     const edge = edges[i];
     if (!edge) continue;
@@ -228,6 +298,7 @@ export function pageMetrics(
     for (let j = i + 1; j < edges.length; j += 1) {
       const other = edges[j];
       if (!other) continue;
+      segmentOverlaps += countRouteOverlaps(edge.points, other.points);
       if (edge.label && other.label && boxesOverlap(edge.label, other.label))
         labelOverlaps += 1;
       const seen: Vec[] = [];
@@ -259,5 +330,5 @@ export function pageMetrics(
       }
     }
   }
-  return { edgeCrossings, labelOverlaps };
+  return { edgeCrossings, labelOverlaps, segmentOverlaps };
 }

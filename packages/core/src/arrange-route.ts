@@ -7,21 +7,14 @@ import {
   type PageId,
   type PageKind,
 } from "@nodetto/ir";
+import { planRouteLanes } from "./arrange-route-lanes.ts";
 import { applyCommands, type Command } from "./commands.ts";
-import {
-  isLabelObstacle,
-  labelOverlapScore,
-  resolvedLabelBox,
-} from "./diagram-lint/metrics.ts";
-import { boxCenter, type Box, type Vec } from "./geometry.ts";
+import { placeConnectorLabels } from "./connector-label-placement.ts";
+import { isLabelObstacle } from "./diagram-lint/metrics.ts";
+import { boxCenter, type Box } from "./geometry.ts";
 import { createShapeContext } from "./hit-test.ts";
 import type { ShapeUtilRegistry } from "./shape-util.ts";
-import {
-  connectorDecoration,
-  endpointReaderFor,
-  resolveConnector,
-} from "./shapes/connector.ts";
-import { pointAlongRoute } from "./shapes/connector/route.ts";
+import { endpointReaderFor, resolveConnector } from "./shapes/connector.ts";
 import { Store } from "./store.ts";
 
 export const ROUTE_PAGE_KINDS: readonly PageKind[] = [
@@ -36,6 +29,7 @@ export const ROUTE_PAGE_KINDS: readonly PageKind[] = [
 export interface RouteOptions {
   readonly targetIds?: readonly ElementId[];
   readonly resetManual: boolean;
+  readonly separation?: boolean;
 }
 type Side = "right" | "top" | "bottom" | "left";
 type End = "from" | "to";
@@ -49,10 +43,13 @@ interface Endpoint {
   position: number;
   projection: number;
 }
-const sides: readonly Side[] = ["right", "top", "bottom", "left"];
+const sides: readonly Side[] = ["top", "right", "bottom", "left"];
 const resetFields = [
   "routingWaypoints",
   "routingBend",
+  "routingLane",
+  "labelOffsetX",
+  "labelOffsetY",
   "fromPort",
   "toPort",
   "fromPortPosition",
@@ -132,9 +129,15 @@ export function planRoute(
       next["routing"] = "orthogonal";
       for (const key of resetFields) {
         if (
-          key === "labelPosition" &&
-          edge.type.startsWith("bpmn.") &&
-          edge.visual.labelBounds
+          (options.separation === false &&
+            (key === "labelPosition" ||
+              key === "labelOffsetX" ||
+              key === "labelOffsetY")) ||
+          ((key === "labelPosition" ||
+            key === "labelOffsetX" ||
+            key === "labelOffsetY") &&
+            edge.type.startsWith("bpmn.") &&
+            edge.visual.labelBounds)
         )
           continue;
         delete next[key];
@@ -178,12 +181,21 @@ export function planRoute(
   }
   const current = (edge: Element) =>
     data.get(edge.id) ?? (edge.semantic as Record<string, unknown>);
-  // Count existing non-loop ends and manual loop ends before allocating new loops.
-  const used = new Map<string, Map<Side, number>>();
-  const addUse = (node: string, side: Side) => {
-    const count = used.get(node) ?? new Map<Side, number>();
-    count.set(side, (count.get(side) ?? 0) + 1);
-    used.set(node, count);
+  // Keep inferred and already stored ends fixed; only ports written here can move.
+  type Usage = { edge: Element; end: End; opposite: string; movable: boolean };
+  const used = new Map<string, Map<Side, Usage[]>>();
+  const uses = (node: string, side: Side): Usage[] => {
+    let bySide = used.get(node);
+    if (!bySide) {
+      bySide = new Map();
+      used.set(node, bySide);
+    }
+    let list = bySide.get(side);
+    if (!list) {
+      list = [];
+      bySide.set(side, list);
+    }
+    return list;
   };
   for (const edge of edges) {
     const ends = endpointReaderFor(edge.type)(edge.semantic);
@@ -196,6 +208,7 @@ export function planRoute(
     for (const end of ["from", "to"] as const) {
       if (columnEnd(edge, end)) continue;
       let side = port(current(edge)[`${end}Port`]);
+      const written = !!side && movable.has(edge.id) && ends.from !== ends.to;
       const box = context.boundsOf(ends[end]);
       const point = end === "from" ? resolved?.start : resolved?.end;
       if (!side && box && point) {
@@ -211,29 +224,63 @@ export function planRoute(
               ? "bottom"
               : "top";
       }
-      if (side) addUse(ends[end], side);
+      if (side)
+        uses(ends[end], side).push({
+          edge,
+          end,
+          opposite: end === "from" ? ends.to : ends.from,
+          movable: written,
+        });
     }
   }
   for (const edge of edges) {
     const ends = endpointReaderFor(edge.type)(edge.semantic);
     if (!ends || ends.from !== ends.to || !movable.has(edge.id)) continue;
-    const count = used.get(ends.from);
-    let side: Side = "right";
-    for (const candidate of sides)
-      if ((count?.get(candidate) ?? 0) < (count?.get(side) ?? 0))
-        side = candidate;
+    const node = ends.from;
+    let side = sides.find((candidate) => uses(node, candidate).length === 0);
+    if (!side) {
+      const freeable = sides.filter((candidate) =>
+        uses(node, candidate).every((item) => item.movable),
+      );
+      const choices = freeable.length ? freeable : sides;
+      side = choices[0] ?? "top";
+      for (const candidate of choices)
+        if (uses(node, candidate).length < uses(node, side).length)
+          side = candidate;
+      if (freeable.length) {
+        const centerBox = context.boundsOf(node);
+        const center = centerBox && boxCenter(centerBox);
+        for (const item of uses(node, side)) {
+          const oppositeBox = context.boundsOf(item.opposite);
+          const opposite = oppositeBox && boxCenter(oppositeBox);
+          const destination: Side =
+            side === "top" || side === "bottom"
+              ? center && opposite && opposite.x >= center.x
+                ? "right"
+                : "left"
+              : center && opposite && opposite.y > center.y
+                ? "bottom"
+                : "top";
+          current(item.edge)[`${item.end}Port`] = destination;
+          uses(node, destination).push(item);
+        }
+        uses(node, side).length = 0;
+      }
+    }
     const next = current(edge);
     next["fromPort"] = side;
     next["toPort"] = side;
     next["fromPortPosition"] = 0.3;
     next["toPortPosition"] = 0.7;
-    addUse(ends.from, side);
-    addUse(ends.from, side);
+    uses(node, side).push(
+      { edge, end: "from", opposite: node, movable: false },
+      { edge, end: "to", opposite: node, movable: false },
+    );
   }
   const groups = new Map<string, Endpoint[]>();
   for (const edge of edges) {
     const ends = endpointReaderFor(edge.type)(edge.semantic);
-    if (!ends || ends.from === ends.to) continue;
+    if (!ends) continue;
     for (const end of ["from", "to"] as const) {
       if (columnEnd(edge, end)) continue;
       const d = current(edge);
@@ -249,7 +296,7 @@ export function planRoute(
         node: ends[end],
         opposite,
         side,
-        movable: movable.has(edge.id),
+        movable: ends.from !== ends.to && movable.has(edge.id),
         position: typeof position === "number" ? position : 0.5,
         projection: side === "left" || side === "right" ? center.y : center.x,
       };
@@ -379,97 +426,72 @@ export function planRoute(
   const routed = edges
     .map((edge) => draft.get(edge.id))
     .filter((edge): edge is Element => !!edge);
-  const routes = new Map<string, readonly Vec[]>();
-  for (const edge of routed) {
-    const route = resolveConnector(
-      edge,
+  if (options.separation !== false) {
+    const patches = planRouteLanes(
+      routed.map((element) => {
+        const ends = endpointReaderFor(element.type)(element.semantic);
+        return {
+          element,
+          movable: movable.has(element.id) && !!ends && ends.from !== ends.to,
+        };
+      }),
       routedContext,
-      endpointReaderFor(edge.type),
     );
-    if (route) routes.set(edge.id, route.points);
+    const laneCommands: Command[] = [];
+    for (const edge of routed) {
+      const patch = patches.get(edge.id);
+      if (!patch) continue;
+      const semantic = { ...current(edge), ...patch };
+      data.set(edge.id, semantic);
+      laneCommands.push({ type: "updateSemantic", id: edge.id, semantic });
+    }
+    applyCommands(draft, laneCommands);
   }
-  const obstacles: Box[] = [];
-  for (const element of draft.getPageElements(pageId)) {
-    if (!isLabelObstacle(element)) continue;
-    const bounds = routedContext.boundsOf(element.id);
-    if (bounds) obstacles.push(bounds);
-  }
-  const labels: Box[] = [];
-  for (const edge of routed) {
-    if (
-      targets.has(edge.id) &&
-      !(edge.type.startsWith("bpmn.") && edge.visual.labelBounds)
-    )
-      continue;
-    const points = routes.get(edge.id);
-    if (!points) continue;
-    const position = current(edge)["labelPosition"];
-    const at =
-      typeof position === "number" && Number.isFinite(position)
-        ? Math.max(0, Math.min(1, position))
-        : 0.5;
-    const box = resolvedLabelBox(edge, points, pointAlongRoute(points, at));
-    if (box) labels.push(box);
+  const finalEdges = routed
+    .map((edge) => draft.get(edge.id))
+    .filter((edge): edge is Element => !!edge);
+  const finalContext = createShapeContext(draft, registry, 1);
+  if (options.separation !== false) {
+    const obstacles: Box[] = [];
+    for (const element of draft.getPageElements(pageId)) {
+      if (!isLabelObstacle(element)) continue;
+      const bounds = finalContext.boundsOf(element.id);
+      if (bounds) obstacles.push(bounds);
+    }
+    const labelEdges = finalEdges.flatMap((element) => {
+      const route = resolveConnector(
+        element,
+        finalContext,
+        endpointReaderFor(element.type),
+      );
+      return route
+        ? [
+            {
+              element,
+              semantic: current(element),
+              points: route.points,
+              movable: targets.has(element.id),
+            },
+          ]
+        : [];
+    });
+    for (const [id, fields] of placeConnectorLabels({
+      edges: labelEdges,
+      obstacles,
+    })) {
+      const semantic = data.get(id);
+      if (!semantic) continue;
+      for (const key of ["labelPosition", "labelOffsetX", "labelOffsetY"]) {
+        delete semantic[key];
+      }
+      Object.assign(semantic, fields);
+    }
   }
   const commands: Command[] = [];
-  for (const edge of routed) {
-    const points = routes.get(edge.id);
-    if (!points) continue;
-    const semantic = { ...current(edge) };
-    const text = edge.type.startsWith("bpmn.")
-      ? semantic["name"]
-      : connectorDecoration(edge).label;
-    if (
-      targets.has(edge.id) &&
-      typeof text === "string" &&
-      text.length > 0 &&
-      !(edge.type.startsWith("bpmn.") && edge.visual.labelBounds)
-    ) {
-      let best = 0.5;
-      let bestScore = Number.POSITIVE_INFINITY;
-      const others = [...routes.entries()]
-        .filter(([id]) => id !== edge.id)
-        .map(([, route]) => route);
-      for (const candidate of [0.5, 0.35, 0.65, 0.2, 0.8, 0.1, 0.9]) {
-        const box = resolvedLabelBox(
-          edge,
-          points,
-          pointAlongRoute(points, candidate),
-        );
-        if (!box) break;
-        const score = labelOverlapScore(box, obstacles, labels, others);
-        if (score < bestScore) {
-          bestScore = score;
-          best = candidate;
-        }
-        if (score === 0) break;
-      }
-      if (best === 0.5) {
-        // biome-ignore lint/performance/noDelete: midpoint is represented by an absent field.
-        delete semantic["labelPosition"];
-      } else semantic["labelPosition"] = best;
-    }
-    const position =
-      typeof semantic["labelPosition"] === "number"
-        ? semantic["labelPosition"]
-        : 0.5;
-    const box = resolvedLabelBox(
-      edge,
-      points,
-      pointAlongRoute(points, position),
-    );
-    if (
-      box &&
-      targets.has(edge.id) &&
-      !(edge.type.startsWith("bpmn.") && edge.visual.labelBounds)
-    )
-      labels.push(box);
+  for (const edge of finalEdges) {
+    const semantic = data.get(edge.id);
     const original = store.get(edge.id);
-    if (
-      targets.has(edge.id) &&
-      original &&
-      !equalSemantic(semantic, original.semantic)
-    )
+    if (semantic && original && !equalSemantic(semantic, original.semantic))
       commands.push({ type: "updateSemantic", id: edge.id, semantic });
   }
   return commands;

@@ -85,6 +85,7 @@ test("Straighten action removes an orthogonal route in one undoable edit", () =>
         ...(editor.store.get(edge)?.semantic as Record<string, unknown>),
         routing: "orthogonal",
         routingBend: 0.7,
+        routingLane: 3,
         routingAxis: "horizontal",
       },
     },
@@ -103,6 +104,7 @@ test("Straighten action removes an orthogonal route in one undoable edit", () =>
   const semantic = editor.store.get(edge)?.semantic as Record<string, unknown>;
   expect(semantic["routingWaypoints"]).toBeUndefined();
   expect(semantic["routingBend"]).toBeUndefined();
+  expect(semantic["routingLane"]).toBeUndefined();
   editor.undo();
   expect(editor.getSnapshot()).toEqual(before);
 });

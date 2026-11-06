@@ -3,6 +3,7 @@ import {
   columnFrames,
   LAYERED_PAGE_KINDS,
   planLayered,
+  selectLayeredOrder,
 } from "./arrange-layered.ts";
 import { FRAME_TITLE_BAND } from "./shapes/frame.ts";
 import { frameParents } from "./frame-tree.ts";
@@ -417,4 +418,234 @@ test("duplicate explicit frame IDs retain their first index", () => {
   expect(plan(["stage1", "stage0", "stage1"])).toEqual(
     plan(["stage1", "stage0"]),
   );
+});
+
+test("layered selection preserves default and chooses by metrics", () => {
+  const editor = fixture();
+  const options = { direction: "LR" as const };
+  const rank = planLayered(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+  );
+  expect(
+    planLayered(editor.store, TEST_PAGE.id, editor.registry, {
+      ...options,
+      memberOrder: "rank",
+    }),
+  ).toEqual(rank);
+  let calls = 0;
+  const selected = selectLayeredOrder(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+    () => {
+      calls++;
+      return { edgeCrossings: 0, segmentOverlaps: 0, labelOverlaps: 0 };
+    },
+  );
+  expect(selected).toEqual(rank);
+  expect(calls).toBeLessThan(3);
+  if ("error" in selected) throw new Error(selected.error);
+  editor.apply(selected.commands, { placed: selected.placed });
+  const again = selectLayeredOrder(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+    () => ({ edgeCrossings: 0, segmentOverlaps: 0, labelOverlaps: 0 }),
+  );
+  if ("error" in again) throw new Error(again.error);
+  expect(again.commands).toEqual([]);
+  const empty = makeEditor();
+  expect(
+    selectLayeredOrder(
+      empty.store,
+      TEST_PAGE.id,
+      empty.registry,
+      options,
+      () => ({ edgeCrossings: 0, segmentOverlaps: 0, labelOverlaps: 0 }),
+    ),
+  ).toEqual(planLayered(empty.store, TEST_PAGE.id, empty.registry, options));
+});
+
+test("selection prefers fewer crossings, then overlaps, and keeps a tied no-op", () => {
+  const editor = fixture();
+  editor.apply([
+    { type: "updateVisual", id: "idle", visual: { y: 200 } },
+    { type: "updateVisual", id: "running", visual: { y: 30 } },
+  ]);
+  const options = { direction: "LR" as const };
+  const rank = planLayered(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+  );
+  const input = planLayered(editor.store, TEST_PAGE.id, editor.registry, {
+    ...options,
+    memberOrder: "input",
+  });
+  if ("error" in rank || "error" in input)
+    throw new Error("unexpected planning error");
+  expect(rank.commands).not.toEqual(input.commands);
+  expect(rank.commands.length).toBeGreaterThan(0);
+  expect(input.commands.length).toBeGreaterThan(0);
+  let tieCalls = 0;
+  const rankOnTie = selectLayeredOrder(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+    () => {
+      tieCalls++;
+      return { edgeCrossings: 0, segmentOverlaps: 0, labelOverlaps: 0 };
+    },
+  );
+  expect(tieCalls).toBe(2);
+  expect(rankOnTie).toEqual(rank);
+  let calls = 0;
+  const crossing = selectLayeredOrder(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+    () => ({
+      edgeCrossings: calls++ === 0 ? 1 : 0,
+      segmentOverlaps: 0,
+      labelOverlaps: 0,
+    }),
+  );
+  expect(crossing).toEqual(input);
+  calls = 0;
+  const overlap = selectLayeredOrder(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+    () => ({
+      edgeCrossings: 0,
+      segmentOverlaps: calls++ === 0 ? 1 : 0,
+      labelOverlaps: 0,
+    }),
+  );
+  expect(overlap).toEqual(input);
+  editor.apply(input.commands, { placed: input.placed });
+  const tied = selectLayeredOrder(
+    editor.store,
+    TEST_PAGE.id,
+    editor.registry,
+    options,
+    () => ({ edgeCrossings: 0, segmentOverlaps: 0, labelOverlaps: 0 }),
+  );
+  if ("error" in tied) throw new Error(tied.error);
+  expect(tied.commands).toEqual([]);
+});
+
+test("barycenter keeps frame order and sizes and contains members", () => {
+  const rankEditor = fixture();
+  const baryEditor = fixture();
+  const rank = planLayered(
+    rankEditor.store,
+    TEST_PAGE.id,
+    rankEditor.registry,
+    { direction: "LR" },
+  );
+  const bary = planLayered(
+    baryEditor.store,
+    TEST_PAGE.id,
+    baryEditor.registry,
+    { direction: "LR", memberOrder: "barycenter" },
+  );
+  if ("error" in rank || "error" in bary)
+    throw new Error("unexpected planning error");
+  rankEditor.apply(rank.commands, { placed: rank.placed });
+  baryEditor.apply(bary.commands, { placed: bary.placed });
+  for (const id of ["stage0", "stage1"]) {
+    expect(baryEditor.store.get(id)?.visual).toEqual(
+      rankEditor.store.get(id)?.visual,
+    );
+  }
+  const parents = frameParents(
+    baryEditor.store,
+    TEST_PAGE.id,
+    baryEditor.createShapeContext(),
+  );
+  expect(parents.get("idle")).toBe("stage0");
+  expect(parents.get("running")).toBe("stage0");
+  expect(parents.get("done")).toBe("stage1");
+});
+
+test("connected barycenter changes member order without changing frames", () => {
+  function connectedFixture() {
+    const editor = makeEditor();
+    for (const [id, x, members] of [
+      ["stage0", 0, ["a", "b"]],
+      ["stage1", 600, ["c", "d"]],
+    ] as const) {
+      editor.createElement("frame", {
+        id,
+        semantic: { name: id, memberIds: [...members] },
+        visual: { x, y: 0, width: 500, height: 500 },
+      });
+      for (const [index, member] of members.entries())
+        editor.createElement("state.node", {
+          id: member,
+          semantic: { kind: "state", name: member },
+          visual: { x: x + 20, y: 30 + index * 120, width: 80, height: 50 },
+        });
+    }
+    for (const [id, from, to] of [
+      ["e1", "a", "c"],
+      ["e2", "a", "d"],
+      ["e3", "b", "c"],
+    ] as const)
+      editor.createElement("state.transition", { id, semantic: { from, to } });
+    return editor;
+  }
+  const rankEditor = connectedFixture();
+  const baryEditor = connectedFixture();
+  const rank = planLayered(
+    rankEditor.store,
+    TEST_PAGE.id,
+    rankEditor.registry,
+    { direction: "LR" },
+  );
+  const bary = planLayered(
+    baryEditor.store,
+    TEST_PAGE.id,
+    baryEditor.registry,
+    { direction: "LR", memberOrder: "barycenter" },
+  );
+  if ("error" in rank || "error" in bary)
+    throw new Error("unexpected planning error");
+  rankEditor.apply(rank.commands, { placed: rank.placed });
+  baryEditor.apply(bary.commands, { placed: bary.placed });
+  const y = (editor: ReturnType<typeof connectedFixture>, id: string) => {
+    const value = editor.store.get(id)?.visual.y;
+    if (value === undefined) throw new Error(`missing position for ${id}`);
+    return value;
+  };
+  expect(y(rankEditor, "a")).toBeLessThan(y(rankEditor, "b"));
+  expect(y(baryEditor, "b")).toBeLessThan(y(baryEditor, "a"));
+  for (const id of ["stage0", "stage1"])
+    expect(baryEditor.store.get(id)?.visual).toEqual(
+      rankEditor.store.get(id)?.visual,
+    );
+  for (const editor of [rankEditor, baryEditor]) {
+    const parents = frameParents(
+      editor.store,
+      TEST_PAGE.id,
+      editor.createShapeContext(),
+    );
+    for (const [id, frame] of [
+      ["a", "stage0"],
+      ["b", "stage0"],
+      ["c", "stage1"],
+      ["d", "stage1"],
+    ] as const)
+      expect(parents.get(id)).toBe(frame);
+  }
 });

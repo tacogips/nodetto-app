@@ -2,7 +2,7 @@
 //
 // Shape:
 //   meta     Y.Map   { schemaVersion, id, title, extensions?, unknownRecords? }
-//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, extensions? }>
+//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, connectorRouting?, extensions? }>
 //   elements Y.Map<ElementId, Y.Map{ type, page, index, semantic,
 //                                    accessibility?, visual, extensions? }>
 //
@@ -91,6 +91,9 @@ export function pageFields(page: Page): Record<string, unknown> {
     kind: page.kind,
     ...(page.mode === undefined ? {} : { mode: page.mode }),
     ...(page.sqlDialect === undefined ? {} : { sqlDialect: page.sqlDialect }),
+    ...(page.connectorRouting === undefined
+      ? {}
+      : { connectorRouting: page.connectorRouting }),
     ...(page.tokenMode === undefined ? {} : { tokenMode: page.tokenMode }),
     ...(page.order === undefined ? {} : { order: page.order }),
     ...(page.extensions === undefined ? {} : { extensions: page.extensions }),
@@ -207,6 +210,23 @@ export function pageFromY(id: PageId, value: unknown): Page {
     name: String(record.name ?? ""),
     kind: record.kind as Page["kind"],
     ...(isPageMode(record.mode) ? { mode: record.mode } : {}),
+    ...(isPlainObject(record.connectorRouting) &&
+    (record.connectorRouting.routing === "straight" ||
+      record.connectorRouting.routing === "orthogonal") &&
+    (record.connectorRouting.routingAvoidObstacles === undefined ||
+      typeof record.connectorRouting.routingAvoidObstacles === "boolean")
+      ? {
+          connectorRouting: {
+            routing: record.connectorRouting.routing,
+            ...(record.connectorRouting.routingAvoidObstacles === undefined
+              ? {}
+              : {
+                  routingAvoidObstacles:
+                    record.connectorRouting.routingAvoidObstacles,
+                }),
+          },
+        }
+      : {}),
     ...(record.sqlDialect === "postgresql" ||
     record.sqlDialect === "mysql" ||
     record.sqlDialect === "sqlite"

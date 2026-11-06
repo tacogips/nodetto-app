@@ -141,6 +141,10 @@ These are specified in `design-docs/specs/design-cli-layout-merge-lint.md`:
 The edit batch semantics above are unchanged, except that unknown top-level
 operation fields are now rejected.
 
+`connect` routing fields, `set-page-routing`, route separation, label moves and
+the `segmentOverlaps` metric are specified in
+`design-docs/specs/design-connector-routing-arranging.md`.
+
 ### Ids and names
 
 Page and element ids are assigned automatically, are opaque and never change;

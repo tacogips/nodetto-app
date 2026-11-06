@@ -41,7 +41,9 @@ test("validates visual style keys for add and update", () => {
   expect(() =>
     check("add", { fill: "#112233", verticalAlign: "top", extensions: {} }),
   ).not.toThrow();
-  expect(() => check("connect", { valign: 1 })).not.toThrow();
+  expect(() => check("connect", { valign: 1 })).toThrow(
+    'unknown visual.style key "valign"',
+  );
   expect(() => checkOperationFields({ op: "add", visual: 3 }, 0)).not.toThrow();
   expect(() => check("update", 3)).not.toThrow();
 });
@@ -114,6 +116,7 @@ test("handler operation reads are represented in their field rows", () => {
     "move-page": ["pages:movePage", "pages:placePage"],
     "rename-page": ["pages:renamePage"],
     "set-page-mode": ["pages:setPageMode"],
+    "set-page-routing": ["pages:setPageRouting"],
     "delete-page": ["pages:deletePage"],
   };
   const reads = (spec: string): string[] => {
@@ -218,4 +221,76 @@ test("each operation with an unknown field exits 2 before writing", () => {
     expect(result.stderr).toContain(`Valid fields: ${fields.join(", ")}`);
     expect(writes).toBe(0);
   }
+});
+
+test("page routing operations validate, set, and clear defaults", () => {
+  const editor = new Editor();
+  const batch = new Batch(editor);
+  const id = editor.store.listPages()[0]?.id;
+  expect(id).toBeDefined();
+  batch.apply(
+    {
+      op: "set-page-routing",
+      id,
+      routing: "orthogonal",
+      routingAvoidObstacles: true,
+    },
+    0,
+  );
+  expect(
+    editor.store.listPages().find((page) => page.id === id)?.connectorRouting,
+  ).toEqual({ routing: "orthogonal", routingAvoidObstacles: true });
+  expect(() =>
+    batch.apply(
+      {
+        op: "set-page-routing",
+        id,
+        routing: null,
+        routingAvoidObstacles: false,
+      },
+      0,
+    ),
+  ).toThrow("routingAvoidObstacles");
+  expect(() =>
+    batch.apply({ op: "set-page-routing", id, routing: "manual" }, 0),
+  ).toThrow("routing");
+  expect(() =>
+    batch.apply(
+      {
+        op: "set-page-routing",
+        id,
+        routing: "straight",
+        routingAvoidObstacles: 1,
+      },
+      0,
+    ),
+  ).toThrow("routingAvoidObstacles");
+  batch.apply({ op: "set-page-routing", id, routing: null }, 0);
+  expect(
+    editor.store.listPages().find((page) => page.id === id)?.connectorRouting,
+  ).toBeUndefined();
+  batch.apply(
+    {
+      op: "add-page",
+      name: "New page",
+      id: "new-page",
+      connectorRouting: { routing: "straight", routingAvoidObstacles: false },
+    },
+    0,
+  );
+  expect(
+    editor.store.listPages().find((page) => page.id === "new-page")
+      ?.connectorRouting,
+  ).toEqual({ routing: "straight", routingAvoidObstacles: false });
+  expect(() =>
+    batch.apply(
+      {
+        op: "add-page",
+        name: "Invalid",
+        connectorRouting: { routing: "straight", extra: true },
+      },
+      0,
+    ),
+  ).toThrow("connectorRouting.extra");
+  batch.dispose();
 });

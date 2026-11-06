@@ -15,6 +15,10 @@ Revised again 2026-11-05 for continuation 5: the owner's Q11 direction (keep
 depth-one behavior, document it, do not block), the as-built E1 geometry errors
 and E2.1 refusals, and the "Continuation 5 partition" for finishing clm-09.
 
+Revised by `design-docs/specs/design-connector-routing-arranging.md`
+(2026-11-06): A2 reset fields, A3 label candidates and offsets, A4 self-loop
+reservation, A5 side order and freed sides, and the `lint --metrics` fields.
+
 Owner decisions: `design-docs/user-qa/cli-layout-merge-lint.md`. Each open
 question has a default that this design implements. Q11 has no chosen option,
 but the owner directed that current depth-one behavior stays and that Q11 blocks

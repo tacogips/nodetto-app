@@ -40,7 +40,7 @@ export function formatMetricsLines(
     const value = metrics.get(page.id);
     if (value)
       lines.push(
-        `metrics ${page.name}: ${value.edgeCrossings} edge crossing(s), ${value.labelOverlaps} edge-label overlap(s)`,
+        `metrics ${page.name}: ${value.edgeCrossings} edge crossing(s), ${value.labelOverlaps} edge-label overlap(s), ${value.segmentOverlaps} overlapping segment pair(s)`,
       );
   }
   return lines.join("\n");

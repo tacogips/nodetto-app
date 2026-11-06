@@ -30,6 +30,7 @@ export function straightConnectorSemantic(
   for (const key of [
     "routingWaypoints",
     "routingBend",
+    "routingLane",
     "routingAxis",
     "routingAvoidObstacles",
   ]) {

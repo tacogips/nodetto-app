@@ -805,6 +805,22 @@ export function validateDocument(
             ),
           );
       }
+      if (
+        page["connectorRouting"] !== undefined &&
+        checkObject(out, page["connectorRouting"], `${path}.connectorRouting`)
+      ) {
+        const routing = page["connectorRouting"];
+        checkEnum(out, routing["routing"], `${path}.connectorRouting.routing`, [
+          "straight",
+          "orthogonal",
+        ]);
+        checkBoolean(
+          out,
+          routing["routingAvoidObstacles"],
+          `${path}.connectorRouting.routingAvoidObstacles`,
+          { optional: true },
+        );
+      }
       if (page["sqlDialect"] !== undefined) {
         checkEnum(out, page["sqlDialect"], `${path}.sqlDialect`, [
           "postgresql",

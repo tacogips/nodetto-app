@@ -29,6 +29,8 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "fromColumn",
     "toColumn",
     "cardinality",
+    "routing",
+    "routingAvoidObstacles",
   ],
   update: [
     "op",
@@ -78,10 +80,12 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "after",
     "order",
     "mode",
+    "connectorRouting",
   ],
   "move-page": ["op", "id", "before", "after", "order"],
   "rename-page": ["op", "id", "name"],
   "set-page-mode": ["op", "id", "mode"],
+  "set-page-routing": ["op", "id", "routing", "routingAvoidObstacles"],
   "delete-page": ["op", "id"],
 };
 
@@ -111,7 +115,11 @@ export function checkOperationFields(
       : undefined;
   if (!fields) return;
   checkFields(operation, fields, index);
-  if (operation["op"] === "add" || operation["op"] === "update")
+  if (
+    operation["op"] === "add" ||
+    operation["op"] === "update" ||
+    operation["op"] === "connect"
+  )
     checkVisualStyleFields(operation, index);
 }
 

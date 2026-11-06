@@ -669,3 +669,457 @@ test("port spreading uses code-unit order for mixed-case ids", () => {
   expect(semantic(editor, "Zed").fromPortPosition).toBe(0.3333);
   expect(semantic(editor, "alpha").fromPortPosition).toBe(0.6667);
 });
+
+test("unused sides are assigned top then right for successive loops", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const first = editor.createElement("edge.generic", {
+    id: "loop-a",
+    semantic: { from: node, to: node },
+  });
+  const second = editor.createElement("edge.generic", {
+    id: "loop-b",
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, first).fromPort).toBe("top");
+  expect(semantic(editor, second).fromPort).toBe("right");
+  expect([
+    semantic(editor, first).fromPortPosition,
+    semantic(editor, first).toPortPosition,
+  ]).toEqual([0.3, 0.7]);
+  expect(route(editor)).toEqual([]);
+});
+
+test("disabling separation preserves labels while still assigning ports", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 300, y: 0, width: 80, height: 80 },
+  });
+  const edge = editor.createElement("edge.generic", {
+    semantic: { from: a, to: b, labelPosition: 0.2, labelOffsetX: 5 },
+  });
+  const page = editor.store.listPages()[0];
+  if (!page) throw new Error("Missing page");
+  editor.apply(
+    planRoute(editor.store, page.id, editor.registry, {
+      resetManual: true,
+      separation: false,
+    }),
+  );
+  expect(semantic(editor, edge).fromPort).toBe("right");
+  expect(semantic(editor, edge).routingLane).toBeUndefined();
+  expect(semantic(editor, edge).labelPosition).toBe(0.2);
+  expect(semantic(editor, edge).labelOffsetX).toBe(5);
+});
+
+test("a loop frees a side with movable ends when all sides are occupied", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 200, y: 200, width: 80, height: 80 },
+  });
+  const positions = [
+    [200, 0],
+    [400, 200],
+    [200, 400],
+    [0, 200],
+  ] as const;
+  const edges = positions.map(([x, y]) => {
+    const other = editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    });
+    return editor.createElement("edge.generic", {
+      semantic: { from: node, to: other },
+    });
+  });
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, loop).fromPort).toBe("top");
+  expect(semantic(editor, edges[0]!).fromPort).toBe("right");
+  for (const edge of edges)
+    expect(semantic(editor, edge).fromPort).not.toBe("top");
+});
+
+test("a loop reserves both coordinates when fixed ends occupy all sides", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 200, y: 200, width: 80, height: 80 },
+  });
+  const positions = [
+    [200, 0, "top"],
+    [400, 200, "right"],
+    [200, 400, "bottom"],
+    [0, 200, "left"],
+  ] as const;
+  let fixedTop = "";
+  for (const [x, y, side] of positions) {
+    const other = editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    });
+    const fixed = editor.createElement("edge.generic", {
+      semantic: {
+        from: node,
+        to: other,
+        fromPort: side,
+        fromPortPosition: 0.5,
+      },
+    });
+    if (side === "top") fixedTop = fixed;
+    if (side !== "top")
+      editor.createElement("edge.generic", {
+        semantic: { from: node, to: other, fromPort: side },
+      });
+  }
+  const other = editor.createElement("node.generic", {
+    visual: { x: 250, y: 0, width: 80, height: 80 },
+  });
+  const moving = editor.createElement("edge.generic", {
+    semantic: { from: node, to: other },
+  });
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, loop).fromPort).toBe("top");
+  expect(semantic(editor, loop).fromPortPosition).toBe(0.3);
+  expect(semantic(editor, loop).toPortPosition).toBe(0.7);
+  expect(semantic(editor, fixedTop).fromPortPosition).toBe(0.5);
+  expect([0.3, 0.7]).not.toContain(semantic(editor, fixedTop).fromPortPosition);
+  expect(semantic(editor, moving).fromPort).toBe("top");
+  expect([0.3, 0.7]).not.toContain(semantic(editor, moving).fromPortPosition);
+});
+
+test("reset removes stored lane and label offsets", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 300, y: 0, width: 80, height: 80 },
+  });
+  const edge = editor.createElement("edge.generic", {
+    semantic: {
+      from: a,
+      to: b,
+      fromPort: "right",
+      routingLane: 4,
+      labelOffsetX: 12,
+      labelOffsetY: -5,
+    },
+  });
+  editor.apply(route(editor, true));
+  expect(semantic(editor, edge).routingLane).toBeUndefined();
+  expect(semantic(editor, edge).labelOffsetX).toBeUndefined();
+  expect(semantic(editor, edge).labelOffsetY).toBeUndefined();
+});
+
+test("a loop takes right when a fixed non-loop end occupies top", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 200, y: 200, width: 80, height: 80 },
+  });
+  const other = editor.createElement("node.generic", {
+    visual: { x: 200, y: 0, width: 80, height: 80 },
+  });
+  editor.createElement("edge.generic", {
+    semantic: { from: node, to: other, fromPort: "top" },
+  });
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, loop).fromPort).toBe("right");
+  expect(semantic(editor, loop).toPort).toBe("right");
+});
+
+test("top evacuation selects left for a neighbor to the left", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 200, y: 200, width: 80, height: 80 },
+  });
+  const positions = [
+    [160, 0],
+    [400, 200],
+    [200, 400],
+    [0, 200],
+  ] as const;
+  const edges = positions.map(([x, y]) => {
+    const other = editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    });
+    return editor.createElement("edge.generic", {
+      semantic: { from: node, to: other },
+    });
+  });
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  const top = edges[0];
+  if (!top) throw new Error("Missing top edge");
+  expect(semantic(editor, loop).fromPort).toBe("top");
+  expect(semantic(editor, top).fromPort).toBe("left");
+});
+
+test("separation false skips lanes and label placement for overlapping labeled edges", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 300, y: 150, width: 80, height: 80 },
+  });
+  const ids = ["a", "b", "c"].map((id) =>
+    editor.createElement("edge.generic", {
+      id,
+      semantic: { from: a, to: b, routing: "orthogonal", label: "same label" },
+    }),
+  );
+  const standard = new Editor({ document: editor.getSnapshot() });
+  const page = editor.store.listPages()[0];
+  if (!page) throw new Error("Missing page");
+  editor.apply(
+    planRoute(editor.store, page.id, editor.registry, {
+      resetManual: false,
+      separation: false,
+    }),
+  );
+  standard.apply(route(standard));
+  for (const id of ids) {
+    const value = semantic(editor, id);
+    expect(value.fromPort).toBeDefined();
+    expect(value.toPort).toBeDefined();
+    for (const field of [
+      "routingLane",
+      "routingBend",
+      "labelPosition",
+      "labelOffsetX",
+      "labelOffsetY",
+    ])
+      expect(value[field]).toBeUndefined();
+  }
+  expect(
+    ids.some((id) => semantic(standard, id).routingLane !== undefined),
+  ).toBe(true);
+  expect(
+    ids.some((id) =>
+      ["labelPosition", "labelOffsetX", "labelOffsetY"].some(
+        (field) => semantic(standard, id)[field] !== undefined,
+      ),
+    ),
+  ).toBe(true);
+});
+
+test("a loop frees the strictly least occupied movable side", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 200, y: 200, width: 80, height: 80 },
+  });
+  const positions = [
+    [200, 0],
+    [210, 0],
+    [400, 200],
+    [200, 400],
+    [0, 200],
+  ] as const;
+  const edges = positions.map(([x, y]) => {
+    const other = editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    });
+    return editor.createElement("edge.generic", {
+      semantic: { from: node, to: other },
+    });
+  });
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, loop).fromPort).toBe("right");
+  for (const edge of edges)
+    expect(semantic(editor, edge).fromPort).not.toBe("right");
+  const first = edges[0];
+  const second = edges[1];
+  if (!first || !second) throw new Error("Missing top edges");
+  expect(semantic(editor, first).fromPort).toBe("top");
+  expect(semantic(editor, second).fromPort).toBe("top");
+});
+
+test("a loop reserves positions on the strictly least occupied fixed side", () => {
+  const editor = new Editor();
+  const node = editor.createElement("node.generic", {
+    visual: { x: 200, y: 200, width: 80, height: 80 },
+  });
+  const positions = [
+    [200, 0, "top"],
+    [400, 200, "right"],
+    [200, 400, "bottom"],
+    [0, 200, "left"],
+  ] as const;
+  for (const [x, y, side] of positions) {
+    const other = editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    });
+    const count = side === "right" ? 1 : 3;
+    for (let i = 0; i < count; i++)
+      editor.createElement("edge.generic", {
+        semantic: {
+          from: node,
+          to: other,
+          fromPort: side,
+          fromPortPosition: 0.6,
+        },
+      });
+  }
+  const other = editor.createElement("node.generic", {
+    visual: { x: 400, y: 210, width: 80, height: 80 },
+  });
+  const moving = editor.createElement("edge.generic", {
+    semantic: { from: node, to: other },
+  });
+  const loop = editor.createElement("edge.generic", {
+    semantic: { from: node, to: node },
+  });
+  editor.apply(route(editor));
+  expect(semantic(editor, loop).fromPort).toBe("right");
+  expect(semantic(editor, loop).fromPortPosition).toBe(0.3);
+  expect(semantic(editor, loop).toPortPosition).toBe(0.7);
+  expect(semantic(editor, moving).fromPort).toBe("right");
+  expect([0.3, 0.7]).not.toContain(semantic(editor, moving).fromPortPosition);
+  expect(semantic(editor, moving).fromPortPosition).toBe(0.45);
+});
+
+test("lane separation avoids introducing crossings through grid boxes", () => {
+  const editor = new Editor();
+  const columns = [0, 180, 360].map((x) =>
+    Array.from({ length: 6 }, (_, i) =>
+      editor.createElement("node.generic", {
+        visual: { x, y: i * 120, width: 120, height: 60 },
+      }),
+    ),
+  );
+  const edges: { id: string; from: string; to: string }[] = [];
+  for (let i = 0; i < 6; i++) {
+    const left = columns[0]?.[i];
+    const middle = columns[1]?.[i];
+    const right = columns[2]?.[i];
+    const opposite = columns[2]?.[5 - i];
+    if (!left || !middle || !right || !opposite)
+      throw new Error("Missing grid node");
+    for (const [from, to] of [
+      [left, opposite],
+      [left, middle],
+      [middle, right],
+    ]) {
+      if (!from || !to) throw new Error("Missing endpoints");
+      const id = editor.createElement("edge.generic", {
+        semantic: {
+          from,
+          to,
+          routing: "orthogonal",
+          routingAvoidObstacles: true,
+        },
+      });
+      edges.push({ id, from, to });
+    }
+  }
+  editor.apply(route(editor));
+  const context = editor.createShapeContext();
+  for (const edge of edges) {
+    const element = editor.store.get(edge.id);
+    if (!element) throw new Error("Missing edge");
+    const resolved = resolveConnector(
+      element,
+      context,
+      endpointReaderFor(element.type),
+    );
+    if (!resolved) throw new Error("Missing route");
+    for (const column of columns)
+      for (const node of column) {
+        if (node === edge.from || node === edge.to) continue;
+        const box = context.boundsOf(node);
+        if (!box) throw new Error("Missing box");
+        for (let i = 1; i < resolved.points.length; i++) {
+          const a = resolved.points[i - 1];
+          const b = resolved.points[i];
+          if (!a || !b) throw new Error("Missing route point");
+          expect(segmentOverlapsBox(a, b, box)).toBe(false);
+        }
+      }
+  }
+  expect(route(editor)).toEqual([]);
+});
+
+test("dense column relations remain stable on a second route", () => {
+  const editor = new Editor();
+  const tables = [0, 1].map((col) =>
+    Array.from({ length: 3 }, (_, i) =>
+      editor.createElement("erd.table", {
+        id: `table-${col}-${i}`,
+        semantic: {
+          tableName: `table-${col}-${i}`,
+          columns: Array.from({ length: 6 }, (_, j) => ({
+            id: `c${j}`,
+            name: `c${j}`,
+            dataType: "int",
+          })),
+        },
+        visual: { x: col * 420, y: i * 260, width: 160, height: 220 },
+      }),
+    ),
+  );
+  for (let d = 0; d < 12; d++)
+    for (let t = 0; t < 3; t++) {
+      const from = tables[0]?.[t];
+      const to = tables[1]?.[(t + d) % 3];
+      if (!from || !to) throw new Error("Missing table");
+      editor.createElement("erd.relation", {
+        id: `relation-${String(d * 3 + t).padStart(2, "0")}`,
+        semantic: {
+          from: { table: from, column: `c${d % 6}` },
+          to: { table: to, column: `c${(d + 1) % 6}` },
+          cardinality: "1:*",
+        },
+      });
+    }
+  const first = route(editor);
+  expect(first.length).toBeGreaterThan(0);
+  editor.apply(first);
+  expect(route(editor)).toEqual([]);
+  const page = editor.store.listPages()[0];
+  if (!page) throw new Error("Missing page");
+  const relation = editor.store
+    .listElements()
+    .find(
+      (element) =>
+        element.type === "erd.relation" &&
+        typeof (element.semantic as Record<string, unknown>)["routingLane"] ===
+          "number",
+    );
+  if (!relation) throw new Error("Missing routed relation");
+  const originalLane = (relation.semantic as Record<string, unknown>)[
+    "routingLane"
+  ];
+  const alternative = originalLane === 8 ? 1 : 8;
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: relation.id,
+      semantic: {
+        ...(relation.semantic as Record<string, unknown>),
+        routingLane: alternative,
+      },
+    },
+  ]);
+  const reset = route(editor, true);
+  expect(reset.length).toBeGreaterThan(0);
+  editor.apply(reset);
+  expect(semantic(editor, relation.id).routingLane).toBe(originalLane);
+  expect(route(editor)).toEqual([]);
+});
