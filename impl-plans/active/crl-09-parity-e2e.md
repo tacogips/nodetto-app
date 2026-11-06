@@ -3,17 +3,26 @@
 - planId: crl-09-parity-e2e
 - planPath: impl-plans/active/crl-09-parity-e2e.md
 - progressPath: impl-plans/progress/crl-09-parity-e2e.md
-- wave: 2; dependsOn: crl-08-repair-labels (parity, end-to-end checks and timings measure its routes and labels)
-- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s754-dispatch.json`
-- Design (binding): `design-docs/specs/design-connector-routing-arranging.md`, sections "Fixture and acceptance tests" and "Baseline binary and timing".
-- Evidence: `tmp/crl-s754/crl-09-parity-e2e/`, with gate logs in `final/`.
+- wave: 1; dependsOn: none. crl-08-repair-labels is accepted and committed, so nothing here waits on it.
+- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s759-dispatch.json`
+- Design (binding): `design-docs/specs/design-connector-routing-arranging.md`, sections "Fixture and acceptance tests", "Baseline binary and timing" and "Owner performance decision".
+- Evidence: `tmp/crl-s759/crl-09-parity-e2e/`, with gate logs in `final/`. Earlier logs under `tmp/crl-s754/` stay read-only.
 
 ## Intent and context
 
 Finishes W3 and W4, and carries the unfinished test list from `crl-07-wiring`. Bun and the native CLI (a Rust host running the shared TypeScript engine in Boa) must give byte-identical results for connector routing, arrange and lint. Timings against the pre-change binary are recorded.
 
+## Rerun scope (session 759)
+
+The tests and source this plan describes are implemented and committed at `00542c5`. The previous run stopped only on the old performance wording, which this plan no longer contains. This rerun does the following, and nothing else unless a verification command fails:
+
+1. Run `git diff --name-only 00542c5 -- packages/core/src apps/cli/src` and record the output in the progress log. An empty result, or test files only, means the timing in "Timing" is carried forward and not repeated.
+2. Append a `## Continuation 3 (session 759)` section to the progress log. It states the owner decision using the words "at most 6 user seconds", cites `tmp/crl-s754/crl-09-parity-e2e/continuation-1/timing.log` (layered 4.873, route 3.890), and states that the "unresolved" and "outstanding" performance notes in the earlier sections are superseded. Do not rewrite those earlier sections.
+3. Run the verification list below and record each exit status and log path.
+
 ## Non-goals
 
+- No performance work. Do not profile, optimize or re-time to look for improvement. The owner decision is final.
 - No new behavior. A source edit is allowed only to fix a defect that a test here exposes, and only in the source paths this plan lists. Record the failing test with each such edit.
 - Do not edit `apps/cli/src/__fixtures__/connector-arrange.ts`, help, docs, `commands.ts` or `packages/core/src/index.ts`.
 - Do not change `bunfig.toml`, `mise.toml` or `package.json` to influence test discovery.
@@ -37,7 +46,11 @@ Run with `/usr/bin/time -p`, 3 runs each, baseline and current release binaries,
 - `lint <copy> --metrics`, and `lint <copy> --fix`
 - the batch and mixed fixtures used by `apps/cli/src/native-parity/edit-performance.test.ts`
 
-Generate the fixture with `bun apps/cli/src/__fixtures__/connector-arrange.ts`. Record user seconds, means and the current to baseline ratio. The ratio is a record, not a gate. Current layered then route above a few seconds in total is a repair item, hot loops first. If baseline rejects a command, record its output and exit code, and report that row as not comparable.
+Generate the fixture with `bun apps/cli/src/__fixtures__/connector-arrange.ts`. Record user seconds, means and the current to baseline ratio. The ratio is a record, not a gate. If baseline rejects a command, record its output and exit code, and report that row as not comparable.
+
+Owner decision (final): each native `arrange` command on the shared fixture uses at most 6 user seconds when uncontended. The combined layered plus route figure is not a gate. The target is a recorded manual check, not a test. The recorded uncontended means, layered 4.873 and route 3.890, meet it. Readings above 6 in the progress log are contended or from removed source, and do not count against it.
+
+Repeat timing only if step 1 of "Rerun scope" lists non-test source on the arrange path, or a fix made in this rerun changes it. Then run only the two `arrange` rows, 3 runs each, with nothing else running. A result above 6 means that source change regressed the command: rework the change instead of optimizing other code. For a CPU comparison, reuse the baseline binary only if its SHA-256 is `c8f5c9049d8877d9e277e55c97ec4f76012b6adf6f7201a3440368f1aad2afa0`; otherwise rebuild it as "Baseline binary" describes.
 
 ## File-level changes
 
@@ -115,10 +128,14 @@ Before starting, record `git hash-object` of this plan. Read each file fresh bef
 4. `sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/connect-routing.test.ts apps/cli/src/native-parity/connector-arrange.test.ts apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/edit-performance.test.ts'` -> 0 fail, 0 skip. Up to 3 attempts on a deadline timeout only, with CPU time compared to baseline.
 5. `test ! -e target/crl-baseline` -> exit 0.
 6. `git diff --exit-code -- apps/cli/src/__fixtures__/connector-arrange.ts` -> exit 0.
+7. `grep -q 'expect(after.segmentOverlaps).toBe(0)' apps/cli/src/connector-arrange.test.ts` -> exit 0, the fixture assertion is intact.
+8. `grep -q 'at most 6 user seconds' impl-plans/active/crl-09-parity-e2e.md` -> exit 0.
+9. `grep -q 'at most 6 user seconds' design-docs/specs/design-connector-routing-arranging.md` -> exit 0.
+10. `grep -q 'at most 6 user seconds' impl-plans/progress/crl-09-parity-e2e.md` -> exit 0, after step 2 of "Rerun scope".
 
 ## Done criteria
 
-- Verification 1 to 6 exit 0 with complete logs and exit statuses in the progress log.
-- The progress log holds "Baseline audit", all timing rows with ratios, the coverage record for each carried test, and the failing test for any source edit.
+- Verification 1 to 10 exit 0 with complete logs and exit statuses in the progress log.
+- The progress log holds "Baseline audit", all timing rows with ratios, the coverage record for each carried test, the failing test for any source edit, and the "Continuation 3 (session 759)" section.
 - `grep -c 'moved label' apps/cli/src/native-parity/connector-arrange.test.ts` is at least 1.
 - `grep -n 'connectorRouting' apps/cli/src/native-parity/connect-routing.test.ts` matches.

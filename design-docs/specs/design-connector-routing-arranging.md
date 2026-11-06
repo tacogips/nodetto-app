@@ -3,7 +3,9 @@
 Status: DESIGNED, 2026-11-06. Revised the same day for the continuation (W1 to W5): see
 "Overlap repair", "Nearest free position", "Fixture and acceptance tests", "Baseline binary and
 timing", "Existing outputs that may change" and "Continuation plans". Where the two conflict, these
-sections replace the `crl-07-wiring` plan text.
+sections replace the `crl-07-wiring` plan text. Revised again for the final continuation: the owner
+performance decision in "Baseline binary and timing", and the rerun and archive scope in
+"Continuation plans".
 
 Baseline: `design-docs/specs/design-cli-layout-merge-lint.md` (groups A and E,
 Determinism rules). Its decisions stay unless a section below names what it
@@ -392,7 +394,8 @@ Revises A5 in `planRoute`:
 - Candidate counts are fixed above. Selection adds 3 placements and routes without
   separation. The final pass runs once.
 - Existing deadlines are not relaxed. Manual check: release-binary `/usr/bin/time -p` of
-  layered then route on the fixture, recorded in plan progress, target a few seconds.
+  each arrange command on the fixture, recorded in plan progress, against the target in "Owner
+  performance decision" below.
 - `mise run test-cli` and native deadline tests get a 3-attempt retry before a timeout
   counts as failure, and CPU time is compared with the pre-change binary.
 - Overlap repair and label sorting add work only for connectors that still overlap and labels with
@@ -418,8 +421,28 @@ Measure 3 runs each of `/usr/bin/time -p`, on copies, with the baseline and curr
 - the batch and mixed fixtures of `apps/cli/src/native-parity/edit-performance.test.ts`
 
 Record mean user seconds and the current to baseline ratio. The ratio is a record, not a gate:
-current `arrange` does more work by design. Current layered then route above a few seconds in total
-is a repair item, hot loops first. The gate is that existing deadline tests pass unrelaxed.
+current `arrange` does more work by design. The gate is that existing deadline tests pass unrelaxed.
+
+### Owner performance decision
+
+This is final and replaces the earlier "few seconds in total" repair item. Each native `arrange`
+command on the shared fixture uses at most 6 user seconds when uncontended. The combined layered
+plus route figure is not a gate, and no further performance work is in scope.
+
+- Evidence: `tmp/crl-s754/crl-09-parity-e2e/continuation-1/timing.log`, uncontended 3-run means of
+  layered 4.873 s and route 3.890 s. The owner's decision also cites a 17-state, 47-edge page at
+  layered 2.71 s and route 2.41 s. That reading has no log in this repository, so it is context and
+  not evidence for the target.
+- Readings above 6 s in `impl-plans/progress/crl-09-parity-e2e.md` do not count against the target.
+  They were taken before the label layout cache, or on experimental source that was later removed,
+  and their layered baseline means are also raised (1.050, 1.553 and 1.347 s against the uncontended
+  0.850 s).
+- The target is a recorded manual check, not a test. Add no timing assertion, and do not relax a
+  deadline.
+- The rerun does not repeat the timing while non-test source under `packages/core` and `apps/cli` is
+  unchanged from commit `00542c5`. If a gate-required fix changes it on the arrange path, repeat
+  `arrange` timing once with nothing else running. A result above 6 s means that fix regressed the
+  command: rework the fix instead of optimizing other code.
 
 ## Fixture and acceptance tests
 
@@ -525,15 +548,20 @@ and W2 need.
 
 - Every plan sets `artifactRoots: ["target"]`. Logs go under `tmp/<task-id>/<planId>/` for the
   current manifest's task id, and no file there may match a Bun test name pattern. A rerun takes a
-  new root, and the earlier crl-08 logs under `tmp/crl-s753/` stay read-only.
-- A rerun reuses crl-08 to crl-10 under a fresh manifest, which becomes the single source for
-  `writePaths`, `sharedPaths` and `artifactRoots`. The plans' manifest lines name it. The manifest it
-  replaces is no longer in the run, so it counts as an earlier file.
+  new root, and earlier logs under `tmp/crl-s753/` and `tmp/crl-s754/` stay read-only.
+- A rerun reuses the plans not yet accepted under a fresh manifest, which becomes the single source
+  for `writePaths`, `sharedPaths` and `artifactRoots`. The plans' manifest lines name it. The manifest
+  it replaces is no longer in the run, so it counts as an earlier file. The final continuation
+  dispatches crl-09 and crl-10 under `crl-s759-dispatch.json`, with evidence in `tmp/crl-s759/`.
+  crl-08 is accepted and committed, so it is not dispatched and counts as an earlier file.
+- The crl-09 rerun amends its threshold wording to the owner performance decision, re-runs its
+  verification list, and records the decision in its progress log. Its committed tests and source
+  change only for a failure that re-run exposes.
 - Help and docs (crl-10): the repair behavior, the nearest free position, and removal of any text
   that offers a fixture bound.
-- Archive: all crl plans and manifests end in `impl-plans/completed/`. crl-10 moves `crl-00..07`,
-  `crl-s749-dispatch.json` and any replaced manifest. The workflow's `plan-archive` node moves the
-  plans and the manifest of this run, because
+- Archive: all crl plans and manifests end in `impl-plans/completed/`. crl-10 moves `crl-00..08`,
+  `crl-s749-dispatch.json`, `crl-s753-dispatch.json` and `crl-s754-dispatch.json`. The workflow's
+  `plan-archive` node moves crl-09, crl-10 and `crl-s759-dispatch.json`, because
   workers never move a plan in the run, and the crl-10 record says so. The request names manifests,
   so this differs from the manifests other features keep in `active/`, and `impl-plans/README.md`
   says so. Progress

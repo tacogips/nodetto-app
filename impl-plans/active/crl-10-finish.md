@@ -3,10 +3,10 @@
 - planId: crl-10-finish
 - planPath: impl-plans/active/crl-10-finish.md
 - progressPath: impl-plans/progress/crl-10-finish.md
-- wave: 3 (final); dependsOn: crl-09-parity-e2e
-- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s754-dispatch.json`
-- Design (binding): `design-docs/specs/design-connector-routing-arranging.md`, section "Continuation plans".
-- Evidence: `tmp/crl-s754/crl-10-finish/`, with gate logs in `final/`.
+- wave: 2 (final); dependsOn: crl-09-parity-e2e
+- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s759-dispatch.json`
+- Design (binding): `design-docs/specs/design-connector-routing-arranging.md`, sections "Continuation plans" and "Owner performance decision".
+- Evidence: `tmp/crl-s759/crl-10-finish/`, with gate logs in `final/`. Earlier logs under `tmp/crl-s754/` stay read-only.
 
 ## Intent and context
 
@@ -17,9 +17,10 @@ The workflow's `plan-archive` node moves the plans dispatched in this run, after
 ## Non-goals
 
 - No new behavior. No new test beyond one needed to pin a conflict fix.
-- Do not move `crl-08-repair-labels.md`, `crl-09-parity-e2e.md`, `crl-10-finish.md` or `crl-s754-dispatch.json`.
-- Do not move progress logs. They stay in `impl-plans/progress/`.
+- Do not move `crl-09-parity-e2e.md`, `crl-10-finish.md` or `crl-s759-dispatch.json`.
+- Do not move progress logs, including this plan's. They stay in `impl-plans/progress/`.
 - Do not change deadlines, the fixture generator or test discovery configuration. No push or merge.
+- No performance work. The owner decision in the design is final. Do not re-time unless a fix here changes non-test source on the arrange path.
 
 ## File-level changes
 
@@ -34,13 +35,13 @@ Docs and help, `apps/cli/src/help.ts` and `docs/cli.md`:
 
 Archive, using plain `mv` (no git commands):
 
-- From `impl-plans/active/` to `impl-plans/completed/`: `crl-00-overview.md`, `crl-01-ir-resolver.md`, `crl-02-metric-fixture.md`, `crl-03-label-placement.md`, `crl-04-connect.md`, `crl-05-lanes-self-loops.md`, `crl-06-layered-order.md`, `crl-07-wiring.md`, `crl-s749-dispatch.json`, `crl-s753-dispatch.json`. The last is the manifest `crl-s754-dispatch.json` replaced, so it is no longer in this run.
+- From `impl-plans/active/` to `impl-plans/completed/`: `crl-00-overview.md`, `crl-01-ir-resolver.md`, `crl-02-metric-fixture.md`, `crl-03-label-placement.md`, `crl-04-connect.md`, `crl-05-lanes-self-loops.md`, `crl-06-layered-order.md`, `crl-07-wiring.md`, `crl-08-repair-labels.md`, `crl-s749-dispatch.json`, `crl-s753-dispatch.json`, `crl-s754-dispatch.json`. crl-08 is accepted and committed, and the last two are replaced manifests, so none of them is in this run.
 - Append a closing note to `impl-plans/completed/crl-07-wiring.md`: crl-08 to crl-10 and the design's "Continuation plans" and "Baseline binary and timing" sections replace its open items and its `target/crl-baseline` steps. Its plan body and amendments stay as they are.
 
 `impl-plans/README.md`:
 
-- Add a "Completed" entry in the existing style: what was finished, the design path, no GitHub issue, final gate results (pass, skip and fail counts, native parity not skipped), timing summary, evidence roots `tmp/crl-s749/<planId>/`, `tmp/crl-s753/<planId>/` and `tmp/crl-s754/<planId>/`, and progress logs in `progress/`. State only results recorded in logs.
-- State that crl plans and crl manifests belong in `completed/`, unlike manifests other features keep in `active/`, because the request named them, and that `crl-08` to `crl-10` and `crl-s754-dispatch.json` are moved there by the `plan-archive` node after final verification. Name `crl-s753-dispatch.json` as the replaced manifest, already in `completed/`.
+- Add a "Completed" entry in the existing style: what was finished, the design path, no GitHub issue, final gate results (pass, skip and fail counts, native parity not skipped), timing summary (the target of at most 6 user seconds per `arrange` command when uncontended, and the recorded means of layered 4.873 and route 3.890), evidence roots `tmp/crl-s749/<planId>/`, `tmp/crl-s753/<planId>/`, `tmp/crl-s754/<planId>/` and `tmp/crl-s759/<planId>/`, and progress logs in `progress/`. State only results recorded in logs.
+- State that crl plans and crl manifests belong in `completed/`, unlike manifests other features keep in `active/`, because the request named them, and that `crl-09`, `crl-10` and `crl-s759-dispatch.json` are moved there by the `plan-archive` node after final verification. Name `crl-s753-dispatch.json` and `crl-s754-dispatch.json` as replaced manifests, already in `completed/`.
 
 `design-docs/specs/design-connector-routing-arranging.md`: change only the status line, to record completion after the gates pass.
 
@@ -49,6 +50,7 @@ Archive, using plain `mv` (no git commands):
 - For a gate failure, first find which feature's requested behavior the test pins. A test pinning old behavior may change only where the new behavior is the requested one (see the design's "Existing outputs that may change"), with the reason recorded. Otherwise fix the source.
 - `apps/cli/src/__fixtures__/sequence-golden` and `obstacle-routing-batch` goldens: the second must not change; the first changes only with a recorded reason.
 - A needed edit outside `writePaths` is a blocker: name the failing command, log path, file and symbol.
+- If a fix changes non-test source on the arrange path, repeat only the two `arrange` timing rows of crl-09's "Timing" section, 3 runs each, with nothing else running, and record them. A result above 6 user seconds means that fix regressed the command: rework the fix instead of optimizing other code.
 
 ## What a careless implementation gets wrong
 
@@ -80,10 +82,14 @@ Before starting, record `git hash-object` of this plan. Read each file fresh bef
 10. `git diff --exit-code -- apps/cli/src/__fixtures__/connector-arrange.ts` -> exit 0.
 11. `test ! -e impl-plans/active/crl-s753-dispatch.json` -> exit 0, after the archive.
 12. `grep -q 'crl-s754-dispatch.json' impl-plans/README.md` -> exit 0.
+13. `grep -q 'crl-s759-dispatch.json' impl-plans/README.md` -> exit 0.
+14. `test -f impl-plans/completed/crl-08-repair-labels.md` -> exit 0, after the archive.
+15. `test ! -e impl-plans/active/crl-08-repair-labels.md` -> exit 0, after the archive.
+16. `test ! -e impl-plans/active/crl-s754-dispatch.json` -> exit 0, after the archive.
 
 ## Done criteria
 
-- Verification 1 to 12 exit 0 with complete logs and exit statuses in the progress log, with pass and skip counts for gates 1 and 2.
+- Verification 1 to 16 exit 0 with complete logs and exit statuses in the progress log, with pass and skip counts for gates 1 and 2.
 - Each changed existing test has its reason recorded.
-- All ten earlier files are in `impl-plans/completed/`, and none is in `impl-plans/active/`.
-- `grep -l target/crl-baseline tmp/crl-s754/crl-10-finish/final/verify.log tmp/crl-s754/crl-10-finish/final/test-cli.log` lists no file.
+- All twelve earlier files are in `impl-plans/completed/`, and none is in `impl-plans/active/`.
+- `grep -l target/crl-baseline tmp/crl-s759/crl-10-finish/final/verify.log tmp/crl-s759/crl-10-finish/final/test-cli.log` lists no file.
