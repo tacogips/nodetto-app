@@ -21,6 +21,9 @@
 | 2 | crl-06-layered-order | Member orderings and selection | crl-02 |
 | 3 | crl-07-wiring | Index, `arrange`, `lint`, help, docs, acceptance, native parity, timing | crl-04, crl-05, crl-06 |
 
+The table is the original order. Crl-01 to crl-06 are finished, and the manifest now lists them as
+`acceptedDependencies`, with crl-07 as its only plan (see the Amendment section).
+
 A file owned in two waves is edited only at that plan's wave:
 
 - `packages/core/src/diagram-lint/metrics.test.ts`: crl-02, then crl-05 if a route expectation shifts.
@@ -182,3 +185,13 @@ baseline test counts, final counts, exit statuses, log paths, and any blocker or
 - crl-07 recorded fixture before and after metrics, native timing, and the CPU comparison against
   `target/crl-baseline/nodetto-cli`.
 - Help and docs describe every new field, operation and metric.
+
+## Amendment 2026-11-06 (blocked-wave-scope-or-contract, round 1)
+
+crl-07 stopped before any edit on a reported mismatch between its `dependsOn` and `acceptedPlanIds`
+for crl-05. The recorded dispatch item lists crl-05 as accepted, and wave 6 reports it successful.
+The manifest now records crl-01 to crl-06 as `acceptedDependencies`, with `commit` null because their
+work is uncommitted on the shared working tree over checkpoint
+`d4843e58b679160142ac07225bcf4b4519f17433`. crl-07 has an empty `dependsOn`, and its write paths gain
+the sibling test files for serial repair. Details are in `impl-plans/active/crl-07-wiring.md`. No
+design change.

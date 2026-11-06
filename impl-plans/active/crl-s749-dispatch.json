@@ -55,7 +55,9 @@
       {"decision": "lint --fix plans label moves on in-memory post-wrap text from applyBatch, with one combined runOperations call.", "rationale": "Keeps one atomic write, so the existing 'fix writes once' test stays unchanged."},
       {"decision": "Self-loop side order is top, right, bottom, left (user-qa Q1), and a side is freed by reassigning movable ends when all four are used.", "rationale": "This is the order in the request; a self-loop on an otherwise unused element moves from right to top."},
       {"decision": "Three feature wave 1 plans and three wave 2 plans, with crl-07 alone owning shared registration, help and docs.", "rationale": "Maximum concurrency with dependencies only for real contracts and at most 2 waves before wiring."},
-      {"decision": "The two baseline design documents get only pointer notes to the new design.", "rationale": "Their decisions stay except A2, A3, A4, A5 and the lint --metrics fields, which the new design names as revised."}
+      {"decision": "The two baseline design documents get only pointer notes to the new design.", "rationale": "Their decisions stay except A2, A3, A4, A5 and the lint --metrics fields, which the new design names as revised."},
+      {"decision": "Amendment round 1: the six finished plans move to acceptedDependencies, and crl-07 has an empty dependsOn.", "rationale": "All six were reported successful by wave outcomes, so crl-07 has no pending dependency and no admission comparison to repeat. Final acceptance stays with the serial integration review of the combined tree."},
+      {"decision": "Amendment 2026-11-06 round 1: redispatch crl-07-wiring with crl-01 to crl-06 recorded as acceptedDependencies, an empty dependsOn, six sibling test paths for serial repair, and added verification 8.", "rationale": "Blocked plan: crl-07-wiring (blocked-wave-scope-or-contract, evidence fingerprint 21fe0fdcbc2f1878cdfb46587f5afed8cd9890f584c4eddfd55f248249f7eb99). Resolved gap: the worker reported crl-05-lanes-self-loops absent from fanoutItem.acceptedPlanIds, but wave-007/fanout-join.json lists it and wave-006/wave-summary.json classifies it as successful, so no dependency stays pending. No design change; plan id, scope and acceptance criteria are unchanged."}
     ],
     "intentionalTradeoffs": [
       "layered is not a general guarantee that crossings stay at or below the input; the acceptance test measures the fixture (user-qa Q4).",
@@ -99,240 +101,26 @@
     "residualRisks": [
       "Fixture acceptance, native timing, the R2 root cause, rerun idempotency and the single-write result come from reading code and stay unmeasured until the implementation plans run.",
       "bun run typecheck does not check noUncheckedIndexedAccess, so compliance rests on the plan discipline.",
-      "User-qa Q1 to Q4 are open with defaults kept; a different answer changes only the section each names."
+      "User-qa Q1 to Q4 are open with defaults kept; a different answer changes only the section each names.",
+      "A wave-006 review probe of rank-order layered then route on the fixture gave 1 label overlap, 11 segment overlaps and 196 crossings, without selectLayeredOrder, so crl-07 may need serial repair or a documented bound.",
+      "crl-05 refined 'first zero overlap wins': a lane candidate that crosses more non-endpoint boxes than the base route is excluded. It is recorded only in impl-plans/progress/crl-05-lanes-self-loops.md, for the final combined-tree review to confirm."
     ]
   },
-  "acceptedDependencies": [],
+  "acceptedDependencies": [
+    {"planId": "crl-01-ir-resolver", "planPath": "impl-plans/active/crl-01-ir-resolver.md", "progressPath": "impl-plans/progress/crl-01-ir-resolver.md", "acceptedInWave": 2, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "PageConnectorRouting, Page.connectorRouting, MAX_ROUTING_LANE, routingLane, labelOffsetX, labelOffsetY, setPageConnectorRouting, resolver reads of routing under visual"},
+    {"planId": "crl-02-metric-fixture", "planPath": "impl-plans/active/crl-02-metric-fixture.md", "progressPath": "impl-plans/progress/crl-02-metric-fixture.md", "acceptedInWave": 1, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "PageMetrics.segmentOverlaps, countRouteOverlaps, connectorArrangeDocument, CONNECTOR_ARRANGE_STATE_PAGE, CONNECTOR_ARRANGE_ARCHITECTURE_PAGE, lint --metrics overlap count"},
+    {"planId": "crl-03-label-placement", "planPath": "impl-plans/active/crl-03-label-placement.md", "progressPath": "impl-plans/progress/crl-03-label-placement.md", "acceptedInWave": 4, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "placeConnectorLabels, planLabelFixes, LabelFields, LabelMoveFix"},
+    {"planId": "crl-04-connect", "planPath": "impl-plans/active/crl-04-connect.md", "progressPath": "impl-plans/progress/crl-04-connect.md", "acceptedInWave": 3, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "connect visual and routing fields with documented precedence, set-page-routing, add-page connectorRouting"},
+    {"planId": "crl-05-lanes-self-loops", "planPath": "impl-plans/active/crl-05-lanes-self-loops.md", "progressPath": "impl-plans/progress/crl-05-lanes-self-loops.md", "acceptedInWave": 6, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "planRoute lane search, RouteOptions.separation, self-loop side order, placeConnectorLabels call in the route stage"},
+    {"planId": "crl-06-layered-order", "planPath": "impl-plans/active/crl-06-layered-order.md", "progressPath": "impl-plans/progress/crl-06-layered-order.md", "acceptedInWave": 2, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "LayeredOptions.memberOrder, selectLayeredOrder, LayeredEvaluate, pure orderings in arrange-layered-order.ts"}
+  ],
   "plans": [
-    {
-      "planId": "crl-01-ir-resolver",
-      "planPath": "impl-plans/active/crl-01-ir-resolver.md",
-      "progressPath": "impl-plans/progress/crl-01-ir-resolver.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "packages/ir/src/types.ts",
-        "packages/ir/src/index.ts",
-        "packages/ir/src/validate.ts",
-        "packages/ir/src/validate.test.ts",
-        "packages/ir/src/semantics/connectors.ts",
-        "packages/ir/src/registry/generic.ts",
-        "packages/ir/src/registry/uml.ts",
-        "packages/ir/src/registry/erd.ts",
-        "packages/ir/src/registry/bpmn.ts",
-        "packages/ir/src/connector-routing-fields.test.ts",
-        "packages/io/src/jsonl/parse.ts",
-        "packages/io/src/jsonl/records.ts",
-        "packages/io/src/jsonl/serialize.ts",
-        "packages/io/src/jsonl/roundtrip.test.ts",
-        "packages/io/src/bpmn/equivalence.ts",
-        "packages/collab/src/ydoc.ts",
-        "packages/collab/src/ydoc.test.ts",
-        "packages/core/src/commands.ts",
-        "packages/core/src/editor/pages.ts",
-        "packages/core/src/editor/facade/page-editing.ts",
-        "packages/core/src/editor/bpmn.ts",
-        "packages/core/src/pages.test.ts",
-        "packages/core/src/shapes/connector/resolve.ts",
-        "packages/core/src/shapes/connector/route.ts",
-        "packages/core/src/connector-stored-routing.test.ts",
-        "packages/ui-solid/src/connector-routing.ts",
-        "packages/ui-solid/src/connector-routing.test.ts",
-        "impl-plans/progress/crl-01-ir-resolver.md",
-        "tmp/crl-s749/crl-01-ir-resolver",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "routingLane, labelOffsetX, labelOffsetY and Page.connectorRouting exist with validation, serialization, collab and undo support, and MAX_ROUTING_LANE is 8.",
-        "The resolver reads routing from semantic, then visual, then visual.extensions, with semantic winning, and packages/core/src/svg-export is unchanged.",
-        "Documents without the new fields and without routing under visual keep byte-identical routes and label positions.",
-        "All plan verification commands exit 0 with logs recorded, and the progress log is complete."
-      ],
-      "verification": [
-        "bun test packages/ir/src/connector-routing-fields.test.ts packages/core/src/connector-stored-routing.test.ts",
-        "bun test packages/ir packages/io/src/jsonl packages/io/src/bpmn packages/collab/src/ydoc.test.ts packages/core/src/pages.test.ts packages/core/src/shapes packages/core/src/connector-positions.test.ts packages/ui-solid/src/connector-routing.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/ir/src/semantics/connectors.ts packages/ir/src/connector-routing-fields.test.ts packages/core/src/shapes/connector/resolve.ts packages/core/src/connector-stored-routing.test.ts packages/core/src/editor/facade/page-editing.ts packages/ui-solid/src/connector-routing.ts"
-      ]
-    },
-    {
-      "planId": "crl-02-metric-fixture",
-      "planPath": "impl-plans/active/crl-02-metric-fixture.md",
-      "progressPath": "impl-plans/progress/crl-02-metric-fixture.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/diagram-lint/metrics.ts",
-        "packages/core/src/diagram-lint/metrics.test.ts",
-        "apps/cli/src/lint-metrics.ts",
-        "apps/cli/src/lint-metrics.test.ts",
-        "apps/cli/src/__fixtures__/connector-arrange.ts",
-        "apps/cli/src/__fixtures__/connector-arrange.test.ts",
-        "impl-plans/progress/crl-02-metric-fixture.md",
-        "tmp/crl-s749/crl-02-metric-fixture",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "PageMetrics adds segmentOverlaps, and countRouteOverlaps counts collinear segment pairs from two routes sharing more than 1 unit, while edgeCrossings and labelOverlaps keep their meaning.",
-        "lint --metrics text and JSON report the overlapping segment count.",
-        "The deterministic neutral fixture has 17 states, 4 frames, 43 transitions and 4 self-transitions on the state page, plus the A, C, B, D architecture page, and is fixed before algorithm work.",
-        "The progress log holds the three baseline numbers, apps/cli/src/commands.ts and packages/core/src/index.ts are unchanged, and all plan verification commands exit 0 with logs recorded."
-      ],
-      "verification": [
-        "bun test packages/core/src/diagram-lint/metrics.test.ts apps/cli/src/lint-metrics.test.ts apps/cli/src/__fixtures__/connector-arrange.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/diagram-lint/metrics.ts packages/core/src/diagram-lint/metrics.test.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-metrics.test.ts apps/cli/src/__fixtures__/connector-arrange.ts apps/cli/src/__fixtures__/connector-arrange.test.ts"
-      ]
-    },
-    {
-      "planId": "crl-03-label-placement",
-      "planPath": "impl-plans/active/crl-03-label-placement.md",
-      "progressPath": "impl-plans/progress/crl-03-label-placement.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/connector-label-placement.ts",
-        "packages/core/src/connector-label-placement.test.ts",
-        "impl-plans/progress/crl-03-label-placement.md",
-        "tmp/crl-s749/crl-03-label-placement",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "placeConnectorLabels and planLabelFixes are exported from packages/core/src/connector-label-placement.ts, using the design's candidate order and labelOverlapScore.",
-        "Results that found a zero score in the existing 7 positions stay identical, and bpmn.* connectors get no offsets while labelBounds flows stay fixed and reserved.",
-        "A label with no free candidate keeps its lowest-score position, and output is deterministic in stable id order.",
-        "arrange-route.ts and packages/core/src/index.ts are unchanged, and all plan verification commands exit 0 with logs recorded."
-      ],
-      "verification": [
-        "bun test packages/core/src/connector-label-placement.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/connector-label-placement.ts packages/core/src/connector-label-placement.test.ts"
-      ]
-    },
-    {
-      "planId": "crl-04-connect",
-      "planPath": "impl-plans/active/crl-04-connect.md",
-      "progressPath": "impl-plans/progress/crl-04-connect.md",
-      "wave": 2,
-      "dependsOn": ["crl-01-ir-resolver"],
-      "writePaths": [
-        "apps/cli/src/edit/connect-routing.ts",
-        "apps/cli/src/edit/connect-routing.test.ts",
-        "apps/cli/src/edit/operations/connect.ts",
-        "apps/cli/src/edit/operations/add.ts",
-        "apps/cli/src/edit/operations/pages.ts",
-        "apps/cli/src/edit/operation-fields.ts",
-        "apps/cli/src/edit/operation-fields.test.ts",
-        "apps/cli/src/edit/batch.ts",
-        "apps/cli/src/native-parity/connect-routing.test.ts",
-        "impl-plans/progress/crl-04-connect.md",
-        "tmp/crl-s749/crl-04-connect",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "connect applies visual in both branches, with the same visual.style key check as add, and routing keys under visual move to semantic.",
-        "Top-level routing and routingAvoidObstacles work, and precedence is explicit field > page default > page convention > existing default.",
-        "set-page-routing sets and clears the page default, add-page accepts connectorRouting, and invalid values are an OperationError naming the field.",
-        "sequence.message rejects explicit routing fields and skips the default and convention, and a page with no default and no convention stays straight.",
-        "Bun and native parity tests run without skips, help.ts, docs/cli.md and packages/core/src/index.ts are unchanged, and all plan verification commands exit 0 with logs recorded."
-      ],
-      "verification": [
-        "bun test apps/cli/src/edit/connect-routing.test.ts",
-        "bun test apps/cli/src/edit apps/cli/src/ai-commands.test.ts apps/cli/src/ai-features.test.ts",
-        "bun run typecheck",
-        "bunx biome check apps/cli/src/edit/connect-routing.ts apps/cli/src/edit/connect-routing.test.ts apps/cli/src/edit/operations/connect.ts apps/cli/src/edit/operations/add.ts apps/cli/src/edit/operations/pages.ts apps/cli/src/edit/operation-fields.ts apps/cli/src/edit/operation-fields.test.ts apps/cli/src/edit/batch.ts apps/cli/src/native-parity/connect-routing.test.ts",
-        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/connect-routing.test.ts'"
-      ]
-    },
-    {
-      "planId": "crl-05-lanes-self-loops",
-      "planPath": "impl-plans/active/crl-05-lanes-self-loops.md",
-      "progressPath": "impl-plans/progress/crl-05-lanes-self-loops.md",
-      "wave": 2,
-      "dependsOn": ["crl-01-ir-resolver", "crl-02-metric-fixture", "crl-03-label-placement"],
-      "writePaths": [
-        "packages/core/src/arrange-route.ts",
-        "packages/core/src/arrange-route.test.ts",
-        "packages/core/src/arrange-route-lanes.ts",
-        "packages/core/src/arrange-route-lanes.test.ts",
-        "packages/core/src/diagram-lint/metrics.test.ts",
-        "packages/core/src/arrange-layered-bpmn.test.ts",
-        "packages/core/src/arrange-layered-bpmn.depth-one.collapsed-pool.expected.json",
-        "packages/core/src/arrange-layered-bpmn.depth-one.pool-no-lanes-free-row.expected.json",
-        "packages/core/src/arrange-layered-bpmn.depth-one.subprocess-boundary.expected.json",
-        "packages/core/src/arrange-layered-bpmn.depth-one.two-pools-message-flow.expected.json",
-        "apps/cli/src/arrange-modes.test.ts",
-        "apps/cli/src/connector-arrange-route.test.ts",
-        "apps/cli/src/native-parity/layout.test.ts",
-        "impl-plans/progress/crl-05-lanes-self-loops.md",
-        "tmp/crl-s749/crl-05-lanes-self-loops",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "planRoute separates overlapping routes with routingLane and routingBend through the count-bounded lane search, and never writes waypoints; manual connectors stay fixed.",
-        "planRoute calls placeConnectorLabels, the old 7-position stage is gone, and RouteOptions.separation false skips lanes and label search.",
-        "Self-loops take the first unused side in the order top, right, bottom, left, free a side with only movable ends when all four are used, and otherwise reserve their positions on the side with the fewest ends.",
-        "Golden changes are limited to the design's list, obstacle-routing-batch fixtures are unchanged, the progress log holds route-only fixture numbers, and all plan verification commands exit 0 with logs recorded."
-      ],
-      "verification": [
-        "bun test packages/core/src/arrange-route-lanes.test.ts packages/core/src/arrange-route.test.ts apps/cli/src/connector-arrange-route.test.ts",
-        "bun test packages/core/src/arrange-layered-bpmn.test.ts packages/core/src/diagram-lint/metrics.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/arrange-route.ts packages/core/src/arrange-route.test.ts packages/core/src/arrange-route-lanes.ts packages/core/src/arrange-route-lanes.test.ts apps/cli/src/connector-arrange-route.test.ts",
-        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/layout.test.ts'"
-      ]
-    },
-    {
-      "planId": "crl-06-layered-order",
-      "planPath": "impl-plans/active/crl-06-layered-order.md",
-      "progressPath": "impl-plans/progress/crl-06-layered-order.md",
-      "wave": 2,
-      "dependsOn": ["crl-02-metric-fixture"],
-      "writePaths": [
-        "packages/core/src/arrange-layered.ts",
-        "packages/core/src/arrange-layered.test.ts",
-        "packages/core/src/arrange-layered-order.ts",
-        "packages/core/src/arrange-layered-order.test.ts",
-        "impl-plans/progress/crl-06-layered-order.md",
-        "tmp/crl-s749/crl-06-layered-order",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": ["target"],
-      "acceptanceCriteria": [
-        "LayeredOptions.memberOrder supports rank, input and barycenter, and an absent value gives today's identical commands.",
-        "selectLayeredOrder keeps the lowest edgeCrossings, then segmentOverlaps; a candidate with no commands wins a tie before candidate order, and rank stays unless strictly beaten.",
-        "Ordering is deterministic and frame order, gaps and geometry rules are unchanged.",
-        "arrange-route.ts, arrange-layered-bpmn.ts and apps/cli/src/arrange-modes.ts are unchanged by this plan, and all plan verification commands exit 0 with logs recorded."
-      ],
-      "verification": [
-        "bun test packages/core/src/arrange-layered-order.test.ts packages/core/src/arrange-layered.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-order.ts packages/core/src/arrange-layered-order.test.ts"
-      ]
-    },
     {
       "planId": "crl-07-wiring",
       "planPath": "impl-plans/active/crl-07-wiring.md",
       "progressPath": "impl-plans/progress/crl-07-wiring.md",
-      "wave": 3,
-      "dependsOn": ["crl-04-connect", "crl-05-lanes-self-loops", "crl-06-layered-order"],
+      "wave": 1,
+      "dependsOn": [],
       "writePaths": [
         "packages/core/src/index.ts",
         "apps/cli/src/arrange-modes.ts",
@@ -349,10 +137,16 @@
         "docs/editing.md",
         "README.md",
         "packages/core/src/arrange-route.ts",
+        "packages/core/src/arrange-route.test.ts",
         "packages/core/src/arrange-route-lanes.ts",
+        "packages/core/src/arrange-route-lanes.test.ts",
         "packages/core/src/arrange-layered.ts",
+        "packages/core/src/arrange-layered.test.ts",
         "packages/core/src/arrange-layered-order.ts",
+        "packages/core/src/arrange-layered-order.test.ts",
         "packages/core/src/connector-label-placement.ts",
+        "packages/core/src/connector-label-placement.test.ts",
+        "apps/cli/src/connector-arrange-route.test.ts",
         "impl-plans/progress/crl-07-wiring.md",
         "tmp/crl-s749/crl-07-wiring",
         "target"
@@ -375,7 +169,8 @@
         "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/connector-arrange.test.ts apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/edit-performance.test.ts'",
         "test -x target/crl-baseline/nodetto-cli",
         "CARGO_TERM_QUIET=true mise run verify",
-        "CARGO_TERM_QUIET=true mise run test-cli"
+        "CARGO_TERM_QUIET=true mise run test-cli",
+        "bun test packages/core/src/arrange-route.test.ts packages/core/src/arrange-route-lanes.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-order.test.ts packages/core/src/connector-label-placement.test.ts apps/cli/src/connector-arrange-route.test.ts"
       ]
     }
   ]

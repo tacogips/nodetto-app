@@ -3,8 +3,8 @@
 - planId: crl-07-wiring
 - planPath: impl-plans/active/crl-07-wiring.md
 - progressPath: impl-plans/progress/crl-07-wiring.md
-- wave: 3 (final wiring; runs alone)
-- dependsOn: crl-04-connect, crl-05-lanes-self-loops, crl-06-layered-order
+- wave: 1 of the amended manifest (wave 3 of the original set; final wiring, runs alone)
+- dependsOn: none pending. crl-01 to crl-06 are `acceptedDependencies` in the manifest (see the Amendment section).
 - Design: `design-docs/specs/design-connector-routing-arranging.md`, sections "`arrange` report", "`lint --fix`", "Boa and performance", "Fixture and acceptance tests".
 - Worker rules and contracts: `impl-plans/active/crl-00-overview.md`.
 - writePaths:
@@ -23,16 +23,42 @@
   - `docs/editing.md`
   - `README.md`
   - `packages/core/src/arrange-route.ts`
+  - `packages/core/src/arrange-route.test.ts`
   - `packages/core/src/arrange-route-lanes.ts`
+  - `packages/core/src/arrange-route-lanes.test.ts`
   - `packages/core/src/arrange-layered.ts`
+  - `packages/core/src/arrange-layered.test.ts`
   - `packages/core/src/arrange-layered-order.ts`
+  - `packages/core/src/arrange-layered-order.test.ts`
   - `packages/core/src/connector-label-placement.ts`
+  - `packages/core/src/connector-label-placement.test.ts`
+  - `apps/cli/src/connector-arrange-route.test.ts`
   - `impl-plans/progress/crl-07-wiring.md`
   - `tmp/crl-s749/crl-07-wiring`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
-- The five `packages/core/src/arrange-*` and `connector-label-placement.ts` paths are for serial repair only, if an acceptance test here shows a defect. Record each such edit with the failing test. Do not change `apps/cli/src/__fixtures__/connector-arrange.ts`.
+- The `packages/core/src/arrange-*` and `connector-label-placement.*` paths and `apps/cli/src/connector-arrange-route.test.ts` are for serial repair only, if an acceptance test here shows a defect. Record each such edit with the failing test. Do not change `apps/cli/src/__fixtures__/connector-arrange.ts`.
+
+## Amendment 2026-11-06 (blocked-wave-scope-or-contract, round 1)
+
+Blocker: the first dispatch of this plan stopped before any edit, reporting that `crl-05-lanes-self-loops` was in `fanoutItem.dependsOn` but not in `fanoutItem.acceptedPlanIds`.
+
+Findings:
+
+- The recorded dispatch item contradicts that report. `tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-749/wave-007/fanout-join.json`, `/branches/0/item/acceptedPlanIds`, lists all six plans, including crl-05.
+- `wave-006/wave-summary.json` classifies crl-05 as `successful`, and its test-integrity and adversarial reviews both accepted it. Why the worker read the list differently could not be determined from the recorded artifacts.
+
+Decisions:
+
+1. Authority. crl-01 to crl-06 are recorded as `acceptedDependencies` in `impl-plans/active/crl-s749-dispatch.json`, and this plan's `dependsOn` is empty. There is no pending dependency to admit. Do not stop for dependency readiness.
+2. State of the accepted work. It is uncommitted on the shared working tree, on top of checkpoint `d4843e58b679160142ac07225bcf4b4519f17433`, so `commit` is null in those entries. Read it from the working tree. Do not expect it in `git log`, and do not commit, stash or reset it.
+3. Provisional wording is not a blocker. The crl-05 progress log says independent review is pending, and wave 6 calls acceptance provisional until the serial integration review. Neither stops this plan.
+4. Readback. Before the first edit, record `git hash-object` in the progress log for `packages/core/src/arrange-route.ts` and `packages/core/src/arrange-route-lanes.ts`, and compare them with the crl-05 log values `9c194325aefa9f8ca16471a476ba268772527b1a` and `4b1319eb2d09532fddfc548a1464307d516d8326`. Record a mismatch as drift and continue on the current file.
+5. A real blocker is one of these: a pinned contract symbol from crl-00 missing from the working tree, a needed edit outside `writePaths`, or a verification failure with no repair inside `writePaths`. Name the file and symbol, or the failing command and its log path.
+6. Repair scope. This plan is expected to measure the fixture first. A wave-006 review probe of rank-order `planLayered` then `planRoute`, without `selectLayeredOrder`, gave 1 label overlap, 11 segment overlaps and 196 crossings, against an input of 604 crossings in the crl-05 log. If the wired result is above 0 for either overlap metric, repair within the serial repair paths or document the bound with its geometric reason in `docs/cli.md`, as acceptance already requires. The sibling test files are authorized so a repair can keep or extend their regression tests. An existing assertion changes only under the crl-00 rebaseline rule.
+
+No design change. Plan id, scope, acceptance criteria and existing verification commands are unchanged, apart from added verification 8.
 
 ## Intent and context
 
@@ -146,10 +172,12 @@ Measure with three `/usr/bin/time -p` runs each, baseline and current, on the ba
 5. `test -x target/crl-baseline/nodetto-cli`.
 6. `CARGO_TERM_QUIET=true mise run verify` -> exit 0, with the log kept.
 7. `CARGO_TERM_QUIET=true mise run test-cli` -> exit 0, native parity not skipped. Retry up to 3 attempts on a deadline timeout.
+8. `bun test packages/core/src/arrange-route.test.ts packages/core/src/arrange-route-lanes.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-order.test.ts packages/core/src/connector-label-placement.test.ts apps/cli/src/connector-arrange-route.test.ts` -> 0 fail, with or without serial repairs.
 
 ## Done criteria
 
-- Verification 1-7 exit 0 with complete logs recorded.
+- Verification 1-8 exit 0 with complete logs recorded.
+- The progress log holds the amendment readback hashes for `arrange-route.ts` and `arrange-route-lanes.ts`, with any drift noted.
 - `grep -n "segmentOverlaps" apps/cli/src/commands.ts apps/cli/src/help.ts docs/cli.md` matches in each file.
 - `grep -n "set-page-routing" apps/cli/src/help.ts docs/cli.md` matches in each file.
 - `grep -n "routingLane" apps/cli/src/help.ts docs/cli.md` matches in each file.
