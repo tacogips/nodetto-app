@@ -215,8 +215,12 @@ The lane search compares a connector only with routes placed before it, and neve
 route. The recorded fixture result after layered and route is 3 overlapping segment pairs. Reading
 the resolver shows two other limits of the 9 candidates: a lane can lengthen port escapes so that
 facing stubs meet (escape reaches 44 per side, and `MEMBER_GAP` is 60), and clamped bends and equal
-clearances at k = 7 and 8 can repeat a route. Which of these causes the 3 pairs has not been
-measured, so the first step of plan crl-08 records the residual pairs with their ids and points.
+clearances at k = 7 and 8 can repeat a route. The crl-08 probe measured the pairs: edge-10/edge-21 (1)
+and edge-14/edge-27 (2). Both are facing stubs: the two routes reach opposite sides of neighboring
+states at the same y, so their last runs share that y across the gap. The runs overlap by 72 and 74
+units, and a lane bend offset moves a channel by at most 32, so lanes are unlikely to clear them. Port
+shifts (candidate B) change that y, so B is the expected fix. This comes from reading the recorded
+points, and the measurement after repair is still required.
 
 A repair pass runs at the end of `planRouteLanes`, when `separation` is on:
 
@@ -321,10 +325,11 @@ If none is free, the lowest score wins and ties go to the nearest.
 - A test-only export gives the gap and the candidate list, next to `scoreLabelPlacementForTest`. It
   is not exported from `packages/core/src/index.ts`.
 
-The 2 label overlaps recorded after layered and route, which `lint --fix` also leaves, are expected
-to clear through the new close candidates and the route changes from overlap repair. This has not
-been measured. If they remain, extend item 3 with further rings around each position, in the same
-sort order, and record the measurement that led to it.
+Sorting took the label overlaps after layered and route from 2 to 1 and the maximum gap from 54.698
+to 24.990. The remaining one is edge-20's label on edge-21. It is expected to clear through the route
+changes from overlap repair, which has not been measured. If it remains after repair, extend item 3
+with further rings around each position, in the same sort order, and record the measurement that led
+to it.
 
 Scoring is `labelOverlapScore`, so placement and `lint --metrics` agree. Labels are
 placed in stable order, then labels still scoring above 0 get a second pass with all
@@ -518,12 +523,17 @@ and W2 need.
 | 2 | crl-09 Parity and end-to-end (W3, W4) | `apps/cli/src/native-parity/connect-routing.test.ts`, `connector-arrange.test.ts`, `edit-performance.test.ts` (read only for its fixtures), `lint-diagram.test.ts`, a new `apps/cli/src/connector-routing-e2e.test.ts`, baseline and timing record; for a defect a test exposes, the crl-08 core modules, `shapes/connector/resolve.ts` and `orthogonal-routing.ts` | crl-08: its routes and labels are what parity and timings measure |
 | Final | crl-10 Finish (W5) | `apps/cli/src/help.ts`, `commands.ts`, `docs/cli.md`, `README.md`, `packages/core/src/index.ts`, `impl-plans/README.md`, plan archive, gates on the merged tree, and gate-required semantic conflict fixes | crl-09 |
 
-- Every plan sets `artifactRoots: ["target"]`. Logs go under `tmp/crl-s753/<planId>/`, and no file
-  there may match a Bun test name pattern.
+- Every plan sets `artifactRoots: ["target"]`. Logs go under `tmp/<task-id>/<planId>/` for the
+  current manifest's task id, and no file there may match a Bun test name pattern. A rerun takes a
+  new root, and the earlier crl-08 logs under `tmp/crl-s753/` stay read-only.
+- A rerun reuses crl-08 to crl-10 under a fresh manifest, which becomes the single source for
+  `writePaths`, `sharedPaths` and `artifactRoots`. The plans' manifest lines name it. The manifest it
+  replaces is no longer in the run, so it counts as an earlier file.
 - Help and docs (crl-10): the repair behavior, the nearest free position, and removal of any text
   that offers a fixture bound.
-- Archive: all crl plans and manifests end in `impl-plans/completed/`. crl-10 moves `crl-00..07` and
-  `crl-s749-dispatch.json`. The workflow's `plan-archive` node moves the plans of this run, because
+- Archive: all crl plans and manifests end in `impl-plans/completed/`. crl-10 moves `crl-00..07`,
+  `crl-s749-dispatch.json` and any replaced manifest. The workflow's `plan-archive` node moves the
+  plans and the manifest of this run, because
   workers never move a plan in the run, and the crl-10 record says so. The request names manifests,
   so this differs from the manifests other features keep in `active/`, and `impl-plans/README.md`
   says so. Progress

@@ -4,15 +4,15 @@
 - planPath: impl-plans/active/crl-08-repair-labels.md
 - progressPath: impl-plans/progress/crl-08-repair-labels.md
 - wave: 1; dependsOn: none
-- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s753-dispatch.json`
+- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s754-dispatch.json`
 - Design (binding): `design-docs/specs/design-connector-routing-arranging.md`, sections "Overlap repair", "R4. Label placement", "Nearest free position", "Fixture and acceptance tests", "Existing outputs that may change".
-- Evidence: `tmp/crl-s753/crl-08-repair-labels/`, with gate logs in `final/`.
+- Evidence: `tmp/crl-s754/crl-08-repair-labels/`, with gate logs in `final/`.
 
 ## Intent and context
 
 Finishes W1 and W2. The arrange engine is in the shared TypeScript core, so Bun and the native CLI (Boa) run the same code.
 
-- W1: `layered and route fixture metrics and repeatability` (`apps/cli/src/connector-arrange.test.ts`) fails. The last recorded result is 3 overlapping segment pairs and 2 label overlaps, with crossings 169 against an input of 604. Those figures come from `impl-plans/progress/crl-07-wiring.md`. Re-measure them.
+- W1: `layered and route fixture metrics and repeatability` (`apps/cli/src/connector-arrange.test.ts`) fails. The last recorded result is 3 overlapping segment pairs and 1 label overlap, with crossings 169 against an input of 604. See "Resume state" below.
 - W2: a label moved by placement can land away from its own connector, or from its loop for a self-transition, because own-route distance plays no part in the choice.
 
 `planRouteLanes` compares a connector only with earlier routes and never revisits one. `placeConnectorLabels` takes the first free offset from a fixed list.
@@ -24,6 +24,18 @@ Finishes W1 and W2. The arrange engine is in the shared TypeScript core, so Bun 
 - Do not restructure the crl-01 to crl-06 code. Change it only as this plan states.
 - No Rust change. No change to the default routing of `connect`.
 - `obstacle-routing-batch` fixtures must not change.
+
+## Resume state (2026-11-06, read this first)
+
+This plan was started in an earlier run and is incomplete. `impl-plans/progress/crl-08-repair-labels.md` holds the record. Append to it, and do not delete it.
+
+- Done, keep: nearest-gap offset sorting in `connector-label-placement.ts`, the test-only exports `labelRouteGapSquaredForTest` and `labelCandidatesForTest`, and the recorded rebaseline of the blocked-offset test. Check these against the file-level changes below, and do not redo them.
+- Not done, first task: the repair pass and `RouteLanePatch` in `arrange-route-lanes.ts`. Then the route scenes, label scenes and distance-bound tests under "Tests to add" that are still missing.
+- Recorded measurements: `tmp/crl-s753/crl-08-repair-labels/before-probe.log` (after layered then route: crossings 169, label overlaps 2, segment overlaps 3, maximum gap 54.698) and `after-label-probe.log` (169, 1, 3, maximum gap 24.990). These satisfy the "before" measurement of Step 1, and the probe under that directory may be reused. That directory is read-only for this run: copy the probe to the evidence directory above if it needs changes, and write new logs there.
+- Residual pairs: edge-10/edge-21 (1) and edge-14/edge-27 (2). Both are facing stubs on state-05 `right` and state-14 `left`, at the same y (203.998 and 224.002). Candidate B is the expected fix. edge-20's label hits edge-21, so re-measure it after repair before deciding on rings.
+- The manifest also authorizes `packages/core/src/shapes/connector/resolve.ts` and `orthogonal-routing.ts`. Edit them only for a defect a probe or test measurement shows, and record that measurement. They are not part of the planned change.
+- Existing `final/` gate logs are not completion evidence. Move `final/` to `attempt-<n>/` before the first gate run.
+- Do not return until verification 1 to 6 exit 0. Keep iterating on the repair rather than reporting partial progress. The only early return is the blocker in the tier C rule below.
 
 ## Step 1: measure first
 

@@ -4,9 +4,9 @@
 - planPath: impl-plans/active/crl-09-parity-e2e.md
 - progressPath: impl-plans/progress/crl-09-parity-e2e.md
 - wave: 2; dependsOn: crl-08-repair-labels (parity, end-to-end checks and timings measure its routes and labels)
-- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s753-dispatch.json`
+- Manifest (single source for writePaths, sharedPaths, artifactRoots): `impl-plans/active/crl-s754-dispatch.json`
 - Design (binding): `design-docs/specs/design-connector-routing-arranging.md`, sections "Fixture and acceptance tests" and "Baseline binary and timing".
-- Evidence: `tmp/crl-s753/crl-09-parity-e2e/`, with gate logs in `final/`.
+- Evidence: `tmp/crl-s754/crl-09-parity-e2e/`, with gate logs in `final/`.
 
 ## Intent and context
 
