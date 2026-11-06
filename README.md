@@ -88,9 +88,11 @@ Tauri desktop app. The hosted cloud edition lives in a private repository. See
 
 ### Layout, selection, and merging
 
-`arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text; `lint --metrics` reports crossings and label overlaps. `--quiet` suppresses warnings.
+`arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text; `lint --metrics` reports crossings and label overlaps. `--quiet` suppresses warnings, not lint findings.
 
-Edit references use `name:<text>`, ids and `@ref`. `update` and `delete` accept `where` with `page`, `type`, `from`, `to`, `parent`, `name`, and `expect`; `select` binds a `ref`. `label` updates display text. `carryMembers` controls frame, `bpmn.participant`, `bpmn.lane`, `bpmn.subProcess` and `breadboard.board` box updates. See the [CLI guide](docs/cli.md#layout-selection-and-merging) for per-kind tables and limitations.
+`convert` changes a compatible element type while preserving its identity, geometry and connectors, reporting dropped fields. `delete` with `reconnectTo` moves direct connectors before deletion. For frame-scoped DDL, `memberIds` governs explicit content; open frames also include fully contained unclaimed tables by position, and `frame-straddle` lint warns on crossed edges. Sequence participants draw by kind in export and on the canvas: `actor` as a stick figure, `db` as a cylinder and `service` as a rounded box.
+
+Edit references use `name:<text>`, ids and `@ref`. `update`, `convert` and `delete` accept `where` with `page`, `type`, `from`, `to`, `parent`, `name`, and `expect`; `select` binds a `ref`. `label` updates display text. `carryMembers` controls frame, `bpmn.participant`, `bpmn.lane`, `bpmn.subProcess` and `breadboard.board` box updates. See the [CLI guide](docs/cli.md#layout-selection-and-merging) for per-kind tables and limitations.
 
 Set `*.jsonl merge=nodetto` in `.gitattributes`, then configure each clone:
 

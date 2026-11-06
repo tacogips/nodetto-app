@@ -190,7 +190,7 @@ export function applyBatch(
         (issue) => unknownFieldKey(issue.path, parsed.document.elements)?.key,
       ),
   );
-  const warnings: EditWarning[] = [];
+  const warnings: EditWarning[] = [...batch.convertWarnings];
   for (const issue of validation) {
     if (issue.code !== "semantic.unknownField") continue;
     const item = unknownFieldKey(issue.path, snapshot.elements);
@@ -225,6 +225,8 @@ export function applyBatch(
     matches: batch.matches,
     created: batch.created,
     replaced: batch.replaced,
+    ...(batch.converted.length ? { converted: batch.converted } : {}),
+    ...(batch.reconnected.length ? { reconnected: batch.reconnected } : {}),
     counts,
     operations: operations.length,
     warnings,

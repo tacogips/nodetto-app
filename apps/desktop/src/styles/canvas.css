@@ -281,6 +281,21 @@
   text-align: center;
 }
 
+.nodetto-sequence-participant-actor,
+.nodetto-sequence-participant-db {
+  height: 54px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.nodetto-sequence-participant-actor svg,
+.nodetto-sequence-participant-db svg {
+  position: absolute;
+  inset: 0;
+}
+
 .nodetto-sequence-participant-head span {
   color: var(--nodetto-muted);
   font-size: 9px;

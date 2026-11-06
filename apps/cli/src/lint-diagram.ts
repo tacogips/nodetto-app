@@ -5,7 +5,11 @@ import {
   type PageId,
 } from "@nodetto/ir";
 import { parseDocument } from "@nodetto/io";
-import { lintNodeOverlaps, NODE_OVERLAP_PAGE_KINDS } from "@nodetto/core";
+import {
+  lintFrameStraddles,
+  lintNodeOverlaps,
+  NODE_OVERLAP_PAGE_KINDS,
+} from "@nodetto/core";
 import { planTextWrapFixes, type TextWrapFix } from "@nodetto/core";
 import type { CommandIo } from "./commands.ts";
 import { runOperations } from "./edit-command.ts";
@@ -47,7 +51,7 @@ export interface DiagramLintRow {
   readonly pageId: PageId;
   readonly elementId: string;
   readonly severity: "error" | "warning";
-  readonly ruleId: "node-overlap" | "image-missing";
+  readonly ruleId: "node-overlap" | "frame-straddle" | "image-missing";
   readonly message: string;
 }
 export interface DiagramLintResult {
@@ -120,6 +124,14 @@ export function lintDiagramPages(
         elementId: finding.elementId,
         severity: "warning",
         ruleId: "node-overlap",
+        message: finding.message,
+      });
+    for (const finding of lintFrameStraddles(currentDocument, page.id))
+      rows.push({
+        pageId: page.id,
+        elementId: finding.elementId,
+        severity: "warning",
+        ruleId: "frame-straddle",
         message: finding.message,
       });
     if (!io.readAttachment) continue;

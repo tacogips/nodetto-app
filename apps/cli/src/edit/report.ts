@@ -16,6 +16,10 @@ export function formatEditReport(
         created: result.created,
         ...(result.matches === undefined ? {} : { matches: result.matches }),
         ...(result.replaced.length ? { replaced: result.replaced } : {}),
+        ...(result.converted?.length ? { converted: result.converted } : {}),
+        ...(result.reconnected?.length
+          ? { reconnected: result.reconnected }
+          : {}),
         pages: Object.fromEntries(result.counts),
         warnings: result.warnings,
       },
@@ -36,6 +40,20 @@ export function formatEditReport(
     ...result.replaced.map(
       (item) =>
         `  replaced ${item.id} ${item.path}: ${JSON.stringify(item.before)} -> ${JSON.stringify(item.after)}`,
+    ),
+    ...(result.converted ?? []).flatMap((item) => [
+      `  converted ${item.id} ${item.fromType} -> ${item.toType}`,
+      ...item.mapped.map(
+        (mapping) => `    mapped ${mapping.from} -> ${mapping.to}`,
+      ),
+      ...item.dropped.map((path) => `    cannot carry ${path}`),
+      ...item.connectors.map(
+        (connector) => `    connector ${connector.id} (${connector.type})`,
+      ),
+    ]),
+    ...(result.reconnected ?? []).map(
+      (item) =>
+        `  reconnected ${item.deleted} -> ${item.to}: ${item.connectors.length} connector(s)`,
     ),
   ];
   lines.push(

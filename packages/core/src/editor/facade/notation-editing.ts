@@ -3,6 +3,7 @@ import type {
   ConnectorPort,
   ConnectorPorts,
   ElementId,
+  FractionalIndex,
   PageId,
   ParticipantKind,
   UmlComponentRelationshipKind,
@@ -12,6 +13,7 @@ import type { BpmnFlowType } from "../../bpmn/connection.ts";
 import { planBreadboardAnnotation } from "../../breadboard/annotate.ts";
 import { planBreadboardRotation } from "../../breadboard/rotate.ts";
 import {
+  bpmnFlowEndpointIssue,
   checkBpmnSemantic,
   planBpmnConnection,
   planBpmnLane,
@@ -30,6 +32,7 @@ import {
 } from "../../editor/connections.ts";
 import {
   buildSequenceParticipant,
+  nextParticipantOrder,
   planSequenceActivation,
   planSequenceMove,
 } from "../../editor/sequence.ts";
@@ -247,6 +250,30 @@ export class NotationEditing extends PageEditing {
       applyOptions,
     );
     return { ok: true, id, type: plan.type };
+  }
+
+  nextParticipantOrderOn(page: PageId): FractionalIndex {
+    return nextParticipantOrder(this.store, this.rng, page);
+  }
+
+  bpmnFlowIssue(
+    flowType: string,
+    from: ElementId,
+    to: ElementId,
+    overlay?: { readonly id: ElementId; readonly type: string },
+  ): string | null {
+    const snapshot = this.store.getSnapshot();
+    const document = overlay
+      ? {
+          ...snapshot,
+          elements: snapshot.elements.map((element) =>
+            element.id === overlay.id
+              ? { ...element, type: overlay.type }
+              : element,
+          ),
+        }
+      : snapshot;
+    return bpmnFlowEndpointIssue(document, flowType, from, to);
   }
 
   reconnectBpmnFlow(

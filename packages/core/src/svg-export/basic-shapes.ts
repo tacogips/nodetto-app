@@ -5,6 +5,7 @@ import type { Element } from "@nodetto/ir";
 import { resolvedCornerRadii, roundedRectPath } from "../corner-radii.ts";
 import type { Box } from "../geometry.ts";
 import { nodeLabelLayout } from "../node-label.ts";
+import { sequenceParticipantNotation } from "../shapes/sequence-participant-notation.ts";
 import { geoOutline } from "../shapes/geo-outline.ts";
 import { geoFlipOf } from "../shapes/outline.ts";
 import { fmt, readString, tag, text, wrap } from "./markup.ts";
@@ -188,16 +189,60 @@ export function renderSequenceParticipant(
   theme: SvgTheme,
 ): string {
   const head = { x: box.x, y: box.y, width: box.width, height: 56 };
+  const notation = sequenceParticipantNotation(element, head, {
+    ink: theme.ink,
+    surface: theme.surface,
+  });
+  const lifeline = tag("line", {
+    x1: box.x + box.width / 2,
+    y1: box.y + head.height,
+    x2: box.x + box.width / 2,
+    y2: box.y + box.height,
+    stroke: theme.muted,
+    "stroke-width": 1,
+    "stroke-dasharray": "5 4",
+  });
+  if (notation) {
+    const shapes = notation.primitives
+      .map((primitive) => {
+        const paint = styled(
+          {
+            fill: primitive.fill,
+            stroke: primitive.stroke,
+            "stroke-width": primitive.strokeWidth,
+          },
+          element.visual,
+          element.id,
+        );
+        if (primitive.kind === "circle")
+          return tag("circle", {
+            cx: primitive.cx,
+            cy: primitive.cy,
+            r: primitive.r,
+            ...paint,
+          });
+        if (primitive.kind === "path")
+          return tag("path", {
+            d: primitive.d,
+            ...paint,
+            ...(primitive.role === "participant-body" ? { fill: "none" } : {}),
+          });
+        return "";
+      })
+      .join("");
+    return (
+      lifeline +
+      shapes +
+      centredLabel(
+        notation.labelBox,
+        readString(element.semantic, "name"),
+        element.visual,
+        theme,
+      )
+    );
+  }
   return (
-    tag("line", {
-      x1: box.x + box.width / 2,
-      y1: box.y + head.height,
-      x2: box.x + box.width / 2,
-      y2: box.y + box.height,
-      stroke: theme.muted,
-      "stroke-width": 1,
-      "stroke-dasharray": "5 4",
-    }) +
+    lifeline +
     tag(
       "rect",
       styled(

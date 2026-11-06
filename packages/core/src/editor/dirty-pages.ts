@@ -66,6 +66,13 @@ export function dirtyPages(
       const element = store.get(command.id);
       if (element) {
         changed.push(element);
+        if (command.type === "convertElement")
+          changed.push({
+            ...element,
+            type: command.elementType,
+            semantic: command.semantic,
+            visual: command.visual,
+          });
         if (command.type === "updateSemantic")
           changed.push({ ...element, semantic: command.semantic });
         if (command.type === "updateVisual")

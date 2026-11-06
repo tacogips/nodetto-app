@@ -1,6 +1,7 @@
 # Element conversion, sequence participant shapes, ERD frame scope
 
-Status: DESIGNED, 2026-11-06
+Status: IMPLEMENTED, 2026-11-06. Plans: `impl-plans/completed/cpf-00-overview.md` and
+`cpf-01` to `cpf-08` beside it.
 
 ## Overview
 

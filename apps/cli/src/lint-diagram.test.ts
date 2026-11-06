@@ -213,3 +213,44 @@ test("image checks normalize document paths and reject symlink escapes", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("ERD frame straddles are warning rows in text and JSON", async () => {
+  const { document, element } = await import(
+    "../../../packages/core/src/test-helpers.ts"
+  );
+  const { runCli } = await import("./commands.ts");
+  const frame = element({
+    id: "frame",
+    type: "frame",
+    semantic: { name: "zone" },
+    visual: { x: 0, y: 0, width: 200, height: 100 },
+  });
+  const table = element({
+    id: "table",
+    type: "erd.table",
+    semantic: { tableName: "widgets", columns: [] },
+    visual: { x: 180, y: 10, width: 100 },
+  });
+  const doc = document(
+    [frame, table],
+    [{ id: "page-1", name: "Schema", kind: "erd" }],
+  );
+  const io = { readText: () => serializeDocument(doc), writeText: () => {} };
+  const text = runCli(["lint", "doc"], io, "t");
+  expect(text.exitCode).toBe(0);
+  expect(text.stdout).toContain("widgets");
+  expect(text.stdout).toContain("zone");
+  const json = runCli(["lint", "doc", "--format", "json"], io, "t");
+  expect(json.exitCode).toBe(0);
+  expect(json.stdout).toContain('"frame-straddle"');
+  expect(json.stdout).toContain('"warning"');
+  const inside = {
+    ...doc,
+    elements: [frame, { ...table, visual: { ...table.visual, x: 10 } }],
+  };
+  expect(
+    lintDiagramPages(io, "doc", inside, { fix: false }).rows.filter(
+      (row) => row.ruleId === "frame-straddle",
+    ),
+  ).toEqual([]);
+});

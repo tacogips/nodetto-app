@@ -64,6 +64,13 @@ export type Command =
       readonly semantic: unknown;
     }
   | {
+      readonly type: "convertElement";
+      readonly id: ElementId;
+      readonly elementType: string;
+      readonly semantic: unknown;
+      readonly visual: Visual;
+    }
+  | {
       readonly type: "replaceAccessibility";
       readonly id: ElementId;
       readonly accessibility?: AccessibilityMetadata;
@@ -624,6 +631,42 @@ export function applyCommands(
         });
         break;
       }
+      case "convertElement": {
+        const previous = mustGet(command.id, "convertElement");
+        const issues = validateSemanticPayload(
+          command.elementType,
+          command.semantic,
+          "semantic",
+        );
+        if (!getElementTypeDefinition(command.elementType))
+          issues.push(
+            error(
+              "value.enum",
+              "elementType",
+              `unknown element type "${command.elementType}"`,
+            ),
+          );
+        if (!isPlainObject(command.visual))
+          issues.push(error("type.object", "visual", "expected a JSON object"));
+        else issues.push(...validateVisualFields(command.visual));
+        if (hasErrors(issues))
+          fail(issues, `convertElement: invalid payload for "${command.id}"`);
+        working.set(command.id, {
+          ...previous,
+          type: command.elementType,
+          semantic: command.semantic,
+          visual: command.visual,
+        });
+        markUpdate(command.id);
+        undo.unshift({
+          type: "convertElement",
+          id: command.id,
+          elementType: previous.type,
+          semantic: previous.semantic,
+          visual: previous.visual,
+        });
+        break;
+      }
       case "replaceAccessibility": {
         const previous = mustGet(command.id, "replaceAccessibility");
         const issues = validateAccessibilityMetadata(
@@ -833,6 +876,20 @@ export function applyCommands(
           : [],
     ),
   );
+  const converted = new Set(
+    commands.flatMap((command) =>
+      command.type === "convertElement" ? [command.id] : [],
+    ),
+  );
+  if (converted.size) {
+    for (const element of allElements().values()) {
+      if (
+        converted.has(element.id) ||
+        referencesOf(element).some((reference) => converted.has(reference.id))
+      )
+        semanticChanges.add(element.id);
+    }
+  }
   for (const id of semanticChanges) {
     const element = working.get(id);
     if (!element) continue;

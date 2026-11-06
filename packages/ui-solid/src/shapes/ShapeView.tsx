@@ -233,7 +233,7 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
             <NodeView element={props.element} />
           </Match>
           <Match when={props.element.type === "sequence.participant"}>
-            <SequenceParticipantView element={props.element} />
+            <SequenceParticipantView element={props.element} box={props.box} />
           </Match>
           <Match when={props.element.type === "sequence.activation"}>
             <div class="nodetto-sequence-activation" />
