@@ -1,4 +1,11 @@
 import { expect, test } from "bun:test";
+import {
+  Store,
+  applyCommands,
+  pageMetrics,
+  planLayered,
+  planRoute,
+} from "@nodetto/core";
 import { serializeDocument, parseDocument } from "@nodetto/io";
 import type { PageKind } from "@nodetto/ir";
 import {
@@ -186,6 +193,39 @@ test("route preserves manual waypoints until reset", () => {
   expect(reset.routingWaypoints).toBeUndefined();
 });
 
+test("layered preserves manual routing on a two-frame page", () => {
+  const f = fixture();
+  const before = parseDocument(f.text);
+  const manual = {
+    ...before,
+    elements: before.elements.map((element) =>
+      element.id === "edge0"
+        ? {
+            ...element,
+            semantic: {
+              ...(element.semantic as Record<string, unknown>),
+              routing: "manual",
+              routingWaypoints: [{ u: 0.4, v: 0.3 }],
+            },
+          }
+        : element,
+    ),
+  };
+  f.io.writeText("doc.jsonl", serializeDocument(manual));
+  expect(run(f, "--mode", "layered", "--write").exitCode).toBe(0);
+  const semantic = parseDocument(f.text).elements.find(
+    (element) => element.id === "edge0",
+  )?.semantic;
+  expect(semantic).toMatchObject({
+    routing: "manual",
+    routingWaypoints: [{ u: 0.4, v: 0.3 }],
+  });
+  expect(run(f, "--mode", "layered", "--check").exitCode).toBe(0);
+  const again = run(f, "--mode", "layered", "--write");
+  expect(again.exitCode).toBe(0);
+  expect(again.stderr).toContain("0 layer update(s)");
+});
+
 test("layered reverses horizontal frame order", () => {
   const f = fixture();
   expect(
@@ -308,3 +348,74 @@ for (const mode of ["route", "layered"]) {
     expect(text).toBe(written);
   });
 }
+
+test("layered selects a lower-crossing order and remains stable", () => {
+  const editor = makeEditor({
+    document: document([], [{ ...TEST_PAGE, kind: "state" }]),
+  });
+  for (const [id, x, members] of [
+    ["frame-a", 0, ["a", "b", "c"]],
+    ["frame-b", 600, ["x", "y", "z"]],
+  ] as const) {
+    editor.createElement("frame", {
+      id,
+      semantic: { name: id, memberIds: [...members] },
+      visual: { x, y: 0, width: 500, height: 500 },
+    });
+  }
+  for (const [i, id] of ["a", "b", "c", "x", "y", "z"].entries()) {
+    editor.createElement("state.node", {
+      id,
+      semantic: { kind: "state", name: id },
+      visual: {
+        x: i < 3 ? 20 : 620,
+        y: 30 + (i % 3) * 100,
+        width: 80,
+        height: 50,
+      },
+    });
+  }
+  for (const [i, [from, to]] of [
+    ["a", "x"],
+    ["a", "y"],
+    ["b", "x"],
+  ].entries()) {
+    editor.createElement("state.transition", {
+      id: `edge-${i}`,
+      semantic: { from, to },
+    });
+  }
+  const crossings = (memberOrder: "rank" | "barycenter") => {
+    const plan = planLayered(editor.store, TEST_PAGE.id, editor.registry, {
+      direction: "LR",
+      memberOrder,
+    });
+    if ("error" in plan) throw new Error(plan.error);
+    const draft = new Store(editor.getSnapshot());
+    applyCommands(draft, plan.commands);
+    applyCommands(
+      draft,
+      planRoute(draft, TEST_PAGE.id, editor.registry, {
+        resetManual: true,
+        separation: false,
+      }),
+    );
+    return pageMetrics(draft, TEST_PAGE.id, editor.registry).edgeCrossings;
+  };
+  expect(crossings("barycenter")).toBeLessThan(crossings("rank"));
+  let text = serializeDocument(editor.getSnapshot());
+  const io = {
+    readText: () => text,
+    writeText: (_: string, value: string) => {
+      text = value;
+    },
+  };
+  const args = ["doc.jsonl", "--mode", "layered"];
+  expect(arrangeLayeredOrRoute(io, [...args, "--write"]).exitCode).toBe(0);
+  const written = text;
+  expect(arrangeLayeredOrRoute(io, [...args, "--check"]).exitCode).toBe(0);
+  const again = arrangeLayeredOrRoute(io, [...args, "--write"]);
+  expect(again.exitCode).toBe(0);
+  expect(again.stderr).toContain("0 layer update(s)");
+  expect(text).toBe(written);
+});

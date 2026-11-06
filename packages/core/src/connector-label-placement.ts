@@ -13,6 +13,7 @@ import {
 } from "./diagram-lint/metrics.ts";
 import type { Box, Vec } from "./geometry.ts";
 import { createShapeContext } from "./hit-test.ts";
+import { connectorLabelExtent, connectorLabelLayout } from "./label-layout.ts";
 import {
   connectorDecoration,
   endpointReaderFor,
@@ -244,12 +245,18 @@ export function labelCandidatesForTest(
   return [...candidates(edge)];
 }
 
-function* candidates(edge: LabelPlacementEdge): Generator<LabelFields> {
+function* candidates(
+  edge: LabelPlacementEdge,
+  resolveBox: (
+    edge: LabelPlacementEdge,
+    value: LabelFields,
+  ) => Box | null = boxAt,
+): Generator<LabelFields> {
   for (const p of positions) yield p === 0.5 ? {} : { labelPosition: p };
   if (edge.element.type.startsWith("bpmn.")) return;
   const offsets: { value: LabelFields; gap: number; index: number }[] = [];
   for (const p of positions) {
-    const box = boxAt(edge, { labelPosition: p });
+    const box = resolveBox(edge, { labelPosition: p });
     if (!box) continue;
     const w = box.width;
     const h = box.height;
@@ -270,6 +277,18 @@ function* candidates(edge: LabelPlacementEdge): Generator<LabelFields> {
       [w + 4, -h - 4],
       [-w - 4, h + 4],
       [w + 4, h + 4],
+      [-2 * w - 8, -h - 4],
+      [2 * w + 8, -h - 4],
+      [-2 * w - 8, h + 4],
+      [2 * w + 8, h + 4],
+      [-w - 4, -2 * h - 8],
+      [w + 4, -2 * h - 8],
+      [-w - 4, 2 * h + 8],
+      [w + 4, 2 * h + 8],
+      [0, -3 * h - 12],
+      [0, 3 * h + 12],
+      [-3 * w - 12, 0],
+      [3 * w + 12, 0],
     ]) {
       const x = Math.round(rawX ?? 0);
       const y = Math.round(rawY ?? 0);
@@ -281,7 +300,7 @@ function* candidates(edge: LabelPlacementEdge): Generator<LabelFields> {
       if (p !== 0.5) value.labelPosition = Math.round(p * 10000) / 10000;
       if (x) value.labelOffsetX = x;
       if (y) value.labelOffsetY = y;
-      const shifted = boxAt(edge, value);
+      const shifted = resolveBox(edge, value);
       if (shifted)
         offsets.push({
           value,
@@ -304,6 +323,39 @@ export function placeConnectorLabels(input: {
   const routeData = segments(edges);
   const placed = new Map<ElementId, Box>();
   const result = new Map<ElementId, LabelFields>();
+  const layouts = new Map<
+    ElementId,
+    { layout: ReturnType<typeof connectorLabelLayout>; width: number }
+  >();
+  const cachedBoxAt = (
+    edge: LabelPlacementEdge,
+    value: LabelFields,
+  ): Box | null => {
+    if (edge.element.type.startsWith("bpmn.")) return boxAt(edge, value);
+    let cached = layouts.get(edge.element.id);
+    if (!cached) {
+      const base = boxAt(edge, {});
+      if (!base) return null;
+      cached = {
+        layout: connectorLabelLayout(
+          connectorDecoration(edge.element).label,
+          edge.element.visual,
+        ),
+        width: base.width,
+      };
+      layouts.set(edge.element.id, cached);
+    }
+    const position = Math.max(0, Math.min(1, value.labelPosition ?? 0.5));
+    const point = pointAlongRoute(edge.points, position);
+    const anchor = {
+      x: point.x + (value.labelOffsetX ?? 0),
+      y: point.y + (value.labelOffsetY ?? 0),
+    };
+    const text = connectorLabelExtent(cached.layout, anchor);
+    return text
+      ? { ...text, x: anchor.x - cached.width / 2, width: cached.width }
+      : boxAt(edge, value);
+  };
   const movable: LabelPlacementEdge[] = [];
   for (const edge of edges) {
     if (
@@ -325,8 +377,8 @@ export function placeConnectorLabels(input: {
     let bestScore = Number.POSITIVE_INFINITY;
     let best: LabelFields = {};
     let bestBox: Box | null = null;
-    for (const candidate of candidates(edge)) {
-      const box = boxAt(edge, candidate);
+    for (const candidate of candidates(edge, cachedBoxAt)) {
+      const box = cachedBoxAt(edge, candidate);
       if (!box) continue;
       const value = score(
         box,

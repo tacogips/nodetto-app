@@ -101,6 +101,17 @@ export function arrangeLayeredOrRoute(
     return fail(`Mode ${mode} supports page kinds: ${kinds.join(", ")}.`);
   const editor = new Editor({ document: loaded.document });
   const resetManual = parsed.flags.has("--reset-manual");
+  const manualSemantics =
+    mode === "layered" && !resetManual
+      ? editor.store
+          .getPageElements(page.id)
+          .filter(
+            (element) =>
+              (element.semantic as Record<string, unknown>).routing ===
+              "manual",
+          )
+          .map((element) => ({ id: element.id, semantic: element.semantic }))
+      : [];
   let count = 0;
   if (mode === "layered" && page.kind === "bpmn") {
     if (parsed.options.has("--frames") || direction === "TB")
@@ -149,6 +160,20 @@ export function arrangeLayeredOrRoute(
     if ("error" in result) return fail(result.error);
     count += result.commands.length;
     editor.apply(result.commands, { placed: result.placed });
+  }
+  for (const original of manualSemantics) {
+    const current = editor.store.get(original.id);
+    if (
+      current &&
+      JSON.stringify(current.semantic) !== JSON.stringify(original.semantic)
+    )
+      editor.apply([
+        {
+          type: "updateSemantic",
+          id: original.id,
+          semantic: original.semantic,
+        },
+      ]);
   }
   let targetIds: string[] | undefined;
   const requestedIds = parsed.options.get("--ids");

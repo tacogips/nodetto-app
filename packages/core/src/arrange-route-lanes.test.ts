@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Editor } from "./editor.ts";
-import { planRouteLanes } from "./arrange-route-lanes.ts";
+import { planRouteLanes, type RouteLanePatch } from "./arrange-route-lanes.ts";
 import { countRouteOverlaps } from "./diagram-lint/metrics.ts";
 import { endpointReaderFor, resolveConnector } from "./shapes/connector.ts";
 
@@ -106,8 +106,12 @@ test("fixed routes and custom bends participate in the bounded search", () => {
   for (const { element } of edges) {
     const patch = patches.get(element.id);
     if (!patch) continue;
-    expect(patch.routingLane).toBeGreaterThan(0);
-    expect(patch.routingLane).toBeLessThanOrEqual(8);
+    if (patch.routingLane !== undefined) {
+      expect(patch.routingLane).toBeGreaterThan(0);
+      expect(patch.routingLane).toBeLessThanOrEqual(8);
+    } else {
+      expect(patch.fromPortPosition ?? patch.toPortPosition).toBeDefined();
+    }
     if (patch.routingBend !== undefined && patch.routingLane !== undefined) {
       const base = resolveConnector(
         element,
@@ -198,7 +202,21 @@ test("saturated lanes choose the lowest overlap count and earliest tied candidat
     [...fixed, { element, movable: true }],
     context,
   );
-  expect(patches.get(id)?.routingLane ?? 0).toBe(firstMinimum);
+  const patch = patches.get(id);
+  expect(patch).toBeDefined();
+  const repaired = resolveConnector(
+    { ...element, semantic: { ...semantic, ...patch } },
+    context,
+    endpointReaderFor(element.type),
+  );
+  if (!repaired) throw new Error("Missing repaired route");
+  const repairedScore = candidates.reduce(
+    (sum, other) =>
+      sum + countRouteOverlaps(repaired.points, other.resolved.points),
+    0,
+  );
+  expect(repairedScore).toBeLessThan(minimum);
+  expect(firstMinimum).toBeGreaterThan(0);
 });
 
 test("lane search separates two detours around an obstacle", () => {
@@ -236,7 +254,7 @@ test("lane search separates two detours around an obstacle", () => {
   const context = editor.createShapeContext();
   const resolve = (
     element: typeof first.element,
-    patch: Record<string, unknown> = {},
+    patch: RouteLanePatch = {},
   ) => {
     const route = resolveConnector(
       {
@@ -343,4 +361,220 @@ test("movable route separates from a fixed manual route", () => {
   );
   if (!separated) throw new Error("Missing separated route");
   expect(countRouteOverlaps(fixedRoute.points, separated.points)).toBe(0);
+});
+
+test("repair moves an earlier facing stub without using loop positions", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 140, y: 0, width: 80, height: 80 },
+  });
+  const ids = [
+    editor.createElement("edge.generic", {
+      id: "a-moving",
+      semantic: {
+        from: a,
+        to: b,
+        routing: "orthogonal",
+        fromPort: "right",
+        toPort: "left",
+        fromPortPosition: 0.5,
+        toPortPosition: 0.5,
+      },
+    }),
+    editor.createElement("edge.generic", {
+      id: "z-fixed",
+      semantic: {
+        from: b,
+        to: a,
+        routing: "orthogonal",
+        fromPort: "left",
+        toPort: "right",
+        fromPortPosition: 0.5,
+        toPortPosition: 0.8,
+      },
+    }),
+    editor.createElement("edge.generic", {
+      id: "loop",
+      semantic: {
+        from: a,
+        to: a,
+        routing: "orthogonal",
+        fromPort: "right",
+        toPort: "right",
+        fromPortPosition: 0.3,
+        toPortPosition: 0.7,
+      },
+    }),
+  ];
+  const edges = ids.map((id) => {
+    const element = editor.store.get(id);
+    if (!element) throw new Error("Missing edge");
+    return { element, movable: id === "a-moving" };
+  });
+  const context = editor.createShapeContext();
+  const patches = planRouteLanes(edges, context);
+  expect([...patches]).toEqual([
+    ...planRouteLanes([...edges].reverse(), context),
+  ]);
+  const moving = edges[0];
+  const fixed = edges[1];
+  if (!moving || !fixed) throw new Error("Missing edges");
+  const patch = patches.get(moving.element.id);
+  expect(patch).toBeDefined();
+  expect(patch?.fromPortPosition ?? patch?.toPortPosition).toBeDefined();
+  for (const value of [patch?.fromPortPosition, patch?.toPortPosition]) {
+    if (value === undefined) continue;
+    expect(Math.abs(value - 0.3)).toBeGreaterThan(0.0001);
+    expect(Math.abs(value - 0.7)).toBeGreaterThan(0.0001);
+  }
+  if (patch?.fromPortPosition !== undefined)
+    expect(patch.fromPortPosition).toBeGreaterThan(0.3);
+  if (patch?.fromPortPosition !== undefined)
+    expect(patch.fromPortPosition).toBeLessThan(0.7);
+  const resolve = (
+    element: typeof moving.element,
+    patch: RouteLanePatch = {},
+  ) =>
+    resolveConnector(
+      {
+        ...element,
+        semantic: {
+          ...(element.semantic as Record<string, unknown>),
+          ...patch,
+        },
+      },
+      context,
+      endpointReaderFor(element.type),
+    );
+  const left = resolve(moving.element, patch);
+  const right = resolve(fixed.element);
+  if (!left || !right) throw new Error("Missing routes");
+  expect(countRouteOverlaps(left.points, right.points)).toBe(0);
+});
+
+test("repair shifts the end sharing a side with a self-loop and keeps end order", () => {
+  const editor = new Editor();
+  const a = editor.createElement("node.generic", {
+    visual: { x: 0, y: 0, width: 80, height: 80 },
+  });
+  const b = editor.createElement("node.generic", {
+    visual: { x: 140, y: 0, width: 80, height: 80 },
+  });
+  const ids = [
+    editor.createElement("edge.generic", {
+      id: "a-moving",
+      semantic: {
+        from: a,
+        to: b,
+        routing: "orthogonal",
+        fromPort: "right",
+        toPort: "left",
+        fromPortPosition: 0.5,
+        toPortPosition: 0.5,
+      },
+    }),
+    editor.createElement("edge.generic", {
+      id: "z-other",
+      semantic: {
+        from: b,
+        to: a,
+        routing: "orthogonal",
+        fromPort: "left",
+        toPort: "right",
+        fromPortPosition: 0.8,
+        toPortPosition: 0.5,
+      },
+    }),
+    editor.createElement("edge.generic", {
+      id: "loop",
+      semantic: {
+        from: a,
+        to: a,
+        routing: "orthogonal",
+        fromPort: "right",
+        toPort: "right",
+        fromPortPosition: 0.3,
+        toPortPosition: 0.7,
+      },
+    }),
+  ];
+  const edges = ids.map((id) => {
+    const element = editor.store.get(id);
+    if (!element) throw new Error("Missing edge");
+    return { element, movable: id !== "loop" };
+  });
+  const context = editor.createShapeContext();
+  const patches = planRouteLanes(edges, context);
+  expect([...patches.keys()]).toEqual(["a-moving"]);
+  expect(patches.get("a-moving")).toEqual({ fromPortPosition: 0.4 });
+  expect([...patches]).toEqual([
+    ...planRouteLanes([...edges].reverse(), context),
+  ]);
+  const moving = edges[0];
+  const other = edges[1];
+  if (!moving || !other) throw new Error("Missing connectors");
+  const moved = resolveConnector(
+    {
+      ...moving.element,
+      semantic: {
+        ...(moving.element.semantic as Record<string, unknown>),
+        ...patches.get("a-moving"),
+      },
+    },
+    context,
+    endpointReaderFor(moving.element.type),
+  );
+  const fixed = resolveConnector(
+    other.element,
+    context,
+    endpointReaderFor(other.element.type),
+  );
+  if (!moved || !fixed) throw new Error("Missing routes");
+  expect(countRouteOverlaps(moved.points, fixed.points)).toBe(0);
+  expect(
+    planRouteLanes(
+      edges.filter(({ element }) => element.id !== "loop"),
+      context,
+    ).get("a-moving"),
+  ).toEqual({ fromPortPosition: 0.25 });
+});
+
+test("repair leaves non-overlapping connectors unpatched", () => {
+  const editor = new Editor();
+  const nodes = [
+    [0, 0],
+    [300, 0],
+    [0, 300],
+    [300, 300],
+  ].map(([x, y]) =>
+    editor.createElement("node.generic", {
+      visual: { x, y, width: 80, height: 80 },
+    }),
+  );
+  const [a, b, c, d] = nodes;
+  if (!a || !b || !c || !d) throw new Error("Missing nodes");
+  const ids = [
+    [a, b],
+    [c, d],
+  ].map(([from, to], index) =>
+    editor.createElement("edge.generic", {
+      id: `disjoint-${index}`,
+      semantic: {
+        from,
+        to,
+        routing: "orthogonal",
+        fromPort: "right",
+        toPort: "left",
+      },
+    }),
+  );
+  const edges = ids.map((id) => {
+    const element = editor.store.get(id);
+    if (!element) throw new Error("Missing edge");
+    return { element, movable: true };
+  });
+  expect(planRouteLanes(edges, editor.createShapeContext()).size).toBe(0);
 });

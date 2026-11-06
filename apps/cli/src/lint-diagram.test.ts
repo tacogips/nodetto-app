@@ -151,6 +151,57 @@ test("fix writes once and rejects BPMN", () => {
   expect(serializeDocument(parseDocument(source))).toBe(source);
 });
 
+test("wrap and label fixes are atomic and repeat without writes", () => {
+  let source = textLayoutProblemDocument("architecture");
+  let writes = 0;
+  const io = {
+    readText: () => source,
+    writeText: (_path: string, text: string) => {
+      source = text;
+      writes++;
+    },
+  };
+  const options = { fix: true, textLayoutPageIds: [TEXT_LAYOUT_PAGE_ID] };
+  const first = lintDiagramPages(
+    io,
+    "doc.jsonl",
+    parseDocument(source),
+    options,
+  );
+  expect(first.error).toBeUndefined();
+  expect(formatFixLines(first.fixes)).toContain("line break(s)");
+  expect(formatFixLines(first.fixes)).toContain("moved label");
+  expect(writes).toBe(1);
+  const second = lintDiagramPages(
+    io,
+    "doc.jsonl",
+    parseDocument(source),
+    options,
+  );
+  expect(second.fixes).toHaveLength(0);
+  expect(writes).toBe(1);
+});
+
+test("failed combined label batch saves neither label nor wrap fixes", () => {
+  const source = textLayoutProblemDocument("architecture");
+  let reads = 0;
+  let writes = 0;
+  const io = {
+    readText: () => (++reads === 1 ? source : "invalid"),
+    writeText: () => {
+      writes++;
+    },
+  };
+  const result = lintDiagramPages(io, "doc.jsonl", parseDocument(source), {
+    fix: true,
+    textLayoutPageIds: [TEXT_LAYOUT_PAGE_ID],
+  });
+  expect(formatFixLines(result.fixes)).toContain("moved label");
+  expect(result.error).toBeDefined();
+  expect(result.written).toBe(false);
+  expect(writes).toBe(0);
+});
+
 test("document relative paths normalize directory segments", () => {
   const cases = [
     ["a/b/../doc.jsonl", "img/x.png", "a/img/x.png"],

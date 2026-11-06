@@ -79,7 +79,11 @@ test("offset candidates select the nearest free position on routes and loops", (
   for (const e of [
     edge("straight"),
     {
-      ...edge("loop"),
+      ...edge("loop", "edge.generic", {
+        from: "state",
+        to: "state",
+        label: "Label",
+      }),
       points: [
         { x: 0, y: 0 },
         { x: 0, y: -100 },
@@ -116,6 +120,7 @@ test("offset candidates select the nearest free position on routes and loops", (
       );
     expect(free.length).toBeGreaterThan(0);
     const gap = labelRouteGapSquaredForTest(chosenBox, e.points);
+    expect(gap).toBeLessThanOrEqual((chosenBox.height + 8) ** 2);
     expect(gap).toBe(
       Math.min(
         ...free.map((box) => labelRouteGapSquaredForTest(box, e.points)),
