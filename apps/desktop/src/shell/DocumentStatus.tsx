@@ -94,6 +94,17 @@ export function DocumentStatus(props: DocumentStatusProps): JSX.Element {
           </span>
         )}
       </Show>
+      <Show when={!props.isCloud && props.file.copiedAttachments.length > 0}>
+        <span
+          class="app-file-status"
+          role="status"
+          title={props.file.copiedAttachments
+            .map((copy) => `${copy.from} -> ${copy.to}`)
+            .join("\n")}
+        >
+          {`copied ${props.file.copiedAttachments.length} image(s) into artifacts/`}
+        </span>
+      </Show>
     </div>
   );
 }

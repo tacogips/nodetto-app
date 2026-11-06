@@ -40,9 +40,33 @@ and lint manifests (`clm-s725-dispatch.json`, `clm-s731-dispatch.json`,
 `clm-s732-dispatch.json`, `clm-s736-dispatch.json`,
 `clm-s737-dispatch.json`, `clm-s740-dispatch.json`) also stay in `active/`
 with their pre-archive `planPath` values; s740 was the final dispatch and
-the earlier ones must not be dispatched again.
+the earlier ones must not be dispatched again. The file save stability
+manifest `fss-s751-dispatch.json` also stays in `active/` with its
+pre-archive `planPath` values.
 
 ## Completed
+
+File save stability (session 751; design:
+`design-docs/specs/design-file-save-stability.md`; no GitHub issue). An
+outside change to an open file no longer causes a save without unsaved in-app
+changes, saves keep unchanged records byte-identical, and same-folder saves
+leave relative image references alone. Save As keeps a reference when it still
+resolves, otherwise copies the image and reports the copy. Integration review
+accepted the combined tree. The final gate log records `mise run verify` exit 0
+with 3292 pass, 51 skip, 0 fail. The fss-04 progress log records 85 Rust passes.
+`mise run test-cli` was not required because no CLI code changed. There is no
+browser E2E suite, and the reported scenario has not been run in the real
+desktop app; session tests use a mock backend. Progress logs stay in
+`progress/`. Evidence: `tmp/fss-s751/<planId>/` and
+`tmp/fss-s751/serial-reconcile-wave-003/mise-verify.log`.
+
+| Plan | Scope |
+|---|---|
+| [fss-00-overview](completed/fss-00-overview.md) | Waves, ownership and pinned contracts |
+| [fss-01-preserving-serializer](completed/fss-01-preserving-serializer.md) | `serializeDocumentPreservingText` in `packages/io` |
+| [fss-02-attachments](completed/fss-02-attachments.md) | Per-`src` attachment decisions and Save As copies |
+| [fss-03-session](completed/fss-03-session.md) | Save gate, reconcile, snapshot loop, status note and session tests |
+| [fss-04-docs-final](completed/fss-04-docs-final.md) | User docs and final verification |
 
 CLI layout, merge and lint (sessions 725, 731, 732, 736, 737 and 740;
 design: `design-docs/specs/design-cli-layout-merge-lint.md`; no GitHub

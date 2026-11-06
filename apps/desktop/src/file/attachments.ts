@@ -17,7 +17,13 @@ export interface PreparedAttachments {
     readonly after: string;
   }[];
   readonly resolved: ReadonlyMap<string, string>;
+  readonly copied: readonly { readonly from: string; readonly to: string }[];
 }
+function directoryOf(path: string): string {
+  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return separator < 0 ? "" : path.slice(0, separator);
+}
+
 export async function prepareDocumentAttachments(
   editor: Editor,
   document: Document,
@@ -28,43 +34,86 @@ export async function prepareDocumentAttachments(
   const sources = new Map<string, string>();
   const resolved = new Map<string, string>();
   const changes: { id: string; before: string; after: string }[] = [];
+  const copied: { from: string; to: string }[] = [];
   const elements = [];
+  const read = async (
+    path: string,
+    src: string,
+  ): Promise<string | undefined> => {
+    try {
+      if (!backend.readAttachment) return undefined;
+      return encodeRasterDataUrl(await backend.readAttachment(path, src));
+    } catch {
+      return undefined;
+    }
+  };
   for (const element of document.elements) {
     if (element.type !== "image.raster") {
       elements.push(element);
       continue;
     }
     const image = element.semantic as ImageSemantic;
-    // Legacy/test hosts can still preserve embedded images without an asset backend.
-    if (!backend.storeAttachment) {
-      if (!isRasterDataUrl(image.src))
-        throw new Error("This file backend cannot save document attachments.");
+    const embedded = isRasterDataUrl(image.src);
+    if (
+      (!embedded &&
+        sourcePath !== null &&
+        directoryOf(sourcePath) === directoryOf(destination)) ||
+      (embedded && !backend.storeAttachment)
+    ) {
       elements.push(element);
       continue;
     }
     let reference = sources.get(image.src);
-    if (!reference) {
-      let data = editor.assets.resolve(image.src);
-      if (!data && sourcePath && backend.readAttachment)
-        data = encodeRasterDataUrl(
-          await backend.readAttachment(sourcePath, image.src),
-        );
+    if (reference === undefined) {
+      let data = embedded ? image.src : editor.assets.resolve(image.src);
+      if (!embedded && sourcePath !== null) {
+        // Invalid cached or read bytes count as unavailable for Save As.
+        try {
+          if (data) decodeRasterDataUrl(data);
+        } catch {
+          data = undefined;
+        }
+        if (!data) data = await read(sourcePath, image.src);
+        const destinationData = await read(destination, image.src);
+        if (destinationData) {
+          const destinationBytes = decodeRasterDataUrl(destinationData).bytes;
+          const sourceBytes = data
+            ? decodeRasterDataUrl(data).bytes
+            : undefined;
+          if (
+            !sourceBytes ||
+            (sourceBytes.length === destinationBytes.length &&
+              sourceBytes.every(
+                (byte, index) => byte === destinationBytes[index],
+              ))
+          ) {
+            sources.set(image.src, image.src);
+            resolved.set(image.src, destinationData);
+            elements.push(element);
+            continue;
+          }
+        }
+      }
       if (!data)
         throw new Error(
           `Missing attachment: ${image.src}. Restore the file before saving a copy.`,
         );
+      if (!backend.storeAttachment)
+        throw new Error("This file backend cannot save document attachments.");
       const { bytes, extension } = decodeRasterDataUrl(data);
       reference = await backend.storeAttachment(destination, extension, bytes);
       if (!isRasterAttachmentPath(reference))
         throw new Error("File backend returned an invalid attachment path.");
       sources.set(image.src, reference);
       resolved.set(reference, data);
+      if (!embedded && sourcePath !== null)
+        copied.push({ from: image.src, to: reference });
     }
     if (reference !== image.src)
       changes.push({ id: element.id, before: image.src, after: reference });
     elements.push({ ...element, semantic: { ...image, src: reference } });
   }
-  return { document: { ...document, elements }, changes, resolved };
+  return { document: { ...document, elements }, changes, resolved, copied };
 }
 
 /** Missing assets never discard a valid document; callers surface these messages. */

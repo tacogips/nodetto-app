@@ -229,10 +229,26 @@ The preference is remembered across launches. Automatic saving creates a JSONL
 file in the app data directory's `documents` folder after the first shape is
 created; an empty document creates no file. An imported document is named
 after its source file, such as `board.jsonl` for `board.kicad_pcb`, with a
-number added when that name is taken. These documents appear in File > Recent. File > Save as chooses a different location and copies referenced
-images into its `artifacts/` directory before saving JSONL. Move or share both
-the JSONL file and this directory together. Missing attachments are reported;
-saving never deletes files needed by undo or other documents.
+number added when that name is taken. These documents appear in File > Recent.
+
+When another program changes an open file, the app shows the change live and
+writes nothing unless you have unsaved changes in the app. When it saves, lines
+for records the app did not change stay byte-identical and in the same order.
+Saving in the same folder never rewrites a relative image path such as
+`thumbs/widget.png`, even if the image is missing; the save succeeds. A missing
+file is reported when the app opens the document or applies an outside change,
+not by the save. Images without a file reference, such as pasted or dropped
+images, are stored in `artifacts/` beside the document. An imported document
+without a file yet stores its cached images there on first save.
+
+File > Save as can choose another folder. A relative image path stays unchanged
+if the new folder has the same file, or if the destination file is readable but
+the source is not. Otherwise, if the source image is available, the app copies
+it into the new folder's `artifacts/`, updates the path, and reports the copy in
+the status bar. If neither location has the image, or a needed copy cannot be
+stored, Save As fails without writing the document. Move or share the JSONL file
+together with every image it references. Saving never deletes files needed by
+undo or other documents.
 
 Manual saving writes only with File > Save or Cmd/Ctrl+S. Switching back to
 Automatic saves pending edits after the usual quiet period. Quitting waits for

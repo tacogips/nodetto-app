@@ -28,6 +28,7 @@ export {
   PAGE_KIND,
   PAGE_RECORD_KEYS,
 } from "./jsonl/records.ts";
+export { serializeDocumentPreservingText } from "./jsonl/preserve-text.ts";
 export {
   type SerializeOptions,
   serializeDocument,

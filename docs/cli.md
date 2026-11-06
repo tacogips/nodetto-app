@@ -142,9 +142,11 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   can be determined, a glyph no font has produces `warning: glyph-missing
   <id>: ...` on stderr with code points. SVG is unchanged.
 - The desktop app applies outside changes to an open file live, keeping the
-  camera and selection. With unsaved local edits it merges three ways at element
-  and field level (a move and a rename of the same table both survive) and
-  autosaves the result; only the same field changed on both sides, or a file that
+  camera and selection. With no unsaved local edits it does not write the file.
+  With unsaved local edits it merges three ways at element and field level (a move
+  and a rename of the same table both survive) and autosaves the result, keeping
+  untouched lines byte-identical and relative image references unchanged; only
+  the same field changed on both sides, or a file that
   now holds a different document, raises the "File changed on disk" banner.
 
 In `edit update`, `visual` and `semantic` objects deep-merge, arrays replace,

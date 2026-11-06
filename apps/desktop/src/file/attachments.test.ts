@@ -169,3 +169,211 @@ test("a document switch during asset preparation retires the pending JSONL write
   expect(editor.assets.resolve(reference)).toBeUndefined();
   session.dispose();
 });
+
+test("same-directory save preserves relative images and stores embedded images", async () => {
+  const { host, files, events } = backend();
+  const source = new Editor();
+  source.createElement("image.raster", {
+    semantic: { src: "thumbs/widget-1.png", alt: "Widget" },
+  });
+  const { serializeDocument } = await import("@nodetto/io");
+  files.set("/first/design.jsonl", serializeDocument(source.getSnapshot()));
+  const editor = new Editor();
+  const session = new DocumentSession({
+    editor,
+    backend: host,
+    saveMode: "manual",
+  });
+  expect(await session.openPath("/first/design.jsonl")).toBe(true);
+  editor.createElement("image.raster", {
+    semantic: { src: PNG, alt: "Embedded" },
+  });
+  expect(await session.save()).toBe(true);
+  expect(events).toEqual(["asset", "document"]);
+  const written = files.get("/first/design.jsonl");
+  expect(written).toBeDefined();
+  expect(written).toContain("thumbs/widget-1.png");
+  expect(written).not.toContain("data:image");
+  session.dispose();
+});
+
+test("attachment preparation follows the save decision table", async () => {
+  const { prepareDocumentAttachments } = await import("./attachments.ts");
+  const src = "thumbs/widget-1.png";
+  const bytes = decodeRasterDataUrl(PNG).bytes;
+  const make = (count = 1) => {
+    const editor = new Editor();
+    for (let i = 0; i < count; i++)
+      editor.createElement("image.raster", {
+        semantic: { src, alt: "Widget" },
+      });
+    return editor;
+  };
+  const source = "/first/design.jsonl";
+  const destination = "/second/design.jsonl";
+  const sources = (
+    result: Awaited<ReturnType<typeof prepareDocumentAttachments>>,
+  ) =>
+    result.document.elements.map(
+      (element) => (element.semantic as ImageSemantic).src,
+    );
+
+  {
+    const editor = make(3);
+    const { host } = backend();
+    let reads = 0;
+    let stores = 0;
+    host.readAttachment = async () => {
+      reads++;
+      throw new Error("unexpected read");
+    };
+    host.storeAttachment = async () => {
+      stores++;
+      throw new Error("unexpected store");
+    };
+    const result = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      "/first/copy.jsonl",
+      source,
+    );
+    expect(sources(result)).toEqual([src, src, src]);
+    expect(result.changes).toEqual([]);
+    expect(result.copied).toEqual([]);
+    host.storeAttachment = undefined;
+    const missing = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      source,
+      source,
+    );
+    expect(sources(missing)).toEqual([src, src, src]);
+    const bare = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      "copy.jsonl",
+      "design.jsonl",
+    );
+    expect(sources(bare)).toEqual([src, src, src]);
+    expect(reads).toBe(0);
+    expect(stores).toBe(0);
+  }
+  {
+    const editor = make();
+    const { host } = backend();
+    await expect(
+      prepareDocumentAttachments(
+        editor,
+        editor.getSnapshot(),
+        host,
+        destination,
+        null,
+      ),
+    ).rejects.toThrow("Missing attachment");
+    editor.assets.set(src, PNG);
+    const result = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      destination,
+      null,
+    );
+    expect(sources(result)).toEqual([reference]);
+    expect(result.copied).toEqual([]);
+  }
+  for (const sourceAvailable of [true, false]) {
+    const editor = make();
+    const { host, attachments, events } = backend();
+    if (sourceAvailable) attachments.set(`${source}:${src}`, bytes);
+    attachments.set(`${destination}:${src}`, bytes);
+    const result = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      destination,
+      source,
+    );
+    expect(sources(result)).toEqual([src]);
+    expect(result.resolved.get(src)).toBe(PNG);
+    expect(result.copied).toEqual([]);
+    expect(events).toEqual([]);
+  }
+  for (const destinationAvailable of [true, false]) {
+    const editor = make(2);
+    const { host, attachments, events } = backend();
+    attachments.set(`${source}:${src}`, bytes);
+    if (destinationAvailable)
+      attachments.set(`${destination}:${src}`, new Uint8Array([...bytes, 1]));
+    const result = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      destination,
+      source,
+    );
+    expect(sources(result)).toEqual([reference, reference]);
+    expect(result.copied).toEqual([{ from: src, to: reference }]);
+    expect(result.changes).toHaveLength(2);
+    expect(events).toEqual(["asset"]);
+  }
+  {
+    const editor = make();
+    const { host, attachments } = backend();
+    await expect(
+      prepareDocumentAttachments(
+        editor,
+        editor.getSnapshot(),
+        host,
+        destination,
+        source,
+      ),
+    ).rejects.toThrow("Missing attachment");
+    attachments.set(`${source}:${src}`, bytes);
+    host.storeAttachment = undefined;
+    await expect(
+      prepareDocumentAttachments(
+        editor,
+        editor.getSnapshot(),
+        host,
+        destination,
+        source,
+      ),
+    ).rejects.toThrow("cannot save document attachments");
+  }
+  {
+    const editor = new Editor();
+    editor.createElement("image.raster", {
+      semantic: { src: PNG, alt: "Embedded" },
+    });
+    const { host } = backend();
+    host.storeAttachment = undefined;
+    const result = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      destination,
+      null,
+    );
+    expect(sources(result)).toEqual([PNG]);
+    expect(result.copied).toEqual([]);
+  }
+  {
+    const editor = new Editor();
+    editor.createElement("image.raster", {
+      semantic: { src: reference, alt: "Widget" },
+    });
+    editor.assets.set(reference, PNG);
+    const { host } = backend();
+    const result = await prepareDocumentAttachments(
+      editor,
+      editor.getSnapshot(),
+      host,
+      destination,
+      source,
+    );
+    expect(result.copied).toEqual([{ from: reference, to: reference }]);
+  }
+});

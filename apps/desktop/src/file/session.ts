@@ -13,6 +13,7 @@
 //     rewrites the file identically also stays quiet.
 //   - `loading` is set while the editor is being replaced, so the diffs a
 //     load produces never mark the fresh document dirty.
+//   - An automatic save skips writes when the document matches disk.
 //
 // The pieces live beside this file: `session-types.ts` (the published
 // state), `session-paths.ts` (path and error helpers), `session-import.ts`
@@ -31,7 +32,11 @@ import {
   formatIssue,
   getElementTypeDefinition,
 } from "@nodetto/ir";
-import { parseDocumentResult, serializeDocument } from "@nodetto/io";
+import {
+  parseDocumentResult,
+  serializeDocument,
+  serializeDocumentPreservingText,
+} from "@nodetto/io";
 import type { BpmnImportWarning } from "@nodetto/io";
 import {
   hydrateDocumentAttachments,
@@ -100,6 +105,7 @@ export class DocumentSession {
     dirty: false,
     conflict: null,
     outsideChange: null,
+    copiedAttachments: [],
     recent: [],
     importWarnings: [],
     status: "idle",
@@ -160,6 +166,8 @@ export class DocumentSession {
         // The note describes the last outside change; a local edit retires it.
         if (this.current.outsideChange !== null)
           this.patch({ outsideChange: null });
+        if (this.current.copiedAttachments.length > 0)
+          this.patch({ copiedAttachments: [] });
         this.markDirty();
       }
     });
@@ -205,6 +213,7 @@ export class DocumentSession {
       importWarnings: [],
       conflict: null,
       outsideChange: null,
+      copiedAttachments: [],
       status: "idle",
       error: null,
     });
@@ -384,6 +393,7 @@ export class DocumentSession {
       return false;
     }
     if (choice === "keep") {
+      this.lastSavedText = conflict.diskText;
       this.patch({ conflict: null });
       this.markDirty();
       return true;
@@ -474,6 +484,8 @@ export class DocumentSession {
     this.documentGeneration += 1;
     if (this.current.outsideChange !== null)
       this.patch({ outsideChange: null });
+    if (this.current.copiedAttachments.length > 0)
+      this.patch({ copiedAttachments: [] });
     this.loading = true;
     try {
       this.editor.loadDocument(document);
@@ -616,19 +628,41 @@ export class DocumentSession {
     let text: string;
     let attachments: PreparedAttachments;
     try {
-      attachments = await prepareDocumentAttachments(
-        this.editor,
-        this.editor.getSnapshot(),
-        this.backend,
-        path,
-        this.current.filePath,
-      );
       if (
-        generation !== this.documentGeneration ||
-        (automatic && !this.canAutosave())
-      )
-        return false;
-      text = serializeDocument(attachments.document);
+        automatic &&
+        path === this.current.filePath &&
+        this.lastSavedText !== null &&
+        serializeDocumentPreservingText(
+          this.editor.getSnapshot(),
+          this.lastSavedText,
+        ) === this.lastSavedText
+      ) {
+        this.patch({ dirty: false });
+        return true;
+      }
+      let revision: number;
+      do {
+        revision = this.editor.store.revision;
+        attachments = await prepareDocumentAttachments(
+          this.editor,
+          this.editor.getSnapshot(),
+          this.backend,
+          path,
+          this.current.filePath,
+        );
+        if (
+          generation !== this.documentGeneration ||
+          (automatic && !this.canAutosave())
+        )
+          return false;
+      } while (revision !== this.editor.store.revision);
+      text =
+        this.lastSavedText === null
+          ? serializeDocument(attachments.document)
+          : serializeDocumentPreservingText(
+              attachments.document,
+              this.lastSavedText,
+            );
     } catch (error) {
       this.fail(`could not serialize the document: ${describeError(error)}`);
       return false;
@@ -660,11 +694,15 @@ export class DocumentSession {
       this.loading = false;
     }
     this.lastSavedText = text;
-    const dirty = serializeDocument(this.editor.getSnapshot()) !== text;
+    const dirty =
+      serializeDocumentPreservingText(this.editor.getSnapshot(), text) !== text;
     this.patch({
       filePath: path,
       fileName: baseName(path),
       dirty,
+      ...(attachments.copied.length > 0
+        ? { copiedAttachments: attachments.copied }
+        : {}),
       // Saving with a banner up is the user choosing "keep mine", and disk
       // now holds their document, so that banner is answered. A banner
       // raised *during* this write is a different question about a change
@@ -745,7 +783,7 @@ export class DocumentSession {
         this.editor.loadDocument(target, { preserveView: true });
       } else if (!isEmptyCommit(commit)) {
         this.editor.store.commit(commit);
-        this.editor.reconcileDerivedState();
+        if (this.current.dirty) this.editor.reconcileDerivedState();
       }
     } finally {
       this.loading = false;

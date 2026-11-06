@@ -3,6 +3,7 @@
 
 import type { DocumentChangeSource, Editor } from "@nodetto/core";
 import type { BpmnImportWarning } from "@nodetto/io";
+import type { PreparedAttachments } from "./attachments.ts";
 import type { FileBackend, RecentEntry } from "./backend.ts";
 import type { SaveMode } from "./save-mode.ts";
 
@@ -36,6 +37,8 @@ export interface SessionState {
   readonly conflict: SessionConflict | null;
   /** Cleared by the next local edit, open or new document. */
   readonly outsideChange: OutsideChange | null;
+  /** Cleared by the next local edit, open or new document. */
+  readonly copiedAttachments: PreparedAttachments["copied"];
   readonly recent: readonly RecentEntry[];
   readonly importWarnings: readonly BpmnImportWarning[];
   readonly status: SessionStatus;

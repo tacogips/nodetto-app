@@ -361,9 +361,12 @@ auto layout. Field overrides can be restored individually from Source
 overrides. Refresh and structure reconciliation each form one undoable,
 collaborative transaction.
 The Image importer accepts PNG, JPEG, WebP or GIF assets (up to 1 MiB
-each). Desktop saving stores their bytes in a sibling `artifacts/` directory
-and references them by relative paths in JSONL. Legacy embedded images remain
-readable and are externalized on the next desktop save. The same formats can be dragged directly onto the canvas, with up to
+each). Desktop saving stores newly embedded image bytes in a sibling `artifacts/`
+directory and references them by relative paths in JSONL. Legacy embedded images
+remain readable and are externalized on the next save that actually writes.
+Existing relative references stay unchanged on same-folder saves; Save As may
+copy an image when needed in the new folder. Opening or reloading writes nothing.
+The same formats can be dragged directly onto the canvas, with up to
 16 files decoded before one atomic insertion. Multi-image drops begin at the
 exact pointer location in page coordinates, retain aspect ratio within a
 480-pixel edge and flow into deterministic rows. A failed file or a document

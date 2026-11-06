@@ -133,7 +133,7 @@ function elementLine(element: Element): string {
   return stringifyCanonical(record, elementRecordOrder(definition?.keyOrder));
 }
 
-function unknownLine(record: UnknownRecord): string {
+export function unknownLine(record: UnknownRecord): string {
   const merged: Record<string, unknown> = { ...record.data };
   merged["kind"] = record.kind;
   return stringifyCanonical(merged, UNKNOWN_RECORD_ORDER);
