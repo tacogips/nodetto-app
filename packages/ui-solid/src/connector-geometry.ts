@@ -29,6 +29,7 @@ export function sameConnectorGeometry(
     samePoint(a.start, b.start) &&
     samePoint(a.end, b.end) &&
     samePoint(a.labelPoint, b.labelPoint) &&
+    a.labelStartX === b.labelStartX &&
     samePoint(a.bendPoint, b.bendPoint) &&
     a.bendAxis === b.bendAxis &&
     samePoints(a.points, b.points) &&

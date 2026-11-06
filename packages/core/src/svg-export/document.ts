@@ -32,12 +32,18 @@ import { expandContainers } from "../frame-tree.ts";
 import { type Box, boxCenter, rotatedBox, unionBoxes } from "../geometry.ts";
 import { gradientId, strokeGradientId } from "../gradient.ts";
 import { memberIdsOf } from "../group.ts";
+import { connectorLabelExtent, connectorLabelLayout } from "../label-layout.ts";
+import { SEQUENCE_SELF_LABEL_BOUNDS_GLYPH_WIDTH } from "../sequence-layout.ts";
 import { createShapeContext } from "../hit-test.ts";
 import { croppedImageBox } from "../image-crop.ts";
 import { containerPaintOrder } from "../paint-order.ts";
 import { selfContained } from "../references.ts";
 import type { ShapeContext, ShapeUtilRegistry } from "../shape-util.ts";
-import { endpointReaderFor, resolveConnector } from "../shapes/connector.ts";
+import {
+  connectorDecoration,
+  endpointReaderFor,
+  resolveConnector,
+} from "../shapes/connector.ts";
 import { freehandGeometry } from "../shapes/freehand.ts";
 import { stateNodeLabelBox } from "../shapes/state.ts";
 import { useCaseNodeLabelBox } from "../shapes/usecase.ts";
@@ -311,6 +317,34 @@ export function renderElementsSvg(
               height: primitive.lineHeight * primitive.lines.length,
             });
           }
+        }
+      }
+    }
+    if (element.type === "sequence.message" && !clip) {
+      const resolved = resolveConnector(
+        element,
+        context,
+        endpointReaderFor(element.type),
+      );
+      if (resolved?.labelStartX !== undefined) {
+        const layout = connectorLabelLayout(
+          connectorDecoration(element).label,
+          element.visual,
+        );
+        const extent = connectorLabelExtent(layout, resolved.labelPoint);
+        if (extent) {
+          let longest = 0;
+          for (const line of layout.lines)
+            longest = Math.max(longest, [...line].length);
+          boxes.push({
+            x: resolved.labelStartX,
+            y: extent.y,
+            width:
+              longest *
+              (layout.fontSize * SEQUENCE_SELF_LABEL_BOUNDS_GLYPH_WIDTH +
+                Math.max(0, element.visual.style?.letterSpacing ?? 0)),
+            height: extent.height,
+          });
         }
       }
     }

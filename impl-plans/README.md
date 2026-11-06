@@ -40,8 +40,8 @@ and lint manifests (`clm-s725-dispatch.json`, `clm-s731-dispatch.json`,
 `clm-s732-dispatch.json`, `clm-s736-dispatch.json`,
 `clm-s737-dispatch.json`, `clm-s740-dispatch.json`) also stay in `active/`
 with their pre-archive `planPath` values; s740 was the final dispatch and
-the earlier ones must not be dispatched again. The file save stability
-manifest `fss-s751-dispatch.json` also stays in `active/` with its
+the earlier ones must not be dispatched again. The manifests `fss-s751-dispatch.json`, `seq-self-s750-dispatch.json`
+also stay in `active/` with their
 pre-archive `planPath` values.
 
 ## Completed
@@ -67,6 +67,38 @@ desktop app; session tests use a mock backend. Progress logs stay in
 | [fss-02-attachments](completed/fss-02-attachments.md) | Per-`src` attachment decisions and Save As copies |
 | [fss-03-session](completed/fss-03-session.md) | Save gate, reconcile, snapshot loop, status note and session tests |
 | [fss-04-docs-final](completed/fss-04-docs-final.md) | User docs and final verification |
+
+Sequence self-messages (session 750; design:
+`design-docs/specs/design-sequence-self-messages.md`, user QA:
+`design-docs/user-qa/sequence-self-messages.md`; no GitHub issue). A sequence
+participant can connect to itself in the Bun and native CLI and with the app's
+message tool, for `sync`, `async` and `return`. A self-message draws as a loop
+with its label beside it in SVG, PNG, PDF and on the canvas, and rows,
+activations and lifelines leave room for the loop. Golden fixtures from base
+commit 1e8f43d cover documents without self-messages. Wave 1 ran plan 01, wave
+2 ran plans 02-05, and wave 3 ran plans 06 and 07. Serial reconciliation on the
+combined tree recorded `mise run verify` exit 0 (3309 pass, 58 skip, 0 fail)
+and `mise run test-cli` exit 0 on its first attempt (365 pass, 0 fail). Median
+native user time was 1.13 s against 1.08 s for the pre-change binary, a ratio
+of 1.05. There is no browser E2E suite, so the canvas has interaction and pure
+helper tests only. Native raster tests have run only on macOS. Native PNG loses
+label text for an unresolved named font such as Arial; this is a pre-existing
+defect left for an owner decision. Plan 06 lines 62 and 66 keep wording that
+its review brief superseded: independent edit runs are compared on everything
+not generated, and its native PNG fixture uses the default font. Q1 and Q2 in
+the user QA stay open on their defaults. Progress logs stay in `progress/`.
+Evidence: `tmp/seq-self-s750/<planId>/` and
+`tmp/seq-self-s750/reconcile-wave-005/`.
+
+| Plan | Scope |
+|---|---|
+| [seq-self-01-contract](completed/seq-self-01-contract.md) | Pre-change goldens, loop geometry, row layout, route, label anchor and connect rule |
+| [seq-self-02-export](completed/seq-self-02-export.md) | SVG loop, label placement and export viewBox bound |
+| [seq-self-03-shape-bounds](completed/seq-self-03-shape-bounds.md) | Sequence shape bounds, rows, activations and lifelines |
+| [seq-self-04-authoring](completed/seq-self-04-authoring.md) | Self-message planning in `planSequenceMessage` and authoring tests |
+| [seq-self-05-canvas](completed/seq-self-05-canvas.md) | Canvas loop, label and message tool drag |
+| [seq-self-06-cli](completed/seq-self-06-cli.md) | `types` note, CLI tests, native parity, PNG containment and timing |
+| [seq-self-07-wiring](completed/seq-self-07-wiring.md) | Help text, `docs/cli.md` and help parity tests |
 
 CLI layout, merge and lint (sessions 725, 731, 732, 736, 737 and 740;
 design: `design-docs/specs/design-cli-layout-merge-lint.md`; no GitHub

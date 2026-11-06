@@ -205,6 +205,16 @@ default columns, and message order determines spaced timeline rows. Lifelines
 and activation bars extend to the messages. Explicit saved positions remain
 authoritative, and adding messages or reordering participants works with the
 same resolved geometry without rewriting the imported document on open.
+A sequence participant can connect to itself to create a self-call loop on the
+next timeline row, with its label beside the loop. The message kind can be
+`sync`, `async`, or `return`; following rows and lifelines leave room for the
+loop. In the app, drag with the Message tool from a lifeline back to the same
+lifeline to create a self-call. A click creates nothing, and a generic
+connector-tool drag does not create one.
+
+```json
+{"op":"connect","from":"@a","to":"@a","label":"check","semantic":{"kind":"sync"}}
+```
 
 See [the design](../design-docs/specs/design-cli-ai-drawing.md).
 

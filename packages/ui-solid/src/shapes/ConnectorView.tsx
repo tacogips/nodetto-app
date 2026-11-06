@@ -13,6 +13,7 @@ import {
   connectorLabelBaselines,
   connectorLabelLayout,
   connectorPath,
+  type ConnectorEndpoints,
   diamondGradientPatches,
   endpointReaderFor,
   shapeAuthoringWarnings,
@@ -48,6 +49,15 @@ function markerUrl(
   return kind === null
     ? undefined
     : `url(#${prefix}${markerVariant(kind, end).id})`;
+}
+
+export function connectorLabelTextAttrs(resolved: ConnectorEndpoints): {
+  readonly x: number;
+  readonly textAnchor: "start" | "middle";
+} {
+  return resolved.labelStartX === undefined
+    ? { x: resolved.labelPoint.x, textAnchor: "middle" }
+    : { x: resolved.labelStartX, textAnchor: "start" };
 }
 
 export function ConnectorView(props: ConnectorViewProps): JSX.Element {
@@ -359,6 +369,7 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                 connectorLabelBaselines(layout(), resolved().labelPoint.y);
               const backdrop = () =>
                 connectorLabelBackdrop(layout(), resolved().labelPoint);
+              const textAttrs = () => connectorLabelTextAttrs(resolved());
               return (
                 <>
                   <Show when={backdrop()}>
@@ -372,13 +383,13 @@ export function ConnectorView(props: ConnectorViewProps): JSX.Element {
                       />
                     )}
                   </Show>
-                  <text class="nodetto-connector-label" text-anchor="middle">
+                  <text
+                    class="nodetto-connector-label"
+                    text-anchor={textAttrs().textAnchor}
+                  >
                     <For each={layout().lines}>
                       {(line, index) => (
-                        <tspan
-                          x={resolved().labelPoint.x}
-                          y={baselines()[index()]}
-                        >
+                        <tspan x={textAttrs().x} y={baselines()[index()]}>
                           {line}
                         </tspan>
                       )}

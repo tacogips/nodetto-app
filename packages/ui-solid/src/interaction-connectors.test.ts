@@ -584,3 +584,80 @@ describe("free line gestures", () => {
     expect(editor.store.get(edge.id)!.semantic).not.toHaveProperty("to");
   });
 });
+
+describe("sequence self-message gestures", () => {
+  function setup(
+    tool:
+      | typeof Tool.SequenceMessage
+      | typeof Tool.Connector = Tool.SequenceMessage,
+    locked = false,
+  ) {
+    const editor = new Editor();
+    const participant = editor.createElement("sequence.participant", {
+      visual: { x: 0, y: 0, width: 160, height: 300, locked },
+    });
+    return { editor, participant, ...interactionFor(editor, tool) };
+  }
+  function drag(
+    interaction: ReturnType<typeof setup>["interaction"],
+    distance: number,
+  ) {
+    interaction.onPointerDown(pointer({ clientX: 80, clientY: 100 }));
+    interaction.onPointerMove(
+      pointer({ clientX: 80, clientY: 100 + distance }),
+    );
+    interaction.onPointerUp(pointer({ clientX: 80, clientY: 100 + distance }));
+  }
+  test("drag creates one selected self-message in one undo step", () => {
+    const { editor, participant, interaction } = setup();
+    const before = editor.history.undoSize;
+    drag(interaction, 40);
+    const messages = editor.store
+      .listElements()
+      .filter((e) => e.type === "sequence.message");
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.semantic).toMatchObject({
+      from: participant,
+      to: participant,
+    });
+    expect([...editor.selection.ids()]).toEqual([messages[0]?.id]);
+    expect(editor.history.undoSize).toBe(before + 1);
+    editor.undo();
+    expect(editor.store.get(messages[0]!.id)).toBeUndefined();
+    expect(editor.history.undoSize).toBe(before);
+  });
+  test("clicks and short drags create nothing", () => {
+    for (const distance of [0, 2]) {
+      const { editor, interaction } = setup();
+      drag(interaction, distance);
+      expect(
+        editor.store
+          .listElements()
+          .filter((e) => e.type === "sequence.message"),
+      ).toHaveLength(0);
+    }
+  });
+  test("locked participants and generic connector self-drags create nothing", () => {
+    for (const { tool, locked } of [
+      { tool: Tool.SequenceMessage, locked: true },
+      { tool: Tool.Connector, locked: false },
+    ]) {
+      const { editor, interaction } = setup(tool, locked);
+      drag(interaction, 40);
+      expect(editor.store.listElements()).toHaveLength(1);
+    }
+  });
+  test("state transition click still self-connects", () => {
+    const editor = new Editor();
+    const state = editor.createElement("state.node", {
+      visual: { x: 0, y: 0, width: 160, height: 100 },
+    });
+    const { interaction } = interactionFor(editor, Tool.StateTransition);
+    interaction.onPointerDown(pointer({ clientX: 80, clientY: 50 }));
+    interaction.onPointerUp(pointer({ clientX: 80, clientY: 50 }));
+    expect(
+      editor.store.listElements().find((e) => e.type === "state.transition")
+        ?.semantic,
+    ).toMatchObject({ from: state, to: state });
+  });
+});

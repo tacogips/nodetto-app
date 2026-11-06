@@ -162,6 +162,7 @@ ${EXIT_CODES}`,
 Without a type, list the element types grouped by the page kinds that use them.
 With a type, print its semantic fields (name, type, required, default), its
 visual fields and a minimal "add" operation for nodetto-cli edit.
+"nodetto-cli types sequence.message" describes self-messages.
 
   --kind     Only types typically drawn on this page kind (freeform, erd,
              uml, sequence, state, flowchart, architecture, bpmn, breadboard
@@ -274,7 +275,9 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     the next timeline row, BPMN flow (BPMN rules apply), otherwise a generic edge with an arrow.
     "label" sets the label (trigger for states, name for BPMN); "type" and
     "semantic" override. A table or state may connect to itself (a
-    self-referencing foreign key or a self-transition).
+    self-referencing foreign key or a self-transition). A sequence participant
+    may connect to itself, creating a self-call loop on the next timeline row.
+    Its semantic.kind is sync, async or return.
   - scale enlarges or shrinks "ids" (with the contents of their frames and
     groups) or every element of "page" by "factor", keeping the layout:
     positions and sizes scale about "origin" ({"x","y"}; default the top-left

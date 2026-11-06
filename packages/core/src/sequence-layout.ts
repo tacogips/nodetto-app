@@ -8,6 +8,39 @@ import type {
 import type { ShapeContext } from "./shape-util.ts";
 import { compareFractional } from "./fractional.ts";
 
+export const SEQUENCE_SELF_LOOP_WIDTH = 40;
+export const SEQUENCE_SELF_LOOP_HEIGHT = 32;
+export const SEQUENCE_SELF_LABEL_GAP = 8;
+export const SEQUENCE_SELF_LABEL_BOUNDS_GLYPH_WIDTH = 1.15;
+
+export function isSequenceSelfMessage(element: Element): boolean {
+  if (element.type !== "sequence.message") return false;
+  const semantic = element.semantic as SequenceMessageSemantic;
+  return typeof semantic.from === "string" && semantic.from === semantic.to;
+}
+
+export function sequenceMessageExtent(element: Element): number {
+  return isSequenceSelfMessage(element) ? SEQUENCE_SELF_LOOP_HEIGHT : 0;
+}
+
+export function sequenceOrderBottomY(
+  element: Element,
+  order: string,
+  context: ShapeContext,
+): number {
+  const elements = context.elementsOnPage?.(element.page) ?? [element];
+  return (
+    sequenceOrderY(element, order, context) +
+    (elements.some(
+      (candidate) =>
+        isSequenceSelfMessage(candidate) &&
+        (candidate.semantic as SequenceMessageSemantic).order === order,
+    )
+      ? SEQUENCE_SELF_LOOP_HEIGHT
+      : 0)
+  );
+}
+
 export function sequenceParticipants(
   element: Element,
   context: ShapeContext,
@@ -39,9 +72,18 @@ export function sequenceOrderY(
   );
   if (explicit?.visual.y !== undefined) return explicit.visual.y;
   const orders = new Set<string>([order]);
+  let priorSelfMessages = 0;
   for (const candidate of elements) {
-    if (candidate.type === "sequence.message")
-      orders.add((candidate.semantic as SequenceMessageSemantic).order);
+    if (candidate.type === "sequence.message") {
+      const candidateOrder = (candidate.semantic as SequenceMessageSemantic)
+        .order;
+      orders.add(candidateOrder);
+      if (
+        isSequenceSelfMessage(candidate) &&
+        compareFractional(candidateOrder, order) < 0
+      )
+        priorSelfMessages += 1;
+    }
     if (candidate.type === "sequence.activation") {
       const semantic = candidate.semantic as SequenceActivationSemantic;
       orders.add(semantic.fromOrder);
@@ -55,7 +97,9 @@ export function sequenceOrderY(
       (participant) => participant.visual.y ?? 0,
     ),
   );
-  return headerY + 164 + slot * 52;
+  return (
+    headerY + 164 + slot * 52 + priorSelfMessages * SEQUENCE_SELF_LOOP_HEIGHT
+  );
 }
 
 export function sequenceMessageY(
