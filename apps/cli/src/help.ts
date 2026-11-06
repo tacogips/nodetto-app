@@ -275,6 +275,14 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     "label" sets the label (trigger for states, name for BPMN); "type" and
     "semantic" override. A table or state may connect to itself (a
     self-referencing foreign key or a self-transition).
+    connect accepts "visual", "routing" and "routingAvoidObstacles". Routing
+    precedence: explicit field > page default > page convention > existing default.
+    A convention requires every routing-capable peer to have the same stored
+    straight or orthogonal routing and obstacle setting. Set a default with
+    {"op":"set-page-routing","id":"p1","routing":"orthogonal","routingAvoidObstacles":true};
+    routing null clears it. add-page accepts connectorRouting; manual is rejected.
+    Stored visual routing is honored, though semantic is the supported location.
+    Arrange writes semantic routingLane, labelPosition, labelOffsetX and labelOffsetY.
   - scale enlarges or shrinks "ids" (with the contents of their frames and
     groups) or every element of "page" by "factor", keeping the layout:
     positions and sizes scale about "origin" ({"x","y"}; default the top-left
@@ -542,7 +550,10 @@ Exit codes: 0 clean, 1 conflicts (output written), 2 usage or input error.`,
   [--ids <id,...>] [--reset-manual] [--write] [--check]
 
 Tidy is the default; overlaps removes overlaps, layered lays out columns and
-route recomputes connectors. --direction applies to tidy and layered. --frames
+route separates connectors and places labels; layered selects a better member order
+when available, without a general crossing guarantee. Moved labels are reported on
+stderr. Self-loops prefer top, right, bottom, left; movable ends can be reassigned
+to free a side, otherwise the least-used side is shared. --direction applies to tidy and layered. --frames
 is layered only; --ids is route only; --reset-manual is layered or route only.
 Stored ports and routes count as manual and are preserved unless rerun with
 --reset-manual. --write rewrites the file; --check exits 1 if anything changes.
@@ -595,10 +606,10 @@ ${EXIT_CODES}`,
                         [--config <file>] [--format text|json] [--fix] [--metrics]
                         [--font-dir <dir>]
 
---fix wraps text using CJK break rules without resizing boxes; .bpmn exits 2.
---metrics reports edge crossings and label overlaps and never changes the exit code.
-Text: metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s).
-JSON contains edgeCrossings and labelOverlaps per page and in summary.
+--fix wraps text and moves colliding labels; .bpmn exits 2.
+--metrics reports edge crossings, label overlaps and segmentOverlaps; it never changes the exit code.
+Text: metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s), <k> overlapping segment pair(s).
+JSON contains edgeCrossings, labelOverlaps and segmentOverlaps per page and in summary.
 Metrics cover bpmn, erd, state, uml, flowchart, architecture and freeform.
 Rules: bpmn and breadboard: existing rules and image-missing; architecture and
 freeform: text layout and image-missing; flowchart: text layout, node-overlap

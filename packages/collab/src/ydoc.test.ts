@@ -325,3 +325,23 @@ describe("ydoc mapping", () => {
     expect(ydocToIr(doc).elements).toHaveLength(1);
   });
 });
+
+test("page connector routing survives collaboration and invalid values are dropped", () => {
+  const base = erdDocument();
+  const connectorRouting = {
+    routing: "orthogonal" as const,
+    routingAvoidObstacles: true,
+  };
+  const doc = {
+    ...base,
+    pages: base.pages.map((page) => ({ ...page, connectorRouting })),
+  };
+  expect(roundTrip(doc).pages).toEqual(doc.pages);
+  expect(
+    pageFromY("p", {
+      name: "Page",
+      kind: "freeform",
+      connectorRouting: { routing: "manual" },
+    }).connectorRouting,
+  ).toBeUndefined();
+});

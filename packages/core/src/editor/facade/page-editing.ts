@@ -144,6 +144,26 @@ export class PageEditing extends SelectionEditing {
     return true;
   }
 
+  setPageConnectorRouting(
+    id: PageId,
+    value: NonNullable<Page["connectorRouting"]> | null,
+    applyOptions: ApplyOptions = {},
+  ): boolean {
+    const page = this.store.getPage(id);
+    const current = page?.connectorRouting;
+    if (
+      !page ||
+      (current?.routing === value?.routing &&
+        current?.routingAvoidObstacles === value?.routingAvoidObstacles)
+    )
+      return false;
+    this.apply(
+      [{ type: "updatePage", id, page: { connectorRouting: value } }],
+      applyOptions,
+    );
+    return true;
+  }
+
   /** Select a design-token mode for one page; null restores Default. */
   setPageTokenMode(
     id: PageId,

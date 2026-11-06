@@ -10,6 +10,8 @@ import {
   requireText,
 } from "../operation-input.ts";
 import { addElement } from "./add.ts";
+import { resolveConnectRouting, supportsRouting } from "../connect-routing.ts";
+import { withBoxLabelAlign } from "../visual-patch.ts";
 
 /**
  * Connect two elements the way the app's connect tool does (connectSmart):
@@ -47,7 +49,13 @@ export function connectElements(
       index,
       `${shape.id} is not a connector; use {"op":"add","shape":"${shape.id}"}.`,
     );
-  if (typeof operation["type"] === "string")
+  const resolved = resolveConnectRouting(batch, from.page, operation, index);
+  if (typeof operation["type"] === "string") {
+    if (!supportsRouting(operation["type"]) && resolved.explicit)
+      throw new OperationError(
+        index,
+        `${operation["type"]} does not support routing`,
+      );
     return addElement(
       batch,
       {
@@ -68,14 +76,19 @@ export function connectElements(
                 }
               : {}),
           },
-          isPlainObject(operation["semantic"]) ? operation["semantic"] : {},
+          deepMerge(
+            isPlainObject(operation["semantic"]) ? operation["semantic"] : {},
+            supportsRouting(operation["type"]) ? resolved.routing : {},
+          ),
         ),
+        ...(resolved.visual === undefined ? {} : { visual: resolved.visual }),
         ...(typeof operation["ref"] === "string"
           ? { ref: operation["ref"] }
           : {}),
       },
       index,
     );
+  }
   batch.editor.setCurrentPage(from.page);
   const id = shape
     ? connectShape(batch.editor, shape.id, from.id, to.id)
@@ -95,6 +108,8 @@ export function connectElements(
   const created = batch.editor.store.get(id);
   if (!created)
     throw new OperationError(index, "The connector was not created.");
+  if (!supportsRouting(created.type) && resolved.explicit)
+    throw new OperationError(index, `${created.type} does not support routing`);
   let patch: Record<string, Json> = {};
   if (created.type === "erd.relation") {
     const column = (table: Element, query: Json, field: string) => {
@@ -131,6 +146,16 @@ export function connectElements(
   }
   if (isPlainObject(operation["semantic"]))
     patch = deepMerge(patch, operation["semantic"]) as Record<string, Json>;
+  if (supportsRouting(created.type))
+    patch = deepMerge(patch, resolved.routing) as Record<string, Json>;
+  if (resolved.visual !== undefined)
+    batch.editor.apply([
+      {
+        type: "updateVisual",
+        id,
+        visual: withBoxLabelAlign(created.type, resolved.visual, undefined),
+      },
+    ]);
   if (Object.keys(patch).length)
     batch.editor.apply([
       {

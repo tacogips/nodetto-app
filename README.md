@@ -88,7 +88,7 @@ Tauri desktop app. The hosted cloud edition lives in a private repository. See
 
 ### Layout, selection, and merging
 
-`arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text; `lint --metrics` reports crossings and label overlaps. `--quiet` suppresses warnings.
+`arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text and moves labels; `lint --metrics` reports crossings, label overlaps and overlapping segment pairs. `--quiet` suppresses warnings.
 
 Edit references use `name:<text>`, ids and `@ref`. `update` and `delete` accept `where` with `page`, `type`, `from`, `to`, `parent`, `name`, and `expect`; `select` binds a `ref`. `label` updates display text. `carryMembers` controls frame, `bpmn.participant`, `bpmn.lane`, `bpmn.subProcess` and `breadboard.board` box updates. See the [CLI guide](docs/cli.md#layout-selection-and-merging) for per-kind tables and limitations.
 

@@ -13,6 +13,7 @@ function stable(value: unknown): unknown {
             key !== "routing" &&
             key !== "routingAxis" &&
             key !== "routingBend" &&
+            key !== "routingLane" &&
             key !== "routingAvoidObstacles" &&
             key !== "routingWaypoints",
         )

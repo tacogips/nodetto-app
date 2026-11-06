@@ -29,6 +29,7 @@ import {
   movePage,
   renamePage,
   setPageMode,
+  setPageRouting,
   deletePage,
 } from "./operations/pages.ts";
 import { addElement } from "./operations/add.ts";
@@ -318,6 +319,9 @@ export class Batch {
       case "set-page-mode":
         setPageMode(this, operation, index);
         return;
+      case "set-page-routing":
+        setPageRouting(this, operation, index);
+        return;
       case "delete-page":
         deletePage(this, operation, index);
         return;
@@ -361,7 +365,7 @@ export class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, set-page-routing, delete-page, add, connect, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
         );
     }
   }

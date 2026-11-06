@@ -40,6 +40,15 @@ import {
 import type { Store } from "./store.ts";
 import { isFractionalKey } from "./fractional.ts";
 
+function validPageRouting(value: unknown): boolean {
+  return (
+    isPlainObject(value) &&
+    (value["routing"] === "straight" || value["routing"] === "orthogonal") &&
+    (value["routingAvoidObstacles"] === undefined ||
+      typeof value["routingAvoidObstacles"] === "boolean")
+  );
+}
+
 export type Command =
   | { readonly type: "createElement"; readonly element: Element }
   | { readonly type: "deleteElements"; readonly ids: readonly ElementId[] }
@@ -83,6 +92,7 @@ export type Command =
         readonly mode?: PageMode | null;
         readonly tokenMode?: string | null;
         readonly sqlDialect?: Page["sqlDialect"] | null;
+        readonly connectorRouting?: Page["connectorRouting"] | null;
         readonly order?: FractionalIndex | null;
       };
     }
@@ -380,6 +390,13 @@ function validateNewPage(
   }
   if (page.mode !== undefined && !isPageMode(page.mode))
     out.push(error("value.enum", "page.mode", "unknown page mode"));
+  if (
+    page.connectorRouting !== undefined &&
+    !validPageRouting(page.connectorRouting)
+  )
+    out.push(
+      error("value.enum", "page.connectorRouting", "invalid connector routing"),
+    );
   if (
     page.sqlDialect !== undefined &&
     !["postgresql", "mysql", "sqlite"].includes(page.sqlDialect)
@@ -723,7 +740,22 @@ export function applyCommands(
             "updatePage: invalid SQL dialect",
           );
         }
+        if (
+          patch.connectorRouting != null &&
+          !validPageRouting(patch.connectorRouting)
+        )
+          throw new CommandError(
+            [
+              error(
+                "value.enum",
+                "page.connectorRouting",
+                "invalid connector routing",
+              ),
+            ],
+            "updatePage: invalid connector routing",
+          );
         const {
+          connectorRouting: _oldConnectorRouting,
           mode: _oldPageMode,
           tokenMode: _oldMode,
           order: _oldOrder,
@@ -739,6 +771,13 @@ export function applyCommands(
               : previous.mode === undefined
                 ? {}
                 : { mode: previous.mode }),
+          ...(patch.connectorRouting === null
+            ? {}
+            : patch.connectorRouting !== undefined
+              ? { connectorRouting: patch.connectorRouting }
+              : previous.connectorRouting === undefined
+                ? {}
+                : { connectorRouting: previous.connectorRouting }),
           ...(patch.sqlDialect === null
             ? {}
             : patch.sqlDialect !== undefined
@@ -775,6 +814,7 @@ export function applyCommands(
               : { mode: previous.mode ?? null }),
             tokenMode: previous.tokenMode ?? null,
             sqlDialect: previous.sqlDialect ?? null,
+            connectorRouting: previous.connectorRouting ?? null,
             order: previous.order ?? null,
           },
         });

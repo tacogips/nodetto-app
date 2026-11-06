@@ -775,6 +775,8 @@ export {
 } from "./document-merge.ts";
 export {
   planLayered,
+  selectLayeredOrder,
+  type LayeredEvaluate,
   columnFrames,
   LAYERED_PAGE_KINDS,
   type LayeredOptions,
@@ -795,6 +797,11 @@ export {
   NODE_OVERLAP_PAGE_KINDS,
   type NodeOverlapFinding,
 } from "./diagram-lint/node-overlap.ts";
+export {
+  planLabelFixes,
+  type LabelMoveFix,
+  type LabelFields,
+} from "./connector-label-placement.ts";
 export { planTextWrapFixes, type TextWrapFix } from "./text-layout-lint/fix.ts";
 
 export { bpmnFlowLabelBox } from "./bpmn/notation.ts";

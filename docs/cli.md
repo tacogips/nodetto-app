@@ -283,7 +283,11 @@ nodetto-cli lint flow.jsonl --fix
 nodetto-cli lint flow.jsonl --metrics --format json
 ```
 
-`lint --fix` wraps text using CJK break rules without resizing boxes and exits 2 on `.bpmn`. `--metrics` reports `edgeCrossings` and `labelOverlaps` per page and in the JSON summary, or `metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s)` in text; metrics never change exit codes.
+`connect` accepts `visual`, `routing`, and `routingAvoidObstacles`. Precedence is explicit field > page default > page convention > existing default. A convention exists only when every routing-capable peer has the same stored straight or orthogonal routing and obstacle setting; absent or manual routing prevents a convention. Set a page default with `{"op":"set-page-routing","id":"p1","routing":"orthogonal","routingAvoidObstacles":true}`; use `routing: null` to clear it. `add-page` accepts `connectorRouting` with the same fields. Manual page defaults are rejected. Routing stored under `visual` is honored, but `semantic` is the supported location.
+
+Layered chooses a better measured member order when available; it does not guarantee fewer crossings on every page. Route and layered separate routes, place labels, and report moved label IDs on stderr. They write semantic `routingLane`, `labelPosition`, `labelOffsetX` and `labelOffsetY`. Rerun with `--reset-manual` after moving elements. Self-loops prefer top, right, bottom, then left; movable ends are reassigned to free a side when possible, otherwise the least-used side is shared. A free label position means one of the fixed candidate positions and offsets has zero collision score; when none does, the lowest-scoring candidate remains visible in metrics.
+
+`lint --fix` wraps text using CJK break rules and moves colliding labels in one write; `.bpmn` exits 2. `--metrics` reports `edgeCrossings`, `labelOverlaps` and `segmentOverlaps` per page and in the JSON summary. Text reports crossings, edge-label overlaps and overlapping segment pairs. Metrics never change exit codes.
 
 | Page kind | Lint rules |
 | --- | --- |

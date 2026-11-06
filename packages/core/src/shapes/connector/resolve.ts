@@ -9,6 +9,7 @@ import {
   erdEndpointColumnIds,
   type ErdEndpoint,
   getElementTypeDefinition,
+  MAX_ROUTING_LANE,
 } from "@nodetto/ir";
 import { groupedIds, isConnectorBackdrop } from "../../backdrops.ts";
 import {
@@ -94,17 +95,25 @@ function obstacleBoxes(
   start: Vec,
   end: Vec,
   context: ShapeContext,
+  lane: number,
 ): readonly Box[] {
   const boxes: Box[] = [];
   for (const { id, box } of routingObstacles(element, context)) {
     if (endpointIds.has(id)) continue;
-    const contains = (point: Vec) =>
-      point.x >= box.x &&
-      point.x <= box.x + box.width &&
-      point.y >= box.y &&
-      point.y <= box.y + box.height;
-    // A surface containing an endpoint must not block its own connector.
-    if (!contains(start) && !contains(end)) boxes.push(box);
+    const contains = (b: Box, point: Vec) =>
+      point.x >= b.x &&
+      point.x <= b.x + b.width &&
+      point.y >= b.y &&
+      point.y <= b.y + b.height;
+    if (contains(box, start) || contains(box, end)) continue;
+    const grow = lane * 8;
+    const grown = {
+      x: box.x - grow,
+      y: box.y - grow,
+      width: box.width + 2 * grow,
+      height: box.height + 2 * grow,
+    };
+    boxes.push(contains(grown, start) || contains(grown, end) ? box : grown);
   }
   return boxes;
 }
@@ -188,6 +197,32 @@ function computeConnector(
     typeof element.semantic === "object" && element.semantic !== null
       ? (element.semantic as Record<string, unknown>)
       : {};
+  const visual =
+    typeof element.visual === "object" && element.visual !== null
+      ? (element.visual as unknown as Record<string, unknown>)
+      : {};
+  const extensions =
+    typeof visual["extensions"] === "object" && visual["extensions"] !== null
+      ? (visual["extensions"] as Record<string, unknown>)
+      : {};
+  const stored = (key: string): unknown =>
+    key in semantic
+      ? semantic[key]
+      : key in visual
+        ? visual[key]
+        : extensions[key];
+  const rawRouting = stored("routing");
+  const routing = typeof rawRouting === "string" ? rawRouting : undefined;
+  const rawAvoid = stored("routingAvoidObstacles");
+  const avoid = typeof rawAvoid === "boolean" ? rawAvoid : undefined;
+  const rawLane = semantic["routingLane"];
+  const lane =
+    typeof rawLane === "number" &&
+    Number.isInteger(rawLane) &&
+    rawLane >= 0 &&
+    rawLane <= MAX_ROUTING_LANE
+      ? rawLane
+      : 0;
   const rawLabelPosition = semantic["labelPosition"];
   const labelRatio =
     typeof rawLabelPosition === "number" && Number.isFinite(rawLabelPosition)
@@ -195,7 +230,21 @@ function computeConnector(
       : 0.5;
   const route = (...args: Parameters<typeof withRoute>): ConnectorEndpoints => {
     args[7] = labelRatio;
-    return withRoute(...args);
+    const result = withRoute(...args);
+    if (element.type.startsWith("bpmn.")) return result;
+    const x = semantic["labelOffsetX"];
+    const y = semantic["labelOffsetY"];
+    const dx = typeof x === "number" && Number.isFinite(x) ? x : 0;
+    const dy = typeof y === "number" && Number.isFinite(y) ? y : 0;
+    return dx || dy
+      ? {
+          ...result,
+          labelPoint: {
+            x: result.labelPoint.x + dx,
+            y: result.labelPoint.y + dy,
+          },
+        }
+      : result;
   };
   const hasColumns = (end: string): boolean =>
     element.type === "erd.relation" &&
@@ -296,7 +345,7 @@ function computeConnector(
     ids.from === ids.to &&
     !fromPin &&
     !toPin &&
-    semantic["routing"] !== "manual"
+    routing !== "manual"
   ) {
     // A self-referencing key loops out of the right side between its rows;
     // a table-level self relation spreads its ends around the centre.
@@ -337,7 +386,7 @@ function computeConnector(
     }
     return route({ x: fromCenter.x, y }, { x: toCenter.x, y }, fromBox, toBox);
   }
-  if (semantic["routing"] === "manual") {
+  if (routing === "manual") {
     const stored = manualWaypoints(semantic);
     const waypointPoints = stored.map((waypoint) =>
       connectorWaypointToPage(waypoint, fromCenter, toCenter),
@@ -370,10 +419,7 @@ function computeConnector(
       waypointPoints,
     );
   }
-  if (
-    semantic["routing"] === "orthogonal" ||
-    (ids.from === ids.to && (fromPin || toPin))
-  ) {
+  if (routing === "orthogonal" || (ids.from === ids.to && (fromPin || toPin))) {
     const requested = semantic["routingAxis"];
     const horizontal =
       requested === "horizontal" ||
@@ -407,12 +453,15 @@ function computeConnector(
       );
     // Leave pinned sides outward before finding a channel. Include endpoint
     // boxes so a branch pinned to the far side cannot run through its node.
+    const baseEscape = 24;
+    const escapeDistance = Math.min(baseEscape + 3 * lane, 44);
     const portEscape = (
       point: Vec,
       pin: Vec | undefined,
       node: Element,
       box: Box,
       port: unknown,
+      distance: number,
     ): Vec => {
       if (!pin) return point;
       const direction =
@@ -431,22 +480,83 @@ function computeConnector(
       const outer = rotatedBox(box, endpointRotation(node));
       return Math.abs(normal.x) >= Math.abs(normal.y)
         ? {
-            x: normal.x >= 0 ? outer.x + outer.width + 24 : outer.x - 24,
+            x:
+              normal.x >= 0
+                ? outer.x + outer.width + distance
+                : outer.x - distance,
             y: point.y,
           }
         : {
             x: point.x,
-            y: normal.y >= 0 ? outer.y + outer.height + 24 : outer.y - 24,
+            y:
+              normal.y >= 0
+                ? outer.y + outer.height + distance
+                : outer.y - distance,
           };
     };
-    const routeStart = portEscape(
+    const safeDistance = (
+      point: Vec,
+      pin: Vec | undefined,
+      node: Element,
+      box: Box,
+      port: unknown,
+    ): number => {
+      if (!pin || lane === 0 || avoid === false) return escapeDistance;
+      const base = portEscape(point, pin, node, box, port, baseEscape);
+      const candidate = portEscape(point, pin, node, box, port, escapeDistance);
+      const obstacles = routingObstacles(element, context);
+      for (let i = 0; i < obstacles.length; i++) {
+        const obstacle = obstacles[i];
+        if (!obstacle || obstacle.id === ids.from || obstacle.id === ids.to)
+          continue;
+        const bounds = obstacle.box;
+        const contains = (p: Vec) =>
+          p.x >= bounds.x &&
+          p.x <= bounds.x + bounds.width &&
+          p.y >= bounds.y &&
+          p.y <= bounds.y + bounds.height;
+        const insideReal = (p: Vec) =>
+          p.x > bounds.x + CONNECTOR_OBSTACLE_CLEARANCE &&
+          p.x < bounds.x + bounds.width - CONNECTOR_OBSTACLE_CLEARANCE &&
+          p.y > bounds.y + CONNECTOR_OBSTACLE_CLEARANCE &&
+          p.y < bounds.y + bounds.height - CONNECTOR_OBSTACLE_CLEARANCE;
+        if (
+          (contains(candidate) && !contains(base)) ||
+          (insideReal(candidate) && !insideReal(base))
+        )
+          return baseEscape;
+      }
+      return escapeDistance;
+    };
+    const fromDistance = safeDistance(
       start,
       fromPin,
       from,
       fromBox,
       semantic["fromPort"],
     );
-    const routeEnd = portEscape(end, toPin, to, toBox, semantic["toPort"]);
+    const toDistance = safeDistance(end, toPin, to, toBox, semantic["toPort"]);
+    const smallestEscape = Math.min(
+      fromPin ? fromDistance : escapeDistance,
+      toPin ? toDistance : escapeDistance,
+    );
+    const clearance = Math.min(12 + 8 * lane, smallestEscape - 1);
+    const routeStart = portEscape(
+      start,
+      fromPin,
+      from,
+      fromBox,
+      semantic["fromPort"],
+      fromDistance,
+    );
+    const routeEnd = portEscape(
+      end,
+      toPin,
+      to,
+      toBox,
+      semantic["toPort"],
+      toDistance,
+    );
     const rawBend = semantic["routingBend"];
     const bend =
       typeof rawBend === "number" && Number.isFinite(rawBend)
@@ -483,15 +593,15 @@ function computeConnector(
             const node = index === 0 ? from : to;
             const bounds = rotatedBox(box, endpointRotation(node));
             return {
-              x: bounds.x - 12,
-              y: bounds.y - 12,
-              width: bounds.width + 24,
-              height: bounds.height + 24,
+              x: bounds.x - clearance,
+              y: bounds.y - clearance,
+              width: bounds.width + clearance * 2,
+              height: bounds.height + clearance * 2,
             };
           })
         : [];
     const obstacles =
-      semantic["routingAvoidObstacles"] === false
+      avoid === false
         ? endpointObstacles
         : [
             ...endpointObstacles,
@@ -501,6 +611,7 @@ function computeConnector(
               routeStart,
               routeEnd,
               context,
+              lane,
             ),
           ];
     const middle = avoidOrthogonalObstacles(

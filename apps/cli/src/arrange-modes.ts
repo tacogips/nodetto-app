@@ -1,8 +1,13 @@
-import { Editor } from "@nodetto/core";
+import {
+  Editor,
+  applyCommands,
+  pageMetrics,
+  selectLayeredOrder,
+} from "@nodetto/core";
 import { planLayeredBpmn } from "@nodetto/core";
 import { getElementTypeDefinition, type Element, type Page } from "@nodetto/ir";
 import { serializeDocument } from "@nodetto/io";
-import { columnFrames, LAYERED_PAGE_KINDS, planLayered } from "@nodetto/core";
+import { columnFrames, LAYERED_PAGE_KINDS } from "@nodetto/core";
 import { planRoute, ROUTE_PAGE_KINDS } from "@nodetto/core";
 import {
   type CommandIo,
@@ -122,10 +127,25 @@ export function arrangeLayeredOrRoute(
             columnFrames(editor.store, page.id, editor.registry),
           );
     if (typeof order === "string") return fail(order);
-    const result = planLayered(editor.store, page.id, editor.registry, {
-      direction,
-      ...(order === undefined ? {} : { frameOrder: order }),
-    });
+    const result = selectLayeredOrder(
+      editor.store,
+      page.id,
+      editor.registry,
+      {
+        direction,
+        ...(order === undefined ? {} : { frameOrder: order }),
+      },
+      (draft) => {
+        applyCommands(
+          draft,
+          planRoute(draft, page.id, editor.registry, {
+            resetManual: true,
+            separation: false,
+          }),
+        );
+        return pageMetrics(draft, page.id, editor.registry);
+      },
+    );
     if ("error" in result) return fail(result.error);
     count += result.commands.length;
     editor.apply(result.commands, { placed: result.placed });
@@ -148,6 +168,24 @@ export function arrangeLayeredOrRoute(
       targetIds.push(result.id);
     }
   }
+  const labelFields = (semantic: Record<string, unknown>) =>
+    JSON.stringify([
+      semantic.labelPosition,
+      semantic.labelOffsetX,
+      semantic.labelOffsetY,
+    ]);
+  const beforeLabels = new Map(
+    editor.store
+      .getPageElements(page.id)
+      .filter(
+        (element) =>
+          getElementTypeDefinition(element.type)?.category === "edge",
+      )
+      .map((element) => [
+        element.id,
+        labelFields(element.semantic as Record<string, unknown>),
+      ]),
+  );
   const commands = planRoute(editor.store, page.id, editor.registry, {
     resetManual,
     ...(targetIds === undefined ? {} : { targetIds }),
@@ -163,14 +201,27 @@ export function arrangeLayeredOrRoute(
       };
     return ok("", `${loaded.warnings}${path} is already arranged.\n`);
   }
+  const movedLabels = editor.store
+    .getPageElements(page.id)
+    .filter(
+      (element) =>
+        beforeLabels.has(element.id) &&
+        beforeLabels.get(element.id) !==
+          labelFields(element.semantic as Record<string, unknown>),
+    )
+    .map((element) => element.id)
+    .sort();
+  const movedReport = movedLabels.length
+    ? `Moved ${movedLabels.length} connector label(s): ${movedLabels.join(", ")}\n`
+    : "";
   const arranged = serializeDocument(editor.getSnapshot());
   if (parsed.flags.has("--write")) {
     const failure = writeOutput(io, path, arranged);
     if (failure) return fail(`${loaded.warnings}${failure}`);
     return ok(
       "",
-      `${loaded.warnings}Arranged page "${page.name}" of ${path}: ${count} layer update(s).\n`,
+      `${loaded.warnings}Arranged page "${page.name}" of ${path}: ${count} layer update(s).\n${movedReport}`,
     );
   }
-  return ok(arranged, loaded.warnings);
+  return ok(arranged, `${loaded.warnings}${movedReport}`);
 }

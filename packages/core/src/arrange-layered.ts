@@ -5,14 +5,19 @@ import {
   type PageId,
   type PageKind,
 } from "@nodetto/ir";
-import type { Command } from "./commands.ts";
+import { applyCommands, type Command } from "./commands.ts";
+import {
+  orderColumnMembers,
+  type MemberOrder,
+} from "./arrange-layered-order.ts";
+import type { PageMetrics } from "./diagram-lint/metrics.ts";
 import { expandContainers, frameParents } from "./frame-tree.ts";
 import { outermostGroupOf } from "./group.ts";
 import { createShapeContext } from "./hit-test.ts";
 import type { ShapeUtilRegistry } from "./shape-util.ts";
 import { endpointReaderFor } from "./shapes/connector.ts";
 import { FRAME_TITLE_BAND } from "./shapes/frame.ts";
-import type { Store } from "./store.ts";
+import { Store } from "./store.ts";
 
 export const LAYERED_PAGE_KINDS: readonly PageKind[] = [
   "state",
@@ -25,6 +30,7 @@ export const LAYERED_PAGE_KINDS: readonly PageKind[] = [
 export interface LayeredOptions {
   readonly direction: "LR" | "TB";
   readonly frameOrder?: readonly ElementId[];
+  readonly memberOrder?: MemberOrder;
 }
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const edge = (e: Element): boolean =>
@@ -171,6 +177,33 @@ export function planLayered(
   const placed = new Set<ElementId>();
   const columns: (Element | undefined)[] = [...ordered];
   if (membersByOwner.has(undefined)) columns.push(undefined);
+  const neighbors = new Map<ElementId, ElementId[]>();
+  for (const [from, targets] of outgoing) {
+    for (const to of targets) {
+      neighbors.set(from, [...(neighbors.get(from) ?? []), to]);
+      neighbors.set(to, [...(neighbors.get(to) ?? []), from]);
+    }
+  }
+  const memberIds = columns.map((frame) =>
+    (membersByOwner.get(frame?.id) ?? []).map((unit) => unit.id),
+  );
+  const reordered = orderColumnMembers(
+    options.memberOrder ?? "rank",
+    memberIds,
+    neighbors,
+    (id) => {
+      const box = context.boundsOf(id);
+      return box ? (options.direction === "LR" ? box.y : box.x) : 0;
+    },
+  );
+  for (const [index, frame] of columns.entries()) {
+    const members: Element[] = [];
+    for (const id of reordered[index] ?? []) {
+      const element = store.get(id);
+      if (element) members.push(element);
+    }
+    membersByOwner.set(frame?.id, members);
+  }
   for (const frame of columns) {
     const members = membersByOwner.get(frame?.id) ?? [];
     const sizes = members
@@ -235,4 +268,50 @@ export function planLayered(
     else y += height + 120;
   }
   return { commands, placed };
+}
+
+export type LayeredEvaluate = (draft: Store) => PageMetrics;
+
+export function selectLayeredOrder(
+  store: Store,
+  pageId: PageId,
+  registry: ShapeUtilRegistry,
+  options: LayeredOptions,
+  evaluate: LayeredEvaluate,
+): { commands: Command[]; placed: ReadonlySet<ElementId> } | { error: string } {
+  let best:
+    | {
+        commands: Command[];
+        placed: ReadonlySet<ElementId>;
+        metrics: PageMetrics;
+      }
+    | undefined;
+  const seen = new Set<string>();
+  for (const memberOrder of ["rank", "input", "barycenter"] as const) {
+    const plan = planLayered(store, pageId, registry, {
+      ...options,
+      memberOrder,
+    });
+    if ("error" in plan) return plan;
+    const key = JSON.stringify(plan.commands);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const draft = new Store(store.getSnapshot());
+    applyCommands(draft, plan.commands);
+    const metrics = evaluate(draft);
+    if (
+      !best ||
+      metrics.edgeCrossings < best.metrics.edgeCrossings ||
+      (metrics.edgeCrossings === best.metrics.edgeCrossings &&
+        metrics.segmentOverlaps < best.metrics.segmentOverlaps) ||
+      (metrics.edgeCrossings === best.metrics.edgeCrossings &&
+        metrics.segmentOverlaps === best.metrics.segmentOverlaps &&
+        plan.commands.length === 0 &&
+        best.commands.length > 0)
+    ) {
+      best = { ...plan, metrics };
+    }
+  }
+  if (!best) throw new Error("No layered order candidates");
+  return { commands: best.commands, placed: best.placed };
 }

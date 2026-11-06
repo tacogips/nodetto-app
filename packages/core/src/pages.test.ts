@@ -244,3 +244,18 @@ describe("page commands", () => {
     ]);
   });
 });
+
+test("page connector routing is copied, cleared and undoable", () => {
+  const editor = makeEditor();
+  const value = { routing: "orthogonal" as const, routingAvoidObstacles: true };
+  expect(editor.setPageConnectorRouting(TEST_PAGE.id, value)).toBe(true);
+  expect(editor.setPageConnectorRouting(TEST_PAGE.id, { ...value })).toBe(
+    false,
+  );
+  const copy = editor.duplicatePage(TEST_PAGE.id);
+  expect(editor.store.getPage(copy!)?.connectorRouting).toEqual(value);
+  expect(editor.setPageConnectorRouting(TEST_PAGE.id, null)).toBe(true);
+  expect(editor.store.getPage(TEST_PAGE.id)?.connectorRouting).toBeUndefined();
+  editor.undo();
+  expect(editor.store.getPage(TEST_PAGE.id)?.connectorRouting).toEqual(value);
+});

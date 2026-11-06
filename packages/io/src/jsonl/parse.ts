@@ -225,6 +225,9 @@ function collect(text: string, keepSourceLines = false): Collected {
         name: known["name"],
         kind: known["pageKind"],
         ...(known["mode"] === undefined ? {} : { mode: known["mode"] }),
+        ...(known["connectorRouting"] === undefined
+          ? {}
+          : { connectorRouting: known["connectorRouting"] }),
         ...(known["sqlDialect"] === undefined
           ? {}
           : { sqlDialect: known["sqlDialect"] }),

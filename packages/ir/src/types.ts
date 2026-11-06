@@ -385,6 +385,11 @@ export interface LabelBounds {
   readonly height: number;
 }
 
+export interface PageConnectorRouting {
+  readonly routing: "straight" | "orthogonal";
+  readonly routingAvoidObstacles?: boolean;
+}
+
 export interface Page {
   readonly id: PageId;
   readonly name: string;
@@ -397,6 +402,7 @@ export interface Page {
   readonly tokenMode?: string;
   /** Input syntax for ERD table definitions; omitted means PostgreSQL. */
   readonly sqlDialect?: "postgresql" | "mysql" | "sqlite";
+  readonly connectorRouting?: PageConnectorRouting;
   readonly extensions?: Extensions;
 }
 

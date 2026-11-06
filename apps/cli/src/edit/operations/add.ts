@@ -5,6 +5,7 @@ import {
   isPlainObject,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { splitVisualRouting } from "../connect-routing.ts";
 import { applyLabel } from "../label-field.ts";
 import { withBoxLabelAlign } from "../visual-patch.ts";
 import {
@@ -38,9 +39,16 @@ export function addElement(
   const visual = operation["visual"];
   if (visual !== undefined && !isPlainObject(visual))
     throw new OperationError(index, `"visual" must be an object`);
-  let addVisual = isPlainObject(visual)
-    ? withBoxLabelAlign(type, visual, undefined)
-    : visual;
+  const split =
+    definition?.category === "edge" &&
+    definition.keyOrder.keys.includes("routing") &&
+    isPlainObject(visual)
+      ? splitVisualRouting(visual, index)
+      : undefined;
+  const visualInput = split?.visual ?? visual;
+  let addVisual = isPlainObject(visualInput)
+    ? withBoxLabelAlign(type, visualInput, undefined)
+    : visualInput;
   if (
     (type === "node.generic" || type === "shape.geo") &&
     isPlainObject(addVisual) &&
@@ -67,15 +75,19 @@ export function addElement(
   const content = autoPlace ? batch.editor.pageBounds(page.id) : null;
   // Given fields are merged over the type's defaults, so an agent states
   // only what it cares about (lists such as columns replace the default).
+  const semanticInput =
+    split && Object.keys(split.routing).length
+      ? deepMerge(split.routing, operation["semantic"] ?? {})
+      : operation["semantic"];
   const semantic =
-    operation["semantic"] === undefined
+    semanticInput === undefined
       ? undefined
       : batch.resolveReferences(
           type,
           fillIds(
             deepMerge(
               batch.editor.registry.getOrFallback(type).defaultSemantic(),
-              operation["semantic"],
+              semanticInput,
             ),
             definition?.keyOrder,
           ),

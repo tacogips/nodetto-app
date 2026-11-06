@@ -7,6 +7,7 @@ import { createDefaultRegistry } from "../shapes/index.ts";
 import { Store } from "../store.ts";
 import { document, element, TEST_PAGE } from "../test-helpers.ts";
 import {
+  countRouteOverlaps,
   isLabelObstacle,
   labelOverlapScore,
   pageMetrics,
@@ -249,4 +250,50 @@ test("ERD metrics count crossings and table collisions but ignore containing fra
   expect(metrics([a, b, obstacle, horizontal]).labelOverlaps).toBeGreaterThan(
     0,
   );
+});
+
+test("route overlap counts collinear shared lengths over one unit", () => {
+  const line = (x1: number, y1: number, x2: number, y2: number) => [
+    { x: x1, y: y1 },
+    { x: x2, y: y2 },
+  ];
+  const a = line(0, 0, 100, 0);
+  expect(countRouteOverlaps(a, line(50, 0, 150, 0))).toBe(1);
+  expect(countRouteOverlaps(a, line(99, 0, 120, 0))).toBe(0);
+  expect(countRouteOverlaps(a, line(98.5, 0, 120, 0))).toBe(1);
+  expect(countRouteOverlaps(a, line(100, 0, 120, 0))).toBe(0);
+  expect(countRouteOverlaps(a, line(50, 2, 150, 2))).toBe(0);
+  expect(countRouteOverlaps(a, line(50, -5, 50, 5))).toBe(0);
+  expect(countRouteOverlaps(line(0, 0, 10, 10), line(5, 5, 15, 15))).toBe(1);
+  expect(
+    countRouteOverlaps(
+      [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+      ],
+      [
+        { x: 5, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 5 },
+      ],
+    ),
+  ).toBe(2);
+  expect(countRouteOverlaps(a, line(50, 0, 50, 0))).toBe(0);
+  expect(countRouteOverlaps(a, line(50, 1e-12, 150, 1e-12))).toBe(1);
+});
+
+test("page metrics count shared segments between distinct edges", () => {
+  const nodes = [
+    box("a", "node.generic", 0, 0),
+    box("b", "node.generic", 200, 0),
+  ];
+  const result = metrics([
+    ...nodes,
+    edge("one", "a", "b"),
+    edge("two", "a", "b"),
+  ]);
+  expect(result.segmentOverlaps).toBe(1);
+  expect(result.edgeCrossings).toBe(1);
+  expect(result.labelOverlaps).toBe(0);
 });

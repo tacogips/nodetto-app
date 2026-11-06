@@ -1,5 +1,11 @@
 import { isFractionalKey } from "@nodetto/core";
-import { isPageKind, isPageMode, PAGE_MODES } from "@nodetto/ir";
+import {
+  isPageKind,
+  isPageMode,
+  isPlainObject,
+  PAGE_MODES,
+  type PageConnectorRouting,
+} from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
 import {
   type Json,
@@ -10,6 +16,34 @@ import {
 
 function unknownMode(mode: Json): string {
   return `Unknown page mode "${String(mode)}". Choose ${PAGE_MODES.join(", ")}, or null to follow the page kind.`;
+}
+
+function pageRouting(
+  value: Json,
+  index: number,
+  field: string,
+): PageConnectorRouting {
+  if (!isPlainObject(value))
+    throw new OperationError(index, `"${field}" must be an object`);
+  for (const key of Object.keys(value))
+    if (key !== "routing" && key !== "routingAvoidObstacles")
+      throw new OperationError(index, `unknown field "${field}.${key}"`);
+  const routing = value["routing"];
+  if (routing !== "straight" && routing !== "orthogonal")
+    throw new OperationError(
+      index,
+      `"${field}.routing" must be straight or orthogonal`,
+    );
+  const avoid = value["routingAvoidObstacles"];
+  if (avoid !== undefined && typeof avoid !== "boolean")
+    throw new OperationError(
+      index,
+      `"${field}.routingAvoidObstacles" must be true or false`,
+    );
+  return {
+    routing,
+    ...(avoid === undefined ? {} : { routingAvoidObstacles: avoid }),
+  };
 }
 
 /**
@@ -72,12 +106,18 @@ export function addPage(
   const mode = operation["mode"];
   if (mode !== undefined && !isPageMode(mode))
     throw new OperationError(index, unknownMode(mode));
+  const connectorRouting =
+    operation["connectorRouting"] === undefined
+      ? undefined
+      : pageRouting(operation["connectorRouting"], index, "connectorRouting");
   const id = batch.editor.createPage({
     name: requireText(operation["name"], "name", index),
     kind,
     ...(mode === undefined ? {} : { mode }),
     ...(typeof operation["id"] === "string" ? { id: operation["id"] } : {}),
   });
+  if (connectorRouting !== undefined)
+    batch.editor.setPageConnectorRouting(id, connectorRouting);
   if (typeof operation["ref"] === "string")
     batch.refs.set(operation["ref"], id);
   placePage(batch, id, operation, index);
@@ -123,6 +163,36 @@ export function setPageMode(
     throw new OperationError(index, unknownMode(mode));
   batch.editor.setPageMode(page.id, mode);
   return;
+}
+
+export function setPageRouting(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  const page = batch.page(operation["id"], index);
+  if (operation["routing"] === null) {
+    if (operation["routingAvoidObstacles"] !== undefined)
+      throw new OperationError(
+        index,
+        `"routingAvoidObstacles" cannot accompany null routing`,
+      );
+    batch.editor.setPageConnectorRouting(page.id, null);
+    return;
+  }
+  batch.editor.setPageConnectorRouting(
+    page.id,
+    pageRouting(
+      {
+        routing: operation["routing"],
+        ...(operation["routingAvoidObstacles"] === undefined
+          ? {}
+          : { routingAvoidObstacles: operation["routingAvoidObstacles"] }),
+      },
+      index,
+      "connectorRouting",
+    ),
+  );
 }
 
 export function deletePage(

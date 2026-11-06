@@ -144,6 +144,7 @@ export function planBpmnReconnect(
         "routing",
         "routingAxis",
         "routingBend",
+        "routingLane",
         "routingAvoidObstacles",
         "routingWaypoints",
         "fromPort",
