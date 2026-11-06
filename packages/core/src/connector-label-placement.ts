@@ -197,15 +197,63 @@ export function scoreLabelPlacementForTest(
     segments(edges),
   );
 }
+function labelRouteGapSquared(box: Box, points: readonly Vec[]): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (!a || !b) continue;
+    if (intersects(a.x, a.y, b.x, b.y, box)) return 0;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = dx * dx + dy * dy;
+    for (const x of [box.x, box.x + box.width]) {
+      for (const y of [box.y, box.y + box.height]) {
+        const t =
+          length === 0
+            ? 0
+            : Math.max(
+                0,
+                Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / length),
+              );
+        best = Math.min(
+          best,
+          (x - a.x - t * dx) ** 2 + (y - a.y - t * dy) ** 2,
+        );
+      }
+    }
+    for (const point of [a, b]) {
+      const x = Math.max(box.x, Math.min(box.x + box.width, point.x));
+      const y = Math.max(box.y, Math.min(box.y + box.height, point.y));
+      best = Math.min(best, (point.x - x) ** 2 + (point.y - y) ** 2);
+    }
+  }
+  return best;
+}
+
+export function labelRouteGapSquaredForTest(
+  box: Box,
+  points: readonly Vec[],
+): number {
+  return labelRouteGapSquared(box, points);
+}
+
+export function labelCandidatesForTest(
+  edge: LabelPlacementEdge,
+): LabelFields[] {
+  return [...candidates(edge)];
+}
+
 function* candidates(edge: LabelPlacementEdge): Generator<LabelFields> {
   for (const p of positions) yield p === 0.5 ? {} : { labelPosition: p };
   if (edge.element.type.startsWith("bpmn.")) return;
+  const offsets: { value: LabelFields; gap: number; index: number }[] = [];
   for (const p of positions) {
     const box = boxAt(edge, { labelPosition: p });
     if (!box) continue;
     const w = box.width;
     const h = box.height;
-    for (const [x, y] of [
+    for (const [rawX, rawY] of [
       [0, -h - 4],
       [0, h + 4],
       [-w - 4, 0],
@@ -214,18 +262,36 @@ function* candidates(edge: LabelPlacementEdge): Generator<LabelFields> {
       [0, 2 * h + 8],
       [-2 * w - 8, 0],
       [2 * w + 8, 0],
+      [0, -h / 2 - 2],
+      [0, h / 2 + 2],
+      [-w / 2 - 2, 0],
+      [w / 2 + 2, 0],
+      [-w - 4, -h - 4],
+      [w + 4, -h - 4],
+      [-w - 4, h + 4],
+      [w + 4, h + 4],
     ]) {
+      const x = Math.round(rawX ?? 0);
+      const y = Math.round(rawY ?? 0);
       const value: {
         labelPosition?: number;
         labelOffsetX?: number;
         labelOffsetY?: number;
       } = {};
       if (p !== 0.5) value.labelPosition = Math.round(p * 10000) / 10000;
-      if (x) value.labelOffsetX = Math.round(x);
-      if (y) value.labelOffsetY = Math.round(y);
-      yield value;
+      if (x) value.labelOffsetX = x;
+      if (y) value.labelOffsetY = y;
+      const shifted = boxAt(edge, value);
+      if (shifted)
+        offsets.push({
+          value,
+          gap: labelRouteGapSquared(shifted, edge.points),
+          index: offsets.length,
+        });
     }
   }
+  offsets.sort((a, b) => a.gap - b.gap || a.index - b.index);
+  for (const item of offsets) yield item.value;
 }
 export function placeConnectorLabels(input: {
   readonly edges: readonly LabelPlacementEdge[];

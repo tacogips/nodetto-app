@@ -6,6 +6,8 @@ import { parseDocument } from "@nodetto/io";
 import type { Document } from "@nodetto/ir";
 import { expect, test } from "bun:test";
 import {
+  labelCandidatesForTest,
+  labelRouteGapSquaredForTest,
   placeConnectorLabels,
   planLabelFixes,
   scoreLabelPlacementForTest,
@@ -65,12 +67,71 @@ test("offsets clear blocked positions and BPMN never uses offsets", () => {
   const result = placeConnectorLabels({ edges: [edge("a")], obstacles }).get(
     "a",
   );
-  expect(result?.labelOffsetY).toBeLessThan(0);
+  expect(Math.abs(result?.labelOffsetY ?? 0)).toBeGreaterThan(0);
   expect(Number.isInteger(result?.labelOffsetY)).toBe(true);
   const flow = edge("b", "bpmn.sequenceFlow", { name: "Label" });
   expect(placeConnectorLabels({ edges: [flow], obstacles }).get("b")).toEqual(
     {},
   );
+});
+
+test("offset candidates select the nearest free position on routes and loops", () => {
+  for (const e of [
+    edge("straight"),
+    {
+      ...edge("loop"),
+      points: [
+        { x: 0, y: 0 },
+        { x: 0, y: -100 },
+        { x: 100, y: -100 },
+        { x: 100, y: 0 },
+      ],
+    },
+  ]) {
+    const obstacles =
+      e.element.id === "straight"
+        ? [{ x: -100, y: -20, width: 1200, height: 40 }]
+        : [{ x: -10, y: -110, width: 120, height: 120 }];
+    const candidates = labelCandidatesForTest(e);
+    expect(labelCandidatesForTest(e)).toEqual(candidates);
+    const boxFor = (fields: LabelFields) => {
+      const point = pointAlongRoute(e.points, fields.labelPosition ?? 0.5);
+      return resolvedLabelBox(e.element, e.points, {
+        x: point.x + (fields.labelOffsetX ?? 0),
+        y: point.y + (fields.labelOffsetY ?? 0),
+      });
+    };
+    const chosen = placeConnectorLabels({ edges: [e], obstacles }).get(
+      e.element.id,
+    );
+    expect(chosen).toBeDefined();
+    if (!chosen) throw new Error("Missing placement");
+    const chosenBox = boxFor(chosen);
+    if (!chosenBox) throw new Error("Missing label box");
+    const free = candidates
+      .map(boxFor)
+      .filter(
+        (box): box is NonNullable<typeof box> =>
+          !!box && labelOverlapScore(box, obstacles, [], []) === 0,
+      );
+    expect(free.length).toBeGreaterThan(0);
+    const gap = labelRouteGapSquaredForTest(chosenBox, e.points);
+    expect(gap).toBe(
+      Math.min(
+        ...free.map((box) => labelRouteGapSquaredForTest(box, e.points)),
+      ),
+    );
+  }
+  const flow = edge("flow", "bpmn.sequenceFlow", { name: "Label" });
+  const candidates = labelCandidatesForTest(flow);
+  expect(candidates).toHaveLength(19);
+  expect(
+    candidates.every(
+      (candidate) =>
+        candidate.labelOffsetX === undefined &&
+        candidate.labelOffsetY === undefined,
+    ),
+  ).toBe(true);
 });
 
 test("reserves fixed labels and uses stable id order", () => {
