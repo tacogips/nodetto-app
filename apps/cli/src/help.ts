@@ -579,8 +579,10 @@ Exit codes: 0 clean, 1 conflicts (output written), 2 usage or input error.`,
 
 Tidy is the default; overlaps removes overlaps, layered lays out columns and
 route separates connectors and places labels; layered selects a better member order
-when available, without a general crossing guarantee. Moved labels are reported on
-stderr. Self-loops prefer top, right, bottom, left; movable ends can be reassigned
+when available, without a general crossing guarantee. Both repair remaining segment
+overlaps, including by moving ports. Labels use the nearest free candidate to their
+connector or loop: a fixed position and offset with zero collision score. If none is
+free, the lowest-scoring candidate is used. Moved labels are reported on stderr. Self-loops prefer top, right, bottom, left; movable ends can be reassigned
 to free a side, otherwise the least-used side is shared. --direction applies to tidy and layered. --frames
 is layered only; --ids is route only; --reset-manual is layered or route only.
 Stored ports and routes count as manual and are preserved unless rerun with

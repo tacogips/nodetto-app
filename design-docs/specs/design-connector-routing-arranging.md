@@ -1,6 +1,6 @@
 # nodetto-cli: connector routing and arranging follow-up
 
-Status: DESIGNED, 2026-11-06. Revised the same day for the continuation (W1 to W5): see
+Status: IMPLEMENTED, final gates passed, 2026-11-07. Designed and revised on 2026-11-06 for the continuation (W1 to W5): see
 "Overlap repair", "Nearest free position", "Fixture and acceptance tests", "Baseline binary and
 timing", "Existing outputs that may change" and "Continuation plans". Where the two conflict, these
 sections replace the `crl-07-wiring` plan text. Revised again for the final continuation: the owner

@@ -213,3 +213,7 @@ Measure with three `/usr/bin/time -p` runs each, baseline and current, on the ba
 - The progress log holds before and after fixture metrics, the CPU ratios and the native timing.
 - The progress log holds the baseline audit record, and `shasum -a 256 target/crl-baseline/nodetto-cli` matches its recorded digest.
 - The "fix writes once" test in `apps/cli/src/lint-diagram.test.ts` is unchanged: its `expect(writes).toBe(1)` line is still present.
+
+## Closing note
+
+crl-08 to crl-10 and the design document’s "Continuation plans" and "Baseline binary and timing" sections replace the open items and `target/crl-baseline` steps in this plan.

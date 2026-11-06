@@ -46,6 +46,10 @@ pre-archive `planPath` values.
 
 ## Completed
 
+Connector routing and arranging (design: `design-docs/specs/design-connector-routing-arranging.md`; no GitHub issue): overlap repair, nearest free label placement, routing parity and end-to-end coverage are finished. The combined `mise run verify` passed (Bun: 3484 pass, 64 skip, 0 fail; Rust: 85 pass, 0 fail, 0 ignored), and `mise run test-cli` passed (438 pass, 0 skip, 0 fail; native parity ran). Logs: `tmp/crl-s759/crl-10-finish/final/`. The uncontended target is at most 6 user seconds per arrange command; recorded means are layered 4.873 and route 3.890 seconds. Evidence roots: `tmp/crl-s749/<planId>/`, `tmp/crl-s753/<planId>/`, `tmp/crl-s754/<planId>/`, and `tmp/crl-s759/<planId>/`; progress logs remain in `progress/`.
+
+The crl plans and manifests belong in `completed/` because the request named them, unlike other feature manifests in `active/`. Replaced manifests `crl-s749-dispatch.json`, `crl-s753-dispatch.json`, and `crl-s754-dispatch.json` are in `completed/`. The workflow plan-archive node moves `crl-09-parity-e2e.md`, `crl-10-finish.md`, and `crl-s759-dispatch.json` there after final verification.
+
 File save stability (session 751; design:
 `design-docs/specs/design-file-save-stability.md`; no GitHub issue). An
 outside change to an open file no longer causes a save without unsaved in-app
