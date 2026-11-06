@@ -1,4 +1,4 @@
-import { expandContainers } from "./frame-tree.ts";
+import { erdFrameScope } from "./erd-frame-scope.ts";
 import { databaseObjectsDdl } from "./database-objects-ddl.ts";
 import type {
   Element,
@@ -79,9 +79,14 @@ export function generateDatabaseDdl(
     const frame = editor.store.get(options.frameId);
     if (frame?.type !== "frame" || frame.page !== pageId)
       throw new Error("DDL scope must be a frame on the selected page.");
-    const included = new Set(
-      expandContainers(editor.store, [frame.id], editor.createShapeContext(1)),
+    const scope = erdFrameScope(
+      editor.store,
+      pageId,
+      frame.id,
+      editor.createShapeContext(1),
     );
+    const included = scope.included;
+    warnings.push(...scope.warnings);
     elements = elements.filter((element) => {
       if (included.has(element.id)) return true;
       if (element.type !== "erd.relation") return false;

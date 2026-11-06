@@ -147,7 +147,9 @@ nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
   and a rename of the same table both survive) and autosaves the result, keeping
   untouched lines byte-identical and relative image references unchanged; only
   the same field changed on both sides, or a file that
-  now holds a different document, raises the "File changed on disk" banner.
+  now holds a different document, raises the "File changed on disk" banner. A
+  `convert` also raises it when a local edit conflicts with the conversion, the
+  merge would not validate, or a dependent no longer suits the new type.
 
 In `edit update`, `visual` and `semantic` objects deep-merge, arrays replace,
 and null removes a key; removing a required field is an error. For
@@ -302,10 +304,11 @@ nodetto-cli lint flow.jsonl --metrics --format json
 | bpmn, breadboard | Existing kind rules and `image-missing` |
 | architecture, freeform | Text layout and `image-missing` |
 | flowchart | Text layout, `node-overlap`, `image-missing` |
-| erd, state, uml | `node-overlap`, `image-missing` |
+| erd | `node-overlap`, `frame-straddle`, `image-missing` |
+| state, uml | `node-overlap`, `image-missing` |
 | Any other kind with images | `image-missing` |
 
-Edit references resolve exact id, `@ref`, `name:<text>`, then unique id prefix. Name matching is case-sensitive, exact after trimming, and scoped to the operation page, source page of a connect, the element page for semantic references, or the whole document. Missing or ambiguous names list candidates. `update` and `delete` accept either `id` or `where`: its `page`, `type`, `from`, `to`, `parent`, `name` keys combine with AND and at least one is required. `expect` is an integer at least zero, allowed only with `where`; a mismatch aborts without writing, zero matches without `expect` is an error, and `expect: 0` is a no-op. `select` binds one existing element using a fresh `ref` and either `id` or `where`; its `expect` defaults to and must be 1. Text reports `operation <i> (<op>): matched <n> element(s)` and JSON has `matches` with operation, op, count and ids. `--quiet` never hides matches. Unknown top-level fields are rejected with valid fields listed.
+Edit references resolve exact id, `@ref`, `name:<text>`, then unique id prefix. Name matching is case-sensitive, exact after trimming, and scoped to the operation page, source page of a connect, the element page for semantic references, or the whole document. Missing or ambiguous names list candidates. `update`, `convert` and `delete` accept either `id` or `where`: its `page`, `type`, `from`, `to`, `parent`, `name` keys combine with AND and at least one is required. `expect` is an integer at least zero, allowed only with `where`; a mismatch aborts without writing, zero matches without `expect` is an error, and `expect: 0` is a no-op. `select` binds one existing element using a fresh `ref` and either `id` or `where`; its `expect` defaults to and must be 1. Text reports `operation <i> (<op>): matched <n> element(s)` and JSON has `matches` with operation, op, count and ids. `--quiet` never hides matches. Unknown top-level fields are rejected with valid fields listed.
 
 ```json
 {"op":"delete","where":{"type":"bpmn.sequenceFlow","from":"name:Approve","to":"name:Update status"},"expect":1}
@@ -348,3 +351,13 @@ SVG, Mermaid, D2 and draw.io text exports depend only on canonical content and r
 #!/bin/sh
 nodetto-cli export flow.jsonl --page Flow --format svg --output flow.svg
 ```
+
+### Conversion, frame scope and participant rendering
+
+The `convert` edit operation accepts `id` or `where` with `expect`, and `type` and/or palette `shape`, with optional `semantic` and `label`. `visual` is not accepted; use a later `update` for visual changes. To choose a `shape.geo` geometry, use `semantic.geo`, for example `{"op":"convert","id":"@a","type":"shape.geo","semantic":{"geo":"diamond"}}`. It keeps the id, resolved bounds, index, membership and connectors; equivalent text maps to the target field. Fields it cannot carry are dropped and reported as `convert.fieldDropped` warnings. `--dry-run` reports dropped fields and affected connectors. Edges, frames, groups and locked elements cannot convert. Invalid semantics, incompatible connectors or changed bounds fail atomically; resize first if necessary.
+
+`delete` with `reconnectTo` moves direct connectors to another element while retaining ports, labels and routes; incompatible endpoints or targets fail atomically. Connectors attached only to a cascaded `uml.port` are removed without being moved or reported, including when a later reconnect operation cascades the port. Non-edge references follow their existing cascade or detach rule.
+
+For `ddl --frame`, `memberIds` lists are authoritative except non-empty lists containing only frames, so `memberIds: []` is a closed frame. Open frames (no list or only frames) also include fully contained, unclaimed tables by position, regardless of z-order or nested positional frame edges. A straddling table excluded from a selected frame or another ambiguous exclusion produces a named warning; `--strict` exits 3. Canvas ownership may differ from DDL scope. `lint` reports `frame-straddle` as a warning naming the table and frame without changing its exit code.
+
+Sequence participant rendering uses a stick figure with the name below for `actor`, a cylinder for `db`, and a rounded box for `service`, in export and on the canvas; all retain their lifelines. `types sequence.participant` describes this in text and its JSON `rendering` key.

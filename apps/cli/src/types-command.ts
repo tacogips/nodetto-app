@@ -19,6 +19,9 @@ import {
 } from "./commands.ts";
 import { helpFor } from "./help.ts";
 
+const PARTICIPANT_RENDERING =
+  "kind actor draws a stick figure with the name below; db draws a cylinder; service draws a rounded box. All keep a lifeline.";
+
 const TYPES_OPTIONS = new Set(["--kind", "--format"]);
 
 const GENERAL = [
@@ -212,6 +215,9 @@ export function typesCommand(
           defaultVisual: visual,
           example,
           ...(notes ? { notes } : {}),
+          ...(type === "sequence.participant"
+            ? { rendering: PARTICIPANT_RENDERING }
+            : {}),
         },
         null,
         2,
@@ -227,6 +233,9 @@ export function typesCommand(
     `Default visual: ${JSON.stringify(visual)}`,
     `References: deleting a referenced element ${definition.onReferenceDeleted === "cascade" ? "deletes this element too" : "clears the reference"}.`,
     ...(notes ?? []),
+    ...(type === "sequence.participant"
+      ? [`Rendering: ${PARTICIPANT_RENDERING}`]
+      : []),
     "",
     "Example operation for nodetto-cli edit:",
     `  ${JSON.stringify(example)}`,

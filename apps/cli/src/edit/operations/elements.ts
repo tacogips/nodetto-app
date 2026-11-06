@@ -10,6 +10,7 @@ import { nullPaths, visualPatchCommand } from "../visual-patch.ts";
 import { heldMembers } from "../carry-members.ts";
 import { selectedWhere } from "../selectors.ts";
 import { applyLabel } from "../label-field.ts";
+import { reconnectConnectors, verifyReconnected } from "./convert.ts";
 import {
   deepMerge,
   fillIds,
@@ -252,8 +253,12 @@ export function deleteElement(
   index: number,
 ): void {
   const elements = selectedWhere(batch, operation, index, "delete");
+  if (operation["reconnectTo"] !== undefined)
+    reconnectConnectors(batch, operation, index, elements);
   if (elements.length)
     batch.editor.deleteElements(elements.map((element) => element.id));
+  if (operation["reconnectTo"] !== undefined)
+    verifyReconnected(batch, index, elements);
   for (const element of elements) batch.touchedPages.add(element.page);
   return;
 }

@@ -40,7 +40,7 @@ and lint manifests (`clm-s725-dispatch.json`, `clm-s731-dispatch.json`,
 `clm-s732-dispatch.json`, `clm-s736-dispatch.json`,
 `clm-s737-dispatch.json`, `clm-s740-dispatch.json`) also stay in `active/`
 with their pre-archive `planPath` values; s740 was the final dispatch and
-the earlier ones must not be dispatched again. The manifests `fss-s751-dispatch.json`, `seq-self-s750-dispatch.json`
+the earlier ones must not be dispatched again. The manifests `fss-s751-dispatch.json`, `seq-self-s750-dispatch.json`, `cpf-s748-dispatch.json`
 also stay in `active/` with their
 pre-archive `planPath` values.
 
@@ -99,6 +99,33 @@ Evidence: `tmp/seq-self-s750/<planId>/` and
 | [seq-self-05-canvas](completed/seq-self-05-canvas.md) | Canvas loop, label and message tool drag |
 | [seq-self-06-cli](completed/seq-self-06-cli.md) | `types` note, CLI tests, native parity, PNG containment and timing |
 | [seq-self-07-wiring](completed/seq-self-07-wiring.md) | Help text, `docs/cli.md` and help parity tests |
+
+Element conversion, sequence participant shapes and ERD frame scope (session
+748; design: `design-docs/specs/design-convert-participant-frame-scope.md`; no
+GitHub issue). The work added the `convert` edit operation, `delete` with
+`reconnectTo`, conversion checks in desktop reconciliation, stick figure and
+cylinder participants in export and on the canvas, the `ddl --frame` table
+scope rule, and the `frame-straddle` lint warning. The final gate logs record
+`mise run verify` 3344 pass, 54 skip, 0 fail; `mise run test-cli` 392 pass, 0
+fail on attempt 2, after attempt 1 hit native deadline timeouts; and native
+parity 3 pass, 0 fail. Median CPU ratios against the pre-change binary are
+update 0.989, ddl 1.010, lint 0.990 and svg 0.964. There is no browser E2E
+suite, and actor and db participants have not been rendered on the desktop
+canvas; a manual check of a sequence page with all three kinds is still worth
+doing before release. Progress logs stay in `progress/`. Evidence:
+`tmp/cpf-s748/<planId>/` and `tmp/cpf-s748/reconcile-wave-005/`.
+
+| Plan | Scope |
+|---|---|
+| [cpf-00-overview](completed/cpf-00-overview.md) | Waves, ownership and final verification |
+| [cpf-01-convert-command](completed/cpf-01-convert-command.md) | `convertElement` command and editor facade methods |
+| [cpf-02-participant-export](completed/cpf-02-participant-export.md) | Participant notation, SVG export and `types` |
+| [cpf-03-ddl-frame-scope](completed/cpf-03-ddl-frame-scope.md) | DDL scope resolver and `frame-straddle` rule module |
+| [cpf-04-edit-convert-op](completed/cpf-04-edit-convert-op.md) | `convert` op, `delete` `reconnectTo` and report |
+| [cpf-05-desktop-reconcile](completed/cpf-05-desktop-reconcile.md) | Conversion checks in `planOutsideChange` |
+| [cpf-06-wiring](completed/cpf-06-wiring.md) | Core exports, lint hook, help, docs and README |
+| [cpf-07-canvas-view](completed/cpf-07-canvas-view.md) | Canvas participant view |
+| [cpf-08-native-parity](completed/cpf-08-native-parity.md) | Native parity tests and CPU timing |
 
 CLI layout, merge and lint (sessions 725, 731, 732, 736, 737 and 740;
 design: `design-docs/specs/design-cli-layout-merge-lint.md`; no GitHub

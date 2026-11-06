@@ -3,6 +3,7 @@
 // A rejection is returned, not thrown, so the editor can announce it.
 
 import type {
+  Document,
   ConnectorPort,
   ConnectorPorts,
   Element,
@@ -26,6 +27,25 @@ import type { ShapeContext } from "../shape-util.ts";
 import type { Store } from "../store.ts";
 
 export type BpmnRejected = Extract<BpmnConnectionResult, { ok: false }>;
+
+/** Return an issue when a flow cannot retain its requested type. */
+export function bpmnFlowEndpointIssue(
+  document: Document,
+  flowType: string,
+  from: ElementId,
+  to: ElementId,
+): string | null {
+  const result = resolveBpmnConnection(
+    document,
+    from,
+    to,
+    flowType as BpmnFlowType,
+  );
+  if (!result.ok) return result.message;
+  return result.type === flowType
+    ? null
+    : `Flow type ${flowType} would be corrected to ${result.type}.`;
+}
 
 /** The connector a BPMN connection between `from` and `to` creates. */
 export function planBpmnConnection(

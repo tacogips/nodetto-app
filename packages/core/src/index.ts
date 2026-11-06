@@ -800,3 +800,12 @@ export { planTextWrapFixes, type TextWrapFix } from "./text-layout-lint/fix.ts";
 export { bpmnFlowLabelBox } from "./bpmn/notation.ts";
 export { wrapTextToWidth } from "./text-wrap.ts";
 export { buildBpmnModel } from "./bpmn/model.ts";
+
+export {
+  sequenceParticipantNotation,
+  type SequenceParticipantNotation,
+} from "./shapes/sequence-participant-notation.ts";
+export {
+  lintFrameStraddles,
+  type FrameStraddleFinding,
+} from "./diagram-lint/frame-straddle.ts";

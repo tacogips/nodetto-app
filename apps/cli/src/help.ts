@@ -169,6 +169,9 @@ visual fields and a minimal "add" operation for nodetto-cli edit.
              or pcb).
   --format   text (default) or json.
 
+For sequence.participant, text includes a Rendering: line and JSON has a rendering
+key: actor is a stick figure, db a cylinder, and service a rounded box.
+
 Palette shapes (a flowchart decision, a use-case actor, an iPhone artboard) are
 listed by "nodetto-cli shapes"; several shapes can share one element type.
 
@@ -195,7 +198,7 @@ name: matches label text exactly, case-sensitively after trimming. Scope is the
 operation's page, the source page for connect's to, the element page for
 semantic references, or the whole document. Missing or ambiguous names list
 candidates. Reference fields inside semantic are resolved; other text is not.
-update and delete accept id or where (not both). where has at least one of
+update, convert and delete accept id or where (not both). where has at least one of
 page, type, from, to, parent and name; all keys must match. expect is an integer
 at least 0, only with where. Mismatch aborts without writing; zero matches
 without expect is an error, while expect:0 is a no-op.
@@ -206,6 +209,21 @@ element(s), or JSON matches with operation, op, count and ids. --quiet never
 hides matches. Unknown operation fields are rejected with valid fields listed.
 Example: {"op":"delete","where":{"type":"bpmn.sequenceFlow",
  "from":"name:Approve","to":"name:Update status"},"expect":1}
+
+convert takes type and/or palette shape, optional semantic and label. For a chosen
+shape.geo geometry, use semantic.geo, for example:
+{"op":"convert","id":"@a","type":"shape.geo","semantic":{"geo":"diamond"}}
+It keeps id, index, bounds, membership and connectors; text maps to the target field.
+Fields it cannot carry are dropped and reported as convert.fieldDropped warnings.
+--dry-run lists dropped fields and affected connectors using the same checks.
+Edges, frames, groups and locked elements cannot convert. Invalid semantics,
+changed bounds or incompatible connector endpoints fail the batch without writing;
+resize first when a target requires different bounds.
+delete reconnectTo moves direct connectors to the target, preserving ports, labels
+and routing; invalid endpoints or targets fail atomically. Connectors attached only
+to a cascaded uml.port are removed without being moved or reported, even if a
+later reconnect operation cascades that port. Non-edge references follow their
+existing cascade or detach rule.
 
 update label maps: text.note -> text; frame -> name; node.generic -> label;
 state.node -> name; erd.table -> tableName; state.transition -> trigger;
@@ -242,6 +260,8 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   {"op":"append","id":"@orders","field":"columns","items":[{"name":"total","dataType":"integer"}]}
   {"op":"remove-item","id":"@orders","field":"columns","item":"total"}
   {"op":"move","id":"t-users","x":40,"y":80}
+  {"op":"convert","id":"@a","shape":"flowchart:database"}
+  {"op":"delete","id":"@a","reconnectTo":"@b"}
   {"op":"delete","id":"01M4WD"}
   {"op":"scale","page":"p1","factor":1.25}
   {"op":"replace-text","find":"example.dev","replace":"example.info"}
@@ -503,6 +523,11 @@ ERD tables.
              of at least 6 characters. Unknown or ambiguous values exit 2 and
              list candidate frames (short id, name, full id).
              Cross-scope references produce warnings and are omitted.
+             memberIds lists are authoritative except lists naming only frames;
+             open frames (no list or only frames) also include fully contained,
+             unclaimed tables by position regardless of z-order or nested edges.
+             Ambiguous exclusions warn with the table name; --strict exits 3.
+             Canvas ownership can differ from DDL scope.
   --dialect  postgresql (default), mysql or sqlite.
   --output   Write the SQL to a file instead of stdout.
   --check    Compare the generated SQL with an existing file; exit 1 when it is
@@ -608,6 +633,8 @@ freeform: text layout and image-missing; flowchart: text layout, node-overlap
 and image-missing; erd, state and uml: node-overlap and image-missing; other
 pages with images: image-missing.
 node-overlap and image-missing rules cover diagram pages and attachments.
+ERD frame-straddle warns when a table crosses a frame edge, naming both;
+this warning does not change the exit code.
 Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages from a
 nodetto document or BPMN XML.
 Text output is empty when clean; --format json always prints a report. A

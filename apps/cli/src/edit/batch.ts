@@ -22,7 +22,13 @@ import {
   type Json,
   type JsonObject,
 } from "./operation-input.ts";
-import type { Created, MatchReport } from "./types.ts";
+import type {
+  ConvertReport,
+  Created,
+  EditWarning,
+  MatchReport,
+  ReconnectReport,
+} from "./types.ts";
 import { checkOperationFields } from "./operation-fields.ts";
 import {
   addPage,
@@ -33,6 +39,7 @@ import {
 } from "./operations/pages.ts";
 import { addElement } from "./operations/add.ts";
 import { connectElements } from "./operations/connect.ts";
+import { convertElements } from "./operations/convert.ts";
 import {
   editListField,
   updateElement,
@@ -49,6 +56,9 @@ export class Batch {
   readonly created: Created[] = [];
   readonly touchedPages = new Set<string>();
   readonly replaced: TextReplacement[] = [];
+  readonly converted: ConvertReport[] = [];
+  readonly reconnected: ReconnectReport[] = [];
+  readonly convertWarnings: EditWarning[] = [];
   /** The element auto placement put last on each page, to line up with. */
   readonly lastPlaced = new Map<string, string>();
   private orderedIdsCache: readonly string[] | undefined;
@@ -327,6 +337,9 @@ export class Batch {
       case "connect":
         connectElements(this, operation, index);
         return;
+      case "convert":
+        convertElements(this, operation, index);
+        return;
       case "append":
       case "remove-item":
         editListField(this, operation, index, op);
@@ -361,7 +374,7 @@ export class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, delete-page, add, connect, convert, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
         );
     }
   }

@@ -113,6 +113,7 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
     ) ||
     permitted.some(
       (command) =>
+        command.type === "convertElement" ||
         command.type === "updateSemantic" ||
         command.type === "updateVisual" ||
         command.type === "replaceVisual" ||

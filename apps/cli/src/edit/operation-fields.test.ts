@@ -64,6 +64,15 @@ test("suggests a close field", () => {
   ).toThrow('Did you mean "replace"?');
 });
 
+test("convert rejects visual and delete accepts reconnectTo", () => {
+  expect(() => checkOperationFields({ op: "convert", visual: {} }, 0)).toThrow(
+    'unknown field "visual"',
+  );
+  expect(() =>
+    checkOperationFields({ op: "delete", reconnectTo: "target" }, 0),
+  ).not.toThrow();
+});
+
 test("replace-text validates boolean flags", () => {
   const batch = new Batch(new Editor());
   for (const field of ["regex", "ignoreCase"])
@@ -85,6 +94,7 @@ test("handler operation reads are represented in their field rows", () => {
       "batch:record",
     ],
     connect: ["connect:connectElements", "batch:shape", "batch:record"],
+    convert: ["convert:convertElements", "selectors:selectedWhere"],
     update: [
       "elements:updateElement",
       "elements:updateOne",

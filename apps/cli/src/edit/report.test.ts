@@ -90,3 +90,50 @@ test("reports matches in text and JSON", () => {
       .matches,
   ).toEqual(matches);
 });
+
+test("reports conversions and reconnections in text and JSON", () => {
+  const converted = [
+    {
+      operation: 0,
+      id: "one",
+      fromType: "node.generic",
+      toType: "state.node",
+      mapped: [{ from: "semantic.label", to: "semantic.name" }],
+      dropped: ["semantic.extra"],
+      connectors: [{ id: "edge", type: "edge.generic" }],
+    },
+  ];
+  const reconnected = [
+    { operation: 1, deleted: "two", to: "one", connectors: ["edge"] },
+  ];
+  const withReports = { ...result, converted, reconnected };
+  for (const dryRun of [false, true]) {
+    const text = formatEditReport(withReports, "x", dryRun, "text");
+    expect(text).toContain(
+      "  converted one node.generic -> state.node\n    mapped semantic.label -> semantic.name\n    cannot carry semantic.extra\n    connector edge (edge.generic)\n  reconnected two -> one: 1 connector(s)\n",
+    );
+    const json = JSON.parse(formatEditReport(withReports, "x", dryRun, "json"));
+    expect(Object.keys(json)).toEqual([
+      "written",
+      "operations",
+      "created",
+      "replaced",
+      "converted",
+      "reconnected",
+      "pages",
+      "warnings",
+    ]);
+    expect(json.converted).toEqual(converted);
+    expect(json.reconnected).toEqual(reconnected);
+  }
+  const empty = JSON.parse(
+    formatEditReport(
+      { ...result, converted: [], reconnected: [] },
+      "x",
+      false,
+      "json",
+    ),
+  );
+  expect(Object.hasOwn(empty, "converted")).toBe(false);
+  expect(Object.hasOwn(empty, "reconnected")).toBe(false);
+});

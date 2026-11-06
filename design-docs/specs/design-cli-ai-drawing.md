@@ -197,6 +197,9 @@ above. The README's scoped schema export example uses a frame name.
 Known edge: because names come before prefixes, a frame named like another frame's
 id prefix resolves by name. Tests cover this. The full id always resolves.
 
+Which tables the resolved frame contains is specified in
+`design-convert-participant-frame-scope.md` ("E3: frame membership for DDL").
+
 ## Live co-editing in the desktop app
 
 The app already watches the open file (`watch.rs`, `document-file-changed`) and today

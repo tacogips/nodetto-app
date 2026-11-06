@@ -33,7 +33,11 @@ reproducible drawing batch and the supported notation.
 ## Sequence authoring
 
 Use Actor, Service, or Seq DB in the shared toolbar to place ordered sequence
-participants on an empty page. The Edge tool creates a timeline message when
+participants on an empty page. On the canvas and in export, an actor draws as a
+stick figure with the name below, a database as a cylinder, and a service as a
+rounded box, each with its lifeline. The canvas omits the kind caption on actor
+and database participants, and draws a gradient fill on them as a solid color.
+The Edge tool creates a timeline message when
 both endpoints are participants, appends it below existing messages, and grows
 unlocked lifelines in the same undoable edit. Participant inspectors can add
 activation bars spanning that participant's messages; activations remain
