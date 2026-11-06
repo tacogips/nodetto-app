@@ -38,12 +38,12 @@ export function connectByType(
 ): ElementId | null {
   const source = editor.store.get(from);
   const target = editor.store.get(to);
-  // Self-transitions and self-referencing foreign keys are the only
-  // connections an element may make to itself.
+  // State transitions, ERD relations and sequence messages may connect to themselves.
   if (
     (from === to &&
       source?.type !== "state.node" &&
-      source?.type !== "erd.table") ||
+      source?.type !== "erd.table" &&
+      source?.type !== "sequence.participant") ||
     !source ||
     !target ||
     source.page !== target.page

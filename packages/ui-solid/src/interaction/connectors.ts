@@ -321,11 +321,12 @@ export function createConnectorGestures(
       point,
       selfConnects(gesture.connectorType) ? [] : [gesture.from],
     );
-    // A click on a table with the relation tool is not a self-reference;
+    // A click with the relation or message tool is not a self-connection;
     // ending on the source needs a drag.
     const target =
       dropped === gesture.from &&
-      gesture.connectorType === "erd.relation" &&
+      (gesture.connectorType === "erd.relation" ||
+        gesture.connectorType === "sequence.message") &&
       Math.hypot(point.x - gesture.startPage.x, point.y - gesture.startPage.y) *
         editor.camera.get().z <
         4

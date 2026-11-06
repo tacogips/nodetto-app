@@ -19,7 +19,17 @@ import {
   type Vec,
 } from "../../geometry.ts";
 import { avoidOrthogonalObstacles } from "../../orthogonal-routing.ts";
-import { sequenceMessageY } from "../../sequence-layout.ts";
+import {
+  connectorLabelExtent,
+  connectorLabelLayout,
+} from "../../label-layout.ts";
+import {
+  SEQUENCE_SELF_LABEL_GAP,
+  SEQUENCE_SELF_LOOP_HEIGHT,
+  SEQUENCE_SELF_LOOP_WIDTH,
+  sequenceMessageY,
+} from "../../sequence-layout.ts";
+import { connectorDecoration } from "./decoration.ts";
 import type { ShapeContext } from "../../shape-util.ts";
 import {
   endpointRotation,
@@ -327,6 +337,37 @@ function computeConnector(
   }
   if (element.type === "sequence.message") {
     const y = sequenceMessageY(element, context);
+    if (ids.from === ids.to) {
+      const cx = fromCenter.x;
+      const start = { x: cx, y };
+      const end = { x: cx, y: y + SEQUENCE_SELF_LOOP_HEIGHT };
+      const base = route(start, end, fromBox, toBox, [
+        start,
+        { x: cx + SEQUENCE_SELF_LOOP_WIDTH, y },
+        { x: cx + SEQUENCE_SELF_LOOP_WIDTH, y: end.y },
+        end,
+      ]);
+      const labelStartX =
+        cx + SEQUENCE_SELF_LOOP_WIDTH + SEQUENCE_SELF_LABEL_GAP;
+      const layout = connectorLabelLayout(
+        connectorDecoration(element).label,
+        element.visual,
+      );
+      const extent = connectorLabelExtent(layout, { x: 0, y: 0 });
+      return {
+        ...base,
+        labelStartX,
+        labelPoint: extent
+          ? {
+              x: labelStartX + extent.width / 2,
+              y:
+                y +
+                SEQUENCE_SELF_LOOP_HEIGHT / 2 -
+                (extent.y + extent.height / 2),
+            }
+          : { x: labelStartX, y: y + SEQUENCE_SELF_LOOP_HEIGHT / 2 },
+      };
+    }
     if (fromCenter.x === toCenter.x) {
       return route(
         { x: fromCenter.x, y },

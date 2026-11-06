@@ -194,6 +194,12 @@ export function typesCommand(
     semantic,
     visual: { ...visual, x: 0, y: 0 },
   };
+  const notes =
+    type === "sequence.message"
+      ? [
+          "Equal from and to draw a self-call loop; connect from a participant to itself creates one on the next row.",
+        ]
+      : undefined;
   if (format === "json")
     return ok(
       `${JSON.stringify(
@@ -205,6 +211,7 @@ export function typesCommand(
           defaultSemantic: semantic,
           defaultVisual: visual,
           example,
+          ...(notes ? { notes } : {}),
         },
         null,
         2,
@@ -219,6 +226,7 @@ export function typesCommand(
     `Default semantic: ${JSON.stringify(semantic)}`,
     `Default visual: ${JSON.stringify(visual)}`,
     `References: deleting a referenced element ${definition.onReferenceDeleted === "cascade" ? "deletes this element too" : "clears the reference"}.`,
+    ...(notes ?? []),
     "",
     "Example operation for nodetto-cli edit:",
     `  ${JSON.stringify(example)}`,

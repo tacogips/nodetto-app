@@ -1,6 +1,8 @@
 import type { SequenceActivationSemantic } from "@nodetto/ir";
 import {
+  sequenceMessageExtent,
   sequenceMessageY,
+  sequenceOrderBottomY,
   sequenceOrderY,
   sequenceParticipants,
 } from "../sequence-layout.ts";
@@ -26,7 +28,11 @@ export const sequenceParticipantShapeUtil: ShapeUtil = {
       height = Math.max(
         220,
         ...messages.map(
-          (message) => sequenceMessageY(message, context) + 60 - y,
+          (message) =>
+            sequenceMessageY(message, context) +
+            sequenceMessageExtent(message) +
+            60 -
+            y,
         ),
       );
     }
@@ -84,7 +90,7 @@ export const sequenceActivationShapeUtil: ShapeUtil = {
     const { x, y, width, height } = element.visual;
     if (!participant && x === undefined) return null;
     const top = y ?? sequenceOrderY(element, semantic.fromOrder, context);
-    const bottom = sequenceOrderY(element, semantic.toOrder, context);
+    const bottom = sequenceOrderBottomY(element, semantic.toOrder, context);
     const resolvedWidth = width ?? 10;
     return {
       x: participant

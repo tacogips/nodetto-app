@@ -20,7 +20,11 @@ import {
   type Rng,
 } from "../fractional.ts";
 import type { Vec } from "../geometry.ts";
-import { sequenceMessageY } from "../sequence-layout.ts";
+import {
+  SEQUENCE_SELF_LOOP_HEIGHT,
+  sequenceMessageExtent,
+  sequenceMessageY,
+} from "../sequence-layout.ts";
 import type { Store } from "../store.ts";
 
 /** An order key after every message and activation bound on `page`. */
@@ -166,7 +170,12 @@ export function buildSequenceParticipant(
   const context = editor.createShapeContext();
   for (const element of editor.store.getPageElements(page)) {
     if (element.type === "sequence.message")
-      bottom = Math.max(bottom, sequenceMessageY(element, context) + 60);
+      bottom = Math.max(
+        bottom,
+        sequenceMessageY(element, context) +
+          sequenceMessageExtent(element) +
+          60,
+      );
   }
   return editor.buildElement("sequence.participant", {
     page,
@@ -226,7 +235,9 @@ export function planSequenceActivation(
   const startY = first
     ? sequenceMessageY(first, context)
     : (participant.visual.y ?? 0) + 104;
-  const endY = last ? sequenceMessageY(last, context) : startY + 52;
+  const endY = last
+    ? sequenceMessageY(last, context) + sequenceMessageExtent(last)
+    : startY + 52;
   const activation = editor.buildElement("sequence.activation", {
     page: participant.page,
     semantic: { participant: participantId, fromOrder, toOrder },
@@ -267,7 +278,11 @@ export function planSequenceMessage(
     .getPageElements(source.page)
     .filter((element) => element.type === "sequence.message")
     .reduce(
-      (bottom, element) => Math.max(bottom, sequenceMessageY(element, context)),
+      (bottom, element) =>
+        Math.max(
+          bottom,
+          sequenceMessageY(element, context) + sequenceMessageExtent(element),
+        ),
       Math.max((source.visual.y ?? 0) + 112, (target.visual.y ?? 0) + 112),
     );
   const y = existingY + 52;
@@ -287,7 +302,11 @@ export function planSequenceMessage(
     .getPageElements(source.page)
     .filter((element) => element.type === "sequence.participant")) {
     if (context.isLocked?.(participant.id)) continue;
-    const requiredHeight = y - (participant.visual.y ?? 0) + 60;
+    const requiredHeight =
+      y +
+      (from === to ? SEQUENCE_SELF_LOOP_HEIGHT : 0) -
+      (participant.visual.y ?? 0) +
+      60;
     if ((participant.visual.height ?? 220) < requiredHeight)
       commands.push({
         type: "replaceVisual",

@@ -309,7 +309,9 @@ export const MANUAL_ROUTE_TYPES: ReadonlySet<string> = new Set([
 /** Connectors a drag may end on the element it started from. */
 export function selfConnects(connectorType: string | undefined): boolean {
   return (
-    connectorType === "state.transition" || connectorType === "erd.relation"
+    connectorType === "state.transition" ||
+    connectorType === "erd.relation" ||
+    connectorType === "sequence.message"
   );
 }
 

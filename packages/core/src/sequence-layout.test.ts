@@ -1,4 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import {
+  isSequenceSelfMessage,
+  sequenceMessageExtent,
+  sequenceOrderBottomY,
+  sequenceOrderY,
+} from "./sequence-layout.ts";
 import { createShapeContext } from "./hit-test.ts";
 import { readDirectEndpoints, resolveConnector } from "./shapes/connector.ts";
 import { renderPageSvg } from "./svg-export.ts";
@@ -151,4 +157,56 @@ describe("semantic-only imported sequence geometry", () => {
       )?.start.y,
     ).toBe(420);
   });
+});
+
+test("self-message orders extend implicit rows while saved positions win", () => {
+  const source = imported();
+  const make = (selfIds: string[], saved = false) => {
+    const editor = makeEditor({
+      document: {
+        ...source,
+        elements: source.elements.map((item) =>
+          item.type === "sequence.message" && selfIds.includes(item.id)
+            ? {
+                ...item,
+                semantic: {
+                  ...(item.semantic as { from: string }),
+                  to: (item.semantic as { from: string }).from,
+                },
+                ...(saved && item.id === "lookup"
+                  ? { visual: { y: 420 } }
+                  : {}),
+              }
+            : item,
+        ),
+      },
+    });
+    return {
+      editor,
+      context: createShapeContext(editor.store, editor.registry, 1),
+    };
+  };
+  const normal = make([]);
+  const one = make(["lookup"]);
+  const two = make(["get", "lookup"]);
+  const message = one.editor.store.get("lookup")!;
+  expect(isSequenceSelfMessage(message)).toBe(true);
+  expect(isSequenceSelfMessage(normal.editor.store.get("get")!)).toBe(false);
+  expect(isSequenceSelfMessage({ ...message, semantic: {} })).toBe(false);
+  expect(sequenceMessageExtent(message)).toBe(32);
+  expect(sequenceOrderY(message, "a1", one.context)).toBe(164);
+  expect(sequenceOrderY(message, "a2", one.context)).toBe(216);
+  expect(sequenceOrderY(message, "a3", one.context)).toBe(300);
+  expect(
+    sequenceOrderY(two.editor.store.get("lookup")!, "a3", two.context),
+  ).toBe(332);
+  expect(
+    sequenceOrderY(normal.editor.store.get("get")!, "a3", normal.context),
+  ).toBe(268);
+  expect(sequenceOrderBottomY(message, "a2", one.context)).toBe(248);
+  expect(sequenceOrderBottomY(message, "a1", one.context)).toBe(164);
+  const saved = make(["lookup"], true);
+  expect(
+    sequenceOrderY(saved.editor.store.get("lookup")!, "a2", saved.context),
+  ).toBe(420);
 });

@@ -175,9 +175,10 @@ export function renderConnector(
           : text(
               textStyled(
                 {
-                  x: resolved.labelPoint.x,
+                  x: resolved.labelStartX ?? resolved.labelPoint.x,
                   y: baselines[index] as number,
-                  "text-anchor": "middle",
+                  "text-anchor":
+                    resolved.labelStartX === undefined ? "middle" : "start",
                   fill: theme.muted,
                   "font-size": layout.fontSize,
                   // The halo covers what the estimated backdrop misses.

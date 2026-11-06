@@ -151,7 +151,12 @@ describe("sequence smart connect", () => {
     });
     const edge = editor.connectSmart(participant, node);
     expect(editor.store.get(edge as string)?.type).toBe("edge.generic");
-    expect(editor.connectSmart(participant, participant)).toBeNull();
+    expect(
+      editor.store.get(editor.connectSmart(participant, participant) as string),
+    ).toMatchObject({
+      type: "sequence.message",
+      semantic: { from: participant, to: participant },
+    });
   });
 
   test("respects participant locks without partially extending lifelines", () => {
@@ -292,5 +297,88 @@ describe("sequence activations", () => {
     });
     expect(editor.createSequenceActivation("missing")).toBeNull();
     expect(validateDocument(editor.getSnapshot())).toEqual([]);
+  });
+});
+
+describe("sequence self-message authoring", () => {
+  test("reserves loop height between rows and keeps ordinary pitch", () => {
+    const editor = makeEditor();
+    const a = editor.createSequenceParticipant("actor", { x: 100, y: 80 });
+    const b = editor.createSequenceParticipant("service", { x: 340, y: 80 });
+    const first = editor.connectSmart(a, b) as string;
+    const self = editor.connectSmart(a, a) as string;
+    const last = editor.connectSmart(a, b) as string;
+    const firstY = editor.store.get(first)?.visual.y ?? 0;
+    const selfY = editor.store.get(self)?.visual.y ?? 0;
+    expect(selfY).toBe(firstY + 52);
+    expect(editor.store.get(last)?.visual.y).toBe(selfY + 32 + 52);
+    expect(editor.moveSequenceElement(self, -1)).toBe(true);
+    expect(
+      Math.abs(
+        (editor.store.get(first)?.visual.y ?? 0) -
+          (editor.store.get(self)?.visual.y ?? 0),
+      ),
+    ).toBeGreaterThanOrEqual(32);
+
+    const plain = makeEditor();
+    const x = plain.createSequenceParticipant("actor", { x: 100, y: 80 });
+    const z = plain.createSequenceParticipant("service", { x: 340, y: 80 });
+    const ids = [
+      plain.connectSmart(x, z),
+      plain.connectSmart(x, z),
+      plain.connectSmart(x, z),
+    ];
+    const ys = ids.map((id) => plain.store.get(id as string)?.visual.y ?? 0);
+    expect(ys[1]).toBe((ys[0] ?? 0) + 52);
+    expect(ys[2]).toBe((ys[1] ?? 0) + 52);
+  });
+
+  test("grows unlocked lifelines and activation for a first self-message", () => {
+    const editor = makeEditor();
+    const a = editor.createSequenceParticipant("actor", { x: 100, y: 80 });
+    const b = editor.createSequenceParticipant("service", { x: 340, y: 80 });
+    const locked = editor.createSequenceParticipant("db", { x: 580, y: 80 });
+    editor.apply([
+      { type: "updateVisual", id: locked, visual: { locked: true } },
+    ]);
+    const lockedHeight = editor.store.get(locked)?.visual.height;
+    const self = editor.connectSmart(a, a) as string;
+    const message = editor.store.get(self);
+    const y = message?.visual.y ?? 0;
+    expect(y).toBe((editor.store.get(a)?.visual.y ?? 0) + 112 + 52);
+    expect(message?.semantic).toMatchObject({ kind: "sync", label: "Message" });
+    for (const id of [a, b]) {
+      const participant = editor.store.get(id);
+      expect(participant?.visual.height ?? 0).toBeGreaterThanOrEqual(
+        y + 32 + 60 - (participant?.visual.y ?? 0),
+      );
+    }
+    expect(editor.store.get(locked)?.visual.height).toBe(lockedHeight);
+    editor.apply([{ type: "updateVisual", id: a, visual: { height: 220 } }]);
+    const activation = editor.createSequenceActivation(a) as string;
+    const bar = editor.store.get(activation);
+    expect(
+      (bar?.visual.y ?? 0) + (bar?.visual.height ?? 0),
+    ).toBeGreaterThanOrEqual(y + 32);
+    expect(editor.store.get(a)?.visual.height ?? 0).toBeGreaterThanOrEqual(
+      y + 32 + 60 - (editor.store.get(a)?.visual.y ?? 0),
+    );
+    const added = editor.createSequenceParticipant("service", {
+      x: 820,
+      y: 80,
+    });
+    const participant = editor.store.get(added);
+    expect(
+      (participant?.visual.y ?? 0) + (participant?.visual.height ?? 0),
+    ).toBeGreaterThanOrEqual(y + 32 + 60);
+  });
+
+  test("rejects a locked self-connect without changes", () => {
+    const editor = makeEditor();
+    const a = editor.createSequenceParticipant("actor", { x: 100, y: 80 });
+    editor.apply([{ type: "updateVisual", id: a, visual: { locked: true } }]);
+    const before = editor.getSnapshot();
+    expect(editor.connectSmart(a, a)).toBeNull();
+    expect(editor.getSnapshot()).toEqual(before);
   });
 });

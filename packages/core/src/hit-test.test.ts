@@ -370,3 +370,32 @@ describe("container paint order hit testing", () => {
     ).toBe("pool");
   });
 });
+
+test("self-message legs pick the message while its hollow picks the participant", () => {
+  const store = new Store(
+    document([
+      element({
+        id: "participant",
+        type: "sequence.participant",
+        semantic: { name: "Widget", kind: "service", order: "a1" },
+        visual: { x: 0, y: 0, width: 100, height: 300 },
+      }),
+      element({
+        id: "message",
+        index: "a2",
+        type: "sequence.message",
+        semantic: {
+          from: "participant",
+          to: "participant",
+          order: "a1",
+          kind: "sync",
+        },
+        visual: { y: 150 },
+      }),
+    ]),
+  );
+  expect(pick(store, { x: 90, y: 166 })).toBe("message");
+  expect(pick(store, { x: 70, y: 150 })).toBe("message");
+  expect(pick(store, { x: 70, y: 166 })).toBe("participant");
+  expect(pick(store, { x: 50, y: 280 })).toBe("participant");
+});

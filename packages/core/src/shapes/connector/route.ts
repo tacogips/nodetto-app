@@ -15,6 +15,8 @@ export interface ConnectorEndpoints {
   readonly points: readonly Vec[];
   /** Halfway along route length, used by labels across every renderer. */
   readonly labelPoint: Vec;
+  /** Page x of left-aligned label text. Absent means centred on labelPoint. */
+  readonly labelStartX?: number;
   /** Preferred channel handle, even when obstacle avoidance adds detours. */
   readonly bendPoint?: Vec;
   readonly bendAxis?: "x" | "y";

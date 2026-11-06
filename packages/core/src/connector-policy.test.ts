@@ -5,7 +5,11 @@ import {
   type Element,
 } from "@nodetto/ir";
 import { Editor } from "./editor.ts";
-import { readTableEndpoints, resolveConnector } from "./shapes/connector.ts";
+import {
+  readDirectEndpoints,
+  readTableEndpoints,
+  resolveConnector,
+} from "./shapes/connector.ts";
 import { makeEditor } from "./test-helpers.ts";
 
 test("typed connectors reject wrong endpoint types atomically through command writes", () => {
@@ -161,4 +165,28 @@ test("an ERD table connects to itself with a relation that loops outside it", ()
   // Other notations still refuse self-connections.
   const umlClass = editor.createElement("uml.class");
   expect(editor.connectSmart(umlClass, umlClass)).toBeNull();
+});
+
+test("sequence participants self-connect while locked and unsupported shapes refuse", () => {
+  const editor = makeEditor();
+  const participant = editor.createElement("sequence.participant");
+  const id = editor.connectSmart(participant, participant)!;
+  const message = editor.store.get(id)!;
+  expect(message.type).toBe("sequence.message");
+  expect(message.semantic).toMatchObject({
+    from: participant,
+    to: participant,
+  });
+  expect(
+    resolveConnector(message, editor.createShapeContext(), readDirectEndpoints)
+      ?.points,
+  ).toHaveLength(4);
+  editor.apply([
+    { type: "updateVisual", id: participant, visual: { locked: true } },
+  ]);
+  expect(editor.connectSmart(participant, participant)).toBeNull();
+  for (const type of ["usecase.node", "shape.geo"]) {
+    const node = editor.createElement(type);
+    expect(editor.connectSmart(node, node)).toBeNull();
+  }
 });
