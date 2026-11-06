@@ -13,16 +13,21 @@ HTML-page importer or portable HTML-and-assets export workflow.
 ## Required behavior
 
 1. Documents reference attachments by a normalized POSIX path relative to the
-   JSONL file, for example `artifacts/<content-hash>.png`. Save the bytes beside
-   the document, not inside JSONL. Keep legacy embedded documents readable.
+   JSONL file, for example `artifacts/<content-hash>.png` or `thumbs/widget.png`.
+   Save the bytes beside the document, not inside JSONL. Keep legacy embedded
+   documents readable.
 2. Resolve assets through a host-independent adapter. Core/IR never read a local
    filesystem or fetch arbitrary URLs. Desktop and CLI implement local adapters;
    the web host can supply its own implementation later.
-3. First save externalizes embedded assets. Save As copies referenced bytes to
-   the destination's artifacts directory before atomically writing JSONL.
-   Missing files produce actionable errors; do not silently write a broken copy.
+3. First save externalizes embedded assets. Saving never rewrites an existing
+   relative reference. Save As to another folder keeps a reference that still
+   resolves to the same bytes, and otherwise copies the bytes to the destination's
+   artifacts directory and reports it, before atomically writing JSONL; see
+   `design-file-save-stability.md`.
+   Files missing on both sides produce actionable errors; do not silently write a
+   broken copy.
    Never delete attachments during save or undo. Empty untitled documents still
-   create no files. Copies of the JSONL plus its artifacts directory remain usable.
+   create no files. A copy of the JSONL plus every file it references remains usable.
 4. Display, image replacement/cropping, prototype preview, raster masks and
    SVG/PNG/PDF/HTML export resolve the same asset references. CLI export resolves
    from the input file's directory, independently of the working directory.

@@ -16,7 +16,9 @@ Adapters:
 - `createFileDocumentChangeSource(backend)` translates native filesystem events
   into document invalidations. Watch/unwatch operations are serialized because
   the desktop host owns one native watch. `DocumentSession` re-reads and merges
-  the document through its existing three-way merge policy.
+  the document through its existing three-way merge policy. An outside change
+  writes nothing unless the user has unsaved edits; see
+  `design-file-save-stability.md`.
 - `createYjsDocumentChangeSource(doc)` translates the cloud provider's synchronized
   Y.Doc into notifications. Nested changed element IDs and transaction origin are
   preserved, and page/metadata changes invalidate the full snapshot. One
