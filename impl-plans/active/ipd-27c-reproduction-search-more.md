@@ -192,3 +192,9 @@ Literal-id gate (binding for ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction; 
 Scope precedence (s812): the operator round-18 Scope wording in this plan and in its manifest entry ("ops files under tmp/ipd-s772/ipd-27-reproduction/ops/", "appending to the document the previous part left") is superseded by the operator round-22 rebuild rule. Ops are the `gen/ops/` output of `gen/build.ts`, and every run rebuilds `work/doc.jsonl` from an empty document. The round-18 text is kept for the record.
 
 Unchanged: planId, dependsOn, writePaths, sharedPaths, sharedPathNotes, artifactRoots, the 31 accepted dependencies, the lint, frame, flow, compare and privacy gates, and every operator section. The only verification change is the literal-id gate added above. It is also in this plan's manifest entry, inserted after `validate`.
+
+## Amendment 2026-11-10 (operator round 23, binding; keep this section verbatim)
+
+Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.
+
+`ipd-27a-reproduction-chrome` is accepted; its document and comparisons are in `tmp/ipd-s772/ipd-27-reproduction/work/`. Continue from them.

@@ -140,3 +140,9 @@ Unchanged: planId, dependsOn, writePaths, sharedPaths, artifactRoots, steps 1-8 
 ## Amendment 2026-11-10 (operator round 22, binding; keep this section verbatim)
 
 Scratch rule (operator round 22, binding for every remaining plan): temporary directories that test harnesses create under the operating system temp dir (mkdtemp under os.tmpdir(), for example nodetto-*-parity-*) are authorized scratch and are not write-scope violations. The reproduction plans do not run the native parity suites (they belong to accepted ipd-23 and ipd-24); their required gates are build-cli plus the reproduction gates.
+
+## Amendment 2026-11-10 (operator round 23, binding; keep this section verbatim)
+
+Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.
+
+`ipd-27a-reproduction-chrome` is accepted; its document and comparisons are in `tmp/ipd-s772/ipd-27-reproduction/work/`. Continue from them.
