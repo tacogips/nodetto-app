@@ -2,7 +2,7 @@
 // page with every option, exit code and an example, printed by
 // `nodetto-cli help <command>` or `nodetto-cli <command> --help`.
 
-import { TABLE_HELP } from "./table-command.ts";
+import { TABLE_HELP } from "./table-help.ts";
 
 export const OVERVIEW = `nodetto-cli - read, draw, check and convert nodetto documents (.jsonl)
 Usage: nodetto-cli <command> [options]

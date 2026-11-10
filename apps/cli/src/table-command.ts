@@ -1,7 +1,6 @@
 import { parseCsv, parseTsv, tableSheetFromGrid } from "@nodetto/core";
 import {
   TABLE_SHEET_COLUMN_TYPES,
-  TABLE_SHEET_LIMITS,
   type TableSheetColumnType,
 } from "@nodetto/ir";
 import {
@@ -12,11 +11,10 @@ import {
 } from "./commands.ts";
 import { runOperations } from "./edit-command.ts";
 import type { JsonObject } from "./edit/operation-input.ts";
+import { TABLE_HELP } from "./table-help.ts";
 
-export const TABLE_HELP = `Usage: nodetto-cli table create <doc.jsonl> (--csv <file> | --tsv <file> | --data <json>) [--page <id|name>] [--id <id>] [--x <n> --y <n>] [--no-header] [--types t1,t2,...] [--widths w1,w2,...] [--format text|json]
-       nodetto-cli table set <doc.jsonl> <table-id> --cell <row>:<col> --value <text> [--cell ... --value ...] [--format text|json]
-CSV and TSV support RFC 4180 quoting and a UTF-8 BOM; ragged rows are padded. The first record names columns unless --no-header is given.
-Types: ${TABLE_SHEET_COLUMN_TYPES.join(", ")}. Limits: ${TABLE_SHEET_LIMITS.maxColumns} columns, ${TABLE_SHEET_LIMITS.maxRows} rows, ${TABLE_SHEET_LIMITS.maxCellText} characters per cell, ${TABLE_SHEET_LIMITS.maxColumnName} per column name, ${TABLE_SHEET_LIMITS.maxOptions} options of ${TABLE_SHEET_LIMITS.maxOptionLength} characters; widths ${TABLE_SHEET_LIMITS.minColumnWidth}-${TABLE_SHEET_LIMITS.maxColumnWidth}, heights ${TABLE_SHEET_LIMITS.minRowHeight}-${TABLE_SHEET_LIMITS.maxRowHeight}.`;
+export { TABLE_HELP };
+
 const usage = (message?: string): CommandResult =>
   fail(message ? `${message}\n\n${TABLE_HELP}` : TABLE_HELP);
 
