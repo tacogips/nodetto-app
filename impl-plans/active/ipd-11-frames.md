@@ -23,6 +23,10 @@
   - `impl-plans/progress/ipd-11-frames.md`
   - `tmp/ipd-s772/ipd-11-frames`
   - `packages/ui-solid/src/interaction-creation.test.ts`
+  - `packages/ui-solid/src/interaction/lifecycle.ts`
+  - `packages/ui-solid/src/interaction/pointer.ts`
+  - `packages/ui-solid/src/interaction/events.ts`
+  - `packages/ui-solid/src/interaction/types.ts`
 - sharedPaths:
   - `packages/core/src/index.ts`
   - `apps/cli/src/commands.test.ts`
@@ -131,6 +135,10 @@ Desktop auto-parent:
 - Coordinates with `parent` are relative only in the operation input. Stored geometry stays page space.
 - Inspect output changes. Update `apps/cli/src/commands.test.ts` or inspect tests only if they cover frames with children, and list each changed expectation (sharedPaths).
 - The examples' preview images change because of outside titles. That is accepted, and `ipd-26` regenerates them. Do not regenerate examples here.
+- Shared gesture lifecycle (round 6): only gestures that create or translate elements (creation, `translating`) may reparent. `resizing`, `resizing-selection`, `rotating`, `rotating-selection`, `routing-bend`, `routing-waypoint`, `breadboard-wire-point`, `sequence-reorder`, marquee and nudge must not reparent.
+- `editor.endBatch()` (in `finishGesture`) and `editor.abortBatch()` (in `cancelGesture`) must still run exactly once for every gesture kind listed there today (`lifecycle.ts:35-45` and `:61-71`). Do not add a second `endBatch`, and do not skip one on the reparent path.
+- `cancelGesture` (Escape, pointer cancel) must not reparent. Aborting the batch alone must restore the pre-gesture membership.
+- `interaction/types.ts` holds the accepted `ipd-29` field `SnapSettings.gridSize?: 4 | 8 | 24`, read at `interaction/snapping.ts:163`. Keep it unchanged. Do not rename, retype or remove it.
 
 ## Tests
 
@@ -168,8 +176,8 @@ Imitate `packages/ui-solid/src/interaction-creation.test.ts` helpers.
 
 ## Verification (evidence in `final/`)
 
-1. `bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts` -> exit 0, 0 fail.
-2. `bun run typecheck` -> no `error TS` line in the owned files.
+1. `bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts` -> exit 0, 0 fail.
+2. `bun run typecheck` -> no `error TS` line in the owned files and none in `packages/ui-solid/src/interaction/snapping.ts` (it reads `SnapSettings.gridSize` from the owned `interaction/types.ts`).
 3. `bunx biome check` on the owned files -> exit 0.
 4. Visual evidence: export `final/frames.png` at `--scale 2`, from a page with two iPhone frames and one diagram frame. Check that titles are above device frames and never overlap content.
 
@@ -187,3 +195,14 @@ Verification passes, and the progress log records the before/after drop behavior
 ## Amendment 2026-11-10 (operator round 5)
 
 `packages/ui-solid/src/interaction-creation.test.ts` is added to this plan's writePaths. Add the missing `PrototypeBack` entry to the gesture classification expectation that fails today (1 of 172; finding `integration-s781-w1-ui-solid-prototype-back-gesture`) and change nothing else in that file. Verification adds `bun test packages/ui-solid/src/interaction-creation.test.ts` -> 0 fail. Keep the ipd-11 work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (operator round 6)
+
+This plan also owns `packages/ui-solid/src/interaction/lifecycle.ts`, `pointer.ts`, `events.ts` and `types.ts`. Run drop-time and creation-time reparenting inside the same history batch, before `finishGesture` closes it, so a single undo reverts the move and the reparent together. Verification: `bun test packages/core/src/insertion-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/ui-solid/src/interaction-creation.test.ts` -> 0 fail. Keep the ipd-11 work already in the working tree and continue from it.
+
+Step 5 repair S5-s784-R1 (appended 2026-11-10). Ownership, dependsOn, waves and the ownership block are unchanged. Because this amendment hands ipd-11 the shared gesture lifecycle and `interaction/types.ts`, the round-6 regression set widens to cover every gesture that `finishGesture`/`cancelGesture` closes, and also the accepted `ipd-29` snap grid size:
+
+- `bun test packages/core/src/insertion-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts` -> exit 0, 0 fail. Record the pass and fail counts and the log path in the progress log.
+- `bun run typecheck` -> no `error TS` line in the owned files, and none in `packages/ui-solid/src/interaction/snapping.ts`. `SnapSettings.gridSize?: 4 | 8 | 24` in `packages/ui-solid/src/interaction/types.ts` is byte-identical before and after (record `grep -n 'gridSize' packages/ui-solid/src/interaction/types.ts` before and after editing).
+- The pitfalls added under `## Pitfalls` (reparent only in create/translate gestures; `endBatch`/`abortBatch` exactly once per listed gesture kind; no reparent on cancel; keep `gridSize`) are binding for this amendment.
+- These commands replace the round-6 verification sentence above. Verification item 1 already includes them. No workspace-wide gate is added, because ipd-11 is alone in W1.

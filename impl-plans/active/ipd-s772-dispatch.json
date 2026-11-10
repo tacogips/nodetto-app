@@ -115,6 +115,14 @@
       {
         "decision": "2026-11-10 operator amendment round 5 (session-781 wave 2): ipd-07-icon-core-cli, ipd-07b-icon-data-ascii, ipd-08-cli-layout-ops and ipd-10-icon-desktop are accepted dependencies. ipd-11-frames owns packages/ui-solid/src/interaction-creation.test.ts and adds the missing PrototypeBack entry to its gesture classification expectation (finding integration-s781-w1-ui-solid-prototype-back-gesture); change nothing else in that test. Keep the ipd-11 work already in the working tree and continue from it.",
         "rationale": "bun test packages/ui-solid/src/interaction-creation.test.ts fails 1/172 on the gesture classification list, which lacks the new PrototypeBack gesture; the file was outside ipd-11's writePaths, and integration-review stalled on the repeated finding (2 visits)."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 6 (session-783 wave 1): ipd-11-frames also owns packages/ui-solid/src/interaction/lifecycle.ts, pointer.ts, events.ts and types.ts. Drop-time and creation-time reparenting into a frame must run inside the same history batch, before finishGesture closes it, so one undo reverts the move and the reparent together. Keep the ipd-11 work already in the working tree and continue from it.",
+        "rationale": "The creation/drop attachment regressions in packages/ui-solid/src/frame-parent-interaction.test.ts fail because finishGesture in lifecycle.ts closes the batch before reparenting; those integration files were outside ipd-11's writePaths. No other pending plan owns them (ipd-18 owns hit-testing.ts, ipd-22 owns context-menu.ts), so the adjacent integration points are granted at once to avoid another single-file scope round."
+      },
+      {
+        "decision": "Step 4 rerun 2026-11-10 (session-784, Step 5 repair S5-s784-R1): ownership, dependsOn and waves are unchanged. ipd-11-frames round-6 verification now also runs interaction-dragging-camera, interaction-rotate-resize, interaction-connectors, interaction-keyboard-menus, interaction-selection-snapping and snap-grid-size tests (with insertion-parent, frame-parent-interaction and interaction-creation) -> 0 fail. The typecheck gate also covers packages/ui-solid/src/interaction/snapping.ts, and SnapSettings.gridSize (ipd-29) stays unchanged. New binding pitfalls: reparent only in create/translate gestures; endBatch/abortBatch exactly once per gesture kind listed in finishGesture/cancelGesture; cancelGesture never reparents.",
+        "rationale": "Round 6 gave ipd-11 the shared gesture lifecycle and interaction/types.ts without widening its regression and typecheck scope. A batching regression in resize, rotate, routing or nudge undo, or the loss of the accepted ipd-29 grid size, would otherwise pass ipd-11 and surface only at ipd-28."
       }
     ],
     "intentionalTradeoffs": [
@@ -168,7 +176,11 @@
         "apps/cli/src/frame-parent.test.ts",
         "impl-plans/progress/ipd-11-frames.md",
         "tmp/ipd-s772/ipd-11-frames",
-        "packages/ui-solid/src/interaction-creation.test.ts"
+        "packages/ui-solid/src/interaction-creation.test.ts",
+        "packages/ui-solid/src/interaction/lifecycle.ts",
+        "packages/ui-solid/src/interaction/pointer.ts",
+        "packages/ui-solid/src/interaction/events.ts",
+        "packages/ui-solid/src/interaction/types.ts"
       ],
       "sharedPaths": [
         "packages/core/src/index.ts",
@@ -191,8 +203,8 @@
         "Verification passes, and the progress log records the before/after drop behavior."
       ],
       "verification": [
-        "bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts",
-        "bun run typecheck",
+        "bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts",
+        "bun run typecheck (no error TS in the owned files or in packages/ui-solid/src/interaction/snapping.ts; SnapSettings.gridSize in packages/ui-solid/src/interaction/types.ts unchanged)",
         "bunx biome check"
       ]
     },
