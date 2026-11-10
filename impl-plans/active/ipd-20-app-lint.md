@@ -8,6 +8,8 @@
 - Evidence: `tmp/ipd-s772/ipd-20-app-lint/`.
 <!-- ownership:start -->
 - writePaths:
+  - `packages/core/src/kits/ios/content.ts`
+  - `packages/core/src/kits/ios/kit-content.test.ts`
   - `packages/core/src/app-design-lint`
   - `apps/cli/src/commands.ts`
   - `apps/cli/src/lint-diagram.ts`
@@ -147,14 +149,16 @@ New `apps/cli/src/app-lint-cli.test.ts`:
 
 ## Verification (evidence in `final/`)
 
-1. `bun test packages/core/src/app-design-lint apps/cli/src/app-lint-cli.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/lint-metrics.test.ts packages/core/src/text-layout-lint` -> exit 0, 0 fail.
-2. `sh -c 'L=tmp/ipd-s772/ipd-20-app-lint/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-20-app-lint/final && bun run typecheck --pretty false > "$L" 2>&1 && exit 0; grep -q "error TS" "$L" || exit 2; ! grep -E "^(packages/core/src/app-design-lint/[^(]*|apps/cli/src/commands\.ts|apps/cli/src/lint-diagram\.ts|apps/cli/src/app-lint-cli\.test\.ts)\([0-9]+,[0-9]+\): error TS" "$L"'` -> exit 0. Exit 0 also when the workspace typecheck fails only in files this plan does not own (record those as `owned_elsewhere`). Exit 1 prints the `error TS` lines in owned files: fix them. Exit 2 means tsc failed without diagnostics: a gate failure. The full log is the evidence.
-3. `bunx biome check packages/core/src/app-design-lint apps/cli/src/commands.ts apps/cli/src/lint-diagram.ts apps/cli/src/app-lint-cli.test.ts` -> exit 0 (owned TS/TSX/CSS files only; every listed file must exist at completion).
+1. `bun test packages/core/src/app-design-lint apps/cli/src/app-lint-cli.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/lint-metrics.test.ts packages/core/src/text-layout-lint packages/core/src/kits apps/cli/src/kit-cli.test.ts` -> exit 0, 0 fail.
+2. `sh -c 'L=tmp/ipd-s772/ipd-20-app-lint/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-20-app-lint/final && bun run typecheck --pretty false > "$L" 2>&1 && exit 0; grep -q "error TS" "$L" || exit 2; ! grep -E "^(packages/core/src/app-design-lint/[^(]*|apps/cli/src/commands\.ts|apps/cli/src/lint-diagram\.ts|apps/cli/src/app-lint-cli\.test\.ts|packages/core/src/kits/ios/content\.ts|packages/core/src/kits/ios/kit-content\.test\.ts)\([0-9]+,[0-9]+\): error TS" "$L"'` -> exit 0. Exit 0 also when the workspace typecheck fails only in files this plan does not own (record those as `owned_elsewhere`). Exit 1 prints the `error TS` lines in owned files: fix them. Exit 2 means tsc failed without diagnostics: a gate failure. The full log is the evidence.
+3. `bunx biome check packages/core/src/app-design-lint apps/cli/src/commands.ts apps/cli/src/lint-diagram.ts apps/cli/src/app-lint-cli.test.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/kit-content.test.ts` -> exit 0 (owned TS/TSX/CSS files only; every listed file must exist at completion).
 
 ## Done criteria
 
 - Verification passes.
 - `rg -c '"app-' packages/core/src/app-design-lint/index.ts` -> 7 or more.
+- Default `ios:composer` (packages/core/src/kits/ios/content.ts): the `input` control height is at least 44 and the component height grows to contain it with the existing 8-point vertical padding (8 + input height + 8); width 390, input width 314, horizontal padding and the 36x36 send button size, icon and x offset are unchanged.
+- The `Clean instances` case passes: every IOS_KIT component inserted with defaults into a frame:iphone gives zero findings of any app rule, including app-touch-target for ios:composer; no rule threshold or exclusion was changed to get there.
 
 ## Worker rules
 
@@ -167,3 +171,19 @@ New `apps/cli/src/app-lint-cli.test.ts`:
 ## Amendment 2026-11-10 (step5 s786 S5-s786-R2)
 
 The manifest and Verification typecheck and biome gates are now scoped to this plan's owned files, with the expected result stated (typecheck: exit 0, or exit 0 when only non-owned files fail; exit 1 lists owned-file `error TS` lines; exit 2 is a tsc failure without diagnostics). The markdown and the manifest carry the identical command strings. Ownership, plan ID and dependsOn are unchanged. Errors in non-owned files are `owned_elsewhere` findings and never block (see Worker rules).
+
+## Amendment 2026-11-10 (operator round 11)
+
+The 44-point iOS touch target wins. This plan owns `packages/core/src/kits/ios/content.ts` and `kit-content.test.ts` for one change: the default `ios:composer` interactive input becomes at least 44 points tall, and the composer container grows to fit. Keep its width, padding, send button and every other kit default unchanged, and update only the matching `kit-content.test.ts` expectations. The touch-target rule and the zero-findings requirement for every default kit stay as specified. Then complete the remaining planned regression scenarios and rerun the gates. Keep the ipd-20 work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step4 s791, round 11 follow-up)
+
+- The two round-11 ownership bullets are plain paths; the scope limit lives here: in `content.ts` change only the default `ios:composer` geometry (the `input` control height to at least 44, the component height and, only if needed to keep the send button vertically centred under `composerLayout` align center, the send button y offset; keep the 36x36 size, icon and x offset, width 390, input width 314, padding 8/16/16 and every other kit default). In `kit-content.test.ts` change only the matching composer expectations.
+- Pitfall: the `ios:composer` branch in the instantiation code (`group("sendButton", ...)` with hardcoded `at.y + 8`) must stay consistent with the component body; if the send button y changes in one place, change it in both. Do not touch `props.ts`, `types.ts`, `style.ts` or `kit-core.test.ts` (accepted `ipd-15`).
+- Do not lower the 44-point threshold, exempt `ios:composer`, or add any suppression to make the `Clean instances` case pass.
+- Gates: the bun test aggregate now also runs `packages/core/src/kits` and `apps/cli/src/kit-cli.test.ts` as regressions for the kit change; the typecheck regex and the biome arguments now include the two round-11 files. The markdown and the manifest carry identical command strings.
+- New test cases:
+  - default `ios:composer` instance -> `input` height >= 44 and component height == input height + 16 (kit-content.test.ts).
+  - default `ios:composer` inserted into `frame:iphone` -> zero `app-touch-target` findings (covered by `Clean instances`).
+- Progress log: record pre/post hashes of `content.ts` and `kit-content.test.ts`, the old and new composer geometry, and the final aggregate counts (previous run: 40 pass, 1 fail, 41 tests).
+- planId, dependsOn (none pending), sharedPaths and artifactRoots are unchanged.
