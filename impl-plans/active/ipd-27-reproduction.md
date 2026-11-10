@@ -98,3 +98,13 @@ Per-frame PNGs at scale 2 are compared side by side with every reference screens
 - No source edits, and no state-changing git commands.
 - No emojis.
 - Commands run in the foreground with full logs.
+
+## Amendment 2026-11-10 (operator round 16, binding; keep this section verbatim)
+
+Determinism contract. Documents built through `nodetto-cli edit` operations contain values generated at random: element and component ids (including the ids kit insertion mints internally) and fractional ordering keys such as element `index` and page `order`. Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from `ipd-24-parity-flows`, never raw byte equality:
+
+- ids are replaced by ordinal placeholders, never numbered by their position in the file;
+- generated ordering keys are compared by relative order within their collection;
+- every other field and every pre-existing value is compared exactly.
+
+The committed example document is generated once and committed. Its regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation. Keep the work already in the working tree and continue from it.

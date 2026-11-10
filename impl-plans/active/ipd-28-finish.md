@@ -114,3 +114,13 @@ All of steps 1-8 are satisfied, the README entry exists, and the design status i
   3. Scan: `sh -c 'D=tmp/ipd-s772/ipd-28-finish/final; L="$D/emoji-files.txt"; test -s "$L" && test "$(grep -c "[[:space:]]" "$L")" -eq 0 || exit 2; rg -n --no-messages "[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]" $(cat "$L") > "$D/emoji-scan.out" 2> "$D/emoji-scan.err"; rc=$?; echo "exit=$rc"; test "$rc" -eq 1 && test ! -s "$D/emoji-scan.out" && test ! -s "$D/emoji-scan.err"'` -> exit 0 only when rg exits 1 and `emoji-scan.out` and `emoji-scan.err` are empty. It exits 2 on an empty or whitespace-containing list, because rg without path arguments would search the whole working directory.
 - Any non-zero exit of these entries is a gate failure; on a scan failure, list each file and line from `emoji-scan.out` as a finding. Do not exclude `packages/core/src/icons/lucide-data.generated.ts`.
 - Unchanged: steps 1-6 and 8, the privacy `git grep --untracked` gate, planId, dependsOn, writePaths, sharedPaths and artifactRoots.
+
+## Amendment 2026-11-10 (operator round 16, binding; keep this section verbatim)
+
+Determinism contract. Documents built through `nodetto-cli edit` operations contain values generated at random: element and component ids (including the ids kit insertion mints internally) and fractional ordering keys such as element `index` and page `order`. Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from `ipd-24-parity-flows`, never raw byte equality:
+
+- ids are replaced by ordinal placeholders, never numbered by their position in the file;
+- generated ordering keys are compared by relative order within their collection;
+- every other field and every pre-existing value is compared exactly.
+
+The committed example document is generated once and committed. Its regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation. Keep the work already in the working tree and continue from it.

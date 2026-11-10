@@ -147,3 +147,7 @@ Generated-value comparison. An edit may create values at random, independently i
 3. Every value that already existed in the input document, and every other field, is compared exactly after normalization.
 
 Do not change engine or harness code. Done when the parity gate passes in three consecutive runs and the DR-02 and clean-kit lint cases are complete. Keep the ipd-24 work already in the working tree and continue from it.
+
+## Implementation status 2026-11-10
+
+The assigned implementation and its three consecutive parity runs are recorded in `impl-plans/progress/ipd-24-parity-flows.md`. Formal review and integration remain downstream.
