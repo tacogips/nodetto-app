@@ -179,6 +179,10 @@
       {
         "decision": "2026-11-10 operator amendment round 17 (session-801 wave 1): Kit quality fix (operator round 17, binding): ipd-26-example-sample owns the iOS kit sources and tests (packages/core/src/kits/ios/bars.ts, content.ts, style.ts, insert.ts, props.ts, types.ts, kit-core.test.ts, kit-content.test.ts). (a) Round every computed kit child position and size to whole points, so no default kit instance or child is off the 1-point grid. (b) Size every default kit text box to fit its default text at its font, so no default kit instance reports note-overflow. (c) Afterwards every default kit component, inserted with its defaults into a 390x844 iPhone frame, lints with zero findings; add one regression test that inserts each kit component and asserts zero app-design lint findings. Do not change the lint rules. Update existing kit test expectations only where (a) or (b) changes a number. (d) The sample's prototype links target the specific child control (tab item, back button, send button) inside the kit instance, not the whole instance, and no link label overlaps another control. (e) Do not regenerate template HTML/CSS or other existing outputs beyond the design doc's accepted output changes; revert any unrequired regeneration. The round-16 determinism contract still applies.",
         "rationale": "The generic sample's zero-findings lint gate failed with 19 warnings: 16 app-off-grid on children of kit instances (fractional coordinates from unrounded centering), 2 note-overflow in kit text boxes 18 high whose default text needs two lines, and 1 label collision in the sample's own links. The kit defaults are the defect and the reproduction (ipd-27) uses the same kit, so they are fixed once at the source."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 18 (session-802 wave 2): ipd-26-example-sample is an accepted dependency. Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only. The reproduction is split into sequential parts sharing one document: ipd-27a-reproduction-chrome (shared chrome + screens 01-03) -> ipd-27b-reproduction-detail (04-06) -> ipd-27c-reproduction-search-more (07-10) -> ipd-27-reproduction (links, flow start, full gates, all comparisons, copy). Keep the ipd-27 work already in tmp/ipd-s772/ipd-27-reproduction and continue from it.",
+        "rationale": "ipd-27 asked for an approved treatment of one screen where the +47/-35 shifts make the content overlap the bottom chrome; the running app scrolls that content under the tab bar with the floating buttons overlaid, so a clipped scroll region reproduces it faithfully. The single unit also ran out of continuations with 329 lint warnings and visible defects on five draft screens; ten screens are too much for one unit, so it is split by screen group."
       }
     ],
     "intentionalTradeoffs": [
@@ -213,48 +217,118 @@
   },
   "plans": [
     {
-      "planId": "ipd-26-example-sample",
-      "planPath": "impl-plans/active/ipd-26-example-sample.md",
-      "progressPath": "impl-plans/progress/ipd-26-example-sample.md",
+      "planId": "ipd-27a-reproduction-chrome",
+      "planPath": "impl-plans/active/ipd-27a-reproduction-chrome.md",
+      "progressPath": "impl-plans/progress/ipd-27a-reproduction-chrome.md",
       "dependsOn": [],
       "writePaths": [
-        "examples/design",
-        "apps/cli/scripts/generate-iphone-kit-example.ts",
-        "apps/cli/src/iphone-kit-example.test.ts",
-        "apps/cli/src/native-parity/iphone-kit-example.test.ts",
-        "impl-plans/progress/ipd-26-example-sample.md",
-        "tmp/ipd-s772/ipd-26-example-sample",
+        "impl-plans/progress/ipd-27a-reproduction-chrome.md",
+        "tmp/ipd-s772/ipd-27-reproduction",
         "target",
-        "packages/core/src/kits/ios/bars.ts",
-        "packages/core/src/kits/ios/content.ts",
-        "packages/core/src/kits/ios/style.ts",
-        "packages/core/src/kits/ios/insert.ts",
-        "packages/core/src/kits/ios/props.ts",
-        "packages/core/src/kits/ios/types.ts",
-        "packages/core/src/kits/ios/kit-core.test.ts",
-        "packages/core/src/kits/ios/kit-content.test.ts"
+        "apps/desktop/src-tauri/binaries"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/ipd-s772/ipd-26-example-sample",
-        "target"
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
       ],
       "acceptanceCriteria": [
-        "Verification passes, and `du -sk examples/design/iphone-kit` < 5120.",
+        "All part verification passes: build-cli exit 0, validate exit 0 and app lint summary.problems 0 on the cumulative working document tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl, 3 top-level 390x844 screen frames, and a comparison image for each of screens 01, 02, 03.",
+        "The per-screen table in the progress log covers screens 01, 02, 03 with drift <= 4, yes for icons, colors and weight, and 0 missing elements.",
+        "No private content appears in the progress log: `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27a-reproduction-chrome.md` exits 1.",
+        "This part does not copy deliverables into the operator-named output directory, add prototype links or the flow start, or rewrite private-terms.txt; ipd-27-reproduction owns those.",
         "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
-        "Kit quality fix (operator round 17, binding): ipd-26-example-sample owns the iOS kit sources and tests (packages/core/src/kits/ios/bars.ts, content.ts, style.ts, insert.ts, props.ts, types.ts, kit-core.test.ts, kit-content.test.ts). (a) Round every computed kit child position and size to whole points, so no default kit instance or child is off the 1-point grid. (b) Size every default kit text box to fit its default text at its font, so no default kit instance reports note-overflow. (c) Afterwards every default kit component, inserted with its defaults into a 390x844 iPhone frame, lints with zero findings; add one regression test that inserts each kit component and asserts zero app-design lint findings. Do not change the lint rules. Update existing kit test expectations only where (a) or (b) changes a number. (d) The sample's prototype links target the specific child control (tab item, back button, send button) inside the kit instance, not the whole instance, and no link label overlaps another control. (e) Do not regenerate template HTML/CSS or other existing outputs beyond the design doc's accepted output changes; revert any unrequired regeneration. The round-16 determinism contract still applies.",
-        "Step4 s802 verification scope: the kit tests (including the round-17 (c) zero-findings regression in packages/core/src/kits/ios/kit-content.test.ts), the owned-file typecheck gate and biome on the eight kit files pass. Second generator runs are compared with the round-15 normalization, not by shasum."
+        "Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.",
+        "Scope (operator round 18): this part builds screens 01, 02 and 03, plus the shared chrome built once from kit components and reused by every screen that shows it (status bar, home indicator, recurring bars and overlay buttons) in tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl through nodetto-cli operations (ops files under tmp/ipd-s772/ipd-27-reproduction/ops/), appending to the document the previous part left. Done when, for this part's frames only: nodetto-cli validate exits 0; nodetto-cli lint reports zero findings on these frames; each frame is exported at scale 2 and compared with its reference screenshot; the progress-log table shows drift <= 4 points, correct icons, colors and weight, and 0 missing elements per screen. Fix kit or engine gaps only as findings naming the owning plan. Prototype links, the flow start, the full-document gate and the copy to the output directory belong to ipd-27-reproduction.",
+        "CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence."
       ],
       "verification": [
-        "bun apps/cli/scripts/generate-iphone-kit-example.ts",
-        "bun test apps/cli/src/iphone-kit-example.test.ts packages/core/src/templates/design-templates.test.ts",
-        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/iphone-kit-example.test.ts",
-        "bun apps/cli/scripts/generate-design-examples.ts",
-        "bunx biome check apps/cli/scripts/generate-iphone-kit-example.ts apps/cli/src/iphone-kit-example.test.ts apps/cli/src/native-parity/iphone-kit-example.test.ts",
-        "bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/app-design-lint",
-        "sh -c 'L=tmp/ipd-s772/ipd-26-example-sample/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-26-example-sample/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/core/src/kits/ios/[^(]*|apps/cli/scripts/generate-iphone-kit-example\\.ts|apps/cli/src/iphone-kit-example\\.test\\.ts|apps/cli/src/native-parity/iphone-kit-example\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/kit-core.test.ts packages/core/src/kits/ios/kit-content.test.ts"
+        "CARGO_TERM_QUIET=true mise run build-cli",
+        "apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
+        "sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e \"const d=await Bun.stdin.json(); process.exit(d.summary.problems === 0 ? 0 : 1)\"'",
+        "sh -c 'test \"$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE \"^    frame .* 390x844$\")\" -eq 3'",
+        "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/01-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/02-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/03-compare.png'",
+        "sh -c '! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27a-reproduction-chrome.md'"
+      ]
+    },
+    {
+      "planId": "ipd-27b-reproduction-detail",
+      "planPath": "impl-plans/active/ipd-27b-reproduction-detail.md",
+      "progressPath": "impl-plans/progress/ipd-27b-reproduction-detail.md",
+      "dependsOn": [
+        "ipd-27a-reproduction-chrome"
+      ],
+      "writePaths": [
+        "impl-plans/progress/ipd-27b-reproduction-detail.md",
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "acceptanceCriteria": [
+        "All part verification passes: build-cli exit 0, validate exit 0 and app lint summary.problems 0 on the cumulative working document tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl, 6 top-level 390x844 screen frames, and a comparison image for each of screens 04, 05, 06.",
+        "The per-screen table in the progress log covers screens 04, 05, 06 with drift <= 4, yes for icons, colors and weight, and 0 missing elements; screen 05 records its clipped-row count by number only.",
+        "No private content appears in the progress log: `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27b-reproduction-detail.md` exits 1.",
+        "This part does not copy deliverables into the operator-named output directory, add prototype links or the flow start, or rewrite private-terms.txt; ipd-27-reproduction owns those.",
+        "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
+        "Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.",
+        "Scope (operator round 18): this part builds screens 04, 05 and 06 (05 uses the clipped scroll-region treatment of the layout rule) in tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl through nodetto-cli operations (ops files under tmp/ipd-s772/ipd-27-reproduction/ops/), appending to the document the previous part left. Done when, for this part's frames only: nodetto-cli validate exits 0; nodetto-cli lint reports zero findings on these frames; each frame is exported at scale 2 and compared with its reference screenshot; the progress-log table shows drift <= 4 points, correct icons, colors and weight, and 0 missing elements per screen. Fix kit or engine gaps only as findings naming the owning plan. Prototype links, the flow start, the full-document gate and the copy to the output directory belong to ipd-27-reproduction.",
+        "CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true mise run build-cli",
+        "apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
+        "sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e \"const d=await Bun.stdin.json(); process.exit(d.summary.problems === 0 ? 0 : 1)\"'",
+        "sh -c 'test \"$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE \"^    frame .* 390x844$\")\" -eq 6'",
+        "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/04-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/05-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/06-compare.png'",
+        "sh -c '! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27b-reproduction-detail.md'"
+      ]
+    },
+    {
+      "planId": "ipd-27c-reproduction-search-more",
+      "planPath": "impl-plans/active/ipd-27c-reproduction-search-more.md",
+      "progressPath": "impl-plans/progress/ipd-27c-reproduction-search-more.md",
+      "dependsOn": [
+        "ipd-27b-reproduction-detail"
+      ],
+      "writePaths": [
+        "impl-plans/progress/ipd-27c-reproduction-search-more.md",
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "acceptanceCriteria": [
+        "All part verification passes: build-cli exit 0, validate exit 0 and app lint summary.problems 0 on the cumulative working document tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl, 10 top-level 390x844 screen frames, and a comparison image for each of screens 07, 08, 09, 10.",
+        "The per-screen table in the progress log covers screens 07, 08, 09, 10 with drift <= 4, yes for icons, colors and weight, and 0 missing elements.",
+        "No private content appears in the progress log: `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27c-reproduction-search-more.md` exits 1.",
+        "This part does not copy deliverables into the operator-named output directory, add prototype links or the flow start, or rewrite private-terms.txt; ipd-27-reproduction owns those.",
+        "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
+        "Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.",
+        "Scope (operator round 18): this part builds screens 07, 08, 09 and 10 in tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl through nodetto-cli operations (ops files under tmp/ipd-s772/ipd-27-reproduction/ops/), appending to the document the previous part left. Done when, for this part's frames only: nodetto-cli validate exits 0; nodetto-cli lint reports zero findings on these frames; each frame is exported at scale 2 and compared with its reference screenshot; the progress-log table shows drift <= 4 points, correct icons, colors and weight, and 0 missing elements per screen. Fix kit or engine gaps only as findings naming the owning plan. Prototype links, the flow start, the full-document gate and the copy to the output directory belong to ipd-27-reproduction.",
+        "CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true mise run build-cli",
+        "apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
+        "sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e \"const d=await Bun.stdin.json(); process.exit(d.summary.problems === 0 ? 0 : 1)\"'",
+        "sh -c 'test \"$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE \"^    frame .* 390x844$\")\" -eq 10'",
+        "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/07-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/08-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/09-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/10-compare.png'",
+        "sh -c '! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27c-reproduction-search-more.md'"
       ]
     },
     {
@@ -262,7 +336,7 @@
       "planPath": "impl-plans/active/ipd-27-reproduction.md",
       "progressPath": "impl-plans/progress/ipd-27-reproduction.md",
       "dependsOn": [
-        "ipd-26-example-sample"
+        "ipd-27c-reproduction-search-more"
       ],
       "writePaths": [
         "impl-plans/progress/ipd-27-reproduction.md",
@@ -282,14 +356,17 @@
         "The per-screen table in the progress log shows drift <= 4 for all ten screens, with yes for icons, colors and weight, and 0 missing elements.",
         "No private content appears in the progress log: `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27-reproduction.md` exits 1.",
         "Deliverables are copied into the git-ignored operator-named output directory from workflow input acceptance criterion 4 (documented exception to writePaths; the name stays out of tracked files).",
-        "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation."
+        "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
+        "Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.",
+        "Scope (operator round 18): ipd-27a/b/c built all ten screens. This plan adds the prototype links and the flow start, runs the full-document gates (validate, lint zero findings across all ten frames), exports all ten frames, compares all ten with their references and records the per-screen table, then copies the deliverables to the output directory and writes private-terms.txt. If any screen regressed, fix it here through operations.",
+        "CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence."
       ],
       "verification": [
         "CARGO_TERM_QUIET=true mise run build-cli",
-        "target/release/nodetto-cli validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
-        "target/release/nodetto-cli lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json",
-        "target/release/nodetto-cli inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --flows",
-        "target/release/nodetto-cli inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame",
+        "apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
+        "sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e \"const d=await Bun.stdin.json(); process.exit(d.summary.problems === 0 ? 0 : 1)\"'",
+        "sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --flows --format json | bun -e \"const d=await Bun.stdin.json(); process.exit(d.flows.length === 1 && d.flows[0].links.length > 0 ? 0 : 1)\"'",
+        "sh -c 'test \"$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE \"^    frame .* 390x844$\")\" -eq 10'",
         "sh -c 'test \"$(ls tmp/ipd-s772/ipd-27-reproduction/work/compare | wc -l | tr -d \" \")\" -eq 10'",
         "git check-ignore -q tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
         "sh -c '! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27-reproduction.md'"
@@ -511,6 +588,12 @@
       "planPath": "impl-plans/active/ipd-24-parity-flows.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted in session-799 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-26-example-sample",
+      "planPath": "impl-plans/active/ipd-26-example-sample.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-802 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
     }
   ]
 }

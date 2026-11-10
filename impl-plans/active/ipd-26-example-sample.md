@@ -171,3 +171,13 @@ Round 17 gave this plan the iOS kit sources, but the Verification list did not g
 9. `bunx biome check packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/kit-core.test.ts packages/core/src/kits/ios/kit-content.test.ts` -> exit 0.
 
 Clarification: the round-16 determinism contract replaces the second-run `shasum` sentence in Verification item 1. A second generator run is compared with the round-15 generated-value normalization, not by bytes. Pitfall: rounding kit geometry (round 17 (a)) changes the default sizes of kit children. Re-run `bun apps/cli/scripts/generate-iphone-kit-example.ts` only after gates 7 and 8 pass. The committed sample must reflect the fixed kit and lint with zero findings.
+
+## Round 17 implementation checklist
+
+- [x] Default kit instances and children use integral geometry and report no app-design or text-overflow findings in the focused regression.
+- [x] Sample links use child controls, and the generated sample validates, lints cleanly, and renders four screens.
+- [x] Owned kit tests, owned-file typecheck, and scoped biome checks pass.
+- [x] Native parity and normalized repeated operation runs pass.
+- [x] Compare two generator runs using generated-value normalization.
+- [x] Serial verification of existing example generation and output-scope review.
+- [ ] Formal review and workflow finalization (downstream).

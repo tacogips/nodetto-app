@@ -3,7 +3,7 @@
 - planId: ipd-27-reproduction
 - planPath: impl-plans/active/ipd-27-reproduction.md
 - progressPath: impl-plans/progress/ipd-27-reproduction.md
-- dependsOn: ipd-25-docs-help, ipd-26-example-sample (all features, parity and docs are done)
+- dependsOn: ipd-27c-reproduction-search-more (which follows ipd-27a and ipd-27b; accepted ipd-25-docs-help and ipd-26-example-sample supply all features, parity and docs)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, section "Reproduction (item 11) support", Decision 10.2 (bands), user-QA Q1 default (device layout with two bands).
 - Evidence and working directory: `tmp/ipd-s772/ipd-27-reproduction/` (git-ignored).
 <!-- ownership:start -->
@@ -81,8 +81,8 @@ Per-frame PNGs at scale 2 are compared side by side with every reference screens
 ## Verification (evidence in `tmp/ipd-s772/ipd-27-reproduction/final/`)
 
 1. `nodetto-cli validate <output-dir>/<doc>.jsonl` -> exit 0.
-2. `nodetto-cli lint <output-dir>/<doc>.jsonl --format json` -> summary 0 problems.
-3. `nodetto-cli inspect <output-dir>/<doc>.jsonl --flows` -> one flow. Count 10 frames of 390×844 with `nodetto-cli inspect --type frame`.
+2. Lint gate (asserting; `lint` exits 0 even when it reports findings): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); process.exit(d.summary.problems === 0 ? 0 : 1)"'` -> exit 0. It exits 1 when `summary.problems` is not 0.
+3. Flow gate (asserting): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --flows --format json | bun -e "const d=await Bun.stdin.json(); process.exit(d.flows.length === 1 && d.flows[0].links.length > 0 ? 0 : 1)"'` -> exit 0. It exits 1 unless there is exactly one flow and that flow has at least one link. Frame gate (asserting): `sh -c 'test "$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE "^    frame .* 390x844$")" -eq 10'` -> exit 0. It exits 1 unless there are exactly ten 390x844 screen frames. After the step 9 copy, run the same three commands with `<output-dir>/<doc>.jsonl` in place of the working document, record only their exit codes, and keep the path abbreviated in the progress log.
 4. `ls <output-dir>/compare | wc -l` -> 10.
 5. `git status --porcelain --ignored -- tmp | head` shows `tmp/` ignored. `git check-ignore -q <output-dir>` -> exit 0.
 
@@ -108,3 +108,23 @@ Determinism contract. Documents built through `nodetto-cli edit` operations cont
 - every other field and every pre-existing value is compared exactly.
 
 The committed example document is generated once and committed. Its regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation. Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (operator round 18, binding; keep this section verbatim)
+
+`ipd-27a-reproduction-chrome`, `ipd-27b-reproduction-detail` and `ipd-27c-reproduction-search-more` build the ten screens. This plan adds the prototype links and the flow start, runs the full-document gates (validate, and lint with zero findings across all ten frames), exports and compares all ten frames and records the per-screen table, then performs steps 9 and 10. If a screen regressed, fix it here through operations.
+
+Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.
+
+## Amendment 2026-11-10 (step 4 s805 plan consistency, round 19)
+
+Step 4 corrections (session 805): the header dependsOn now matches the dispatch manifest (`ipd-27c-reproduction-search-more`). The manifest verification uses the sidecar path below instead of `target/release/nodetto-cli`.
+
+CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence.
+
+Unchanged: writePaths, sharedPaths, artifactRoots, the round-16 and round-18 sections and every privacy rule.
+
+## Amendment 2026-11-10 (step 4 s805 asserting final gates, round 20)
+
+Step 4 correction for review finding S5-s805-1. Verification items 2 and 3 and the dispatch manifest entry for this plan now use asserting gates, because the earlier bare commands exit 0 whatever they print. `nodetto-cli lint` exits 0 even when it reports findings (see `apps/cli/src/app-lint-cli.test.ts`), and `inspect --flows` and `inspect --type frame` exit 0 for any count. The lint gate fails unless `summary.problems === 0`. This matters most in this plan, because the prototype links added here can create `app-touch-target` findings on hotspots smaller than 44 points. The flow gate fails unless `flows.length === 1` and `flows[0].links.length > 0` (field shape from `apps/cli/src/inspect-command.ts`, `--flows --format json`). The frame gate fails unless exactly ten top-level 390x844 frames exist (the same pattern as `ipd-27c-reproduction-search-more`, with `-eq 10`). The manifest diff is limited to `plans[ipd-27-reproduction].verification`.
+
+Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, acceptance criteria, the round-16, round-18 and round-19 sections, and every privacy rule.
