@@ -88,3 +88,7 @@ Static: Biome on the owned files, then `bun run typecheck`.
 - `grep -c 'setPageHiddenInPresentation' packages/ui-solid/src/PageTabs.tsx packages/ui-solid/src/inspector/PageSection.tsx`
   is at least 1 per file.
 - The progress log has the intent hash, per-edit hashes and command results.
+
+## Implementation status
+
+Implemented; focused tests and scoped Biome passed. Typecheck result and edit evidence are recorded in the plan-local progress log and handoff. Formal review remains downstream.

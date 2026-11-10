@@ -20,8 +20,10 @@
   - `impl-plans/progress/prs-06-wiring.md`
   - `tmp/prs-s793/prs-06-wiring`
   - `target`
+  - `apps/desktop/dist` (gitignored vite build output; added in amendment
+    round 2)
 - sharedPaths: none
-- artifactRoots: `target`
+- artifactRoots: `target`, `apps/desktop/dist`
 
 ## Intent and context
 
@@ -168,3 +170,29 @@ permission is still present. Nothing else in this plan changes.
   empty.
 - The progress log has the intent hash, per-edit hashes and every command's
   exit status and counts.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 2)
+
+Blocker from wave 3: `bun run build` was not run because its output
+directory is outside the declared artifact root. The blocked path is
+`apps/desktop/dist`.
+
+- Decision: authorize `apps/desktop/dist` in this plan's writePaths and
+  artifactRoots.
+  - It is the gitignored output of `vite build`: root `.gitignore` has
+    `dist/`, and `apps/desktop/vite.config.ts` sets no `outDir`.
+  - Nothing is relocated, and no source or design change is made.
+- Worker steps:
+  - The wiring source edits were already made in wave 3 and the progress
+    log records their hashes. Re-read them fresh and do not rewrite them
+    unless a check fails.
+  - Run `bun run build`. Write its full output to
+    `tmp/prs-s793/prs-06-wiring/final/build.log` and record the exit status.
+  - Confirm that `git status --porcelain -- apps/desktop/dist` prints
+    nothing, which shows the output stays ignored.
+  - Then re-run verifications 1 to 3 if any owned source changed since
+    their last logs. Record their results either way.
+- Forbidden:
+  - committing or force-adding anything under `apps/desktop/dist`
+  - changing `vite.config.ts`, which is not owned by this plan
+  - editing accepted prs-01 to prs-05 files

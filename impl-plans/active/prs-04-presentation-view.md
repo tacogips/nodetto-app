@@ -147,3 +147,7 @@ Static: Biome on the owned files, then `bun run typecheck`.
 - Verification 1 exited 0.
 - `grep -n 'innerHTML' packages/ui-solid/src/presentation/` has no match.
 - The progress log has the intent hash, per-edit hashes and command results.
+
+## Implementation status
+
+- Source, focused tests and progress evidence are implemented; independent review and downstream wiring remain pending.

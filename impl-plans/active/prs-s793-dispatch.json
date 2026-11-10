@@ -19,6 +19,24 @@
       "planPath": "impl-plans/active/prs-02-core-presentation.md",
       "acceptedBy": "integration-review wave-001, session 793",
       "provides": "@nodetto/core presentation exports: slideList, startIndex, PresentationState, PresentationAction, createPresentationState, reducePresentation, currentSlide, slideCounter, PRESENTATION_MARGIN, fitSlide, SlideSize, SlideSource, slideSource, svgSize."
+    },
+    {
+      "planId": "prs-03-fullscreen",
+      "planPath": "impl-plans/active/prs-03-fullscreen.md",
+      "acceptedBy": "integration-review wave-002, session 793",
+      "provides": "enterPresentationFullscreen (tauri, dom and none modes; idempotent restore) and watchFullscreenExit in apps/desktop/src/shell/presentation-fullscreen.ts; the core:window:allow-set-fullscreen capability and the regenerated gen/schemas/capabilities.json."
+    },
+    {
+      "planId": "prs-04-presentation-view",
+      "planPath": "impl-plans/active/prs-04-presentation-view.md",
+      "acceptedBy": "integration-review wave-002, session 793",
+      "provides": "PresentationView, createPresentationController and presentationKeyAction from packages/ui-solid/src/presentation/index.ts."
+    },
+    {
+      "planId": "prs-05-page-flag-ui",
+      "planPath": "impl-plans/active/prs-05-page-flag-ui.md",
+      "acceptedBy": "integration-review wave-002, session 793",
+      "provides": "The PageTabs Hide/Show in presentation menu item, the PRESENTATION_HIDDEN_TAB_CLASS class and title suffix, and the PageSection Show in presentation switch."
     }
   ],
   "checkpointAmendments": [
@@ -31,6 +49,16 @@
       "unmatchedPaths": ["apps/desktop/src-tauri/gen/schemas/capabilities.json"],
       "assignedTo": "prs-03-fullscreen",
       "gateChange": "git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json' replaces the full gen/schemas gate in prs-03 and prs-06."
+    },
+    {
+      "round": 2,
+      "date": "2026-11-10",
+      "reason": "blocked-wave-scope-or-contract",
+      "previousCheckpointCommit": "d5eeb9710280eafa0970b34d0714dfcffd9bae75",
+      "blockedPlanIds": ["prs-06-wiring"],
+      "paths": ["apps/desktop/dist"],
+      "decision": "apps/desktop/dist is the gitignored vite output of bun run build (root .gitignore 'dist/'; apps/desktop/vite.config.ts sets no outDir). It is authorized as a prs-06-wiring writePath and artifactRoot. No output relocation and no source or design change.",
+      "resumeCriterion": "prs-06 runs bun run build and records exit 0 in tmp/prs-s793/prs-06-wiring/final/build.log."
     }
   ],
   "designDocPaths": ["design-docs/specs/design-presentation.md", "design-docs/user-qa/presentation.md"],
@@ -64,7 +92,11 @@
       "prs-02 owns the single core barrel line, because @nodetto/core has no subpath exports and wave-2 ui-solid must import it.",
       "ui-solid behavior lives in a DOM-free controller, because ui-solid tests run without a DOM.",
       "Core function names are prefixed (reducePresentation, currentSlide, slideCounter) for barrel uniqueness; behavior is unchanged.",
-      "Amendment 2026-11-10 (round 1, PRS-INT-001): tauri-build regenerates gen/schemas/capabilities.json from capabilities/default.json, so adding the fullscreen permission necessarily changes it. prs-03 owns that file and keeps it as generated. The gen/schemas gates exclude only capabilities.json; acl-manifests.json, desktop-schema.json and macOS-schema.json stay byte-identical."
+      "Amendment 2026-11-10 (round 1, PRS-INT-001): tauri-build regenerates gen/schemas/capabilities.json from capabilities/default.json, so adding the fullscreen permission necessarily changes it. prs-03 owns that file and keeps it as generated. The gen/schemas gates exclude only capabilities.json; acl-manifests.json, desktop-schema.json and macOS-schema.json stay byte-identical.",
+      {
+        "decision": "Amendment 2026-11-10 round 2: authorize the gitignored vite build output apps/desktop/dist as a prs-06-wiring writePath and artifactRoot so the required bun run build gate can run; no output relocation, source or design change.",
+        "rationale": "Blocked plan prs-06-wiring (reason blocked-wave-scope-or-contract, trigger comm-018333): bun run build writes apps/desktop/dist (vite.config.ts sets no outDir; .gitignore:8 dist/; 0 tracked files), which lay outside the declared artifact root target. prs-03, prs-04 and prs-05 are recorded as acceptedDependencies. Completion requires build.log exit 0 and an empty git status --porcelain -- apps/desktop/dist. Amendment budget 2 of 2 used."
+      }
     ],
     "intentionalTradeoffs": [
       "Mixed-version cloud clients may drop the flag when an older client edits the page.",
@@ -84,89 +116,6 @@
   },
   "plans": [
     {
-      "planId": "prs-03-fullscreen",
-      "planPath": "impl-plans/active/prs-03-fullscreen.md",
-      "progressPath": "impl-plans/progress/prs-03-fullscreen.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "apps/desktop/src/shell/presentation-fullscreen.ts",
-        "apps/desktop/src/shell/presentation-fullscreen.test.ts",
-        "apps/desktop/src-tauri/capabilities/default.json",
-        "apps/desktop/src-tauri/gen/schemas/capabilities.json",
-        "impl-plans/progress/prs-03-fullscreen.md",
-        "tmp/prs-s793/prs-03-fullscreen",
-        "target"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": ["target"],
-      "verification": [
-        "bun test ./apps/desktop/src/shell/presentation-fullscreen.test.ts"
-      ],
-      "acceptanceCriteria": [
-        "The verification exited 0 with at least one passing test and zero failures.",
-        "enterPresentationFullscreen covers the Tauri (restoring prior state), DOM and none paths, never rejects, and has an idempotent restore; watchFullscreenExit fires once on leaving DOM fullscreen.",
-        "capabilities/default.json contains core:window:allow-set-fullscreen. The tauri-build output apps/desktop/src-tauri/gen/schemas/capabilities.json is kept as generated, and its default.permissions array equals the capabilities/default.json permissions array. git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json' exits 0.",
-        "The progress log has the intent hash, per-edit hashes and command results, including fresh hashes of capabilities/default.json and gen/schemas/capabilities.json and the narrowed gate result (amendment round 1, PRS-INT-001)."
-      ]
-    },
-    {
-      "planId": "prs-04-presentation-view",
-      "planPath": "impl-plans/active/prs-04-presentation-view.md",
-      "progressPath": "impl-plans/progress/prs-04-presentation-view.md",
-      "wave": 2,
-      "dependsOn": ["prs-01-page-flag", "prs-02-core-presentation"],
-      "writePaths": [
-        "packages/ui-solid/src/presentation/index.ts",
-        "packages/ui-solid/src/presentation/keys.ts",
-        "packages/ui-solid/src/presentation/keys.test.ts",
-        "packages/ui-solid/src/presentation/controller.ts",
-        "packages/ui-solid/src/presentation/controller.test.ts",
-        "packages/ui-solid/src/presentation/PresentationView.tsx",
-        "packages/ui-solid/src/presentation/Presentation.css",
-        "impl-plans/progress/prs-04-presentation-view.md",
-        "tmp/prs-s793/prs-04-presentation-view",
-        "target"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": ["target"],
-      "verification": [
-        "bun test ./packages/ui-solid/src/presentation/keys.test.ts ./packages/ui-solid/src/presentation/controller.test.ts"
-      ],
-      "acceptanceCriteria": [
-        "The verification exited 0 with at least one passing test and zero failures.",
-        "The tests show: the slide rendered as a data:image/svg+xml src containing the element data-id; the counter 1 / 2 then 2 / 2; the number+Enter jump; B black; preventDefault and stopImmediatePropagation on mapped and unmapped keys; an unchanged editor revision; Esc clearing digits, then onExit once with the current page; reconcile after hiding; and an inherited-hidden-frame page producing a non-null src.",
-        "No innerHTML in packages/ui-solid/src/presentation/.",
-        "The progress log has the intent hash, per-edit hashes and command results."
-      ]
-    },
-    {
-      "planId": "prs-05-page-flag-ui",
-      "planPath": "impl-plans/active/prs-05-page-flag-ui.md",
-      "progressPath": "impl-plans/progress/prs-05-page-flag-ui.md",
-      "wave": 2,
-      "dependsOn": ["prs-01-page-flag"],
-      "writePaths": [
-        "packages/ui-solid/src/PageTabs.tsx",
-        "packages/ui-solid/src/inspector/PageSection.tsx",
-        "packages/ui-solid/src/page-presentation-toggle.ts",
-        "packages/ui-solid/src/page-presentation-toggle.test.ts",
-        "impl-plans/progress/prs-05-page-flag-ui.md",
-        "tmp/prs-s793/prs-05-page-flag-ui",
-        "target"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": ["target"],
-      "verification": [
-        "bun test ./packages/ui-solid/src/page-presentation-toggle.test.ts ./packages/ui-solid/src/page-rename.test.ts ./packages/ui-solid/src/page-tab-drag.test.ts"
-      ],
-      "acceptanceCriteria": [
-        "The verification exited 0 with at least one passing test and zero failures.",
-        "The PageTabs options menu has a Hide/Show in presentation menuitem (disabled when read-only), hidden tabs get the class and title suffix, and PageSection has a Show in presentation switch; both call setPageHiddenInPresentation.",
-        "The progress log has the intent hash, per-edit hashes and command results."
-      ]
-    },
-    {
       "planId": "prs-06-wiring",
       "planPath": "impl-plans/active/prs-06-wiring.md",
       "progressPath": "impl-plans/progress/prs-06-wiring.md",
@@ -183,10 +132,11 @@
         "README.md",
         "impl-plans/progress/prs-06-wiring.md",
         "tmp/prs-s793/prs-06-wiring",
-        "target"
+        "target",
+        "apps/desktop/dist"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["target"],
+      "artifactRoots": ["target", "apps/desktop/dist"],
       "verification": [
         "bun test ./apps/desktop/src/shell/window-input.test.ts ./packages/ui-solid/src/presentation/controller.test.ts",
         "CARGO_TERM_QUIET=true mise run test",
@@ -197,7 +147,8 @@
         "The final gates bun run typecheck, CARGO_TERM_QUIET=true mise run lint, bun run build and git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json' exited 0, and gen/schemas/capabilities.json still lists core:window:allow-set-fullscreen (amendment round 1, PRS-INT-001).",
         "F5 and Shift+F5 start a presentation (not in editable targets, preventDefault); the File menu and header Present actions exist; window-input returns early while presenting; fullscreen enter/restore and the DOM exit watcher are wired; exit returns to the last shown page.",
         "docs/editing.md has a ## Presentation section covering every key, and README.md links docs/editing.md#presentation.",
-        "The progress log has the intent hash, per-edit hashes and every command's exit status and counts."
+        "The progress log has the intent hash, per-edit hashes and every command's exit status and counts.",
+        "Amendment round 2 (blocked-wave-scope-or-contract): bun run build exited 0 with its vite output written to the gitignored artifact root apps/desktop/dist; the log is tmp/prs-s793/prs-06-wiring/final/build.log; git status shows no tracked change under apps/desktop/dist."
       ]
     }
   ]

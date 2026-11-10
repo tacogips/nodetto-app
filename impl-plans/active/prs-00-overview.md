@@ -125,3 +125,11 @@ why prs-02 (and not wiring) owns the core barrel line.
   gate excludes only it.
 - Waves are unchanged: prs-03 (redispatch), then prs-04 and prs-05, then
   prs-06.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 2)
+
+- The wave-2 integration review accepted prs-03, prs-04 and prs-05. They
+  are now `acceptedDependencies`. Only prs-06-wiring remains dispatchable.
+- prs-06 is blocked on the build gate. The fix authorizes the gitignored
+  vite output `apps/desktop/dist` as a prs-06 writePath and artifactRoot.
+  Nothing else changes.
