@@ -47,7 +47,7 @@ The workflow's `plan-archive` node moves the `ipd` plans after final verificatio
 1. `CARGO_TERM_QUIET=true mise run verify` -> exit 0, or only the failures listed in the `ipd-00` "Baseline failures" table (named exclusions).
 2. `CARGO_TERM_QUIET=true mise run test-cli` -> exit 0, or only baseline failures. The native parity tests must not be skipped. Retry up to 3 times, only on deadline timeouts.
 3. `CARGO_TERM_QUIET=true mise run build-cli` -> exit 0.
-4. `bun run typecheck` -> exit 0.
+4. `sh -c 'mkdir -p tmp/ipd-s772/ipd-28-finish/final && bun run typecheck --pretty false > tmp/ipd-s772/ipd-28-finish/final/typecheck.log 2>&1'` -> exit 0. This stays workspace-wide: ipd-28 runs alone after every other plan, so any `error TS` line anywhere fails it.
 5. Privacy:
    - `git ls-files tmp | wc -l` -> 0.
    - `git ls-files -o --exclude-standard | grep -c '^tmp/'` -> 0.

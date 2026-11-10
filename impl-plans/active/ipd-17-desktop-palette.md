@@ -79,8 +79,8 @@ The acceptance criteria require that the text layer, icons, iOS kit and device p
 ## Verification (evidence in `final/`)
 
 1. `bun test packages/ui-solid/src/app-palette.test.ts packages/ui-solid/src/shape-search.test.ts packages/ui-solid/src/bpmn-palette.test.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/palette-drag.test.ts packages/ui-solid/src/panel-keyboard.test.ts packages/ui-solid/src/workspaces.test.ts` -> exit 0, 0 fail.
-2. `bun run typecheck` -> no `error TS` line in the owned files.
-3. `bunx biome check` on the owned files -> exit 0.
+2. `sh -c 'L=tmp/ipd-s772/ipd-17-desktop-palette/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-17-desktop-palette/final && bun run typecheck --pretty false > "$L" 2>&1 && exit 0; grep -q "error TS" "$L" || exit 2; ! grep -E "^(packages/ui-solid/src/shape-palette\.ts|packages/ui-solid/src/ShapePalette\.tsx|packages/ui-solid/src/shape-search\.ts|packages/ui-solid/src/palette-drag\.ts|packages/ui-solid/src/app-palette\.test\.ts)\([0-9]+,[0-9]+\): error TS" "$L"'` -> exit 0. Exit 0 also when the workspace typecheck fails only in files this plan does not own (record those as `owned_elsewhere`). Exit 1 prints the `error TS` lines in owned files: fix them. Exit 2 means tsc failed without diagnostics: a gate failure. The full log is the evidence.
+3. `bunx biome check packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/ShapePalette.tsx packages/ui-solid/src/shape-search.ts packages/ui-solid/src/palette-drag.ts packages/ui-solid/src/app-palette.test.ts` -> exit 0 (owned TS/TSX/CSS files only; every listed file must exist at completion).
 
 ## Done criteria
 
@@ -92,3 +92,8 @@ Verification passes.
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - `packages/ui-solid/src/index.ts` is shared: append export lines only, if needed.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+- Gate scope (S5-s786-R2): the typecheck and biome gates cover only this plan's owned files. `error TS` lines or biome diagnostics in files this plan does not own never block completion and are never fixed here: record each as an `owned_elsewhere` finding in the progress log (file path and the first error line, no fix) and finish. Errors in owned files always block. Do not wait for, or ask for, another amendment because a sibling's in-progress file fails the workspace typecheck.
+
+## Amendment 2026-11-10 (step5 s786 S5-s786-R2)
+
+The manifest and Verification typecheck and biome gates are now scoped to this plan's owned files, with the expected result stated (typecheck: exit 0, or exit 0 when only non-owned files fail; exit 1 lists owned-file `error TS` lines; exit 2 is a tsc failure without diagnostics). The markdown and the manifest carry the identical command strings. Ownership, plan ID and dependsOn are unchanged. Errors in non-owned files are `owned_elsewhere` findings and never block (see Worker rules).

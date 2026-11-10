@@ -178,7 +178,7 @@ New `apps/cli/src/frames-compare.test.ts`:
 
 ## Done criteria
 
-Verification passes.
+Implementation verification passes; formal integrity and adversarial review remain pending. See `impl-plans/progress/ipd-16-frames-export-compare.md`.
 
 ## Worker rules
 

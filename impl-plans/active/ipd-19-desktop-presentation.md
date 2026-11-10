@@ -3,11 +3,12 @@
 - planId: ipd-19-desktop-presentation
 - planPath: impl-plans/active/ipd-19-desktop-presentation.md
 - progressPath: impl-plans/progress/ipd-19-desktop-presentation.md
-- dependsOn: ipd-13-prototype-core-cli
+- dependsOn: none (ipd-13-prototype-core-cli is an accepted dependency)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decisions 8.6 (presentation), 8.7 (persistent elements) and 8.1 (`back`, `swap-overlay` actions); user-QA Q4 default (in-window, full-window overlay).
 - Evidence: `tmp/ipd-s772/ipd-19-desktop-presentation/`.
 <!-- ownership:start -->
 - writePaths:
+  - `packages/core/src/prototype.ts`
   - `packages/ui-solid/src/prototype-presentation.ts`
   - `packages/ui-solid/src/PrototypePreview.tsx`
   - `packages/ui-solid/src/PrototypeHotspots.tsx`
@@ -116,8 +117,9 @@ Existing prototype tests (`prototype-overlays.test.ts`, `prototype-transition.te
 ## Verification (evidence in `final/`)
 
 1. `bun test packages/ui-solid/src/prototype-presentation.test.ts packages/ui-solid/src/prototype-preview-flows.test.ts packages/ui-solid/src/prototype-overlays.test.ts packages/ui-solid/src/prototype-transition.test.ts packages/ui-solid/src/prototype-trigger.test.ts packages/ui-solid/src/prototype-scroll.test.ts packages/ui-solid/src/prototype-surface-focus.test.ts packages/ui-solid/src/prototype-variant-state.test.ts` -> exit 0, 0 fail.
-2. `bun run typecheck` -> no `error TS` line in the owned files.
-3. `bunx biome check` on the owned TS/TSX files -> exit 0.
+2. `sh -c 'L=tmp/ipd-s772/ipd-19-desktop-presentation/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-19-desktop-presentation/final && bun run typecheck --pretty false > "$L" 2>&1 && exit 0; grep -q "error TS" "$L" || exit 2; ! grep -E "^(packages/ui-solid/src/prototype-presentation\.ts|packages/ui-solid/src/PrototypePreview\.tsx|packages/ui-solid/src/PrototypeHotspots\.tsx|packages/ui-solid/src/PrototypeLayer\.tsx|packages/ui-solid/src/prototype-transition\.ts|packages/ui-solid/src/prototype-presentation\.test\.ts|packages/ui-solid/src/prototype-preview-flows\.test\.ts|packages/core/src/prototype\.ts)\([0-9]+,[0-9]+\): error TS" "$L"'` -> exit 0. Exit 0 also when the workspace typecheck fails only in files this plan does not own (record those as `owned_elsewhere`). Exit 1 prints the `error TS` lines in owned files: fix them. Exit 2 means tsc failed without diagnostics: a gate failure. The full log is the evidence.
+3. `bunx biome check packages/ui-solid/src/prototype-presentation.ts packages/ui-solid/src/PrototypePreview.tsx packages/ui-solid/src/PrototypeHotspots.tsx packages/ui-solid/src/PrototypeLayer.tsx packages/ui-solid/src/prototype-transition.ts apps/desktop/src/styles/prototype-preview.css packages/ui-solid/src/prototype-presentation.test.ts packages/ui-solid/src/prototype-preview-flows.test.ts packages/core/src/prototype.ts` -> exit 0 (owned TS/TSX/CSS files only; every listed file must exist at completion).
+4. After the `packages/core/src/prototype.ts` edit: `bun test packages/core/src/prototype.test.ts packages/core/src/screen-transition.test.ts packages/core/src/workspace-workflow.test.ts packages/core/src/outline-interaction.test.ts packages/core/src/masks.test.ts packages/core/src/boolean-operations.test.ts packages/core/src/group-compositing.test.ts apps/desktop/src/design-workflow.test.ts` -> exit 0, 0 fail. These suites pin the accepted ipd-13 `prototypeScreen` behavior (navigate, open-overlay, close-overlay, change-to, hidden-target filtering, fixed/overflow hit gating). Do not weaken or edit them; this plan does not own them.
 
 ## Done criteria
 
@@ -128,3 +130,33 @@ Verification passes.
 - Record `git hash-object` of this plan first.
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+- Gate scope (S5-s786-R2): the typecheck and biome gates cover only this plan's owned files. `error TS` lines or biome diagnostics in files this plan does not own never block completion and are never fixed here: record each as an `owned_elsewhere` finding in the progress log (file path and the first error line, no fix) and finish. Errors in owned files always block. Do not wait for, or ask for, another amendment because a sibling's in-progress file fails the workspace typecheck.
+
+## Amendment 2026-11-10 (operator round 9)
+
+This plan owns `packages/core/src/prototype.ts`. Change `prototypeScreen` so `back` and `swap-overlay` links reach the presentation; keep every existing navigate and overlay behavior and test. Then rerun the presentation regression and the required verification. Keep the ipd-19 work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step5 s786 S5-s786-R1 and S5-s786-R2)
+
+Ownership, plan ID and dependsOn (none; `ipd-13-prototype-core-cli` is an accepted dependency) are unchanged. This section binds the round-9 `prototype.ts` change.
+
+`prototypeScreen` change (`packages/core/src/prototype.ts`, the `validTarget` expression in the `links` flatMap):
+
+- Add only `back` and `swap-overlay` to the action allow-list next to `navigate`, `open-overlay` and `close-overlay`. Keep `target?.type === "frame"` for both. A `swap-overlay` `to` must be a frame; a link whose `to` is not a frame stays dropped.
+- Keep the `change-to` variant check, the hidden-source and hidden-target filtering, the `hitBox` requirement, and the `prototypeFixed` / `prototypeOverflow` hit gating exactly as they are. Do not restructure the function and do not change the returned link shape other than letting the two actions through.
+
+Pitfalls:
+
+- A `back` link's `to` is the source's own screen frame (`connectPrototypeBack`, `packages/core/src/screen-transition.ts:98-116`). The presentation must treat `back` as "pop history" (the same handler as the back button) and must never navigate to `to`. Navigating to `to` silently does nothing, because it is the current screen.
+- `back` with empty history does nothing (no exit, no navigation).
+- `swap-overlay` replaces the top overlay. With no open overlay it opens the destination as the only overlay, as the in-progress handler at `PrototypePreview.tsx:414-427` already does. The overlay count must never grow on a swap.
+- Do not edit the core test suites listed in Verification item 4; they belong to accepted plans. If one fails, the `prototype.ts` change is wrong: fix `prototype.ts`.
+
+Regression test (add to the owned `packages/ui-solid/src/prototype-preview-flows.test.ts`), `input -> expected`:
+
+- Two screens A and B, A navigates to B, and B has a button with a back link created by `connectPrototypeBack` -> `prototypeScreen(editor, B).links` contains that link with `action: "back"` (the returned link field is `action`, read from the semantic `prototypeAction`); the preview on B shows its hotspot; clicking it returns to A and history shrinks by one.
+- Screen B with an open overlay O1 and a hotspot inside O1 with a `swap-overlay` link to frame O2 -> `prototypeScreen` returns the link with `action: "swap-overlay"`; clicking it shows O2, O1 is gone, overlay count stays 1.
+- A `swap-overlay` link whose `to` is not a frame -> not returned by `prototypeScreen`, no hotspot.
+- Existing navigate and open-overlay hotspots on the same screens keep working (one click each, same destinations as before).
+
+Gates are now scoped to owned files (S5-s786-R2); see Verification items 2 and 3 and the gate-scope worker rule.
