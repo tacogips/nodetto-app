@@ -3,7 +3,7 @@
 - planId: ipd-23-parity-shapes
 - planPath: impl-plans/active/ipd-23-parity-shapes.md
 - progressPath: impl-plans/progress/ipd-23-parity-shapes.md
-- dependsOn: ipd-06-geo-strokes, ipd-07-icon-core-cli, ipd-08-cli-layout-ops, ipd-09-text-layer, ipd-11-frames, ipd-12-controls, ipd-13-prototype-core-cli, ipd-14-kit-core, ipd-15-kit-content, ipd-16-frames-export-compare, ipd-20-app-lint, ipd-21-html-prototype
+- dependsOn: ipd-06-geo-strokes, ipd-07-icon-core-cli, ipd-07b-icon-data-ascii, ipd-08-cli-layout-ops, ipd-09-text-layer, ipd-11-frames, ipd-12-controls, ipd-13-prototype-core-cli, ipd-14-kit-core, ipd-15-kit-content, ipd-16-frames-export-compare, ipd-20-app-lint, ipd-21-html-prototype
   - These are all the plans that change the engine bundle, so the native binary is built from a stable tree.
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, "Global rules" (one implementation, two hosts) and "Verification" (native parity split by area). Areas: text, shapes, controls, icons, frames, layout operations.
 - Evidence: `tmp/ipd-s772/ipd-23-parity-shapes/`.
@@ -104,3 +104,7 @@ Bundle size (Q3):
 - Edit only writePaths.
 - No state-changing git commands, no emojis. Generic fixtures only.
 - Evidence files must not match Bun test patterns. Run builds in the foreground with full logs.
+
+## Amendment 2026-11-10 (step5 s781 IPD-R5 follow-up)
+
+- New dependency `ipd-07b-icon-data-ascii`. It regenerates `packages/core/src/icons/lucide-data.generated.ts` with ASCII-escaped source bytes, which changes the engine bundle by under 1 KB. The bundle-size measurement (Q3) must run on the regenerated data, so this plan follows it. No other change to this plan.

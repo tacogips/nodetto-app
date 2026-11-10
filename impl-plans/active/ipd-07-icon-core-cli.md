@@ -88,8 +88,8 @@ Already delivered by `ipd-07a-icon-shape` (amendment round 3); verify, do not re
 
 - `shapes icon <query...> [--all]` prints one line per icon: `<name>\t<comma-joined tags>`.
   - Limit 50, or unlimited with `--all`.
-  - No matches -> exit 1 with `no icon matches "<query>"`.
-- `shapes icon:<name>` describes it like other shape IDs: element type, defaults, a `draw` command and an edit op. An unknown name gives exit 1 with suggestions.
+  - No matches -> exit 0 (`EXIT_OK`), printing `no icon matches "<query>"` plus the hint `Search with nodetto-cli shapes icon <query>`, the same way the existing `shapes <words>` empty result returns `ok(...)` (amendment IPD-R6).
+- `shapes icon:<name>` describes it like other shape IDs: element type, defaults, a `draw` command and an edit op. An unknown name gives exit 2 (`EXIT_ERROR`, input error) with `unknown icon "<name>"` on stderr, followed by `Did you mean: a, b, c?` (up to 5 names from `searchIcons(name, 5)`) or, when there is no near match, the hint `Search with nodetto-cli shapes icon <query>` (amendment IPD-R6).
 - The plain `shapes` listing appends one synthetic row after the catalogue rows, in the existing row format: id `icon:<name>`, label "Icon (any Lucide name; see shapes icon <query>)", category `ui-control`, type `ui.icon`.
 - Category and connector filters treat it like a `ui-control` placed shape.
 - Plain `shapes` also lists the new catalogue rows from `ipd-05`. Update the expectations in `apps/cli/src/shapes-command.test.ts`.
@@ -126,10 +126,13 @@ New `packages/core/src/ui-icon.test.ts`:
 New `apps/cli/src/icon-commands.test.ts`, using the existing CLI test helpers from `apps/cli/src/shapes-command.test.ts`:
 
 - `shapes icon bell` -> the first line starts with `bell\t`, exit 0.
-- `shapes icon zzzz-none` -> exit 1.
+- `shapes icon zzzz-none` -> exit 0, stdout contains `no icon matches "zzzz-none"` and `Search with nodetto-cli shapes icon` (amendment IPD-R6).
+- `shapes icon:bel` -> exit 2, stderr contains `unknown icon "bel"`, `Did you mean` and `bell` (amendment IPD-R6).
+- `shapes icon:zzzz-none` -> exit 2, stderr contains `unknown icon "zzzz-none"` and `Search with nodetto-cli shapes icon` (amendment IPD-R6).
 - `shapes icon:bell` -> mentions `ui.icon`.
 - `draw doc icon:search --at 10,10` -> the doc has a `ui.icon` with `icon: "search"`, 24×24.
-- `edit` with `{"op":"add","shape":"icon:not-an-icon"}` -> exit 1 with "Did you mean".
+- `edit` with `{"op":"add","shape":"icon:not-an-icon"}` -> exit 2 (EXIT_ERROR, the existing edit operation-error contract; amendment round 4) with unknown icon "not-an-icon" and "Search with nodetto-cli shapes icon".
+- `edit` with `{"op":"add","shape":"icon:bel"}` -> exit 2 (EXIT_ERROR; amendment round 4) with "Did you mean" and "bell".
 - `validate` on a doc with `{icon:"nope"}` -> exit 0, and stderr contains `icon.unknown`.
 
 ## Verification (evidence in `final/`)
@@ -188,3 +191,31 @@ Decision for this plan:
 - The File-level changes block for `uiIconShapeUtil` is now a contract to verify, not to rewrite: confirm the type, bounds, defaults and registration match it, and record the result in the progress log.
 - This supersedes the round-2 sentence "fix the shape in `packages/core/src/shapes/ui-icon.ts` or its registration in `packages/core/src/shapes/index.ts`": if `apps/cli/src/edit/label-field.test.ts` fails because the util or its registration is missing or wrong, record a finding with status `owned_elsewhere` (owner `ipd-07a-icon-shape`) and do not edit `packages/core/src/shapes/index.ts`.
 - Verification step 1 keeps `apps/cli/src/edit/label-field.test.ts` (exit 0, 0 fail). The done-criterion `rg` now targets `packages/core/src/shapes/ui-icon.ts`, because the registration in `index.ts` references the util by import name, not by the `"ui.icon"` literal.
+
+## Amendment 2026-11-10 (S779-W3-IPD07-PLAN-CONTRADICTION)
+
+The no-match case requires search guidance; a separate near-match case requires suggestions. This reconciles the test with the unchanged no-match contract above.
+
+## Amendment 2026-11-10 (operator round 4)
+
+Unknown-icon `edit` operations fail through the existing operation-error path and exit 2 (`EXIT_ERROR`), like every other invalid edit operation (`nodetto-cli edit --help`: "2 usage, input or operation error"). Exit 1 is `EXIT_DRIFT` and must not be reused. Do not change the CLI exit-code contract. Keep the ipd-07 work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step5 s781 IPD-R6)
+
+This amendment supersedes every earlier exit-1 rule in this plan. The design (2.4 Lookup) sets no exit code for `shapes icon`, so the existing CLI contract applies: `apps/cli/src/commands.ts` `EXIT_OK=0`, `EXIT_DRIFT=1`, `EXIT_ERROR=2`, and `apps/cli/src/help.ts` `EXIT_CODES` ("1 out of date (--check), 2 usage or input error"), which the shapes help prints.
+
+One exit code per outcome:
+
+| Outcome | Exit | Output |
+| --- | --- | --- |
+| `shapes icon <query>` with matches | 0 | one `<name>\t<tags>` line per icon |
+| `shapes icon <query>` with no match | 0 | stdout `no icon matches "<query>"` plus `Search with nodetto-cli shapes icon <query>` (mirrors the `shapes <words>` empty-result `ok(...)` branch) |
+| `shapes icon:<unknown>` | 2 | stderr `unknown icon "<name>"` plus `Did you mean: ...` or the search hint |
+| `edit` add `icon:<unknown>` | 2 | unchanged round-4 rule (operation error) |
+
+- No ipd-07 path may return exit 1. `EXIT_DRIFT` is reserved for `--check`.
+- Use the existing exit-code constants (`EXIT_ERROR`) or the `fail(message)` default, not a literal `1`.
+- Keep the ipd-07 work already in the working tree. Change only the exit codes, messages and test expectations: `apps/cli/src/shapes-command.ts` (the `fail(..., 1)` no-match branch becomes an `ok(...)` result; the unknown `icon:<name>` branch fails with exit 2) and `apps/cli/src/icon-commands.test.ts` (the `zzzz-none` search expects 0; add the `icon:bel` and `icon:zzzz-none` cases). Both files are already in this plan's writePaths.
+- Do not change `EXIT_CODES`, `help.ts`, the ownership block, dependsOn or the dispatch manifest.
+- Pitfall: a test that only checks `exitCode !== 0` would pass with exit 1. Assert the exact value (`toBe(0)` / `toBe(2)`).
+- Extra done criterion: `rg -n 'fail\([^)]*, 1\)' apps/cli/src/shapes-command.ts` -> exit 1 (no match), and `bun test apps/cli/src/icon-commands.test.ts apps/cli/src/shapes-command.test.ts` -> exit 0, 0 fail, with exact assertions for exit 0 (no-match search) and exit 2 (unknown `icon:<name>`, unknown icon in `edit`).

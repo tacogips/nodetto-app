@@ -57,9 +57,11 @@ The workflow's `plan-archive` node moves the `ipd` plans after final verificatio
    - If any file matches, record a finding listing the file. Do not print the matched text; keep `-l`. Redact the match in files this plan owns. For other files, record a `pending_downstream` finding for the commit step.
 6. Licenses:
    - `test -f THIRD_PARTY_NOTICES.md && test -f packages/core/src/icons/LICENSE-lucide.txt && test -f packages/core/src/text-metrics/LICENSE-liberation-sans.txt` -> exit 0.
-7. No emojis in changed or new text files, tracked or untracked:
-   - `{ git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E '\.(md|ts|tsx|json|html)$' | while read -r f; do test -f "$f" && echo "$f"; done | xargs grep -nP '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]'` -> exit 1 (no match).
-   - Record the number of files scanned.
+7. No emojis in changed or new text files, tracked or untracked (scanner: ripgrep; amendment IPD-R5):
+   - Build the list: `{ git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E '\.(md|ts|tsx|json|html)$' | while read -r f; do test -f "$f" && echo "$f"; done > tmp/ipd-s772/ipd-28-finish/final/emoji-files.txt`, then record `wc -l < tmp/ipd-s772/ipd-28-finish/final/emoji-files.txt` as the scanned-file count (must be greater than 0). Also `grep -c '[[:space:]]' tmp/ipd-s772/ipd-28-finish/final/emoji-files.txt` -> 0, because the scan passes the list as unquoted arguments; if any path has whitespace, record a gate failure.
+   - Positive control first: `printf 'a\xe2\x9c\x85b\n' | rg -n '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]'` -> exit 0 with one match line. Record the command and exit code in the progress log. If it does not exit 0, the scanner is broken: stop and record a gate failure.
+   - Scan without xargs: `rg -n --no-messages '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]' $(cat tmp/ipd-s772/ipd-28-finish/final/emoji-files.txt) > tmp/ipd-s772/ipd-28-finish/final/emoji-scan.out 2> tmp/ipd-s772/ipd-28-finish/final/emoji-scan.err; echo "exit=$?"` (if the list is too long for one argument vector, run it in chunks with the same rule per chunk).
+   - Clean only when rg exits 1 AND `tmp/ipd-s772/ipd-28-finish/final/emoji-scan.out` and `tmp/ipd-s772/ipd-28-finish/final/emoji-scan.err` are both empty. Exit 0 means emojis were found (record each listed file and line as a finding). Any other exit code, or any stderr text, is a gate failure to record, never a pass.
 8. Lockfile unchanged: `git diff --exit-code f59bef4 -- bun.lock package.json` -> exit 0.
 
 ## File-level changes
@@ -94,3 +96,12 @@ All of steps 1-8 are satisfied, the README entry exists, and the design status i
 - Read each file fresh before editing it, with pre and post hashes.
 - No state-changing git commands, no emojis.
 - Evidence files must not match Bun test patterns. Before repeating a gate, move `final/` to `attempt-<n>/`.
+
+## Amendment 2026-11-10 (step5 s781 IPD-R5)
+
+- The previous step 7 piped the file list into `xargs grep -nP`. On darwin, xargs runs `/usr/bin/grep` (BSD), which has no `-P` (`grep: invalid option -- P`, exit 2), and BSD xargs turns that into exit 1, the same code the gate expected for "no match". The gate therefore passed without scanning any file.
+- Replacement: ripgrep (`rg`, installed through mise; host version 15.2.0) invoked directly, without xargs, with `--no-messages`. It keeps the same tracked plus untracked file union and the same extension filter.
+- A recorded positive control (`printf 'a\xe2\x9c\x85b\n' | rg -n '<range>'` -> exit 0) proves the scanner works on the host before the scan.
+- Only exit 1 with empty stdout and empty stderr counts as clean. Any stderr text or unexpected exit code is a gate failure.
+- Do not use `grep -P` anywhere in this plan. Unchanged: the privacy `git grep --untracked` gate in step 5, writePaths, artifactRoots, dependsOn and the dispatch manifest.
+- First real run of the amended scan (step 4 rerun, 133 files): positive control exit 0, scan exit 0 with empty stderr, matches only in `packages/core/src/icons/lucide-data.generated.ts` (upstream Lucide tags U+1F389 and U+1F38A on `party-popper`). `ipd-07b-icon-data-ascii` owns that fix (ASCII-escaped generated source, runtime data unchanged) and precedes this plan through `ipd-23` -> `ipd-24`/`ipd-26` -> `ipd-27`. If the scan still matches that file here, record a finding against `ipd-07b-icon-data-ascii`; do not exclude the file from the scan.

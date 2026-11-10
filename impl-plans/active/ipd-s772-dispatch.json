@@ -103,6 +103,14 @@
       {
         "decision": "Step 4 rerun 2026-11-10 (session-777): the operator round-3 split is normalized without scope change. ipd-07a-icon-shape gets the standard ownership block and plan contract; ipd-07's markdown drops the prose writePaths entry and lists packages/core/src/shapes/ui-icon.ts as a sharedPath with a note; ipd-05, ipd-06, ipd-07, ipd-08, ipd-09 and ipd-12 headers name ipd-07a (directly or via ipd-07) and accepted dependencies separately, with dated round-3 amendment sections; waves recomputed (ipd-07a 1; ipd-05, ipd-06 2; ipd-07, ipd-09, ipd-12 3; ipd-08 4). ipd-08 keeps dependsOn ipd-07 (the Step 5 S5-R2-IPD08-GATE repair) and ipd-07 keeps label-field.test.ts in its verification. The tmp plan-check inputs are resynced and check-md.ts matches ipd-NNx plan files.",
         "rationale": "Step 5 S5-R2-IPD08-GATE and S5-R2-L1 required the ordering repair to be explicit and the checkers to exit 0; the operator round-3 working-tree amendment left a prose path entry in ipd-07 and a non-standard ipd-07a header that the markdown checker could not parse."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 4 (session-779 waves 3-4): ipd-07a-icon-shape, ipd-05-core-catalogue, ipd-06-geo-strokes, ipd-09-text-layer and ipd-12-controls are accepted dependencies. ipd-07-icon-core-cli unknown-icon rule is: `Did you mean: a, b, c?` only when searchIcons(name, 5) returns at least one match; otherwise `Search with nodetto-cli shapes icon <query>`. Its edit test cases are therefore: `icon:bel` -> exit 2 (EXIT_ERROR), message contains `Did you mean` and `bell`; `icon:not-an-icon` -> exit 2 (EXIT_ERROR), message contains `unknown icon` and `Search with nodetto-cli shapes icon`. Keep the ipd-07 work already in the working tree and continue from it. Unknown-icon edit operations use the existing operation-error path and exit 2; exit 1 is EXIT_DRIFT and the CLI exit-code contract does not change.",
+        "rationale": "The ipd-07 plan required search guidance when there are no matches but also required `icon:not-an-icon` (which has no matches) to report `Did you mean`; the implementer followed the no-match rule and the unit blocked twice on the contradiction (session-779 waves 3 and 4). In wave 4 the corrected plan still said exit 1, contradicting the CLI contract (EXIT_ERROR 2, EXIT_DRIFT 1), and the unit blocked again."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 4 Step 5 s781 repairs (accepted): ipd-28 step 7 emoji gate runs rg directly over git diff --name-only f59bef4 plus git ls-files -o --exclude-standard with a whitespace precheck and positive control (IPD-R5); new plan ipd-07b-icon-data-ascii (dependsOn ipd-07-icon-core-cli) escapes non-ASCII code units in scripts/vendor-lucide.ts output and regenerates packages/core/src/icons/lucide-data.generated.ts from tmp/ipd-s772/ipd-03-icon-data/src/package with an unchanged runtime hash; ipd-23-parity-shapes dependsOn gains ipd-07b so ipd-24, 26, 27 and 28 follow it; ipd-07 fixes one exit code per outcome (search no match 0, unknown icon 2, exit 1 banned) (IPD-R6).",
+        "rationale": "Step 5 (session-781) accepted the repairs: the repaired ipd-28 gate found raw emoji in the accepted ipd-03 output (rg -c gives 1 matching line in lucide-data.generated.ts); excluding the vendored file would hide real matches, so a dedicated owner plan is the smallest correct choice. ipd-07 had conflicting exit-code text. Plan checkers exit 0 (21 plans, 0 problems)."
       }
     ],
     "intentionalTradeoffs": [
@@ -137,129 +145,11 @@
   },
   "plans": [
     {
-      "planId": "ipd-07a-icon-shape",
-      "planPath": "impl-plans/active/ipd-07a-icon-shape.md",
-      "progressPath": "impl-plans/progress/ipd-07a-icon-shape.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/shapes/ui-icon.ts",
-        "packages/core/src/shapes/index.ts",
-        "impl-plans/progress/ipd-07a-icon-shape.md",
-        "tmp/ipd-s772/ipd-07a-icon-shape"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-07a-icon-shape"
-      ],
-      "verification": [
-        "bun test apps/cli/src/edit/label-field.test.ts",
-        "bun test packages/core",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/shapes/ui-icon.ts packages/core/src/shapes/index.ts"
-      ],
-      "acceptanceCriteria": [
-        "The verification above passes (packages/core: no new failures versus the ipd-00-baseline record).",
-        "label-field.test.ts 'all registered types accept their mapped label or report no label' passes.",
-        "`rg -n 'uiIconShapeUtil' packages/core/src/shapes/index.ts` -> 2 matches (import and register); `rg -n 'icon: \"square\"' packages/core/src/shapes/ui-icon.ts` -> 1 match."
-      ]
-    },
-    {
-      "planId": "ipd-05-core-catalogue",
-      "planPath": "impl-plans/active/ipd-05-core-catalogue.md",
-      "progressPath": "impl-plans/progress/ipd-05-core-catalogue.md",
-      "wave": 2,
-      "dependsOn": [
-        "ipd-07a-icon-shape"
-      ],
-      "writePaths": [
-        "packages/core/src/tools.ts",
-        "packages/core/src/shape-catalogue.ts",
-        "packages/core/src/shape-catalogue.test.ts",
-        "packages/core/src/shapes/frame.ts",
-        "packages/core/src/screen-transition.ts",
-        "packages/core/src/ipd-catalogue.test.ts",
-        "impl-plans/progress/ipd-05-core-catalogue.md",
-        "tmp/ipd-s772/ipd-05-core-catalogue"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-05-core-catalogue"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "`rg -n '\"text:layer\"|\"prototype:back\"|\"frame:iphone-402x874\"' packages/core/src/tools.ts` -> 3 matches."
-      ],
-      "verification": [
-        "bun test packages/core/src/shape-catalogue.test.ts packages/core/src/ipd-catalogue.test.ts packages/core/src/frame.test.ts packages/core/src/screen-transition.test.ts packages/core/src/arrange-layered.test.ts",
-        "bun test apps/cli/src/shapes-command.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/tools.ts packages/core/src/shape-catalogue.ts packages/core/src/shapes/frame.ts packages/core/src/screen-transition.ts packages/core/src/ipd-catalogue.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-06-geo-strokes",
-      "planPath": "impl-plans/active/ipd-06-geo-strokes.md",
-      "progressPath": "impl-plans/progress/ipd-06-geo-strokes.md",
-      "wave": 2,
-      "dependsOn": [
-        "ipd-07a-icon-shape"
-      ],
-      "writePaths": [
-        "packages/core/src/shapes/geo-outline.ts",
-        "packages/core/src/svg-export/rect-strokes.ts",
-        "packages/core/src/svg-export/basic-shapes.ts",
-        "packages/core/src/svg-export/paint.ts",
-        "packages/core/src/label-layout.ts",
-        "packages/core/src/geo-strokes.test.ts",
-        "apps/cli/src/thin-rect-export.test.ts",
-        "packages/ui-solid/src/shapes/GeoShapeView.tsx",
-        "packages/ui-solid/src/shapes/RectStrokes.tsx",
-        "packages/ui-solid/src/shapes/label-align-style.ts",
-        "packages/ui-solid/src/shapes/rect-strokes-view.test.ts",
-        "impl-plans/progress/ipd-06-geo-strokes.md",
-        "tmp/ipd-s772/ipd-06-geo-strokes"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-06-geo-strokes"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes, and the progress log records the visual inspection notes."
-      ],
-      "verification": [
-        "bun test packages/core/src/geo-strokes.test.ts packages/core/src/svg-export.test.ts packages/core/src/label-layout.test.ts packages/core/src/geo-actor.test.ts apps/cli/src/thin-rect-export.test.ts apps/cli/src/export-determinism.test.ts apps/cli/src/export-paint-order.test.ts packages/ui-solid/src/shapes/rect-strokes-view.test.ts",
-        "bun test packages/core/src/text-layout-lint apps/cli/src/text-layout-lint.test.ts apps/cli/src/box-label-compat.test.ts",
-        "bun run typecheck",
-        "bunx biome check"
-      ]
-    },
-    {
       "planId": "ipd-07-icon-core-cli",
       "planPath": "impl-plans/active/ipd-07-icon-core-cli.md",
       "progressPath": "impl-plans/progress/ipd-07-icon-core-cli.md",
       "wave": 3,
-      "dependsOn": [
-        "ipd-05-core-catalogue",
-        "ipd-07a-icon-shape"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "packages/core/src/svg-export/shapes.ts",
         "packages/core/src/shape-warnings.ts",
@@ -302,6 +192,39 @@
       ]
     },
     {
+      "planId": "ipd-07b-icon-data-ascii",
+      "planPath": "impl-plans/active/ipd-07b-icon-data-ascii.md",
+      "progressPath": "impl-plans/progress/ipd-07b-icon-data-ascii.md",
+      "wave": 4,
+      "dependsOn": [
+        "ipd-07-icon-core-cli"
+      ],
+      "writePaths": [
+        "scripts/vendor-lucide.ts",
+        "packages/core/src/icons/lucide-data.generated.ts",
+        "packages/core/src/icons/LICENSE-lucide.txt",
+        "packages/core/src/icons/icons.test.ts",
+        "impl-plans/progress/ipd-07b-icon-data-ascii.md",
+        "tmp/ipd-s772/ipd-07b-icon-data-ascii"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-07b-icon-data-ascii"
+      ],
+      "acceptanceCriteria": [
+        "The generated Lucide data file contains only ASCII source bytes; the runtime LUCIDE_DATA string hash is unchanged; party-popper keeps its emoji tags at runtime.",
+        "Verification passes."
+      ],
+      "verification": [
+        "bun scripts/vendor-lucide.ts tmp/ipd-s772/ipd-03-icon-data/src/package",
+        "rg -c '[^\\x00-\\x7f]' packages/core/src/icons/lucide-data.generated.ts (exit 1)",
+        "bun test packages/core/src/icons/icons.test.ts packages/core/src/ui-icon.test.ts",
+        "bunx biome check scripts/vendor-lucide.ts packages/core/src/icons/icons.test.ts",
+        "bun run typecheck"
+      ]
+    },
+    {
       "planId": "ipd-08-cli-layout-ops",
       "planPath": "impl-plans/active/ipd-08-cli-layout-ops.md",
       "progressPath": "impl-plans/progress/ipd-08-cli-layout-ops.md",
@@ -328,47 +251,6 @@
         "bun test apps/cli/src/layout-ops.test.ts apps/cli/src/edit apps/cli/src/edit-frame-carry.test.ts packages/core/src/auto-layout.test.ts packages/core/src/align.test.ts",
         "bun run typecheck",
         "bunx biome check apps/cli/src/edit/operations/layout.ts apps/cli/src/edit/sizing-fields.ts apps/cli/src/layout-ops.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-09-text-layer",
-      "planPath": "impl-plans/active/ipd-09-text-layer.md",
-      "progressPath": "impl-plans/progress/ipd-09-text-layer.md",
-      "dependsOn": [
-        "ipd-05-core-catalogue",
-        "ipd-07a-icon-shape"
-      ],
-      "writePaths": [
-        "packages/core/src/text-layout.ts",
-        "packages/core/src/svg-export/text-note.ts",
-        "packages/core/src/text-layer.test.ts",
-        "packages/ui-solid/src/shapes/TextNoteView.tsx",
-        "apps/cli/src/edit/typography-link.ts",
-        "apps/cli/src/edit/visual-patch.ts",
-        "apps/cli/src/text-layer-cli.test.ts",
-        "impl-plans/progress/ipd-09-text-layer.md",
-        "tmp/ipd-s772/ipd-09-text-layer"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-09-text-layer"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "`rg -n 'export function textNoteLines' packages/core/src/text-layout.ts` -> 1 match."
-      ],
-      "verification": [
-        "bun test packages/core/src/text-layer.test.ts apps/cli/src/text-layer-cli.test.ts packages/core/src/text-layout.test.ts packages/core/src/text-styles.test.ts packages/core/src/svg-export.test.ts packages/core/src/text-layout-lint apps/cli/src/text-layout-export.test.ts packages/ui-solid/src/text-note-view.test.ts",
-        "bun run typecheck",
-        "bunx biome check"
       ]
     },
     {
@@ -409,8 +291,6 @@
       "planPath": "impl-plans/active/ipd-11-frames.md",
       "progressPath": "impl-plans/progress/ipd-11-frames.md",
       "dependsOn": [
-        "ipd-05-core-catalogue",
-        "ipd-06-geo-strokes",
         "ipd-07-icon-core-cli"
       ],
       "writePaths": [
@@ -456,54 +336,10 @@
       ]
     },
     {
-      "planId": "ipd-12-controls",
-      "planPath": "impl-plans/active/ipd-12-controls.md",
-      "progressPath": "impl-plans/progress/ipd-12-controls.md",
-      "dependsOn": [
-        "ipd-06-geo-strokes",
-        "ipd-07a-icon-shape"
-      ],
-      "writePaths": [
-        "packages/core/src/svg-export/ui-control.ts",
-        "packages/core/src/ui-control-paint.ts",
-        "packages/core/src/ui-control-style.test.ts",
-        "packages/core/src/interface-code.ts",
-        "packages/core/src/interface-code-controls.test.ts",
-        "packages/ui-solid/src/shapes/UiControlView.tsx",
-        "packages/ui-solid/src/shapes/UiControlView.css",
-        "packages/ui-solid/src/inspector/UiControlSection.tsx",
-        "packages/ui-solid/src/ui-control-view.test.ts",
-        "impl-plans/progress/ipd-12-controls.md",
-        "tmp/ipd-s772/ipd-12-controls"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-12-controls"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "`rg -n '#137e7e' packages/ui-solid/src/shapes/UiControlView.css` -> only in `var(...)` fallbacks."
-      ],
-      "verification": [
-        "bun test packages/core/src/ui-control-style.test.ts packages/ui-solid/src/ui-control-view.test.ts packages/core/src/interface-code-controls.test.ts packages/core/src/svg-export.test.ts packages/core/src/interface-code.test.ts packages/core/src/html-bundle.test.ts packages/core/src/templates/design-templates.test.ts apps/cli/src/html-export.test.ts",
-        "bun run typecheck",
-        "bunx biome check"
-      ]
-    },
-    {
       "planId": "ipd-13-prototype-core-cli",
       "planPath": "impl-plans/active/ipd-13-prototype-core-cli.md",
       "progressPath": "impl-plans/progress/ipd-13-prototype-core-cli.md",
       "dependsOn": [
-        "ipd-05-core-catalogue",
         "ipd-11-frames"
       ],
       "writePaths": [
@@ -556,11 +392,8 @@
       "planPath": "impl-plans/active/ipd-14-kit-core.md",
       "progressPath": "impl-plans/progress/ipd-14-kit-core.md",
       "dependsOn": [
-        "ipd-05-core-catalogue",
         "ipd-07-icon-core-cli",
-        "ipd-09-text-layer",
-        "ipd-11-frames",
-        "ipd-12-controls"
+        "ipd-11-frames"
       ],
       "writePaths": [
         "packages/core/src/kits/ios/types.ts",
@@ -683,7 +516,6 @@
       "planPath": "impl-plans/active/ipd-17-desktop-palette.md",
       "progressPath": "impl-plans/progress/ipd-17-desktop-palette.md",
       "dependsOn": [
-        "ipd-05-core-catalogue",
         "ipd-10-icon-desktop",
         "ipd-14-kit-core"
       ],
@@ -798,8 +630,6 @@
       "progressPath": "impl-plans/progress/ipd-20-app-lint.md",
       "dependsOn": [
         "ipd-07-icon-core-cli",
-        "ipd-09-text-layer",
-        "ipd-12-controls",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
         "ipd-15-kit-content",
@@ -927,18 +757,16 @@
       "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
       "progressPath": "impl-plans/progress/ipd-23-parity-shapes.md",
       "dependsOn": [
-        "ipd-06-geo-strokes",
         "ipd-07-icon-core-cli",
         "ipd-08-cli-layout-ops",
-        "ipd-09-text-layer",
         "ipd-11-frames",
-        "ipd-12-controls",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
         "ipd-15-kit-content",
         "ipd-16-frames-export-compare",
         "ipd-20-app-lint",
-        "ipd-21-html-prototype"
+        "ipd-21-html-prototype",
+        "ipd-07b-icon-data-ascii"
       ],
       "writePaths": [
         "apps/cli/src/native-parity/app-design-shapes.test.ts",
@@ -968,12 +796,9 @@
       "planPath": "impl-plans/active/ipd-24-parity-flows.md",
       "progressPath": "impl-plans/progress/ipd-24-parity-flows.md",
       "dependsOn": [
-        "ipd-06-geo-strokes",
         "ipd-07-icon-core-cli",
         "ipd-08-cli-layout-ops",
-        "ipd-09-text-layer",
         "ipd-11-frames",
-        "ipd-12-controls",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
         "ipd-15-kit-content",
@@ -1010,7 +835,6 @@
       "dependsOn": [
         "ipd-07-icon-core-cli",
         "ipd-08-cli-layout-ops",
-        "ipd-09-text-layer",
         "ipd-11-frames",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
@@ -1200,6 +1024,36 @@
       "planPath": "impl-plans/active/ipd-01-ir-schema.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted by the operator after amendment round 2 (session-775): bun test packages/ir 156/156, golden 57/57, typecheck clean; its only aggregate failure (label-field.test.ts ui.icon default) is owned by ipd-07a-icon-shape"
+    },
+    {
+      "planId": "ipd-07a-icon-shape",
+      "planPath": "impl-plans/active/ipd-07a-icon-shape.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-05-core-catalogue",
+      "planPath": "impl-plans/active/ipd-05-core-catalogue.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-06-geo-strokes",
+      "planPath": "impl-plans/active/ipd-06-geo-strokes.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-09-text-layer",
+      "planPath": "impl-plans/active/ipd-09-text-layer.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-12-controls",
+      "planPath": "impl-plans/active/ipd-12-controls.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
     }
   ]
 }
