@@ -45,9 +45,35 @@ also stay in `active/` with their
 pre-archive `planPath` values. The spreadsheet table manifests
 `tsh-s776-dispatch.json` and `tsh-s780-dispatch.json` also stay in
 `active/` with their pre-archive `planPath` values; s780 was the final
-dispatch, and s776 must not be dispatched again.
+dispatch, and s776 must not be dispatched again. The presentation manifest
+`prs-s793-dispatch.json` also stays in `active/` with its pre-archive
+`planPath` values.
 
 ## Completed
+
+Presentation (slideshow) mode (session 793; design:
+`design-docs/specs/design-presentation.md`; owner Q&A:
+`design-docs/user-qa/presentation.md`; no GitHub issue, source is the session
+793 runtime workflowInput). Pages are presented full screen in tab order,
+read-only and fitted to the screen, with F5/Shift+F5, the File menu and header
+Present actions, keyboard, mouse and control-bar navigation, and an optional
+`Page.hiddenInPresentation` flag edited through the `updatePage` patch.
+Integration review accepted the combined tree: `mise run verify` exit 0 (Bun
+3641 pass, 0 fail; Rust 85 pass), typecheck, lint and `bun run build` clean.
+Logs: `tmp/prs-s793/reconcile-wave-004/` and
+`tmp/prs-s793/prs-06-wiring/final/`. There is no browser E2E suite; native
+Tauri fullscreen and the DOM fullscreen exit still need a manual desktop smoke
+test. Progress logs stay in `progress/`.
+
+| Plan | Scope |
+|---|---|
+| [prs-00-overview](completed/prs-00-overview.md) | Waves, ownership and final verification |
+| [prs-01-page-flag](completed/prs-01-page-flag.md) | `hiddenInPresentation` in IR, JSONL, Yjs and `updatePage` |
+| [prs-02-core-presentation](completed/prs-02-core-presentation.md) | Slide list, navigation reducer, fit and slide source |
+| [prs-03-fullscreen](completed/prs-03-fullscreen.md) | Tauri/DOM fullscreen helper and capability |
+| [prs-04-presentation-view](completed/prs-04-presentation-view.md) | `PresentationView`, controller and key map |
+| [prs-05-page-flag-ui](completed/prs-05-page-flag-ui.md) | Page tab menu item and inspector switch |
+| [prs-06-wiring](completed/prs-06-wiring.md) | Desktop shortcuts, menus, fullscreen wiring, docs and README |
 
 Spreadsheet table element `table.sheet` (sessions 776, 778 and 780; design:
 `design-docs/specs/design-table-sheet.md`; owner Q&A:

@@ -100,6 +100,7 @@ export type Command =
         readonly tokenMode?: string | null;
         readonly sqlDialect?: Page["sqlDialect"] | null;
         readonly connectorRouting?: Page["connectorRouting"] | null;
+        readonly hiddenInPresentation?: boolean | null;
         readonly order?: FractionalIndex | null;
       };
     }
@@ -797,7 +798,22 @@ export function applyCommands(
             ],
             "updatePage: invalid connector routing",
           );
+        if (
+          patch.hiddenInPresentation != null &&
+          typeof patch.hiddenInPresentation !== "boolean"
+        )
+          throw new CommandError(
+            [
+              error(
+                "type.boolean",
+                "page.hiddenInPresentation",
+                "expected a boolean or null",
+              ),
+            ],
+            "updatePage: invalid hiddenInPresentation",
+          );
         const {
+          hiddenInPresentation: _oldHiddenInPresentation,
           connectorRouting: _oldConnectorRouting,
           mode: _oldPageMode,
           tokenMode: _oldMode,
@@ -821,6 +837,13 @@ export function applyCommands(
               : previous.connectorRouting === undefined
                 ? {}
                 : { connectorRouting: previous.connectorRouting }),
+          ...(patch.hiddenInPresentation === null
+            ? {}
+            : patch.hiddenInPresentation !== undefined
+              ? { hiddenInPresentation: patch.hiddenInPresentation }
+              : previous.hiddenInPresentation === undefined
+                ? {}
+                : { hiddenInPresentation: previous.hiddenInPresentation }),
           ...(patch.sqlDialect === null
             ? {}
             : patch.sqlDialect !== undefined
@@ -855,6 +878,11 @@ export function applyCommands(
             ...(patch.mode === undefined
               ? {}
               : { mode: previous.mode ?? null }),
+            ...(patch.hiddenInPresentation === undefined
+              ? {}
+              : {
+                  hiddenInPresentation: previous.hiddenInPresentation ?? null,
+                }),
             tokenMode: previous.tokenMode ?? null,
             sqlDialect: previous.sqlDialect ?? null,
             connectorRouting: previous.connectorRouting ?? null,

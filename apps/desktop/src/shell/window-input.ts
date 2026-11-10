@@ -3,6 +3,7 @@
 // dismissing the header's menus and cloud panel.
 
 import type { Editor } from "@nodetto/core";
+import { isEditableTarget } from "@nodetto/ui-solid";
 import type { CloudSession } from "../cloud/session.ts";
 import { handleHistoryShortcut } from "../history-shortcuts.ts";
 
@@ -15,6 +16,8 @@ export interface WindowInputSource {
 
 export interface WindowInputOptions {
   readonly settingsOpen: () => boolean;
+  readonly presenting: () => boolean;
+  readonly startPresentation: (from: "first" | "current") => void;
   readonly isCloud: () => boolean;
   /** Run the shared export action wherever focus is. */
   readonly exportDocument: () => void;
@@ -26,13 +29,37 @@ export interface WindowInputOptions {
   readonly fileMenu: () => HTMLDetailsElement | undefined;
 }
 
+export function presentationStartShortcut(
+  event: Pick<
+    KeyboardEvent,
+    "key" | "shiftKey" | "ctrlKey" | "metaKey" | "altKey" | "target"
+  >,
+): "first" | "current" | null {
+  if (
+    event.key !== "F5" ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    isEditableTarget(event.target)
+  )
+    return null;
+  return event.shiftKey ? "current" : "first";
+}
+
 /** Install the shell's window listeners; returns their removal. */
 export function watchWindowInput(
   source: WindowInputSource,
   options: WindowInputOptions,
 ): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (options.settingsOpen()) return;
+    if (options.settingsOpen() || options.presenting()) return;
+    const present = presentationStartShortcut(event);
+    if (present) {
+      event.preventDefault();
+      event.stopPropagation();
+      options.startPresentation(present);
+      return;
+    }
     const modifier = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
 
@@ -73,7 +100,7 @@ export function watchWindowInput(
   };
   window.addEventListener("keydown", onKeyDown, true);
   const localHistory = (event: KeyboardEvent): void => {
-    if (options.settingsOpen()) return;
+    if (options.settingsOpen() || options.presenting()) return;
     if (!options.isCloud()) handleHistoryShortcut(event, source.editor);
   };
   // Bubble after canvas handlers so their nudge/gesture bookkeeping runs

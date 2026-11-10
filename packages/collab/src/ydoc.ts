@@ -2,7 +2,7 @@
 //
 // Shape:
 //   meta     Y.Map   { schemaVersion, id, title, extensions?, unknownRecords? }
-//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, connectorRouting?, extensions? }>
+//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, connectorRouting?, hiddenInPresentation?, extensions? }>
 //   elements Y.Map<ElementId, Y.Map{ type, page, index, semantic,
 //                                    accessibility?, visual, extensions? }>
 //
@@ -94,6 +94,9 @@ export function pageFields(page: Page): Record<string, unknown> {
     ...(page.connectorRouting === undefined
       ? {}
       : { connectorRouting: page.connectorRouting }),
+    ...(page.hiddenInPresentation === undefined
+      ? {}
+      : { hiddenInPresentation: page.hiddenInPresentation }),
     ...(page.tokenMode === undefined ? {} : { tokenMode: page.tokenMode }),
     ...(page.order === undefined ? {} : { order: page.order }),
     ...(page.extensions === undefined ? {} : { extensions: page.extensions }),
@@ -231,6 +234,9 @@ export function pageFromY(id: PageId, value: unknown): Page {
     record.sqlDialect === "mysql" ||
     record.sqlDialect === "sqlite"
       ? { sqlDialect: record.sqlDialect }
+      : {}),
+    ...(typeof record.hiddenInPresentation === "boolean"
+      ? { hiddenInPresentation: record.hiddenInPresentation }
       : {}),
     ...(typeof record.tokenMode === "string"
       ? { tokenMode: record.tokenMode }

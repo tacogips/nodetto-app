@@ -27,6 +27,11 @@ import {
 } from "./page-tab-drag.ts";
 import { pageRenameDraft } from "./page-rename.ts";
 import {
+  PRESENTATION_HIDDEN_TAB_CLASS,
+  PRESENTATION_HIDDEN_TITLE_SUFFIX,
+  presentationToggleLabel,
+} from "./page-presentation-toggle.ts";
+import {
   pageTabFlingStep,
   pageTabScrollEdges,
   pageTabScrollStep,
@@ -440,6 +445,8 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
                   data-page-drag-target={id}
                   classList={{
                     "nodetto-active": currentId() === id,
+                    [PRESENTATION_HIDDEN_TAB_CLASS]:
+                      page().hiddenInPresentation === true,
                     "is-dragging": draggedPage() === id,
                     "is-drop-before":
                       drop()?.id === id && drop()?.side === "before",
@@ -459,7 +466,7 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
                         aria-selected={currentId() === id}
                         tabindex={currentId() === id ? 0 : -1}
                         onKeyDown={(event) => tabKey(event, id)}
-                        title={`${page().name} (${page().kind})${readOnly() ? "" : ". Double-click to rename"}`}
+                        title={`${page().name} (${page().kind})${readOnly() ? "" : ". Double-click to rename"}${page().hiddenInPresentation === true ? PRESENTATION_HIDDEN_TITLE_SUFFIX : ""}`}
                         draggable={false}
                         onPointerDown={(event) => {
                           suppressClick = false;
@@ -641,6 +648,24 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
                         onClick={() => duplicate(page())}
                       >
                         Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        tabindex="-1"
+                        class="nodetto-menu-item"
+                        disabled={readOnly()}
+                        onClick={() => {
+                          props.editor.setPageHiddenInPresentation(
+                            id,
+                            !(page().hiddenInPresentation === true),
+                          );
+                          setMenuFor(null);
+                        }}
+                      >
+                        {presentationToggleLabel(
+                          page().hiddenInPresentation === true,
+                        )}
                       </button>
                       <button
                         type="button"

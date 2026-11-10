@@ -336,3 +336,7 @@
 .app-viewer-footer .nodetto-zoom-group {
   box-shadow: none;
 }
+
+.nodetto-page-tab-presentation-hidden {
+  opacity: 0.55;
+}

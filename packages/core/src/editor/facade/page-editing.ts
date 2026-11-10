@@ -29,6 +29,17 @@ export class PageEditing extends SelectionEditing {
     });
   }
 
+  /** Export any page as a standalone SVG. */
+  exportPageSvgOf(
+    pageId: PageId,
+    options: SvgExportOptions = {},
+  ): string | null {
+    return renderPageSvg(this.store, this.registry, pageId, {
+      resolveAsset: this.requireAsset,
+      ...options,
+    });
+  }
+
   /** Exact artboard envelope, with no editor-title annotation. */
   exportArtboardSvg(
     id: ElementId,
@@ -126,6 +137,26 @@ export class PageEditing extends SelectionEditing {
     const page = this.store.getPage(id);
     if (!page || (page.mode ?? null) === mode) return false;
     this.apply([{ type: "updatePage", id, page: { mode } }], applyOptions);
+    return true;
+  }
+
+  setPageHiddenInPresentation(
+    id: PageId,
+    hidden: boolean,
+    applyOptions: ApplyOptions = {},
+  ): boolean {
+    const page = this.store.getPage(id);
+    if (!page || (page.hiddenInPresentation === true) === hidden) return false;
+    this.apply(
+      [
+        {
+          type: "updatePage",
+          id,
+          page: { hiddenInPresentation: hidden ? true : null },
+        },
+      ],
+      applyOptions,
+    );
     return true;
   }
 

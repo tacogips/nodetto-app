@@ -207,6 +207,29 @@ the selection's top-left corner. Preserve selection proportions couples the two
 dimensions. Artboard children follow constraints and auto layout, and database
 table/class heights remain derived. Unsupported resize selections show a reason.
 
+## Presentation
+
+Use Present (header button or File menu) or F5 to start from the first slide;
+use Present from current page or Shift+F5 to start at the current page. The
+shortcuts do not fire while typing in a text field. Each slide is one page in
+tab order, shown read-only and fitted to the screen: a page with exactly one
+visible frame shows that frame, otherwise its content bounds. Use the page tab menu's
+Hide/Show in presentation action or the inspector's Show in presentation switch
+to skip a page. Starting on a hidden page begins at the next shown page. When
+every page is hidden, Present is disabled.
+
+Right, Down, PageDown, Space, Enter, N, or clicking the slide advances; Left,
+Up, PageUp, Backspace, or P goes back. Home and End jump to the first and last
+slide. Type a slide number and press Enter to jump to it. B toggles a black
+screen. Escape clears a pending number or exits, returning to the page that
+was shown. While presenting, editor shortcuts are disabled; F11 remains
+available for window fullscreen.
+
+Move the pointer to reveal the automatically hiding control bar with previous,
+next, counter (`n / total`) and exit controls. The presentation uses fullscreen
+when available (the desktop window in the app) and otherwise fills the
+application window. Leaving browser fullscreen also ends the presentation.
+
 ## Page navigation
 
 Review comments can be filtered across all pages and searched by feedback,

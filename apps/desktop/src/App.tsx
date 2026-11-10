@@ -21,13 +21,15 @@
 import {
   createDesignTemplate,
   createReviewComment,
+  slideList,
+  startIndex,
   type DesignTemplateId,
   type EditableField,
   type Editor,
   type NewReviewMessage,
   type Vec,
 } from "@nodetto/core";
-import type { ElementId } from "@nodetto/ir";
+import type { ElementId, PageId } from "@nodetto/ir";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -44,6 +46,7 @@ import {
   Inspector,
   Layers,
   PageTabs,
+  PresentationView,
   ReviewCommentPins,
   runAction,
   SelectionToolbar,
@@ -97,6 +100,11 @@ import { FileActions } from "./shell/FileActions.tsx";
 import { createPaneLayout } from "./shell/pane-layout.ts";
 import { createPresencePublisher } from "./shell/presence.ts";
 import { PaneDivider, SidePane } from "./shell/SidePanes.tsx";
+import {
+  enterPresentationFullscreen,
+  watchFullscreenExit,
+  type PresentationFullscreenSession,
+} from "./shell/presentation-fullscreen.ts";
 import { watchWindowInput } from "./shell/window-input.ts";
 import { followPageWorkspace, selectWorkspacePage } from "./shell/workspace.ts";
 import { TemplateDialog } from "./TemplateDialog.tsx";
@@ -498,12 +506,82 @@ export function App(props: AppProps): JSX.Element {
     onCleanup(stop);
   });
 
+  const [presenting, setPresenting] = createSignal(false);
+  const [presentFrom, setPresentFrom] = createSignal<PageId | null>(null);
+  const presentDisabled = () => {
+    editorSignals.rev();
+    return slideList(props.editor.store.listPages()).length === 0;
+  };
+  let fullscreen: PresentationFullscreenSession | undefined;
+  let removeFullscreenWatcher: (() => void) | undefined;
+  let presentationGeneration = 0;
+  const exitPresentation = (page: PageId) => {
+    if (!presenting()) return;
+    setPresenting(false);
+    presentationGeneration++;
+    removeFullscreenWatcher?.();
+    removeFullscreenWatcher = undefined;
+    const session = fullscreen;
+    fullscreen = undefined;
+    void session?.restore();
+    props.editor.setCurrentPage(page);
+  };
+  const startPresentation = (from: "first" | "current") => {
+    if (presenting()) return;
+    const pages = props.editor.store.listPages();
+    const page = from === "current" ? props.editor.currentPageId : null;
+    if (
+      startIndex(
+        pages.map((p) => p.id),
+        slideList(pages),
+        page,
+      ) === null
+    )
+      return;
+    if (fileMenu) fileMenu.open = false;
+    setCloudPanelExpanded(false);
+    setContextMenu(null);
+    setPresentFrom(page);
+    setPresenting(true);
+    const generation = ++presentationGeneration;
+    void enterPresentationFullscreen().then((session) => {
+      if (generation !== presentationGeneration || !presenting()) {
+        void session.restore();
+        return;
+      }
+      fullscreen = session;
+      if (session.mode === "dom") {
+        removeFullscreenWatcher = watchFullscreenExit(document, () => {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          if (presenting())
+            window.dispatchEvent(
+              new KeyboardEvent("keydown", { key: "Escape" }),
+            );
+        });
+        if (!document.fullscreenElement) {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          if (presenting())
+            window.dispatchEvent(
+              new KeyboardEvent("keydown", { key: "Escape" }),
+            );
+        }
+      }
+    });
+  };
+  onCleanup(() => {
+    presentationGeneration++;
+    removeFullscreenWatcher?.();
+    void fullscreen?.restore();
+  });
+
   // ----------------------------------------------------------- keyboard
 
   onMount(() => {
     onCleanup(
       watchWindowInput(props, {
         settingsOpen,
+        presenting,
+        startPresentation,
         isCloud,
         exportDocument: () =>
           runAction(getAction("exportSvg"), actionContext()),
@@ -665,6 +743,8 @@ export function App(props: AppProps): JSX.Element {
             onOpen={open}
             onReload={reload}
             onExport={openExport}
+            onPresent={startPresentation}
+            presentDisabled={presentDisabled()}
             onSave={() => void props.session.save()}
             onSaveAs={() => void props.session.saveAs()}
             onOpenRecent={openRecent}
@@ -697,6 +777,15 @@ export function App(props: AppProps): JSX.Element {
         }
         utilitiesContent={
           <>
+            <button
+              type="button"
+              class="app-file-button"
+              title="Present (F5)"
+              disabled={presentDisabled()}
+              onClick={() => startPresentation("first")}
+            >
+              Present
+            </button>
             <div class="app-header-slot">{props.headerContent}</div>
             <HelpHint text="Double-click to edit text; right-click for the menu; Ctrl/Cmd + wheel to zoom; Shift + 1 to fit; Ctrl/Cmd + Z to undo; Ctrl/Cmd + S to save." />
           </>
@@ -873,6 +962,13 @@ export function App(props: AppProps): JSX.Element {
           </Show>
         </SidePane>
       </div>
+      <Show when={presenting()}>
+        <PresentationView
+          editor={props.editor}
+          from={presentFrom()}
+          onExit={exitPresentation}
+        />
+      </Show>
     </div>
   );
 }

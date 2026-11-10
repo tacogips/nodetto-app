@@ -16,6 +16,8 @@ export interface FileActionsProps {
   readonly onOpen: () => void;
   readonly onReload: () => void;
   readonly onExport: () => void;
+  readonly onPresent: (from: "first" | "current") => void;
+  readonly presentDisabled: boolean;
   readonly onSave: () => void;
   readonly onSaveAs: () => void;
   readonly onOpenRecent: (path: string) => void;
@@ -107,6 +109,24 @@ export function FileActions(props: FileActionsProps): JSX.Element {
               title="Save As"
             >
               <Icon name="saveAs" />
+            </button>
+            <button
+              type="button"
+              class="app-file-button"
+              disabled={props.presentDisabled}
+              onClick={() => props.onPresent("first")}
+              title="Present (F5)"
+            >
+              Present
+            </button>
+            <button
+              type="button"
+              class="app-file-button"
+              disabled={props.presentDisabled}
+              onClick={() => props.onPresent("current")}
+              title="Present from current page (Shift+F5)"
+            >
+              Present from current page
             </button>
             <select
               class="app-recent-select"

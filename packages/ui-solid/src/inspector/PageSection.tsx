@@ -3,6 +3,7 @@
 import type { Editor } from "@nodetto/core";
 import { PAGE_KINDS, type Page, type PageKind, shortPageId } from "@nodetto/ir";
 import { type JSX, lazy, Suspense } from "solid-js";
+import { Switch } from "../Switch.tsx";
 import {
   Field,
   Section,
@@ -64,6 +65,19 @@ export function PageSection(props: PageSectionProps): JSX.Element {
             options={PAGE_KIND_OPTIONS}
             onCommit={(kind) =>
               props.editor.setPageKind(props.page.id, kind as PageKind)
+            }
+          />
+        </Field>
+        <Field label="Show in presentation">
+          <Switch
+            aria-label="Show in presentation"
+            checked={props.page.hiddenInPresentation !== true}
+            disabled={props.editor.readOnly}
+            onChange={(event) =>
+              props.editor.setPageHiddenInPresentation(
+                props.page.id,
+                !event.currentTarget.checked,
+              )
             }
           />
         </Field>

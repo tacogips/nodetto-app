@@ -817,3 +817,4 @@ export {
   lintFrameStraddles,
   type FrameStraddleFinding,
 } from "./diagram-lint/frame-straddle.ts";
+export * from "./presentation/index.ts";

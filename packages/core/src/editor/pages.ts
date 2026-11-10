@@ -114,6 +114,9 @@ export function planDuplicatePage(
     ...(source.mode ? { mode: source.mode } : {}),
     order: ordering.order,
     ...(source.tokenMode ? { tokenMode: source.tokenMode } : {}),
+    ...(source.hiddenInPresentation === true
+      ? { hiddenInPresentation: true }
+      : {}),
     ...(source.connectorRouting
       ? { connectorRouting: source.connectorRouting }
       : {}),

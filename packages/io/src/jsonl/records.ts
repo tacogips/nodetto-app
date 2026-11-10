@@ -39,6 +39,7 @@ export const PAGE_RECORD_KEYS: readonly string[] = [
   "tokenMode",
   "sqlDialect",
   "connectorRouting",
+  "hiddenInPresentation",
 ];
 
 export const ELEMENT_RECORD_KEYS: readonly string[] = [

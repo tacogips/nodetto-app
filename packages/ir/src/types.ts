@@ -403,6 +403,8 @@ export interface Page {
   /** Input syntax for ERD table definitions; omitted means PostgreSQL. */
   readonly sqlDialect?: "postgresql" | "mysql" | "sqlite";
   readonly connectorRouting?: PageConnectorRouting;
+  /** Absent means shown in presentations. */
+  readonly hiddenInPresentation?: boolean;
   readonly extensions?: Extensions;
 }
 

@@ -228,6 +228,9 @@ function collect(text: string, keepSourceLines = false): Collected {
         ...(known["connectorRouting"] === undefined
           ? {}
           : { connectorRouting: known["connectorRouting"] }),
+        ...(known["hiddenInPresentation"] === undefined
+          ? {}
+          : { hiddenInPresentation: known["hiddenInPresentation"] }),
         ...(known["sqlDialect"] === undefined
           ? {}
           : { sqlDialect: known["sqlDialect"] }),

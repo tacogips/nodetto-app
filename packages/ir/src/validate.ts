@@ -821,6 +821,12 @@ export function validateDocument(
           { optional: true },
         );
       }
+      checkBoolean(
+        out,
+        page["hiddenInPresentation"],
+        `${path}.hiddenInPresentation`,
+        { optional: true },
+      );
       if (page["sqlDialect"] !== undefined) {
         checkEnum(out, page["sqlDialect"], `${path}.sqlDialect`, [
           "postgresql",
