@@ -3,7 +3,7 @@
 - planId: ipd-08-cli-layout-ops
 - planPath: impl-plans/active/ipd-08-cli-layout-ops.md
 - progressPath: impl-plans/progress/ipd-08-cli-layout-ops.md
-- wave: 3. dependsOn: ipd-04-cli-edit-contracts
+- wave: 5. dependsOn: ipd-04-cli-edit-contracts, ipd-07-icon-core-cli (amendment 2026-11-10 round 2: verification-only ordering; see the Amendment section).
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decision 7 (7.1-7.5) and D8.
 - Evidence: `tmp/ipd-s772/ipd-08-cli-layout-ops/`.
 <!-- ownership:start -->
@@ -139,3 +139,54 @@ Verification passes, and the progress log records the test counts and visual not
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - Edit only writePaths.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+
+## Current implementation status
+
+Implemented and visually inspected; the required aggregate verification remains
+open because the shared `ui.icon` default fails the existing registered-type
+test. See `impl-plans/progress/ipd-08-cli-layout-ops.md` for counts, evidence,
+and the required owner repair and rerun. The done criteria are not yet met.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 2, ordering)
+
+Finding S5-R2-IPD08-GATE (mid). The verification aggregate in step 1 includes
+`apps/cli/src/edit`, and therefore `apps/cli/src/edit/label-field.test.ts`
+("all registered types accept their mapped label or report no label"). That
+test creates every type in `ELEMENT_TYPES` from
+`editor.registry.getOrFallback(type).defaultSemantic()`. `ui.icon` is in
+`ELEMENT_TYPES` (ipd-01, accepted), but its core shape with
+`defaultSemantic: () => ({icon: "square"})` is delivered only by
+`ipd-07-icon-core-cli` (`packages/core/src/shapes/ui-icon.ts`). Until then the
+fallback semantic fails `icon.source` validation
+(`packages/ir/src/registry/icons.ts`), and the aggregate exits 1 with
+171 pass / 1 fail.
+
+Decision (one option chosen, no exclude):
+
+- `dependsOn` gains `ipd-07-icon-core-cli` (manifest and this header). The wave
+  moves from 3 to 5. Downstream plans that depend on ipd-08 (ipd-23, ipd-24,
+  ipd-25) already follow ipd-07, so no other plan is delayed.
+- Verification step 1 is unchanged. `apps/cli/src/edit` stays in the
+  aggregate; nothing is excluded, skipped or loosened.
+- writePaths are unchanged and stay disjoint from ipd-07.
+
+Worker instructions for the redispatch:
+
+1. The source edits in `apps/cli/src/edit/operations/layout.ts`,
+   `apps/cli/src/edit/sizing-fields.ts` and `apps/cli/src/layout-ops.test.ts`
+   are already in the working tree. Do not reimplement them. Record their
+   `git hash-object` values first and compare against the hashes in the
+   progress log. Edit them only if verification shows a defect inside these
+   files.
+2. Rerun verification steps 1-3 into `tmp/ipd-s772/ipd-08-cli-layout-ops/final/`
+   and record exit codes and counts. Step 1 must exit 0 with 0 fail.
+3. Reuse the existing visual evidence (`final/layout.png`) unless a source edit
+   was needed in step 1; in that case re-export and re-inspect it.
+4. If `label-field.test.ts` still fails for `ui.icon` after ipd-07 is accepted,
+   record it as a finding with status `owned_elsewhere` (owner ipd-07) and do not
+   edit `label-field.test.ts`, `packages/core/src/shapes/ui-icon.ts` or
+   `packages/ir/src/registry/icons.ts`.
+
+Forbidden: editing or skipping `apps/cli/src/edit/label-field.test.ts`; taking
+ownership of `packages/core/src/shapes/ui-icon.ts` or
+`packages/ir/src/registry/icons.ts`; dropping `apps/cli/src/edit` from step 1.

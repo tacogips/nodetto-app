@@ -134,7 +134,7 @@ New `apps/cli/src/icon-commands.test.ts`, using the existing CLI test helpers fr
 
 ## Verification (evidence in `final/`)
 
-1. `bun test packages/core/src/ui-icon.test.ts apps/cli/src/icon-commands.test.ts apps/cli/src/shapes-command.test.ts apps/cli/src/commands.test.ts apps/cli/src/warnings.test.ts packages/core/src/shape-warnings.test.ts` -> exit 0, 0 fail.
+1. `bun test packages/core/src/ui-icon.test.ts apps/cli/src/icon-commands.test.ts apps/cli/src/shapes-command.test.ts apps/cli/src/commands.test.ts apps/cli/src/warnings.test.ts packages/core/src/shape-warnings.test.ts apps/cli/src/edit/label-field.test.ts` -> exit 0, 0 fail (`label-field.test.ts` added by amendment 2026-11-10 round 2).
 2. `bun run typecheck` -> no `error TS` line in the owned files.
 3. `bunx biome check` on the owned files -> exit 0.
 4. Visual evidence:
@@ -145,6 +145,7 @@ New `apps/cli/src/icon-commands.test.ts`, using the existing CLI test helpers fr
 
 - Verification passes.
 - `rg -n '"ui.icon"' packages/core/src/shapes/index.ts packages/core/src/svg-export/shapes.ts` -> 2 or more matches.
+- `bun test apps/cli/src/edit/label-field.test.ts` -> exit 0, 0 fail: a `ui.icon` created from the core registry `defaultSemantic()` (`{icon: "square"}`) validates.
 
 ## Worker rules
 
@@ -152,3 +153,26 @@ New `apps/cli/src/icon-commands.test.ts`, using the existing CLI test helpers fr
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - `packages/core/src/index.ts` is shared: append export lines only.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 2, ordering)
+
+Finding S5-R2-IPD08-GATE (mid). `apps/cli/src/edit/label-field.test.ts`
+("all registered types accept their mapped label or report no label") fails
+today for `ui.icon`: the core shape registry has no `ui.icon` shape, so
+`getOrFallback("ui.icon").defaultSemantic()` returns a semantic without `icon`
+or `path`, which `packages/ir/src/registry/icons.ts` rejects with
+`icon.source`. This plan's `packages/core/src/shapes/ui-icon.ts`
+(`defaultSemantic: () => ({icon: "square"})`) is the owner fix.
+
+Decision:
+
+- Verification step 1 now includes `apps/cli/src/edit/label-field.test.ts`,
+  expecting exit 0 and 0 fail. A done criterion records that the `ui.icon`
+  default semantic validates.
+- `label-field.test.ts` is run, never edited: it is not in writePaths, and it
+  must not be skipped or loosened. If it still fails, fix the shape in
+  `packages/core/src/shapes/ui-icon.ts` or its registration in
+  `packages/core/src/shapes/index.ts`.
+- `ipd-08-cli-layout-ops` now depends on this plan and reruns its aggregate
+  after this plan is accepted. writePaths of both plans are unchanged and
+  disjoint.

@@ -155,3 +155,7 @@ The engine-size and native-deadline check happens in `ipd-23`/`ipd-24`. It feeds
 - Tests added to `packages/core/src/icons/icons.test.ts`: `brain-circuit` keeps its filled node and its markup contains a filled element with the icon color; a fixture child with `fill="red"` -> the generator rejects it with the icon name.
 - The preliminary `scripts/vendor-lucide.ts` in the working tree is this plan's file; read it fresh and complete it rather than rewriting from scratch.
 - Dependency note: ipd-00-baseline is an accepted dependency; `ipd-02` is accepted, so `packages/core/src/index.ts` already holds its append-only exports, which must survive.
+
+## Implementation status, amendment round 1
+
+Full Lucide 1.70.0 data, license, lookup, markup, notices and regression tests are implemented. The full set is 2,322 icons and 981,957 bytes (SHA-256 `5a90d1994dadfd0c20e05cf2df28c92a0121ac5020475f0afe36da848c3609e3`, after the attempt-3 Biome suppression line); deterministic generation and focused tests pass. Workspace typecheck passes on the final rerun; see the progress log for evidence. Formal review and integration remain downstream.

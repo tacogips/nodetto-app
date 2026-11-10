@@ -22,6 +22,8 @@
   - `packages/ir/src/registry.test.ts`
   - `packages/ir/src/index.ts`
   - `packages/ir/src/ipd-schema.test.ts`
+  - `packages/io/src/jsonl/golden.test.ts`
+  - `packages/io/src/__fixtures__/ui-icon.jsonl`
   - `impl-plans/progress/ipd-01-ir-schema.md`
   - `tmp/ipd-s772/ipd-01-ir-schema`
 - sharedPaths:
@@ -183,6 +185,8 @@ The CLI derives allowed style keys from `VISUAL_STYLE_KEY_ORDER.keys` (`apps/cli
 - `rg -n '"swap-overlay"' packages/ir/src/semantics/connectors.ts` -> 1 match.
 - The progress log has hash records and the evidence table.
 
+Implementation status: done criteria verified on the shared tree; independent review and workflow finalization remain pending. See `impl-plans/progress/ipd-01-ir-schema.md`.
+
 ## Worker rules
 
 - Record `git hash-object` of this plan first.
@@ -197,3 +201,30 @@ The CLI derives allowed style keys from `VISUAL_STYLE_KEY_ORDER.keys` (`apps/cli
 - Decision: `packages/ir/src/registry.test.ts` is added to writePaths. The only permitted edit is to add `ui.icon` to its complete ELEMENT_TYPES expectation, in the registry's ordering. Change nothing else in that file.
 - Test: `bun test packages/ir/src/registry.test.ts` -> exit 0, 0 fail, and the expectation lists `ui.icon` exactly once.
 - Dependency note: ipd-00-baseline is an accepted dependency (its baseline evidence is in `impl-plans/progress/ipd-00-baseline.md`); this plan has no pending dependency and does not redo the baseline.
+
+## Amendment 2026-11-10 (integration-paths-outside-writePaths, round 2)
+
+Second manifest amendment overall. The runtime `checkpointAmendment.amendmentRound` was 0, and the checkpoint was 7c88950. The scope is bounded: this round only assigns the unowned integration path. It changes no IR contract.
+
+- Finding `integration-s775-w1-golden-ui-icon` (mid): this plan registers `ui.icon` in `ELEMENT_TYPES`. `packages/io/src/jsonl/golden.test.ts` "golden file coverage" requires every registered type to appear in some GOLDEN fixture, and it now fails with `missing = ["ui.icon"]`. Reproduced: `bun test packages/io/src/jsonl/golden.test.ts` -> exit 1, 53 pass / 1 fail (log `tmp/ipd-s772/plan-check/amend-s775/golden-before.log`).
+- Decision: add `packages/io/src/jsonl/golden.test.ts` and the new file `packages/io/src/__fixtures__/ui-icon.jsonl` to writePaths. No sharedPaths change.
+- Ordered changes:
+  1. Read `packages/io/src/__fixtures__/ui-controls.jsonl` and use it as the format model: a document record, a page record (`pageKind: "freeform"`), then element records. Create `ui-icon.jsonl` with one document, one page and two `ui.icon` elements. Give one the semantic `{"icon":"bell"}` and the other `{"path":"M0 0L24 24","viewBox":24}`. Each gets a plain `visual` box such as `{"x":20,"y":20,"width":24,"height":24}`. Use generic ids such as `icon-1` through `icon-4`.
+  2. Produce the canonical bytes with a throwaway script under `tmp/ipd-s772/ipd-01-ir-schema/`. The script must run `serializeDocument(parseDocument(draft))` from `packages/io/src/jsonl/` and must not be a `*.test.ts` file. Write that output to the fixture. Confirm that `parseDocumentResult` reports `ok: true` and no errors.
+  3. In `golden.test.ts`, append `"ui-icon"` as the last entry of the `GOLDEN` array. Change nothing else.
+  4. In `impl-plans/progress/ipd-01-ir-schema.md`, record the pre and post `git hash-object` of `golden.test.ts`, the post hash of the new fixture, and the command log.
+- Forbidden:
+  - Do not edit any existing fixture under `packages/io/src/__fixtures__/`.
+  - Do not remove, skip or loosen the coverage assertion, and do not filter `ui.icon` out of `ELEMENT_TYPES`.
+  - Do not change `ui.icon` semantics, key order or the registry order.
+  - Do not touch `apps/cli/src/edit/label-field.test.ts`. Its `ui.icon` failure comes from `defaultSemantic()` in the core shape registry and is owned by ipd-07-icon-core-cli (`packages/core/src/shapes/ui-icon.ts`).
+- Tests:
+  - fixture `ui-icon` -> parses without errors, reserializes byte-for-byte, and round-trips identically.
+  - coverage test -> `missing` equals `[]`.
+- Verification (logs in `tmp/ipd-s772/ipd-01-ir-schema/amend-s775/`):
+  - `bun test packages/io/src/jsonl/golden.test.ts` -> exit 0, 0 fail.
+  - `bun test packages/ir packages/io` -> exit 0, 0 fail.
+  - `bunx biome check packages/io/src/jsonl/golden.test.ts` -> exit 0.
+  - `bun run typecheck` -> exit 0.
+  - `git diff --exit-code -- packages/io/src/__fixtures__` -> exit 0. The new fixture is untracked, so no existing fixture may change.
+- Done: all of the above pass. In `bun test packages apps/cli/src`, the only remaining failure is the ipd-07-owned `label-field.test.ts`.
