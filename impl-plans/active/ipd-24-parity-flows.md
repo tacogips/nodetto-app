@@ -100,3 +100,7 @@ Verification passes, and the progress log has a per-case result table.
 - Read each file fresh before editing it, with pre and post hashes.
 - No state-changing git commands, no emojis. Generic fixtures only.
 - Evidence files must not match Bun test patterns. Builds run in the foreground.
+
+## Amendment 2026-11-10 (operator round 12)
+
+Compare PNG outputs (frame exports and the compare diff image) between Bun and native by decoded content, not encoded bytes. Use the existing `decodeRgbaPng` from `apps/cli/src/native-parity/harness.ts` and assert equal width, height and RGBA pixels with exact equality, so any pixel difference still fails. Encoded PNG bytes may differ because the two encoders compress differently. Text, JSON, SVG and HTML outputs keep their exact or normalized comparisons. Then complete the remaining cases: kit insertion and property cases, the DR-02 lint cases and the remaining comparison assertions. Keep the ipd-24 work already in the working tree and continue from it.

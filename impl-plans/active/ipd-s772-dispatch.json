@@ -151,6 +151,14 @@
       {
         "decision": "2026-11-10 step4 s791: ipd-20-app-lint round-11 ownership bullets are plain paths (scope limit moved to the amendment text); its bun test aggregate adds packages/core/src/kits and apps/cli/src/kit-cli.test.ts as kit regressions, and its typecheck regex and biome arguments include content.ts and kit-content.test.ts. Two composer acceptance criteria were added. Markdown and manifest gate strings are identical. planId, dependsOn, sharedPaths and artifactRoots are unchanged.",
         "rationale": "check-manifest.ts reported 3 problems (2 prose path bullets, 1 md/manifest writePaths mismatch); after the fix it exits 0 with 0 problems."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 12 (session-791 wave 4): ipd-20-app-lint, ipd-22-desktop-export-compare-check, ipd-23-parity-shapes and ipd-25-docs-help are accepted dependencies. ipd-24-parity-flows compares PNG outputs (frame exports and the compare diff image) between Bun and native by decoded content, not encoded bytes: use the existing harness decodeRgbaPng and assert equal width, height and RGBA pixels (exact equality; any pixel difference still fails). Encoded PNG bytes may differ because the two encoders compress differently. Text, JSON, SVG and HTML outputs keep their existing exact or normalized comparisons. ipd-24 then completes its remaining cases (kit insertion and property cases, DR-02 lint cases, remaining comparison assertions). Keep the ipd-24 work already in the working tree and continue from it.",
+        "rationale": "ipd-24 failed only because the single-file compare operation's PNG bytes differ between Bun and native; the two PNG encoders produce different compressed streams for the same image, so a byte assertion is the wrong contract. apps/cli/src/native-parity/harness.ts already provides decodeRgbaPng for this."
+      },
+      {
+        "decision": "Step 5 s794 IPD-R7 (2026-11-10): the plans[ipd-28-finish].verification emoji gate now matches the IPD-R5 markdown gate (ipd-28-finish.md step 7). The single stale `xargs grep -nP ...; test $? -eq 1` entry is replaced by three sh -c entries, in order: (1) ripgrep positive control on U+2705, which must exit 0; (2) build tmp/ipd-s772/ipd-28-finish/final/emoji-files.txt from the union of git diff --name-only f59bef4 and git ls-files -o --exclude-standard, filtered to md/ts/tsx/json/html existing files, then require a non-empty list with no whitespace in paths; (3) refuse an empty or whitespace list (exit 2, because rg with no path arguments would search the working directory), run rg -n --no-messages over the list with stdout and stderr captured in emoji-scan.out and emoji-scan.err, and pass only when rg exits 1 and both files are empty. No other manifest field changed.",
+        "rationale": "Step 5 s794 showed that on darwin BSD grep has no -P: xargs returned 1, so the stale manifest gate exited 0 on a file containing U+2705 and scanned nothing. Round 4 (IPD-R5) fixed only the markdown. Step 4 s794b controls: the new scan entry fails on a known-emoji list and passes on a clean list, and check-manifest.ts now flags grep -P in pending verification and requires emoji gate strings to appear verbatim in the plan markdown."
       }
     ],
     "intentionalTradeoffs": [
@@ -185,126 +193,10 @@
   },
   "plans": [
     {
-      "planId": "ipd-20-app-lint",
-      "planPath": "impl-plans/active/ipd-20-app-lint.md",
-      "progressPath": "impl-plans/progress/ipd-20-app-lint.md",
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/app-design-lint",
-        "apps/cli/src/commands.ts",
-        "apps/cli/src/lint-diagram.ts",
-        "apps/cli/src/app-lint-cli.test.ts",
-        "impl-plans/progress/ipd-20-app-lint.md",
-        "tmp/ipd-s772/ipd-20-app-lint",
-        "packages/core/src/kits/ios/content.ts",
-        "packages/core/src/kits/ios/kit-content.test.ts"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-20-app-lint"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "`rg -c '\"app-' packages/core/src/app-design-lint/index.ts` -> 7 or more.",
-        "Default `ios:composer` (packages/core/src/kits/ios/content.ts): the `input` control height is at least 44 and the component height grows to contain it with the existing 8-point vertical padding (8 + input height + 8); width 390, input width 314, horizontal padding and the 36x36 send button size, icon and x offset are unchanged.",
-        "The `Clean instances` case passes: every IOS_KIT component inserted with defaults into a frame:iphone gives zero findings of any app rule, including app-touch-target for ios:composer; no rule threshold or exclusion was changed to get there."
-      ],
-      "verification": [
-        "bun test packages/core/src/app-design-lint apps/cli/src/app-lint-cli.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/lint-metrics.test.ts packages/core/src/text-layout-lint packages/core/src/kits apps/cli/src/kit-cli.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-20-app-lint/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-20-app-lint/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/core/src/app-design-lint/[^(]*|apps/cli/src/commands\\.ts|apps/cli/src/lint-diagram\\.ts|apps/cli/src/app-lint-cli\\.test\\.ts|packages/core/src/kits/ios/content\\.ts|packages/core/src/kits/ios/kit-content\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/core/src/app-design-lint apps/cli/src/commands.ts apps/cli/src/lint-diagram.ts apps/cli/src/app-lint-cli.test.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/kit-content.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-22-desktop-export-compare-check",
-      "planPath": "impl-plans/active/ipd-22-desktop-export-compare-check.md",
-      "progressPath": "impl-plans/progress/ipd-22-desktop-export-compare-check.md",
-      "dependsOn": [
-        "ipd-20-app-lint"
-      ],
-      "writePaths": [
-        "packages/ui-solid/src/ExportDialog.tsx",
-        "packages/ui-solid/src/ExportDialog.css",
-        "packages/ui-solid/src/compare-dialog.ts",
-        "packages/ui-solid/src/CompareDialog.tsx",
-        "packages/ui-solid/src/AppDesignProblemsPanel.tsx",
-        "packages/ui-solid/src/AppDesignProblemsPanel.css",
-        "packages/ui-solid/src/interaction/context-menu.ts",
-        "packages/ui-solid/src/ContextMenu.tsx",
-        "apps/desktop/src/App.tsx",
-        "packages/ui-solid/src/compare-dialog.test.ts",
-        "packages/ui-solid/src/app-design-panel.test.ts",
-        "packages/ui-solid/src/export-dialog-artboards.test.ts",
-        "impl-plans/progress/ipd-22-desktop-export-compare-check.md",
-        "tmp/ipd-s772/ipd-22-desktop-export-compare-check"
-      ],
-      "sharedPaths": [
-        "packages/ui-solid/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/ui-solid/src/index.ts",
-          "intendedEdit": "append export lines only, and only if needed; re-read before writing; verify sibling lines survive"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-22-desktop-export-compare-check"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes, and the progress log records the visual comparison notes."
-      ],
-      "verification": [
-        "bun test packages/ui-solid/src/compare-dialog.test.ts packages/ui-solid/src/app-design-panel.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts packages/ui-solid/src/raster-export.test.ts packages/ui-solid/src/pdf-export.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts apps/desktop/src/design-workflow.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-22-desktop-export-compare-check/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-22-desktop-export-compare-check/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/ui-solid/src/ExportDialog\\.tsx|packages/ui-solid/src/compare-dialog\\.ts|packages/ui-solid/src/CompareDialog\\.tsx|packages/ui-solid/src/AppDesignProblemsPanel\\.tsx|packages/ui-solid/src/interaction/context-menu\\.ts|packages/ui-solid/src/ContextMenu\\.tsx|apps/desktop/src/App\\.tsx|packages/ui-solid/src/compare-dialog\\.test\\.ts|packages/ui-solid/src/app-design-panel\\.test\\.ts|packages/ui-solid/src/export-dialog-artboards\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/ui-solid/src/ExportDialog.tsx packages/ui-solid/src/ExportDialog.css packages/ui-solid/src/compare-dialog.ts packages/ui-solid/src/CompareDialog.tsx packages/ui-solid/src/AppDesignProblemsPanel.tsx packages/ui-solid/src/AppDesignProblemsPanel.css packages/ui-solid/src/interaction/context-menu.ts packages/ui-solid/src/ContextMenu.tsx apps/desktop/src/App.tsx packages/ui-solid/src/compare-dialog.test.ts packages/ui-solid/src/app-design-panel.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-23-parity-shapes",
-      "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
-      "progressPath": "impl-plans/progress/ipd-23-parity-shapes.md",
-      "dependsOn": [
-        "ipd-20-app-lint"
-      ],
-      "writePaths": [
-        "apps/cli/src/native-parity/app-design-shapes.test.ts",
-        "impl-plans/progress/ipd-23-parity-shapes.md",
-        "tmp/ipd-s772/ipd-23-parity-shapes",
-        "target"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-23-parity-shapes",
-        "target"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "The progress log has the bundle size delta, plus a table of each case with its result."
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
-        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/app-design-shapes.test.ts",
-        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/edit-performance.test.ts apps/cli/src/native-parity/export.test.ts apps/cli/src/mcp-stdio.test.ts",
-        "bunx biome check apps/cli/src/native-parity/app-design-shapes.test.ts"
-      ]
-    },
-    {
       "planId": "ipd-24-parity-flows",
       "planPath": "impl-plans/active/ipd-24-parity-flows.md",
       "progressPath": "impl-plans/progress/ipd-24-parity-flows.md",
-      "dependsOn": [
-        "ipd-20-app-lint",
-        "ipd-23-parity-shapes"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "apps/cli/src/native-parity/app-design-flows.test.ts",
         "impl-plans/progress/ipd-24-parity-flows.md",
@@ -327,43 +219,10 @@
       ]
     },
     {
-      "planId": "ipd-25-docs-help",
-      "planPath": "impl-plans/active/ipd-25-docs-help.md",
-      "progressPath": "impl-plans/progress/ipd-25-docs-help.md",
-      "dependsOn": [
-        "ipd-20-app-lint",
-        "ipd-22-desktop-export-compare-check"
-      ],
-      "writePaths": [
-        "apps/cli/src/help.ts",
-        "docs/cli.md",
-        "docs/design.md",
-        "README.md",
-        "apps/cli/src/help-app-design.test.ts",
-        "impl-plans/progress/ipd-25-docs-help.md",
-        "tmp/ipd-s772/ipd-25-docs-help"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-25-docs-help"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes."
-      ],
-      "verification": [
-        "bun test apps/cli/src/help-app-design.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/help-style-export.test.ts apps/cli/src/help-convert-frame.test.ts apps/cli/src/sequence-self-help.test.ts apps/cli/src/mcp.test.ts",
-        "bunx biome check apps/cli/src/help.ts apps/cli/src/help-app-design.test.ts",
-        "grep -c 'Designing phone apps with the CLI' docs/cli.md"
-      ]
-    },
-    {
       "planId": "ipd-26-example-sample",
       "planPath": "impl-plans/active/ipd-26-example-sample.md",
       "progressPath": "impl-plans/progress/ipd-26-example-sample.md",
       "dependsOn": [
-        "ipd-20-app-lint",
-        "ipd-23-parity-shapes",
         "ipd-24-parity-flows"
       ],
       "writePaths": [
@@ -397,7 +256,6 @@
       "planPath": "impl-plans/active/ipd-27-reproduction.md",
       "progressPath": "impl-plans/progress/ipd-27-reproduction.md",
       "dependsOn": [
-        "ipd-25-docs-help",
         "ipd-26-example-sample"
       ],
       "writePaths": [
@@ -435,7 +293,6 @@
       "planPath": "impl-plans/active/ipd-28-finish.md",
       "progressPath": "impl-plans/progress/ipd-28-finish.md",
       "dependsOn": [
-        "ipd-22-desktop-export-compare-check",
         "ipd-27-reproduction"
       ],
       "writePaths": [
@@ -465,7 +322,9 @@
         "sh -c 'test \"$(git ls-files -o --exclude-standard | grep -c ^tmp/)\" -eq 0'",
         "sh -c '! git grep --untracked -l -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt -- . \":!tmp\"'",
         "test -f THIRD_PARTY_NOTICES.md && test -f packages/core/src/icons/LICENSE-lucide.txt && test -f packages/core/src/text-metrics/LICENSE-liberation-sans.txt",
-        "sh -c '{ git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E \"\\.(md|ts|tsx|json|html)$\" | while read -r f; do test -f \"$f\" && echo \"$f\"; done | xargs grep -nP \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\"; test $? -eq 1'",
+        "sh -c 'printf \"a\\xe2\\x9c\\x85b\\n\" | rg -n \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\"'",
+        "sh -c 'D=tmp/ipd-s772/ipd-28-finish/final; mkdir -p \"$D\" && { git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E \"\\.(md|ts|tsx|json|html)$\" | while read -r f; do test -f \"$f\" && echo \"$f\"; done > \"$D/emoji-files.txt\"; test -s \"$D/emoji-files.txt\" && test \"$(grep -c \"[[:space:]]\" \"$D/emoji-files.txt\")\" -eq 0 && wc -l < \"$D/emoji-files.txt\"'",
+        "sh -c 'D=tmp/ipd-s772/ipd-28-finish/final; L=\"$D/emoji-files.txt\"; test -s \"$L\" && test \"$(grep -c \"[[:space:]]\" \"$L\")\" -eq 0 || exit 2; rg -n --no-messages \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\" $(cat \"$L\") > \"$D/emoji-scan.out\" 2> \"$D/emoji-scan.err\"; rc=$?; echo \"exit=$rc\"; test \"$rc\" -eq 1 && test ! -s \"$D/emoji-scan.out\" && test ! -s \"$D/emoji-scan.err\"'",
         "git diff --exit-code f59bef4 -- bun.lock package.json"
       ]
     }
@@ -614,6 +473,30 @@
       "planPath": "impl-plans/active/ipd-15-kit-content.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted in session-790 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-20-app-lint",
+      "planPath": "impl-plans/active/ipd-20-app-lint.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-22-desktop-export-compare-check",
+      "planPath": "impl-plans/active/ipd-22-desktop-export-compare-check.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-23-parity-shapes",
+      "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-25-docs-help",
+      "planPath": "impl-plans/active/ipd-25-docs-help.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
     }
   ]
 }
