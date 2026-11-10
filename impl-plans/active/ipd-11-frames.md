@@ -27,6 +27,7 @@
   - `packages/ui-solid/src/interaction/pointer.ts`
   - `packages/ui-solid/src/interaction/events.ts`
   - `packages/ui-solid/src/interaction/types.ts`
+  - `apps/cli/src/export-command.test.ts`
 - sharedPaths:
   - `packages/core/src/index.ts`
   - `apps/cli/src/commands.test.ts`
@@ -176,7 +177,7 @@ Imitate `packages/ui-solid/src/interaction-creation.test.ts` helpers.
 
 ## Verification (evidence in `final/`)
 
-1. `bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts` -> exit 0, 0 fail.
+1. `bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts apps/cli/src/export-command.test.ts` -> exit 0, 0 fail.
 2. `bun run typecheck` -> no `error TS` line in the owned files and none in `packages/ui-solid/src/interaction/snapping.ts` (it reads `SnapSettings.gridSize` from the owned `interaction/types.ts`).
 3. `bunx biome check` on the owned files -> exit 0.
 4. Visual evidence: export `final/frames.png` at `--scale 2`, from a page with two iPhone frames and one diagram frame. Check that titles are above device frames and never overlap content.
@@ -206,3 +207,32 @@ Step 5 repair S5-s784-R1 (appended 2026-11-10). Ownership, dependsOn, waves and 
 - `bun run typecheck` -> no `error TS` line in the owned files, and none in `packages/ui-solid/src/interaction/snapping.ts`. `SnapSettings.gridSize?: 4 | 8 | 24` in `packages/ui-solid/src/interaction/types.ts` is byte-identical before and after (record `grep -n 'gridSize' packages/ui-solid/src/interaction/types.ts` before and after editing).
 - The pitfalls added under `## Pitfalls` (reparent only in create/translate gestures; `endBatch`/`abortBatch` exactly once per listed gesture kind; no reparent on cancel; keep `gridSize`) are binding for this amendment.
 - These commands replace the round-6 verification sentence above. Verification item 1 already includes them. No workspace-wide gate is added, because ipd-11 is alone in W1.
+
+## Amendment 2026-11-10 (integration-paths-outside-writePaths, round 7)
+
+Finding `integration-s784-ipd11-export-command-stale-raster-height` (mid). The session-784 reconcile broad suite (`tmp/ipd-s772/reconcile-s784/broad.log`: `bun test packages apps/cli/src` -> 3341 pass, 1 fail) has one new failure versus the ipd-00 baseline (None): `apps/cli/src/export-command.test.ts:318`, test `raster export snaps the frame to whole pixels so the background covers the raster`, expects `475x250 px` and gets `475x267 px`. The shared `fixture()` (`export-command.test.ts:23-26`) creates a frame with `platform: "web"`, so `resolveTitlePlacement` (`packages/core/src/shapes/frame.ts:13`) returns `outside`, and this plan's page export bounds in `svg-export/document.ts` include `frameTitleBox` (`FRAME_OUTSIDE_TITLE_GAP` 6 + `FRAME_OUTSIDE_TITLE_HEIGHT` 16 = 22 units). That is the accepted product behavior (design 6.6 and Accepted output changes row 1). The test expectation is stale, and this plan should have listed it as an affected test.
+
+Decision: `apps/cli/src/export-command.test.ts` is added to this plan's writePaths (one owner; no other pending plan writes it; ipd-13, ipd-16 and ipd-21 only run it and all follow ipd-11 in the DAG). Ownership of every other path, dependsOn, plan IDs and waves are unchanged. Keep the ipd-11 work already in the working tree and continue from it.
+
+Ordered changes:
+
+1. Record `git hash-object apps/cli/src/export-command.test.ts` before editing.
+2. Run `bun test apps/cli/src/export-command.test.ts` and capture the actual values from the captured SVG: the stderr px string, `svgRasterDimensions(captured)`, and the background `<rect>` `x`, `y`, `width`, `height`. Save the log as `tmp/ipd-s772/ipd-11-frames/export-command-before.log`.
+3. In that one test only, update the expected stderr size to the captured one (expected `475x267 px`), update the comments at `:288-289` and `:319-320` to say the outside title adds 22 units of page height (355 units at 0.75 = 266.25 px), set the height bound at `:324` to the new fractional height (for example `> 266.24`), and update the background regex origin (`y`, and `x` if it moved; the old `y="-16"` likely becomes about `-38`) to the captured values. Keep the background height check as `* 0.75 >= 267` (the new rounded height).
+4. Record before/after expectations, the hashes and the log paths in `impl-plans/progress/ipd-11-frames.md`; save the after log as `tmp/ipd-s772/ipd-11-frames/export-command-after.log`.
+
+Pitfalls (binding):
+
+- Do not change product code to make the test pass: outside-title bounds are the accepted design.
+- Do not weaken, skip or delete the snap assertions: `Math.ceil(width * 0.75) === 475`, the width bound `> 474.99`, the height bound just below the new fractional height, and the background reaching the last pixel in both axes must all remain with equal strength.
+- Do not change the shared `fixture()` (for example to `titlePlacement: "inside"`); other tests in the file depend on it. Do not edit any other test in the file, and do not edit `apps/cli/src/export-command.ts` (owned by ipd-13, ipd-16, ipd-21).
+- The round-6 lifecycle, batching and `SnapSettings.gridSize` invariants stay untouched; `packages/ui-solid/src/interaction/lifecycle.ts` and `packages/ui-solid/src/frame-parent-interaction.test.ts` must keep their accepted review-r1 hashes (`1690e2b3`, `3b416da5`).
+
+Verification (in addition to items 1-4 above; item 1 now includes `apps/cli/src/export-command.test.ts`):
+
+- `bun test apps/cli/src/export-command.test.ts` -> exit 0, 8 pass, 0 fail.
+- Verification item 1 aggregate (19 files) -> exit 0, 0 fail; record counts and log path.
+- `bun test packages apps/cli/src` -> exit 0, 0 fail (no new failures versus the ipd-00 baseline, which lists none); log `tmp/ipd-s772/ipd-11-frames/broad-r7.log`.
+- `bun run typecheck` -> no `error TS` line.
+- `bunx biome check apps/cli/src/export-command.test.ts` plus the owned files -> exit 0.
+- `git diff -U0 apps/cli/src/export-command.test.ts` touches only lines inside the raster-snap test.

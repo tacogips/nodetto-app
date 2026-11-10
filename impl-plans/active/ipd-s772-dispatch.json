@@ -123,6 +123,10 @@
       {
         "decision": "Step 4 rerun 2026-11-10 (session-784, Step 5 repair S5-s784-R1): ownership, dependsOn and waves are unchanged. ipd-11-frames round-6 verification now also runs interaction-dragging-camera, interaction-rotate-resize, interaction-connectors, interaction-keyboard-menus, interaction-selection-snapping and snap-grid-size tests (with insertion-parent, frame-parent-interaction and interaction-creation) -> 0 fail. The typecheck gate also covers packages/ui-solid/src/interaction/snapping.ts, and SnapSettings.gridSize (ipd-29) stays unchanged. New binding pitfalls: reparent only in create/translate gestures; endBatch/abortBatch exactly once per gesture kind listed in finishGesture/cancelGesture; cancelGesture never reparents.",
         "rationale": "Round 6 gave ipd-11 the shared gesture lifecycle and interaction/types.ts without widening its regression and typecheck scope. A batching regression in resize, rotate, routing or nudge undo, or the loss of the accepted ipd-29 grid size, would otherwise pass ipd-11 and surface only at ipd-28."
+      },
+      {
+        "decision": "2026-11-10 checkpoint amendment round 7 (integration-paths-outside-writePaths, session-784): ipd-11-frames owns apps/cli/src/export-command.test.ts and updates only the raster-snap test ('raster export snaps the frame to whole pixels so the background covers the raster') expectations and comments to the accepted outside-title page bounds (design 6.6, Accepted output changes row 1): stderr '475x267 px', height bound just below 266.25 px, background rect origin and height from the captured SVG. The shared fixture(), other tests, product code and apps/cli/src/export-command.ts stay unchanged; snap assertions keep equal strength. ipd-11 verification step 1 adds apps/cli/src/export-command.test.ts, plus a broad bun test packages apps/cli/src gate (0 fail). Ownership of other paths, dependsOn, plan IDs and waves W1-W9 are unchanged.",
+        "rationale": "Finding integration-s784-ipd11-export-command-stale-raster-height (mid): the fixture frame has platform 'web', so its title resolves outside and ipd-11's page export bounds add 22 units of height (475x250 -> 475x267 px). The product behavior is the accepted design; the test expectation is stale and was owned by no plan, while ipd-13, ipd-16 and ipd-21 run it as a 0-fail gate and the ipd-28 broad gate depends on it. Same precedent as round 5 (interaction-creation.test.ts)."
       }
     ],
     "intentionalTradeoffs": [
@@ -180,7 +184,8 @@
         "packages/ui-solid/src/interaction/lifecycle.ts",
         "packages/ui-solid/src/interaction/pointer.ts",
         "packages/ui-solid/src/interaction/events.ts",
-        "packages/ui-solid/src/interaction/types.ts"
+        "packages/ui-solid/src/interaction/types.ts",
+        "apps/cli/src/export-command.test.ts"
       ],
       "sharedPaths": [
         "packages/core/src/index.ts",
@@ -203,9 +208,10 @@
         "Verification passes, and the progress log records the before/after drop behavior."
       ],
       "verification": [
-        "bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts",
+        "bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts apps/cli/src/export-command.test.ts",
         "bun run typecheck (no error TS in the owned files or in packages/ui-solid/src/interaction/snapping.ts; SnapSettings.gridSize in packages/ui-solid/src/interaction/types.ts unchanged)",
-        "bunx biome check"
+        "bunx biome check",
+        "bun test apps/cli/src/export-command.test.ts (exit 0, 0 fail) and bun test packages apps/cli/src (exit 0, 0 fail; no new failures versus the ipd-00 baseline)"
       ]
     },
     {
