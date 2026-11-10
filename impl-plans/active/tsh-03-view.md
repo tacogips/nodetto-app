@@ -13,7 +13,7 @@
   - `packages/ui-solid/src/shapes/table-sheet-view-model.ts` (new)
   - `packages/ui-solid/src/table-sheet-view.test.ts` (new)
   - `impl-plans/progress/tsh-03-view.md`
-  - `tmp/tsh-s778/tsh-03-view`
+  - `tmp/tsh-s780/tsh-03-view`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -96,6 +96,6 @@ Static checks (tsh-00; must exit 0, but they are not test commands):
 
 - `TableSheetView` is exported with the pinned signature, and the view
   model is tested.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s778/tsh-03-view/final/`.
+- Verifications 1-4 exited 0, with logs under `tmp/tsh-s780/tsh-03-view/final/`.
 - `grep -n -- "--app-\|prefers-color-scheme\|nodetto-canvas-dark" packages/ui-solid/src/shapes/TableSheetView.css`
   prints nothing. Record the grep exit status 1 in the progress log.

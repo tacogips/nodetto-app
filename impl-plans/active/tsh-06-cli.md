@@ -16,7 +16,7 @@
   - `apps/cli/src/edit/operation-fields.ts`
   - `apps/cli/src/edit/operation-fields.test.ts`
   - `impl-plans/progress/tsh-06-cli.md`
-  - `tmp/tsh-s778/tsh-06-cli`
+  - `tmp/tsh-s780/tsh-06-cli`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -171,6 +171,6 @@ Static checks (tsh-00; must exit 0, but they are not test commands):
 
 - `tableCommand`, `TABLE_HELP` and `setCells` are exported, and
   `set-cells` is dispatched in `batch.ts`.
-- Verifications 1-2 exited 0, and both static checks exited 0, with logs under `tmp/tsh-s778/tsh-06-cli/final/`.
+- Verifications 1-2 exited 0, and both static checks exited 0, with logs under `tmp/tsh-s780/tsh-06-cli/final/`.
 - `commands.ts`, `help.ts` and `types-command.ts` are untouched by this
   plan, and the progress log is complete.

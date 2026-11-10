@@ -21,7 +21,7 @@
   - `packages/core/src/table-sheet/index.ts` (new)
   - `packages/core/src/index.ts` (one line only)
   - `impl-plans/progress/tsh-01a-ir.md`
-  - `tmp/tsh-s778/tsh-01a-ir`
+  - `tmp/tsh-s780/tsh-01a-ir`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -96,7 +96,7 @@ Starting state at `87365fb`:
    - `headerRow: false` and `striped: true`
    Produce the canonical bytes by running
    `serializeDocument(parseDocument(text))` once in a scratch script under
-   `tmp/tsh-s778/tsh-01a-ir/`. Imitate the other fixtures for
+   `tmp/tsh-s780/tsh-01a-ir/`. Imitate the other fixtures for
    document/page records.
 7. `golden.test.ts`: append `"table-sheet"` to `GOLDEN`.
 8. `jsonl/table-sheet.test.ts`: the tests below.
@@ -141,7 +141,7 @@ Starting state at `87365fb`:
   - `validateDocument` gives no errors and no `semantic.unknownField`
   - cell keys written in reverse order -> canonical sorted output
 
-## Verification (each exits 0 and shows at least 1 test with 0 failures; logs under `tmp/tsh-s778/tsh-01a-ir/final/`)
+## Verification (each exits 0 and shows at least 1 test with 0 failures; logs under `tmp/tsh-s780/tsh-01a-ir/final/`)
 
 1. `bun test ./packages/ir/src/registry/table.test.ts ./packages/ir/src/registry.test.ts ./packages/ir/src/registry/erd.test.ts` -> `ir.log`
 2. `bun test ./packages/io/src/jsonl/table-sheet.test.ts ./packages/io/src/jsonl/golden.test.ts` -> `io.log`

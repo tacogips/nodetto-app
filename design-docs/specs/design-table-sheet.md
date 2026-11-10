@@ -722,4 +722,31 @@ These were open in the intake. They are recorded in
 - Edit result codes (`table.limit`, `table.cellType`, `table.lastColumn`,
   `table.unknownRow`, `table.unknownColumn`) are return values of the core
   edit functions. They are not new validation codes.
-- Evidence root for this run: `tmp/tsh-s778/<planId>/`.
+- Evidence root for this run: `tmp/tsh-s780/<planId>/` (renamed from
+  `tmp/tsh-s778` in session 780 so it matches the active taskId).
+
+## 15. Continuation (session 780)
+
+- The design, section 11 split and plans committed at `fc2ef3b` are reused
+  unchanged. Run 778 failed at dispatch only: every entry of
+  `impl-plans/active/tsh-s778-dispatch.json` lacked `acceptanceCriteria`.
+- The `Column N` rule is already pinned in section 6, in
+  `impl-plans/active/tsh-00-overview.md` and in its owning plan
+  `tsh-01d-values` (`columns.ts`, `grid.ts`). `tsh-01c-edits` explicitly
+  does not own `insertColumn`, naming or paste. No plan edit is needed.
+- Dispatch contract for this run: exactly one active manifest,
+  `impl-plans/active/tsh-s780-dispatch.json`, with the 13 plans of
+  section 11 (`tsh-01a`..`tsh-01d` wave 1, `tsh-02`..`tsh-07` wave 2,
+  `tsh-08-wiring` wave 3). Every entry has `planId`, `planPath`,
+  `progressPath`, `wave`, `dependsOn` (the section 11 "Depends on"
+  column), `writePaths`, `sharedPaths`, `verification`,
+  `artifactRoots: ["target"]` and a non-empty `acceptanceCriteria` array of
+  non-empty strings copied from that plan's `## Done criteria` section.
+  The field shape follows `tsh-s776-dispatch.json`.
+  `tsh-s778-dispatch.json` is deleted in the same checkpoint. The
+  superseded stubs `tsh-01-model` and `tsh-04-cell-editing` stay on disk
+  and are not dispatched.
+- The evidence root is `tmp/tsh-s780/<planId>/`. It matches the manifest
+  `evidenceRoot` `tmp/tsh-s780` for taskId `tsh-s780`. The plans' former
+  `tmp/tsh-s778` log path was renamed mechanically at the checkpoint. It is
+  a log directory name only and does not change scope.

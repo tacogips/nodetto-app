@@ -15,7 +15,7 @@
   - `packages/core/src/table-sheet/shape.ts` (new)
   - `packages/core/src/table-sheet/shape.test.ts` (new)
   - `impl-plans/progress/tsh-01b-layout.md`
-  - `tmp/tsh-s778/tsh-01b-layout`
+  - `tmp/tsh-s780/tsh-01b-layout`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -127,7 +127,7 @@ Parity between canvas and export depends on both sides reading only
   - the default ids are c1..c3 and r1..r3; two calls return distinct
     objects
 
-## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s778/tsh-01b-layout/final/`)
+## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s780/tsh-01b-layout/final/`)
 
 1. `bun test ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts` -> `layout.log`
 

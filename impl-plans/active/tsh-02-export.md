@@ -11,7 +11,7 @@
   - `packages/core/src/svg-export/table-sheet.ts` (new)
   - `packages/core/src/svg-export/table-sheet.test.ts` (new)
   - `impl-plans/progress/tsh-02-export.md`
-  - `tmp/tsh-s778/tsh-02-export`
+  - `tmp/tsh-s780/tsh-02-export`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -118,6 +118,6 @@ Static checks (tsh-00; must exit 0, but they are not test commands):
 ## Done criteria
 
 - `renderTableSheet` is exported with the pinned signature.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s778/tsh-02-export/final/`.
+- Verifications 1-4 exited 0, with logs under `tmp/tsh-s780/tsh-02-export/final/`.
 - `svg-export/shapes.ts` is untouched by this plan, and the progress log is
   complete.

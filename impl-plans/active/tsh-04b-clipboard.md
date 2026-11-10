@@ -11,7 +11,7 @@
   - `packages/ui-solid/src/table-sheet/clipboard.ts` (new)
   - `packages/ui-solid/src/table-sheet/clipboard.test.ts` (new)
   - `impl-plans/progress/tsh-04b-clipboard.md`
-  - `tmp/tsh-s778/tsh-04b-clipboard`
+  - `tmp/tsh-s780/tsh-04b-clipboard`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -81,7 +81,7 @@ Create the table with `editor.createElement("table.sheet", { semantic, visual: {
 - A rejecting `readText` -> null and no change.
 - A rejecting `writeText` on cut -> false and no change.
 
-## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s778/tsh-04b-clipboard/final/`)
+## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s780/tsh-04b-clipboard/final/`)
 
 1. `bun test ./packages/ui-solid/src/table-sheet/clipboard.test.ts` -> `clipboard.log`
 

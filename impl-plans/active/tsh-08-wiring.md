@@ -35,7 +35,7 @@
   - `docs/cli.md`
   - `docs/editing.md`
   - `impl-plans/progress/tsh-08-wiring.md`
-  - `tmp/tsh-s778/tsh-08-wiring`
+  - `tmp/tsh-s780/tsh-08-wiring`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -206,7 +206,7 @@ Producers of the interaction modules, all under
   6. `types table.sheet` mentions `columns`
   7. `draw doc table.sheet` creates a 3x3 table
 
-## Verification (each exit 0; test commands show at least 1 test, 0 fail; logs under `tmp/tsh-s778/tsh-08-wiring/final/`)
+## Verification (each exit 0; test commands show at least 1 test, 0 fail; logs under `tmp/tsh-s780/tsh-08-wiring/final/`)
 
 1. `bun test ./packages/core/src/table-sheet-export.test.ts ./packages/core/src/shape-catalogue.test.ts ./packages/core/src/svg-export/table-sheet.test.ts ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts` -> `core.log`
 2. `bun test ./packages/ui-solid/src/table-sheet-wiring.test.ts ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts ./packages/ui-solid/src/table-sheet/clipboard.test.ts ./packages/ui-solid/src/table-sheet/resize.test.ts ./packages/ui-solid/src/table-sheet-view.test.ts ./packages/ui-solid/src/inspector/table-sheet-section.test.ts ./packages/ui-solid/src/Toolbar.test.ts ./packages/ui-solid/src/shape-search.test.ts ./packages/ui-solid/src/interaction-keyboard-menus.test.ts` -> `ui.log`

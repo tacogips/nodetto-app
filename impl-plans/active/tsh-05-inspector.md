@@ -12,7 +12,7 @@
   - `packages/ui-solid/src/inspector/table-sheet-section.ts` (new)
   - `packages/ui-solid/src/inspector/table-sheet-section.test.ts` (new)
   - `impl-plans/progress/tsh-05-inspector.md`
-  - `tmp/tsh-s778/tsh-05-inspector`
+  - `tmp/tsh-s780/tsh-05-inspector`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -107,6 +107,6 @@ Static checks (tsh-00; must exit 0, but they are not test commands):
 ## Done criteria
 
 - `TableSheetSection` is exported with the pinned props.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s778/tsh-05-inspector/final/`.
+- Verifications 1-4 exited 0, with logs under `tmp/tsh-s780/tsh-05-inspector/final/`.
 - `Inspector.tsx` is unchanged by this plan, and the progress log is
   complete.

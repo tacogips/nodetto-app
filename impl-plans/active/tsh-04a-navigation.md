@@ -19,7 +19,7 @@
   - `packages/ui-solid/src/table-sheet/SelectionOverlay.tsx` (new)
   - `packages/ui-solid/src/table-sheet/TableSheet.css` (new)
   - `impl-plans/progress/tsh-04a-navigation.md`
-  - `tmp/tsh-s778/tsh-04a-navigation`
+  - `tmp/tsh-s780/tsh-04a-navigation`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -163,7 +163,7 @@ and select it.
   - unchanged text -> no history entry
   - initial text of `"alpha\nbeta"` -> `"alpha\nbeta"`
 
-## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s778/tsh-04a-navigation/final/`)
+## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s780/tsh-04a-navigation/final/`)
 
 1. `bun test ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts` -> `navigation.log`
 

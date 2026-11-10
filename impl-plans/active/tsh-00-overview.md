@@ -11,7 +11,7 @@
   `./semantics/table.ts`, and `packages/ir/src/index.ts` re-exports the
   section 2 symbols. That makes the committed IR contract importable from
   `@nodetto/ir` before wave 1 starts.
-- Evidence root: `tmp/tsh-s778/<planId>/`. Progress log:
+- Evidence root: `tmp/tsh-s780/<planId>/`. Progress log:
   `impl-plans/progress/<planId>.md`. Do not push, merge or bump versions.
 - This overview is not dispatched and has no write paths.
 - Superseded plans: `tsh-01-model` and `tsh-04-cell-editing`. Never
@@ -227,7 +227,7 @@ Wave-2 exports that tsh-08 consumes:
     are shared, so plans must list their own files.
 - Confirm that each log names only the expected files and shows 1 or more
   passing tests with 0 failing.
-- Write each command's full output to `tmp/tsh-s778/<planId>/final/<name>.log`.
+- Write each command's full output to `tmp/tsh-s780/<planId>/final/<name>.log`.
   Record the exit status and the pass, fail and skip counts in the progress
   log. Before repeating a run, move `final/` to `attempt-<n>/`. An incomplete
   log is not a passing check.

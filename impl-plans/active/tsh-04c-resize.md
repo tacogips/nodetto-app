@@ -11,7 +11,7 @@
   - `packages/ui-solid/src/table-sheet/resize.ts` (new)
   - `packages/ui-solid/src/table-sheet/resize.test.ts` (new)
   - `impl-plans/progress/tsh-04c-resize.md`
-  - `tmp/tsh-s778/tsh-04c-resize`
+  - `tmp/tsh-s780/tsh-04c-resize`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -78,7 +78,7 @@ export function resetColumnWidth(editor: Editor, elementId: ElementId, columnId:
 - A drag far below the minimum -> 24.
 - `resetColumnWidth` on c1 -> 120 and true. A second call -> false.
 
-## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s778/tsh-04c-resize/final/`)
+## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s780/tsh-04c-resize/final/`)
 
 1. `bun test ./packages/ui-solid/src/table-sheet/resize.test.ts` -> `resize.log`
 

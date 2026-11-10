@@ -13,7 +13,7 @@
   - `docs/import-export.md`
   - `apps/cli/src/table-docs.test.ts` (new)
   - `impl-plans/progress/tsh-07-docs.md`
-  - `tmp/tsh-s778/tsh-07-docs`
+  - `tmp/tsh-s780/tsh-07-docs`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -105,6 +105,6 @@ Static checks (tsh-00; must exit 0, but they are not test commands):
 ## Done criteria
 
 - The three docs are updated, and the drift test passes.
-- Logs are under `tmp/tsh-s778/tsh-07-docs/final/`, with the progress log
+- Logs are under `tmp/tsh-s780/tsh-07-docs/final/`, with the progress log
   complete.
 - `git diff --stat -- docs/` lists only the three files.

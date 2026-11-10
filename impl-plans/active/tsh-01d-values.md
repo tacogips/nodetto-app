@@ -17,7 +17,7 @@
   - `packages/core/src/table-sheet/grid.ts` (new)
   - `packages/core/src/table-sheet/grid.test.ts` (new)
   - `impl-plans/progress/tsh-01d-values.md`
-  - `tmp/tsh-s778/tsh-01d-values`
+  - `tmp/tsh-s780/tsh-01d-values`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -172,7 +172,7 @@ The clipboard must copy STORED values exactly. A text cell
     row 1 and column `Qty`
   - ids are `c1..`/`r1..`
 
-## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s778/tsh-01d-values/final/`)
+## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s780/tsh-01d-values/final/`)
 
 1. `bun test ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts` -> `values.log`
 

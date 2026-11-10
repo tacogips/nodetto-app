@@ -18,7 +18,7 @@
   - `packages/core/src/table-sheet/delimited.ts` (new)
   - `packages/core/src/table-sheet/delimited.test.ts` (new)
   - `impl-plans/progress/tsh-01c-edits.md`
-  - `tmp/tsh-s778/tsh-01c-edits`
+  - `tmp/tsh-s780/tsh-01c-edits`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -156,7 +156,7 @@ files.
     parses correctly
   - a ragged CSV is returned ragged
 
-## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s778/tsh-01c-edits/final/`)
+## Verification (exits 0 and shows at least 1 test with 0 failures; log under `tmp/tsh-s780/tsh-01c-edits/final/`)
 
 1. `bun test ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts` -> `edits.log`
 
