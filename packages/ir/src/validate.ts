@@ -739,6 +739,38 @@ function validateElement(
   );
 }
 
+function validateSlideFields(
+  out: ValidationIssue[],
+  value: unknown,
+  path: string,
+  keys: readonly string[],
+  min: number,
+  max: number,
+  code: string,
+): void {
+  if (value === undefined || !checkObject(out, value, path)) return;
+  for (const key of keys) {
+    const number = value[key];
+    if (
+      typeof number !== "number" ||
+      !Number.isFinite(number) ||
+      number < min ||
+      number > max
+    )
+      out.push(
+        error(
+          code,
+          `${path}.${key}`,
+          `expected a finite number from ${min} to ${max}`,
+        ),
+      );
+  }
+  for (const key of Object.keys(value)) {
+    if (!keys.includes(key))
+      out.push(error("type.unknown", `${path}.${key}`, "unknown field"));
+  }
+}
+
 export interface ValidateOptions {
   /**
    * Report references to element ids that are absent from the document.
@@ -769,6 +801,16 @@ export function validateDocument(
   });
   checkString(out, root["id"], "id");
   checkString(out, root["title"], "title", { allowEmpty: true });
+
+  validateSlideFields(
+    out,
+    root["slideSize"],
+    "slideSize",
+    ["width", "height"],
+    1,
+    100000,
+    "range.slideSize",
+  );
 
   const pageIds = new Set<string>();
   const pages = asArray(root["pages"]);
@@ -826,6 +868,15 @@ export function validateDocument(
         page["hiddenInPresentation"],
         `${path}.hiddenInPresentation`,
         { optional: true },
+      );
+      validateSlideFields(
+        out,
+        page["slideOrigin"],
+        `${path}.slideOrigin`,
+        ["x", "y"],
+        -1000000,
+        1000000,
+        "range.slideOrigin",
       );
       if (page["sqlDialect"] !== undefined) {
         checkEnum(out, page["sqlDialect"], `${path}.sqlDialect`, [

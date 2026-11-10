@@ -27,6 +27,8 @@ import {
   type PageId,
   type PageKind,
   type PageMode,
+  type SlideSize,
+  type SlideOrigin,
   type ValidationIssue,
   type Visual,
   validateAccessibilityMetadata,
@@ -49,7 +51,29 @@ function validPageRouting(value: unknown): boolean {
   );
 }
 
+function validSlideFields(
+  value: unknown,
+  keys: readonly string[],
+  min: number,
+  max: number,
+): boolean {
+  return (
+    isPlainObject(value) &&
+    Object.keys(value).length === keys.length &&
+    keys.every((key) => {
+      const n = value[key];
+      return (
+        typeof n === "number" && Number.isFinite(n) && n >= min && n <= max
+      );
+    })
+  );
+}
+
 export type Command =
+  | {
+      readonly type: "updateDocument";
+      readonly document: { readonly slideSize?: SlideSize | null };
+    }
   | { readonly type: "createElement"; readonly element: Element }
   | { readonly type: "deleteElements"; readonly ids: readonly ElementId[] }
   | {
@@ -101,6 +125,7 @@ export type Command =
         readonly sqlDialect?: Page["sqlDialect"] | null;
         readonly connectorRouting?: Page["connectorRouting"] | null;
         readonly hiddenInPresentation?: boolean | null;
+        readonly slideOrigin?: SlideOrigin | null;
         readonly order?: FractionalIndex | null;
       };
     }
@@ -480,6 +505,8 @@ export function applyCommands(
     }
     return materialized;
   };
+  let meta = store.getMeta();
+  let metaChanged = false;
   const pages = new Map<PageId, Page>();
   for (const page of store.listPages()) {
     pages.set(page.id, page);
@@ -714,6 +741,33 @@ export function applyCommands(
         });
         break;
       }
+      case "updateDocument": {
+        const size = command.document.slideSize;
+        if (
+          size != null &&
+          !validSlideFields(size, ["width", "height"], 1, 100000)
+        )
+          fail(
+            [
+              error(
+                "range.slideSize",
+                "document.slideSize",
+                "invalid slide size",
+              ),
+            ],
+            "updateDocument: invalid slide size",
+          );
+        if (size !== undefined) {
+          undo.unshift({
+            type: "updateDocument",
+            document: { slideSize: meta.slideSize ?? null },
+          });
+          const { slideSize: _oldSlideSize, ...base } = meta;
+          meta = size === null ? base : { ...base, slideSize: size };
+        }
+        metaChanged = true;
+        break;
+      }
       case "createPage": {
         const issues = validateNewPage(pages, command.page);
         if (hasErrors(issues)) {
@@ -812,7 +866,22 @@ export function applyCommands(
             ],
             "updatePage: invalid hiddenInPresentation",
           );
+        if (
+          patch.slideOrigin != null &&
+          !validSlideFields(patch.slideOrigin, ["x", "y"], -1000000, 1000000)
+        )
+          fail(
+            [
+              error(
+                "range.slideOrigin",
+                "page.slideOrigin",
+                "invalid slide origin",
+              ),
+            ],
+            "updatePage: invalid slide origin",
+          );
         const {
+          slideOrigin: _oldSlideOrigin,
           hiddenInPresentation: _oldHiddenInPresentation,
           connectorRouting: _oldConnectorRouting,
           mode: _oldPageMode,
@@ -844,6 +913,13 @@ export function applyCommands(
               : previous.hiddenInPresentation === undefined
                 ? {}
                 : { hiddenInPresentation: previous.hiddenInPresentation }),
+          ...(patch.slideOrigin === null
+            ? {}
+            : patch.slideOrigin !== undefined
+              ? { slideOrigin: patch.slideOrigin }
+              : previous.slideOrigin === undefined
+                ? {}
+                : { slideOrigin: previous.slideOrigin }),
           ...(patch.sqlDialect === null
             ? {}
             : patch.sqlDialect !== undefined
@@ -883,6 +959,9 @@ export function applyCommands(
               : {
                   hiddenInPresentation: previous.hiddenInPresentation ?? null,
                 }),
+            ...(patch.slideOrigin === undefined
+              ? {}
+              : { slideOrigin: previous.slideOrigin ?? null }),
             tokenMode: previous.tokenMode ?? null,
             sqlDialect: previous.sqlDialect ?? null,
             connectorRouting: previous.connectorRouting ?? null,
@@ -1007,6 +1086,7 @@ export function applyCommands(
   }
 
   store.commit({
+    ...(metaChanged ? { meta } : {}),
     insert,
     update,
     remove: [...removed],

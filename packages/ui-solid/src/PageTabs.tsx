@@ -42,6 +42,7 @@ import {
 export interface PageTabsProps {
   readonly editor: Editor;
   readonly placement?: "top" | "bottom";
+  readonly onCopyShapesFrom?: (targetId: PageId) => void;
 }
 
 const reducedMotion = (): boolean =>
@@ -649,6 +650,21 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
                       >
                         Duplicate
                       </button>
+                      <Show when={props.onCopyShapesFrom}>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          tabindex="-1"
+                          class="nodetto-menu-item"
+                          disabled={readOnly() || pages().length <= 1}
+                          onClick={() => {
+                            props.onCopyShapesFrom?.(id);
+                            setMenuFor(null);
+                          }}
+                        >
+                          Copy shapes from page...
+                        </button>
+                      </Show>
                       <button
                         type="button"
                         role="menuitem"

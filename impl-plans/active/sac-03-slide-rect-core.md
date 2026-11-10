@@ -118,3 +118,7 @@ Static: `bunx biome check` on the owned files.
   is empty.
 - The progress log has the intent hash, per-edit hashes and the exit
   statuses.
+
+## Implementation status
+
+- Assigned source and tests implemented; focused tests, typecheck and owned-file Biome check passed on the shared tree. Formal review and final integration remain downstream.

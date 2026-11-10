@@ -23,6 +23,7 @@ export const DOCUMENT_RECORD_KEYS: readonly string[] = [
   "schemaVersion",
   "id",
   "title",
+  "slideSize",
 ];
 
 /**
@@ -40,6 +41,7 @@ export const PAGE_RECORD_KEYS: readonly string[] = [
   "sqlDialect",
   "connectorRouting",
   "hiddenInPresentation",
+  "slideOrigin",
 ];
 
 export const ELEMENT_RECORD_KEYS: readonly string[] = [
@@ -55,9 +57,13 @@ export const ELEMENT_RECORD_KEYS: readonly string[] = [
 
 export const DOCUMENT_RECORD_ORDER: KeyOrder = {
   keys: DOCUMENT_RECORD_KEYS,
+  children: { slideSize: { keys: ["width", "height"] } },
 };
 
-export const PAGE_RECORD_ORDER: KeyOrder = { keys: PAGE_RECORD_KEYS };
+export const PAGE_RECORD_ORDER: KeyOrder = {
+  keys: PAGE_RECORD_KEYS,
+  children: { slideOrigin: { keys: ["x", "y"] } },
+};
 
 /** Element order with the semantic payload order spliced in per type. */
 export function elementRecordOrder(semantic?: KeyOrder): KeyOrder {

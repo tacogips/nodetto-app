@@ -17,6 +17,7 @@ import {
   type Extensions,
   type Page,
   type PageId,
+  type SlideSize,
   SCHEMA_VERSION,
   type UnknownRecord,
 } from "@nodetto/ir";
@@ -36,12 +37,14 @@ export interface DocumentMeta {
   readonly schemaVersion: number;
   readonly id: DocId;
   readonly title: string;
+  readonly slideSize?: SlideSize;
   readonly extensions?: Extensions;
   readonly unknownRecords?: readonly UnknownRecord[];
 }
 
 /** One commit's worth of element and page changes, already validated. */
 export interface StoreCommit {
+  readonly meta?: DocumentMeta;
   readonly insert?: readonly Element[];
   readonly update?: readonly Element[];
   readonly remove?: readonly ElementId[];
@@ -162,6 +165,9 @@ export class Store {
       schemaVersion: document.schemaVersion,
       id: document.id,
       title: document.title,
+      ...(document.slideSize === undefined
+        ? {}
+        : { slideSize: document.slideSize }),
       extensions: document.extensions,
       unknownRecords: document.unknownRecords,
     };
@@ -191,6 +197,10 @@ export class Store {
     const updated: ElementId[] = [];
     const removed: ElementId[] = [];
     let pagesChanged = false;
+    if (commit.meta !== undefined) {
+      this.meta = commit.meta;
+      pagesChanged = true;
+    }
     // Invalidate before mutation/notification, including moves between pages.
     for (const element of [
       ...(commit.insert ?? []),
@@ -263,6 +273,9 @@ export class Store {
       schemaVersion: this.meta.schemaVersion,
       id: this.meta.id,
       title: this.meta.title,
+      ...(this.meta.slideSize === undefined
+        ? {}
+        : { slideSize: this.meta.slideSize }),
       pages,
       elements,
       ...(this.meta.unknownRecords
@@ -287,6 +300,9 @@ export class Store {
       schemaVersion: this.meta.schemaVersion,
       id: this.meta.id,
       title: this.meta.title,
+      ...(this.meta.slideSize === undefined
+        ? {}
+        : { slideSize: this.meta.slideSize }),
       pages: this.listPages(),
       elements,
       ...(this.meta.unknownRecords

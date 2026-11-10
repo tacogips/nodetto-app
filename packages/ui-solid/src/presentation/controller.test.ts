@@ -100,3 +100,21 @@ test("reconciles hidden pages and renders inherited hidden frame fallback", () =
   expect(controller.state()?.slides).toEqual(["p3"]);
   expect(controller.counterText()).toBe("1 / 1");
 });
+
+test("slide size updates invalidate the presentation cache", () => {
+  const editor = makeEditor({ document: document([rect], pages) });
+  const controller = createPresentationController({
+    editor,
+    from: "p1",
+    onExit: () => {},
+  });
+  const before = controller.slide().size;
+  editor.apply([
+    {
+      type: "updateDocument",
+      document: { slideSize: { width: 1920, height: 1080 } },
+    },
+  ]);
+  expect(controller.slide().size).toEqual({ width: 1920, height: 1080 });
+  expect(controller.slide().size).not.toEqual(before);
+});

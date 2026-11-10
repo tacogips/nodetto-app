@@ -390,6 +390,16 @@ export interface PageConnectorRouting {
   readonly routingAvoidObstacles?: boolean;
 }
 
+export interface SlideSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface SlideOrigin {
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface Page {
   readonly id: PageId;
   readonly name: string;
@@ -405,6 +415,7 @@ export interface Page {
   readonly connectorRouting?: PageConnectorRouting;
   /** Absent means shown in presentations. */
   readonly hiddenInPresentation?: boolean;
+  readonly slideOrigin?: SlideOrigin;
   readonly extensions?: Extensions;
 }
 
@@ -440,6 +451,8 @@ export interface UnknownRecord {
  * back-reference, so the in-memory document owns a flat `elements` list.
  */
 export interface Document {
+  /** Absent means there is no explicit slide size. */
+  readonly slideSize?: SlideSize;
   readonly schemaVersion: number;
   readonly id: DocId;
   readonly title: string;

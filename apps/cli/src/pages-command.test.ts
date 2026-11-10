@@ -244,3 +244,88 @@ test("edit points element operations given a page id to the page operations", ()
   expect(result.stderr).toContain("is a page, not an element");
   expect(result.stderr).toContain("move-page");
 });
+
+test("pages copy-shapes copies references and handles no-write cases", () => {
+  const source = new Editor();
+  const a = source.store.listPages()[0];
+  if (!a) throw new Error("missing initial page");
+  source.renamePage(a.id, "A");
+  const first = source.createElement("shape.geo", {
+    semantic: { geo: "rect" },
+    visual: { x: 10, y: 20 },
+  });
+  const second = source.createElement("shape.geo", {
+    semantic: { geo: "rect" },
+    visual: { x: 30, y: 40 },
+  });
+  source.createElement("edge.generic", {
+    semantic: { from: first, to: second },
+  });
+  const b = source.createPage({ name: "B" });
+  source.createElement("shape.geo", { semantic: { geo: "rect" } });
+  source.createPage({ name: "C" });
+  let saved = serializeDocument(source.getSnapshot());
+  let writes = 0;
+  const io: CommandIo = {
+    readText: () => saved,
+    writeText: (_path, value) => {
+      writes++;
+      saved = value;
+    },
+  };
+  const run = (...args: string[]) =>
+    runCli(["pages", "copy-shapes", "doc.jsonl", ...args], io, "test");
+  const dry = run(
+    "--from",
+    "prev",
+    "--to",
+    "B",
+    "--dry-run",
+    "--format",
+    "json",
+  );
+  expect(dry.exitCode).toBe(0);
+  expect(JSON.parse(dry.stdout)).toMatchObject({
+    written: false,
+    copied: expect.any(Array),
+  });
+  expect(JSON.parse(dry.stdout).copied).toHaveLength(3);
+  expect(writes).toBe(0);
+  for (const [from, to, message] of [
+    ["prev", "A", "has no previous page"],
+    ["next", "C", "has no next page"],
+    ["B", "B", "same page"],
+  ]) {
+    const result = run("--from", from!, "--to", to!);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain(message!);
+    expect(result.stderr).toContain("Nothing was written.");
+    expect(writes).toBe(0);
+  }
+  const empty = run("--from", "C", "--to", "A");
+  expect(empty.exitCode).toBe(0);
+  expect(empty.stdout).toContain("Copied 0 elements");
+  expect(writes).toBe(0);
+  const result = run("--from", "prev", "--to", "B", "--format", "json");
+  expect(result.exitCode).toBe(0);
+  expect(writes).toBe(1);
+  const copied: string[] = JSON.parse(result.stdout).copied;
+  const doc = parseDocument(saved);
+  expect(doc.elements.filter((element) => element.page === b)).toHaveLength(4);
+  expect(copied).toHaveLength(3);
+  expect(
+    copied.every(
+      (id) =>
+        !source.getSnapshot().elements.some((element) => element.id === id),
+    ),
+  ).toBe(true);
+  const copiedElements = copied.map((id) =>
+    doc.elements.find((element) => element.id === id),
+  );
+  expect(copiedElements[0]?.visual).toEqual(source.store.get(first)?.visual);
+  expect(copiedElements[1]?.visual).toEqual(source.store.get(second)?.visual);
+  expect(copiedElements[2]?.semantic).toEqual({
+    from: copied[0],
+    to: copied[1],
+  });
+});

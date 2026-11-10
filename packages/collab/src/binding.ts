@@ -43,6 +43,7 @@ import {
   PAGES_KEY,
   pageFromY,
   pageToY,
+  toY,
   ydocToIr,
 } from "./ydoc.ts";
 
@@ -77,6 +78,7 @@ export class CollabBinding {
    * still the same object as the store's is known unchanged without a diff.
    */
   private readonly pageShadow = new Map<PageId, Page>();
+  private metaSlideShadow: string | undefined;
   private readonly undoListeners = new Set<() => void>();
 
   private unsubscribeStore: (() => void) | null = null;
@@ -255,6 +257,9 @@ export class CollabBinding {
   }
 
   private resetShadow(): void {
+    this.metaSlideShadow = JSON.stringify(
+      this.editor.store.getMeta().slideSize,
+    );
     this.shadow.clear();
     for (const element of this.editor.store.listElements()) {
       this.shadow.set(element.id, element);
@@ -293,6 +298,7 @@ export class CollabBinding {
         if (diff.pagesChanged) {
           // Pages first: a peer integrates a transaction's structs in write
           // order, so a new page lands before the first element placed on it.
+          this.syncMeta();
           this.syncPages();
         }
         for (const id of diff.added) {
@@ -335,6 +341,15 @@ export class CollabBinding {
         captureColors(records, before, after);
       this.colorUndo.set(item, records);
     }
+  }
+
+  private syncMeta(): void {
+    const value = this.editor.store.getMeta().slideSize;
+    const shadow = JSON.stringify(value);
+    if (shadow === this.metaSlideShadow) return;
+    if (value === undefined) this.meta.delete("slideSize");
+    else this.meta.set("slideSize", toY(value));
+    this.metaSlideShadow = shadow;
   }
 
   /**

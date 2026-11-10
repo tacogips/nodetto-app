@@ -7,6 +7,7 @@ import {
 import {
   planDuplicatePage,
   planNewPage,
+  planPageElementsCopy,
   planPageMove,
 } from "../../editor/pages.ts";
 import type { ApplyOptions, CreatePageOptions } from "../../editor/types.ts";
@@ -237,6 +238,39 @@ export class PageEditing extends SelectionEditing {
     this.apply(plan.commands, applyOptions);
     this.setCurrentPage(plan.page.id);
     return plan.page.id;
+  }
+
+  /** Return the adjacent page in tab order, including hidden pages. */
+  adjacentPageId(id: PageId, direction: "prev" | "next"): PageId | null {
+    const pages = this.store.listPages();
+    const index = pages.findIndex((page) => page.id === id);
+    if (index < 0) return null;
+    return pages[index + (direction === "prev" ? -1 : 1)]?.id ?? null;
+  }
+
+  /** Copy all elements to another page in one undoable operation. */
+  copyPageElements(
+    fromPageId: PageId,
+    toPageId: PageId,
+    applyOptions: ApplyOptions = {},
+  ): ElementId[] | null {
+    if (
+      fromPageId === toPageId ||
+      !this.store.getPage(fromPageId) ||
+      !this.store.getPage(toPageId)
+    )
+      return null;
+    if (this.store.getPageElements(fromPageId).length === 0) return [];
+    const plan = planPageElementsCopy(
+      this,
+      this.idSource,
+      fromPageId,
+      toPageId,
+    );
+    this.apply(plan.commands, applyOptions);
+    if (this.currentPageId !== toPageId) this.setCurrentPage(toPageId);
+    this.selection.set(plan.ids);
+    return [...plan.ids];
   }
 
   // ---------------------------------------------------------------- camera

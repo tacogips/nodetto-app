@@ -180,3 +180,7 @@ Static: `bunx biome check` on owned files only.
   union and the case.
 - The progress log has the intent hash, the per-edit hashes and every
   command's exit status.
+
+## Implementation status
+
+- Assigned implementation and focused verification complete; logs and per-edit evidence are in `tmp/sac-s826/sac-01-slide-data/`. Formal review and stable integration verification remain downstream.

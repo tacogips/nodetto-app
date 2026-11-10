@@ -8,7 +8,7 @@ import {
   type PageId,
   SCHEMA_VERSION,
 } from "@nodetto/ir";
-import { copyElements, planPaste } from "../clipboard.ts";
+import { copyElements, planPaste, type PastePlan } from "../clipboard.ts";
 import type { Command } from "../commands.ts";
 import type { EditorCore } from "./facade/core.ts";
 import type { Rng } from "../fractional.ts";
@@ -87,6 +87,25 @@ export function planPageMove(
   ];
 }
 
+/** Plan a same-position copy of all elements from one page onto another. */
+export function planPageElementsCopy(
+  editor: EditorCore,
+  idSource: IdSource,
+  fromPageId: PageId,
+  toPageId: PageId,
+): PastePlan {
+  const payload = copyElements(
+    editor.store,
+    editor.store.getPageElements(fromPageId).map((element) => element.id),
+  );
+  return planPaste(payload, {
+    page: toPageId,
+    idSource,
+    nextIndex: () => editor.nextIndex(toPageId),
+    offset: { x: 0, y: 0 },
+  });
+}
+
 /**
  * A copy of page `id`, placed right after it, with everything on it pasted
  * across through the clipboard path (ids remapped). `null` for unknown ids.
@@ -117,20 +136,12 @@ export function planDuplicatePage(
     ...(source.hiddenInPresentation === true
       ? { hiddenInPresentation: true }
       : {}),
+    ...(source.slideOrigin ? { slideOrigin: { ...source.slideOrigin } } : {}),
     ...(source.connectorRouting
       ? { connectorRouting: source.connectorRouting }
       : {}),
   };
-  const payload = copyElements(
-    editor.store,
-    editor.store.getPageElements(id).map((element) => element.id),
-  );
-  const plan = planPaste(payload, {
-    page: page.id,
-    idSource,
-    nextIndex: () => editor.nextIndex(page.id),
-    offset: { x: 0, y: 0 },
-  });
+  const plan = planPageElementsCopy(editor, idSource, id, page.id);
   return {
     page,
     commands: [

@@ -213,6 +213,8 @@ export {
   PAGE_MODES,
   type Page,
   type PageConnectorRouting,
+  type SlideSize,
+  type SlideOrigin,
   pageModeOf,
   type PageId,
   type PageKind,

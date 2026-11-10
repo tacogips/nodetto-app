@@ -75,6 +75,7 @@ import { GRID_SPACING, isConnector } from "./canvas/geometry.ts";
 import { createImageDrop, ImageDropStatus } from "./canvas/image-drop.tsx";
 import { listenForNavigationKeys } from "./canvas/navigation-keys.ts";
 import { createOverlayTargets } from "./canvas/overlay-targets.ts";
+import { SlideAreaOverlay } from "./canvas/SlideAreaOverlay.tsx";
 import { SelectionOutlines } from "./canvas/SelectionOutlines.tsx";
 import { TransformHandles } from "./canvas/TransformHandles.tsx";
 import { createVisualUnitRenderer } from "./canvas/visual-units.tsx";
@@ -94,6 +95,8 @@ export interface NodettoCanvasProps {
   readonly snap: SnapSettings;
   /** False hides the dotted background. */
   readonly showGrid: boolean;
+  /** Omitted means automatic visibility based on slide size. */
+  readonly showSlideArea?: boolean;
   readonly showRulers?: boolean;
   /** Resolved light/dark canvas per page kind; omitted keeps every page light. */
   readonly canvasBackground?: CanvasBackgroundSetting;
@@ -383,6 +386,12 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
 
         <svg class="nodetto-layer nodetto-overlay-layer">
           <title>Selection</title>
+          <SlideAreaOverlay
+            editor={props.editor}
+            revision={signals.rev}
+            zoom={cameraZoom}
+            show={() => props.showSlideArea}
+          />
           <Show when={isBreadboardPage()}>
             <BreadboardOverlay
               editor={props.editor}

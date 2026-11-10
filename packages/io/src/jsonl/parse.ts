@@ -231,6 +231,9 @@ function collect(text: string, keepSourceLines = false): Collected {
         ...(known["hiddenInPresentation"] === undefined
           ? {}
           : { hiddenInPresentation: known["hiddenInPresentation"] }),
+        ...(known["slideOrigin"] === undefined
+          ? {}
+          : { slideOrigin: known["slideOrigin"] }),
         ...(known["sqlDialect"] === undefined
           ? {}
           : { sqlDialect: known["sqlDialect"] }),
@@ -308,6 +311,8 @@ function buildSnapshot(collected: Collected): DocumentSnapshot | undefined {
     pages: collected.pages,
     elements: collected.elements,
   };
+  if (known["slideSize"] !== undefined)
+    snapshot["slideSize"] = known["slideSize"];
   if (collected.unknownRecords.length > 0) {
     snapshot["unknownRecords"] = collected.unknownRecords;
   }

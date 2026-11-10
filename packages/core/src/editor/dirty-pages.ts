@@ -49,6 +49,7 @@ export function dirtyPages(
   const changed: Element[] = [];
   for (const command of commands) {
     if (
+      command.type === "updateDocument" ||
       command.type === "createPage" ||
       command.type === "updatePage" ||
       command.type === "deletePage"

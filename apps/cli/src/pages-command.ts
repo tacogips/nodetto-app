@@ -13,12 +13,15 @@ import {
   parseArgs,
 } from "./commands.ts";
 import { helpFor } from "./help.ts";
+import { pagesCopyShapesCommand } from "./pages-copy-shapes.ts";
 
 /** List page identities without rendering or traversing diagram contents. */
 export function pagesCommand(
   io: CommandIo,
   args: readonly string[],
 ): CommandResult {
+  if (args[0] === "copy-shapes")
+    return pagesCopyShapesCommand(io, args.slice(1));
   const parsed = parseArgs(args, new Set(["--format", "--kind"]), new Set());
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("pages")}`);

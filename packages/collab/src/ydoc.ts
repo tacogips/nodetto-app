@@ -97,6 +97,9 @@ export function pageFields(page: Page): Record<string, unknown> {
     ...(page.hiddenInPresentation === undefined
       ? {}
       : { hiddenInPresentation: page.hiddenInPresentation }),
+    ...(page.slideOrigin === undefined
+      ? {}
+      : { slideOrigin: page.slideOrigin }),
     ...(page.tokenMode === undefined ? {} : { tokenMode: page.tokenMode }),
     ...(page.order === undefined ? {} : { order: page.order }),
     ...(page.extensions === undefined ? {} : { extensions: page.extensions }),
@@ -171,6 +174,7 @@ export function applyIrToDoc(
       meta.set("schemaVersion", document.schemaVersion);
       meta.set("id", document.id);
       meta.set("title", document.title);
+      setOptional(meta, "slideSize", document.slideSize);
       setOptional(meta, "extensions", document.extensions);
       if (document.unknownRecords && document.unknownRecords.length > 0) {
         meta.set("unknownRecords", unknownRecordsToY(document.unknownRecords));
@@ -237,6 +241,13 @@ export function pageFromY(id: PageId, value: unknown): Page {
       : {}),
     ...(typeof record.hiddenInPresentation === "boolean"
       ? { hiddenInPresentation: record.hiddenInPresentation }
+      : {}),
+    ...(isPlainObject(record.slideOrigin) &&
+    typeof record.slideOrigin.x === "number" &&
+    Number.isFinite(record.slideOrigin.x) &&
+    typeof record.slideOrigin.y === "number" &&
+    Number.isFinite(record.slideOrigin.y)
+      ? { slideOrigin: { x: record.slideOrigin.x, y: record.slideOrigin.y } }
       : {}),
     ...(typeof record.tokenMode === "string"
       ? { tokenMode: record.tokenMode }
@@ -309,6 +320,7 @@ export function ydocToIr(doc: Y.Doc): Document {
     : [];
 
   const extensions = fromY(meta.get("extensions"));
+  const slideSize = fromY(meta.get("slideSize"));
 
   return {
     schemaVersion: Number(meta.get("schemaVersion") ?? 1),
@@ -316,6 +328,15 @@ export function ydocToIr(doc: Y.Doc): Document {
     title: String(meta.get("title") ?? ""),
     pages,
     elements,
+    ...(isPlainObject(slideSize) &&
+    typeof slideSize.width === "number" &&
+    Number.isFinite(slideSize.width) &&
+    slideSize.width > 0 &&
+    typeof slideSize.height === "number" &&
+    Number.isFinite(slideSize.height) &&
+    slideSize.height > 0
+      ? { slideSize: { width: slideSize.width, height: slideSize.height } }
+      : {}),
     ...(unknownRecords.length > 0 ? { unknownRecords } : {}),
     ...(isPlainObject(extensions) ? { extensions } : {}),
   };

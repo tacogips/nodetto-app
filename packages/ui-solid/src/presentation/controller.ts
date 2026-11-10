@@ -3,6 +3,7 @@ import {
   currentSlide,
   fitSlide,
   reducePresentation,
+  resolveSlideRect,
   slideCounter,
   slideList,
   slideSource,
@@ -71,17 +72,38 @@ export function createPresentationController({
     const page = currentSlide(state);
     if (cache?.page === page && cache.revision === editor.revision)
       return cache.result;
-    const source = slideSource(editor.store, editor.registry, page);
-    const svg =
-      (source.kind === "artboard"
-        ? editor.exportArtboardSvg(source.frameId)
-        : null) ?? editor.exportPageSvgOf(page, { padding: 0 });
-    const result = {
-      src: svg
-        ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-        : null,
-      size: svg ? svgSize(svg) : null,
-    };
+    const slideSize = editor.store.getMeta().slideSize;
+    let result: { src: string | null; size: SlideSize | null };
+    if (slideSize) {
+      const rect = resolveSlideRect(editor.store, editor.registry, page, {
+        slideSize,
+        slideOrigin: editor.store.getPage(page)?.slideOrigin,
+      });
+      if (!rect) throw new Error("Explicit slide rect is missing");
+      const { x, y, width, height } = rect;
+      const svg =
+        editor.store.getPageElements(page).length === 0
+          ? null
+          : editor.exportPageSvgOf(page, { viewport: { x, y, width, height } });
+      result = {
+        src: svg
+          ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+          : null,
+        size: { width, height },
+      };
+    } else {
+      const source = slideSource(editor.store, editor.registry, page);
+      const svg =
+        (source.kind === "artboard"
+          ? editor.exportArtboardSvg(source.frameId)
+          : null) ?? editor.exportPageSvgOf(page, { padding: 0 });
+      result = {
+        src: svg
+          ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+          : null,
+        size: svg ? svgSize(svg) : null,
+      };
+    }
     cache = { page, revision: editor.revision, result };
     return result;
   }
