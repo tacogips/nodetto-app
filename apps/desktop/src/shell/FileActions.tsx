@@ -18,6 +18,8 @@ export interface FileActionsProps {
   readonly onExport: () => void;
   readonly onPresent: (from: "first" | "current") => void;
   readonly presentDisabled: boolean;
+  readonly copyShapesDisabled: boolean;
+  readonly onCopyShapes: () => void;
   readonly onSave: () => void;
   readonly onSaveAs: () => void;
   readonly onOpenRecent: (path: string) => void;
@@ -127,6 +129,14 @@ export function FileActions(props: FileActionsProps): JSX.Element {
               title="Present from current page (Shift+F5)"
             >
               Present from current page
+            </button>
+            <button
+              type="button"
+              class="app-file-button"
+              disabled={props.copyShapesDisabled}
+              onClick={() => props.onCopyShapes()}
+            >
+              Copy shapes from page...
             </button>
             <select
               class="app-recent-select"

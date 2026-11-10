@@ -33,6 +33,7 @@ test("explicit slide uses exact viewport and fit", () => {
   const controller = controllerFor(editor);
   expect(controller.slide().size).toEqual(size);
   const svg = decodeURIComponent(controller.slide().src ?? "");
+  expect(svg).not.toContain("nodetto-slide-area");
   expect(svg).toContain('viewBox="100 -50 1920 1080"');
   expect(svg).toContain('width="1920"');
   expect(svg).toContain('height="1080"');
@@ -50,6 +51,9 @@ test("empty explicit slide keeps size", () => {
 });
 test("unset slide uses original content export", () => {
   const editor = makeEditor({ document: document([shape("a", 10)], [page]) });
+  expect(
+    decodeURIComponent(controllerFor(editor).slide().src ?? ""),
+  ).not.toContain("nodetto-slide-area");
   const svg = editor.exportPageSvgOf("p1", { padding: 0 });
   expect(controllerFor(editor).slide()).toEqual({
     src: svg

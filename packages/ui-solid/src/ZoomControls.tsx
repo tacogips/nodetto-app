@@ -27,6 +27,8 @@ export interface ZoomControlsProps {
   readonly context: ActionContext;
   readonly snap: SnapSettings;
   readonly showGrid: boolean;
+  readonly showSlideArea?: boolean;
+  readonly onShowSlideAreaChange?: (show: boolean) => void;
   readonly showRulers?: boolean;
   readonly onShowRulersChange?: (show: boolean) => void;
   readonly onSnapChange: (snap: SnapSettings) => void;
@@ -212,6 +214,14 @@ export function ZoomControls(props: ZoomControlsProps): JSX.Element {
             () => props.showGrid,
             () => props.onShowGridChange(!props.showGrid),
           )}
+          <Show when={props.onShowSlideAreaChange}>
+            {toggle(
+              "Slide area",
+              "Show slide area",
+              () => props.showSlideArea === true,
+              () => props.onShowSlideAreaChange?.(!props.showSlideArea),
+            )}
+          </Show>
           {toggle(
             "Snap",
             "Snap to other objects (hold Cmd/Ctrl to bypass)",

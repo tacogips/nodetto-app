@@ -28,7 +28,9 @@ associations.
   data, paste TSV from spreadsheets, and build tables from CSV/TSV with the
   CLI. See [Spreadsheet tables](docs/editing.md#spreadsheet-tables).
 - **Presentation**: present pages full screen as a slideshow in tab order
-  (F5, or Shift+F5 from the current page), and hide pages from it. See
+  (F5, or Shift+F5 from the current page), hide pages, set a slide size and
+  show its slide area while editing. Copy shapes from another page to build
+  the next slide. See
   [Presentation](docs/editing.md#presentation).
 - **Import and export**: Mermaid, draw.io, D2, BPMN XML, SVG, PNG, PDF and
   static websites. See [Import and export](docs/import-export.md).

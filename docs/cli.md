@@ -222,6 +222,16 @@ in scripts. Each page remembers the editing mode (tool palette) last chosen on
 it; `{"op":"set-page-mode","id":"<page>","mode":"usecase"}` changes it and
 `add-page` accepts `"mode"`.
 
+### Copy shapes from a page
+
+`nodetto-cli pages copy-shapes <doc.jsonl> --from <page|prev|next> --to <page> [--dry-run] [--format text|json]`
+
+copies shapes onto the target page. Page arguments accept IDs or exact names;
+`prev` and `next` select the neighbor relative to the target and take precedence
+over page names. `--dry-run` previews without writing, and `--format` selects
+text or JSON. Errors include the message "Nothing was written." An empty source
+also writes nothing.
+
 Every CLI `--page` option and edit page reference accepts a short ID, full ID,
 or exact name. A document with several pages requires `--page` unless
 `--element` identifies the owning page. Ambiguous aliases or names require a

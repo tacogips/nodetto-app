@@ -500,3 +500,19 @@ session-359 final verification.
 | [bpmn-13-core-integration-tests](completed/bpmn-13-core-integration-tests.md) | Cross-package fixture tests |
 | [bpmn-14-docs](completed/bpmn-14-docs.md) | README and `docs/bpmn/` |
 | [bpmn-15-desktop](completed/bpmn-15-desktop.md) | Desktop menus, `.bpmn` open, dialog filter, file association |
+
+## Slide area and copy shapes (sac-s826 / sac-s830)
+
+Slide sizing, editing overlay and copying shapes between pages. Verification logs: `tmp/sac-s830/sac-08-wiring/final/`. Dispatch manifests remain in `active/`; the archive node moves the plans.
+
+| Plan | Scope |
+| --- | --- |
+| [sac-00-overview](completed/sac-00-overview.md) | overview |
+| [sac-01-slide-data](completed/sac-01-slide-data.md) | slide data |
+| [sac-02-copy-shapes-core](completed/sac-02-copy-shapes-core.md) | copy shapes core |
+| [sac-03-slide-rect-core](completed/sac-03-slide-rect-core.md) | slide rect core |
+| [sac-04-slide-collab-duplicate](completed/sac-04-slide-collab-duplicate.md) | slide collab duplicate |
+| [sac-05-cli-copy-shapes](completed/sac-05-cli-copy-shapes.md) | cli copy shapes |
+| [sac-06-slide-area-overlay](completed/sac-06-slide-area-overlay.md) | slide area overlay |
+| [sac-07-settings-and-picker-ui](completed/sac-07-settings-and-picker-ui.md) | settings and picker ui |
+| [sac-08-wiring](completed/sac-08-wiring.md) | wiring |

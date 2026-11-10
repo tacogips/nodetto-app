@@ -34,6 +34,8 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ExportDialog,
+  CopyShapesDialog,
+  effectiveShowSlideArea,
   Icon,
   type ActionContext,
   ContextMenu,
@@ -234,6 +236,16 @@ export function App(props: AppProps): JSX.Element {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [snap, setSnap] = createSignal<SnapSettings>(preferences.snap);
   const [showGrid, setShowGrid] = createSignal(preferences.showGrid);
+  const [showSlideArea, setShowSlideArea] = createSignal(
+    preferences.showSlideArea,
+  );
+  const effectiveSlideArea = () => {
+    editorSignals.rev();
+    return effectiveShowSlideArea(
+      showSlideArea(),
+      props.editor.store.getMeta().slideSize,
+    );
+  };
   const [showRulers, setShowRulers] = createSignal(preferences.showRulers);
   const changeShowRulers = setShowRulers;
   const [viewport, setViewport] = createSignal({ width: 0, height: 0 });
@@ -260,6 +272,9 @@ export function App(props: AppProps): JSX.Element {
     storeEditorPreferences(
       {
         showGrid: showGrid(),
+        ...(showSlideArea() === undefined
+          ? {}
+          : { showSlideArea: showSlideArea() }),
         showRulers: showRulers(),
         leftPaneOpen: panes.leftPaneOpen(),
         rightPaneOpen: panes.rightPaneOpen(),
@@ -506,6 +521,19 @@ export function App(props: AppProps): JSX.Element {
     onCleanup(stop);
   });
 
+  const [copyShapesTarget, setCopyShapesTarget] = createSignal<PageId | null>(
+    null,
+  );
+  const openCopyShapes = (target: PageId) => {
+    if (fileMenu) fileMenu.open = false;
+    setCloudPanelExpanded(false);
+    setContextMenu(null);
+    setCopyShapesTarget(target);
+  };
+  const copyShapesDisabled = () => {
+    editorSignals.rev();
+    return props.editor.readOnly || props.editor.store.listPages().length < 2;
+  };
   const [presenting, setPresenting] = createSignal(false);
   const [presentFrom, setPresentFrom] = createSignal<PageId | null>(null);
   const presentDisabled = () => {
@@ -745,6 +773,8 @@ export function App(props: AppProps): JSX.Element {
             onExport={openExport}
             onPresent={startPresentation}
             presentDisabled={presentDisabled()}
+            copyShapesDisabled={copyShapesDisabled()}
+            onCopyShapes={() => openCopyShapes(props.editor.currentPageId)}
             onSave={() => void props.session.save()}
             onSaveAs={() => void props.session.saveAs()}
             onOpenRecent={openRecent}
@@ -853,6 +883,7 @@ export function App(props: AppProps): JSX.Element {
               onCommentPlace={placeComment}
               snap={snap()}
               showGrid={showGrid()}
+              showSlideArea={showSlideArea()}
               showRulers={showRulers()}
               onEditRequest={(id, region) => {
                 if (region === "title" || region === "body") {
@@ -919,7 +950,11 @@ export function App(props: AppProps): JSX.Element {
             </Show>
           </div>
           <div class="app-viewer-footer" style={panes.viewerMargins()}>
-            <PageTabs editor={props.editor} placement="bottom" />
+            <PageTabs
+              editor={props.editor}
+              placement="bottom"
+              onCopyShapesFrom={openCopyShapes}
+            />
             <ZoomControls
               context={actionContext()}
               snap={snap()}
@@ -927,6 +962,10 @@ export function App(props: AppProps): JSX.Element {
               showRulers={showRulers()}
               onSnapChange={setSnap}
               onShowGridChange={setShowGrid}
+              showSlideArea={effectiveSlideArea()}
+              onShowSlideAreaChange={() =>
+                setShowSlideArea(!effectiveSlideArea())
+              }
               onShowRulersChange={changeShowRulers}
             />
           </div>
@@ -962,6 +1001,15 @@ export function App(props: AppProps): JSX.Element {
           </Show>
         </SidePane>
       </div>
+      <Show when={copyShapesTarget()}>
+        {(target) => (
+          <CopyShapesDialog
+            editor={props.editor}
+            targetId={target()}
+            onClose={() => setCopyShapesTarget(null)}
+          />
+        )}
+      </Show>
       <Show when={presenting()}>
         <PresentationView
           editor={props.editor}

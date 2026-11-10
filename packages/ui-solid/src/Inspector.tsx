@@ -1,3 +1,4 @@
+import { PresentationSection } from "./inspector/PresentationSection.tsx";
 import { UiControlSection } from "./inspector/UiControlSection.tsx";
 import { DATABASE_OBJECT_LABELS, isDatabaseObjectType } from "@nodetto/ir";
 import { DatabaseObjectSection } from "./inspector/DatabaseObjectSection.tsx";
@@ -420,7 +421,10 @@ export function Inspector(props: InspectorProps): JSX.Element {
           <Show when={selectedIds().length === 0}>
             <Show when={page()}>
               {(current) => (
-                <PageSection editor={props.editor} page={current()} />
+                <>
+                  <PageSection editor={props.editor} page={current()} />
+                  <PresentationSection editor={props.editor} page={current()} />
+                </>
               )}
             </Show>
           </Show>

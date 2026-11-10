@@ -10,6 +10,7 @@ Usage: nodetto-cli <command> [options]
 Look at a document
   nodetto-cli open <file>         Open a file in the desktop app
   nodetto-cli pages <doc>         List page numbers, short IDs, names and kinds
+  nodetto-cli pages copy-shapes  Copy shapes between pages
   nodetto-cli inspect <doc>       Compact outline (or JSON) of pages and elements
   nodetto-cli types [<type>]      Element types and the fields each one takes
   nodetto-cli validate <doc>      Check that a document parses and is valid
@@ -36,7 +37,6 @@ Convert and check
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
   nodetto-cli authorize [folder]  Grant project-folder access for the Store CLI
-
 Global --quiet suppresses warning lines.
 
 Run "nodetto-cli help <command>" or "nodetto-cli <command> --help" for details.
@@ -99,6 +99,11 @@ Example:
 ${EXIT_CODES}`,
 
   pages: `Usage: nodetto-cli pages <doc.jsonl> [--format text|json] [--kind <page kind>]
+       nodetto-cli pages copy-shapes <doc.jsonl> --from <page|prev|next> --to <page> [--dry-run] [--format text|json]
+
+Copy shapes to the target page. --from and --to accept page IDs or names;
+prev and next select the source adjacent to --to and take precedence over names.
+--dry-run previews without writing; --format selects text or JSON output.
 
 List pages in display order, including page number, stable short ID, full ID,
 name, diagram kind and editing mode. The number is a current display position,
@@ -123,6 +128,7 @@ changes only the display name; names are the human-facing key for --page and
 Examples:
   nodetto-cli pages mixed.jsonl
   nodetto-cli pages mixed.jsonl --kind erd --format json
+  nodetto-cli pages copy-shapes mixed.jsonl --from prev --to "Page 2"
   nodetto-cli export mixed.jsonl --page <short-id> --format pdf --output schema.pdf
 
 ${EXIT_CODES}`,

@@ -212,8 +212,9 @@ table/class heights remain derived. Unsupported resize selections show a reason.
 Use Present (header button or File menu) or F5 to start from the first slide;
 use Present from current page or Shift+F5 to start at the current page. The
 shortcuts do not fire while typing in a text field. Each slide is one page in
-tab order, shown read-only and fitted to the screen: a page with exactly one
-visible frame shows that frame, otherwise its content bounds. Use the page tab menu's
+tab order, shown read-only and fitted to the screen. With no explicit slide
+size, a page with exactly one visible frame shows that frame, otherwise its
+content bounds. Use the page tab menu's
 Hide/Show in presentation action or the inspector's Show in presentation switch
 to skip a page. Starting on a hidden page begins at the next shown page. When
 every page is hidden, Present is disabled.
@@ -229,6 +230,28 @@ Move the pointer to reveal the automatically hiding control bar with previous,
 next, counter (`n / total`) and exit controls. The presentation uses fullscreen
 when available (the desktop window in the app) and otherwise fills the
 application window. Leaving browser fullscreen also ends the presentation.
+
+### Slide size
+
+With no selection, use the Presentation inspector to choose None (fit content),
+16:9 (1920 x 1080), 4:3 (1024 x 768), 16:10 (1920 x 1200), A4 landscape
+(1123 x 794), or a custom width and height. An explicit size clips presentation
+content outside the slide. Set the current page's slide origin X and Y in the
+inspector, or reset it to (0, 0).
+
+### Slide area
+
+The Slide area view toggle shows a dashed outline and slide number, or a
+Hidden from presentation label. An explicit slide size also dims the outside.
+By default the overlay is on when a slide size is set; the toggle overrides
+that preference. The overlay is never exported or shown in presentation.
+
+### Copy shapes from page
+
+Choose Copy shapes from page... from the page tab menu or File controls.
+Previous page is the default when available; choose another source if needed.
+Shapes are copied at the same coordinates on top of existing content, selected,
+and can be removed in one undo step.
 
 ## Page navigation
 

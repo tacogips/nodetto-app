@@ -144,3 +144,7 @@ export { Icon } from "./Icon.tsx";
 export { Switch } from "./Switch.tsx";
 
 export * from "./presentation/index.ts";
+
+export { CopyShapesDialog } from "./CopyShapesDialog.tsx";
+export { PresentationSection } from "./inspector/PresentationSection.tsx";
+export { effectiveShowSlideArea } from "./canvas/slide-area.ts";

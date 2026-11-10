@@ -8,6 +8,7 @@ import {
 
 export interface EditorPreferences {
   readonly showGrid: boolean;
+  readonly showSlideArea?: boolean;
   readonly showRulers: boolean;
   readonly leftPaneOpen: boolean;
   readonly rightPaneOpen: boolean;
@@ -52,6 +53,9 @@ export function loadEditorPreferences(
     const delay = value["autosaveDelayMs"];
     return {
       showGrid: bool("showGrid"),
+      ...(typeof value["showSlideArea"] === "boolean"
+        ? { showSlideArea: value["showSlideArea"] }
+        : {}),
       showRulers: bool("showRulers"),
       leftPaneOpen: bool("leftPaneOpen"),
       rightPaneOpen: bool("rightPaneOpen"),
