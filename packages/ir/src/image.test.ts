@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { isRasterDataUrl, MAX_IMAGE_BYTES } from "./image.ts";
+import {
+  decodeRasterDataUrl,
+  encodeRasterDataUrl,
+  isRasterDataUrl,
+  MAX_ATTACHMENT_IMAGE_BYTES,
+  MAX_IMAGE_BYTES,
+} from "./image.ts";
 
 test("image limit is measured in decoded bytes at the exact boundary", () => {
   const image = Buffer.alloc(MAX_IMAGE_BYTES);
@@ -11,6 +17,21 @@ test("image limit is measured in decoded bytes at the exact boundary", () => {
   expect(
     isRasterDataUrl(`data:image/png;base64,${oversized.toString("base64")}`),
   ).toBe(false);
+});
+
+test("attachments allow 30 MiB while document-embedded images stay at 1 MiB", () => {
+  expect(MAX_ATTACHMENT_IMAGE_BYTES).toBe(30 * 1024 * 1024);
+  const image = new Uint8Array(MAX_ATTACHMENT_IMAGE_BYTES);
+  image.set([137, 80, 78, 71, 13, 10, 26, 10]);
+  const encoded = encodeRasterDataUrl(image);
+  expect(isRasterDataUrl(encoded)).toBe(false);
+  expect(isRasterDataUrl(encoded, MAX_ATTACHMENT_IMAGE_BYTES)).toBe(true);
+  expect(decodeRasterDataUrl(encoded).bytes.length).toBe(
+    MAX_ATTACHMENT_IMAGE_BYTES,
+  );
+  const oversized = new Uint8Array(MAX_ATTACHMENT_IMAGE_BYTES + 1);
+  oversized.set([137, 80, 78, 71, 13, 10, 26, 10]);
+  expect(() => encodeRasterDataUrl(oversized)).toThrow("30 MiB");
 });
 
 test("declared image MIME must match its signature", () => {

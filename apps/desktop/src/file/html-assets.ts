@@ -2,6 +2,7 @@ import {
   encodeRasterDataUrl,
   decodeRasterDataUrl,
   isRasterDataUrl,
+  MAX_ATTACHMENT_IMAGE_BYTES,
   isRelativeAttachmentPath,
 } from "@nodetto/ir";
 
@@ -34,7 +35,8 @@ export class HtmlImportAssets {
     base = "",
   ): Promise<{ path: string; data: string }> {
     let data: string;
-    if (isRasterDataUrl(reference)) data = reference;
+    if (isRasterDataUrl(reference, MAX_ATTACHMENT_IMAGE_BYTES))
+      data = reference;
     else {
       const relative = htmlDependencyPath(reference, base);
       const cached = this.references.get(relative);

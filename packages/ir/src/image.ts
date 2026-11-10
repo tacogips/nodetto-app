@@ -1,9 +1,20 @@
-/** Embedded raster assets keep designs portable without external requests. */
+/**
+ * Raster data URLs stored inside a document's `src`. Documents sync over
+ * 1 MiB WebSocket messages, so embedded images stay small.
+ */
 export const MAX_IMAGE_BYTES = 1024 * 1024;
-export function isRasterDataUrl(value: unknown): value is string {
+/**
+ * Raster attachments held outside the document (sibling `artifacts/` files,
+ * the host asset cache and export bundles).
+ */
+export const MAX_ATTACHMENT_IMAGE_BYTES = 30 * 1024 * 1024;
+export function isRasterDataUrl(
+  value: unknown,
+  maxBytes: number = MAX_IMAGE_BYTES,
+): value is string {
   if (
     typeof value !== "string" ||
-    value.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 64
+    value.length > Math.ceil(maxBytes / 3) * 4 + 64
   )
     return false;
   const match =
@@ -16,7 +27,7 @@ export function isRasterDataUrl(value: unknown): value is string {
   if (encoded.length % 4 !== 0) return false;
   const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
   const bytes = (encoded.length / 4) * 3 - padding;
-  if (bytes > MAX_IMAGE_BYTES) return false;
+  if (bytes > maxBytes) return false;
   const alphabet =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   const last = alphabet.indexOf(encoded[encoded.length - padding - 1] ?? "");
@@ -54,8 +65,8 @@ export function decodeRasterDataUrl(source: string): {
   readonly extension: string;
   readonly bytes: Uint8Array;
 } {
-  if (!isRasterDataUrl(source))
-    throw new Error("Invalid raster image or image exceeds 1 MiB.");
+  if (!isRasterDataUrl(source, MAX_ATTACHMENT_IMAGE_BYTES))
+    throw new Error("Invalid raster image or image exceeds 30 MiB.");
   const comma = source.indexOf(",");
   const mime = source.slice(11, source.indexOf(";"));
   const binary = atob(source.slice(comma + 1));
@@ -66,8 +77,8 @@ export function decodeRasterDataUrl(source: string): {
 }
 
 export function encodeRasterDataUrl(bytes: Uint8Array): string {
-  if (bytes.length > MAX_IMAGE_BYTES)
-    throw new Error("Raster attachment exceeds the 1 MiB image limit.");
+  if (bytes.length > MAX_ATTACHMENT_IMAGE_BYTES)
+    throw new Error("Raster attachment exceeds the 30 MiB attachment limit.");
   const starts = (signature: readonly number[]) =>
     signature.every((byte, index) => bytes[index] === byte);
   const mime = starts([137, 80, 78, 71, 13, 10, 26, 10])
@@ -85,6 +96,7 @@ export function encodeRasterDataUrl(bytes: Uint8Array): string {
   for (let offset = 0; offset < bytes.length; offset += 8192)
     chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 8192)));
   const result = `data:image/${mime};base64,${btoa(chunks.join(""))}`;
-  if (!isRasterDataUrl(result)) throw new Error("Invalid raster attachment.");
+  if (!isRasterDataUrl(result, MAX_ATTACHMENT_IMAGE_BYTES))
+    throw new Error("Invalid raster attachment.");
   return result;
 }

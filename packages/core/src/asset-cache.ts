@@ -1,4 +1,8 @@
-import { isRasterAttachmentPath, isRasterDataUrl } from "@nodetto/ir";
+import {
+  isRasterAttachmentPath,
+  isRasterDataUrl,
+  MAX_ATTACHMENT_IMAGE_BYTES,
+} from "@nodetto/ir";
 
 /** Decoded sources are host-owned view state. They never enter JSONL/history. */
 export class AssetCache {
@@ -7,7 +11,10 @@ export class AssetCache {
   readonly resolve = (source: string): string | undefined =>
     isRasterDataUrl(source) ? source : this.sources.get(source);
   set(path: string, source: string): void {
-    if (!isRasterAttachmentPath(path) || !isRasterDataUrl(source))
+    if (
+      !isRasterAttachmentPath(path) ||
+      !isRasterDataUrl(source, MAX_ATTACHMENT_IMAGE_BYTES)
+    )
       throw new Error("Invalid raster attachment or decoded source.");
     if (this.sources.get(path) === source) return;
     this.sources.set(path, source);

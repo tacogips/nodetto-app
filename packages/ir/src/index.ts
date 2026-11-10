@@ -227,7 +227,11 @@ export {
   type ValidateOptions,
   validateDocument,
 } from "./validate.ts";
-export { isRasterDataUrl, MAX_IMAGE_BYTES } from "./image.ts";
+export {
+  isRasterDataUrl,
+  MAX_ATTACHMENT_IMAGE_BYTES,
+  MAX_IMAGE_BYTES,
+} from "./image.ts";
 export type { ImageCrop, ImageSemantic } from "./semantics.ts";
 export type {
   BooleanOperation,
