@@ -8,6 +8,14 @@
 - Evidence: `tmp/ipd-s772/ipd-26-example-sample/`.
 <!-- ownership:start -->
 - writePaths:
+  - `packages/core/src/kits/ios/bars.ts`
+  - `packages/core/src/kits/ios/content.ts`
+  - `packages/core/src/kits/ios/style.ts`
+  - `packages/core/src/kits/ios/insert.ts`
+  - `packages/core/src/kits/ios/props.ts`
+  - `packages/core/src/kits/ios/types.ts`
+  - `packages/core/src/kits/ios/kit-core.test.ts`
+  - `packages/core/src/kits/ios/kit-content.test.ts`
   - `examples/design`
   - `apps/cli/scripts/generate-iphone-kit-example.ts`
   - `apps/cli/src/iphone-kit-example.test.ts`
@@ -141,3 +149,25 @@ Determinism contract. Documents built through `nodetto-cli edit` operations cont
 - every other field and every pre-existing value is compared exactly.
 
 The committed example document is generated once and committed. Its regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation. Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (operator round 17, binding; keep this section verbatim)
+
+Kit quality fix. This plan owns the iOS kit sources and tests listed in writePaths.
+
+- (a) Round every computed kit child position and size to whole points, so no default kit instance or child is off the 1-point grid.
+- (b) Size every default kit text box to fit its default text at its font, so no default kit instance reports `note-overflow`.
+- (c) Afterwards, every default kit component inserted with its defaults into a 390x844 iPhone frame lints with zero findings. Add one regression test that inserts each kit component and asserts zero app-design lint findings. Do not change the lint rules. Update existing kit test expectations only where (a) or (b) changes a number.
+- (d) The sample's prototype links target the specific child control (tab item, back button, send button) inside the kit instance, not the whole instance, and no link label overlaps another control.
+- (e) Do not regenerate template HTML/CSS or other existing outputs beyond the design doc's accepted output changes; revert any regeneration that was not required.
+
+The round-16 determinism contract still applies. Keep the ipd-26 work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step4 s802, verification scope for round 17)
+
+Round 17 gave this plan the iOS kit sources, but the Verification list did not gate them. These gates are added, and the manifest carries the same command strings. Ownership, plan ID and dependsOn are unchanged.
+
+7. `bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/app-design-lint` -> exit 0, 0 fail. The round-17 (c) regression test lives in `packages/core/src/kits/ios/kit-content.test.ts`. For every kit shape ID it inserts the default component into a 390x844 iPhone frame and expects 0 app-design lint findings. It imports the existing lint entry point and does not change any rule.
+8. `sh -c 'L=tmp/ipd-s772/ipd-26-example-sample/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-26-example-sample/final && bun run typecheck --pretty false > "$L" 2>&1 && exit 0; grep -q "error TS" "$L" || exit 2; ! grep -E "^(packages/core/src/kits/ios/[^(]*|apps/cli/scripts/generate-iphone-kit-example\.ts|apps/cli/src/iphone-kit-example\.test\.ts|apps/cli/src/native-parity/iphone-kit-example\.test\.ts)\([0-9]+,[0-9]+\): error TS" "$L"'` -> exit 0. The exit codes mean the same as in ipd-20. Exit 0 is also accepted when tsc fails only in files this plan does not own; record those as `owned_elsewhere`. Exit 1 lists the errors in owned files, which you must fix. Exit 2 means tsc failed without printing diagnostics, which is a gate failure.
+9. `bunx biome check packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/kit-core.test.ts packages/core/src/kits/ios/kit-content.test.ts` -> exit 0.
+
+Clarification: the round-16 determinism contract replaces the second-run `shasum` sentence in Verification item 1. A second generator run is compared with the round-15 generated-value normalization, not by bytes. Pitfall: rounding kit geometry (round 17 (a)) changes the default sizes of kit children. Re-run `bun apps/cli/scripts/generate-iphone-kit-example.ts` only after gates 7 and 8 pass. The committed sample must reflect the fixed kit and lint with zero findings.
