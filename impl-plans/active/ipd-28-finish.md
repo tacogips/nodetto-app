@@ -158,3 +158,7 @@ General scratch rule (operator round 26, binding for every remaining plan; super
 ## Amendment 2026-11-11 (operator round 29, binding; keep this section verbatim)
 
 Formatting authority (operator round 29, binding for ipd-28-finish): ipd-28 may apply formatting-only fixes (`bunx biome check --write` or `bunx biome format --write` limited to files changed on this branch versus f59bef4, and `cargo fmt` for changed Rust files) to any such file, even outside its writePaths, provided `git diff` of those files after formatting shows only whitespace and formatting changes and every behavioral test still passes; record the formatted paths in the progress log. Then rerun every required gate.
+
+## Amendment 2026-11-11 (operator round 30, binding; keep this section verbatim)
+
+Test-discovery hygiene (operator round 30, binding for ipd-28-finish): the operator renamed the four test-named scratch copies under git-ignored tmp/ (two ipd-21 pre-format copies and two step-4 simulations) to *.test.ts.evidence, preserving their content, so the workspace `bun test` in `mise run verify` no longer collects them. Never write files named *.test.ts or *.test.tsx under tmp/; save copies with an .evidence suffix. Rerun every required gate; the formatting fix to packages/core/src/index.ts is already applied.
