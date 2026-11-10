@@ -84,10 +84,10 @@ Scope: this part's screens 07, 08, 09, 10 only. The output-directory copy, proto
 
 1. `CARGO_TERM_QUIET=true mise run build-cli` -> exit 0, log kept.
 2. `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl` -> exit 0.
-3. `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json` -> `summary.problems` 0 for the whole working document. Earlier parts' frames must stay clean; fix any regression in them through the ops files.
+3. Lint gate (asserting, operator round 19): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); const f=d.pages.flatMap((p)=>p.findings); process.exit(d.summary.errors === 0 && f.every((x)=>x.ruleId === \"app-misaligned\") ? 0 : 1)"'` -> exit 0. It exits 1 if there is any error or any finding other than `app-misaligned` (so `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target and overlap must be zero). Record the `app-misaligned` count per screen with `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); console.log(d.pages.flatMap((p)=>p.findings).filter((x)=>x.ruleId === \"app-misaligned\").length)"'`. For each one, record in the progress log that the element matches the reference screenshot within 4 points. This applies to the whole working document. Earlier parts' frames must stay clean; fix any regression in them through the ops files.
 4. `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE '^    frame .* 390x844$'` -> 10 (cumulative top-level 390x844 screen frames after this part).
 5. For each of 07, 08, 09, 10: `test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/<NN>-compare.png` -> exit 0, and the image was opened and inspected (one progress-log table row per screen).
-6. `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27c-reproduction-search-more.md` -> exit 1.
+6. `sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && test -s impl-plans/progress/ipd-27c-reproduction-search-more.md && ! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27c-reproduction-search-more.md'` -> exit 0 (fails if the terms file or the progress log is missing, or a term matches).
 
 ## Done criteria
 
@@ -127,3 +127,17 @@ Step 4 corrections (session 805): the header now names this plan's own planId, p
 CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence.
 
 Unchanged: writePaths, sharedPaths, artifactRoots, the round-16 and round-18 sections and every privacy rule.
+
+## Amendment 2026-11-10 (operator round 19, binding; keep this section verbatim)
+
+Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` ("nearly aligns") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.
+
+Visual acceptance (operator round 19): fix every drift visible in the side-by-side comparisons, including floating action button icon stroke width and color, border color, card accent bar width, button and badge positions, so each screen is within 4 points and matches icon weight and color.
+
+Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step 4 s806 plan consistency, round 19)
+
+Step 4 makes the plan consistent with the operator round-19 section above. Verification item 3 now uses the round-19 lint gate, which allows only `app-misaligned`. The privacy self-check now fails closed when `private-terms.txt` is missing. The dispatch manifest entry for this plan uses the same strings.
+
+Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, the frame, compare and flow gates, the round-16, round-18 and round-19 operator sections, and every privacy rule.

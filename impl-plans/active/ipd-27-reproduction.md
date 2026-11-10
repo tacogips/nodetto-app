@@ -81,7 +81,7 @@ Per-frame PNGs at scale 2 are compared side by side with every reference screens
 ## Verification (evidence in `tmp/ipd-s772/ipd-27-reproduction/final/`)
 
 1. `nodetto-cli validate <output-dir>/<doc>.jsonl` -> exit 0.
-2. Lint gate (asserting; `lint` exits 0 even when it reports findings): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); process.exit(d.summary.problems === 0 ? 0 : 1)"'` -> exit 0. It exits 1 when `summary.problems` is not 0.
+2. Lint gate (asserting, operator round 19): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); const f=d.pages.flatMap((p)=>p.findings); process.exit(d.summary.errors === 0 && f.every((x)=>x.ruleId === \"app-misaligned\") ? 0 : 1)"'` -> exit 0. It exits 1 if there is any error or any finding other than `app-misaligned` (so `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target and overlap must be zero). Record the `app-misaligned` count per screen with `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); console.log(d.pages.flatMap((p)=>p.findings).filter((x)=>x.ruleId === \"app-misaligned\").length)"'`. For each one, record in the progress log that the element matches the reference screenshot within 4 points. `lint` itself exits 0 even when it reports findings.
 3. Flow gate (asserting): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --flows --format json | bun -e "const d=await Bun.stdin.json(); process.exit(d.flows.length === 1 && d.flows[0].links.length > 0 ? 0 : 1)"'` -> exit 0. It exits 1 unless there is exactly one flow and that flow has at least one link. Frame gate (asserting): `sh -c 'test "$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE "^    frame .* 390x844$")" -eq 10'` -> exit 0. It exits 1 unless there are exactly ten 390x844 screen frames. After the step 9 copy, run the same three commands with `<output-dir>/<doc>.jsonl` in place of the working document, record only their exit codes, and keep the path abbreviated in the progress log.
 4. `ls <output-dir>/compare | wc -l` -> 10.
 5. `git status --porcelain --ignored -- tmp | head` shows `tmp/` ignored. `git check-ignore -q <output-dir>` -> exit 0.
@@ -90,7 +90,7 @@ Per-frame PNGs at scale 2 are compared side by side with every reference screens
 
 - All verification passes.
 - The per-screen table in the progress log shows drift <= 4 for all ten screens, with yes for icons, colors and weight, and 0 missing elements.
-- No private content appears in the progress log. Self-check: `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27-reproduction.md` -> exit 1.
+- No private content appears in the progress log. Self-check: `sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && test -s impl-plans/progress/ipd-27-reproduction.md && ! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27-reproduction.md'` -> exit 0 (fails if the terms file or the progress log is missing, or a term matches).
 
 ## Worker rules
 
@@ -128,3 +128,25 @@ Unchanged: writePaths, sharedPaths, artifactRoots, the round-16 and round-18 sec
 Step 4 correction for review finding S5-s805-1. Verification items 2 and 3 and the dispatch manifest entry for this plan now use asserting gates, because the earlier bare commands exit 0 whatever they print. `nodetto-cli lint` exits 0 even when it reports findings (see `apps/cli/src/app-lint-cli.test.ts`), and `inspect --flows` and `inspect --type frame` exit 0 for any count. The lint gate fails unless `summary.problems === 0`. This matters most in this plan, because the prototype links added here can create `app-touch-target` findings on hotspots smaller than 44 points. The flow gate fails unless `flows.length === 1` and `flows[0].links.length > 0` (field shape from `apps/cli/src/inspect-command.ts`, `--flows --format json`). The frame gate fails unless exactly ten top-level 390x844 frames exist (the same pattern as `ipd-27c-reproduction-search-more`, with `-eq 10`). The manifest diff is limited to `plans[ipd-27-reproduction].verification`.
 
 Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, acceptance criteria, the round-16, round-18 and round-19 sections, and every privacy rule.
+
+## Amendment 2026-11-10 (operator round 19, binding; keep this section verbatim)
+
+Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` ("nearly aligns") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.
+
+Visual acceptance (operator round 19): fix every drift visible in the side-by-side comparisons, including floating action button icon stroke width and color, border color, card accent bar width, button and badge positions, so each screen is within 4 points and matches icon weight and color.
+
+Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step 4 s806 plan consistency, round 19)
+
+Step 4 makes the plan consistent with the operator round-19 section above. Verification item 2 now uses the round-19 lint gate, which allows only `app-misaligned`. The privacy self-check now fails closed when `private-terms.txt` is missing. The dispatch manifest entry for this plan uses the same strings.
+
+Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, the frame, compare and flow gates, the round-16, round-18 and round-19 operator sections, and every privacy rule.
+
+## Amendment 2026-11-11 (step 4 s806 superseded lint wording, round 19)
+
+Step 4 correction for review finding S5-s806-1. In the round-20 section above ("step 4 s805 asserting final gates"), the sentence "The lint gate fails unless `summary.problems === 0`." is superseded by the operator round-19 reproduction lint gate. The round-20 text is left unchanged for the record. The binding gate is verification item 2: `summary.errors === 0` and every finding has `ruleId` `app-misaligned`; each `app-misaligned` finding is justified in the progress log as within 4 points of the reference, with a per-screen count. Step 5 ("Iterate until there are zero findings") is read the same way. `app-touch-target` findings on prototype hotspots smaller than 44 points still fail the gate, as do `app-off-grid`, `note-overflow`, `app-text-overflow` and overlap findings.
+
+The dispatch manifest entry for this plan now states the same predicate in acceptanceCriteria[0], and acceptanceCriteria[2] names the fail-closed privacy command from verification item 7 (`test -s` on `private-terms.txt` and on the progress log before the negated grep), expecting exit 0.
+
+Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, verification strings, the round-16, round-18 and round-19 operator sections, and every privacy rule.

@@ -124,3 +124,15 @@ Determinism contract. Documents built through `nodetto-cli edit` operations cont
 - every other field and every pre-existing value is compared exactly.
 
 The committed example document is generated once and committed. Its regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation. Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (operator round 19, binding; keep this section verbatim)
+
+Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` ("nearly aligns") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.
+
+Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step 4 s806 plan consistency, round 19)
+
+The step 5 privacy gate in the dispatch manifest is now `sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && ! git grep --untracked -l -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt -- . ":!tmp"'` -> exit 0. It still runs `git grep --untracked` and still expects no match. It now also fails when `private-terms.txt` is missing or empty, which the bare negation used to treat as a pass. The round-19 reproduction lint rule (only `app-misaligned` allowed, each finding justified within 4 points) applies to the reproduction document only. The ipd-28 suite gates are unchanged.
+
+Unchanged: planId, dependsOn, writePaths, sharedPaths, artifactRoots, steps 1-8 and the emoji gates.

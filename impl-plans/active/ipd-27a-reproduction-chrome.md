@@ -12,6 +12,14 @@
   - `tmp/ipd-s772/ipd-27-reproduction`
   - `target`
   - `apps/desktop/src-tauri/binaries`
+  - `packages/core/src/kits/ios/bars.ts`
+  - `packages/core/src/kits/ios/content.ts`
+  - `packages/core/src/kits/ios/style.ts`
+  - `packages/core/src/kits/ios/insert.ts`
+  - `packages/core/src/kits/ios/props.ts`
+  - `packages/core/src/kits/ios/types.ts`
+  - `packages/core/src/kits/ios/kit-core.test.ts`
+  - `packages/core/src/kits/ios/kit-content.test.ts`
 - sharedPaths:
   - none
 - sharedPathNotes:
@@ -44,7 +52,7 @@ Per-frame PNGs at scale 2 are compared side by side with every reference screens
 
 ## Non-goals
 
-- No source changes. A missing feature or a bug is a finding naming the owning plan, with a generic reproduction written from scratch.
+- No source changes except the 8 kit files under `packages/core/src/kits/ios/` in writePaths, limited to the operator round-19 kit fix and its tests. Any other missing feature or bug is a finding naming the owning plan, with a generic reproduction written from scratch.
 - No tracked files other than the progress log, which must contain no private content.
 
 ## Steps
@@ -84,10 +92,10 @@ Scope: this part's screens 01, 02, 03 only. The output-directory copy, prototype
 
 1. `CARGO_TERM_QUIET=true mise run build-cli` -> exit 0, log kept.
 2. `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl` -> exit 0.
-3. `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json` -> `summary.problems` 0 for the whole working document. Earlier parts' frames must stay clean; fix any regression in them through the ops files.
+3. Lint gate (asserting, operator round 19): `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); const f=d.pages.flatMap((p)=>p.findings); process.exit(d.summary.errors === 0 && f.every((x)=>x.ruleId === \"app-misaligned\") ? 0 : 1)"'` -> exit 0. It exits 1 if there is any error or any finding other than `app-misaligned` (so `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target and overlap must be zero). Record the `app-misaligned` count per screen with `sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e "const d=await Bun.stdin.json(); console.log(d.pages.flatMap((p)=>p.findings).filter((x)=>x.ruleId === \"app-misaligned\").length)"'`. For each one, record in the progress log that the element matches the reference screenshot within 4 points. This applies to the whole working document. Earlier parts' frames must stay clean; fix any regression in them through the ops files.
 4. `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE '^    frame .* 390x844$'` -> 3 (cumulative top-level 390x844 screen frames after this part).
 5. For each of 01, 02, 03: `test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/<NN>-compare.png` -> exit 0, and the image was opened and inspected (one progress-log table row per screen).
-6. `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27a-reproduction-chrome.md` -> exit 1.
+6. `sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && test -s impl-plans/progress/ipd-27a-reproduction-chrome.md && ! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27a-reproduction-chrome.md'` -> exit 0 (fails if the terms file or the progress log is missing, or a term matches).
 
 ## Done criteria
 
@@ -98,7 +106,7 @@ Scope: this part's screens 01, 02, 03 only. The output-directory copy, prototype
 ## Worker rules
 
 - Record `git hash-object` of this plan first.
-- No source edits, and no state-changing git commands.
+- No source edits except the 8 kit files under `packages/core/src/kits/ios/` in writePaths, limited to the operator round-19 kit fix and its tests; any other missing feature or bug is a finding for its owning plan. No state-changing git commands.
 - No emojis.
 - Commands run in the foreground with full logs.
 
@@ -127,3 +135,45 @@ Step 4 corrections (session 805): the header now names this plan's own planId, p
 CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence.
 
 Unchanged: writePaths, sharedPaths, artifactRoots, the round-16 and round-18 sections and every privacy rule.
+
+## Amendment 2026-11-10 (operator round 19, binding; keep this section verbatim)
+
+Kit fix (operator round 19, binding for ipd-27a): ipd-27a-reproduction-chrome owns the iOS kit sources and tests. (a) The tab bar distributes its item widths in whole points for any item count (the widths sum to the bar width; for example 98, 97, 98, 97 for four items on 390), and places every icon, label and badge on the 1-point grid, with or without a badge. (b) The default floating action button has no offset dark shadow (no visible crescent); use none or a subtle centered shadow. Add kit regression tests: a tab bar with 2 to 5 items, with and without a badge, and a floating action button each lint with zero findings. Do not change lint rules.
+
+Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` ("nearly aligns") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.
+
+Visual acceptance (operator round 19): fix every drift visible in the side-by-side comparisons, including floating action button icon stroke width and color, border color, card accent bar width, button and badge positions, so each screen is within 4 points and matches icon weight and color.
+
+Keep the work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (step 4 s806 plan consistency, round 19)
+
+Step 4 makes the plan consistent with the operator round-19 section above. Verification item 3 now uses the round-19 lint gate, which allows only `app-misaligned`. The privacy self-check now fails closed when `private-terms.txt` is missing. The dispatch manifest entry for this plan uses the same strings. The ownership bullets are plain paths, with no suffix.
+
+Kit gates (this plan owns the iOS kit files). Do the kit fix first. Then rerun step 1 (`mise run build-cli`) so the sidecar bundles the fixed kit, and rebuild `tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl` from the ops files, because stored kit instances keep the geometry they were inserted with. Test cases to add in `packages/core/src/kits/ios/kit-core.test.ts` or `kit-content.test.ts`: a tab bar with 2, 3, 4 and 5 items on a 390 bar has whole-point item widths that sum to 390 (4 items -> 98, 97, 98, 97 or an equivalent whole-point split), and 0 app lint findings with and without a badge. The default floating action button has no offset dark shadow and 0 app lint findings. Do not change lint rules (`packages/core/src/app-design-lint`) or any file outside writePaths. Do not edit the committed example under `examples/design`. It stores materialized instances, so its test must keep passing unchanged. If it fails, record that as a finding.
+
+7. `bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/app-design-lint apps/cli/src/iphone-kit-example.test.ts` -> exit 0, 0 fail.
+8. `sh -c 'L=tmp/ipd-s772/ipd-27-reproduction/final/ipd-27a-reproduction-chrome/typecheck.log; mkdir -p tmp/ipd-s772/ipd-27-reproduction/final/ipd-27a-reproduction-chrome && bun run typecheck --pretty false > "$L" 2>&1 && exit 0; grep -q "error TS" "$L" || exit 2; ! grep -E "^packages/core/src/kits/ios/[^(]*\([0-9]+,[0-9]+\): error TS" "$L"'` -> exit 0. Exit 0 is also accepted when tsc fails only in files this plan does not own; record those as `owned_elsewhere`. Exit 1 lists errors in owned kit files, which you must fix. Exit 2 means tsc failed without diagnostics, which is a gate failure.
+9. `bunx biome check packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/kit-core.test.ts packages/core/src/kits/ios/kit-content.test.ts` -> exit 0.
+10. `sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/app-design-shapes.test.ts apps/cli/src/native-parity/iphone-kit-example.test.ts'` -> exit 0, 0 fail, 0 skip (Bun and native kit output agree).
+
+Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, the frame, compare and flow gates, the round-16, round-18 and round-19 operator sections, and every privacy rule.
+
+## Amendment 2026-11-11 (step 4 s806 scope of source edits, round 19)
+
+Step 4 correction for review finding S5-s806-2. The Non-goals bullet and the Worker rules bullet that forbade all source edits contradicted the operator round-19 section, which makes this plan the owner of the iOS kit sources and tests. Both bullets now allow source edits only in these 8 writePaths, and only for the round-19 kit fix (whole-point tab bar item widths, 1-point grid placement of icons, labels and badges, no offset floating-action-button shadow) and its regression tests:
+
+- `packages/core/src/kits/ios/bars.ts`
+- `packages/core/src/kits/ios/content.ts`
+- `packages/core/src/kits/ios/style.ts`
+- `packages/core/src/kits/ios/insert.ts`
+- `packages/core/src/kits/ios/props.ts`
+- `packages/core/src/kits/ios/types.ts`
+- `packages/core/src/kits/ios/kit-core.test.ts`
+- `packages/core/src/kits/ios/kit-content.test.ts`
+
+The round-18 phrase "Fix kit or engine gaps only as findings naming the owning plan" is read with this plan as the owner of the kit: a kit gap covered by the round-19 kit fix is fixed here, not filed. Every other gap (engine, lint rules in `packages/core/src/app-design-lint`, renderer, CLI, `examples/design`) remains a finding naming its owning plan. Lint rules must not change.
+
+Step 5 ("Iterate until there are zero findings") is read with the operator round-19 reproduction lint gate: errors and every rule other than `app-misaligned` must be zero, and each remaining `app-misaligned` finding is justified in the progress log as within 4 points of the reference, with a per-screen count.
+
+Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, verification strings, the round-16, round-18 and round-19 operator sections, and every privacy rule. `ipd-27b-reproduction-detail`, `ipd-27c-reproduction-search-more` and `ipd-27-reproduction` keep their unconditional no-source-edit rules.
