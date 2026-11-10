@@ -39,6 +39,7 @@ import {
   renderUmlClass,
   renderUmlComponent,
 } from "./structured-shapes.ts";
+import { renderTableSheet } from "./table-sheet.ts";
 import { renderTextNote } from "./text-note.ts";
 import { renderPcbShape } from "./pcb-shapes.ts";
 import type { SvgTheme } from "./theme.ts";
@@ -267,6 +268,8 @@ export function renderShape(
       return renderDatabaseObject(element, box, theme);
     case "erd.table":
       return renderErdTable(element, box, theme);
+    case "table.sheet":
+      return renderTableSheet(element, box, theme);
     case UmlComponentType.Component:
     case UmlComponentType.Interface:
     case UmlComponentType.Port:

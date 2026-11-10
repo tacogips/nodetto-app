@@ -27,6 +27,7 @@ import {
   connectorBackdropIds,
   containerPaintOrder,
   groupOf,
+  tableSheetLayout,
 } from "@nodetto/core";
 import type { Element, ElementId } from "@nodetto/ir";
 import {
@@ -49,6 +50,10 @@ import {
   Show,
   Suspense,
 } from "solid-js";
+import { createTableSheetSelection } from "./table-sheet/selection.ts";
+import { resetColumnWidth, tableSheetRegionAt } from "./table-sheet/resize.ts";
+import { TableSheetCellEditor } from "./table-sheet/CellEditor.tsx";
+import { TableSheetSelectionOverlay } from "./table-sheet/SelectionOverlay.tsx";
 import { createEditorSignals } from "./adapter.ts";
 import { FreehandInput } from "./FreehandInput.tsx";
 import { installRasterMaskSampler } from "./raster-mask-sampler.ts";
@@ -122,6 +127,12 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     width: 0,
     height: 0,
   });
+  const tableSheetSelection = createTableSheetSelection();
+  createEffect(() => {
+    signals.rev();
+    signals.selection();
+    tableSheetSelection.reconcile(props.editor);
+  });
   const imageDrop = createImageDrop(props, () => container);
 
   const interaction = createInteraction(props.editor, {
@@ -136,6 +147,24 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     onCommentPlace: (point) => props.onCommentPlace?.(point),
     snap: () => props.snap,
     viewport,
+    tableSheetSelection,
+    onTableSheetDoubleClick: (id, point) => {
+      const element = props.editor.store.get(id);
+      if (element?.type !== "table.sheet") return false;
+      const region = tableSheetRegionAt(
+        tableSheetLayout(element),
+        point,
+        props.editor.camera.get().z,
+      );
+      if (region?.kind === "column-border")
+        resetColumnWidth(props.editor, id, region.columnId);
+      else if (region?.kind === "cell") {
+        props.editor.selection.set([id]);
+        tableSheetSelection.activate(id, region);
+        tableSheetSelection.startEditing();
+      }
+      return true;
+    },
     onEditRequest: (id, region) => props.onEditRequest?.(id, region),
     onContextMenu: (at, hit) => props.onContextMenu?.(at, hit),
   });
@@ -406,7 +435,20 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
           />
         </svg>
 
-        <div class={`nodetto-layer ${SLOT_LAYER_CLASS}`}>{props.children}</div>
+        <div class={`nodetto-layer ${SLOT_LAYER_CLASS}`}>
+          <TableSheetSelectionOverlay
+            editor={props.editor}
+            selection={tableSheetSelection}
+          />
+          <Show when={tableSheetSelection.state()?.editing}>
+            <TableSheetCellEditor
+              editor={props.editor}
+              selection={tableSheetSelection}
+              onDone={() => container?.focus()}
+            />
+          </Show>
+          {props.children}
+        </div>
       </div>
       <Show when={isPcbPage()}>
         <PcbLayersPanel editor={props.editor} revision={signals.rev} />

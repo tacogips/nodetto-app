@@ -129,6 +129,7 @@ export const COMMON_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.Person, label: "Person", icon: "person" },
   { tool: Tool.StickFigure, label: "Stick figure", icon: "actor" },
   { tool: Tool.Package, label: "Package", icon: "package" },
+  { tool: Tool.Sheet, label: "Sheet", icon: "table" },
   { tool: Tool.Text, label: "Text", icon: "text" },
   { tool: Tool.Note, label: "Note", icon: "note" },
   { tool: Tool.Node, label: "Node", icon: "node" },

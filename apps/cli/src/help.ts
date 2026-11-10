@@ -2,8 +2,9 @@
 // page with every option, exit code and an example, printed by
 // `nodetto-cli help <command>` or `nodetto-cli <command> --help`.
 
-export const OVERVIEW = `nodetto-cli - read, draw, check and convert nodetto documents (.jsonl)
+import { TABLE_HELP } from "./table-command.ts";
 
+export const OVERVIEW = `nodetto-cli - read, draw, check and convert nodetto documents (.jsonl)
 Usage: nodetto-cli <command> [options]
 
 Look at a document
@@ -17,6 +18,7 @@ Draw and edit
   nodetto-cli shapes [<words>]    Palette shapes by shape ID (--category uml)
   nodetto-cli draw <doc> <shape>  Draw one shape or connector by its shape ID
   nodetto-cli edit <doc>          Apply add/update/move/delete operations (JSON)
+  nodetto-cli table create|set     Spreadsheet tables from CSV/TSV or JSON; edit cells
   nodetto-cli arrange <doc>       Arrange one page: tidy, overlaps, layered or route
 Render
   nodetto-cli export <doc>        Export a page or selected artwork
@@ -45,6 +47,7 @@ const EXIT_CODES = `Exit codes: 0 success, 1 out of date (--check), 2 usage or i
 3 warnings with --strict.`;
 
 export const COMMAND_HELP: Readonly<Record<string, string>> = {
+  table: TABLE_HELP,
   authorize: `Usage: nodetto-cli authorize [project-folder]
 
 Open the macOS folder picker and remember access to the selected project folder.
@@ -247,6 +250,7 @@ minimum; pool width must be greater than 30 per lane depth and at least the
 nested lanes' extent. These geometry errors exit 2 without writing.
 
 Operations (a JSON array, or JSON Lines; --ops - reads stdin):
+  set-cells updates spreadsheet table cells in one operation.
   {"op":"add","page":"p1","type":"erd.table","ref":"orders",
    "semantic":{"tableName":"orders","columns":[{"name":"id","dataType":"uuid","pk":true}]}}
   {"op":"add","page":"p1","type":"node.generic","semantic":{"label":"Pay"},

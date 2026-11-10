@@ -1,6 +1,6 @@
 # Spreadsheet table element: `table.sheet`
 
-Status: design, not implemented. Revised for the session 778 continuation
+Status: implemented (session 778). Revised for the session 778 continuation
 (section 14): the plan split in section 11, the core file layout in
 section 4 and section 6, and the `Column N` naming rule in section 6 changed.
 The behavior is otherwise the same as the reviewed 9f4414b design.
@@ -528,7 +528,7 @@ files). Its worker stopped after two files, so this split replaces
 wiring. Each file has exactly one owner, and every plan is sized for one
 worker: about 150 plan lines or fewer and at most four source files plus
 their tests. Exact exported names and signatures are pinned in
-`impl-plans/active/tsh-00-overview.md`. The plans implement them verbatim.
+`impl-plans/completed/tsh-00-overview.md`. The plans implement them verbatim.
 
 Wave 1. These four plans depend only on code committed at `87365fb`: the
 section 2 IR contract and existing core modules such as `ShapeUtil`,
@@ -731,7 +731,7 @@ These were open in the intake. They are recorded in
   unchanged. Run 778 failed at dispatch only: every entry of
   `impl-plans/active/tsh-s778-dispatch.json` lacked `acceptanceCriteria`.
 - The `Column N` rule is already pinned in section 6, in
-  `impl-plans/active/tsh-00-overview.md` and in its owning plan
+  `impl-plans/completed/tsh-00-overview.md` and in its owning plan
   `tsh-01d-values` (`columns.ts`, `grid.ts`). `tsh-01c-edits` explicitly
   does not own `insertColumn`, naming or paste. No plan edit is needed.
 - Dispatch contract for this run: exactly one active manifest,

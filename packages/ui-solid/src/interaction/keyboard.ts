@@ -9,6 +9,13 @@ import {
   pasteSelectionStyle,
 } from "@nodetto/core";
 import { Tool, type ToolKind } from "../tools.ts";
+import {
+  copyTableRange,
+  cutTableRange,
+  pasteIntoTable,
+} from "../table-sheet/clipboard.ts";
+import { handleTableSheetKey } from "../table-sheet/keyboard.ts";
+import { readTableSheet } from "@nodetto/core";
 import type { CircuitTools } from "./circuit.ts";
 import type { ContextMenus } from "./context-menu.ts";
 import type { InteractionContext } from "./context.ts";
@@ -239,6 +246,62 @@ export function createKeyboardHandlers(
     }
     const modifier = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
+    const selection = options.tableSheetSelection;
+    const sheet = selection?.state();
+    const range = selection?.range(editor);
+    if (
+      selection &&
+      sheet &&
+      range &&
+      state.gesture.kind === "idle" &&
+      editor.selection.has(sheet.elementId)
+    ) {
+      flushNudge();
+      const documentRevision = editor.documentOpenRevision;
+      const clipboard =
+        typeof navigator === "undefined" ? undefined : navigator.clipboard;
+      if (
+        modifier &&
+        !event.altKey &&
+        clipboard &&
+        ["c", "x", "v"].includes(key)
+      ) {
+        event.preventDefault();
+        if (editor.readOnly && key !== "c") return;
+        const target = { elementId: sheet.elementId, range };
+        if (key === "c") void copyTableRange(editor, target, clipboard);
+        else if (key === "x") void cutTableRange(editor, target, clipboard);
+        else
+          void pasteIntoTable(
+            editor,
+            { elementId: sheet.elementId, row: range.top, column: range.left },
+            clipboard,
+          ).then((pasted) => {
+            if (
+              !pasted?.range ||
+              editor.documentOpenRevision !== documentRevision ||
+              selection.state() !== sheet
+            )
+              return;
+            const element = editor.store.get(sheet.elementId);
+            if (element?.type !== "table.sheet") return;
+            const table = readTableSheet(element.semantic);
+            const firstRow = table.rows[pasted.range.top];
+            const firstCol = table.columns[pasted.range.left];
+            const lastRow = table.rows[pasted.range.bottom];
+            const lastCol = table.columns[pasted.range.right];
+            if (!firstRow || !firstCol || !lastRow || !lastCol) return;
+            selection.activate(sheet.elementId, {
+              rowId: firstRow.id,
+              columnId: firstCol.id,
+            });
+            selection.extend({ rowId: lastRow.id, columnId: lastCol.id });
+          });
+        return;
+      }
+      if (!editor.readOnly && handleTableSheetKey(event, { editor, selection }))
+        return;
+    }
     const arrow = modifier ? undefined : ARROW_KEYS[key];
 
     if (!arrow) {

@@ -114,6 +114,54 @@ dashed D2 connection, and Database DDL emits no foreign key or uniqueness for
 it. Turning it on drops the constraint-only settings (referential actions and
 timing).
 
+## Spreadsheet tables
+
+Choose **Sheet** in the toolbox to create a 3x3 spreadsheet table. This is
+`table.sheet`, distinct from the ERD **Table** tool (`erd.table`). Its semantic
+payload contains ordered columns and rows, with cells keyed by column id;
+`headerRow` defaults to true and `striped` enables alternating row shading.
+
+```json
+{"columns":[{"id":"c1","name":"Item","width":120,"type":"text"}],"rows":[{"id":"r1","cells":{"c1":{"value":"Widget"}}}],"headerRow":true,"striped":false}
+```
+
+Column types are `text` (string), `number` (finite number), `checkbox`
+(boolean), `select` (string from its options), and `date` (a real calendar
+date stored as `YYYY-MM-DD`). Numbers align right by default, checkboxes
+center, and other types left. Columns can set alignment; cells can override
+alignment, `bold`, and `fill` (a 3, 6, or 8 digit hex color).
+
+| Property | Limit |
+| --- | --- |
+| Columns | 1-100 |
+| Rows | 0-1000 |
+| Cell text | 10000 characters |
+| Column name | 200 characters |
+| Select options | 100 options, 200 characters each |
+| Column width | 24-2000 px |
+| Row height | 20-2000 px |
+
+Validation reports `table.id`, `table.noColumns`, `table.limit`, `table.size`,
+`table.unknownColumn`, `table.cellEmpty`, `table.cellType`, `table.options`,
+and `table.cellFill` for malformed data. Bounds follow the column widths and
+row heights; selection handles do not resize the table.
+
+Click a cell to select it; Shift-click or Shift+arrow extends the selection.
+Double-click, Enter, F2 or typing starts editing. In the single-line editor,
+Enter commits and moves down, Tab and Shift+Tab commit and move horizontally,
+and Escape cancels. Outside the editor, arrows move the active cell, Delete
+clears the selection, and Escape exits cell selection. Copy, cut and paste use
+TSV. Copy preserves stored text exactly; paste coerces values to column types
+and grows the table when needed, within the limits. Text pasted with newlines
+is retained but displayed on one line.
+
+Add columns, paste growth and CLI `--no-header` name new text columns
+`Column N`, using the smallest positive N not already used by such a header;
+their initial width is 120. Drag column or row borders to resize; double-click
+a column border to reset its width to 120. The inspector controls the header,
+striping, column names, types, widths and alignment, and adds or removes rows
+and columns. Each edit is one undo step.
+
 ## Page ordering
 
 Page options include Move left and Move right. New pages append to the document;

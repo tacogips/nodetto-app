@@ -85,6 +85,7 @@ export const Tool = {
   Text: "text.note",
   Note: "text.note:note",
   Table: "erd.table",
+  Sheet: "table.sheet",
   View: "erd.view",
   MaterializedView: "erd.materialized-view",
   Function: "erd.function",
@@ -776,6 +777,7 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.Node:
     case Tool.Text:
     case Tool.Table:
+    case Tool.Sheet:
     case Tool.View:
     case Tool.MaterializedView:
     case Tool.Function:

@@ -60,6 +60,7 @@ import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
 import { gerberCommand } from "./gerber-command.ts";
 import { pcbCommand } from "./pcb-command.ts";
+import { tableCommand } from "./table-command.ts";
 import { MIN_PREFIX, shortIds, type Resolution } from "./ids.ts";
 import { glyphMissingMessage, glyphRowsByPage } from "./glyph-coverage.ts";
 
@@ -171,7 +172,7 @@ export function parseArgs(
 }
 
 export function formatIssue(issue: ValidationIssue): string {
-  return `${issue.severity}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}${issue.code === "semantic.unknownField" ? ` (${issue.code})` : ""}`;
+  return `${issue.severity}: ${issue.path ? `${issue.path}: ` : ""}${issue.message}${issue.code === "semantic.unknownField" || issue.code?.startsWith("table.") ? ` (${issue.code})` : ""}`;
 }
 
 export function loadDocument(
@@ -1056,6 +1057,8 @@ function dispatchCli(
       return diffCommand(io, rest);
     case "edit":
       return editCommand(io, rest);
+    case "table":
+      return tableCommand(io, rest);
     case "types":
       return typesCommand(io, rest);
     case "shapes":

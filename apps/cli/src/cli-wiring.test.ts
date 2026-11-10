@@ -9,6 +9,7 @@ import {
 } from "../../../packages/core/src/test-helpers.ts";
 import { textLayoutProblemDocument } from "./__fixtures__/text-layout.ts";
 import { runCli, type CommandIo } from "./commands.ts";
+import { TABLE_HELP } from "./table-command.ts";
 
 function memoryIo(
   files: Record<string, string>,
@@ -105,6 +106,12 @@ function bpmn() {
     }),
   ]);
 }
+
+test("table command help and missing subcommand", () => {
+  const io = memoryIo({});
+  expect(run(io, "table", "--help").stdout).toBe(`${TABLE_HELP}\n`);
+  expect(run(io, "table").exitCode).toBe(2);
+});
 
 test("merge exits for clean, conflict, and invalid inputs and keeps ours on quiet conflict", () => {
   const base = doc("freeform");

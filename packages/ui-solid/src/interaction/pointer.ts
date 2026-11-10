@@ -2,9 +2,19 @@
 // starts, route every move to the running gesture (paced to repaint frames
 // when the host asks), and commit or cancel it on release.
 
-import { ancestorChain, normalizeBox, outermostGroupOf } from "@nodetto/core";
+import {
+  ancestorChain,
+  normalizeBox,
+  outermostGroupOf,
+  tableSheetLayout,
+} from "@nodetto/core";
 import type { ElementId } from "@nodetto/ir";
 import { Tool, creationFor, isConnectorTool } from "../tools.ts";
+import { tableSheetCellClick } from "../table-sheet/selection.ts";
+import {
+  beginTableSheetResize,
+  tableSheetRegionAt,
+} from "../table-sheet/resize.ts";
 import type { CircuitTools } from "./circuit.ts";
 import type { ConnectorGestures } from "./connectors.ts";
 import type { ContextMenus } from "./context-menu.ts";
@@ -171,6 +181,33 @@ export function createPointerHandlers(
       return;
     }
 
+    const selectedElement = editor.store.get(hit);
+    const sheetSelection = options.tableSheetSelection;
+    if (
+      !editor.readOnly &&
+      sheetSelection &&
+      editor.selection.has(hit) &&
+      selectedElement?.type === "table.sheet"
+    ) {
+      const region = tableSheetRegionAt(
+        tableSheetLayout(selectedElement),
+        point,
+        editor.camera.get().z,
+      );
+      if (region?.kind === "cell") {
+        tableSheetCellClick(editor, sheetSelection, hit, region, {
+          shift: event.shiftKey,
+        });
+        return;
+      }
+      if (region) {
+        state.gesture = {
+          kind: "table-sheet-resize",
+          resize: beginTableSheetResize(editor, hit, region, point),
+        };
+        return;
+      }
+    }
     const clickTarget = selectOnPress(hit, event.shiftKey);
     if (editor.readOnly) return;
     if (transform.beginSequenceReorder(hit, event, clickTarget)) return;
@@ -213,6 +250,9 @@ export function createPointerHandlers(
       gesture.moved = true;
     }
     switch (gesture.kind) {
+      case "table-sheet-resize":
+        gesture.resize.move(ctx.pagePoint(event));
+        return;
       case "panning": {
         const now = ctx.screenPoint(event);
         if (
@@ -295,6 +335,25 @@ export function createPointerHandlers(
 
   const onPointerMove = (event: PointerEvent): void => {
     if (state.gesture.kind === "idle") {
+      const hit = hits.canvasHitTest(ctx.pagePoint(event));
+      const element =
+        hit && editor.selection.has(hit) ? editor.store.get(hit) : null;
+      const region =
+        element?.type === "table.sheet"
+          ? tableSheetRegionAt(
+              tableSheetLayout(element),
+              ctx.pagePoint(event),
+              editor.camera.get().z,
+            )
+          : null;
+      const container = options.container();
+      if (container)
+        container.style.cursor =
+          region?.kind === "column-border"
+            ? "col-resize"
+            : region?.kind === "row-border"
+              ? "row-resize"
+              : "";
       ctx.setHoverTarget(
         !editor.readOnly && isConnectorTool(options.tool())
           ? hits.targetUnder(ctx.pagePoint(event), [])
@@ -451,6 +510,11 @@ export function createPointerHandlers(
       connectors.insertRouteWaypoint(event, hit, element, point);
       return;
     }
+    if (
+      element?.type === "table.sheet" &&
+      options.onTableSheetDoubleClick?.(hit, point)
+    )
+      return;
     const box = editor.getBounds(hit);
     const region = element && box ? editRegionAt(element, box, point) : "body";
     options.onEditRequest?.(hit, region);

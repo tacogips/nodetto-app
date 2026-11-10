@@ -22,6 +22,7 @@ import { isPcbElementType } from "@nodetto/ir";
 import type { AccessibilityRole, Element } from "@nodetto/ir";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { ErdTableView } from "./ErdTableView.tsx";
+import { TableSheetView } from "./TableSheetView.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { FreehandView } from "./FreehandView.tsx";
 import { CompoundPathView } from "./CompoundPathView.tsx";
@@ -243,6 +244,9 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
           </Match>
           <Match when={isDatabaseObjectType(props.element.type)}>
             <DatabaseObjectView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "table.sheet"}>
+            <TableSheetView element={props.element} />
           </Match>
           <Match when={props.element.type === "erd.table"}>
             <ErdTableView element={props.element} />

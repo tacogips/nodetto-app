@@ -88,9 +88,27 @@ export function createInteraction(
   const snapping = createSnapping(ctx);
   // The lifecycle flushes the last queued drag sample through the pointer
   // handlers, which are built on top of it; bind late.
-  const lifecycle = createGestureLifecycle(ctx, (event) =>
+  const baseLifecycle = createGestureLifecycle(ctx, (event) =>
     pointer.applyPointerMove(event),
   );
+  const lifecycle = {
+    ...baseLifecycle,
+    finishGesture: () => {
+      if (ctx.state.gesture.kind === "table-sheet-resize")
+        ctx.state.gesture.resize.end();
+      baseLifecycle.finishGesture();
+    },
+    cancelGesture: () => {
+      if (ctx.state.gesture.kind === "table-sheet-resize")
+        ctx.state.gesture.resize.cancel();
+      baseLifecycle.cancelGesture();
+    },
+    claim: (event: PointerEvent) => {
+      if (ctx.state.gesture.kind === "table-sheet-resize")
+        ctx.state.gesture.resize.end();
+      baseLifecycle.claim(event);
+    },
+  };
   const menus = createContextMenus(ctx, hits, lifecycle);
   const transform = createTransformGestures(ctx, snapping, lifecycle);
   const connectors = createConnectorGestures(ctx, hits, lifecycle);
@@ -140,7 +158,10 @@ export function createInteraction(
     onKeyUp: keyboard.onKeyUp,
     onDoubleClick: pointer.onDoubleClick,
     onContextMenu: menus.onContextMenu,
-    onBlur: keyboard.onBlur,
+    onBlur: () => {
+      if (state.gesture.kind === "table-sheet-resize") cancelGesture();
+      keyboard.onBlur();
+    },
     startResize: editableGesture(transform.startResize),
     startResizeSelection: editableGesture(transform.startResizeSelection),
     startRotate: editableGesture(transform.startRotate),

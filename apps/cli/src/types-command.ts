@@ -25,6 +25,7 @@ const PARTICIPANT_RENDERING =
 const TYPES_OPTIONS = new Set(["--kind", "--format"]);
 
 const GENERAL = [
+  "table.sheet",
   "ui.control",
   "node.generic",
   "edge.generic",

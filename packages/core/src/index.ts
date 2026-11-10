@@ -369,6 +369,7 @@ export {
 } from "./shapes/geo.ts";
 export { createDefaultRegistry } from "./shapes/index.ts";
 export * from "./bpmn/index.ts";
+export * from "./table-sheet/index.ts";
 export * from "./breadboard/index.ts";
 export * from "./text-layout-lint/index.ts";
 export * from "./pcb-board/index.ts";

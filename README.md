@@ -24,6 +24,9 @@ associations.
 - **Diagrams**: ER diagrams with PostgreSQL, MySQL and SQLite DDL export, UML
   class, component and use-case diagrams, sequence diagrams, state machines,
   flowcharts and BPMN operation flows. See [Editing diagrams](docs/editing.md).
+- **Spreadsheet tables**: create and edit typed grids with headers and cell
+  data, paste TSV from spreadsheets, and build tables from CSV/TSV with the
+  CLI. See [Spreadsheet tables](docs/editing.md#spreadsheet-tables).
 - **Import and export**: Mermaid, draw.io, D2, BPMN XML, SVG, PNG, PDF and
   static websites. See [Import and export](docs/import-export.md).
 - **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,
@@ -53,6 +56,7 @@ MIT License.
 ## Command line
 
 ```bash
+nodetto-cli table create schema.jsonl --csv data.csv
 nodetto-cli inspect schema.jsonl
 nodetto-cli shapes --category uml
 nodetto-cli draw schema.jsonl usecase:actor --label Customer

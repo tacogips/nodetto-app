@@ -12,6 +12,7 @@ const DESIGN_TABLE_TYPES: readonly string[] = [
   "node.generic",
   "edge.generic",
   "erd.table",
+  "table.sheet",
   "erd.relation",
   "uml.class",
   "uml.association",

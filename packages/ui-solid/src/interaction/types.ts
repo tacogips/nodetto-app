@@ -16,6 +16,7 @@ import type {
   UseCaseRelationshipKind,
 } from "@nodetto/ir";
 import type { Accessor } from "solid-js";
+import type { TableSheetSelection } from "../table-sheet/selection.ts";
 import type { ToolKind } from "../tools.ts";
 import type { EditRegion, ResizeHandle } from "./geometry.ts";
 
@@ -54,6 +55,10 @@ export type Scheduler = (callback: () => void, delayMs: number) => () => void;
 
 export type Gesture =
   | { readonly kind: "idle" }
+  | {
+      readonly kind: "table-sheet-resize";
+      readonly resize: { move(point: Vec): void; end(): void; cancel(): void };
+    }
   | {
       readonly kind: "rotating";
       readonly id: ElementId;
@@ -195,6 +200,8 @@ export interface InteractionOptions {
   readonly viewport?: Accessor<ViewportSize>;
   /** A double-click, Enter or F2, or a freshly placed text element. */
   readonly onEditRequest?: (id: ElementId, region: EditRegion) => void;
+  readonly tableSheetSelection?: TableSheetSelection;
+  readonly onTableSheetDoubleClick?: (id: ElementId, point: Vec) => boolean;
   /** Right-click or Shift+F10; `hit` is the (group-resolved) element. */
   readonly onContextMenu?: (
     at: ContextMenuPoint,

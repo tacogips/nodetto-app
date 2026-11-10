@@ -9,6 +9,8 @@ nodetto-cli ddl schema.jsonl --dialect postgresql --strict --output schema.sql
 nodetto-cli ddl schema.jsonl --dialect postgresql --strict --check schema.sql
 nodetto-cli format schema.jsonl --check     # or --write
 nodetto-cli arrange schema.jsonl --write    # Tidy layout; --mode overlaps, --check
+nodetto-cli table create diagram.jsonl --data '[["Item"],["Widget"]]'
+nodetto-cli table set diagram.jsonl sheet1 --cell 0:0 --value Todo
 nodetto-cli validate schema.jsonl
 nodetto-cli lint process.jsonl --format text
 nodetto-cli bpmn import process.bpmn --output process.jsonl
@@ -51,6 +53,38 @@ warnings. `bpmn export --check` exits 1 on drift; usage or parse errors exit 2.
 `breadboard bom`, `netlist`, `gerber` and `import`, and `gerber import` and
 `export`, exit 3 with `--strict` when they report warnings, and 2 for usage or
 input errors.
+
+### Spreadsheet tables
+
+```bash
+nodetto-cli table create <doc.jsonl> (--csv <file> | --tsv <file> | --data <json>) [--page <id|name>] [--id <id>] [--x <n> --y <n>] [--no-header] [--types t1,t2,...] [--widths w1,w2,...] [--format text|json]
+nodetto-cli table set <doc.jsonl> <table-id> --cell <row>:<col> --value <text> [--cell ... --value ...] [--format text|json]
+nodetto-cli draw <doc> table.sheet
+nodetto-cli shapes table
+```
+
+Create accepts exactly one source. CSV follows RFC 4180 quoting and accepts an
+optional UTF-8 BOM; TSV supports quoted fields, and ragged rows are padded.
+`--data` is a JSON array of arrays of strings, numbers or booleans. The first
+record supplies column names unless `--no-header` is given; that flag names
+columns `Column 1`, `Column 2`, and so on, but does not hide the header row.
+Types default to text; `--types` and `--widths` supply comma-separated column
+properties. Supply `--x` and `--y` together. For `table set`, row and column
+references may be zero-based indexes; row ids, column ids and unique column
+names are also accepted. Cell/value pairs are applied together.
+
+For batch editing, use an operation such as:
+
+```json
+{"op":"set-cells","id":"sheet1","cells":[{"row":0,"column":0,"value":"Todo","bold":true,"align":"left","fill":"#ffeeaa"}]}
+```
+
+Cells also accept boolean or number values; `null` clears a value or style.
+An inline add operation can supply the same semantic payload as the editor:
+`{"op":"add","type":"table.sheet","semantic":{"columns":[{"id":"c1","name":"Item","type":"text","width":120}],"rows":[]}}`.
+`lint` and `validate` report `table.*` validation issues, including
+`table.cellType`; `export` supports SVG, PNG and PDF. See
+[Spreadsheet tables](editing.md#spreadsheet-tables) for limits and codes.
 
 ## PCB boards (KiCad)
 

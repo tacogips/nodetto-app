@@ -14,6 +14,7 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "place",
     "label",
   ],
+  "set-cells": ["op", "id", "ref", "cells"],
   connect: [
     "op",
     "from",

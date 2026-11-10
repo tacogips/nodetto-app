@@ -1,3 +1,4 @@
+import type { TableSheetSemantic } from "./semantics/table.ts";
 import type { UiControlSemantic } from "./ui-controls.ts";
 import type { DatabaseObjectSemantic } from "./database-objects.ts";
 import type {
@@ -105,6 +106,7 @@ export interface SemanticByType {
   "node.generic": GenericNodeSemantic;
   "edge.generic": GenericEdgeSemantic;
   "erd.table": ErdTableSemantic;
+  "table.sheet": TableSheetSemantic;
   "erd.view": DatabaseObjectSemantic;
   "erd.materialized-view": DatabaseObjectSemantic;
   "erd.function": DatabaseObjectSemantic;

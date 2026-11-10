@@ -38,6 +38,7 @@ import {
   setPageRouting,
   deletePage,
 } from "./operations/pages.ts";
+import { setCells } from "./operations/table.ts";
 import { addElement } from "./operations/add.ts";
 import { connectElements } from "./operations/connect.ts";
 import { convertElements } from "./operations/convert.ts";
@@ -338,6 +339,9 @@ export class Batch {
       case "add":
         addElement(this, operation, index);
         return;
+      case "set-cells":
+        setCells(this, operation, index);
+        return;
       case "connect":
         connectElements(this, operation, index);
         return;
@@ -378,7 +382,7 @@ export class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, set-page-routing, delete-page, add, connect, convert, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, set-page-routing, delete-page, add, set-cells, connect, convert, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
         );
     }
   }

@@ -76,6 +76,7 @@ const LISTINGS: Readonly<Record<ShapeCategoryId, Listing>> = {
     [Tool.Text, "Text"],
     [Tool.Note, "Note"],
     [Tool.Node, "Node"],
+    [Tool.Sheet, "Sheet"],
     [Tool.Frame, "Frame"],
     [Tool.Connector, "Connector"],
   ],

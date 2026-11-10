@@ -95,6 +95,7 @@ test("handler operation reads are represented in their field rows", () => {
       "batch:shape",
       "batch:record",
     ],
+    "set-cells": ["table:setCells"],
     connect: ["connect:connectElements", "batch:shape", "batch:record"],
     convert: ["convert:convertElements", "selectors:selectedWhere"],
     update: [

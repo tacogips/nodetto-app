@@ -14,6 +14,7 @@ import { databaseObjectDefinitions } from "./database-objects.ts";
 // this module assembles them in registration order.
 
 import { GENERIC_NODE, GENERIC_EDGE } from "./registry/generic.ts";
+import { TABLE_SHEET } from "./registry/table.ts";
 import { ERD_TABLE, ERD_RELATION } from "./registry/erd.ts";
 import {
   UML_CLASS,
@@ -80,6 +81,7 @@ const DEFINITIONS: readonly ElementTypeDefinition[] = [
   GENERIC_NODE,
   GENERIC_EDGE,
   ERD_TABLE,
+  TABLE_SHEET,
   uiControlDefinition,
   ...databaseObjectDefinitions,
   ERD_RELATION,

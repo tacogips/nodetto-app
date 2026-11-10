@@ -202,3 +202,9 @@ nodetto-cli export design.jsonl --format html --output website.zip
 Use `--element <frame-id>` for one artboard. These are static pages; application
 logic and prototype navigation are not generated. Missing images stop export
 with an error.
+
+## Spreadsheet tables
+
+SVG, PNG and PDF render `table.sheet` like the canvas; text truncation uses
+estimated widths, so the ellipsis position may differ slightly. Code handoff,
+draw.io, Mermaid and D2 do not export spreadsheet tables.

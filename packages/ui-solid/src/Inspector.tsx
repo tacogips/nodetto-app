@@ -68,6 +68,7 @@ import { BasicAppearance } from "./inspector/BasicAppearance.tsx";
 import { StyleSection } from "./inspector/StyleSection.tsx";
 import { ImageSection } from "./inspector/ImageSection.tsx";
 import { UmlClassSection } from "./inspector/UmlClassSection.tsx";
+import { TableSheetSection } from "./inspector/TableSheetSection.tsx";
 import { ColorBindingsSection } from "./inspector/ColorBindingsSection.tsx";
 import { NumberBindingsSection } from "./inspector/NumberBindingsSection.tsx";
 import { TextStyleBindingsSection } from "./inspector/TextStyleBindingsSection.tsx";
@@ -191,6 +192,7 @@ export function Inspector(props: InspectorProps): JSX.Element {
     const labels: Record<string, string> = {
       "ui.control": "Control",
       "erd.table": "Table",
+      "table.sheet": "Table (sheet)",
       "uml.class": "Class",
       "state.node": "State",
       "state.transition": "State transition",
@@ -269,6 +271,9 @@ export function Inspector(props: InspectorProps): JSX.Element {
           </Match>
           <Match when={isDatabaseObjectType(element().type)}>
             <DatabaseObjectSection editor={props.editor} element={element()} />
+          </Match>
+          <Match when={element().type === "table.sheet"}>
+            <TableSheetSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type === "erd.table"}>
             <Suspense>

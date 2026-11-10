@@ -57,6 +57,11 @@ describe("shape catalogue", () => {
       geo: "diamond",
       label: "Condition?",
     });
+    expect(findShape("table.sheet")).toMatchObject({
+      label: "Sheet",
+      type: "table.sheet",
+    });
+    expect(shapeCreation(Tool.Sheet)?.type).toBe("table.sheet");
     expect(findShape("select")).toBeUndefined();
   });
 

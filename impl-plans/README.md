@@ -42,9 +42,44 @@ and lint manifests (`clm-s725-dispatch.json`, `clm-s731-dispatch.json`,
 with their pre-archive `planPath` values; s740 was the final dispatch and
 the earlier ones must not be dispatched again. The manifests `fss-s751-dispatch.json`, `seq-self-s750-dispatch.json`, `cpf-s748-dispatch.json`
 also stay in `active/` with their
-pre-archive `planPath` values.
+pre-archive `planPath` values. The spreadsheet table manifests
+`tsh-s776-dispatch.json` and `tsh-s780-dispatch.json` also stay in
+`active/` with their pre-archive `planPath` values; s780 was the final
+dispatch, and s776 must not be dispatched again.
 
 ## Completed
+
+Spreadsheet table element `table.sheet` (sessions 776, 778 and 780; design:
+`design-docs/specs/design-table-sheet.md`; owner Q&A:
+`design-docs/user-qa/table-sheet.md`; no GitHub issue, source is the session
+780 runtime workflowInput). The element is a typed grid with toolbox
+creation, in-place cell editing, TSV clipboard, column and row resize, an
+inspector section, `table.*` validation, SVG/PNG/PDF export and the CLI
+commands `table create` and `table set`. `erd.table` is unchanged. Plans:
+[tsh-00-overview](completed/tsh-00-overview.md),
+[tsh-01a-ir](completed/tsh-01a-ir.md),
+[tsh-01b-layout](completed/tsh-01b-layout.md),
+[tsh-01c-edits](completed/tsh-01c-edits.md),
+[tsh-01d-values](completed/tsh-01d-values.md),
+[tsh-02-export](completed/tsh-02-export.md),
+[tsh-03-view](completed/tsh-03-view.md),
+[tsh-04a-navigation](completed/tsh-04a-navigation.md),
+[tsh-04b-clipboard](completed/tsh-04b-clipboard.md),
+[tsh-04c-resize](completed/tsh-04c-resize.md),
+[tsh-05-inspector](completed/tsh-05-inspector.md),
+[tsh-06-cli](completed/tsh-06-cli.md),
+[tsh-07-docs](completed/tsh-07-docs.md) and
+[tsh-08-wiring](completed/tsh-08-wiring.md). The superseded stubs
+[tsh-01-model](completed/tsh-01-model.md) and
+[tsh-04-cell-editing](completed/tsh-04-cell-editing.md) are archived with
+them as history. Final gate logs (tsh-08-wiring): `mise run test` 3607
+pass, 64 skip, 0 fail; `mise run test-cli` 448 pass, 0 fail on attempt 1;
+typecheck, lint, `mise run build` and `mise run build-cli` clean. Logs:
+`tmp/tsh-s780/tsh-08-wiring/resume/`. Integration logs:
+`tmp/tsh-s780/reconcile-wave-006/`. Evidence roots: `tmp/tsh-s780/<planId>/`.
+Progress logs remain in `progress/`. Browser E2E coverage does not exist in
+this repository, so canvas interactions still need a manual desktop smoke
+test.
 
 Connector routing and arranging (design: `design-docs/specs/design-connector-routing-arranging.md`; no GitHub issue): overlap repair, nearest free label placement, routing parity and end-to-end coverage are finished. The combined `mise run verify` passed (Bun: 3484 pass, 64 skip, 0 fail; Rust: 85 pass, 0 fail, 0 ignored), and `mise run test-cli` passed (438 pass, 0 skip, 0 fail; native parity ran). Logs: `tmp/crl-s759/crl-10-finish/final/`. The uncontended target is at most 6 user seconds per arrange command; recorded means are layered 4.873 and route 3.890 seconds. Evidence roots: `tmp/crl-s749/<planId>/`, `tmp/crl-s753/<planId>/`, `tmp/crl-s754/<planId>/`, and `tmp/crl-s759/<planId>/`; progress logs remain in `progress/`.
 
