@@ -69,7 +69,7 @@ Native edit performance (operator round 24, binding): native nodetto-cli edit sc
    - Make `Store` copies cheaper (for example structural sharing of unchanged element records) while keeping the public `Store` API and its immutability semantics.
    - Restrict derived planning to the pages or elements a command touched, when the planners only read those.
    - Cache the short-id maps and kit definition lookups, and invalidate them on the store diff.
-3. In `apps/cli/src/native-parity/edit-performance.test.ts`, add one `nativeTest` case (or a small group), using the pattern of the existing cases in that file: `mkdtempSync` under `tmpdir()`, Bun first, then native, then compare stdout, stderr and document text. The fixture is generic. It has 3 to 4 sequential batches reaching about 300 elements over several 390x844 frames, and it uses `parent`, `select` and kit shape ids. Compare Bun and native documents with the accepted round-15/16 normalization, so generated ids and fractional ordering keys are not compared raw. Reuse the normalizer from `apps/cli/src/native-parity/app-design-flows.test.ts` by copying it locally; do not edit that file. Assert that each native batch takes under 3000 ms, and that the batch on the largest document takes under 3 times the first batch.
+3. In `apps/cli/src/native-parity/edit-performance.test.ts`, add one `nativeTest` case (or a small group), using the pattern of the existing cases in that file: `mkdtempSync` under `tmpdir()`, Bun first, then native, then compare stdout, stderr and document text. The fixture is generic. It has 3 to 4 sequential batches reaching about 300 elements over several 390x844 frames, and it uses `parent`, `select` and kit shape ids. Compare Bun and native documents with the accepted round-15/16 normalization, so generated ids and fractional ordering keys are not compared raw. Reuse the normalizer from `apps/cli/src/native-parity/app-design-flows.test.ts` by copying it locally; do not edit that file. Assert that each native batch takes under 5000 ms, and that the batch on the largest document takes under 4 times the first batch (operator round 25 limits, replacing 3000 ms / 3x).
 4. Write the progress log `impl-plans/progress/ipd-27p-native-edit-perf.md` with: before and after native and Bun batch timings (element count, operation count, ms), the hot path you identified (file:symbol and top profile frames), each change, and every verification command with its exit code and pass/fail counts.
 
 ## Invariants
@@ -90,7 +90,7 @@ Native edit performance (operator round 24, binding): native nodetto-cli edit sc
 
 ## Test cases
 
-- 4 synthetic batches, about 300 elements, 390x844 frames, `parent` + `select` + kit insertion -> each native batch under 3000 ms; the last batch under 3 times the first; Bun and native documents equal after normalization; stdout and stderr equal.
+- 4 synthetic batches, about 300 elements, 390x844 frames, `parent` + `select` + kit insertion -> each native batch under 5000 ms; the last batch under 4 times the first (operator round 25 limits; the round-24 3000 ms / 3x wording is superseded); Bun and native documents equal after normalization; stdout and stderr equal.
 - Existing obstacle-routing cases in `edit-performance.test.ts` -> still pass, with byte-equal expected output.
 - `bun test apps/cli/src/edit packages/core` -> 0 fail. This covers the editor, store, auto-layout, text-layout, text-styles and kit tests that guard result equality.
 
@@ -107,6 +107,11 @@ Native edit performance (operator round 24, binding): native nodetto-cli edit sc
 
 ## Done criteria
 
-- The progress log records before and after timings, and the after timings meet the 3000 ms and 3x limits on the synthetic driver.
+- The progress log records before and after timings, and the after timings meet the round-25 limits on the synthetic driver: every native batch under 5000 ms and the last batch under 4 times the first. The test's `toBeLessThan(3000)` and `* 3` assertions in `apps/cli/src/native-parity/edit-performance.test.ts` are updated to 5000 and 4 to match.
+- Scratch written by existing suites under the git-ignored `apps/desktop/tmp/` is authorized (round 25) and is not an out-of-scope write; it is not a writePath and must not be committed.
 - Verification items 1-7 (and 8 if applicable) exit 0, with counts recorded in the progress log.
 - `git diff --name-only` plus `git ls-files -o --exclude-standard`, filtered to source, shows edits only inside this plan's writePaths.
+
+## Amendment 2026-11-11 (operator round 25, binding; keep this section verbatim)
+
+Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.
