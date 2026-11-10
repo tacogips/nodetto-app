@@ -3,7 +3,7 @@
 - planId: ipd-27-reproduction
 - planPath: impl-plans/active/ipd-27-reproduction.md
 - progressPath: impl-plans/progress/ipd-27-reproduction.md
-- dependsOn: ipd-27c-reproduction-search-more (which follows ipd-27a and ipd-27b; accepted ipd-25-docs-help and ipd-26-example-sample supply all features, parity and docs)
+- dependsOn: none (manifest dependsOn []; ipd-27a, ipd-27b and ipd-27c-reproduction-search-more are accepted dependencies, and accepted ipd-25-docs-help and ipd-26-example-sample supply all features, parity and docs)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, section "Reproduction (item 11) support", Decision 10.2 (bands), user-QA Q1 default (device layout with two bands).
 - Evidence and working directory: `tmp/ipd-s772/ipd-27-reproduction/` (git-ignored).
 <!-- ownership:start -->
@@ -217,3 +217,7 @@ General scratch rule (operator round 26, binding for every remaining plan; super
 ## Amendment 2026-11-11 (operator round 27, binding; keep this section verbatim)
 
 Required correction (operator round 27, binding for ipd-27-reproduction): on the screen with the clipped scroll region, the current-day marker is too narrow (8 points wide) so its digit is clipped; widen the marker to fit its digit with at least 2 points of padding on each side, keep its color and corner radius, and keep it on the 1-point grid. Elements covered by the floating action buttons on that screen are the intentional overlay of the round-18 layout rule and do not count as missing.
+
+## Amendment 2026-11-11 (operator round 28, binding; keep this section verbatim)
+
+Operator decision (round 28, binding for ipd-27-reproduction): (1) The round-18 intentional-overlay rule applies to every screen, not only the one with the clipped scroll region: wherever the floating action buttons cover part of content that is visible in the web-view reference (screen 09 row accessories included), that is the intended overlay of the running app and is neither a missing element nor a visual failure. (2) Screen 10's reference shows the bottom tab bar without the badge; remove the badge from screen 10's tab bar (every other screen keeps its badge as in its reference), then re-export and recompare screen 10. After both, the reproduction is complete when the existing gates still pass; copy the final document, frames and comparisons to the output directory again.
