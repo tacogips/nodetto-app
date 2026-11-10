@@ -213,3 +213,7 @@ Performance target and scratch (operator round 25, binding for ipd-27p and every
 ## Amendment 2026-11-11 (operator round 26, binding; keep this section verbatim)
 
 General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.
+
+## Amendment 2026-11-11 (operator round 27, binding; keep this section verbatim)
+
+Required correction (operator round 27, binding for ipd-27-reproduction): on the screen with the clipped scroll region, the current-day marker is too narrow (8 points wide) so its digit is clipped; widen the marker to fit its digit with at least 2 points of padding on each side, keep its color and corner radius, and keep it on the 1-point grid. Elements covered by the floating action buttons on that screen are the intentional overlay of the round-18 layout rule and do not count as missing.

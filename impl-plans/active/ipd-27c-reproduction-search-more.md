@@ -3,7 +3,7 @@
 - planId: ipd-27c-reproduction-search-more
 - planPath: impl-plans/active/ipd-27c-reproduction-search-more.md
 - progressPath: impl-plans/progress/ipd-27c-reproduction-search-more.md
-- dependsOn: ipd-27b-reproduction-detail
+- dependsOn: none (operator round 27). ipd-27p-native-edit-perf and ipd-27b-reproduction-detail are accepted dependencies; the ipd-27b document and comparisons are in `tmp/ipd-s772/ipd-27-reproduction/work/`. The manifest `dependsOn` is `[]`.
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, section "Reproduction (item 11) support", Decision 10.2 (bands), user-QA Q1 default (device layout with two bands).
 - Evidence and working directory: `tmp/ipd-s772/ipd-27-reproduction/` (git-ignored).
 <!-- ownership:start -->
@@ -206,3 +206,9 @@ Performance target and scratch (operator round 25, binding for ipd-27p and every
 ## Amendment 2026-11-11 (operator round 26, binding; keep this section verbatim)
 
 General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.
+
+## Amendment 2026-11-11 (operator round 27, binding; keep this section verbatim)
+
+`ipd-27p-native-edit-perf` and `ipd-27b-reproduction-detail` are accepted dependencies (operator round 27, session-816 wave 2), so this plan is the root of the pending chain ipd-27c -> ipd-27-reproduction -> ipd-28-finish and its manifest `dependsOn` is `[]`. Continue from the accepted document and comparisons in `tmp/ipd-s772/ipd-27-reproduction/work/`. The round-27 current-day marker correction on the clipped scroll-region screen is owned by `ipd-27-reproduction`; this part does not change that screen's ops in gen/build.ts except to keep the `--through 10` rebuild working. On that screen, elements covered by the floating action buttons are the intentional overlay of the round-18 layout rule and do not count as missing.
+
+Unchanged: planId, writePaths, sharedPaths, sharedPathNotes, artifactRoots, scope (screens 07-10), verification strings and every operator section.

@@ -235,6 +235,10 @@
       {
         "decision": "2026-11-11 operator amendment round 26 (session-815 wave 1): General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.",
         "rationale": "ipd-27p met the round-25 performance target (synthetic regression 5/5 passed, batches 2.2-3.8 s, down from 8.1-21.3 s) but blocked a third time on scratch: the accepted ipd-26 example test writes into tmp/ipd-s772/ipd-26-example-sample/. Scratch boundaries were granted one directory per round; a single rule over all git-ignored scratch ends that loop while still forbidding stray tracked or untracked files."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 27 (session-816 wave 2): ipd-27p-native-edit-perf and ipd-27b-reproduction-detail are accepted dependencies. Required correction (operator round 27, binding for ipd-27-reproduction): on the screen with the clipped scroll region, the current-day marker is too narrow (8 points wide) so its digit is clipped; widen the marker to fit its digit with at least 2 points of padding on each side, keep its color and corner radius, and keep it on the 1-point grid. Elements covered by the floating action buttons on that screen are the intentional overlay of the round-18 layout rule and do not count as missing.",
+        "rationale": "ipd-27b certified screens 04 and 06 but not screen 05 because the floating overlay covers an element visible in the web-view reference; adding the status bar makes that overlap unavoidable and the running app scrolls content under the floating buttons. The operator inspected the comparisons, found only the narrow current-day marker as a real defect, and moved its fix into the final reproduction pass."
       }
     ],
     "intentionalTradeoffs": [
@@ -269,112 +273,10 @@
   },
   "plans": [
     {
-      "planId": "ipd-27p-native-edit-perf",
-      "planPath": "impl-plans/active/ipd-27p-native-edit-perf.md",
-      "progressPath": "impl-plans/progress/ipd-27p-native-edit-perf.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "apps/cli/src/edit",
-        "packages/core/src/editor",
-        "packages/core/src/store.ts",
-        "packages/core/src/auto-layout.ts",
-        "packages/core/src/text-layout.ts",
-        "packages/core/src/text-styles.ts",
-        "packages/core/src/color-tokens.ts",
-        "packages/core/src/number-tokens.ts",
-        "packages/core/src/aspect-ratio.ts",
-        "packages/core/src/insertion-parent.ts",
-        "packages/core/src/kits/ios/insert.ts",
-        "apps/cli/native/src/engine.rs",
-        "apps/cli/src/native-parity/edit-performance.test.ts",
-        "impl-plans/progress/ipd-27p-native-edit-perf.md",
-        "tmp/ipd-s772/ipd-27p-native-edit-perf",
-        "target",
-        "apps/desktop/src-tauri/binaries"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-27p-native-edit-perf",
-        "target",
-        "apps/desktop/src-tauri/binaries"
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
-        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/edit-performance.test.ts",
-        "bun test apps/cli/src/edit packages/core",
-        "CARGO_TERM_QUIET=true mise run test-cli",
-        "CARGO_TERM_QUIET=true mise run build-cli",
-        "sh -c 'mkdir -p tmp/ipd-s772/ipd-27p-native-edit-perf/final && bun run typecheck --pretty false > tmp/ipd-s772/ipd-27p-native-edit-perf/final/typecheck.log 2>&1'",
-        "bunx biome check apps/cli/src/edit packages/core/src/editor packages/core/src/store.ts packages/core/src/auto-layout.ts packages/core/src/text-layout.ts packages/core/src/text-styles.ts packages/core/src/color-tokens.ts packages/core/src/number-tokens.ts packages/core/src/aspect-ratio.ts packages/core/src/insertion-parent.ts packages/core/src/kits/ios/insert.ts apps/cli/src/native-parity/edit-performance.test.ts"
-      ],
-      "acceptanceCriteria": [
-        "Native edit performance (operator round 24, binding): native nodetto-cli edit scales superlinearly with document size (a synthetic-like 135-operation batch takes over 90 s on a 300-element document, batches on 151/233/298 elements take 6/39/59 s), while the Bun CLI runs the same batches in about 1 s. macOS sample shows the time in the embedded Boa engine's garbage collector (GcHeader inc_ref_count, GC dropping, mark_heap), which points to per-operation work proportional to the whole document (cloning, rescanning or reserializing the document or its indexes for every operation, for example in auto-parenting containment, selection or kit insertion). Profile with `bun --cpu-prof` and with `sample` on the native binary, find the per-operation O(document) work in the edit path, and make batch application near-linear without changing any result (all parity, edit and kit tests stay green). Add a generic synthetic regression to apps/cli/src/native-parity/edit-performance.test.ts: build about 300 elements in several 390x844 iPhone frames over 3 to 4 edit batches that use parent, select and kit insertion; assert every native batch finishes in under 3 s and the batch on the largest document takes under 3 times the first batch. No private reference content in the fixture.",
-        "Temporary directories under the OS temp dir created by test harnesses are authorized scratch.",
-        "Results unchanged: document bytes, stdout, stderr, exit codes and warnings stay identical (generated ids and ordering keys compared only after the accepted round-15/16 normalization); Store public API, undo/redo and ApplyOptions semantics unchanged; no Boa/Cargo.toml/Cargo.lock/build.rs/build-engine.ts changes and no GC-disabling or validation-skipping shortcuts.",
-        "The progress log records before/after native and Bun batch timings (elements, operations, ms), the profiled hot path (file:symbol and top frames) and every verification command with exit code and counts; mise run test-cli shows no new failures versus the ipd-00 baseline (438 pass, 0 fail).",
-        "target and apps/desktop/src-tauri/binaries are build-output artifact roots with no authored source.",
-        "Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.",
-        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them."
-      ]
-    },
-    {
-      "planId": "ipd-27b-reproduction-detail",
-      "planPath": "impl-plans/active/ipd-27b-reproduction-detail.md",
-      "progressPath": "impl-plans/progress/ipd-27b-reproduction-detail.md",
-      "dependsOn": [
-        "ipd-27p-native-edit-perf"
-      ],
-      "writePaths": [
-        "impl-plans/progress/ipd-27b-reproduction-detail.md",
-        "tmp/ipd-s772/ipd-27-reproduction",
-        "target",
-        "apps/desktop/src-tauri/binaries"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-27-reproduction",
-        "target",
-        "apps/desktop/src-tauri/binaries"
-      ],
-      "acceptanceCriteria": [
-        "All part verification passes: build-cli exit 0, validate exit 0 and app lint (operator round 19 gate) exits with summary.errors 0 and every finding is app-misaligned, each one justified in the progress log as matching the reference screenshot within 4 points, with a per-screen app-misaligned count for screens 04, 05, 06 on the cumulative working document tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl, 6 top-level 390x844 screen frames, and a comparison image for each of screens 04, 05, 06.",
-        "The per-screen table in the progress log covers screens 04, 05, 06 with drift <= 4, yes for icons, colors and weight, and 0 missing elements; screen 05 records its clipped-row count by number only.",
-        "No private content appears in the progress log: `sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && test -s impl-plans/progress/ipd-27b-reproduction-detail.md && ! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27b-reproduction-detail.md'` exits 0 (fails closed: a missing or empty private-terms.txt or progress log fails the check).",
-        "This part does not copy deliverables into the operator-named output directory, add prototype links or the flow start, or rewrite private-terms.txt; ipd-27-reproduction owns those.",
-        "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
-        "Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.",
-        "Scope (operator round 18): this part builds screens 04, 05 and 06 (05 uses the clipped scroll-region treatment of the layout rule) in tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl through nodetto-cli operations (ops files under tmp/ipd-s772/ipd-27-reproduction/ops/), appending to the document the previous part left. Done when, for this part's frames only: nodetto-cli validate exits 0; nodetto-cli lint reports zero findings on these frames; each frame is exported at scale 2 and compared with its reference screenshot; the progress-log table shows drift <= 4 points, correct icons, colors and weight, and 0 missing elements per screen. Fix kit or engine gaps only as findings naming the owning plan. Prototype links, the flow start, the full-document gate and the copy to the output directory belong to ipd-27-reproduction.",
-        "CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence.",
-        "Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` (\"nearly aligns\") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.",
-        "Visual acceptance (operator round 19): fix every drift visible in the side-by-side comparisons, including floating action button icon stroke width and color, border color, card accent bar width, button and badge positions, so each screen is within 4 points and matches icon weight and color.",
-        "Scratch rule (operator round 22, binding for every remaining plan): temporary directories that test harnesses create under the operating system temp dir (mkdtemp under os.tmpdir(), for example nodetto-*-parity-*) are authorized scratch and are not write-scope violations. The reproduction plans do not run the native parity suites (they belong to accepted ipd-23 and ipd-24); their required gates are build-cli plus the reproduction gates.",
-        "Rebuild rule (operator round 22, binding for ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction): the reproduction document is rebuilt from an empty document on the fixed kit by a generator script kept under tmp/ipd-s772/ipd-27-reproduction/ (git-ignored). The script writes the ops files and applies them with nodetto-cli edit. Ops never hard-code generated element ids: build each screen in one edit batch using `ref` and `@ref`, and resolve cross-batch targets (for example prototype link targets) by element name through nodetto-cli inspect --format json inside the script. Each part reruns the script from scratch for its screens plus all earlier parts, so the document always reflects the current kit.",
-        "Generator contract (step 4 s811, round 22; amended step 4 s812): the only authored source is tmp/ipd-s772/ipd-27-reproduction/gen/build.ts, run as `bun tmp/ipd-s772/ipd-27-reproduction/gen/build.ts --through <NN>` (03, 06 or 10, plus --links for ipd-27-reproduction). Each run deletes work/doc.jsonl, starts from an empty document and applies the ops it writes to gen/ops/ with the built sidecar. Each screen is one batch that uses ref/@ref, cross-batch references are written as names (`name:<exact name>` in id, from, to, parent and memberIds, or select+where{name,page}+expect 1 then @ref; the flow start is an update with id name:<start frame name>). inspect --format json is only used to check that each referenced name is unique on the page before a batch is written, and ids found through it are never written to gen/ops/. Ops files hold one compact op per line, are always files (never stdin), and pass the s812 literal-id gate in this plan's verification with exit 0 (exit 1 means a literal id or id prefix under any key or in an array, exit 2 means no ops files). The pre-fix ops/ files and the old document are layout reference only. No native parity suite is run.",
-        "Scope precedence (step 4 s812): the 'ops files under tmp/ipd-s772/ipd-27-reproduction/ops/' and 'appending to the document the previous part left' wording in the operator round-18 Scope criterion is superseded by the operator round-22 rebuild rule. Ops are the gen/ops/ output of gen/build.ts, and every run rebuilds work/doc.jsonl from an empty document. The round-18 text is kept for the record.",
-        "Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.",
-        "Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.",
-        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them."
-      ],
-      "verification": [
-        "CARGO_TERM_QUIET=true mise run build-cli",
-        "apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
-        "sh -c 'set -- tmp/ipd-s772/ipd-27-reproduction/gen/ops/*.json; test -f \"$1\" || exit 2; ! grep -nE \"\\\"[0-9A-HJKMNP-TV-Z]{26}\\\"|\\\"(id|target|parent|page|from|to)\\\": *\\\"[0-9A-HJKMNP-TV-Z]{4,25}\\\"|\\\"(memberIds|ids)\\\": *\\[[^]]*\\\"[0-9A-HJKMNP-TV-Z]{4,25}\\\"|^[[:space:]]+\\\"\" \"$@\"'",
-        "sh -c 'apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json | bun -e \"const d=await Bun.stdin.json(); const f=d.pages.flatMap((p)=>p.findings); process.exit(d.summary.errors === 0 && f.every((x)=>x.ruleId === \\\"app-misaligned\\\") ? 0 : 1)\"'",
-        "sh -c 'test \"$(apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame | grep -cE \"^    frame .* 390x844$\")\" -eq 6'",
-        "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/04-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/05-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/06-compare.png'",
-        "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && test -s impl-plans/progress/ipd-27b-reproduction-detail.md && ! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27b-reproduction-detail.md'"
-      ]
-    },
-    {
       "planId": "ipd-27c-reproduction-search-more",
       "planPath": "impl-plans/active/ipd-27c-reproduction-search-more.md",
       "progressPath": "impl-plans/progress/ipd-27c-reproduction-search-more.md",
-      "dependsOn": [
-        "ipd-27b-reproduction-detail"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "impl-plans/progress/ipd-27c-reproduction-search-more.md",
         "tmp/ipd-s772/ipd-27-reproduction",
@@ -405,7 +307,8 @@
         "Scope precedence (step 4 s812): the 'ops files under tmp/ipd-s772/ipd-27-reproduction/ops/' and 'appending to the document the previous part left' wording in the operator round-18 Scope criterion is superseded by the operator round-22 rebuild rule. Ops are the gen/ops/ output of gen/build.ts, and every run rebuilds work/doc.jsonl from an empty document. The round-18 text is kept for the record.",
         "Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.",
         "Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.",
-        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them."
+        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.",
+        "Accepted-dependency update (operator round 27, binding for ipd-27c-reproduction-search-more): ipd-27p-native-edit-perf and ipd-27b-reproduction-detail are accepted dependencies, so this plan is the root of the pending chain ipd-27c -> ipd-27-reproduction -> ipd-28-finish and dependsOn is []. Continue from the accepted document and comparisons in tmp/ipd-s772/ipd-27-reproduction/work/. The round-27 current-day marker correction on the clipped scroll-region screen is owned by ipd-27-reproduction; on that screen, elements covered by the floating action buttons are the intentional overlay of the round-18 layout rule and do not count as missing."
       ],
       "verification": [
         "CARGO_TERM_QUIET=true mise run build-cli",
@@ -453,7 +356,8 @@
         "Generator contract (step 4 s811, round 22; amended step 4 s812): the only authored source is tmp/ipd-s772/ipd-27-reproduction/gen/build.ts, run as `bun tmp/ipd-s772/ipd-27-reproduction/gen/build.ts --through <NN>` (03, 06 or 10, plus --links for ipd-27-reproduction). Each run deletes work/doc.jsonl, starts from an empty document and applies the ops it writes to gen/ops/ with the built sidecar. Each screen is one batch that uses ref/@ref, cross-batch references are written as names (`name:<exact name>` in id, from, to, parent and memberIds, or select+where{name,page}+expect 1 then @ref; the flow start is an update with id name:<start frame name>). inspect --format json is only used to check that each referenced name is unique on the page before a batch is written, and ids found through it are never written to gen/ops/. Ops files hold one compact op per line, are always files (never stdin), and pass the s812 literal-id gate in this plan's verification with exit 0 (exit 1 means a literal id or id prefix under any key or in an array, exit 2 means no ops files). The pre-fix ops/ files and the old document are layout reference only. No native parity suite is run.",
         "Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.",
         "Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.",
-        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them."
+        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.",
+        "Required correction (operator round 27, binding for ipd-27-reproduction): on the screen with the clipped scroll region, the current-day marker is too narrow (8 points wide) so its digit is clipped; widen the marker to fit its digit with at least 2 points of padding on each side, keep its color and corner radius, and keep it on the 1-point grid. Elements covered by the floating action buttons on that screen are the intentional overlay of the round-18 layout rule and do not count as missing."
       ],
       "verification": [
         "CARGO_TERM_QUIET=true mise run build-cli",
@@ -706,6 +610,18 @@
       "planPath": "impl-plans/active/ipd-27a-reproduction-chrome.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted by the operator after session-811 wave 1: rebuilt document validates, passes the reproduction lint gate with zero hard findings, no literal generated ids; the operator inspected the three side-by-side comparisons and judged every element within 4 points with matching icons, colors and weight (one badge about 2 points off). Its work is in tmp/ipd-s772/ipd-27-reproduction."
+    },
+    {
+      "planId": "ipd-27p-native-edit-perf",
+      "planPath": "impl-plans/active/ipd-27p-native-edit-perf.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-816 wave 1 (passed test-integrity, adversarial and integration reviews); native batches 2.2-3.8 s"
+    },
+    {
+      "planId": "ipd-27b-reproduction-detail",
+      "planPath": "impl-plans/active/ipd-27b-reproduction-detail.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted by the operator after session-816 wave 2: the operator inspected the three comparisons; screens 04 and 06 are within 4 points with matching icons, colors and weight; on screen 05 the floating action buttons cover part of the last visible row, which is the intentional overlay of the round-18 layout rule, and one required correction is handed to ipd-27-reproduction"
     }
   ]
 }
