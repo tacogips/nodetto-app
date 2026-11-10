@@ -131,3 +131,9 @@ Do not change `harness.ts`. PNG outputs keep the round-12 decoded RGBA compariso
 The working-tree kit-insertion loop (the `compareFile` calls on `add frame:iphone` plus `add ios:<shape>`) and every other id-minting `add` or `connect` case move to the normalized helper. Cases with fixed ids and no new elements stay on `compareFile`.
 
 Stability evidence: run Verification step 2 three times in a row. Each run must exit 0 with 0 fail and 0 skip. Record all three logs in `tmp/ipd-s772/ipd-24-parity-flows/final/` and their counts in the progress log. One passing run is not enough, because the id order between the two hosts is random.
+
+## Amendment 2026-11-10 (operator round 14, binding; keep this section verbatim)
+
+Z-order comparison: an element's fractional z-order `index` is randomized when the element is created, independently in Bun and native. The normalized comparison therefore does not compare the raw `index` strings of elements created by the compared edit. Instead, for each page, sort all elements by `index` (the engine ordering) and assert that both hosts give the same sequence of normalized element ids (ID placeholders and fixed ids). Raw `index` values of elements that already existed in the input document are compared exactly. Every other field is compared exactly after id normalization. Do not change engine or harness code.
+
+Done when the normalized edit-parity test and the decoded-PNG checks pass in three consecutive runs of the parity gate, and the DR-02 and clean-kit lint cases are complete. Keep the ipd-24 work already in the working tree and continue from it.
