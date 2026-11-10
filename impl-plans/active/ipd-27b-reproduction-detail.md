@@ -3,7 +3,7 @@
 - planId: ipd-27b-reproduction-detail
 - planPath: impl-plans/active/ipd-27b-reproduction-detail.md
 - progressPath: impl-plans/progress/ipd-27b-reproduction-detail.md
-- dependsOn: none pending (operator round 23: ipd-27a-reproduction-chrome is now an accepted dependency; its document and comparisons are in `tmp/ipd-s772/ipd-27-reproduction/work/`). The manifest `dependsOn` is `[]`.
+- dependsOn: ipd-27p-native-edit-perf (operator round 24). ipd-27a-reproduction-chrome is an accepted dependency (operator round 23); its document and comparisons are in `tmp/ipd-s772/ipd-27-reproduction/work/`. The manifest `dependsOn` is `["ipd-27p-native-edit-perf"]`.
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, section "Reproduction (item 11) support", Decision 10.2 (bands), user-QA Q1 default (device layout with two bands).
 - Evidence and working directory: `tmp/ipd-s772/ipd-27-reproduction/` (git-ignored).
 <!-- ownership:start -->
@@ -199,3 +199,7 @@ Unchanged: planId, dependsOn, writePaths, sharedPaths, sharedPathNotes, artifact
 Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.
 
 `ipd-27a-reproduction-chrome` is accepted; its document and comparisons are in `tmp/ipd-s772/ipd-27-reproduction/work/`. Continue from them.
+
+## Amendment 2026-11-11 (operator round 24, binding)
+
+ipd-27b-reproduction-detail now depends on the new root plan ipd-27p-native-edit-perf. Native `nodetto-cli edit` batches on a document of about 300 elements took minutes (screen 05 stayed CPU-bound for over six minutes), so the reproduction waits until ipd-27p makes native batch application near-linear. When this plan resumes, rebuild the sidecar with `CARGO_TERM_QUIET=true mise run build-cli` before running `gen/build.ts`, so that the built binary includes the ipd-27p fix. Keep the work already in the working tree. Scope, writePaths, gates and the round-22/23 rules are unchanged. If a native batch still takes over 3 s, record it as an owned_elsewhere finding against ipd-27p-native-edit-perf instead of editing engine or editor code.
