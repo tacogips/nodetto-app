@@ -4,7 +4,7 @@
 - planPath: impl-plans/active/tsh-07-docs.md
 - progressPath: impl-plans/progress/tsh-07-docs.md
 - wave: 2
-- dependsOn: tsh-01-model
+- dependsOn: tsh-01a-ir
 - Design: `design-docs/specs/design-table-sheet.md` sections 2-9; `design-docs/user-qa/table-sheet.md`.
 - Contracts and worker rules: `impl-plans/active/tsh-00-overview.md`.
 - writePaths:
@@ -13,7 +13,7 @@
   - `docs/import-export.md`
   - `apps/cli/src/table-docs.test.ts` (new)
   - `impl-plans/progress/tsh-07-docs.md`
-  - `tmp/tsh-s776/tsh-07-docs`
+  - `tmp/tsh-s778/tsh-07-docs`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -53,6 +53,9 @@ belong to tsh-08.
      - arrows, Delete and Escape outside it
    - Copy, cut and paste as TSV: copy preserves stored text exactly, and
      paste grows the table and coerces values to the column types.
+   - New columns, from Add column, paste growth or CLI `--no-header`, are
+     named `Column N`, where N is the smallest positive number no column
+     uses yet. They are text columns of width 120 (tsh-00 rule).
    - Column and row border dragging; a double-click on a column border
      resets it to 120. Every edit is one undo step.
    - Inspector controls, and the toolbox "Sheet" entry that creates the
@@ -90,18 +93,18 @@ belong to tsh-08.
 - Write in plain English, without emojis, matching the existing doc tone.
 - Do not document behavior beyond the design, for example formulas or
   sorting.
-- The limits come from `TABLE_SHEET_LIMITS`. If tsh-01's values differ
+- The limits come from `TABLE_SHEET_LIMITS`. If the committed IR values differ
   from the design, record a blocker instead of changing the docs to match.
 
 ## Verification (exit 0; test commands show at least 1 test, 0 fail)
 
 1. `bun test ./apps/cli/src/table-docs.test.ts` -> `docs.log`
-2. `bun run typecheck` -> `typecheck.log` (static gate)
-3. `bunx biome check apps/cli/src/table-docs.test.ts --diagnostic-level=warn` -> `biome.log`
+Static checks (tsh-00; must exit 0, but they are not test commands):
+`bun run typecheck` -> `typecheck.log`, and `bunx biome check apps/cli/src/table-docs.test.ts --diagnostic-level=warn` -> `biome.log`
 
 ## Done criteria
 
 - The three docs are updated, and the drift test passes.
-- Logs are under `tmp/tsh-s776/tsh-07-docs/final/`, with the progress log
+- Logs are under `tmp/tsh-s778/tsh-07-docs/final/`, with the progress log
   complete.
 - `git diff --stat -- docs/` lists only the three files.

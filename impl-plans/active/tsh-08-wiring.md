@@ -4,7 +4,7 @@
 - planPath: impl-plans/active/tsh-08-wiring.md
 - progressPath: impl-plans/progress/tsh-08-wiring.md
 - wave: 3 (final, runs alone)
-- dependsOn: tsh-02-export, tsh-03-view, tsh-04-cell-editing, tsh-05-inspector, tsh-06-cli, tsh-07-docs
+- dependsOn: tsh-02-export, tsh-03-view, tsh-04a-navigation, tsh-04b-clipboard, tsh-04c-resize, tsh-05-inspector, tsh-06-cli, tsh-07-docs
 - Design: `design-docs/specs/design-table-sheet.md` sections 1, 5, 6, 7, 8, 9, 10, 11, 12.
 - Contracts and worker rules: `impl-plans/active/tsh-00-overview.md`.
 - writePaths:
@@ -35,7 +35,7 @@
   - `docs/cli.md`
   - `docs/editing.md`
   - `impl-plans/progress/tsh-08-wiring.md`
-  - `tmp/tsh-s776/tsh-08-wiring`
+  - `tmp/tsh-s778/tsh-08-wiring`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -50,12 +50,17 @@ registration and dispatch point, documents the feature in the README,
 marks the design as implemented, adds end-to-end tests, and runs the
 workspace gates. This is the only plan that touches shared files.
 
-Plan-level refinement: catalogue shape ids are `ToolKind` values
-(`packages/core/src/shape-catalogue.ts:ShapeCatalogueEntry.id`; for
-example the ERD table's id is `erd.table`). The table's shape id is
-therefore `table.sheet`, not the design's `table:sheet`. Update the
-design's section 8/9 wording, and update docs/cli.md if tsh-07 wrote
-`table:sheet`.
+The catalogue shape id is `table.sheet`. Design sections 8 and 9 already
+say so. Update docs/cli.md only if tsh-07 wrote `table:sheet`.
+
+Producers of the interaction modules, all under
+`packages/ui-solid/src/table-sheet/`:
+
+- tsh-04a: `selection.ts` (including `tableSheetCellClick`), `keyboard.ts`,
+  `cell-commit.ts`, `CellEditor.tsx`, `SelectionOverlay.tsx`
+- tsh-04b: `clipboard.ts`, which takes explicit targets
+- tsh-04c: `resize.ts`, which provides `tableSheetRegionAt` and the resize
+  drag
 
 ## Non-goals
 
@@ -124,11 +129,21 @@ design's section 8/9 wording, and update docs/cli.md if tsh-07 wrote
      cursors are set only in Canvas, and record which.
    - Keyboard (`keyboard.ts:onKeyDown`): after the existing
      `isEditableTarget` guard and before any canvas shortcut (nudge,
-     delete, copy, paste), call
-     `if (handleTableSheetKey(event, ctx)) return;`. Its `ctx.clipboard`
-     uses `navigator.clipboard.writeText` and `readText`, guarded when
-     `navigator.clipboard` is undefined (then copy, cut and paste return
-     false and fall through).
+     delete, copy, paste):
+     1. Clipboard routing. While `selection.state()` is set and the
+        element is selected, route the keys to tsh-04b:
+        - Cmd/Ctrl+C: `copyTableRange(editor, {elementId, range: selection.range(editor)}, port)`
+        - Cmd/Ctrl+X: `cutTableRange` with the same target
+        - Cmd/Ctrl+V: `pasteIntoTable(editor, {elementId, row, column}, port)`.
+          `row` and `column` are the indices of the active cell, taken
+          from `selection.range(editor)` top/left.
+        Call `preventDefault()` and return. After a successful paste, set
+        the selection to the returned range: `activate` at the top-left
+        ids, then `extend` to the bottom-right ids.
+        The port uses `navigator.clipboard.writeText` and `readText`. When
+        `navigator.clipboard` is undefined, do not route, and fall
+        through to the existing behavior.
+     2. Then `if (handleTableSheetKey(event, { editor, selection })) return;`.
    - Mount `<TableSheetCellEditor>` when
      `selection.state()?.editing`, and `<TableSheetSelectionOverlay>` in
      the editing overlay layer next to the existing edit handles. Never
@@ -154,9 +169,9 @@ design's section 8/9 wording, and update docs/cli.md if tsh-07 wrote
 10. `README.md`: one feature bullet for spreadsheet tables and one CLI
     example line. Follow the existing README feature list style.
 11. `design-docs/specs/design-table-sheet.md`:
-    - change `Status: design, not implemented.` to
-      `Status: implemented (session 776).`
-    - fix the shape id wording `table:sheet` -> `table.sheet`
+    - change the first sentence of the status paragraph,
+      `Status: design, not implemented.`, to
+      `Status: implemented (session 778).`
     - make no other edits
 
 ## End-to-end tests (input -> expected)
@@ -191,11 +206,16 @@ design's section 8/9 wording, and update docs/cli.md if tsh-07 wrote
   6. `types table.sheet` mentions `columns`
   7. `draw doc table.sheet` creates a 3x3 table
 
-## Verification (each exit 0; test commands show at least 1 test, 0 fail; logs under `tmp/tsh-s776/tsh-08-wiring/final/`)
+## Verification (each exit 0; test commands show at least 1 test, 0 fail; logs under `tmp/tsh-s778/tsh-08-wiring/final/`)
 
-1. `bun test ./packages/core/src/table-sheet-export.test.ts ./packages/core/src/shape-catalogue.test.ts ./packages/core/src/table-sheet ./packages/core/src/svg-export/table-sheet.test.ts` -> `core.log`
-2. `bun test ./packages/ui-solid/src/table-sheet-wiring.test.ts ./packages/ui-solid/src/table-sheet ./packages/ui-solid/src/Toolbar.test.ts ./packages/ui-solid/src/shape-search.test.ts ./packages/ui-solid/src/interaction-keyboard-menus.test.ts` -> `ui.log`
-3. `bun test ./apps/cli/src/table-e2e.test.ts ./apps/cli/src/cli-wiring.test.ts ./apps/cli/src/table-command.test.ts ./apps/cli/src/table-docs.test.ts` -> `cli.log`
+1. `bun test ./packages/core/src/table-sheet-export.test.ts ./packages/core/src/shape-catalogue.test.ts ./packages/core/src/svg-export/table-sheet.test.ts ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts` -> `core.log`
+2. `bun test ./packages/ui-solid/src/table-sheet-wiring.test.ts ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts ./packages/ui-solid/src/table-sheet/clipboard.test.ts ./packages/ui-solid/src/table-sheet/resize.test.ts ./packages/ui-solid/src/table-sheet-view.test.ts ./packages/ui-solid/src/inspector/table-sheet-section.test.ts ./packages/ui-solid/src/Toolbar.test.ts ./packages/ui-solid/src/shape-search.test.ts ./packages/ui-solid/src/interaction-keyboard-menus.test.ts` -> `ui.log`
+3. `bun test ./apps/cli/src/table-e2e.test.ts ./apps/cli/src/cli-wiring.test.ts ./apps/cli/src/table-command.test.ts ./apps/cli/src/edit/operations/table.test.ts ./apps/cli/src/table-docs.test.ts ./apps/cli/src/edit/label-field.test.ts` -> `cli.log`.
+   `label-field.test.ts` loops over `ELEMENT_TYPES`. It passes only after
+   this plan registers `tableSheetShapeUtil` in
+   `packages/core/src/shapes/index.ts`: the default semantic must then
+   validate, and `table.sheet` must report "has no text label". It is a
+   wave-3 check and is not run by any wave-2 plan.
 4. `bun run typecheck` -> `typecheck.log`
 5. `mise run lint` -> `lint.log`
 6. `mise run test` -> `test.log` (includes the unchanged erd tests and the cargo workspace tests)
@@ -204,12 +224,13 @@ design's section 8/9 wording, and update docs/cli.md if tsh-07 wrote
    pass and skip counts. A skipped native test is a failure.
 8. `mise run build-cli` -> `build-cli.log`
 9. `mise run build` -> `build.log`
-10. `git diff --stat f59bef4 -- packages/core/src/commands.ts packages/ir/src/registry/erd.ts packages/core/src/shapes/erdTable.ts packages/ui-solid/src/shapes/ErdTableView.tsx` -> `erd-guard.log`. The output must be empty (an integrity check, not a test).
+Integrity check (not a test command): `git diff --stat f59bef4 -- packages/core/src/commands.ts packages/ir/src/registry/erd.ts packages/core/src/shapes/erdTable.ts packages/ui-solid/src/shapes/ErdTableView.tsx` -> `erd-guard.log`. The output must be empty (an integrity check, not a test).
 
 ## Done criteria
 
 - Every wiring point listed is done.
-- Verifications 1-10 exited 0 (attempts for 7 recorded).
+- Verifications 1-9 exited 0 (attempts for 7 recorded). The integrity
+  check output is empty.
 - The README bullet is present, and the design status reads implemented.
 - The progress log records the per-edit hashes and any serial repair or
   amendment request.

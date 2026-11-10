@@ -4,7 +4,7 @@
 - planPath: impl-plans/active/tsh-06-cli.md
 - progressPath: impl-plans/progress/tsh-06-cli.md
 - wave: 2
-- dependsOn: tsh-01-model
+- dependsOn: tsh-01a-ir, tsh-01c-edits, tsh-01d-values
 - Design: `design-docs/specs/design-table-sheet.md` section 8.
 - Contracts and worker rules: `impl-plans/active/tsh-00-overview.md` (refinement 1: this plan owns the edit op dispatch files).
 - writePaths:
@@ -16,7 +16,7 @@
   - `apps/cli/src/edit/operation-fields.ts`
   - `apps/cli/src/edit/operation-fields.test.ts`
   - `impl-plans/progress/tsh-06-cli.md`
-  - `tmp/tsh-s776/tsh-06-cli`
+  - `tmp/tsh-s778/tsh-06-cli`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -26,7 +26,7 @@
 This plan adds CLI authoring for `table.sheet`:
 
 - inline data through the existing `edit` `add` op, which needs no change
-  once tsh-01 registers the type
+  once tsh-01a registers the type
 - a new `set-cells` edit op
 - a new `nodetto-cli table create|set` command that builds operations and
   runs them through `runOperations`
@@ -113,7 +113,10 @@ Export `TABLE_HELP` for tsh-08 to register.
 ## Pitfalls
 
 - Boa: no `node:*` imports in non-test files, and no regex `split` over the
-  whole file. The parsers are tsh-01's.
+  whole file. The parsers are core's: `parseCsv` and `parseTsv` from tsh-01c, and
+  `tableSheetFromGrid` from tsh-01d. Value writes use `setCellValue` and
+  `coerceCellText` (tsh-01d) and `setCellStyle` and `setColumnOptions`
+  (tsh-01c). `--no-header` names follow the tsh-00 `Column N` rule.
 - All-or-nothing: an invalid cell in `set-cells` must leave the file
   unchanged. This follows from batch semantics; do not write partially.
 - Do not set `headerRow:false` for `--no-header`. The flag only means "the
@@ -155,14 +158,19 @@ Export `TABLE_HELP` for tsh-08 to register.
 ## Verification (exit 0; test commands show at least 1 test, 0 fail)
 
 1. `bun test ./apps/cli/src/table-command.test.ts ./apps/cli/src/edit/operations/table.test.ts ./apps/cli/src/edit/operation-fields.test.ts` -> `cli.log`
-2. `bun test ./apps/cli/src/edit` -> `edit-regression.log`
-3. `bun run typecheck` -> `typecheck.log` (static gate)
-4. `bunx biome check apps/cli/src/table-command.ts apps/cli/src/table-command.test.ts apps/cli/src/edit/operations/table.ts apps/cli/src/edit/operations/table.test.ts apps/cli/src/edit/batch.ts apps/cli/src/edit/operation-fields.ts apps/cli/src/edit/operation-fields.test.ts --diagnostic-level=warn` -> `biome.log`
+2. `bun test ./apps/cli/src/edit/apply-batch.test.ts ./apps/cli/src/edit/report.test.ts ./apps/cli/src/edit/selectors.test.ts` -> `edit-regression.log`.
+   These are existing tests for the batch and op path, and none of them
+   loops over registered element types. Do NOT run the `./apps/cli/src/edit`
+   directory, and do not run `label-field.test.ts`. That test loops over
+   `ELEMENT_TYPES`, so it fails until tsh-08 registers
+   `tableSheetShapeUtil`. tsh-08 owns that check.
+Static checks (tsh-00; must exit 0, but they are not test commands):
+`bun run typecheck` -> `typecheck.log`, and `bunx biome check apps/cli/src/table-command.ts apps/cli/src/table-command.test.ts apps/cli/src/edit/operations/table.ts apps/cli/src/edit/operations/table.test.ts apps/cli/src/edit/batch.ts apps/cli/src/edit/operation-fields.ts apps/cli/src/edit/operation-fields.test.ts --diagnostic-level=warn` -> `biome.log`
 
 ## Done criteria
 
 - `tableCommand`, `TABLE_HELP` and `setCells` are exported, and
   `set-cells` is dispatched in `batch.ts`.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s776/tsh-06-cli/final/`.
+- Verifications 1-2 exited 0, and both static checks exited 0, with logs under `tmp/tsh-s778/tsh-06-cli/final/`.
 - `commands.ts`, `help.ts` and `types-command.ts` are untouched by this
   plan, and the progress log is complete.

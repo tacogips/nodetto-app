@@ -22,6 +22,21 @@ export {
   type UseCaseRelationshipSemantic,
 } from "./semantics.ts";
 export { comparePageOrder } from "./page-order.ts";
+export {
+  isTableSheetDate,
+  TABLE_SHEET_ALIGNS,
+  TABLE_SHEET_COLUMN_TYPES,
+  TABLE_SHEET_ID_PATTERN,
+  TABLE_SHEET_LIMITS,
+  type TableSheetAlign,
+  type TableSheetCell,
+  type TableSheetCellValue,
+  type TableSheetColumn,
+  type TableSheetColumnType,
+  type TableSheetRow,
+  type TableSheetSemantic,
+  tableSheetValueMatches,
+} from "./semantics.ts";
 
 export {
   ACCESSIBILITY_KEY_ORDER,

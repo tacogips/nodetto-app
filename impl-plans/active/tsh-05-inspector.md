@@ -4,7 +4,7 @@
 - planPath: impl-plans/active/tsh-05-inspector.md
 - progressPath: impl-plans/progress/tsh-05-inspector.md
 - wave: 2
-- dependsOn: tsh-01-model
+- dependsOn: tsh-01a-ir, tsh-01b-layout, tsh-01c-edits, tsh-01d-values
 - Design: `design-docs/specs/design-table-sheet.md` section 7.
 - Contracts and worker rules: `impl-plans/active/tsh-00-overview.md`.
 - writePaths:
@@ -12,7 +12,7 @@
   - `packages/ui-solid/src/inspector/table-sheet-section.ts` (new)
   - `packages/ui-solid/src/inspector/table-sheet-section.test.ts` (new)
   - `impl-plans/progress/tsh-05-inspector.md`
-  - `tmp/tsh-s776/tsh-05-inspector`
+  - `tmp/tsh-s778/tsh-05-inspector`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -85,10 +85,14 @@ and the type label. Do not edit `Inspector.tsx`.
 - `rowToDelete` with an active row id -> that id; with a stale id -> the
   last row; with no rows -> `undefined`
 - Integration: with an `Editor` holding a 3x3 table, each step below
-  produces exactly one history entry, and one `editor.undo()` restores the
+  produces exactly one history entry. Create the table with
+  `editor.createElement("table.sheet", { semantic: defaultTableSheetSemantic(), visual: {x:0, y:0} })`.
+  Always pass the explicit semantic: before tsh-08 registers the util, a
+  bare create gets `{}` and fails validation. After each step below, one `editor.undo()` restores the
   previous semantic:
   - "Add row" (rows 3 -> 4)
-  - "Add column" (`Column 4`, width 120)
+  - "Add column" (`Column 1`, width 120, because the default 3x3 has no
+    `Column N` name; see the tsh-00 `Column N` rule)
   - `setColumnOptions(parseOptionLines(...))`
   - `retypeColumn` to number
   - `setStriped(true)`
@@ -97,12 +101,12 @@ and the type label. Do not edit `Inspector.tsx`.
 
 1. `bun test ./packages/ui-solid/src/inspector/table-sheet-section.test.ts` -> `inspector.log`
 2. `bun test ./packages/ui-solid/src/inspector/edits.test.ts` -> `inspector-regression.log`
-3. `bun run typecheck` -> `typecheck.log` (static gate)
-4. `bunx biome check packages/ui-solid/src/inspector/TableSheetSection.tsx packages/ui-solid/src/inspector/table-sheet-section.ts packages/ui-solid/src/inspector/table-sheet-section.test.ts --diagnostic-level=warn` -> `biome.log`
+Static checks (tsh-00; must exit 0, but they are not test commands):
+`bun run typecheck` -> `typecheck.log`, and `bunx biome check packages/ui-solid/src/inspector/TableSheetSection.tsx packages/ui-solid/src/inspector/table-sheet-section.ts packages/ui-solid/src/inspector/table-sheet-section.test.ts --diagnostic-level=warn` -> `biome.log`
 
 ## Done criteria
 
 - `TableSheetSection` is exported with the pinned props.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s776/tsh-05-inspector/final/`.
+- Verifications 1-4 exited 0, with logs under `tmp/tsh-s778/tsh-05-inspector/final/`.
 - `Inspector.tsx` is unchanged by this plan, and the progress log is
   complete.

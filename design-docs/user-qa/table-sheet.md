@@ -39,3 +39,10 @@ only the section named in the question.
 - Default: 100 columns, 1000 rows and 10000 characters per cell, as the
   intake proposed. Widths run from 24 to 2000 px and heights from 20 to
   2000 px.
+
+## Q6. Default name of a new column (section 6) - DECIDED (session 778 input)
+
+- `insertColumn`, paste growth and CLI `--no-header` name a new column
+  `Column N`. N is the smallest positive integer that no existing
+  `Column N` header uses. The column has width 120 and type text unless
+  another type is given.

@@ -4,14 +4,14 @@
 - planPath: impl-plans/active/tsh-02-export.md
 - progressPath: impl-plans/progress/tsh-02-export.md
 - wave: 2
-- dependsOn: tsh-01-model
+- dependsOn: tsh-01a-ir, tsh-01b-layout
 - Design: `design-docs/specs/design-table-sheet.md` sections 4, 5, 12 (SVG assertions).
 - Contracts and worker rules: `impl-plans/active/tsh-00-overview.md`.
 - writePaths:
   - `packages/core/src/svg-export/table-sheet.ts` (new)
   - `packages/core/src/svg-export/table-sheet.test.ts` (new)
   - `impl-plans/progress/tsh-02-export.md`
-  - `tmp/tsh-s776/tsh-02-export`
+  - `tmp/tsh-s778/tsh-02-export`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -112,12 +112,12 @@ Build elements by hand with `Element` literals and use `DEFAULT_SVG_THEME`.
 
 1. `bun test ./packages/core/src/svg-export/table-sheet.test.ts` -> `export.log`
 2. `bun test ./packages/core/src/svg-export.test.ts` -> `svg-regression.log` (the existing export tests are unchanged)
-3. `bun run typecheck` -> `typecheck.log` (static gate)
-4. `bunx biome check packages/core/src/svg-export/table-sheet.ts packages/core/src/svg-export/table-sheet.test.ts --diagnostic-level=warn` -> `biome.log`
+Static checks (tsh-00; must exit 0, but they are not test commands):
+`bun run typecheck` -> `typecheck.log`, and `bunx biome check packages/core/src/svg-export/table-sheet.ts packages/core/src/svg-export/table-sheet.test.ts --diagnostic-level=warn` -> `biome.log`
 
 ## Done criteria
 
 - `renderTableSheet` is exported with the pinned signature.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s776/tsh-02-export/final/`.
+- Verifications 1-4 exited 0, with logs under `tmp/tsh-s778/tsh-02-export/final/`.
 - `svg-export/shapes.ts` is untouched by this plan, and the progress log is
   complete.

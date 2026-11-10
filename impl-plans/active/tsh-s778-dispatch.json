@@ -1,0 +1,225 @@
+{
+  "taskId": "tsh-s778",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-778",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "87365fbe1635faab3ffd9bbc8581cda903c45116",
+  "acceptedDependencies": [
+    {
+      "planId": "tsh-01-model-partial",
+      "planPath": "impl-plans/progress/tsh-01-model.md",
+      "commit": "87365fbe1635faab3ffd9bbc8581cda903c45116",
+      "provides": "packages/ir/src/semantics/table.ts (table.sheet semantic types, TABLE_SHEET_* constants, isTableSheetDate, tableSheetValueMatches) and packages/ir/src/registry/table.test.ts primitive tests; tsh-01a-ir continues these files."
+    }
+  ],
+  "designDocPaths": ["design-docs/specs/design-table-sheet.md", "design-docs/user-qa/table-sheet.md"],
+  "overviewPath": "impl-plans/active/tsh-00-overview.md",
+  "supersededPlans": ["impl-plans/active/tsh-01-model.md", "impl-plans/active/tsh-04-cell-editing.md", "impl-plans/active/tsh-s776-dispatch.json"],
+  "contractSeed": {
+    "paths": ["packages/ir/src/semantics.ts", "packages/ir/src/index.ts"],
+    "change": "semantics.ts re-exports ./semantics/table.ts; index.ts re-exports the 87365fb section 2 symbols, so wave-1 core plans can import them from @nodetto/ir. Committed with the plans before fanout."
+  },
+  "evidenceRoot": "tmp/tsh-s778",
+  "evidenceLayout": "Per-plan logs under tmp/tsh-s778/<planId>/final/. Move final/ to attempt-<n>/ before repeating a run. Untracked data only.",
+  "waveGates": {
+    "afterWave1": ["bun run typecheck", "bun test ./packages/core/src/table-sheet/"],
+    "afterWave2": ["bun run typecheck"]
+  },
+  "reviewContext": {
+    "issueReference": "none; runtime workflowInput of opus-terra-design-and-implement-review-loop-session-778 (continuation of blocked session 776; intake communication comm-017860 from step5-impl-plan-review) is authoritative",
+    "userProblem": "nodetto has no spreadsheet-style element. Users need a first-class table.sheet element (typed columns, rows, header row, per-column widths, per-row heights, cell text) that displays and edits like an Excel sheet or a Notion table, distinct from the ERD erd.table element. Session 776 blocked because the single 354-line tsh-01-model plan was too large for one Terra worker.",
+    "requiredOutcomes": [
+      "table.sheet is created from the toolbox (default 3x3), renders header plus grid with typed cells in light and dark themes, and its bounds equal the sum of column widths and row heights.",
+      "In-place cell editing with Enter, Tab, Shift+Tab, Escape and arrow keys; rows and columns can be added, deleted, renamed, retyped and resized; each edit is one undo step.",
+      "Pasting TSV fills a range and grows the table; copying a range yields TSV.",
+      "The inspector edits header row, striping and column properties.",
+      "Validation rejects duplicate ids, unknown column keys, type mismatches and limit violations with table.* issue codes; valid tables round-trip through JSONL unchanged.",
+      "SVG and PNG export render the table like the canvas, verified by SVG output tests.",
+      "The CLI creates tables from inline data and CSV/TSV, edits cells, lints and exports them; docs/cli.md and help text describe it.",
+      "docs/editing.md documents the shape and design-docs/specs/design-table-sheet.md exists.",
+      "mise run lint, bun run typecheck, the TS test suites, and the CLI and desktop builds pass; erd.table behavior is unchanged."
+    ],
+    "nonGoals": [
+      "Formulas, sorting, filtering, merged cells, frozen panes, multi-line cell layout.",
+      "New Command kinds (the private Worker authoring-discovery.ts is exhaustive over Command kinds).",
+      "Any change to erd.table schema, behavior, rendering or tests, or to packages/core/src/commands.ts.",
+      "Server code, auth, secrets or deployment config in this public repository.",
+      "Version bumps, releases or pushes."
+    ],
+    "constraints": [
+      "Follow AGENTS.md; no emojis; cargo commands use CARGO_TERM_QUIET=true.",
+      "Do not redesign: reuse design-docs/specs/design-table-sheet.md, design-docs/user-qa/table-sheet.md and the pinned contracts in impl-plans/active/tsh-00-overview.md.",
+      "Wave-1 plans do not import each other at runtime; the only cross-plan reference is the type-only import of ./types.ts from tsh-01d-values.",
+      "Every verification command exits 0 and runs at least one test; plans reference only test files they create or that already exist; per-plan verification uses no directory filters.",
+      "Terra workers implement every owned file before reporting and run their plan's verification at the end.",
+      "mise run test-cli (tsh-08) gets up to 3 attempts under load, each logged in attempt-<n>/; deadlines are never relaxed; skipped native tests count as failures.",
+      "Workers run no state-changing git commands, edit only their writePaths and own progress file, and keep evidence under tmp/tsh-s778/<planId>/ untracked.",
+      "Tests use only self-authored neutral data."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Split tsh-01-model into tsh-01a-ir, tsh-01b-layout, tsh-01c-edits and tsh-01d-values, and tsh-04-cell-editing into tsh-04a-navigation, tsh-04b-clipboard and tsh-04c-resize.",
+        "rationale": "Session 776 blocked because one Terra worker stopped after two files of a 354-line plan; smaller plans that each own a handful of files fit one worker and run in parallel."
+      },
+      {
+        "decision": "Commit a contract seed with the plans: packages/ir/src/semantics.ts re-exports ./semantics/table.ts and packages/ir/src/index.ts re-exports the committed table.sheet symbols.",
+        "rationale": "Wave-1 core plans import IR primitives from @nodetto/ir without depending on tsh-01a-ir. tsh-00 overview lines 9-13 require the seed in the plan commit, and the plan reviewer verified typecheck and biome on it."
+      },
+      {
+        "decision": "insertColumn(at, type?) creates a column named Column N (the smallest positive N not used by a Column N header), width 120, type text unless given; pasteGrid uses the same rule.",
+        "rationale": "Resolves the open session 776 plan-review finding; pinned in tsh-00 and the owning plan."
+      },
+      {
+        "decision": "Each edit is one updateSemantic through the existing createElement/updateSemantic/updateVisual paths.",
+        "rationale": "One undo step per edit, and collaboration keeps working without new Command kinds."
+      },
+      {
+        "decision": "tsh-08-wiring alone owns the shared registration files (shape dispatch, core shapes index, ShapeView, toolbox, CLI commands.ts/help.ts, README.md).",
+        "rationale": "Keeps wave-1 and wave-2 file ownership disjoint, with at most 2 waves before wiring."
+      },
+      {
+        "decision": "tsh-06 verification lists explicit test files and excludes label-field.test.ts, which runs in tsh-08 verification 3.",
+        "rationale": "Tests that loop over registered element types fail by design until tsh-08 registers table.sheet (finding S5-778-01)."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "tsh-01c (174 lines), tsh-01d (190) and tsh-04a (177) exceed the ~150-line target; accepted because each owns at most 4 source files.",
+      "Export text truncation uses estimated text widths, so ellipsis points may differ slightly from the browser.",
+      "The cell editor is single-line; newlines reach text cells only through paste or the CLI.",
+      "Concurrent edits to the same cell are last writer wins."
+    ],
+    "supportedEdgeCases": [
+      "Paste larger than the table grows rows and columns up to limits (100 columns, 1000 rows) and reports table.limit beyond them.",
+      "Paste coerces values to column types; select columns gain new options.",
+      "Deleting the last remaining column is refused (table.lastColumn).",
+      "Dates are validated as real YYYY-MM-DD calendar dates including leap years.",
+      "CSV parsing follows RFC 4180 with an optional UTF-8 BOM.",
+      "Escape while editing cancels with no history entry."
+    ],
+    "outOfScopeEdgeCases": [
+      "Formulas, sorting, filtering, merged cells and frozen panes.",
+      "Locale-specific number or date formats.",
+      "Multi-line in-cell layout.",
+      "Tauri WKWebView clipboard permission behavior beyond what tsh-08 observes."
+    ],
+    "residualRisks": [
+      "Superseded tsh-01-model.md, tsh-04-cell-editing.md and tsh-s776-dispatch.json stay in impl-plans/active until plan-archive and must not be dispatched.",
+      "From wave 1 until tsh-08 lands, tests that loop over registered element types (for example label-field.test.ts) fail by design; no wave-1 or wave-2 verification lists them.",
+      "CLI deadline flakiness under load: test-cli gets up to 3 attempts."
+    ],
+    "sourcePaths": [
+      "AGENTS.md",
+      "design-docs/specs/design-table-sheet.md",
+      "design-docs/user-qa/table-sheet.md",
+      "impl-plans/active/tsh-00-overview.md",
+      "impl-plans/progress/tsh-01-model.md",
+      "packages/ir/src/semantics/table.ts",
+      "packages/ir/src/registry/table.test.ts",
+      "packages/ir/src/semantics.ts",
+      "packages/ir/src/index.ts",
+      "packages/ir/src/registry/erd.ts",
+      "packages/core/src/shapes/erdTable.ts",
+      "packages/ui-solid/src/shapes/ErdTableView.tsx",
+      "packages/core/src/commands.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "tsh-01a-ir", "planPath": "impl-plans/active/tsh-01a-ir.md", "progressPath": "impl-plans/progress/tsh-01a-ir.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/ir/src/registry/table.ts", "packages/ir/src/registry/table.test.ts", "packages/ir/src/semantics/table.ts", "packages/ir/src/semantics.ts", "packages/ir/src/registry.ts", "packages/ir/src/index.ts", "packages/ir/src/registry.test.ts", "packages/io/src/__fixtures__/table-sheet.jsonl", "packages/io/src/jsonl/golden.test.ts", "packages/io/src/jsonl/table-sheet.test.ts", "packages/core/src/table-sheet/index.ts", "packages/core/src/index.ts", "impl-plans/progress/tsh-01a-ir.md", "tmp/tsh-s778/tsh-01a-ir", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/ir/src/registry/table.test.ts ./packages/ir/src/registry.test.ts ./packages/ir/src/registry/erd.test.ts",
+        "bun test ./packages/io/src/jsonl/table-sheet.test.ts ./packages/io/src/jsonl/golden.test.ts",
+        "bun test ./packages/core/src/semantic-field-audit.test.ts"
+      ]
+    },
+    {
+      "planId": "tsh-01b-layout", "planPath": "impl-plans/active/tsh-01b-layout.md", "progressPath": "impl-plans/progress/tsh-01b-layout.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/core/src/table-sheet/layout.ts", "packages/core/src/table-sheet/layout.test.ts", "packages/core/src/table-sheet/paint.ts", "packages/core/src/table-sheet/shape.ts", "packages/core/src/table-sheet/shape.test.ts", "impl-plans/progress/tsh-01b-layout.md", "tmp/tsh-s778/tsh-01b-layout", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts"]
+    },
+    {
+      "planId": "tsh-01c-edits", "planPath": "impl-plans/active/tsh-01c-edits.md", "progressPath": "impl-plans/progress/tsh-01c-edits.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/core/src/table-sheet/types.ts", "packages/core/src/table-sheet/edits.ts", "packages/core/src/table-sheet/edits.test.ts", "packages/core/src/table-sheet/apply.ts", "packages/core/src/table-sheet/apply.test.ts", "packages/core/src/table-sheet/delimited.ts", "packages/core/src/table-sheet/delimited.test.ts", "impl-plans/progress/tsh-01c-edits.md", "tmp/tsh-s778/tsh-01c-edits", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts"]
+    },
+    {
+      "planId": "tsh-01d-values", "planPath": "impl-plans/active/tsh-01d-values.md", "progressPath": "impl-plans/progress/tsh-01d-values.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/core/src/table-sheet/coerce.ts", "packages/core/src/table-sheet/coerce.test.ts", "packages/core/src/table-sheet/columns.ts", "packages/core/src/table-sheet/columns.test.ts", "packages/core/src/table-sheet/grid.ts", "packages/core/src/table-sheet/grid.test.ts", "impl-plans/progress/tsh-01d-values.md", "tmp/tsh-s778/tsh-01d-values", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts"]
+    },
+    {
+      "planId": "tsh-02-export", "planPath": "impl-plans/active/tsh-02-export.md", "progressPath": "impl-plans/progress/tsh-02-export.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout"],
+      "writePaths": ["packages/core/src/svg-export/table-sheet.ts", "packages/core/src/svg-export/table-sheet.test.ts", "impl-plans/progress/tsh-02-export.md", "tmp/tsh-s778/tsh-02-export", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/svg-export/table-sheet.test.ts", "bun test ./packages/core/src/svg-export.test.ts"]
+    },
+    {
+      "planId": "tsh-03-view", "planPath": "impl-plans/active/tsh-03-view.md", "progressPath": "impl-plans/progress/tsh-03-view.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout"],
+      "writePaths": ["packages/ui-solid/src/shapes/TableSheetView.tsx", "packages/ui-solid/src/shapes/TableSheetView.css", "packages/ui-solid/src/shapes/table-sheet-view-model.ts", "packages/ui-solid/src/table-sheet-view.test.ts", "impl-plans/progress/tsh-03-view.md", "tmp/tsh-s778/tsh-03-view", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet-view.test.ts", "bun test ./packages/ui-solid/src/erd-table-view.test.ts"]
+    },
+    {
+      "planId": "tsh-04a-navigation", "planPath": "impl-plans/active/tsh-04a-navigation.md", "progressPath": "impl-plans/progress/tsh-04a-navigation.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["packages/ui-solid/src/table-sheet/selection.ts", "packages/ui-solid/src/table-sheet/selection.test.ts", "packages/ui-solid/src/table-sheet/keyboard.ts", "packages/ui-solid/src/table-sheet/keyboard.test.ts", "packages/ui-solid/src/table-sheet/cell-commit.ts", "packages/ui-solid/src/table-sheet/cell-commit.test.ts", "packages/ui-solid/src/table-sheet/CellEditor.tsx", "packages/ui-solid/src/table-sheet/SelectionOverlay.tsx", "packages/ui-solid/src/table-sheet/TableSheet.css", "impl-plans/progress/tsh-04a-navigation.md", "tmp/tsh-s778/tsh-04a-navigation", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts"]
+    },
+    {
+      "planId": "tsh-04b-clipboard", "planPath": "impl-plans/active/tsh-04b-clipboard.md", "progressPath": "impl-plans/progress/tsh-04b-clipboard.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["packages/ui-solid/src/table-sheet/clipboard.ts", "packages/ui-solid/src/table-sheet/clipboard.test.ts", "impl-plans/progress/tsh-04b-clipboard.md", "tmp/tsh-s778/tsh-04b-clipboard", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet/clipboard.test.ts"]
+    },
+    {
+      "planId": "tsh-04c-resize", "planPath": "impl-plans/active/tsh-04c-resize.md", "progressPath": "impl-plans/progress/tsh-04c-resize.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout", "tsh-01c-edits"],
+      "writePaths": ["packages/ui-solid/src/table-sheet/resize.ts", "packages/ui-solid/src/table-sheet/resize.test.ts", "impl-plans/progress/tsh-04c-resize.md", "tmp/tsh-s778/tsh-04c-resize", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet/resize.test.ts"]
+    },
+    {
+      "planId": "tsh-05-inspector", "planPath": "impl-plans/active/tsh-05-inspector.md", "progressPath": "impl-plans/progress/tsh-05-inspector.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["packages/ui-solid/src/inspector/TableSheetSection.tsx", "packages/ui-solid/src/inspector/table-sheet-section.ts", "packages/ui-solid/src/inspector/table-sheet-section.test.ts", "impl-plans/progress/tsh-05-inspector.md", "tmp/tsh-s778/tsh-05-inspector", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/inspector/table-sheet-section.test.ts", "bun test ./packages/ui-solid/src/inspector/edits.test.ts"]
+    },
+    {
+      "planId": "tsh-06-cli", "planPath": "impl-plans/active/tsh-06-cli.md", "progressPath": "impl-plans/progress/tsh-06-cli.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["apps/cli/src/table-command.ts", "apps/cli/src/table-command.test.ts", "apps/cli/src/edit/operations/table.ts", "apps/cli/src/edit/operations/table.test.ts", "apps/cli/src/edit/batch.ts", "apps/cli/src/edit/operation-fields.ts", "apps/cli/src/edit/operation-fields.test.ts", "impl-plans/progress/tsh-06-cli.md", "tmp/tsh-s778/tsh-06-cli", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./apps/cli/src/table-command.test.ts ./apps/cli/src/edit/operations/table.test.ts ./apps/cli/src/edit/operation-fields.test.ts", "bun test ./apps/cli/src/edit/apply-batch.test.ts ./apps/cli/src/edit/report.test.ts ./apps/cli/src/edit/selectors.test.ts"]
+    },
+    {
+      "planId": "tsh-07-docs", "planPath": "impl-plans/active/tsh-07-docs.md", "progressPath": "impl-plans/progress/tsh-07-docs.md", "wave": 2, "dependsOn": ["tsh-01a-ir"],
+      "writePaths": ["docs/editing.md", "docs/cli.md", "docs/import-export.md", "apps/cli/src/table-docs.test.ts", "impl-plans/progress/tsh-07-docs.md", "tmp/tsh-s778/tsh-07-docs", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./apps/cli/src/table-docs.test.ts"]
+    },
+    {
+      "planId": "tsh-08-wiring", "planPath": "impl-plans/active/tsh-08-wiring.md", "progressPath": "impl-plans/progress/tsh-08-wiring.md", "wave": 3,
+      "dependsOn": ["tsh-02-export", "tsh-03-view", "tsh-04a-navigation", "tsh-04b-clipboard", "tsh-04c-resize", "tsh-05-inspector", "tsh-06-cli", "tsh-07-docs"],
+      "writePaths": ["packages/core/src/shapes/index.ts", "packages/core/src/svg-export/shapes.ts", "packages/core/src/tools.ts", "packages/core/src/shape-catalogue.ts", "packages/core/src/shape-catalogue.test.ts", "packages/core/src/table-sheet-export.test.ts", "packages/ui-solid/src/shapes/ShapeView.tsx", "packages/ui-solid/src/Canvas.tsx", "packages/ui-solid/src/interaction/pointer.ts", "packages/ui-solid/src/interaction/keyboard.ts", "packages/ui-solid/src/interaction/types.ts", "packages/ui-solid/src/interaction.ts", "packages/ui-solid/src/Inspector.tsx", "packages/ui-solid/src/shape-palette.ts", "packages/ui-solid/src/Toolbar.test.ts", "packages/ui-solid/src/shape-search.test.ts", "packages/ui-solid/src/table-sheet-wiring.test.ts", "apps/cli/src/commands.ts", "apps/cli/src/help.ts", "apps/cli/src/types-command.ts", "apps/cli/src/cli-wiring.test.ts", "apps/cli/src/table-e2e.test.ts", "README.md", "design-docs/specs/design-table-sheet.md", "docs/cli.md", "docs/editing.md", "impl-plans/progress/tsh-08-wiring.md", "tmp/tsh-s778/tsh-08-wiring", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/core/src/table-sheet-export.test.ts ./packages/core/src/shape-catalogue.test.ts ./packages/core/src/svg-export/table-sheet.test.ts ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts",
+        "bun test ./packages/ui-solid/src/table-sheet-wiring.test.ts ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts ./packages/ui-solid/src/table-sheet/clipboard.test.ts ./packages/ui-solid/src/table-sheet/resize.test.ts ./packages/ui-solid/src/table-sheet-view.test.ts ./packages/ui-solid/src/inspector/table-sheet-section.test.ts ./packages/ui-solid/src/Toolbar.test.ts ./packages/ui-solid/src/shape-search.test.ts ./packages/ui-solid/src/interaction-keyboard-menus.test.ts",
+        "bun test ./apps/cli/src/table-e2e.test.ts ./apps/cli/src/cli-wiring.test.ts ./apps/cli/src/table-command.test.ts ./apps/cli/src/edit/operations/table.test.ts ./apps/cli/src/table-docs.test.ts ./apps/cli/src/edit/label-field.test.ts",
+        "bun run typecheck",
+        "mise run lint",
+        "mise run test",
+        "mise run test-cli",
+        "mise run build-cli",
+        "mise run build"
+      ]
+    }
+  ]
+}

@@ -90,6 +90,7 @@ export * from "./semantics/drawing.ts";
 export * from "./semantics/design.ts";
 export * from "./semantics/bpmn.ts";
 export * from "./semantics/breadboard.ts";
+export * from "./semantics/table.ts";
 
 /** Maps every registered element type to its semantic payload type. */
 export interface SemanticByType {

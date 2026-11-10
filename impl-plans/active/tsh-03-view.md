@@ -4,7 +4,7 @@
 - planPath: impl-plans/active/tsh-03-view.md
 - progressPath: impl-plans/progress/tsh-03-view.md
 - wave: 2
-- dependsOn: tsh-01-model
+- dependsOn: tsh-01a-ir, tsh-01b-layout
 - Design: `design-docs/specs/design-table-sheet.md` sections 1 (appearance invariant), 4, 5.
 - Contracts and worker rules: `impl-plans/active/tsh-00-overview.md`.
 - writePaths:
@@ -13,7 +13,7 @@
   - `packages/ui-solid/src/shapes/table-sheet-view-model.ts` (new)
   - `packages/ui-solid/src/table-sheet-view.test.ts` (new)
   - `impl-plans/progress/tsh-03-view.md`
-  - `tmp/tsh-s776/tsh-03-view`
+  - `tmp/tsh-s778/tsh-03-view`
   - `target`
 - sharedPaths: none
 - artifactRoots: `target`
@@ -22,7 +22,7 @@
 
 This plan draws the table on the Solid canvas. The pixels must follow
 `tableSheetLayout`, so what is drawn is what is picked and exported.
-`ShapeView.tsx` dispatch is tsh-08's. The active-cell highlight is tsh-04's
+`ShapeView.tsx` dispatch is tsh-08's. The active-cell highlight is tsh-04a's
 overlay, not this view's.
 
 ## Non-goals
@@ -89,13 +89,13 @@ overlay, not this view's.
 
 1. `bun test ./packages/ui-solid/src/table-sheet-view.test.ts` -> `view.log`
 2. `bun test ./packages/ui-solid/src/erd-table-view.test.ts` -> `erd-regression.log`
-3. `bun run typecheck` -> `typecheck.log` (static gate)
-4. `bunx biome check packages/ui-solid/src/shapes/TableSheetView.tsx packages/ui-solid/src/shapes/TableSheetView.css packages/ui-solid/src/shapes/table-sheet-view-model.ts packages/ui-solid/src/table-sheet-view.test.ts --diagnostic-level=warn` -> `biome.log`
+Static checks (tsh-00; must exit 0, but they are not test commands):
+`bun run typecheck` -> `typecheck.log`, and `bunx biome check packages/ui-solid/src/shapes/TableSheetView.tsx packages/ui-solid/src/shapes/TableSheetView.css packages/ui-solid/src/shapes/table-sheet-view-model.ts packages/ui-solid/src/table-sheet-view.test.ts --diagnostic-level=warn` -> `biome.log`
 
 ## Done criteria
 
 - `TableSheetView` is exported with the pinned signature, and the view
   model is tested.
-- Verifications 1-4 exited 0, with logs under `tmp/tsh-s776/tsh-03-view/final/`.
+- Verifications 1-4 exited 0, with logs under `tmp/tsh-s778/tsh-03-view/final/`.
 - `grep -n -- "--app-\|prefers-color-scheme\|nodetto-canvas-dark" packages/ui-solid/src/shapes/TableSheetView.css`
   prints nothing. Record the grep exit status 1 in the progress log.

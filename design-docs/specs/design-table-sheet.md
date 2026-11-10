@@ -1,6 +1,9 @@
 # Spreadsheet table element: `table.sheet`
 
-Status: design, not implemented.
+Status: design, not implemented. Revised for the session 778 continuation
+(section 14): the plan split in section 11, the core file layout in
+section 4 and section 6, and the `Column N` naming rule in section 6 changed.
+The behavior is otherwise the same as the reviewed 9f4414b design.
 
 A new first-class element type, `table.sheet`. It shows and edits tabular
 data the way an Excel sheet or a Notion table does. It has ordered typed
@@ -21,8 +24,12 @@ handoff, draw.io/Mermaid/D2 export, Rust-native code changes, and new
 
 ## 1. Baseline and integration points
 
-These paths were checked against the repository at `f59bef4`. No earlier
-table spec exists under `design-docs/specs/`.
+These paths were checked against the repository at `f59bef4` and rechecked
+at `87365fb`. No earlier table spec exists under `design-docs/specs/`. At
+`87365fb`, `packages/ir/src/semantics/table.ts` already holds the full
+section 2 contract (types, `TABLE_SHEET_LIMITS`, `TABLE_SHEET_ID_PATTERN`,
+`isTableSheetDate`, `tableSheetValueMatches`). Nothing else in this design
+exists yet.
 
 - Element type definitions use the `ElementTypeDefinition` contract in
   `packages/ir/src/registry/definition.ts`: `type`, `category`, `keyOrder`,
@@ -200,8 +207,30 @@ a custom row height and an empty row. Its file name is added to `GOLDEN`.
 New directory `packages/core/src/table-sheet/`, exported through
 `packages/core/src/table-sheet/index.ts`. Constants:
 `TABLE_SHEET_HEADER_HEIGHT = 32`, `TABLE_SHEET_DEFAULT_ROW_HEIGHT = 28`,
-`TABLE_SHEET_DEFAULT_COLUMN_WIDTH = 120`, `TABLE_SHEET_CELL_PADDING_X = 8`,
-`TABLE_SHEET_FONT_SIZE = 12`.
+`TABLE_SHEET_CELL_PADDING_X = 8` and `TABLE_SHEET_FONT_SIZE = 12` live in
+`layout.ts`. `TABLE_SHEET_DEFAULT_COLUMN_WIDTH = 120` lives in `columns.ts`
+next to the `Column N` rule (section 6), because only column creation uses
+it.
+
+Core module files (each file has one owning plan; section 11):
+
+| File | Exports |
+|---|---|
+| `layout.ts` | size constants above, `readTableSheet`, `tableSheetBounds`, `tableSheetLayout`, `fitCellText`, layout types |
+| `paint.ts` | `TABLE_SHEET_PAINT` |
+| `shape.ts` | `tableSheetShapeUtil`, `defaultTableSheetSemantic` |
+| `types.ts` | `TableSheetRange`, `TableSheetEditCode`, `TableSheetEditResult` (types only) |
+| `edits.ts` | style and structure edits that need no value coercion |
+| `apply.ts` | `applyTableSheetEdit` |
+| `delimited.ts` | `parseTsv`, `serializeTsv`, `parseCsv` (pure text codecs) |
+| `coerce.ts` | `coerceCellText`, `clipboardCellText` and the value edits `setCellValue`, `setCellText`, `clearRange`, `retypeColumn` |
+| `columns.ts` | `TABLE_SHEET_DEFAULT_COLUMN_WIDTH`, `nextTableSheetColumnName`, `insertColumn` |
+| `grid.ts` | `clipboardGrid`, `pasteGrid`, `tableSheetFromGrid` |
+| `index.ts` | `export *` from each file above |
+
+The split follows what each file needs at runtime. Everything that needs
+value coercion or the `Column N` rule is in `coerce.ts`, `columns.ts` and
+`grid.ts`. The other files never import those.
 
 - Bounds: `x`/`y` come from `visual`. `width = Σ column.width`. `height =
   (headerRow ? 32 : 0) + Σ (row.height ?? 28)`. One exception keeps an empty
@@ -273,20 +302,57 @@ structure. Wiring adds a `case "table.sheet"` to `renderShape`.
 
 ## 6. Editing
 
-All edits are pure functions in `packages/core/src/table-sheet/edits.ts`.
-Each one takes a `TableSheetSemantic` and returns a new one, or a typed
-error for a limit or type violation. The app and the CLI apply the result
-as one `updateSemantic` command. That is one `apply`, so it is one undo
-entry, and it uses the normal validation and collab path. No new `Command`
-kind is added.
+All edits are pure functions in `packages/core/src/table-sheet/`. Each one
+takes a `TableSheetSemantic` and returns a `TableSheetEditResult`: a new
+semantic, or a typed error for a limit or type violation. The app applies
+the result through `applyTableSheetEdit` as one `updateSemantic` command.
+That is one `apply`, so it is one undo entry, and it uses the normal
+validation and collab path. The CLI applies it through its existing
+operation path. No new `Command` kind is added. When an edit changes
+nothing, it returns the input object itself (`result.semantic === s`), and
+`applyTableSheetEdit` applies nothing, so there is no empty undo entry.
 
-Edit functions: `setCell(rowId, columnId, value | undefined)`,
-`setCellStyle`, `clearRange`, `insertRow(at)`, `deleteRows(ids)`,
-`insertColumn(at, type?)`, `deleteColumns(ids)`. Deleting the last column
-is refused. Then `renameColumn`, `retypeColumn`, `setColumnOptions`,
-`setColumnAlign`, `resizeColumn(id, width)`, `resizeRow(id, height)`,
-`setHeaderRow`, `setStriped`. Ids are passed in through an `IdSource`
-parameter. Sizes are rounded to integers and clamped to the limits.
+Edit functions, by file:
+
+- `edits.ts` (no coercion): `setCellStyle`, `insertRow(at, ids)`,
+  `deleteRows(ids)`, `deleteColumns(ids)` (refuses the last column with
+  `table.lastColumn`), `moveColumn`, `renameColumn`, `setColumnOptions`
+  (clears select values that are no longer options and counts them in
+  `skipped`), `setColumnAlign`, `resizeColumn(id, width)`,
+  `resizeRow(id, height)`, `setHeaderRow`, `setStriped`.
+- `coerce.ts` (value writes): `setCellValue(rowId, columnId, value |
+  undefined)`, `setCellText(rowId, columnId, text)`, `clearRange(range)`,
+  `retypeColumn(id, type)`.
+- `columns.ts`: `insertColumn(at, ids, type?)`.
+- `grid.ts`: `pasteGrid(at, grid, ids)`, `tableSheetFromGrid(grid,
+  options)`.
+
+Ids are passed in through an `IdSource` parameter. Sizes are rounded to
+integers and clamped to the limits.
+
+`Column N` naming rule (`columns.ts`, binding for every code path that
+creates a column without a given name):
+
+- A column name uses N when it equals exactly `"Column " + N`, where N is a
+  positive decimal integer with no leading zero (`^Column [1-9][0-9]*$`,
+  case-sensitive, one space).
+- `nextTableSheetColumnName(columns)` returns `Column N` for the smallest
+  positive N that no column name uses.
+- `insertColumn(s, at, ids, type?)` creates `{ id: ids(), name:
+  nextTableSheetColumnName(s.columns), type: type ?? "text", width: 120 }`.
+  It sets no `align` or `options` key, even for `select`, and adds no
+  cells. `at` is clamped to `0..columns.length`. At 100 columns it returns
+  `table.limit` and the input is unchanged.
+- `pasteGrid` appends the columns it needs left to right. Each one is a
+  `text` column of width 120 named by the same rule, with the columns
+  already appended in the same paste counted as used.
+- `tableSheetFromGrid` with `header: false` names every column by the rule,
+  which gives `Column 1..N`. With `header: true`, header fields are used as
+  names verbatim (an empty field gives `""`). Columns past the end of the
+  header record are named by the rule.
+- Examples: the default 3x3 (`Name`, `Status`, `Done`) gives `Column 1`.
+  `[Column 1, Column 3]` gives `Column 2`. `[Column 2]` gives `Column 1`.
+  `Column 01` and `column 1` do not use 1.
 
 Value coercion (`table-sheet/coerce.ts`) is shared by typing, paste,
 retype and the CLI:
@@ -304,9 +370,23 @@ retype and the CLI:
   `select` seeds `options` with the distinct existing display strings in row
   order, capped at the limit. Retyping away from `select` drops `options`.
 
-Interaction lives in new ui-solid modules:
-`packages/ui-solid/src/table-sheet/selection.ts` (state),
-`keyboard.ts`, `cell-editor.tsx`, `resize.ts` and `clipboard.ts`.
+Interaction lives in new ui-solid modules under
+`packages/ui-solid/src/table-sheet/`, in three independent groups:
+
+- Navigation and editing: `selection.ts` (state and
+  `tableSheetCellClick`), `keyboard.ts`, `cell-commit.ts`, `CellEditor.tsx`,
+  `SelectionOverlay.tsx` and `TableSheet.css`. The active-cell and range
+  highlight is this group's overlay component, not part of
+  `TableSheetView`.
+- Clipboard: `clipboard.ts`. Its functions take an explicit target
+  (`{ elementId, range }` for copy and cut, `{ elementId, row, column }`
+  indices for paste) and a `TableClipboardPort`. They never import the
+  selection module. Paste returns the result and the pasted range.
+  `handleTableSheetKey` does not handle Cmd/Ctrl+C/X/V. Wiring routes those
+  keys to the clipboard while a cell is active, converts the selection into
+  the target, and selects the pasted range afterwards.
+- Resize: `resize.ts` (`tableSheetRegionAt`, `beginTableSheetResize`,
+  `resetColumnWidth`). It reads only the core layout and edits.
 
 - State: `{ elementId, active: {row, col}, anchor?: {row, col}, editing:
   boolean }`. It is per canvas, UI-only and never stored in the document.
@@ -334,9 +414,10 @@ Interaction lives in new ui-solid modules:
   one edit. Escape clears the cell selection and keeps the element selected.
   Tab and Shift+Tab move. Canvas arrow-key nudges and element deletion do not
   fire while a cell is active.
-- Clipboard (`table-sheet/tsv.ts` in core, `clipboard.ts` in ui-solid):
+- Clipboard (`delimited.ts` and `grid.ts` in core, `clipboard.ts` in
+  ui-solid):
   - Copy and Cut on an active range write TSV with
-    `serializeTsv(clipboardValues(semantic, range))`. `clipboardValues` reads
+    `serializeTsv(clipboardGrid(semantic, range))`. `clipboardGrid` reads
     stored cell values directly. It never uses the layout display string,
     and no line-break normalization, clipping or ellipsis applies:
     - `text`: the stored string, exactly, including tabs, `\n`, `\r\n` and
@@ -355,7 +436,8 @@ Interaction lives in new ui-solid modules:
   - Paste reads `text/plain`. The parser accepts `\r\n` or `\n`, quoted
     fields and a single trailing newline. The grid is written from the
     active cell. Rows are appended past the last row, and `text` columns
-    named `Column N` (width 120) are appended past the last column. Values
+    (width 120, named by the `Column N` rule above) are appended past the
+    last column. Values
     are coerced per target column. The whole paste is one `updateSemantic`.
     If the result would exceed a limit, nothing changes.
   - With no active cell, the existing element copy and paste are unchanged.
@@ -400,7 +482,7 @@ Wiring adds the `Match` in `Inspector.tsx` and the type label "Table
     [--page <id|name>] [--id <id>] [--x <n> --y <n>] [--no-header]
     [--types t1,t2,...] [--widths w1,w2,...]`. The first record holds the
     column names unless `--no-header` is given, in which case the names are
-    `Column 1..N`. Types default to `text`. `--data` takes a JSON array of row
+    `Column 1..N` (the `Column N` rule in section 6). Types default to `text`. `--data` takes a JSON array of row
     arrays. The command builds the semantic with `tableSheetFromGrid` in
     core and runs one `add` op through `runOperations`, so it gets atomic
     write, retry and the output format. CSV follows RFC 4180: quoted fields,
@@ -412,7 +494,8 @@ Wiring adds the `Match` in `Inspector.tsx` and the type label "Table
 - `lint` and `validate` report the table issue codes through the existing
   validation path, with no new lint rule. `export` (SVG/PNG/PDF) renders
   through `renderShape`. `types table.sheet` lists the fields and an example
-  add op. `shapes`/`draw` get the catalogue shape id `table:sheet`.
+  add op. `shapes`/`draw` get the catalogue shape id `table.sheet`
+  (catalogue ids are `ToolKind` values, the same as `erd.table`).
 - Help text in `help.ts` and docs in `docs/cli.md`.
 
 ## 9. Toolbox
@@ -421,8 +504,11 @@ A new `Tool.Sheet = "table.sheet"` (label "Sheet", icon `table`) sits in the
 General palette group. `Tool.Table` stays as `erd.table`. Creation places the
 default 3x3 table: columns `Name` (text, 160), `Status` (select, options
 `Todo/Doing/Done`, 120) and `Done` (checkbox, 80), plus 3 empty rows. The
-bounds are 360 x 116. The column and row ids come from the editor's
-`IdSource`. The catalogue shape id is `table:sheet`.
+bounds are 360 x 116. `defaultTableSheetSemantic()` uses the fixed ids
+`c1..c3` and `r1..r3`. Ids only need to be unique within one table, and
+`Tool` creation takes the util's static defaults. Rows and columns added
+later in the app get `newElementId` (ULID) ids. The catalogue shape id is
+`table.sheet`.
 
 ## 10. Collaboration and repository boundary
 
@@ -436,49 +522,136 @@ bounds are 360 x 116. The column and row ids come from the editor's
 
 ## 11. Module ownership and plan split
 
-At most two waves before wiring. Dependencies are declared only on real
-contracts.
+Session 776 used one wave-1 plan (`tsh-01-model`, 354 plan lines, about 25
+files). Its worker stopped after two files, so this split replaces
+`tsh-01-model` and `tsh-04-cell-editing`. There are two waves before
+wiring. Each file has exactly one owner, and every plan is sized for one
+worker: about 150 plan lines or fewer and at most four source files plus
+their tests. Exact exported names and signatures are pinned in
+`impl-plans/active/tsh-00-overview.md`. The plans implement them verbatim.
 
-| Plan | Wave | Depends on | Owns (new unless noted) |
-|---|---|---|---|
-| P1 model | 1 | none | `packages/ir/src/semantics/table.ts`, `packages/ir/src/registry/table.ts`, `packages/ir/src/registry/table.test.ts`. IR-internal registration (edit): `semantics.ts`, `registry.ts`, `packages/ir/src/index.ts`, `registry.test.ts`. `packages/io/src/__fixtures__/table-sheet.jsonl` plus the `GOLDEN` entry (edit `golden.test.ts`) and `packages/io/src/jsonl/table-sheet.test.ts`. `packages/core/src/table-sheet/{index,layout,paint,shape,edits,coerce,tsv,grid}.ts` with tests beside them, and the barrel line `export * from "./table-sheet/index.ts"` in `packages/core/src/index.ts`. |
-| P2 export | 2 | P1 | `packages/core/src/svg-export/table-sheet.ts` + `table-sheet.test.ts` |
-| P3 canvas view | 2 | P1 | `packages/ui-solid/src/shapes/TableSheetView.tsx`, `TableSheetView.css`, `table-sheet-view.test.ts` |
-| P4 cell editing | 2 | P1 | `packages/ui-solid/src/table-sheet/{selection,keyboard,clipboard,resize}.ts`, `cell-editor.tsx` + tests |
-| P5 inspector | 2 | P1 | `packages/ui-solid/src/inspector/TableSheetSection.tsx` + `table-sheet-section.test.ts` |
-| P6 CLI | 2 | P1 | `apps/cli/src/table-command.ts`, `apps/cli/src/edit/operations/table.ts` + tests (`table-command.test.ts`, `edit/operations/table.test.ts`) |
-| P7 docs | 2 | P1 | `docs/editing.md` (table section and limits), `docs/cli.md`, `docs/import-export.md` (SVG/PNG note), this spec's status line |
-| P8 wiring | 3 | P2-P7 | `packages/core/src/shapes/index.ts`, `svg-export/shapes.ts`, `tools.ts`, `shape-catalogue.ts`; `packages/ui-solid/src/shapes/ShapeView.tsx`, `Canvas.tsx`/`interaction/pointer.ts`/`interaction/keyboard.ts` hooks, `Inspector.tsx`, `shape-palette.ts`; `apps/cli/src/commands.ts`, `help.ts`, `edit/batch.ts`, `types-command.ts`, `edit/operation-fields.test.ts`, `cli-wiring.test.ts`; `README.md`; end-to-end tests (export SVG through `renderShape`, CLI create→lint→export) |
+Wave 1. These four plans depend only on code committed at `87365fb`: the
+section 2 IR contract and existing core modules such as `ShapeUtil`,
+`Editor`, `IdSource` and `text-layout.ts`.
+
+| Plan | Owns (new unless noted) |
+|---|---|
+| tsh-01a-ir | `packages/ir/src/registry/table.ts`; `packages/ir/src/registry/table.test.ts` (extend the 87365fb file); IR-internal registration (edit): `packages/ir/src/semantics.ts`, `registry.ts`, `index.ts`, `registry.test.ts`; `packages/io/src/__fixtures__/table-sheet.jsonl`, the `GOLDEN` entry in `packages/io/src/jsonl/golden.test.ts`, `packages/io/src/jsonl/table-sheet.test.ts`; the core barrel `packages/core/src/table-sheet/index.ts` and the single line `export * from "./table-sheet/index.ts";` in `packages/core/src/index.ts`. `packages/ir/src/semantics/table.ts` already meets the contract and may change only to fix a defect a test exposes. |
+| tsh-01b-layout | `packages/core/src/table-sheet/layout.ts`, `paint.ts`, `shape.ts`, `layout.test.ts`, `shape.test.ts` |
+| tsh-01c-edits | `packages/core/src/table-sheet/types.ts`, `edits.ts`, `apply.ts`, `delimited.ts`, `edits.test.ts`, `apply.test.ts`, `delimited.test.ts` |
+| tsh-01d-values | `packages/core/src/table-sheet/coerce.ts`, `columns.ts`, `grid.ts`, `coerce.test.ts`, `columns.test.ts`, `grid.test.ts` |
+
+Rules that keep wave 1 independent:
+
+- No wave-1 file imports, at runtime, a file owned by another wave-1 plan.
+  The only cross-plan reference is `import type` of `types.ts` from
+  tsh-01d-values. Its full content (three type declarations) is pinned
+  verbatim in tsh-00. Type-only imports are erased at runtime, so the
+  tests of every plan run whether or not a sibling has finished.
+- Each plan keeps its own small private cell-write helper. For example,
+  `edits.ts` and `coerce.ts` each drop a cell left with no keys. The
+  helpers are not shared, so there is no runtime edge.
+- Wave-1 tests import modules by relative path (`./layout.ts`) and never
+  through `./index.ts`, `../index.ts` or `@nodetto/core`. The barrel
+  `index.ts` and its core line from tsh-01a-ir do not resolve until all
+  four plans have landed. Tests that avoid the barrel are unaffected.
+  tsh-01a-ir's own tests are IR and io tests. `@nodetto/io` depends only on
+  `@nodetto/ir`, so they never load core.
+- `bun run typecheck` and the directory run
+  `bun test ./packages/core/src/table-sheet/` are wave-1 exit gates. They
+  run once all four wave-1 plans have reported, before wave 2 starts. They
+  are not per-plan verification commands.
+
+Wave 2. Each plan depends only on wave 1, through `@nodetto/ir` and
+`@nodetto/core`.
+
+| Plan | Depends on | Owns (new unless noted) |
+|---|---|---|
+| tsh-02-export | 01a, 01b | `packages/core/src/svg-export/table-sheet.ts` + `table-sheet.test.ts` |
+| tsh-03-view | 01a, 01b | `packages/ui-solid/src/shapes/TableSheetView.tsx`, `TableSheetView.css`, `table-sheet-view.test.ts` |
+| tsh-04a-navigation | 01a-01d | `packages/ui-solid/src/table-sheet/selection.ts`, `keyboard.ts`, `cell-commit.ts`, `CellEditor.tsx`, `SelectionOverlay.tsx`, `TableSheet.css` + `selection.test.ts`, `keyboard.test.ts`, `cell-commit.test.ts` |
+| tsh-04b-clipboard | 01a, 01c, 01d | `packages/ui-solid/src/table-sheet/clipboard.ts` + `clipboard.test.ts` |
+| tsh-04c-resize | 01a, 01b, 01c | `packages/ui-solid/src/table-sheet/resize.ts` + `resize.test.ts` |
+| tsh-05-inspector | 01a-01d | `packages/ui-solid/src/inspector/TableSheetSection.tsx` + `table-sheet-section.test.ts` |
+| tsh-06-cli | 01a, 01c, 01d | `apps/cli/src/table-command.ts`, `apps/cli/src/edit/operations/table.ts`, CLI-internal op dispatch `apps/cli/src/edit/batch.ts`, `edit/operation-fields.ts`, `edit/operation-fields.test.ts` (edit) + `table-command.test.ts`, `edit/operations/table.test.ts`. It exports `TABLE_HELP`. |
+| tsh-07-docs | 01a | `docs/editing.md` (table section and limits), `docs/cli.md`, `docs/import-export.md` (SVG/PNG note) |
+
+The three tsh-04 plans do not import each other. `tableSheetCellClick`
+belongs to tsh-04a. `handleTableSheetKey` leaves Cmd/Ctrl+C/X/V to wiring
+(section 6).
+
+Wave 3, tsh-08-wiring (depends on every wave-2 plan) has exclusive
+ownership of:
+
+- core: `packages/core/src/shapes/index.ts`, `svg-export/shapes.ts`,
+  `tools.ts`, `shape-catalogue.ts`
+- ui-solid: `packages/ui-solid/src/shapes/ShapeView.tsx`, the `Canvas.tsx`,
+  `interaction/pointer.ts` and `interaction/keyboard.ts` hooks (including
+  clipboard key routing, overlay and editor mounting, and selection
+  reconcile), `Inspector.tsx`, `shape-palette.ts`
+- CLI: `apps/cli/src/commands.ts`, `help.ts`, `types-command.ts`,
+  `cli-wiring.test.ts`
+- `README.md`, and this spec's status line, set to implemented
+- the end-to-end tests: SVG export through `renderShape`, and CLI
+  create, lint and export
 
 Intentional divergence from the intake's "wiring owns registry index and
-core index.ts": P1 owns IR-internal registration and one barrel line in core
-`index.ts`. The reasons:
+core index.ts". tsh-01a-ir owns IR-internal registration, the core
+`table-sheet/index.ts` barrel and one barrel line in core `index.ts`. The
+reasons:
 
-1. The packages export only `"."`, so wave-2 plans cannot import P1's code
-   until it is re-exported.
+1. The packages export only `"."`, so wave-2 plans in ui-solid and the CLI
+   cannot import wave-1 code until it is re-exported.
 2. `registry.test.ts` and the golden coverage test fail unless registration,
    the type list and the fixture land together.
 
 Every cross-package dispatch and registration file is still owned only by
-P8.
+tsh-08.
 
 Every plan sets `artifactRoots: ["target"]`. writePaths include the tests
-beside each owned module.
+beside each owned module, the plan's progress log and evidence directory,
+and any private helper or constant file the plan creates inside its own
+directory.
 
 ## 12. Verification
 
-Every command must exit 0 and run at least one test:
+Per-plan verification commands must each exit 0 and run at least one test.
+They name only `./`-prefixed test files that the same plan creates or that
+already exist. A directory argument is allowed only for a directory where
+every test file belongs to that plan. `packages/core/src/table-sheet/` and
+`packages/ui-solid/src/table-sheet/` are shared by several plans, so plans
+list their own files explicitly. No plan lists an informational,
+expected-to-fail or binary-less command, for example
+`env -u NODETTO_CLI_TEST_BINARY ...`. Examples:
 
-- `bun test packages/ir/src/registry/table.test.ts packages/io/src/jsonl`
-- `bun test packages/core/src/table-sheet packages/core/src/svg-export/table-sheet.test.ts`
-- `bun test packages/ui-solid/src/table-sheet packages/ui-solid/src/shapes/table-sheet-view.test.ts packages/ui-solid/src/inspector/table-sheet-section.test.ts`
-- `bun test apps/cli/src/table-command.test.ts apps/cli/src/edit/operations/table.test.ts apps/cli/src/cli-wiring.test.ts`
-- `bun test packages/ir packages/io packages/core` (includes the existing
-  `erd.table` tests, which must be unchanged)
-- `bun run typecheck`, `mise run lint`, `mise run test`
-- `mise run test-cli`, up to 3 attempts under load, without relaxing
-  deadlines
-- `mise run build-cli` and `mise run build`
+- tsh-01a-ir: `bun test ./packages/ir/src/registry/table.test.ts
+  ./packages/ir/src/registry.test.ts ./packages/ir/src/registry/erd.test.ts`
+  and `bun test ./packages/io/src/jsonl/table-sheet.test.ts
+  ./packages/io/src/jsonl/golden.test.ts`
+- tsh-01b-layout: `bun test ./packages/core/src/table-sheet/layout.test.ts
+  ./packages/core/src/table-sheet/shape.test.ts`
+- tsh-01c-edits: `bun test ./packages/core/src/table-sheet/edits.test.ts
+  ./packages/core/src/table-sheet/apply.test.ts
+  ./packages/core/src/table-sheet/delimited.test.ts`
+- tsh-01d-values: `bun test ./packages/core/src/table-sheet/coerce.test.ts
+  ./packages/core/src/table-sheet/columns.test.ts
+  ./packages/core/src/table-sheet/grid.test.ts`
+
+Each plan also runs `bunx biome check` on its own files. Repo-wide
+`bun run typecheck` is a wave exit gate (section 11). A failure there that
+comes only from a sibling's unfinished file is recorded and rerun. The
+worker does not fix it.
+
+Wave and final gates:
+
+- after wave 1: `bun run typecheck` and `bun test
+  ./packages/core/src/table-sheet/`
+- after wave 2: `bun run typecheck`
+- tsh-08 and integration review: `bun test packages/ir packages/io
+  packages/core` (includes the existing `erd.table` tests, which must be
+  unchanged), `bun run typecheck`, `mise run lint`, `mise run test`,
+  `mise run test-cli` (up to 3 attempts under load, without relaxing
+  deadlines), `mise run build-cli` and `mise run build`
 
 Required test assertions:
 
@@ -490,8 +663,13 @@ Required test assertions:
   payload. A resize drag gives one history entry.
 - TSV: parse and serialize round-trip, including quoted tabs and newlines.
   Paste growth and the over-limit rejection are tested.
-- Clipboard preservation, core `packages/core/src/table-sheet/tsv.test.ts`
-  plus ui-solid `packages/ui-solid/src/table-sheet/clipboard.test.ts`, using
+- `Column N`: `columns.test.ts` covers every example in section 6, plus
+  `insertColumn` at the 100-column limit. `grid.test.ts` covers a
+  multi-column paste growth (`Column 1`, `Column 2` appended to the default
+  3x3) and `tableSheetFromGrid` with `header: false` and with a record
+  longer than the header.
+- Clipboard preservation, core `packages/core/src/table-sheet/grid.test.ts`
+  and `delimited.test.ts`, plus ui-solid `packages/ui-solid/src/table-sheet/clipboard.test.ts`, using
   self-authored values:
   - A text range holding `"alpha\nbeta"`, `"tab\there"`, `say "hi"` and
     `"line1\r\nline2"` goes through Copy then Paste into another range. The
@@ -523,3 +701,25 @@ These were open in the intake. They are recorded in
   color is stored.
 - The cell editor is single-line. Newlines can enter text cells only
   through paste or the CLI.
+
+## 14. Continuation (session 778)
+
+- Baseline reused without redesign: sections 2, 3, 5, 7, 8, 10 and 13, the
+  owner defaults in `design-docs/user-qa/table-sheet.md` and the plans
+  `tsh-02`, `tsh-03` and `tsh-05` to `tsh-08` from `9f4414b`.
+- Session 776 blocked because one worker owned all of wave 1 and stopped
+  after two files, so `bun test ./packages/core/src/table-sheet/` ran zero
+  tests. Section 11 splits that work into four wave-1 plans and splits
+  `tsh-04` into three wave-2 plans. Plans `tsh-01-model` and
+  `tsh-04-cell-editing` are superseded. `impl-plans/progress/tsh-01-model.md`
+  stays as history.
+- Partial work at `87365fb`: `packages/ir/src/semantics/table.ts` is
+  complete for section 2. `packages/ir/src/registry/table.test.ts` holds
+  primitive tests, and tsh-01a-ir extends it with the validation cases.
+- The `Column N` rule (section 6) replaces the 776 rule "N = column count
+  after insert". The 776 test expectation `Column 4` for the default 3x3
+  becomes `Column 1`.
+- Edit result codes (`table.limit`, `table.cellType`, `table.lastColumn`,
+  `table.unknownRow`, `table.unknownColumn`) are return values of the core
+  edit functions. They are not new validation codes.
+- Evidence root for this run: `tmp/tsh-s778/<planId>/`.
