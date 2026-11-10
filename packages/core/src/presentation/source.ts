@@ -19,8 +19,9 @@ export function slideSource(
   const frames = store
     .getPageElements(pageId)
     .filter((element) => element.type === "frame" && !hidden(element.id));
-  return frames.length === 1
-    ? { kind: "artboard", frameId: frames[0].id }
+  const [only] = frames;
+  return frames.length === 1 && only
+    ? { kind: "artboard", frameId: only.id }
     : { kind: "page" };
 }
 export function svgSize(svg: string): SlideSize | null {
