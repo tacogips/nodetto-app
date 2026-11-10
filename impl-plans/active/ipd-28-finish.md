@@ -3,7 +3,7 @@
 - planId: ipd-28-finish
 - planPath: impl-plans/active/ipd-28-finish.md
 - progressPath: impl-plans/progress/ipd-28-finish.md
-- dependsOn: ipd-22-desktop-export-compare-check, ipd-27-reproduction (transitively, every other ipd plan)
+- dependsOn: none pending (accepted dependencies: ipd-22-desktop-export-compare-check, ipd-27-reproduction; transitively, every other ipd plan)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, "Verification" and "Accepted output changes".
 - Evidence: `tmp/ipd-s772/ipd-28-finish/final/`.
 <!-- ownership:start -->
@@ -154,3 +154,7 @@ Performance target and scratch (operator round 25, binding for ipd-27p and every
 ## Amendment 2026-11-11 (operator round 26, binding; keep this section verbatim)
 
 General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.
+
+## Amendment 2026-11-11 (operator round 29, binding; keep this section verbatim)
+
+Formatting authority (operator round 29, binding for ipd-28-finish): ipd-28 may apply formatting-only fixes (`bunx biome check --write` or `bunx biome format --write` limited to files changed on this branch versus f59bef4, and `cargo fmt` for changed Rust files) to any such file, even outside its writePaths, provided `git diff` of those files after formatting shows only whitespace and formatting changes and every behavioral test still passes; record the formatted paths in the progress log. Then rerun every required gate.
