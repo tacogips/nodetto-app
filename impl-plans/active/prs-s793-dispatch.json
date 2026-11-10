@@ -1,0 +1,251 @@
+{
+  "taskId": "prs-s793",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-793",
+  "implementationBranch": "feat/presentation",
+  "baseBranch": "feat/presentation",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "d6f9ebd19a508fe272d7f65ea524ad60aaa06d81",
+  "acceptedDependencies": [],
+  "designDocPaths": ["design-docs/specs/design-presentation.md", "design-docs/user-qa/presentation.md"],
+  "overviewPath": "impl-plans/active/prs-00-overview.md",
+  "evidenceRoot": "tmp/prs-s793",
+  "evidenceLayout": "Per-plan logs under tmp/prs-s793/<planId>/final/. Move final/ to attempt-<n>/ before repeating a run. Untracked data only.",
+  "waveGates": {
+    "afterWave1": ["bun run typecheck", "bun test ./packages/core/src/presentation/ ./packages/core/src/page-presentation-flag.test.ts"],
+    "afterWave2": ["bun run typecheck", "bun test ./packages/ui-solid/src/presentation/ ./packages/ui-solid/src/page-presentation-toggle.test.ts"]
+  },
+  "reviewContext": {
+    "issueReference": "none; runtime workflowInput of opus-terra-design-and-implement-review-loop-session-793 is authoritative",
+    "userProblem": "Nodetto cannot present a document as a slideshow. Users need a PowerPoint-style full-screen presentation of pages in tab order, rendered read-only and fitted to the screen, with keyboard, mouse and control-bar navigation, and a per-page flag to skip pages.",
+    "requiredOutcomes": [
+      "Optional Page.hiddenInPresentation is validated as a boolean, round-trips in JSONL and Yjs, and is edited only through the updatePage patch with exact undo. Flagless documents are byte-identical.",
+      "Pure core presentation module: slideList, startIndex, navigation reducer, fitSlide, slideSource (with effective inherited visibility) and svgSize, all with tests.",
+      "ui-solid PresentationView plus a DOM-free controller and key map, with tests: slide rendered as a data-URL img from the existing SVG exporter, counter, keys including number+Enter and B, exit callback, and key isolation.",
+      "Desktop: F5 and Shift+F5 (not in editable targets), the File menu items, the header Present button, Tauri or DOM fullscreen with overlay fallback, and a return to the last shown page.",
+      "Page tab menu item and inspector switch for the flag. Docs and the README describe the feature."
+    ],
+    "constraints": [
+      "No new core Command kind; use the updatePage patch.",
+      "Documents without the flag round-trip byte-identically; the setter removes the key instead of writing false.",
+      "Presentation captures every key (stopImmediatePropagation), and window-input returns early while presenting.",
+      "apps/desktop/src-tauri/gen/schemas stays byte-identical. The exporter, layer-state and the CLI are untouched.",
+      "Public repository: no server or auth code. No emojis. gitPush false."
+    ],
+    "designDecisionsAndRationale": [
+      "Rendering reuses renderArtboardSvg/renderPageSvg through Editor.exportArtboardSvg/exportPageSvgOf, shown as a data-URL img, to avoid defs id collisions with the mounted canvas.",
+      "Artboard: exactly one frame that is visible by inherited visibility (createShapeContext.isHidden), otherwise the content bbox; a null artboard export falls back to the page render (PRS-DESIGN-001).",
+      "prs-02 owns the single core barrel line, because @nodetto/core has no subpath exports and wave-2 ui-solid must import it.",
+      "ui-solid behavior lives in a DOM-free controller, because ui-solid tests run without a DOM.",
+      "Core function names are prefixed (reducePresentation, currentSlide, slideCounter) for barrel uniqueness; behavior is unchanged."
+    ],
+    "intentionalTradeoffs": [
+      "Mixed-version cloud clients may drop the flag when an older client edits the page.",
+      "Next on the last slide clamps; there is no end screen (user-qa Q4 default)."
+    ],
+    "nonGoals": ["Transitions", "speaker notes", "presenter view", "CLI", "PPTX/PDF slide export", "new Command kind"],
+    "supportedEdgeCases": ["Start on a hidden page goes to the next visible page, or the last slide", "All pages hidden disables Present", "Live slide-list changes reconcile", "Empty page gives a blank slide", "Browser Esc fullscreen exit ends the presentation", "Frame inside a hidden group is not an artboard"],
+    "outOfScopeEdgeCases": ["Multi-monitor presenter", "Touch swipe gestures"],
+    "residualRisks": [
+      "WKWebView fullscreen behavior is verified only through the Tauri API path and manual use",
+      "Long data URLs for large embedded images",
+      "Plan review (step5): prs-04 has no direct test that a single Esc with no pending digits calls onExit at once; the prs-04 worker should add one.",
+      "Plan review (step5): in prs-06, an Esc pressed before enterPresentationFullscreen resolves leaves no session; the worker must guard a null session and restore after a late resolve (restore is idempotent).",
+      "PresentationView.tsx DOM binding has no automated DOM test (repository limitation)."
+    ],
+    "sourcePaths": ["packages/ir/src", "packages/io/src/jsonl", "packages/collab/src/ydoc.ts", "packages/core/src", "packages/ui-solid/src", "apps/desktop/src", "apps/desktop/src-tauri/capabilities/default.json", "docs/editing.md", "README.md"]
+  },
+  "plans": [
+    {
+      "planId": "prs-01-page-flag",
+      "planPath": "impl-plans/active/prs-01-page-flag.md",
+      "progressPath": "impl-plans/progress/prs-01-page-flag.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/types.ts",
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/page-presentation-flag.test.ts",
+        "packages/io/src/jsonl/records.ts",
+        "packages/io/src/jsonl/parse.ts",
+        "packages/io/src/jsonl/page-presentation-flag.test.ts",
+        "packages/collab/src/ydoc.ts",
+        "packages/collab/src/page-presentation-flag.test.ts",
+        "packages/core/src/commands.ts",
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/editor/facade/page-editing.ts",
+        "packages/core/src/page-presentation-flag.test.ts",
+        "impl-plans/progress/prs-01-page-flag.md",
+        "tmp/prs-s793/prs-01-page-flag",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/ir/src/page-presentation-flag.test.ts",
+        "bun test ./packages/io/src/jsonl/page-presentation-flag.test.ts ./packages/io/src/jsonl/golden.test.ts ./packages/io/src/jsonl/roundtrip.test.ts",
+        "bun test ./packages/collab/src/page-presentation-flag.test.ts ./packages/collab/src/binding-pages-artboards.test.ts",
+        "bun test ./packages/core/src/page-presentation-flag.test.ts ./packages/core/src/editor.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Verifications 1-4 exited 0 with at least one passing test each and zero failures.",
+        "Page.hiddenInPresentation validates as boolean and round-trips byte-identically for absent, true and false in JSONL; Yjs pageFields/pageFromY carry it.",
+        "updatePage accepts hiddenInPresentation boolean|null with conditional exact undo; setPageHiddenInPresentation writes true or removes the key; duplicate copies true; exportPageSvgOf renders any page.",
+        "git diff --stat -- packages/io/src/jsonl/serialize.ts packages/io/src/__fixtures__ apps/cli is empty, and the Command union gains no member.",
+        "The progress log has the intent hash, per-edit hashes and command results."
+      ]
+    },
+    {
+      "planId": "prs-02-core-presentation",
+      "planPath": "impl-plans/active/prs-02-core-presentation.md",
+      "progressPath": "impl-plans/progress/prs-02-core-presentation.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/presentation/index.ts",
+        "packages/core/src/presentation/slides.ts",
+        "packages/core/src/presentation/slides.test.ts",
+        "packages/core/src/presentation/navigation.ts",
+        "packages/core/src/presentation/navigation.test.ts",
+        "packages/core/src/presentation/fit.ts",
+        "packages/core/src/presentation/fit.test.ts",
+        "packages/core/src/presentation/source.ts",
+        "packages/core/src/presentation/source.test.ts",
+        "packages/core/src/index.ts",
+        "impl-plans/progress/prs-02-core-presentation.md",
+        "tmp/prs-s793/prs-02-core-presentation",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/core/src/presentation/slides.test.ts ./packages/core/src/presentation/navigation.test.ts",
+        "bun test ./packages/core/src/presentation/fit.test.ts ./packages/core/src/presentation/source.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Both verifications exited 0 with at least one passing test each and zero failures.",
+        "Tests cover slide order, hidden skip, empty list, startIndex (null, current, hidden goes to next visible or the last), next/prev/first/last/goto clamping, black toggle, digit+enter, reconcile, and fit letterbox/pillarbox/margin/upscale/degenerate cases.",
+        "source.test.ts proves that an inherited-hidden frame plus a visible rectangle gives kind page with a non-null page SVG containing the rectangle data-id, that exactly one visible frame gives an artboard, and that zero or multiple frames give page.",
+        "git diff -- packages/core/src/index.ts adds exactly one line, and source.ts does not test visual.hidden directly.",
+        "The progress log has the intent hash, per-edit hashes and command results."
+      ]
+    },
+    {
+      "planId": "prs-03-fullscreen",
+      "planPath": "impl-plans/active/prs-03-fullscreen.md",
+      "progressPath": "impl-plans/progress/prs-03-fullscreen.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/shell/presentation-fullscreen.ts",
+        "apps/desktop/src/shell/presentation-fullscreen.test.ts",
+        "apps/desktop/src-tauri/capabilities/default.json",
+        "impl-plans/progress/prs-03-fullscreen.md",
+        "tmp/prs-s793/prs-03-fullscreen",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./apps/desktop/src/shell/presentation-fullscreen.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "The verification exited 0 with at least one passing test and zero failures.",
+        "enterPresentationFullscreen covers the Tauri (restoring prior state), DOM and none paths, never rejects, and has an idempotent restore; watchFullscreenExit fires once on leaving DOM fullscreen.",
+        "capabilities/default.json contains core:window:allow-set-fullscreen, and git diff --exit-code -- apps/desktop/src-tauri/gen/schemas exits 0.",
+        "The progress log has the intent hash, per-edit hashes and command results."
+      ]
+    },
+    {
+      "planId": "prs-04-presentation-view",
+      "planPath": "impl-plans/active/prs-04-presentation-view.md",
+      "progressPath": "impl-plans/progress/prs-04-presentation-view.md",
+      "wave": 2,
+      "dependsOn": ["prs-01-page-flag", "prs-02-core-presentation"],
+      "writePaths": [
+        "packages/ui-solid/src/presentation/index.ts",
+        "packages/ui-solid/src/presentation/keys.ts",
+        "packages/ui-solid/src/presentation/keys.test.ts",
+        "packages/ui-solid/src/presentation/controller.ts",
+        "packages/ui-solid/src/presentation/controller.test.ts",
+        "packages/ui-solid/src/presentation/PresentationView.tsx",
+        "packages/ui-solid/src/presentation/Presentation.css",
+        "impl-plans/progress/prs-04-presentation-view.md",
+        "tmp/prs-s793/prs-04-presentation-view",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/ui-solid/src/presentation/keys.test.ts ./packages/ui-solid/src/presentation/controller.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "The verification exited 0 with at least one passing test and zero failures.",
+        "The tests show: the slide rendered as a data:image/svg+xml src containing the element data-id; the counter 1 / 2 then 2 / 2; the number+Enter jump; B black; preventDefault and stopImmediatePropagation on mapped and unmapped keys; an unchanged editor revision; Esc clearing digits, then onExit once with the current page; reconcile after hiding; and an inherited-hidden-frame page producing a non-null src.",
+        "No innerHTML in packages/ui-solid/src/presentation/.",
+        "The progress log has the intent hash, per-edit hashes and command results."
+      ]
+    },
+    {
+      "planId": "prs-05-page-flag-ui",
+      "planPath": "impl-plans/active/prs-05-page-flag-ui.md",
+      "progressPath": "impl-plans/progress/prs-05-page-flag-ui.md",
+      "wave": 2,
+      "dependsOn": ["prs-01-page-flag"],
+      "writePaths": [
+        "packages/ui-solid/src/PageTabs.tsx",
+        "packages/ui-solid/src/inspector/PageSection.tsx",
+        "packages/ui-solid/src/page-presentation-toggle.ts",
+        "packages/ui-solid/src/page-presentation-toggle.test.ts",
+        "impl-plans/progress/prs-05-page-flag-ui.md",
+        "tmp/prs-s793/prs-05-page-flag-ui",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/ui-solid/src/page-presentation-toggle.test.ts ./packages/ui-solid/src/page-rename.test.ts ./packages/ui-solid/src/page-tab-drag.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "The verification exited 0 with at least one passing test and zero failures.",
+        "The PageTabs options menu has a Hide/Show in presentation menuitem (disabled when read-only), hidden tabs get the class and title suffix, and PageSection has a Show in presentation switch; both call setPageHiddenInPresentation.",
+        "The progress log has the intent hash, per-edit hashes and command results."
+      ]
+    },
+    {
+      "planId": "prs-06-wiring",
+      "planPath": "impl-plans/active/prs-06-wiring.md",
+      "progressPath": "impl-plans/progress/prs-06-wiring.md",
+      "wave": 3,
+      "dependsOn": ["prs-03-fullscreen", "prs-04-presentation-view", "prs-05-page-flag-ui"],
+      "writePaths": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/shell/window-input.ts",
+        "apps/desktop/src/shell/window-input.test.ts",
+        "apps/desktop/src/shell/FileActions.tsx",
+        "apps/desktop/src/pane.css",
+        "packages/ui-solid/src/index.ts",
+        "docs/editing.md",
+        "README.md",
+        "impl-plans/progress/prs-06-wiring.md",
+        "tmp/prs-s793/prs-06-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./apps/desktop/src/shell/window-input.test.ts ./packages/ui-solid/src/presentation/controller.test.ts",
+        "CARGO_TERM_QUIET=true mise run test",
+        "CARGO_TERM_QUIET=true mise run verify"
+      ],
+      "acceptanceCriteria": [
+        "Verifications 1-3 exited 0 with tests run and zero failures.",
+        "The final gates bun run typecheck, CARGO_TERM_QUIET=true mise run lint, bun run build and git diff --exit-code -- apps/desktop/src-tauri/gen/schemas exited 0.",
+        "F5 and Shift+F5 start a presentation (not in editable targets, preventDefault); the File menu and header Present actions exist; window-input returns early while presenting; fullscreen enter/restore and the DOM exit watcher are wired; exit returns to the last shown page.",
+        "docs/editing.md has a ## Presentation section covering every key, and README.md links docs/editing.md#presentation.",
+        "The progress log has the intent hash, per-edit hashes and every command's exit status and counts."
+      ]
+    }
+  ]
+}
