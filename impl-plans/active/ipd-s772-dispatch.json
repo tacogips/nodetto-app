@@ -83,6 +83,10 @@
       {
         "decision": "ipd-00 records the f59bef4 baseline alone before any source edit; ipd-28 gates on no new failures versus it.",
         "rationale": "Operator constraint for broad suites that may already fail."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 1: blocked-wave-scope-or-contract operator amendment for session-772 wave 2 blockers: (a) ipd-01-ir-schema owns packages/ir/src/registry.test.ts and updates its complete ELEMENT_TYPES expectation to include ui.icon; (b) ipd-03-icon-data pins lucide-static 1.70.0 (the release already downloaded and recorded) and the generator accepts a `fill` attribute on child geometry elements only with the values `currentColor` or `none`; it stores a per-node `fill` flag, the markup renders `fill=\"currentColor\"` nodes filled with the icon color (and `none` as unfilled, the default), and any other fill value still fails the script with the icon name; (c) ipd-00-baseline, ipd-02-text-measure, ipd-04-cli-edit-contracts and ipd-29-desktop-snap-grid are accepted dependencies whose code is already in the working tree; do not redo them.",
+        "rationale": "Blocked plans: ipd-01-ir-schema and ipd-03-icon-data (gaps resolved: registry.test.ts ownership; lucide-static version pin and fill allowlist). ipd-01 could not pass `bun test packages/ir` because registry.test.ts asserts the full element-type list and was outside its writePaths. Lucide 1.70.0 (latest stable) has fill=\"currentColor\" on a child of brain-circuit.svg (a filled dot); rejecting it would block the whole icon set, while a two-value fill flag keeps the strict allowlist and renders the icon as upstream intends. The run died at wave-2 reconcile from a network outage (ENOTFOUND), not a code failure."
       }
     ],
     "intentionalTradeoffs": [
@@ -117,51 +121,11 @@
   },
   "plans": [
     {
-      "planId": "ipd-00-baseline",
-      "planPath": "impl-plans/active/ipd-00-baseline.md",
-      "progressPath": "impl-plans/progress/ipd-00-baseline.md",
-      "wave": 1,
-      "dependsOn": [],
-      "writePaths": [
-        "impl-plans/progress/ipd-00-baseline.md",
-        "tmp/ipd-s772/ipd-00-baseline",
-        "target",
-        "apps/desktop/src-tauri/binaries"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-00-baseline",
-        "target",
-        "apps/desktop/src-tauri/binaries"
-      ],
-      "acceptanceCriteria": [
-        "`test -s` succeeds for tmp/ipd-s772/ipd-00-baseline/final/verify.log, test-cli.log, build-cli.log and typecheck.log.",
-        "The progress log contains a table row per command with its exit code and counts, a \"Baseline failures\" table (or \"none\"), and the engine bundle size from tmp/ipd-s772/ipd-00-baseline/engine/diagram.js with both exit codes.",
-        "`git diff --stat -- packages apps crates` is empty after the run."
-      ],
-      "verification": [
-        "git rev-parse HEAD",
-        "git diff --stat --exit-code f59bef4 -- packages apps crates Cargo.toml package.json bun.lock",
-        "CARGO_TERM_QUIET=true mise run verify",
-        "CARGO_TERM_QUIET=true mise run test-cli",
-        "CARGO_TERM_QUIET=true mise run build-cli",
-        "bun run typecheck",
-        "sh -c 'NODETTO_ENGINE_OUT_DIR=\"$PWD/tmp/ipd-s772/ipd-00-baseline/engine\" bun apps/cli/scripts/build-engine.ts && wc -c tmp/ipd-s772/ipd-00-baseline/engine/diagram.js'",
-        "test -s tmp/ipd-s772/ipd-00-baseline/final/verify.log",
-        "test -s tmp/ipd-s772/ipd-00-baseline/final/test-cli.log",
-        "test -s tmp/ipd-s772/ipd-00-baseline/final/build-cli.log",
-        "test -s tmp/ipd-s772/ipd-00-baseline/final/typecheck.log"
-      ]
-    },
-    {
       "planId": "ipd-01-ir-schema",
       "planPath": "impl-plans/active/ipd-01-ir-schema.md",
       "progressPath": "impl-plans/progress/ipd-01-ir-schema.md",
       "wave": 2,
-      "dependsOn": [
-        "ipd-00-baseline"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "packages/ir/src/types.ts",
         "packages/ir/src/keyOrder.ts",
@@ -174,6 +138,7 @@
         "packages/ir/src/registry/containers.ts",
         "packages/ir/src/registry/generic.ts",
         "packages/ir/src/registry/icons.ts",
+        "packages/ir/src/registry.test.ts",
         "packages/ir/src/index.ts",
         "packages/ir/src/ipd-schema.test.ts",
         "impl-plans/progress/ipd-01-ir-schema.md",
@@ -205,53 +170,11 @@
       ]
     },
     {
-      "planId": "ipd-02-text-measure",
-      "planPath": "impl-plans/active/ipd-02-text-measure.md",
-      "progressPath": "impl-plans/progress/ipd-02-text-measure.md",
-      "wave": 2,
-      "dependsOn": [
-        "ipd-00-baseline"
-      ],
-      "writePaths": [
-        "packages/core/src/text-measure.ts",
-        "packages/core/src/text-measure.test.ts",
-        "packages/core/src/text-metrics",
-        "scripts/generate-text-metrics.ts",
-        "impl-plans/progress/ipd-02-text-measure.md",
-        "tmp/ipd-s772/ipd-02-text-measure"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-02-text-measure"
-      ],
-      "acceptanceCriteria": [
-        "All verification passes.",
-        "`test -f packages/core/src/text-metrics/LICENSE-liberation-sans.txt`",
-        "`wc -c < packages/core/src/text-metrics/advances.generated.ts` < 20000",
-        "`rg -n 'measureTextWidth|truncateToWidth|APP_FONT_STACK' packages/core/src/index.ts` -> 3 or more matches."
-      ],
-      "verification": [
-        "bun test packages/core/src/text-measure.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/core/src/text-measure.ts packages/core/src/text-measure.test.ts scripts/generate-text-metrics.ts"
-      ]
-    },
-    {
       "planId": "ipd-03-icon-data",
       "planPath": "impl-plans/active/ipd-03-icon-data.md",
       "progressPath": "impl-plans/progress/ipd-03-icon-data.md",
       "wave": 2,
-      "dependsOn": [
-        "ipd-00-baseline"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "packages/core/src/icons",
         "scripts/vendor-lucide.ts",
@@ -284,60 +207,12 @@
       ]
     },
     {
-      "planId": "ipd-04-cli-edit-contracts",
-      "planPath": "impl-plans/active/ipd-04-cli-edit-contracts.md",
-      "progressPath": "impl-plans/progress/ipd-04-cli-edit-contracts.md",
-      "wave": 2,
-      "dependsOn": [
-        "ipd-00-baseline"
-      ],
-      "writePaths": [
-        "apps/cli/src/edit/operation-fields.ts",
-        "apps/cli/src/edit/batch.ts",
-        "apps/cli/src/edit/operations/add.ts",
-        "apps/cli/src/edit/operations/elements.ts",
-        "apps/cli/src/edit/operations/layout.ts",
-        "apps/cli/src/edit/parent-fields.ts",
-        "apps/cli/src/edit/sizing-fields.ts",
-        "apps/cli/src/edit/kit-shapes.ts",
-        "apps/cli/src/edit/icon-shapes.ts",
-        "apps/cli/src/edit/typography-link.ts",
-        "apps/cli/src/edit/ipd-contracts.test.ts",
-        "impl-plans/progress/ipd-04-cli-edit-contracts.md",
-        "tmp/ipd-s772/ipd-04-cli-edit-contracts"
-      ],
-      "sharedPaths": [
-        "apps/cli/src/edit/operation-fields.test.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "apps/cli/src/edit/operation-fields.test.ts",
-          "intendedEdit": "update only expectations that snapshot the full valid-field lists, after the new fields are appended"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-04-cli-edit-contracts"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "`rg -n '\"layout\"|\"align\"|\"distribute\"|\"snap\"' apps/cli/src/edit/operation-fields.ts` -> at least 4 matches.",
-        "All six hook files exist with exactly the exported names above: `rg -n '^export (function|interface)'` on each file.",
-        "The progress log has hash records."
-      ],
-      "verification": [
-        "bun test apps/cli/src/edit apps/cli/src/commands.test.ts apps/cli/src/warnings.test.ts apps/cli/src/ai-commands.test.ts",
-        "bun run typecheck",
-        "bunx biome check apps/cli/src/edit"
-      ]
-    },
-    {
       "planId": "ipd-05-core-catalogue",
       "planPath": "impl-plans/active/ipd-05-core-catalogue.md",
       "progressPath": "impl-plans/progress/ipd-05-core-catalogue.md",
       "wave": 3,
       "dependsOn": [
-        "ipd-01-ir-schema",
-        "ipd-02-text-measure"
+        "ipd-01-ir-schema"
       ],
       "writePaths": [
         "packages/core/src/tools.ts",
@@ -425,7 +300,6 @@
       "dependsOn": [
         "ipd-01-ir-schema",
         "ipd-03-icon-data",
-        "ipd-04-cli-edit-contracts",
         "ipd-05-core-catalogue"
       ],
       "writePaths": [
@@ -470,9 +344,7 @@
       "planPath": "impl-plans/active/ipd-08-cli-layout-ops.md",
       "progressPath": "impl-plans/progress/ipd-08-cli-layout-ops.md",
       "wave": 3,
-      "dependsOn": [
-        "ipd-04-cli-edit-contracts"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "apps/cli/src/edit/operations/layout.ts",
         "apps/cli/src/edit/sizing-fields.ts",
@@ -500,8 +372,6 @@
       "progressPath": "impl-plans/progress/ipd-09-text-layer.md",
       "dependsOn": [
         "ipd-01-ir-schema",
-        "ipd-02-text-measure",
-        "ipd-04-cli-edit-contracts",
         "ipd-05-core-catalogue"
       ],
       "writePaths": [
@@ -576,7 +446,6 @@
       "progressPath": "impl-plans/progress/ipd-11-frames.md",
       "dependsOn": [
         "ipd-01-ir-schema",
-        "ipd-04-cli-edit-contracts",
         "ipd-05-core-catalogue",
         "ipd-06-geo-strokes",
         "ipd-07-icon-core-cli"
@@ -629,7 +498,6 @@
       "progressPath": "impl-plans/progress/ipd-12-controls.md",
       "dependsOn": [
         "ipd-01-ir-schema",
-        "ipd-02-text-measure",
         "ipd-03-icon-data",
         "ipd-06-geo-strokes"
       ],
@@ -727,7 +595,6 @@
       "planPath": "impl-plans/active/ipd-14-kit-core.md",
       "progressPath": "impl-plans/progress/ipd-14-kit-core.md",
       "dependsOn": [
-        "ipd-04-cli-edit-contracts",
         "ipd-05-core-catalogue",
         "ipd-07-icon-core-cli",
         "ipd-09-text-layer",
@@ -895,8 +762,7 @@
       "progressPath": "impl-plans/progress/ipd-18-desktop-prototype-view.md",
       "dependsOn": [
         "ipd-13-prototype-core-cli",
-        "ipd-19-desktop-presentation",
-        "ipd-29-desktop-snap-grid"
+        "ipd-19-desktop-presentation"
       ],
       "writePaths": [
         "packages/ui-solid/src/Toolbar.tsx",
@@ -1056,8 +922,7 @@
         "ipd-18-desktop-prototype-view",
         "ipd-19-desktop-presentation",
         "ipd-20-app-lint",
-        "ipd-21-html-prototype",
-        "ipd-29-desktop-snap-grid"
+        "ipd-21-html-prototype"
       ],
       "writePaths": [
         "packages/ui-solid/src/ExportDialog.tsx",
@@ -1195,8 +1060,7 @@
         "ipd-19-desktop-presentation",
         "ipd-20-app-lint",
         "ipd-21-html-prototype",
-        "ipd-22-desktop-export-compare-check",
-        "ipd-29-desktop-snap-grid"
+        "ipd-22-desktop-export-compare-check"
       ],
       "writePaths": [
         "apps/cli/src/help.ts",
@@ -1337,39 +1201,32 @@
         "sh -c '{ git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E \"\\.(md|ts|tsx|json|html)$\" | while read -r f; do test -f \"$f\" && echo \"$f\"; done | xargs grep -nP \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\"; test $? -eq 1'",
         "git diff --exit-code f59bef4 -- bun.lock package.json"
       ]
+    }
+  ],
+  "acceptedDependencies": [
+    {
+      "planId": "ipd-00-baseline",
+      "planPath": "impl-plans/active/ipd-00-baseline.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-02-text-measure",
+      "planPath": "impl-plans/active/ipd-02-text-measure.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-04-cli-edit-contracts",
+      "planPath": "impl-plans/active/ipd-04-cli-edit-contracts.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
     },
     {
       "planId": "ipd-29-desktop-snap-grid",
       "planPath": "impl-plans/active/ipd-29-desktop-snap-grid.md",
-      "progressPath": "impl-plans/progress/ipd-29-desktop-snap-grid.md",
-      "wave": 2,
-      "dependsOn": [
-        "ipd-00-baseline"
-      ],
-      "writePaths": [
-        "packages/ui-solid/src/interaction/types.ts",
-        "packages/ui-solid/src/interaction/snapping.ts",
-        "packages/ui-solid/src/ZoomControls.tsx",
-        "packages/ui-solid/src/Canvas.tsx",
-        "apps/desktop/src/settings/preferences.ts",
-        "apps/desktop/src/App.tsx",
-        "packages/ui-solid/src/snap-grid-size.test.ts",
-        "impl-plans/progress/ipd-29-desktop-snap-grid.md",
-        "tmp/ipd-s772/ipd-29-desktop-snap-grid"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-29-desktop-snap-grid"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes."
-      ],
-      "verification": [
-        "bun test packages/ui-solid/src/snap-grid-size.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/canvas-rulers.test.ts apps/desktop/src/page-workspace.test.ts",
-        "bun run typecheck",
-        "bunx biome check"
-      ]
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
     }
   ]
 }

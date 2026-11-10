@@ -19,6 +19,7 @@
   - `packages/ir/src/registry/containers.ts`
   - `packages/ir/src/registry/generic.ts`
   - `packages/ir/src/registry/icons.ts`
+  - `packages/ir/src/registry.test.ts`
   - `packages/ir/src/index.ts`
   - `packages/ir/src/ipd-schema.test.ts`
   - `impl-plans/progress/ipd-01-ir-schema.md`
@@ -189,3 +190,10 @@ The CLI derives allowed style keys from `VISUAL_STYLE_KEY_ORDER.keys` (`apps/cli
 - Edit only writePaths. The sharedPaths file only for the stated reason.
 - No state-changing git commands, no lockfile edits, no broad formatting, no emojis. Generic names only.
 - Evidence files must not match Bun test name patterns. Every evidence command records the command, exit code, counts and log path.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 1)
+
+- Blocker (session-772 wave 2): `bun test packages/ir` could not pass because `packages/ir/src/registry.test.ts` asserts the complete element-type list and was outside writePaths.
+- Decision: `packages/ir/src/registry.test.ts` is added to writePaths. The only permitted edit is to add `ui.icon` to its complete ELEMENT_TYPES expectation, in the registry's ordering. Change nothing else in that file.
+- Test: `bun test packages/ir/src/registry.test.ts` -> exit 0, 0 fail, and the expectation lists `ui.icon` exactly once.
+- Dependency note: ipd-00-baseline is an accepted dependency (its baseline evidence is in `impl-plans/progress/ipd-00-baseline.md`); this plan has no pending dependency and does not redo the baseline.

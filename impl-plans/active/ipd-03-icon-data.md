@@ -44,11 +44,12 @@ The module runs unchanged in the Boa-hosted native CLI.
 
 New `scripts/vendor-lucide.ts`, a dev-time Bun script.
 
-- **Input.** `bun scripts/vendor-lucide.ts <extracted-lucide-static-dir>`. The input is an extracted `lucide-static` npm tarball: download `https://registry.npmjs.org/lucide-static/-/lucide-static-<version>.tgz` (latest stable at run time) into `tmp/ipd-s772/ipd-03-icon-data/src/` and extract it there.
+- **Input.** `bun scripts/vendor-lucide.ts <extracted-lucide-static-dir>`. The input is an extracted `lucide-static` npm tarball: download `https://registry.npmjs.org/lucide-static/-/lucide-static-<version>.tgz` (pinned: 1.70.0, already downloaded and recorded in session-772; amendment round 1, 2026-11-10) into `tmp/ipd-s772/ipd-03-icon-data/src/` and extract it there.
 - **Records.** Record the version, the tarball SHA-512 and the `dist.integrity` from `https://registry.npmjs.org/lucide-static/<version>` in the progress log.
 - **Parsing.** Read `package/icons/*.svg` and `package/tags.json` (if absent, tags are `[]`). Parse each SVG's child elements with a small strict regex/XML tokenizer.
   - Accept only the elements `path`, `circle`, `rect`, `line`, `polyline`, `polygon` and `ellipse`.
   - Accept only the geometry attributes `d`, `cx`, `cy`, `r`, `x`, `y`, `width`, `height`, `rx`, `ry`, `x1`, `y1`, `x2`, `y2` and `points`.
+  - Amendment round 1 (2026-11-10): additionally accept a `fill` attribute on a child element only when its value is `currentColor` or `none` (Lucide 1.70.0 `brain-circuit` has `fill="currentColor"` on a dot). Store it as a node attribute `fill` with that value. The markup functions render `fill="currentColor"` nodes filled with the icon color and everything else unfilled (`fill="none"`, the default). Any other `fill` value still fails the script with the icon name. Add a test that `brain-circuit` keeps its filled node and that a fixture with `fill="red"` is rejected.
   - The root `viewBox` must be `0 0 24 24`.
   - Any other element or attribute fails the script with the icon name. Do not silently drop it.
 - **Output.** Write `packages/core/src/icons/lucide-data.generated.ts` deterministically, with icons sorted by name and attributes in a fixed order:
@@ -145,3 +146,12 @@ The engine-size and native-deadline check happens in `ipd-23`/`ipd-24`. It feeds
 - `packages/core/src/index.ts` is shared with `ipd-02` in this wave. Append export lines only and re-read immediately before writing.
 - No state-changing git commands, no lockfile edits, no emojis.
 - If the network is unavailable, record a blocker finding with the exact failing command and stop. Never hand-write icon data.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 1)
+
+- Blocker (session-772 wave 2): lucide-static 1.70.0 (latest stable, already downloaded and recorded in the progress log) has `fill="currentColor"` on a child of `brain-circuit.svg`, which the strict allowlist rejected, so no data file was produced.
+- Decision (a): pin lucide-static 1.70.0. Reuse the archive already under `tmp/ipd-s772/ipd-03-icon-data/src/` after re-checking its SHA-512 against the progress log; re-download only if the digest differs, and record the command and exit code.
+- Decision (b): the generator accepts `fill` on a child geometry element only with the values `currentColor` or `none`, stored as a per-node `fill` attribute. Markup renders `currentColor` nodes filled with the icon color; `none` and absent stay unfilled (default). Any other `fill` value still fails the script with the icon name. No other attribute is added to the allowlist.
+- Tests added to `packages/core/src/icons/icons.test.ts`: `brain-circuit` keeps its filled node and its markup contains a filled element with the icon color; a fixture child with `fill="red"` -> the generator rejects it with the icon name.
+- The preliminary `scripts/vendor-lucide.ts` in the working tree is this plan's file; read it fresh and complete it rather than rewriting from scratch.
+- Dependency note: ipd-00-baseline is an accepted dependency; `ipd-02` is accepted, so `packages/core/src/index.ts` already holds its append-only exports, which must survive.
