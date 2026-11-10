@@ -3,7 +3,7 @@
 - planId: ipd-27a-reproduction-chrome
 - planPath: impl-plans/active/ipd-27a-reproduction-chrome.md
 - progressPath: impl-plans/progress/ipd-27a-reproduction-chrome.md
-- dependsOn: none among pending plans (accepted dependencies ipd-25-docs-help and ipd-26-example-sample supply all features, parity and docs)
+- dependsOn: ipd-27k-kit-grid (pending; fixes the iOS kit first). Accepted dependencies ipd-25-docs-help and ipd-26-example-sample supply all other features, parity and docs.
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, section "Reproduction (item 11) support", Decision 10.2 (bands), user-QA Q1 default (device layout with two bands).
 - Evidence and working directory: `tmp/ipd-s772/ipd-27-reproduction/` (git-ignored).
 <!-- ownership:start -->
@@ -12,14 +12,6 @@
   - `tmp/ipd-s772/ipd-27-reproduction`
   - `target`
   - `apps/desktop/src-tauri/binaries`
-  - `packages/core/src/kits/ios/bars.ts`
-  - `packages/core/src/kits/ios/content.ts`
-  - `packages/core/src/kits/ios/style.ts`
-  - `packages/core/src/kits/ios/insert.ts`
-  - `packages/core/src/kits/ios/props.ts`
-  - `packages/core/src/kits/ios/types.ts`
-  - `packages/core/src/kits/ios/kit-core.test.ts`
-  - `packages/core/src/kits/ios/kit-content.test.ts`
 - sharedPaths:
   - none
 - sharedPathNotes:
@@ -52,7 +44,7 @@ Per-frame PNGs at scale 2 are compared side by side with every reference screens
 
 ## Non-goals
 
-- No source changes except the 8 kit files under `packages/core/src/kits/ios/` in writePaths, limited to the operator round-19 kit fix and its tests. Any other missing feature or bug is a finding naming the owning plan, with a generic reproduction written from scratch.
+- No source changes (operator round 20: the kit fix and the 8 kit files moved to `ipd-27k-kit-grid`). Any missing feature or bug, including a remaining kit gap, is a finding naming the owning plan (`ipd-27k-kit-grid` for the kit), with a generic reproduction written from scratch.
 - No tracked files other than the progress log, which must contain no private content.
 
 ## Steps
@@ -106,7 +98,7 @@ Scope: this part's screens 01, 02, 03 only. The output-directory copy, prototype
 ## Worker rules
 
 - Record `git hash-object` of this plan first.
-- No source edits except the 8 kit files under `packages/core/src/kits/ios/` in writePaths, limited to the operator round-19 kit fix and its tests; any other missing feature or bug is a finding for its owning plan. No state-changing git commands.
+- No source edits (operator round 20); any missing feature or bug, including a kit gap, is a finding for its owning plan. No state-changing git commands.
 - No emojis.
 - Commands run in the foreground with full logs.
 
@@ -177,3 +169,19 @@ The round-18 phrase "Fix kit or engine gaps only as findings naming the owning p
 Step 5 ("Iterate until there are zero findings") is read with the operator round-19 reproduction lint gate: errors and every rule other than `app-misaligned` must be zero, and each remaining `app-misaligned` finding is justified in the progress log as within 4 points of the reference, with a per-screen count.
 
 Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, verification strings, the round-16, round-18 and round-19 operator sections, and every privacy rule. `ipd-27b-reproduction-detail`, `ipd-27c-reproduction-search-more` and `ipd-27-reproduction` keep their unconditional no-source-edit rules.
+
+## Amendment 2026-11-10 (operator round 20, binding; keep this section verbatim)
+
+The kit fix moved to `ipd-27k-kit-grid`, which runs first. This plan builds the shared chrome and screens 01-03 on the fixed kit and does not edit kit sources. A remaining kit gap is a finding for `ipd-27k`.
+
+## Amendment 2026-11-11 (step 4 s808 round-20 consistency)
+
+Step 4 (session 808) applies the operator round-20 section above to the rest of this plan:
+
+- The ownership block no longer lists the 8 kit files; they belong to `ipd-27k-kit-grid`. The header `dependsOn` names `ipd-27k-kit-grid`. The Non-goals and Worker rules bullets now forbid all source edits.
+- The round-19 "Kit fix" paragraph, the s806 "Kit gates" paragraph and the s806 "scope of source edits" section are superseded by round 20: this plan does not perform or own the kit fix. Read them as history only.
+- s806 verification items 8 (owned-file kit typecheck) and 9 (biome on the 8 kit files) are removed from this plan and its manifest entry; `ipd-27k-kit-grid` runs them.
+- s806 verification items 7 (kit, kit-cli, shapes-command, app lint and example tests) and 10 (release build plus native kit parity) stay as read-only regression gates. They confirm that the sidecar built in step 1 bundles the fixed kit. A failure there is a finding for `ipd-27k-kit-grid`, not an edit for this plan.
+- Because stored kit instances keep the geometry they were inserted with, rebuild `tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl` from the ops files after step 1 so every tab bar uses the fixed kit.
+
+Unchanged: planId, writePaths apart from removing the kit files, artifactRoots, the frame, compare, lint and privacy gates, and the round-16, round-18, round-19 and round-20 operator sections.

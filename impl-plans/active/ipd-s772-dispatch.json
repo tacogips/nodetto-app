@@ -191,6 +191,14 @@
       {
         "decision": "2026-11-10 step 4 s806 round-19 plan consistency: (1) the ipd-27a ownership bullets are plain backticked paths (the prose suffix broke check-manifest.ts, which exited 1 with 9 problems). (2) The reproduction lint gate in ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction now implements the operator round-19 rule: it exits 0 only when summary.errors === 0 and every finding has ruleId app-misaligned. Each remaining app-misaligned finding must be justified in the progress log as matching the reference within 4 points, with a per-screen count. (3) The progress-log and ipd-28 privacy gates first check test -s on private-terms.txt, so a missing terms file fails instead of passing. (4) ipd-27a, which now owns the iOS kit files, gets the ipd-26 round-17 kit gates: kit and lint tests, an owned-file typecheck, biome on the 8 kit files, and native kit parity.",
         "rationale": "The uncommitted round-19 amendment added the misaligned allowance but left summary.problems === 0 gates. The working document has 66 warnings, 46 of them app-misaligned, so the old gate could never pass under the new rule. The ownership suffix made the md and manifest declarations disagree. The kit owner had no kit regression, typecheck, biome or parity gate."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 20 (session-806 wave 1): new root unit ipd-27k-kit-grid owns the iOS kit sources and finishes the round-19 kit fix (whole-point tab-bar item widths and child positions for 2-5 items with and without a badge; keep the centered floating-button shadow). ipd-27a-reproduction-chrome depends on it, no longer owns kit sources, and builds the chrome and screens 01-03.",
+        "rationale": "ipd-27a centered the floating-button shadow and added the tab-bar regression (2-5 items, badge), which now fails on a child at x 85.5 (kit aggregate 42/43); carrying the kit fix plus three screens in one unit keeps exhausting its continuations, so the small kit fix becomes its own unit."
+      },
+      {
+        "decision": "2026-11-11 step 4 s808 round-20 consistency: ipd-27k-kit-grid gets a full plan (ownership block with sharedPaths none and artifactRoots tmp/ipd-s772/ipd-27k-kit-grid, dependsOn header, intent, pitfalls, test cases, done criteria, progress log). Its verification uses the scoped kit tests, the owned-file typecheck gate and biome on the 8 kit files instead of the bare 'bun run typecheck' and the directory biome argument. ipd-27a drops the 8 kit files from its ownership block, names ipd-27k-kit-grid in its dependsOn header, forbids all source edits, and drops the kit typecheck and biome gates; the kit tests and native parity stay as read-only regression gates.",
+        "rationale": "check-manifest.ts exited 1 with 11 problems after the operator round-20 manifest change: no ownership block for ipd-27k, an ipd-27a md/manifest writePaths mismatch, 8 biome arguments not owned by ipd-27a, and a missing dependsOn in the ipd-27a header. A bare workspace typecheck gate is rejected by the S5-s786-R2 rule."
       }
     ],
     "intentionalTradeoffs": [
@@ -225,15 +233,12 @@
   },
   "plans": [
     {
-      "planId": "ipd-27a-reproduction-chrome",
-      "planPath": "impl-plans/active/ipd-27a-reproduction-chrome.md",
-      "progressPath": "impl-plans/progress/ipd-27a-reproduction-chrome.md",
+      "planId": "ipd-27k-kit-grid",
+      "planPath": "impl-plans/active/ipd-27k-kit-grid.md",
+      "progressPath": "impl-plans/progress/ipd-27k-kit-grid.md",
+      "wave": 1,
       "dependsOn": [],
       "writePaths": [
-        "impl-plans/progress/ipd-27a-reproduction-chrome.md",
-        "tmp/ipd-s772/ipd-27-reproduction",
-        "target",
-        "apps/desktop/src-tauri/binaries",
         "packages/core/src/kits/ios/bars.ts",
         "packages/core/src/kits/ios/content.ts",
         "packages/core/src/kits/ios/style.ts",
@@ -241,7 +246,40 @@
         "packages/core/src/kits/ios/props.ts",
         "packages/core/src/kits/ios/types.ts",
         "packages/core/src/kits/ios/kit-core.test.ts",
-        "packages/core/src/kits/ios/kit-content.test.ts"
+        "packages/core/src/kits/ios/kit-content.test.ts",
+        "impl-plans/progress/ipd-27k-kit-grid.md",
+        "tmp/ipd-s772/ipd-27k-kit-grid"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-27k-kit-grid"
+      ],
+      "verification": [
+        "bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/app-design-lint apps/cli/src/iphone-kit-example.test.ts",
+        "sh -c 'L=tmp/ipd-s772/ipd-27k-kit-grid/typecheck.log; mkdir -p tmp/ipd-s772/ipd-27k-kit-grid && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^packages/core/src/kits/ios/[^(]*\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
+        "bunx biome check packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/kit-core.test.ts packages/core/src/kits/ios/kit-content.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "Finish the round-19 kit fix only: the tab bar distributes item widths in whole points for any item count (widths sum to the bar width) and every centered child (icon, label, badge) position and size is rounded to a whole point, so the kit-core regression for 2 to 5 items with and without a badge passes (it currently finds a child at x 85.5). Keep the already-landed centered floating action button shadow. bun test packages/core/src/kits/ios passes with 0 fail; every default kit component and every 2-5 item tab bar lints with zero findings. Do not change lint rules or unrelated kit output.",
+        "Keep the work already in the working tree (from ipd-27a) and continue from it.",
+        "Verification (step 4 s808): the kit, kit-cli, shapes-command, app-design-lint and committed-example tests exit 0 with 0 fail, including 'tab bars distribute whole-point slots and lint cleanly with badges'; the owned-file typecheck gate (log tmp/ipd-s772/ipd-27k-kit-grid/typecheck.log) exits 0; biome on the 8 kit files exits 0. Lint rules and examples/design are unchanged (scope.before.sha equals scope.after.sha).",
+        "Progress log impl-plans/progress/ipd-27k-kit-grid.md records the plan hash and the before/after sha256 of the 8 kit files, every command with exit code, log path and pass/fail counts, and any finding for another plan. No emojis.",
+        "Root cause and fix (step 4 s808b, resolves S5-s808-1): the half point comes from the derived constraint pipeline. The bars.ts constraint table gives item icons and badges 'center', so planConstraints (editor/transaction.ts) moves them by delta/2 after applyKitProps resizes a slot. In the count branch of props.ts, applyKitProps writes whole-point x values for the visible Icon, Badge and BadgeBackground children and passes exactly those ids as ApplyOptions.keepMembers to its single editor.apply, so one undo still restores everything. Children moved by the user (offset more than 1 point from the kit offset) and hidden-slot children are neither rewritten nor kept. constraints.ts, editor/* and the bars.ts constraint table are unchanged. A test covers insert with 4 items, then count 3, then undo."
+      ]
+    },
+    {
+      "planId": "ipd-27a-reproduction-chrome",
+      "planPath": "impl-plans/active/ipd-27a-reproduction-chrome.md",
+      "progressPath": "impl-plans/progress/ipd-27a-reproduction-chrome.md",
+      "dependsOn": [
+        "ipd-27k-kit-grid"
+      ],
+      "writePaths": [
+        "impl-plans/progress/ipd-27a-reproduction-chrome.md",
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
@@ -259,10 +297,10 @@
         "Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only.",
         "Scope (operator round 18): this part builds screens 01, 02 and 03, plus the shared chrome built once from kit components and reused by every screen that shows it (status bar, home indicator, recurring bars and overlay buttons) in tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl through nodetto-cli operations (ops files under tmp/ipd-s772/ipd-27-reproduction/ops/), appending to the document the previous part left. Done when, for this part's frames only: nodetto-cli validate exits 0; nodetto-cli lint reports zero findings on these frames; each frame is exported at scale 2 and compared with its reference screenshot; the progress-log table shows drift <= 4 points, correct icons, colors and weight, and 0 missing elements per screen. Fix kit or engine gaps only as findings naming the owning plan. Prototype links, the flow start, the full-document gate and the copy to the output directory belong to ipd-27-reproduction.",
         "CLI path (binding): every `nodetto-cli` command in this plan means the sidecar built by step 1, `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin`. A bare `nodetto-cli` on PATH resolves to an older installed release without the new features, and `target/release/nodetto-cli` is only refreshed by `cargo build --release`, not by `mise run build-cli`, so neither may be used for evidence.",
-        "Kit fix (operator round 19, binding for ipd-27a): ipd-27a-reproduction-chrome owns the iOS kit sources and tests. (a) The tab bar distributes its item widths in whole points for any item count (the widths sum to the bar width; for example 98, 97, 98, 97 for four items on 390), and places every icon, label and badge on the 1-point grid, with or without a badge. (b) The default floating action button has no offset dark shadow (no visible crescent); use none or a subtle centered shadow. Add kit regression tests: a tab bar with 2 to 5 items, with and without a badge, and a floating action button each lint with zero findings. Do not change lint rules.",
         "Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` (\"nearly aligns\") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.",
         "Visual acceptance (operator round 19): fix every drift visible in the side-by-side comparisons, including floating action button icon stroke width and color, border color, card accent bar width, button and badge positions, so each screen is within 4 points and matches icon weight and color.",
-        "Source-edit scope (step 4 s806, mirrors the plan Non-goals and Worker rules): source edits are allowed only in the 8 kit writePaths under packages/core/src/kits/ios/ (bars.ts, content.ts, style.ts, insert.ts, props.ts, types.ts, kit-core.test.ts, kit-content.test.ts), limited to the operator round-19 kit fix and its tests. Any other missing feature or bug, including lint rules and examples/design, is a finding naming its owning plan."
+        "Source-edit scope (step 4 s808, operator round 20): no source edits. The kit files belong to ipd-27k-kit-grid; the kit, example and native-parity tests in this plan's verification are read-only regression gates, and a failure there is a finding for ipd-27k-kit-grid. Any other missing feature or bug, including lint rules and examples/design, is a finding naming its owning plan.",
+        "Scope change (operator round 20): the kit fix moved to ipd-27k-kit-grid, which runs first; this plan builds the shared chrome and screens 01-03 on the fixed kit and does not edit kit sources (a remaining kit gap is a finding for ipd-27k)."
       ],
       "verification": [
         "CARGO_TERM_QUIET=true mise run build-cli",
@@ -272,8 +310,6 @@
         "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/01-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/02-compare.png && test -s tmp/ipd-s772/ipd-27-reproduction/work/compare/03-compare.png'",
         "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && test -s impl-plans/progress/ipd-27a-reproduction-chrome.md && ! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27a-reproduction-chrome.md'",
         "bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/app-design-lint apps/cli/src/iphone-kit-example.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-27-reproduction/final/ipd-27a-reproduction-chrome/typecheck.log; mkdir -p tmp/ipd-s772/ipd-27-reproduction/final/ipd-27a-reproduction-chrome && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^packages/core/src/kits/ios/[^(]*\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/kit-core.test.ts packages/core/src/kits/ios/kit-content.test.ts",
         "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/app-design-shapes.test.ts apps/cli/src/native-parity/iphone-kit-example.test.ts'"
       ]
     },
