@@ -103,4 +103,6 @@ top-level frame on the current page, and shared binary raster assets. CLI:
 `nodetto-cli export design.jsonl --format html --output website.zip`. Generated
 HTML is a static implementation starting point; application behavior and
 prototype navigation are not generated. Missing images fail export instead of
-producing an incomplete package.
+producing an incomplete package. A click-through prototype is a separate
+single-file export (`--format prototype`); see `design-iphone-app-design.md`,
+Decision 8.

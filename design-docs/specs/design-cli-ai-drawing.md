@@ -145,6 +145,17 @@ operation fields are now rejected.
 the `segmentOverlaps` metric are specified in
 `design-docs/specs/design-connector-routing-arranging.md`.
 
+Phone app design from the CLI is specified in
+`design-docs/specs/design-iphone-app-design.md`. It covers:
+
+- `add`/`update` with `parent`, `props` and `sizing`;
+- the `layout`, `align`, `distribute` and `snap` operations;
+- `text:layer`, `icon:<name>` and `ios:<name>` shapes;
+- `inspect --flows`;
+- `export --frames`, `--prototype` and `--format prototype`;
+- `compare`;
+- the app lint rules.
+
 ### Ids and names
 
 Page and element ids are assigned automatically, are opaque and never change;
