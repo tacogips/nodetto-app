@@ -283,10 +283,13 @@ Capability: append `"core:window:allow-set-fullscreen"` to
 `apps/desktop/src-tauri/capabilities/default.json`. `core:default` already
 includes `allow-is-fullscreen`; if a desktop build reports otherwise, also
 add `"core:window:allow-is-fullscreen"`.
-`apps/desktop/src-tauri/gen/schemas/*` lists every available permission, so
-it does not depend on which permissions are granted, and it must stay
-byte-identical. Check with
-`git diff --exit-code apps/desktop/src-tauri/gen/schemas`.
+tauri-build regenerates `apps/desktop/src-tauri/gen/schemas/capabilities.json`
+from the capability files, so that one file is expected to gain the new
+permission. It is kept exactly as generated (amendment 2026-11-10,
+PRS-INT-001). The other gen/schemas files (`acl-manifests.json`,
+`desktop-schema.json`, `macOS-schema.json`) list the available permissions,
+so they must stay byte-identical. Check with
+`git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json'`.
 
 ## 8. Desktop wiring and UI entry points
 
@@ -359,7 +362,8 @@ methods on `Editor`, which need no barrel change.
   3. Zero visible frames, or two or more, return `{ kind: "page" }`.
   4. A frame with its own `visual.hidden = true` beside one visible frame
      returns the visible frame as the artboard.
-- Plan 03: also `git diff --exit-code apps/desktop/src-tauri/gen/schemas`.
+- Plan 03: also
+  `git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json'`.
 - Final: `mise run lint`, `mise run test`, `mise run verify`, `bun run build`.
 
 ## 11. Risks

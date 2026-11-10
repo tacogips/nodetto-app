@@ -140,3 +140,8 @@ Static: Biome on the owned files, then `bun run typecheck`.
 - `git diff d6f9ebd -- packages/core/src/commands.ts | grep -E '^\+\s*\| \{|^\+\s*readonly type:'`
   prints nothing: the `Command` union gains no member.
 - The progress log has the intent hash, per-edit hashes and command results.
+
+## Implementation status
+
+- Implementation and assigned verification completed; formal review and integration remain downstream.
+- Evidence: `tmp/prs-s793/prs-01-page-flag/final/` and `impl-plans/progress/prs-01-page-flag.md`.

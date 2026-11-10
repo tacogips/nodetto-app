@@ -82,7 +82,9 @@ why prs-02 (and not wiring) owns the core barrel line.
   - `packages/core/src/hit-test.ts`
   - `apps/cli/**`
   - any version field
-  - `apps/desktop/src-tauri/gen/schemas/*`
+  - `apps/desktop/src-tauri/gen/schemas/*`. Only prs-03 owns
+    `gen/schemas/capabilities.json`, kept exactly as tauri-build regenerates
+    it (amendment round 1, PRS-INT-001).
   - any other `Command` kind
 - Never add a core `Command` kind. No emojis. Strict TypeScript; guard
   indexed lookups. No `node:*` imports outside tests in `packages/*`.
@@ -110,5 +112,16 @@ why prs-02 (and not wiring) owns the core barrel line.
 - Every plan's done criteria are met.
 - prs-06 recorded exit 0 for `bun run typecheck`, `mise run lint`,
   `mise run test`, `mise run verify` and `bun run build`.
-- `git diff --stat d6f9ebd -- packages/core/src/svg-export apps/cli apps/desktop/src-tauri/gen/schemas`
+- `git diff --stat d6f9ebd -- packages/core/src/svg-export apps/cli apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json'`
   is empty.
+
+## Amendment 2026-11-10 (integration-paths-outside-writePaths, round 1)
+
+- prs-01-page-flag and prs-02-core-presentation were accepted by the wave-1
+  integration review. They are now `acceptedDependencies` in the manifest,
+  not dispatchable plans.
+- PRS-INT-001: tauri-build regenerates `gen/schemas/capabilities.json` from
+  `capabilities/default.json`. prs-03 owns that file, and every gen/schemas
+  gate excludes only it.
+- Waves are unchanged: prs-03 (redispatch), then prs-04 and prs-05, then
+  prs-06.

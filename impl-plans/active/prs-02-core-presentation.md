@@ -164,3 +164,7 @@ Static: Biome on the owned files, then `bun run typecheck`.
 - `grep -n 'visual.hidden' packages/core/src/presentation/source.ts` has no
   match: candidates use the predicate.
 - The progress log has the intent hash, per-edit hashes and command results.
+
+## Implementation status
+
+- Core implementation and assigned tests complete; final focused tests, scoped Biome and typecheck passed on the shared tree. See `impl-plans/progress/prs-02-core-presentation.md` for hashes and logs. Formal review and integration are pending downstream.
