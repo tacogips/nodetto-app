@@ -137,3 +137,13 @@ Stability evidence: run Verification step 2 three times in a row. Each run must 
 Z-order comparison: an element's fractional z-order `index` is randomized when the element is created, independently in Bun and native. The normalized comparison therefore does not compare the raw `index` strings of elements created by the compared edit. Instead, for each page, sort all elements by `index` (the engine ordering) and assert that both hosts give the same sequence of normalized element ids (ID placeholders and fixed ids). Raw `index` values of elements that already existed in the input document are compared exactly. Every other field is compared exactly after id normalization. Do not change engine or harness code.
 
 Done when the normalized edit-parity test and the decoded-PNG checks pass in three consecutive runs of the parity gate, and the DR-02 and clean-kit lint cases are complete. Keep the ipd-24 work already in the working tree and continue from it.
+
+## Amendment 2026-11-10 (operator round 15, binding; keep this section verbatim; supersedes the round-13 and round-14 wording)
+
+Generated-value comparison. An edit may create values at random, independently in Bun and native. In the normalized comparison:
+
+1. Every generated identifier (element ids, page ids, any ULID-like id and its printed short prefix) is replaced with ordinal placeholders by first appearance.
+2. Every generated ordering key, meaning element `index`, page `order` and any other fractional ordering key that the compared edit created, is not compared as a string. Instead, assert that both hosts give the same order of the normalized ids within that collection: pages sorted by `order`, elements per page sorted by `index`.
+3. Every value that already existed in the input document, and every other field, is compared exactly after normalization.
+
+Do not change engine or harness code. Done when the parity gate passes in three consecutive runs and the DR-02 and clean-kit lint cases are complete. Keep the ipd-24 work already in the working tree and continue from it.
