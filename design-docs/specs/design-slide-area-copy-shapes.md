@@ -351,18 +351,31 @@ nodetto-cli pages copy-shapes <doc.jsonl> --from <page|prev|next> --to <page>
   - `apps/desktop/src/settings/preferences.ts` gets
     `showSlideArea?: boolean`. Absent means automatic: shown when the
     document has a `slideSize`.
-  - The effective value is `effectiveShowSlideArea(preference, slideSize)`.
-    `App.tsx` passes `showSlideArea={preference}` to every `NodettoCanvas`;
-    an unset preference passes `undefined`, which means automatic.
-  - The View menu item "Show slide area" is a checkbox showing the effective
-    value. Toggling it stores `!effective`.
-  - It is never written to the document.
-- `App.tsx` passes `showSlideArea` to `Canvas`, hosts `CopyShapesDialog`,
-  and wires `PageTabs.onCopyShapesFrom`. The Edit/Page menu item "Copy shapes
-  from page..." opens the dialog for the current page.
-- `Inspector.tsx` mounts `PresentationSection` next to `PageSection`.
-- `packages/ui-solid/src/index.ts` exports `CopyShapesDialog` and
-  `PresentationSection` if the desktop app imports them.
+  - The effective value is `effectiveShowSlideArea(preference, slideSize)`
+    (landed in `packages/ui-solid/src/canvas/slide-area.ts`).
+    `App.tsx` passes `showSlideArea={preference}` to the `NodettoCanvas`
+    (the app mounts exactly one); an unset preference passes `undefined`,
+    which means automatic.
+  - The desktop app has no menu bar, so the "View menu" checkbox is a
+    "Slide area" toggle in `ZoomControls`, next to the existing "Grid"
+    toggle. It shows the effective value; toggling it stores `!effective`.
+  - It is never written to the document or to Yjs.
+- `App.tsx` passes `showSlideArea` to `NodettoCanvas`, hosts
+  `CopyShapesDialog`, and wires `PageTabs.onCopyShapesFrom`. The design's
+  "Edit/Page menu" entry is a "Copy shapes from page..." button in the
+  `FileActions` header next to Present; it opens the dialog for the current
+  page and is disabled with one page or a read-only editor.
+- `Inspector.tsx` mounts `PresentationSection` directly after `PageSection`
+  in the no-selection block.
+- `packages/ui-solid/src/index.ts` exports `CopyShapesDialog`,
+  `PresentationSection` and `effectiveShowSlideArea`. `packages/core/src/index.ts`
+  needs no edit: it already re-exports `presentation/index.ts` (slide rect,
+  presets, labels), and `copyPageElements`/`adjacentPageId` are `Editor`
+  methods. The CLI needs no `commands.ts` edit: `pages-command.ts`
+  dispatches `copy-shapes` (landed in sac-05); only `help.ts` is updated.
+- There is no thumbnail renderer in this repository; the overlay's
+  absence is asserted for core SVG export (`renderPageSvg`) and for the
+  presentation controller's slide `src`.
 - Docs:
   - `docs/editing.md`, Presentation section: slide size and presets, the
     page origin, the slide area overlay and its toggle, clipping, and copy
@@ -386,6 +399,13 @@ next to the files it touches.
 | 2 | `sac-06-slide-area-overlay` | new `packages/ui-solid/src/canvas/{slide-area.ts,SlideAreaOverlay.tsx,slide-area.test.ts}`, `packages/ui-solid/src/Canvas.tsx` (optional prop + mount only), its CSS, `packages/ui-solid/src/presentation/controller.ts`, `packages/ui-solid/src/presentation/controller.test.ts`, new `packages/ui-solid/src/presentation/slide-clip.test.ts`. `PresentationView.tsx` is not edited | 01, 03 |
 | 2 | `sac-07-settings-and-picker-ui` | new `packages/ui-solid/src/inspector/PresentationSection.tsx`, `packages/ui-solid/src/copy-shapes-options.ts`, `packages/ui-solid/src/CopyShapesDialog.tsx` (+ CSS) and tests, `packages/ui-solid/src/PageTabs.tsx` | 01, 02, 03 |
 | 3 | `sac-08-wiring` | `apps/desktop/src/App.tsx`, `apps/desktop/src/settings/preferences.ts` (+ test), the desktop menu files, `packages/ui-solid/src/Inspector.tsx`, `packages/ui-solid/src/index.ts`, `apps/cli/src/help.ts`, `docs/editing.md`, `docs/cli.md`, `README.md` | 04-07 |
+
+Continuation (2026-11-11, session 830): sac-01..sac-07 landed at ee4c04c.
+The session 826 progress gate treated wave-2 plans listed in
+`sac-08-wiring.dependsOn` as missing dependencies. The continuation manifest
+`impl-plans/active/sac-s830-dispatch.json` (taskId `sac-s830`, evidence root
+`tmp/sac-s830`) lists only `sac-08-wiring` in `plans` and sac-01..sac-07 in
+`acceptedDependencies`; the design itself is unchanged.
 
 The collab update (04) is in wave 2 because it needs only the IR and store
 fields. Without it, in-app editing still works locally; only cloud live
@@ -448,7 +468,9 @@ sync of the new fields depends on it.
 - `sac-07` tests: the options order, "prev" as the default, prev disabled on
   the first page, and the target excluded. Also mapping preset selections to
   commands.
-- `sac-08` tests: the `showSlideArea` preference parse and default.
+- `sac-08` tests: the `showSlideArea` preference parse and default, and an
+  added assertion in `slide-clip.test.ts` that the presentation slide `src`
+  (explicit and unset size) contains no `nodetto-slide-area`.
 - Final: `mise run verify` and `bun run build`.
 
 ## 10. Risks
