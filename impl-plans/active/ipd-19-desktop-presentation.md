@@ -123,7 +123,7 @@ Existing prototype tests (`prototype-overlays.test.ts`, `prototype-transition.te
 
 ## Done criteria
 
-Verification passes.
+Implementation verification passes (30 presentation tests, 43 core/desktop tests, scoped Biome and typecheck; see `impl-plans/progress/ipd-19-desktop-presentation.md`). Formal review remains downstream.
 
 ## Worker rules
 

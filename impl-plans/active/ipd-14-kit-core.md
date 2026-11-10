@@ -226,3 +226,7 @@ This plan now runs after `ipd-19-desktop-presentation`: its workspace typecheck 
 ## Amendment 2026-11-10 (step5 s786 S5-s786-R2)
 
 The manifest and Verification typecheck and biome gates are now scoped to this plan's owned files, with the expected result stated (typecheck: exit 0, or exit 0 when only non-owned files fail; exit 1 lists owned-file `error TS` lines; exit 2 is a tsc failure without diagnostics). The markdown and the manifest carry the identical command strings. Ownership, plan ID and dependsOn are unchanged. Errors in non-owned files are `owned_elsewhere` findings and never block (see Worker rules).
+
+## Implementation continuation 1
+
+The six bar components, insertion and properties, CLI integration, slot reflow and badge behavior are implemented. See `impl-plans/progress/ipd-14-kit-core.md` and `tmp/ipd-s772/ipd-14-kit-core/continuation-1/` for test and visual evidence. Formal review remains downstream.

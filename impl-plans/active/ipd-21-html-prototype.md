@@ -144,7 +144,7 @@ New `apps/cli/src/prototype-html-cli.test.ts`:
 
 ## Done criteria
 
-Verification passes.
+Implementation verification: 71 tests pass, scoped typecheck and Biome pass, and the generic start and navigation screenshots and CLI PNG have been inspected. Formal review remains downstream.
 
 ## Worker rules
 

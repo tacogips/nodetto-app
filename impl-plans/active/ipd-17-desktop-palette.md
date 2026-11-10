@@ -84,7 +84,7 @@ The acceptance criteria require that the text layer, icons, iOS kit and device p
 
 ## Done criteria
 
-Verification passes.
+Implementation complete; focused tests, scoped typecheck and Biome pass. Formal review remains pending; see `impl-plans/progress/ipd-17-desktop-palette.md`.
 
 ## Worker rules
 

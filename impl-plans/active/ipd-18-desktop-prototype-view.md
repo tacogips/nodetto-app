@@ -112,7 +112,7 @@ Existing: `packages/ui-solid/src/Toolbar.test.ts`, `shortcuts.test.ts`, `interac
 
 ## Done criteria
 
-Verification passes.
+Implementation and verification are recorded in `impl-plans/progress/ipd-18-desktop-prototype-view.md`; formal review remains downstream.
 
 ## Worker rules
 

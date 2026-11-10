@@ -135,6 +135,14 @@
       {
         "decision": "2026-11-10 operator amendment round 9 (session-786 wave 2): ipd-13-prototype-core-cli and ipd-16-frames-export-compare are accepted dependencies. ipd-19-desktop-presentation owns packages/core/src/prototype.ts and changes prototypeScreen so back and swap-overlay links reach the presentation (keep every existing navigate/overlay behavior and test). ipd-14-kit-core and ipd-21-html-prototype now depend on ipd-19-desktop-presentation. Keep the ipd-14 and ipd-19 work already in the working tree and continue from it.",
         "rationale": "ipd-19 passed 29/30; the browser regression lacked back and swap-overlay hotspots because prototypeScreen in core prototype.ts filters those links out, and that file (previously ipd-13's) was outside ipd-19's writePaths. ipd-14's typecheck gate failed only on ipd-19's in-progress PrototypePreview.tsx (lines 212, 224) in the shared tree, so ipd-14 must run after ipd-19; ipd-21 consumes prototypeScreen too, so it also waits for the fix."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 10 (session-789 waves 3-4): ipd-14-kit-core, ipd-17-desktop-palette, ipd-18-desktop-prototype-view, ipd-19-desktop-presentation and ipd-21-html-prototype are accepted dependencies. ipd-15-kit-content owns packages/core/src/kits/ios/props.ts, types.ts, style.ts and kit-core.test.ts and extends the kit property contract additively: a property may declare derived effects beyond raw field assignment, namely (a) conditional geometry (for example a list row grows to its subtitle height when subtitle is non-empty), (b) enum properties that select one of a fixed set of child configurations (accessory: none, chevron, value, switch, checkmark), (c) value-to-style mappings (chip selected -> fill/stroke/text colors from kit tokens) and (d) per-side stroke settings (card accent stroke on chosen sides via the Decision 3 per-side borders). Existing raw-assignment properties, ipd-14's kit-core.test.ts expectations and all inserted-instance output stay unchanged unless a test only needs a new optional field added. Keep the ipd-15 work already in the working tree and continue from it.",
+        "rationale": "ipd-15 blocked twice (session-789 waves 3 and 4) because the accepted kit property contract only assigns raw values to fixed fields, which cannot express the content components' required behavior, and the contract files belong to the accepted ipd-14."
+      },
+      {
+        "decision": "2026-11-10 step4 s790: ipd-15-kit-content ownership bullets are plain paths (annotations moved to the amendment text), its Non-goals no longer forbid the round-10 contract files, and its typecheck and biome gates plus the bun test regression set (kit-cli, shapes-command, components, component-refresh) now cover the round-10 owned files. Markdown and manifest gate strings are identical. Ownership, dependsOn and plan IDs are unchanged.",
+        "rationale": "check-manifest.ts reported 5 problems (4 prose path bullets and one md/manifest writePaths mismatch); after the fix it exits 0 with 0 problems."
       }
     ],
     "intentionalTradeoffs": [
@@ -169,62 +177,19 @@
   },
   "plans": [
     {
-      "planId": "ipd-14-kit-core",
-      "planPath": "impl-plans/active/ipd-14-kit-core.md",
-      "progressPath": "impl-plans/progress/ipd-14-kit-core.md",
-      "dependsOn": [
-        "ipd-19-desktop-presentation"
-      ],
-      "writePaths": [
-        "packages/core/src/kits/ios/types.ts",
-        "packages/core/src/kits/ios/style.ts",
-        "packages/core/src/kits/ios/insert.ts",
-        "packages/core/src/kits/ios/props.ts",
-        "packages/core/src/kits/ios/bars.ts",
-        "packages/core/src/kits/ios/content.ts",
-        "packages/core/src/kits/ios/index.ts",
-        "packages/core/src/kits/ios/kit-core.test.ts",
-        "apps/cli/src/edit/kit-shapes.ts",
-        "apps/cli/src/shapes-command.ts",
-        "apps/cli/src/shapes-command.test.ts",
-        "apps/cli/src/kit-cli.test.ts",
-        "impl-plans/progress/ipd-14-kit-core.md",
-        "tmp/ipd-s772/ipd-14-kit-core"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-14-kit-core"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes.",
-        "`rg -n 'IOS_CONTENT_COMPONENTS' packages/core/src/kits/ios/content.ts` -> 1 match."
-      ],
-      "verification": [
-        "bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/components.test.ts packages/core/src/component-refresh.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-14-kit-core/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-14-kit-core/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/core/src/kits/ios/types\\.ts|packages/core/src/kits/ios/style\\.ts|packages/core/src/kits/ios/insert\\.ts|packages/core/src/kits/ios/props\\.ts|packages/core/src/kits/ios/bars\\.ts|packages/core/src/kits/ios/content\\.ts|packages/core/src/kits/ios/index\\.ts|packages/core/src/kits/ios/kit-core\\.test\\.ts|apps/cli/src/edit/kit-shapes\\.ts|apps/cli/src/shapes-command\\.ts|apps/cli/src/shapes-command\\.test\\.ts|apps/cli/src/kit-cli\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/insert.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/bars.ts packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/index.ts packages/core/src/kits/ios/kit-core.test.ts apps/cli/src/edit/kit-shapes.ts apps/cli/src/shapes-command.ts apps/cli/src/shapes-command.test.ts apps/cli/src/kit-cli.test.ts"
-      ]
-    },
-    {
       "planId": "ipd-15-kit-content",
       "planPath": "impl-plans/active/ipd-15-kit-content.md",
       "progressPath": "impl-plans/progress/ipd-15-kit-content.md",
-      "dependsOn": [
-        "ipd-14-kit-core"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "packages/core/src/kits/ios/content.ts",
         "packages/core/src/kits/ios/kit-content.test.ts",
         "impl-plans/progress/ipd-15-kit-content.md",
-        "tmp/ipd-s772/ipd-15-kit-content"
+        "tmp/ipd-s772/ipd-15-kit-content",
+        "packages/core/src/kits/ios/props.ts",
+        "packages/core/src/kits/ios/types.ts",
+        "packages/core/src/kits/ios/style.ts",
+        "packages/core/src/kits/ios/kit-core.test.ts"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [],
@@ -233,123 +198,13 @@
       ],
       "acceptanceCriteria": [
         "Verification passes.",
-        "`rg -c 'id: \"ios:' packages/core/src/kits/ios/content.ts` -> 10."
+        "`rg -c 'id: \"ios:' packages/core/src/kits/ios/content.ts` -> 10.",
+        "Existing kit-core.test.ts, kit-cli.test.ts and shapes-command.test.ts expectations pass unchanged; new effect cases (geometry, variant, style, strokeSides, no-effect equivalence, single undo) pass."
       ],
       "verification": [
-        "bun test packages/core/src/kits",
-        "sh -c 'L=tmp/ipd-s772/ipd-15-kit-content/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-15-kit-content/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/core/src/kits/ios/content\\.ts|packages/core/src/kits/ios/kit-content\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/kit-content.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-17-desktop-palette",
-      "planPath": "impl-plans/active/ipd-17-desktop-palette.md",
-      "progressPath": "impl-plans/progress/ipd-17-desktop-palette.md",
-      "dependsOn": [
-        "ipd-14-kit-core"
-      ],
-      "writePaths": [
-        "packages/ui-solid/src/shape-palette.ts",
-        "packages/ui-solid/src/ShapePalette.tsx",
-        "packages/ui-solid/src/shape-search.ts",
-        "packages/ui-solid/src/palette-drag.ts",
-        "packages/ui-solid/src/app-palette.test.ts",
-        "impl-plans/progress/ipd-17-desktop-palette.md",
-        "tmp/ipd-s772/ipd-17-desktop-palette"
-      ],
-      "sharedPaths": [
-        "packages/ui-solid/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/ui-solid/src/index.ts",
-          "intendedEdit": "append export lines only, and only if needed; re-read before writing; verify sibling lines survive"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-17-desktop-palette"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes."
-      ],
-      "verification": [
-        "bun test packages/ui-solid/src/app-palette.test.ts packages/ui-solid/src/shape-search.test.ts packages/ui-solid/src/bpmn-palette.test.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/palette-drag.test.ts packages/ui-solid/src/panel-keyboard.test.ts packages/ui-solid/src/workspaces.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-17-desktop-palette/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-17-desktop-palette/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/ui-solid/src/shape-palette\\.ts|packages/ui-solid/src/ShapePalette\\.tsx|packages/ui-solid/src/shape-search\\.ts|packages/ui-solid/src/palette-drag\\.ts|packages/ui-solid/src/app-palette\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/ShapePalette.tsx packages/ui-solid/src/shape-search.ts packages/ui-solid/src/palette-drag.ts packages/ui-solid/src/app-palette.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-18-desktop-prototype-view",
-      "planPath": "impl-plans/active/ipd-18-desktop-prototype-view.md",
-      "progressPath": "impl-plans/progress/ipd-18-desktop-prototype-view.md",
-      "dependsOn": [
-        "ipd-19-desktop-presentation"
-      ],
-      "writePaths": [
-        "packages/ui-solid/src/Toolbar.tsx",
-        "packages/ui-solid/src/shortcuts.ts",
-        "packages/ui-solid/src/Canvas.tsx",
-        "packages/ui-solid/src/PrototypeViewLayer.tsx",
-        "packages/ui-solid/src/shapes/ConnectorView.tsx",
-        "packages/ui-solid/src/interaction/hit-testing.ts",
-        "packages/ui-solid/src/FlowsPanel.tsx",
-        "packages/ui-solid/src/prototype-view.test.ts",
-        "packages/ui-solid/src/flows-panel.test.ts",
-        "impl-plans/progress/ipd-18-desktop-prototype-view.md",
-        "tmp/ipd-s772/ipd-18-desktop-prototype-view"
-      ],
-      "sharedPaths": [
-        "packages/ui-solid/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/ui-solid/src/index.ts",
-          "intendedEdit": "append export lines only, and only if needed; re-read before writing; verify sibling lines survive"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-18-desktop-prototype-view"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes."
-      ],
-      "verification": [
-        "bun test packages/ui-solid/src/prototype-view.test.ts packages/ui-solid/src/flows-panel.test.ts packages/ui-solid/src/Toolbar.test.ts packages/ui-solid/src/shortcuts.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/canvas-paint-order.test.ts apps/desktop/src/design-workflow.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-18-desktop-prototype-view/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-18-desktop-prototype-view/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/ui-solid/src/Toolbar\\.tsx|packages/ui-solid/src/shortcuts\\.ts|packages/ui-solid/src/Canvas\\.tsx|packages/ui-solid/src/PrototypeViewLayer\\.tsx|packages/ui-solid/src/shapes/ConnectorView\\.tsx|packages/ui-solid/src/interaction/hit-testing\\.ts|packages/ui-solid/src/FlowsPanel\\.tsx|packages/ui-solid/src/prototype-view\\.test\\.ts|packages/ui-solid/src/flows-panel\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/ui-solid/src/Toolbar.tsx packages/ui-solid/src/shortcuts.ts packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/PrototypeViewLayer.tsx packages/ui-solid/src/shapes/ConnectorView.tsx packages/ui-solid/src/interaction/hit-testing.ts packages/ui-solid/src/FlowsPanel.tsx packages/ui-solid/src/prototype-view.test.ts packages/ui-solid/src/flows-panel.test.ts"
-      ]
-    },
-    {
-      "planId": "ipd-19-desktop-presentation",
-      "planPath": "impl-plans/active/ipd-19-desktop-presentation.md",
-      "progressPath": "impl-plans/progress/ipd-19-desktop-presentation.md",
-      "dependsOn": [],
-      "writePaths": [
-        "packages/ui-solid/src/prototype-presentation.ts",
-        "packages/ui-solid/src/PrototypePreview.tsx",
-        "packages/ui-solid/src/PrototypeHotspots.tsx",
-        "packages/ui-solid/src/PrototypeLayer.tsx",
-        "packages/ui-solid/src/prototype-transition.ts",
-        "apps/desktop/src/styles/prototype-preview.css",
-        "packages/ui-solid/src/prototype-presentation.test.ts",
-        "packages/ui-solid/src/prototype-preview-flows.test.ts",
-        "impl-plans/progress/ipd-19-desktop-presentation.md",
-        "tmp/ipd-s772/ipd-19-desktop-presentation",
-        "packages/core/src/prototype.ts"
-      ],
-      "sharedPaths": [],
-      "sharedPathNotes": [],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-19-desktop-presentation"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes."
-      ],
-      "verification": [
-        "bun test packages/ui-solid/src/prototype-presentation.test.ts packages/ui-solid/src/prototype-preview-flows.test.ts packages/ui-solid/src/prototype-overlays.test.ts packages/ui-solid/src/prototype-transition.test.ts packages/ui-solid/src/prototype-trigger.test.ts packages/ui-solid/src/prototype-scroll.test.ts packages/ui-solid/src/prototype-surface-focus.test.ts packages/ui-solid/src/prototype-variant-state.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-19-desktop-presentation/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-19-desktop-presentation/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/ui-solid/src/prototype-presentation\\.ts|packages/ui-solid/src/PrototypePreview\\.tsx|packages/ui-solid/src/PrototypeHotspots\\.tsx|packages/ui-solid/src/PrototypeLayer\\.tsx|packages/ui-solid/src/prototype-transition\\.ts|packages/ui-solid/src/prototype-presentation\\.test\\.ts|packages/ui-solid/src/prototype-preview-flows\\.test\\.ts|packages/core/src/prototype\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/ui-solid/src/prototype-presentation.ts packages/ui-solid/src/PrototypePreview.tsx packages/ui-solid/src/PrototypeHotspots.tsx packages/ui-solid/src/PrototypeLayer.tsx packages/ui-solid/src/prototype-transition.ts apps/desktop/src/styles/prototype-preview.css packages/ui-solid/src/prototype-presentation.test.ts packages/ui-solid/src/prototype-preview-flows.test.ts packages/core/src/prototype.ts",
-        "bun test packages/core/src/prototype.test.ts packages/core/src/screen-transition.test.ts packages/core/src/workspace-workflow.test.ts packages/core/src/outline-interaction.test.ts packages/core/src/masks.test.ts packages/core/src/boolean-operations.test.ts packages/core/src/group-compositing.test.ts apps/desktop/src/design-workflow.test.ts"
+        "bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/components.test.ts packages/core/src/component-refresh.test.ts",
+        "sh -c 'L=tmp/ipd-s772/ipd-15-kit-content/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-15-kit-content/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/core/src/kits/ios/content\\.ts|packages/core/src/kits/ios/kit-content\\.test\\.ts|packages/core/src/kits/ios/props\\.ts|packages/core/src/kits/ios/types\\.ts|packages/core/src/kits/ios/style\\.ts|packages/core/src/kits/ios/kit-core\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
+        "bunx biome check packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/kit-content.test.ts packages/core/src/kits/ios/props.ts packages/core/src/kits/ios/types.ts packages/core/src/kits/ios/style.ts packages/core/src/kits/ios/kit-core.test.ts"
       ]
     },
     {
@@ -357,7 +212,6 @@
       "planPath": "impl-plans/active/ipd-20-app-lint.md",
       "progressPath": "impl-plans/progress/ipd-20-app-lint.md",
       "dependsOn": [
-        "ipd-14-kit-core",
         "ipd-15-kit-content"
       ],
       "writePaths": [
@@ -391,52 +245,11 @@
       ]
     },
     {
-      "planId": "ipd-21-html-prototype",
-      "planPath": "impl-plans/active/ipd-21-html-prototype.md",
-      "progressPath": "impl-plans/progress/ipd-21-html-prototype.md",
-      "dependsOn": [
-        "ipd-19-desktop-presentation"
-      ],
-      "writePaths": [
-        "packages/core/src/prototype-html.ts",
-        "packages/core/src/prototype-html.test.ts",
-        "packages/core/src/svg-export/theme.ts",
-        "packages/core/src/svg-export/document.ts",
-        "apps/cli/src/export-command.ts",
-        "apps/cli/src/prototype-html-cli.test.ts",
-        "impl-plans/progress/ipd-21-html-prototype.md",
-        "tmp/ipd-s772/ipd-21-html-prototype"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-21-html-prototype"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes."
-      ],
-      "verification": [
-        "bun test packages/core/src/prototype-html.test.ts apps/cli/src/prototype-html-cli.test.ts packages/core/src/html-bundle.test.ts apps/cli/src/html-export.test.ts apps/cli/src/export-command.test.ts packages/core/src/svg-export.test.ts",
-        "sh -c 'L=tmp/ipd-s772/ipd-21-html-prototype/final/typecheck.log; mkdir -p tmp/ipd-s772/ipd-21-html-prototype/final && bun run typecheck --pretty false > \"$L\" 2>&1 && exit 0; grep -q \"error TS\" \"$L\" || exit 2; ! grep -E \"^(packages/core/src/prototype-html\\.ts|packages/core/src/prototype-html\\.test\\.ts|packages/core/src/svg-export/theme\\.ts|packages/core/src/svg-export/document\\.ts|apps/cli/src/export-command\\.ts|apps/cli/src/prototype-html-cli\\.test\\.ts)\\([0-9]+,[0-9]+\\): error TS\" \"$L\"'",
-        "bunx biome check packages/core/src/prototype-html.ts packages/core/src/prototype-html.test.ts packages/core/src/svg-export/theme.ts packages/core/src/svg-export/document.ts apps/cli/src/export-command.ts apps/cli/src/prototype-html-cli.test.ts"
-      ]
-    },
-    {
       "planId": "ipd-22-desktop-export-compare-check",
       "planPath": "impl-plans/active/ipd-22-desktop-export-compare-check.md",
       "progressPath": "impl-plans/progress/ipd-22-desktop-export-compare-check.md",
       "dependsOn": [
-        "ipd-18-desktop-prototype-view",
-        "ipd-19-desktop-presentation",
-        "ipd-20-app-lint",
-        "ipd-21-html-prototype"
+        "ipd-20-app-lint"
       ],
       "writePaths": [
         "packages/ui-solid/src/ExportDialog.tsx",
@@ -480,10 +293,8 @@
       "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
       "progressPath": "impl-plans/progress/ipd-23-parity-shapes.md",
       "dependsOn": [
-        "ipd-14-kit-core",
         "ipd-15-kit-content",
-        "ipd-20-app-lint",
-        "ipd-21-html-prototype"
+        "ipd-20-app-lint"
       ],
       "writePaths": [
         "apps/cli/src/native-parity/app-design-shapes.test.ts",
@@ -513,10 +324,8 @@
       "planPath": "impl-plans/active/ipd-24-parity-flows.md",
       "progressPath": "impl-plans/progress/ipd-24-parity-flows.md",
       "dependsOn": [
-        "ipd-14-kit-core",
         "ipd-15-kit-content",
         "ipd-20-app-lint",
-        "ipd-21-html-prototype",
         "ipd-23-parity-shapes"
       ],
       "writePaths": [
@@ -545,13 +354,8 @@
       "planPath": "impl-plans/active/ipd-25-docs-help.md",
       "progressPath": "impl-plans/progress/ipd-25-docs-help.md",
       "dependsOn": [
-        "ipd-14-kit-core",
         "ipd-15-kit-content",
-        "ipd-17-desktop-palette",
-        "ipd-18-desktop-prototype-view",
-        "ipd-19-desktop-presentation",
         "ipd-20-app-lint",
-        "ipd-21-html-prototype",
         "ipd-22-desktop-export-compare-check"
       ],
       "writePaths": [
@@ -584,7 +388,6 @@
       "dependsOn": [
         "ipd-15-kit-content",
         "ipd-20-app-lint",
-        "ipd-21-html-prototype",
         "ipd-23-parity-shapes",
         "ipd-24-parity-flows"
       ],
@@ -800,6 +603,36 @@
       "planPath": "impl-plans/active/ipd-16-frames-export-compare.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted in session-786 waves 1-2 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-14-kit-core",
+      "planPath": "impl-plans/active/ipd-14-kit-core.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-17-desktop-palette",
+      "planPath": "impl-plans/active/ipd-17-desktop-palette.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-18-desktop-prototype-view",
+      "planPath": "impl-plans/active/ipd-18-desktop-prototype-view.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-19-desktop-presentation",
+      "planPath": "impl-plans/active/ipd-19-desktop-presentation.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-21-html-prototype",
+      "planPath": "impl-plans/active/ipd-21-html-prototype.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
     }
   ]
 }
