@@ -127,6 +127,10 @@
       {
         "decision": "2026-11-10 checkpoint amendment round 7 (integration-paths-outside-writePaths, session-784): ipd-11-frames owns apps/cli/src/export-command.test.ts and updates only the raster-snap test ('raster export snaps the frame to whole pixels so the background covers the raster') expectations and comments to the accepted outside-title page bounds (design 6.6, Accepted output changes row 1): stderr '475x267 px', height bound just below 266.25 px, background rect origin and height from the captured SVG. The shared fixture(), other tests, product code and apps/cli/src/export-command.ts stay unchanged; snap assertions keep equal strength. ipd-11 verification step 1 adds apps/cli/src/export-command.test.ts, plus a broad bun test packages apps/cli/src gate (0 fail). Ownership of other paths, dependsOn, plan IDs and waves W1-W9 are unchanged.",
         "rationale": "Finding integration-s784-ipd11-export-command-stale-raster-height (mid): the fixture frame has platform 'web', so its title resolves outside and ipd-11's page export bounds add 22 units of height (475x250 -> 475x267 px). The product behavior is the accepted design; the test expectation is stale and was owned by no plan, while ipd-13, ipd-16 and ipd-21 run it as a 0-fail gate and the ipd-28 broad gate depends on it. Same precedent as round 5 (interaction-creation.test.ts)."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 8 (session-784 wave 3): ipd-11-frames is an accepted dependency. ipd-13-prototype-core-cli owns packages/core/src/screen-transition.test.ts and updates only the stale verbose prototype label expectation (line ~55) to the Decision 8.3 compact label, keeping every semantic and round-trip assertion. ipd-14-kit-core now depends on ipd-13-prototype-core-cli so it runs on a settled tree. Keep the ipd-13 and ipd-14 work already in the working tree and continue from it.",
+        "rationale": "ipd-13 passed 103/104 tests; the one failure is an out-of-scope test expecting the pre-Decision-8.3 verbose label. ipd-14's typecheck failed only on ipd-13's in-progress prototype files (connect.ts, prototype-links.ts, decoration.ts) in the shared tree, so the two cannot run concurrently."
       }
     ],
     "intentionalTradeoffs": [
@@ -161,66 +165,10 @@
   },
   "plans": [
     {
-      "planId": "ipd-11-frames",
-      "planPath": "impl-plans/active/ipd-11-frames.md",
-      "progressPath": "impl-plans/progress/ipd-11-frames.md",
-      "dependsOn": [],
-      "writePaths": [
-        "packages/core/src/insertion-parent.ts",
-        "packages/core/src/insertion-parent.test.ts",
-        "packages/core/src/frame-title.test.ts",
-        "packages/core/src/svg-export/shapes.ts",
-        "packages/core/src/svg-export/document.ts",
-        "packages/ui-solid/src/shapes/FrameView.tsx",
-        "packages/ui-solid/src/interaction/creation.ts",
-        "packages/ui-solid/src/interaction/transform.ts",
-        "packages/ui-solid/src/frame-parent-interaction.test.ts",
-        "apps/cli/src/edit/parent-fields.ts",
-        "apps/cli/src/inspect-command.ts",
-        "apps/cli/src/frame-parent.test.ts",
-        "impl-plans/progress/ipd-11-frames.md",
-        "tmp/ipd-s772/ipd-11-frames",
-        "packages/ui-solid/src/interaction-creation.test.ts",
-        "packages/ui-solid/src/interaction/lifecycle.ts",
-        "packages/ui-solid/src/interaction/pointer.ts",
-        "packages/ui-solid/src/interaction/events.ts",
-        "packages/ui-solid/src/interaction/types.ts",
-        "apps/cli/src/export-command.test.ts"
-      ],
-      "sharedPaths": [
-        "packages/core/src/index.ts",
-        "apps/cli/src/commands.test.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/index.ts",
-          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
-        },
-        {
-          "path": "apps/cli/src/commands.test.ts",
-          "intendedEdit": "update inspect expectations only where frame children now show rel coordinates"
-        }
-      ],
-      "artifactRoots": [
-        "tmp/ipd-s772/ipd-11-frames"
-      ],
-      "acceptanceCriteria": [
-        "Verification passes, and the progress log records the before/after drop behavior."
-      ],
-      "verification": [
-        "bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts packages/ui-solid/src/interaction-rotate-resize.test.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/snap-grid-size.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts apps/cli/src/export-command.test.ts",
-        "bun run typecheck (no error TS in the owned files or in packages/ui-solid/src/interaction/snapping.ts; SnapSettings.gridSize in packages/ui-solid/src/interaction/types.ts unchanged)",
-        "bunx biome check",
-        "bun test apps/cli/src/export-command.test.ts (exit 0, 0 fail) and bun test packages apps/cli/src (exit 0, 0 fail; no new failures versus the ipd-00 baseline)"
-      ]
-    },
-    {
       "planId": "ipd-13-prototype-core-cli",
       "planPath": "impl-plans/active/ipd-13-prototype-core-cli.md",
       "progressPath": "impl-plans/progress/ipd-13-prototype-core-cli.md",
-      "dependsOn": [
-        "ipd-11-frames"
-      ],
+      "dependsOn": [],
       "writePaths": [
         "packages/core/src/prototype-links.ts",
         "packages/core/src/prototype-links.test.ts",
@@ -233,7 +181,8 @@
         "apps/cli/src/edit/operations/connect.ts",
         "apps/cli/src/prototype-cli.test.ts",
         "impl-plans/progress/ipd-13-prototype-core-cli.md",
-        "tmp/ipd-s772/ipd-13-prototype-core-cli"
+        "tmp/ipd-s772/ipd-13-prototype-core-cli",
+        "packages/core/src/screen-transition.test.ts"
       ],
       "sharedPaths": [
         "packages/core/src/index.ts",
@@ -271,7 +220,7 @@
       "planPath": "impl-plans/active/ipd-14-kit-core.md",
       "progressPath": "impl-plans/progress/ipd-14-kit-core.md",
       "dependsOn": [
-        "ipd-11-frames"
+        "ipd-13-prototype-core-cli"
       ],
       "writePaths": [
         "packages/core/src/kits/ios/types.ts",
@@ -344,7 +293,6 @@
       "planPath": "impl-plans/active/ipd-16-frames-export-compare.md",
       "progressPath": "impl-plans/progress/ipd-16-frames-export-compare.md",
       "dependsOn": [
-        "ipd-11-frames",
         "ipd-13-prototype-core-cli"
       ],
       "writePaths": [
@@ -633,7 +581,6 @@
       "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
       "progressPath": "impl-plans/progress/ipd-23-parity-shapes.md",
       "dependsOn": [
-        "ipd-11-frames",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
         "ipd-15-kit-content",
@@ -669,7 +616,6 @@
       "planPath": "impl-plans/active/ipd-24-parity-flows.md",
       "progressPath": "impl-plans/progress/ipd-24-parity-flows.md",
       "dependsOn": [
-        "ipd-11-frames",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
         "ipd-15-kit-content",
@@ -704,7 +650,6 @@
       "planPath": "impl-plans/active/ipd-25-docs-help.md",
       "progressPath": "impl-plans/progress/ipd-25-docs-help.md",
       "dependsOn": [
-        "ipd-11-frames",
         "ipd-13-prototype-core-cli",
         "ipd-14-kit-core",
         "ipd-15-kit-content",
@@ -744,7 +689,6 @@
       "planPath": "impl-plans/active/ipd-26-example-sample.md",
       "progressPath": "impl-plans/progress/ipd-26-example-sample.md",
       "dependsOn": [
-        "ipd-11-frames",
         "ipd-13-prototype-core-cli",
         "ipd-15-kit-content",
         "ipd-16-frames-export-compare",
@@ -947,6 +891,12 @@
       "planPath": "impl-plans/active/ipd-10-icon-desktop.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted in session-781 waves 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-11-frames",
+      "planPath": "impl-plans/active/ipd-11-frames.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-784 waves 1-2 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
     }
   ]
 }

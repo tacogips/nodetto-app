@@ -3,7 +3,7 @@
 - planId: ipd-14-kit-core
 - planPath: impl-plans/active/ipd-14-kit-core.md
 - progressPath: impl-plans/progress/ipd-14-kit-core.md
-- dependsOn: ipd-04-cli-edit-contracts, ipd-05-core-catalogue, ipd-07-icon-core-cli, ipd-09-text-layer, ipd-11-frames, ipd-12-controls
+- dependsOn: ipd-04-cli-edit-contracts, ipd-05-core-catalogue, ipd-07-icon-core-cli, ipd-09-text-layer, ipd-11-frames, ipd-12-controls, ipd-13-prototype-core-cli (amendment round 8: runs after ipd-13 on a settled tree)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decision 5 (5.1-5.4), and the components `ios:status-bar`, `ios:home-indicator`, `ios:nav-bar`, `ios:tab-bar`, `ios:top-tabs`, `ios:segmented` from 5.5.
 - Evidence: `tmp/ipd-s772/ipd-14-kit-core/`.
 <!-- ownership:start -->
@@ -213,3 +213,7 @@ New `apps/cli/src/kit-cli.test.ts`:
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - `packages/core/src/index.ts` is shared: append export lines only.
 - No state-changing git commands, no emojis, generic content only. Evidence files must not match Bun test patterns.
+
+## Amendment 2026-11-10 (operator round 8)
+
+This plan now depends on `ipd-13-prototype-core-cli` and runs after it, because its workspace typecheck gate failed on ipd-13's in-progress prototype files in the shared tree. Keep the ipd-14 work already in the working tree and continue from it.

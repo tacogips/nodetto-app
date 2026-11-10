@@ -3,7 +3,7 @@
 - planId: ipd-13-prototype-core-cli
 - planPath: impl-plans/active/ipd-13-prototype-core-cli.md
 - progressPath: impl-plans/progress/ipd-13-prototype-core-cli.md
-- dependsOn: ipd-01-ir-schema, ipd-05-core-catalogue, ipd-11-frames (both edit `svg-export/document.ts` and `inspect-command.ts`)
+- dependsOn: ipd-01-ir-schema, ipd-05-core-catalogue, ipd-11-frames (both edit `svg-export/document.ts` and `inspect-command.ts`; all three are accepted dependencies, so this plan has no pending dependency)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decision 8 (8.1-8.5 and 8.7 core rule), D9.
 - Evidence: `tmp/ipd-s772/ipd-13-prototype-core-cli/`.
 <!-- ownership:start -->
@@ -20,6 +20,7 @@
   - `apps/cli/src/prototype-cli.test.ts`
   - `impl-plans/progress/ipd-13-prototype-core-cli.md`
   - `tmp/ipd-s772/ipd-13-prototype-core-cli`
+  - `packages/core/src/screen-transition.test.ts`
 - sharedPaths:
   - `packages/core/src/index.ts`
   - `packages/core/src/svg-export.test.ts`
@@ -192,3 +193,7 @@ Verification passes.
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - `packages/core/src/index.ts` is shared: append export lines only.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+
+## Amendment 2026-11-10 (operator round 8)
+
+This plan owns `packages/core/src/screen-transition.test.ts`. Update only the stale verbose prototype label expectation (around line 55) to the compact label required by Decision 8.3; keep every semantic and round-trip assertion. Then rerun the aggregate and visual verification. Keep the ipd-13 work already in the working tree and continue from it.
