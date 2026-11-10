@@ -234,3 +234,32 @@ Integrity check (not a test command): `git diff --stat f59bef4 -- packages/core/
 - The README bullet is present, and the design status reads implemented.
 - The progress log records the per-edit hashes and any serial repair or
   amendment request.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 1)
+
+Blocker (wave-005): `mise run build` and `mise run build-cli` write outside
+the declared `target` artifact root. Decision, with no design change:
+
+- `apps/desktop/dist` is added to writePaths and artifactRoots. It holds the
+  Vite output of `bun run build` (`apps/desktop/package.json` `vite build`;
+  gitignored by `dist/`).
+- `apps/desktop/src-tauri/binaries` is added to writePaths and
+  artifactRoots. `apps/cli/scripts/build-sidecar.ts` copies
+  `nodetto-cli-<triple>` there (gitignored).
+- Cargo output still goes to the existing `target` root (workspace
+  `Cargo.toml`, `CARGO_TARGET_DIR` unset).
+- `apps/desktop/src-tauri/gen/schemas` is added to writePaths as a source
+  path only, because the Tauri `build.rs` run by `cargo build --release` may
+  rewrite these tracked JSON files. Do not hand-edit them. Record
+  `git hash-object` for each file before and after verification 9 in the
+  progress log. `git diff --stat -- apps/desktop/src-tauri/gen/schemas`
+  must be empty at the end. If the build changes them, report it as an
+  amendment request and do not keep or revert the change by hand.
+- Do not add these directories to any other plan, and do not change
+  `mise.toml`, `.gitignore`, `build-sidecar.ts` or any Tauri config.
+
+Resume: finish the remaining wiring (Canvas and interaction hooks for the
+tsh-04a editor and overlay, tsh-04b clipboard key routing through
+`navigator.clipboard`, tsh-04c pointer resize, `table-sheet-wiring.test.ts`).
+Then run verifications 1-9 in order. Set the design status line to
+implemented only after all of them exit 0.

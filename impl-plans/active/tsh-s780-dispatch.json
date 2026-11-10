@@ -88,6 +88,10 @@
       {
         "decision": "tsh-06 verification lists explicit test files and excludes label-field.test.ts, which runs in tsh-08 verification 3.",
         "rationale": "Tests that loop over registered element types fail by design until tsh-08 registers table.sheet."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 1: authorize the gitignored build outputs apps/desktop/dist and apps/desktop/src-tauri/binaries as tsh-08-wiring writePaths and artifactRoots, and add the tracked apps/desktop/src-tauri/gen/schemas as a source writePath that must stay byte-identical.",
+        "rationale": "Blocked plan tsh-08-wiring (blocked-wave-scope-or-contract): mise run build (desktop Vite build) and mise run build-cli (build-sidecar.ts) write outside the declared target artifact root. The amendment resolves that gap; mise.toml, .gitignore, build-sidecar.ts and the Tauri config stay unchanged, and 12 completed plans are recorded as accepted dependencies of the wave."
       }
     ],
     "intentionalTradeoffs": [
@@ -273,8 +277,16 @@
     {
       "planId": "tsh-08-wiring", "planPath": "impl-plans/active/tsh-08-wiring.md", "progressPath": "impl-plans/progress/tsh-08-wiring.md", "wave": 3,
       "dependsOn": ["tsh-02-export", "tsh-03-view", "tsh-04a-navigation", "tsh-04b-clipboard", "tsh-04c-resize", "tsh-05-inspector", "tsh-06-cli", "tsh-07-docs"],
-      "writePaths": ["packages/core/src/shapes/index.ts", "packages/core/src/svg-export/shapes.ts", "packages/core/src/tools.ts", "packages/core/src/shape-catalogue.ts", "packages/core/src/shape-catalogue.test.ts", "packages/core/src/table-sheet-export.test.ts", "packages/ui-solid/src/shapes/ShapeView.tsx", "packages/ui-solid/src/Canvas.tsx", "packages/ui-solid/src/interaction/pointer.ts", "packages/ui-solid/src/interaction/keyboard.ts", "packages/ui-solid/src/interaction/types.ts", "packages/ui-solid/src/interaction.ts", "packages/ui-solid/src/Inspector.tsx", "packages/ui-solid/src/shape-palette.ts", "packages/ui-solid/src/Toolbar.test.ts", "packages/ui-solid/src/shape-search.test.ts", "packages/ui-solid/src/table-sheet-wiring.test.ts", "apps/cli/src/commands.ts", "apps/cli/src/help.ts", "apps/cli/src/types-command.ts", "apps/cli/src/cli-wiring.test.ts", "apps/cli/src/table-e2e.test.ts", "README.md", "design-docs/specs/design-table-sheet.md", "docs/cli.md", "docs/editing.md", "impl-plans/progress/tsh-08-wiring.md", "tmp/tsh-s780/tsh-08-wiring", "target"],
-      "sharedPaths": [], "artifactRoots": ["target"],
+      "writePaths": ["packages/core/src/shapes/index.ts", "packages/core/src/svg-export/shapes.ts", "packages/core/src/tools.ts", "packages/core/src/shape-catalogue.ts", "packages/core/src/shape-catalogue.test.ts", "packages/core/src/table-sheet-export.test.ts", "packages/ui-solid/src/shapes/ShapeView.tsx", "packages/ui-solid/src/Canvas.tsx", "packages/ui-solid/src/interaction/pointer.ts", "packages/ui-solid/src/interaction/keyboard.ts", "packages/ui-solid/src/interaction/types.ts", "packages/ui-solid/src/interaction.ts", "packages/ui-solid/src/Inspector.tsx", "packages/ui-solid/src/shape-palette.ts", "packages/ui-solid/src/Toolbar.test.ts", "packages/ui-solid/src/shape-search.test.ts", "packages/ui-solid/src/table-sheet-wiring.test.ts", "apps/cli/src/commands.ts", "apps/cli/src/help.ts", "apps/cli/src/types-command.ts", "apps/cli/src/cli-wiring.test.ts", "apps/cli/src/table-e2e.test.ts", "README.md", "design-docs/specs/design-table-sheet.md", "docs/cli.md", "docs/editing.md", "impl-plans/progress/tsh-08-wiring.md", "tmp/tsh-s780/tsh-08-wiring", "target", "apps/desktop/dist", "apps/desktop/src-tauri/binaries", "apps/desktop/src-tauri/gen/schemas"],
+      "sharedPaths": [], "artifactRoots": ["target", "apps/desktop/dist", "apps/desktop/src-tauri/binaries"],
+      "amendments": [
+        {
+          "round": 1,
+          "reason": "blocked-wave-scope-or-contract",
+          "previousCheckpointCommit": "205767f59e4724c7a38761875f739dadd78dcdfe",
+          "decision": "mise run build writes the Vite bundle to apps/desktop/dist (gitignored dist/). mise run build-cli copies the sidecar into apps/desktop/src-tauri/binaries (gitignored). Both are now tsh-08 writePaths and artifactRoots. The Tauri build.rs may regenerate the tracked apps/desktop/src-tauri/gen/schemas; that directory is authorized as a source writePath only so the build can run, and its content must stay byte-identical (see the plan amendment)."
+        }
+      ],
       "verification": [
         "bun test ./packages/core/src/table-sheet-export.test.ts ./packages/core/src/shape-catalogue.test.ts ./packages/core/src/svg-export/table-sheet.test.ts ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts",
         "bun test ./packages/ui-solid/src/table-sheet-wiring.test.ts ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts ./packages/ui-solid/src/table-sheet/clipboard.test.ts ./packages/ui-solid/src/table-sheet/resize.test.ts ./packages/ui-solid/src/table-sheet-view.test.ts ./packages/ui-solid/src/inspector/table-sheet-section.test.ts ./packages/ui-solid/src/Toolbar.test.ts ./packages/ui-solid/src/shape-search.test.ts ./packages/ui-solid/src/interaction-keyboard-menus.test.ts",
