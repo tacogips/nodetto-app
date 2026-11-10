@@ -95,6 +95,14 @@
       {
         "decision": "Amendment 2026-11-10 round 2 (ordering, Step 5 finding S5-R2-IPD08-GATE): ipd-08-cli-layout-ops dependsOn gains ipd-07-icon-core-cli (wave 3 -> 5) and reruns its unchanged verification aggregate (including apps/cli/src/edit) after ipd-07 is accepted; its layout source edits are already in the working tree and are not reimplemented. ipd-07-icon-core-cli verification step 1 adds apps/cli/src/edit/label-field.test.ts (expect exit 0, 0 fail) and an acceptance line that the ui.icon defaultSemantic {icon:\"square\"} validates. label-field.test.ts is run only, never edited, skipped or loosened; writePaths of both plans are unchanged and disjoint.",
         "rationale": "label-field.test.ts creates every ELEMENT_TYPES entry from the core registry defaultSemantic(); ui.icon is registered by ipd-01 but its core shape comes only from ipd-07 (packages/core/src/shapes/ui-icon.ts), so ipd-08's aggregate could not exit 0 in wave 3 and the owner had no gate on the failing test. Only ipd-23, ipd-24 and ipd-25 depend on ipd-08 and they already follow ipd-07, so no downstream plan is delayed."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 3: operator ipd-07a split (session-775 wave 2 blocker, blocked-wave-scope-or-contract):ipd-01-ir-schema is accepted (IR 156/156, golden 57/57, typecheck clean). New root unit ipd-07a-icon-shape takes the minimal ui.icon core shape util (defaultSemantic {icon: \"square\"}) and its createDefaultRegistry registration out of ipd-07; ipd-05, ipd-06, ipd-07, ipd-09 and ipd-12 depend on it; ipd-07 keeps SVG export, warnings, catalogue and CLI work and treats ui-icon.ts as a shared path.",
+        "rationale": "apps/cli/src/edit/label-field.test.ts creates every registered element type from its core default; with the IR type registered but no core util, ui.icon's fallback default lacks icon/path and createElement throws, so every unit running bun test packages apps/cli/src before ipd-07 failed the progress gate. ipd-01 could not fix it inside its IR scope."
+      },
+      {
+        "decision": "Step 4 rerun 2026-11-10 (session-777): the operator round-3 split is normalized without scope change. ipd-07a-icon-shape gets the standard ownership block and plan contract; ipd-07's markdown drops the prose writePaths entry and lists packages/core/src/shapes/ui-icon.ts as a sharedPath with a note; ipd-05, ipd-06, ipd-07, ipd-08, ipd-09 and ipd-12 headers name ipd-07a (directly or via ipd-07) and accepted dependencies separately, with dated round-3 amendment sections; waves recomputed (ipd-07a 1; ipd-05, ipd-06 2; ipd-07, ipd-09, ipd-12 3; ipd-08 4). ipd-08 keeps dependsOn ipd-07 (the Step 5 S5-R2-IPD08-GATE repair) and ipd-07 keeps label-field.test.ts in its verification. The tmp plan-check inputs are resynced and check-md.ts matches ipd-NNx plan files.",
+        "rationale": "Step 5 S5-R2-IPD08-GATE and S5-R2-L1 required the ordering repair to be explicit and the checkers to exit 0; the operator round-3 working-tree amendment left a prose path entry in ipd-07 and a non-standard ipd-07a header that the markdown checker could not parse."
       }
     ],
     "intentionalTradeoffs": [
@@ -129,67 +137,41 @@
   },
   "plans": [
     {
-      "planId": "ipd-01-ir-schema",
-      "planPath": "impl-plans/active/ipd-01-ir-schema.md",
-      "progressPath": "impl-plans/progress/ipd-01-ir-schema.md",
-      "wave": 2,
+      "planId": "ipd-07a-icon-shape",
+      "planPath": "impl-plans/active/ipd-07a-icon-shape.md",
+      "progressPath": "impl-plans/progress/ipd-07a-icon-shape.md",
+      "wave": 1,
       "dependsOn": [],
       "writePaths": [
-        "packages/ir/src/types.ts",
-        "packages/ir/src/keyOrder.ts",
-        "packages/ir/src/validate.ts",
-        "packages/ir/src/ui-controls.ts",
-        "packages/ir/src/semantics/design.ts",
-        "packages/ir/src/semantics/connectors.ts",
-        "packages/ir/src/semantics.ts",
-        "packages/ir/src/registry.ts",
-        "packages/ir/src/registry/containers.ts",
-        "packages/ir/src/registry/generic.ts",
-        "packages/ir/src/registry/icons.ts",
-        "packages/ir/src/registry.test.ts",
-        "packages/ir/src/index.ts",
-        "packages/ir/src/ipd-schema.test.ts",
-        "packages/io/src/jsonl/golden.test.ts",
-        "packages/io/src/__fixtures__/ui-icon.jsonl",
-        "impl-plans/progress/ipd-01-ir-schema.md",
-        "tmp/ipd-s772/ipd-01-ir-schema"
+        "packages/core/src/shapes/ui-icon.ts",
+        "packages/core/src/shapes/index.ts",
+        "impl-plans/progress/ipd-07a-icon-shape.md",
+        "tmp/ipd-s772/ipd-07a-icon-shape"
       ],
-      "sharedPaths": [
-        "packages/core/src/semantic-field-audit.test.ts"
-      ],
-      "sharedPathNotes": [
-        {
-          "path": "packages/core/src/semantic-field-audit.test.ts",
-          "intendedEdit": "update expectations only if the audit enumerates IR keys and fails solely because of the new optional fields; record the reason"
-        }
-      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
       "artifactRoots": [
-        "tmp/ipd-s772/ipd-01-ir-schema"
-      ],
-      "acceptanceCriteria": [
-        "The verification above passes.",
-        "`rg -n 'ICON_NAME_PATTERN|uiIconDefinition|STROKE_ALIGNS|TAB_INDICATORS|FRAME_TITLE_PLACEMENTS' packages/ir/src/index.ts` -> 5 matches.",
-        "`rg -n '\"swap-overlay\"' packages/ir/src/semantics/connectors.ts` -> 1 match.",
-        "The progress log has hash records and the evidence table.",
-        "`bun test packages/io/src/jsonl/golden.test.ts` -> exit 0, 0 fail; `git diff --exit-code -- packages/io/src/__fixtures__` -> exit 0 (no existing fixture modified); GOLDEN ends with \"ui-icon\"."
+        "tmp/ipd-s772/ipd-07a-icon-shape"
       ],
       "verification": [
-        "bun test packages/ir",
-        "bun test packages/core/src/semantic-field-audit.test.ts packages/core/src/svg-export.test.ts",
+        "bun test apps/cli/src/edit/label-field.test.ts",
+        "bun test packages/core",
         "bun run typecheck",
-        "bunx biome check packages/ir/src",
-        "bun test packages/io/src/jsonl/golden.test.ts",
-        "bun test packages/ir packages/io",
-        "bunx biome check packages/io/src/jsonl/golden.test.ts"
+        "bunx biome check packages/core/src/shapes/ui-icon.ts packages/core/src/shapes/index.ts"
+      ],
+      "acceptanceCriteria": [
+        "The verification above passes (packages/core: no new failures versus the ipd-00-baseline record).",
+        "label-field.test.ts 'all registered types accept their mapped label or report no label' passes.",
+        "`rg -n 'uiIconShapeUtil' packages/core/src/shapes/index.ts` -> 2 matches (import and register); `rg -n 'icon: \"square\"' packages/core/src/shapes/ui-icon.ts` -> 1 match."
       ]
     },
     {
       "planId": "ipd-05-core-catalogue",
       "planPath": "impl-plans/active/ipd-05-core-catalogue.md",
       "progressPath": "impl-plans/progress/ipd-05-core-catalogue.md",
-      "wave": 3,
+      "wave": 2,
       "dependsOn": [
-        "ipd-01-ir-schema"
+        "ipd-07a-icon-shape"
       ],
       "writePaths": [
         "packages/core/src/tools.ts",
@@ -228,9 +210,9 @@
       "planId": "ipd-06-geo-strokes",
       "planPath": "impl-plans/active/ipd-06-geo-strokes.md",
       "progressPath": "impl-plans/progress/ipd-06-geo-strokes.md",
-      "wave": 3,
+      "wave": 2,
       "dependsOn": [
-        "ipd-01-ir-schema"
+        "ipd-07a-icon-shape"
       ],
       "writePaths": [
         "packages/core/src/shapes/geo-outline.ts",
@@ -273,14 +255,12 @@
       "planId": "ipd-07-icon-core-cli",
       "planPath": "impl-plans/active/ipd-07-icon-core-cli.md",
       "progressPath": "impl-plans/progress/ipd-07-icon-core-cli.md",
-      "wave": 4,
+      "wave": 3,
       "dependsOn": [
-        "ipd-01-ir-schema",
-        "ipd-05-core-catalogue"
+        "ipd-05-core-catalogue",
+        "ipd-07a-icon-shape"
       ],
       "writePaths": [
-        "packages/core/src/shapes/ui-icon.ts",
-        "packages/core/src/shapes/index.ts",
         "packages/core/src/svg-export/shapes.ts",
         "packages/core/src/shape-warnings.ts",
         "packages/core/src/ui-icon.test.ts",
@@ -294,12 +274,17 @@
         "tmp/ipd-s772/ipd-07-icon-core-cli"
       ],
       "sharedPaths": [
-        "packages/core/src/index.ts"
+        "packages/core/src/index.ts",
+        "packages/core/src/shapes/ui-icon.ts"
       ],
       "sharedPathNotes": [
         {
           "path": "packages/core/src/index.ts",
           "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        },
+        {
+          "path": "packages/core/src/shapes/ui-icon.ts",
+          "intendedEdit": "created and registered by ipd-07a-icon-shape; edit only if the export/warning work needs a helper there; keep its type, bounds, defaults and registration unchanged"
         }
       ],
       "artifactRoots": [
@@ -307,7 +292,7 @@
       ],
       "acceptanceCriteria": [
         "Verification passes.",
-        "`rg -n '\"ui.icon\"' packages/core/src/shapes/index.ts packages/core/src/svg-export/shapes.ts` -> 2 or more matches.",
+        "`rg -n '\"ui.icon\"' packages/core/src/shapes/ui-icon.ts packages/core/src/svg-export/shapes.ts` -> 2 or more matches (one per file).",
         "`bun test apps/cli/src/edit/label-field.test.ts` -> exit 0, 0 fail: a ui.icon created from the core registry defaultSemantic() ({icon: \"square\"}) validates."
       ],
       "verification": [
@@ -320,7 +305,7 @@
       "planId": "ipd-08-cli-layout-ops",
       "planPath": "impl-plans/active/ipd-08-cli-layout-ops.md",
       "progressPath": "impl-plans/progress/ipd-08-cli-layout-ops.md",
-      "wave": 5,
+      "wave": 4,
       "dependsOn": [
         "ipd-07-icon-core-cli"
       ],
@@ -350,8 +335,8 @@
       "planPath": "impl-plans/active/ipd-09-text-layer.md",
       "progressPath": "impl-plans/progress/ipd-09-text-layer.md",
       "dependsOn": [
-        "ipd-01-ir-schema",
-        "ipd-05-core-catalogue"
+        "ipd-05-core-catalogue",
+        "ipd-07a-icon-shape"
       ],
       "writePaths": [
         "packages/core/src/text-layout.ts",
@@ -424,7 +409,6 @@
       "planPath": "impl-plans/active/ipd-11-frames.md",
       "progressPath": "impl-plans/progress/ipd-11-frames.md",
       "dependsOn": [
-        "ipd-01-ir-schema",
         "ipd-05-core-catalogue",
         "ipd-06-geo-strokes",
         "ipd-07-icon-core-cli"
@@ -476,8 +460,8 @@
       "planPath": "impl-plans/active/ipd-12-controls.md",
       "progressPath": "impl-plans/progress/ipd-12-controls.md",
       "dependsOn": [
-        "ipd-01-ir-schema",
-        "ipd-06-geo-strokes"
+        "ipd-06-geo-strokes",
+        "ipd-07a-icon-shape"
       ],
       "writePaths": [
         "packages/core/src/svg-export/ui-control.ts",
@@ -519,7 +503,6 @@
       "planPath": "impl-plans/active/ipd-13-prototype-core-cli.md",
       "progressPath": "impl-plans/progress/ipd-13-prototype-core-cli.md",
       "dependsOn": [
-        "ipd-01-ir-schema",
         "ipd-05-core-catalogue",
         "ipd-11-frames"
       ],
@@ -1211,6 +1194,12 @@
       "planPath": "impl-plans/active/ipd-03-icon-data.md",
       "commit": "uncommitted-working-tree",
       "note": "accepted in session-775 (successfulPlanIds; adversarial and test-integrity reviews accepted); repair ipd-03-branch-1 resolved: bunx biome check packages/core/src/index.ts exits 0 (tmp/ipd-s772/plan-check/amend-s775/index-biome-r2.log); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-01-ir-schema",
+      "planPath": "impl-plans/active/ipd-01-ir-schema.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted by the operator after amendment round 2 (session-775): bun test packages/ir 156/156, golden 57/57, typecheck clean; its only aggregate failure (label-field.test.ts ui.icon default) is owned by ipd-07a-icon-shape"
     }
   ]
 }

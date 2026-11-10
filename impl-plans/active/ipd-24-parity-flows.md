@@ -3,7 +3,7 @@
 - planId: ipd-24-parity-flows
 - planPath: impl-plans/active/ipd-24-parity-flows.md
 - progressPath: impl-plans/progress/ipd-24-parity-flows.md
-- dependsOn: ipd-23-parity-shapes (both build `target`; this orders the two cargo builds), ipd-13-prototype-core-cli, ipd-14-kit-core, ipd-15-kit-content, ipd-16-frames-export-compare, ipd-20-app-lint, ipd-21-html-prototype, plus ipd-06, ipd-07, ipd-08, ipd-09, ipd-11, ipd-12 (stable engine tree; see `ipd-23`)
+- dependsOn: ipd-23-parity-shapes (both build `target`; this orders the two cargo builds), ipd-13-prototype-core-cli, ipd-14-kit-core, ipd-15-kit-content, ipd-16-frames-export-compare, ipd-20-app-lint, ipd-21-html-prototype, plus ipd-06-geo-strokes, ipd-07-icon-core-cli, ipd-08-cli-layout-ops, ipd-09-text-layer, ipd-11-frames, ipd-12-controls (stable engine tree; see `ipd-23`)
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, "Verification" (native parity split by area). Areas: kit, prototype, lint, export/compare.
 - Evidence: `tmp/ipd-s772/ipd-24-parity-flows/`.
 <!-- ownership:start -->

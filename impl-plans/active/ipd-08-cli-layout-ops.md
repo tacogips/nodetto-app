@@ -3,7 +3,7 @@
 - planId: ipd-08-cli-layout-ops
 - planPath: impl-plans/active/ipd-08-cli-layout-ops.md
 - progressPath: impl-plans/progress/ipd-08-cli-layout-ops.md
-- wave: 5. dependsOn: ipd-04-cli-edit-contracts, ipd-07-icon-core-cli (amendment 2026-11-10 round 2: verification-only ordering; see the Amendment section).
+- wave: 4. dependsOn: ipd-07-icon-core-cli; accepted dependency ipd-04-cli-edit-contracts (amendment 2026-11-10 round 2: verification-only ordering; see the Amendment section).
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decision 7 (7.1-7.5) and D8.
 - Evidence: `tmp/ipd-s772/ipd-08-cli-layout-ops/`.
 <!-- ownership:start -->
@@ -190,3 +190,9 @@ Worker instructions for the redispatch:
 Forbidden: editing or skipping `apps/cli/src/edit/label-field.test.ts`; taking
 ownership of `packages/core/src/shapes/ui-icon.ts` or
 `packages/ir/src/registry/icons.ts`; dropping `apps/cli/src/edit` from step 1.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, operator round 3, ipd-07a split)
+
+Operator decision recorded in `impl-plans/active/ipd-s772-dispatch.json` `reviewContext.designDecisionsAndRationale`: `ipd-01-ir-schema` is accepted (its code is in the working tree; `bun test packages/ir packages/io/src/jsonl/golden.test.ts` -> 213 pass, 0 fail). The new root plan `ipd-07a-icon-shape` delivers the minimal `ui.icon` core shape util (`packages/core/src/shapes/ui-icon.ts`, `defaultSemantic: () => ({icon: "square"})`) and its `createDefaultRegistry` registration, so `apps/cli/src/edit/label-field.test.ts` passes before any wave-2 plan runs a broad `bun test packages apps/cli/src` gate.
+
+Decision for this plan: dependsOn stays `ipd-07-icon-core-cli` (the round-2 ordering accepted by Step 5); because `ipd-07` now depends on `ipd-07a-icon-shape`, this plan transitively follows the shape-util fix. Its wave becomes 4 because the accepted `ipd-01` no longer counts as a pending wave. Scope, writePaths and verification are unchanged; the round-2 rule that the worker reruns verification and does not reimplement the layout edits still applies. A remaining `label-field.test.ts` `ui.icon` failure is `owned_elsewhere` (owner `ipd-07a-icon-shape`).

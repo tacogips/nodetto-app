@@ -3,13 +3,11 @@
 - planId: ipd-07-icon-core-cli
 - planPath: impl-plans/active/ipd-07-icon-core-cli.md
 - progressPath: impl-plans/progress/ipd-07-icon-core-cli.md
-- wave: 4. dependsOn: ipd-01-ir-schema, ipd-03-icon-data, ipd-04-cli-edit-contracts, ipd-05-core-catalogue (this plan updates `shapes-command.test.ts` expectations for the new catalogue rows).
+- wave: 3. dependsOn: ipd-05-core-catalogue, ipd-07a-icon-shape (amendment 2026-11-10 operator round 3); accepted dependencies ipd-01-ir-schema, ipd-03-icon-data, ipd-04-cli-edit-contracts (this plan updates `shapes-command.test.ts` expectations for the new catalogue rows).
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decision 2 (2.2 rendering, 2.4 lookup and CLI).
 - Evidence: `tmp/ipd-s772/ipd-07-icon-core-cli/`.
 <!-- ownership:start -->
 - writePaths:
-  - `packages/core/src/shapes/ui-icon.ts`
-  - `packages/core/src/shapes/index.ts`
   - `packages/core/src/svg-export/shapes.ts`
   - `packages/core/src/shape-warnings.ts`
   - `packages/core/src/ui-icon.test.ts`
@@ -23,8 +21,10 @@
   - `tmp/ipd-s772/ipd-07-icon-core-cli`
 - sharedPaths:
   - `packages/core/src/index.ts`
+  - `packages/core/src/shapes/ui-icon.ts`
 - sharedPathNotes:
   - path: `packages/core/src/index.ts`; intendedEdit: append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing
+  - path: `packages/core/src/shapes/ui-icon.ts`; intendedEdit: created and registered by ipd-07a-icon-shape; edit only if the export/warning work needs a helper there; keep its type, bounds, defaults and registration unchanged
 - artifactRoots:
   - `tmp/ipd-s772/ipd-07-icon-core-cli`
 <!-- ownership:end -->
@@ -52,7 +52,7 @@ The desktop view is `ipd-10`.
 
 ## File-level changes
 
-New `packages/core/src/shapes/ui-icon.ts`, `uiIconShapeUtil: ShapeUtil`:
+Already delivered by `ipd-07a-icon-shape` (amendment round 3); verify, do not rewrite. `packages/core/src/shapes/ui-icon.ts`, `uiIconShapeUtil: ShapeUtil`:
 
 - type `"ui.icon"`;
 - `canResize: true`;
@@ -62,7 +62,7 @@ New `packages/core/src/shapes/ui-icon.ts`, `uiIconShapeUtil: ShapeUtil`:
 - `defaultSemantic: () => ({icon: "square"})`;
 - `defaultVisual` 24×24 with style `{stroke: "#000000", strokeWidth: 2}`.
 
-Register it in `packages/core/src/shapes/index.ts:createDefaultRegistry`.
+`ipd-07a-icon-shape` registers it in `packages/core/src/shapes/index.ts:createDefaultRegistry`; this plan must not edit `packages/core/src/shapes/index.ts`.
 
 `packages/core/src/svg-export/shapes.ts`, new `case "ui.icon"`:
 
@@ -144,7 +144,7 @@ New `apps/cli/src/icon-commands.test.ts`, using the existing CLI test helpers fr
 ## Done criteria
 
 - Verification passes.
-- `rg -n '"ui.icon"' packages/core/src/shapes/index.ts packages/core/src/svg-export/shapes.ts` -> 2 or more matches.
+- `rg -n '"ui.icon"' packages/core/src/shapes/ui-icon.ts packages/core/src/svg-export/shapes.ts` -> 2 or more matches (one per file).
 - `bun test apps/cli/src/edit/label-field.test.ts` -> exit 0, 0 fail: a `ui.icon` created from the core registry `defaultSemantic()` (`{icon: "square"}`) validates.
 
 ## Worker rules
@@ -176,3 +176,15 @@ Decision:
 - `ipd-08-cli-layout-ops` now depends on this plan and reruns its aggregate
   after this plan is accepted. writePaths of both plans are unchanged and
   disjoint.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, operator round 3, ipd-07a split)
+
+Operator decision recorded in `impl-plans/active/ipd-s772-dispatch.json` `reviewContext.designDecisionsAndRationale`: `ipd-01-ir-schema` is accepted (its code is in the working tree; `bun test packages/ir packages/io/src/jsonl/golden.test.ts` -> 213 pass, 0 fail). The new root plan `ipd-07a-icon-shape` delivers the minimal `ui.icon` core shape util (`packages/core/src/shapes/ui-icon.ts`, `defaultSemantic: () => ({icon: "square"})`) and its `createDefaultRegistry` registration, so `apps/cli/src/edit/label-field.test.ts` passes before any wave-2 plan runs a broad `bun test packages apps/cli/src` gate.
+
+Decision for this plan:
+
+- dependsOn becomes `ipd-05-core-catalogue`, `ipd-07a-icon-shape`; accepted plans are no longer listed as pending dependencies. Wave 4 -> 3.
+- `packages/core/src/shapes/ui-icon.ts` and `packages/core/src/shapes/index.ts` leave this plan's writePaths. `ui-icon.ts` is a sharedPath (see sharedPathNotes); `packages/core/src/shapes/index.ts` is not writable here.
+- The File-level changes block for `uiIconShapeUtil` is now a contract to verify, not to rewrite: confirm the type, bounds, defaults and registration match it, and record the result in the progress log.
+- This supersedes the round-2 sentence "fix the shape in `packages/core/src/shapes/ui-icon.ts` or its registration in `packages/core/src/shapes/index.ts`": if `apps/cli/src/edit/label-field.test.ts` fails because the util or its registration is missing or wrong, record a finding with status `owned_elsewhere` (owner `ipd-07a-icon-shape`) and do not edit `packages/core/src/shapes/index.ts`.
+- Verification step 1 keeps `apps/cli/src/edit/label-field.test.ts` (exit 0, 0 fail). The done-criterion `rg` now targets `packages/core/src/shapes/ui-icon.ts`, because the registration in `index.ts` references the util by import name, not by the `"ui.icon"` literal.

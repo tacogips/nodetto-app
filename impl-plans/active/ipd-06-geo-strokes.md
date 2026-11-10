@@ -3,7 +3,7 @@
 - planId: ipd-06-geo-strokes
 - planPath: impl-plans/active/ipd-06-geo-strokes.md
 - progressPath: impl-plans/progress/ipd-06-geo-strokes.md
-- wave: 3. dependsOn: ipd-01-ir-schema
+- wave: 2. dependsOn: ipd-07a-icon-shape (amendment 2026-11-10 operator round 3); accepted dependency ipd-01-ir-schema
 - Design (binding): `design-docs/specs/design-iphone-app-design.md`, Decision 3 (3.1 thin rects D4, 3.2 `strokeAlign`, 3.3 `strokeSides`) and Decision 1.6 (geo label `textPadding`, part of D5).
 - Evidence: `tmp/ipd-s772/ipd-06-geo-strokes/`.
 <!-- ownership:start -->
@@ -143,3 +143,9 @@ Verification passes, and the progress log records the visual inspection notes.
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - `packages/core/src/index.ts` is shared: append export lines only.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+
+## Amendment 2026-11-10 (blocked-wave-scope-or-contract, operator round 3, ipd-07a split)
+
+Operator decision recorded in `impl-plans/active/ipd-s772-dispatch.json` `reviewContext.designDecisionsAndRationale`: `ipd-01-ir-schema` is accepted (its code is in the working tree; `bun test packages/ir packages/io/src/jsonl/golden.test.ts` -> 213 pass, 0 fail). The new root plan `ipd-07a-icon-shape` delivers the minimal `ui.icon` core shape util (`packages/core/src/shapes/ui-icon.ts`, `defaultSemantic: () => ({icon: "square"})`) and its `createDefaultRegistry` registration, so `apps/cli/src/edit/label-field.test.ts` passes before any wave-2 plan runs a broad `bun test packages apps/cli/src` gate.
+
+Decision for this plan: dependsOn gains `ipd-07a-icon-shape` (ordering only). writePaths, sharedPaths, scope, tests and verification are unchanged. Do not create or edit `packages/core/src/shapes/ui-icon.ts` or `packages/core/src/shapes/index.ts`. If a broad gate still fails only in `apps/cli/src/edit/label-field.test.ts` for `ui.icon`, record a finding with status `owned_elsewhere` (owner `ipd-07a-icon-shape`) instead of editing that test.
