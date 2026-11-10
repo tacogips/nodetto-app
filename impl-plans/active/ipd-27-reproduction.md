@@ -150,3 +150,52 @@ Step 4 correction for review finding S5-s806-1. In the round-20 section above ("
 The dispatch manifest entry for this plan now states the same predicate in acceptanceCriteria[0], and acceptanceCriteria[2] names the fail-closed privacy command from verification item 7 (`test -s` on `private-terms.txt` and on the progress log before the negated grep), expecting exit 0.
 
 Unchanged: planIds, dependsOn, writePaths, sharedPaths, artifactRoots, verification strings, the round-16, round-18 and round-19 operator sections, and every privacy rule.
+
+## Amendment 2026-11-10 (operator round 22, binding; keep this section verbatim)
+
+Scratch rule (operator round 22, binding for every remaining plan): temporary directories that test harnesses create under the operating system temp dir (mkdtemp under os.tmpdir(), for example nodetto-*-parity-*) are authorized scratch and are not write-scope violations. The reproduction plans do not run the native parity suites (they belong to accepted ipd-23 and ipd-24); their required gates are build-cli plus the reproduction gates.
+
+Rebuild rule (operator round 22, binding for ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction): the reproduction document is rebuilt from an empty document on the fixed kit by a generator script kept under tmp/ipd-s772/ipd-27-reproduction/ (git-ignored). The script writes the ops files and applies them with nodetto-cli edit. Ops never hard-code generated element ids: build each screen in one edit batch using `ref` and `@ref`, and resolve cross-batch targets (for example prototype link targets) by element name through nodetto-cli inspect --format json inside the script. Each part reruns the script from scratch for its screens plus all earlier parts, so the document always reflects the current kit.
+
+## Amendment 2026-11-11 (step 4 s811 round-22 consistency)
+
+Step 4 (session 811) applies the operator round-22 section above to the rest of this plan. Where an earlier section disagrees, this section and round 22 win.
+
+Generator contract (shared by ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction, which run serially):
+
+- The single authored source is `tmp/ipd-s772/ipd-27-reproduction/gen/build.ts` (git-ignored). Run it as `bun tmp/ipd-s772/ipd-27-reproduction/gen/build.ts --through <NN>`, where NN is the last screen this part owns: 03 for ipd-27a, 06 for ipd-27b, 10 for ipd-27c. ipd-27-reproduction runs `--through 10 --links` to add the prototype links and the flow start.
+- On every run the script deletes `tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl` and starts from an empty document. It writes the ops files to `tmp/ipd-s772/ipd-27-reproduction/gen/ops/` and applies them in order with `apps/desktop/src-tauri/binaries/nodetto-cli-aarch64-apple-darwin edit <doc> --ops <file>`. It stops at the first non-zero exit and prints the failing file and exit code.
+- Each screen is one edit batch. Inside a batch, refer to elements only through `ref` and `@ref`. Across batches, for example a link target frame, a hotspot or the flow start, ops refer to existing elements by name and never by id (step 4 s812; this replaces the s811 lookup that wrote ids found through inspect into the ops). Use `name:<exact element name>` in a reference field (`id`, `from`, `to`, `parent`, items of `memberIds`), or bind first with `{"op":"select","ref":"<r>","where":{"name":"<name>","page":"<page name>"},"expect":1}` and then use `@<r>` (apps/cli/src/edit/selectors.ts:62-73, docs/cli.md:315-319). `page` always takes the page name. The flow start is `{"op":"update","id":"name:<start frame name>","semantic":{"prototypeStart":true,"prototypeFlowName":"<flow>"}}` (docs/cli.md:387). An ops file never contains a literal generated element, page or component id, as a full id or as an id prefix. The binding literal-id gate is in the s812 section below.
+- The older `tmp/ipd-s772/ipd-27-reproduction/ops/` files (00-seed, 01-03, 04-corrections, 05-overlays) and the current `work/doc.jsonl` were built on the pre-fix kit with hard-coded ids. Use them only as layout reference. Never apply them and never patch the old document. Earlier mentions of "the ops files" in steps 3 and 5, in Verification item 3 and in earlier amendments mean the generator's output.
+- A later part only adds its own screens to the script. It may correct an earlier part's screen in the script when the full-document lint or a comparison regresses, and it records that correction in its own progress log.
+
+Gates (round 22): the required gates are `mise run build-cli` and the reproduction gates in the dispatch manifest entry for this plan: validate, the round-19 lint gate, the frame count, the comparison images and the privacy self-check. The native parity suites (`apps/cli/src/native-parity/*`) are not run by any reproduction part. They belong to the accepted ipd-23 and ipd-24.
+
+Unchanged: planId, writePaths, sharedPaths, artifactRoots, the layout, lint, comparison and privacy rules, and every operator section.
+
+## Amendment 2026-11-11 (step 4 s812, review finding S5-s811-1)
+
+Step 4 (session 812) fixes the s811 generator contract above, which told the script to put ids found through inspect into the ops and then counted such ids as a failure. Where the s811 section or an earlier section disagrees, this section wins. The operator round-22 section stays verbatim and is read as follows: "resolve cross-batch targets by element name" means the ops carry the name and nodetto-cli resolves it when the batch is applied.
+
+Cross-batch references:
+
+- Write names, not ids. Use `name:<exact element name>` in `id`, `from`, `to`, `parent` and `memberIds` items, or `select` with `where` {`name`, `page`} and `expect` 1, then `@<ref>`. The flow start is an `update` with `id` `name:<start frame name>`. Resolution code: `apps/cli/src/edit/selectors.ts` (`resolveElementReference`, lines 62-73), `apps/cli/src/edit/batch.ts` (`resolveReferences`), `apps/cli/src/edit/operations/connect.ts` (`from`/`to` go through `batch.element`).
+- `nodetto-cli inspect <doc> --format json` is used only as an assertion. Before the script writes a batch that refers to elements from an earlier batch (always including the `--links` batch), it runs inspect on the current document and checks that every referenced name occurs exactly once on the reproduction page. A missing or duplicate name makes the script exit non-zero and print the names. The script never writes an id it read from inspect into `gen/ops/`. Read the JSON field shape from `apps/cli/src/inspect-command.ts` and do not guess it. The CLI itself also rejects a missing or ambiguous `name:` with a non-zero exit, so this check is an early, clearer failure and not the only guard.
+- All applied ops are files in `tmp/ipd-s772/ipd-27-reproduction/gen/ops/`. Do not pipe ops through `--ops -` or stdin.
+- Ops file format: a JSON array with one op per line, each written as `JSON.stringify(op)` with no indentation. The literal-id gate is line based and rejects indented (pretty-printed) files.
+
+Pitfalls:
+
+- Name matching is exact and case-sensitive after trimming. It is scoped to the op page, or to the source page for `connect`. What counts as an element's name depends on the type (`textOf` in `selectors.ts`). For example, a frame's name is `semantic.name` and a `text.note`'s name is its text.
+- Names must be unique on the reproduction page. Kit instance children share default names (for example `Icon` and `Label` in every tab bar slot, or a nav bar `Title`). If a later batch links from such a child, the child's own screen batch gives it a unique name with an `update` on its `@ref` first. Give the ten frames unique names too.
+- Never put an id-shaped string where the gate will see it. A page name, or the whole value of a reference key, must not consist only of 4 to 26 Crockford characters (`0-9`, `A-H`, `J`, `K`, `M`, `N`, `P-T`, `V-Z`). Use names that contain a lowercase letter or a space. If the gate flags a real label, rename it. Do not weaken the gate.
+
+Literal-id gate (binding for ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction; replaces the s811 `grep -cE` count). It is run from the repository root after `gen/build.ts` and expects exit 0:
+
+`sh -c 'set -- tmp/ipd-s772/ipd-27-reproduction/gen/ops/*.json; test -f "$1" || exit 2; ! grep -nE "\"[0-9A-HJKMNP-TV-Z]{26}\"|\"(id|target|parent|page|from|to)\": *\"[0-9A-HJKMNP-TV-Z]{4,25}\"|\"(memberIds|ids)\": *\[[^]]*\"[0-9A-HJKMNP-TV-Z]{4,25}\"|^[[:space:]]+\"" "$@"'`
+
+- Exit 0 means there are ops files and none of them contains a literal id. Exit 1 means a match: a full 26-character id under any key or in any array; a 4 to 25 character id prefix as the whole value of `id`, `target`, `parent`, `page`, `from` or `to`; an id prefix inside `memberIds` or `ids`; or an indented line. Exit 2 means there are no ops files, so an empty `gen/ops/` fails closed.
+- Step 4 tested this exact gate on scratch samples under `tmp/ipd-s772/plan-check/step4-s812/samples/`, running it from each sample root (log in `tmp/ipd-s772/plan-check/step4-s812/gates.log`). The samples with a full id in `from`, `to`, `id`, `page` or `memberIds`, with an id prefix in `id` or `memberIds`, or with pretty-printed JSON exit 1. The empty directory exits 2. The `name:`/`@ref`/`select` sample, with uppercase option labels, exits 0.
+- The progress log records the gate command, its exit code and the number of ops files checked.
+
+Unchanged: planId, dependsOn, writePaths, sharedPaths, sharedPathNotes, artifactRoots, the 31 accepted dependencies, the lint, frame, flow, compare and privacy gates, and every operator section. The only verification change is the literal-id gate added above. It is also in this plan's manifest entry, inserted after `validate`.

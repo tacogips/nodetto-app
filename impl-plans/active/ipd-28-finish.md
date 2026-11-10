@@ -136,3 +136,7 @@ Keep the work already in the working tree and continue from it.
 The step 5 privacy gate in the dispatch manifest is now `sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && ! git grep --untracked -l -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt -- . ":!tmp"'` -> exit 0. It still runs `git grep --untracked` and still expects no match. It now also fails when `private-terms.txt` is missing or empty, which the bare negation used to treat as a pass. The round-19 reproduction lint rule (only `app-misaligned` allowed, each finding justified within 4 points) applies to the reproduction document only. The ipd-28 suite gates are unchanged.
 
 Unchanged: planId, dependsOn, writePaths, sharedPaths, artifactRoots, steps 1-8 and the emoji gates.
+
+## Amendment 2026-11-10 (operator round 22, binding; keep this section verbatim)
+
+Scratch rule (operator round 22, binding for every remaining plan): temporary directories that test harnesses create under the operating system temp dir (mkdtemp under os.tmpdir(), for example nodetto-*-parity-*) are authorized scratch and are not write-scope violations. The reproduction plans do not run the native parity suites (they belong to accepted ipd-23 and ipd-24); their required gates are build-cli plus the reproduction gates.
