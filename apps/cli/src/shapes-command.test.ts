@@ -51,6 +51,25 @@ describe("nodetto-cli shapes", () => {
     ]);
   });
 
+  test("lists the icon catalogue entry as a placed UI shape", () => {
+    const list = (args: string[]) =>
+      JSON.parse(run(["shapes", ...args, "--format", "json"]).stdout) as {
+        id: string;
+      }[];
+    expect(list([]).map((row) => row.id)).toContain("icon:<name>");
+    expect(
+      list(["--category", "ui-control", "--no-connectors"]).map(
+        (row) => row.id,
+      ),
+    ).toContain("icon:<name>");
+    expect(
+      list(["--category", "ui-control", "--connectors"]).map((row) => row.id),
+    ).not.toContain("icon:<name>");
+    expect(list(["--category", "erd"]).map((row) => row.id)).not.toContain(
+      "icon:<name>",
+    );
+  });
+
   test("describes one shape ID and rejects unknown categories", () => {
     const detail = run(["shapes", "flowchart:decision"]);
     expect(detail.stdout).toContain("Creates: shape.geo");

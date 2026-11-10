@@ -11,6 +11,7 @@ import { geoFlipOf } from "../shapes/outline.ts";
 import { fmt, readString, tag, text, wrap } from "./markup.ts";
 import { boxLabelVerticalAlign } from "../label-layout.ts";
 import { centredLabel, styled, textStyled } from "./paint.ts";
+import { rectStrokeMarkup, rectStrokeParts } from "./rect-strokes.ts";
 import { STROKE_WIDTH, type SvgTheme } from "./theme.ts";
 
 const DASH_PATTERNS: Record<string, string> = {
@@ -60,7 +61,24 @@ export function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
           ...shape,
         });
       break;
-    default:
+    default: {
+      const parts = rectStrokeParts(
+        { x: 0, y: 0, width: box.width, height: box.height },
+        element.visual.style,
+      );
+      if (parts && (readString(element.semantic, "geo") || "rect") === "rect") {
+        const clipId = `nd-strokes-${Array.from(element.id, (c) => c.codePointAt(0)?.toString(16)).join("-")}`;
+        body = rectStrokeMarkup(
+          parts,
+          {
+            fill: String(shape.fill),
+            stroke: String(shape.stroke),
+            opacity: element.visual.style?.opacity,
+          },
+          clipId,
+        );
+        break;
+      }
       body = element.visual.style?.cornerRadii
         ? tag("path", {
             d: roundedRectPath(
@@ -83,6 +101,7 @@ export function renderGeo(element: Element, box: Box, theme: SvgTheme): string {
             ...shape,
           });
       break;
+    }
   }
   return (
     wrap("g", { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` }, body) +

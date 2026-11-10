@@ -210,6 +210,15 @@ export interface FontFeatureSetting {
 
 export type TextResizeMode = "fixed" | "auto-width" | "auto-height";
 
+export const STROKE_ALIGNS = ["inside", "center", "outside"] as const;
+export type StrokeAlign = (typeof STROKE_ALIGNS)[number];
+export interface StrokeSides {
+  readonly top?: number;
+  readonly right?: number;
+  readonly bottom?: number;
+  readonly left?: number;
+}
+
 export interface VisualStyle {
   /** Ordered compositing effects. When present, supersedes legacy `shadow`. */
   readonly effects?: readonly LayerEffect[];
@@ -223,12 +232,16 @@ export interface VisualStyle {
     readonly opacity: number;
   };
   readonly fill?: string;
+  readonly accentColor?: string;
+  readonly selectedColor?: string;
   /** Gradient body paint; `fill` remains its portable solid fallback. */
   readonly fillGradient?: FillGradient;
   readonly stroke?: string;
   /** Gradient outline paint; `stroke` remains its portable solid fallback. */
   readonly strokeGradient?: FillGradient;
   readonly strokeWidth?: number;
+  readonly strokeAlign?: StrokeAlign;
+  readonly strokeSides?: StrokeSides;
   /** Shape used at open stroke endpoints. SVG-compatible portable values. */
   readonly strokeCap?: "butt" | "round" | "square";
   /** Shape used where consecutive stroke segments meet. */
@@ -360,6 +373,8 @@ export interface Visual {
   readonly textResize?: TextResizeMode;
   /** Uniform text-note inset; omitted retains the legacy 8x6 inset. */
   readonly textPadding?: number;
+  readonly textMeasure?: "proportional";
+  readonly textTruncate?: "ellipsis";
   /**
    * Clockwise rotation in **degrees**, about the element's own centre.
    *

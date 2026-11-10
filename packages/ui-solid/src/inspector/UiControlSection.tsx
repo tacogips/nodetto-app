@@ -1,11 +1,11 @@
-import type { Editor } from "@nodetto/core";
+import { searchIcons, type Editor } from "@nodetto/core";
 import {
   UI_CONTROL_KINDS,
   type Element,
   type UiControlKind,
   type UiControlSemantic,
 } from "@nodetto/ir";
-import { Show, type JSX } from "solid-js";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { Switch } from "../Switch.tsx";
 import {
   Field,
@@ -15,7 +15,36 @@ import {
   TextArea,
   TextInput,
 } from "./controls.tsx";
-import { writeSemantic } from "./write.ts";
+import { writeSemantic, writeVisual } from "./write.ts";
+
+function IconInput(props: {
+  id: string;
+  label: string;
+  value: string;
+  onCommit: (value: string) => void;
+}): JSX.Element {
+  const [query, setQuery] = createSignal(props.value);
+  return (
+    <>
+      <input
+        class="nodetto-input"
+        aria-label={props.label}
+        list={props.id}
+        value={props.value}
+        onInput={(event) => setQuery(event.currentTarget.value)}
+        onChange={(event) => {
+          props.onCommit(event.currentTarget.value);
+          event.currentTarget.value = props.value;
+        }}
+      />
+      <datalist id={props.id}>
+        <For each={searchIcons(query())}>
+          {(name) => <option value={name} />}
+        </For>
+      </datalist>
+    </>
+  );
+}
 export function UiControlSection(props: {
   editor: Editor;
   element: Element;
@@ -23,6 +52,13 @@ export function UiControlSection(props: {
   const semantic = () => props.element.semantic as UiControlSemantic;
   const write = (patch: Partial<UiControlSemantic>) =>
     writeSemantic(props.editor, props.element.id, { ...semantic(), ...patch });
+  const writeColor = (key: "accentColor" | "selectedColor", value: string) => {
+    const current = props.editor.store.get(props.element.id);
+    if (current)
+      writeVisual(props.editor, props.element.id, {
+        style: { ...current.visual.style, [key]: value || undefined },
+      });
+  };
   return (
     <Section title="UI control">
       <Field label="Control">
@@ -54,6 +90,90 @@ export function UiControlSection(props: {
             onCommit={(inputType) =>
               write({ inputType: inputType as UiControlSemantic["inputType"] })
             }
+          />
+        </Field>
+      </Show>
+      <Show when={semantic().control === "tabs"}>
+        <Field label="Indicator">
+          <SelectInput
+            label="Tab indicator"
+            value={semantic().indicator ?? "cell"}
+            options={["cell", "underline", "pill"].map((value) => ({
+              value,
+              label: value,
+            }))}
+            onCommit={(indicator) =>
+              write({ indicator: indicator as UiControlSemantic["indicator"] })
+            }
+          />
+        </Field>
+        <Field label="Selected color">
+          <TextInput
+            label="Selected color"
+            value={props.element.visual.style?.selectedColor ?? ""}
+            onCommit={(value) => writeColor("selectedColor", value)}
+          />
+        </Field>
+      </Show>
+      <Field label="Accent color">
+        <TextInput
+          label="Accent color"
+          value={props.element.visual.style?.accentColor ?? ""}
+          onCommit={(value) => writeColor("accentColor", value)}
+        />
+      </Field>
+      <Field label="Leading icon">
+        <IconInput
+          id={`nd-leading-${props.element.id}`}
+          label="Leading icon"
+          value={semantic().leadingIcon ?? ""}
+          onCommit={(value) => write({ leadingIcon: value || undefined })}
+        />
+      </Field>
+      <Field label="Trailing icon">
+        <IconInput
+          id={`nd-trailing-${props.element.id}`}
+          label="Trailing icon"
+          value={semantic().trailingIcon ?? ""}
+          onCommit={(value) => write({ trailingIcon: value || undefined })}
+        />
+      </Field>
+      <Field label="Icon size">
+        <NumberInput
+          label="Icon size"
+          min={1}
+          value={semantic().iconSize ?? 20}
+          onCommit={(iconSize) => write({ iconSize })}
+        />
+      </Field>
+      <Field label="Badge">
+        <SelectInput
+          label="Badge mode"
+          value={
+            semantic().badge === undefined
+              ? "none"
+              : semantic().badge === ""
+                ? "dot"
+                : "text"
+          }
+          options={[
+            { value: "none", label: "None" },
+            { value: "dot", label: "Dot" },
+            { value: "text", label: "Text" },
+          ]}
+          onCommit={(mode) =>
+            write({
+              badge: mode === "none" ? undefined : mode === "dot" ? "" : "1",
+            })
+          }
+        />
+      </Field>
+      <Show when={semantic().badge !== undefined && semantic().badge !== ""}>
+        <Field label="Badge text">
+          <TextInput
+            label="Badge text"
+            value={semantic().badge ?? ""}
+            onCommit={(badge) => write({ badge })}
           />
         </Field>
       </Show>

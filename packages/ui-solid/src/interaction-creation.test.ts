@@ -174,6 +174,7 @@ describe("creationFor", () => {
       "comment",
       "edge",
       Tool.ScreenTransition,
+      Tool.PrototypeBack,
       "draw.freehand",
       "edit.points",
       "edit.paint",

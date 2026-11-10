@@ -149,3 +149,5 @@ export * from "./presentation/index.ts";
 export { CopyShapesDialog } from "./CopyShapesDialog.tsx";
 export { PresentationSection } from "./inspector/PresentationSection.tsx";
 export { effectiveShowSlideArea } from "./canvas/slide-area.ts";
+export { AppDesignProblemsPanel } from "./AppDesignProblemsPanel.tsx";
+export { CompareDialog } from "./CompareDialog.tsx";

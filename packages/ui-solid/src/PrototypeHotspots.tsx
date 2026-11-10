@@ -29,6 +29,7 @@ export function PrototypeHotspots(hotspotProps: {
   readonly view: PrototypeView;
   readonly fixed: boolean;
   readonly handlers: PrototypeLinkHandlers;
+  readonly showHints?: boolean;
 }): JSX.Element {
   const { activate, beginPress, changeVariant, consumeSuppressedClick } =
     hotspotProps.handlers;
@@ -63,6 +64,9 @@ export function PrototypeHotspots(hotspotProps: {
             <button
               type="button"
               class="nodetto-prototype-hotspot"
+              classList={{
+                "nodetto-prototype-hotspot-hint": hotspotProps.showHints,
+              }}
               aria-label={link.label}
               role={link.role}
               disabled={link.disabled}

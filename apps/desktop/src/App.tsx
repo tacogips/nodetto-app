@@ -23,6 +23,7 @@ import {
   createReviewComment,
   slideList,
   startIndex,
+  orderedTopLevelFrames,
   type DesignTemplateId,
   type EditableField,
   type Editor,
@@ -40,6 +41,8 @@ import {
   type ActionContext,
   ContextMenu,
   BpmnProblemsPanel,
+  AppDesignProblemsPanel,
+  CompareDialog,
   BreadboardProblemsPanel,
   createEditorSignals,
   NodettoCanvas,
@@ -236,6 +239,21 @@ export function App(props: AppProps): JSX.Element {
   );
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [snap, setSnap] = createSignal<SnapSettings>(preferences.snap);
+  const effectiveSnap = (): SnapSettings => ({
+    ...snap(),
+    gridSize:
+      snap().gridSize ??
+      (workspace() === "app" || workspace() === "web" ? 8 : 24),
+  });
+  const changeEffectiveSnap = (next: SnapSettings) => {
+    if (
+      snap().gridSize === undefined &&
+      next.gridSize === effectiveSnap().gridSize
+    ) {
+      const { gridSize: _gridSize, ...implicit } = next;
+      setSnap(implicit);
+    } else setSnap(next);
+  };
   const [showGrid, setShowGrid] = createSignal(preferences.showGrid);
   const [showSlideArea, setShowSlideArea] = createSignal(
     preferences.showSlideArea,
@@ -262,6 +280,9 @@ export function App(props: AppProps): JSX.Element {
     client: Vec;
   }>();
   const [commentRequest, setCommentRequest] = createSignal(0);
+  const [compareArtboards, setCompareArtboards] = createSignal<
+    readonly ElementId[] | null
+  >(null);
   const [exportRequest, setExportRequest] = createSignal(0);
   const [exportError, setExportError] = createSignal<string | null>(null);
   const [canvasHost, setCanvasHost] = createSignal<HTMLDivElement>();
@@ -646,6 +667,20 @@ export function App(props: AppProps): JSX.Element {
           onClose={() => setTemplatesOpen(false)}
         />
       </Show>
+      <Show when={compareArtboards()}>
+        {(ids) => (
+          <CompareDialog
+            editor={props.editor}
+            artboardIds={ids()}
+            save={
+              props.exportBackend.available
+                ? exportHandlers.saveArtwork
+                : undefined
+            }
+            onClose={() => setCompareArtboards(null)}
+          />
+        )}
+      </Show>
       <Show when={exportRequest() > 0}>
         <ExportDialog
           editor={props.editor}
@@ -659,6 +694,15 @@ export function App(props: AppProps): JSX.Element {
               ? exportHandlers.saveArtwork
               : undefined
           }
+          onCompare={() => {
+            const ids = orderedTopLevelFrames(
+              props.editor.store,
+              props.editor.currentPageId,
+              props.editor.createShapeContext(),
+            );
+            setExportRequest(0);
+            setCompareArtboards(ids);
+          }}
           exportBpmn={exportHandlers.exportBpmn}
           exportBreadboard={exportHandlers.exportBreadboard}
           exportGerber={exportHandlers.exportGerber}
@@ -696,7 +740,12 @@ export function App(props: AppProps): JSX.Element {
       <DocumentBanners
         file={file()}
         isCloud={isCloud()}
-        problemsPanelOpen={isBpmnPage() || isBreadboardPage()}
+        problemsPanelOpen={
+          isBpmnPage() ||
+          isBreadboardPage() ||
+          workspace() === "app" ||
+          workspace() === "web"
+        }
         error={
           cloud()?.error ??
           file().error ??
@@ -892,7 +941,7 @@ export function App(props: AppProps): JSX.Element {
               onToolChange={setActiveTool}
               onMarquee={presence.onMarquee}
               onCommentPlace={placeComment}
-              snap={snap()}
+              snap={effectiveSnap()}
               showGrid={showGrid()}
               showSlideArea={showSlideArea()}
               showRulers={showRulers()}
@@ -955,6 +1004,7 @@ export function App(props: AppProps): JSX.Element {
                   context={actionContext()}
                   at={menu().at}
                   host={canvasHost()}
+                  onCompare={(id) => setCompareArtboards([id])}
                   onClose={() => setContextMenu(null)}
                 />
               )}
@@ -968,10 +1018,10 @@ export function App(props: AppProps): JSX.Element {
             />
             <ZoomControls
               context={actionContext()}
-              snap={snap()}
+              snap={effectiveSnap()}
               showGrid={showGrid()}
               showRulers={showRulers()}
-              onSnapChange={setSnap}
+              onSnapChange={changeEffectiveSnap}
               onShowGridChange={setShowGrid}
               showSlideArea={effectiveSlideArea()}
               onShowSlideAreaChange={() =>
@@ -996,6 +1046,9 @@ export function App(props: AppProps): JSX.Element {
               viewport={viewport}
             />
           </div>
+          <Show when={workspace() === "app" || workspace() === "web"}>
+            <AppDesignProblemsPanel editor={props.editor} viewport={viewport} />
+          </Show>
           <Show when={isBpmnPage()}>
             <BpmnProblemsPanel
               editor={props.editor}

@@ -89,6 +89,30 @@ export interface DerivedPlanInput {
   readonly resolveAsset: (source: string) => string | undefined;
 }
 
+// Constraints only act when an existing parent frame changes size. Avoid
+// building its complete ownership tree when no parent can trigger them.
+function planResizedFrameConstraints(
+  before: Store,
+  after: Store,
+  registry: ShapeUtilRegistry,
+  keep?: ReadonlySet<ElementId>,
+): Command[] {
+  const oldContext = createShapeContext(before, registry, 1);
+  const newContext = createShapeContext(after, registry, 1);
+  for (const element of before.listElements()) {
+    if (element.type !== "frame" || !after.has(element.id)) continue;
+    const oldBox = oldContext.boundsOf(element.id);
+    const newBox = newContext.boundsOf(element.id);
+    if (
+      oldBox &&
+      newBox &&
+      (oldBox.width !== newBox.width || oldBox.height !== newBox.height)
+    )
+      return planConstraints(before, after, registry, undefined, keep);
+  }
+  return [];
+}
+
 /** The derived commands that follow `permitted` in the same transaction. */
 export function planDerivedCommands(input: DerivedPlanInput): Command[] {
   const { store, registry, context, permitted, placed, keepMembers } = input;
@@ -135,7 +159,7 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
       ...planTextResize(draft, registry),
       ...planAspectRatios(draft, registry),
       ...planFrameTranslations(store, draft, registry, held),
-      ...planConstraints(store, draft, registry, undefined, keepMembers),
+      ...planResizedFrameConstraints(store, draft, registry, keepMembers),
     ];
     if (
       store.listPages().some((page) => page.kind === "bpmn") ||
@@ -180,7 +204,12 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
       derived.push(...planAutoLayout(draft, registry));
     derived.push(...planFrameTranslations(beforeLayout, draft, registry, held));
     derived.push(
-      ...planConstraints(beforeLayout, draft, registry, undefined, keepMembers),
+      ...planResizedFrameConstraints(
+        beforeLayout,
+        draft,
+        registry,
+        keepMembers,
+      ),
     );
     derived.push(...planUmlPorts(store, draft));
     derived.push(

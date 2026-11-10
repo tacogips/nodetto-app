@@ -271,6 +271,8 @@ export function prototypeScreen(editor: Editor, frameId: ElementId) {
       (action === "navigate" ||
         action === "open-overlay" ||
         action === "close-overlay" ||
+        action === "back" ||
+        action === "swap-overlay" ||
         Boolean(
           changeSource &&
             componentVariants(editor, changeSource).some(

@@ -6,6 +6,10 @@ import {
   type Element,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { reparentFromUpdate } from "../parent-fields.ts";
+import { applySizingFields } from "../sizing-fields.ts";
+import { applyKitProps } from "../kit-shapes.ts";
+import { normalizeTypography } from "../typography-link.ts";
 import { nullPaths, visualPatchCommand } from "../visual-patch.ts";
 import { heldMembers } from "../carry-members.ts";
 import { selectedWhere } from "../selectors.ts";
@@ -80,9 +84,17 @@ export function updateElement(
   if (
     operation["semantic"] === undefined &&
     operation["visual"] === undefined &&
-    operation["label"] === undefined
+    operation["label"] === undefined &&
+    operation["parent"] === undefined &&
+    operation["memberIndex"] === undefined &&
+    operation["props"] === undefined &&
+    operation["sizing"] === undefined &&
+    operation["absolute"] === undefined
   )
-    throw new OperationError(index, "update needs semantic, visual or label");
+    throw new OperationError(
+      index,
+      "update needs semantic, visual, label, parent, memberIndex, props, sizing or absolute",
+    );
   for (const element of selectedWhere(batch, operation, index, "update"))
     updateOne(batch, element, operation, index);
 }
@@ -132,7 +144,24 @@ function updateOne(
       semantic: merged,
     });
   }
-  const visual = operation["visual"];
+  const normalized = normalizeTypography(
+    element.type,
+    operation["visual"],
+    element.visual,
+    index,
+  );
+  const placement = reparentFromUpdate(batch, element, operation, index);
+  let visual = normalized.visual;
+  if (placement && isPlainObject(visual))
+    visual = {
+      ...visual,
+      ...(typeof visual["x"] === "number"
+        ? { x: visual["x"] + placement.origin.x }
+        : {}),
+      ...(typeof visual["y"] === "number"
+        ? { y: visual["y"] + placement.origin.y }
+        : {}),
+    };
   if (visual !== undefined) {
     if (!isPlainObject(visual))
       throw new OperationError(index, `"visual" must be an object`);
@@ -141,13 +170,24 @@ function updateOne(
   const carry = operation["carryMembers"];
   if (carry !== undefined && typeof carry !== "boolean")
     throw new OperationError(index, `"carryMembers" must be true or false`);
-  if (!commands.length && operation["label"] === undefined)
-    throw new OperationError(index, "update needs semantic, visual or label");
   const keepMembers =
     carry === false
       ? heldMembers(batch.editor, element, visual, index)
       : undefined;
   batch.editor.apply(commands, keepMembers ? { keepMembers } : undefined);
+  applySizingFields(batch, element.id, operation, index);
+  if (operation["props"] !== undefined)
+    applyKitProps(batch, element.id, operation["props"], index);
+  if (normalized.detachedStyle)
+    batch.convertWarnings.push({
+      operation: index,
+      op: "update",
+      element: element.id,
+      type: element.type,
+      path: "visual.textStyle",
+      code: "typography.detachedStyle",
+      message: `detached text style ${normalized.detachedStyle} from ${element.id}`,
+    });
   if (operation["label"] !== undefined)
     applyLabel(batch, element.id, operation["label"], index);
   batch.touchedPages.add(element.page);

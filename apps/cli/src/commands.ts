@@ -3,11 +3,14 @@ import {
   DATABASE_DIALECTS,
   type DatabaseDialect,
   Editor,
+  findIcon,
   bpmnRouteResolver,
   generateDatabaseDdl,
   lintBpmnPage,
   lintBreadboardPage,
   lintTextLayoutPage,
+  lintAppDesignPage,
+  isAppLintPage,
   TEXT_LAYOUT_LINT_PAGE_KINDS,
   parseLintConfig,
   recommendedLintConfig,
@@ -106,6 +109,7 @@ export interface CommandIo {
   /** Binary output (PNG, PDF); required only by commands that write bytes. */
   writeBytes?(path: string, bytes: Uint8Array): void;
   exists?(path: string): boolean;
+  listDir?(path: string): readonly string[];
 }
 
 interface ParsedArgs {
@@ -251,6 +255,10 @@ interface LintFindingRow {
   readonly message: string;
   readonly ruleId: string;
   readonly pin?: number;
+  readonly context?: {
+    readonly screenId?: string;
+    readonly instanceId?: string;
+  };
 }
 
 function warningLines(
@@ -319,14 +327,27 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     stderr = loaded.warnings;
   }
 
+  let appEditor = new Editor({ document });
   const pages = document.pages.filter(
     (page) =>
       page.kind === "bpmn" ||
       page.kind === "breadboard" ||
       TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind) ||
-      diagramLintApplies(document, page),
+      diagramLintApplies(document, page) ||
+      isAppLintPage(appEditor.store, page),
   );
-  const notationIds = new Set(pages.map((page) => page.id));
+  const notationIds = new Set(
+    pages
+      .filter(
+        (page) =>
+          page.kind === "bpmn" ||
+          page.kind === "breadboard" ||
+          TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind) ||
+          diagramLintApplies(document, page),
+      )
+      .map((page) => page.id),
+  );
+  const lintableIds = new Set(pages.map((page) => page.id));
   const glyphRows = glyphRowsByPage(document, (text) =>
     io.fontCoverage?.(text, parsed.options.get("--font-dir")),
   );
@@ -351,7 +372,7 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     selectedPages = [selected];
   } else {
     selectedPages = document.pages.filter(
-      (page) => notationIds.has(page.id) || glyphRows.get(page.id)?.length,
+      (page) => lintableIds.has(page.id) || glyphRows.get(page.id)?.length,
     );
   }
   if (!selectedPages.length) return fail(LINT_NO_PAGES_MESSAGE);
@@ -394,6 +415,7 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     const reloaded = loadDocument(io, path);
     if (typeof reloaded === "string") return fail(reloaded);
     document = reloaded.document;
+    appEditor = new Editor({ document });
   }
   const metrics = parsed.flags.has("--metrics")
     ? lintMetrics(
@@ -450,6 +472,13 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       findings: [
         ...report.findings,
         ...diagram.rows.filter((row) => row.pageId === report.page.id),
+        ...(isAppLintPage(appEditor.store, report.page)
+          ? lintAppDesignPage(
+              appEditor.store,
+              report.page,
+              appEditor.createShapeContext(),
+            )
+          : []),
       ],
     }));
   const allFindings = combinedReports.flatMap((report) => report.findings);
@@ -471,6 +500,9 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
           severity: finding.severity,
           message: finding.message,
           ruleId: finding.ruleId,
+          ...(finding.context === undefined
+            ? {}
+            : { context: finding.context }),
           ...(page.kind === "breadboard" && finding.pin !== undefined
             ? { pin: finding.pin }
             : {}),
@@ -989,15 +1021,24 @@ function validateCommand(
   const loaded = loadDocument(io, path);
   if (typeof loaded === "string") return fail(loaded);
   const { document } = loaded;
+  const iconWarnings = document.elements.flatMap((element) => {
+    const icon = (element.semantic as { icon?: unknown }).icon;
+    return element.type === "ui.icon" &&
+      typeof icon === "string" &&
+      !findIcon(icon)
+      ? [`warning: ${element.id} icon.unknown Unknown icon "${icon}"`]
+      : [];
+  });
+  const warningText = `${loaded.warnings}${iconWarnings.length ? `${iconWarnings.join("\n")}\n` : ""}`;
   if (parsed.flags.has("--strict") && loaded.warningCount > 0)
     return {
       exitCode: EXIT_WARNINGS,
       stdout: `${path}: ${document.pages.length} page(s), ${document.elements.length} element(s).\n`,
-      stderr: `${loaded.warnings}${loaded.warningCount} validation warning(s) with --strict.\n`,
+      stderr: `${warningText}${loaded.warningCount} validation warning(s) with --strict.\n`,
     };
   return ok(
     `${path}: ${document.pages.length} page(s), ${document.elements.length} element(s).\n`,
-    loaded.warnings,
+    warningText,
   );
 }
 
@@ -1070,6 +1111,7 @@ function dispatchCli(
     case "inspect":
       return inspectCommand(io, rest);
     case "open":
+    case "compare":
     case "export":
       return fail(`${command} is asynchronous; call runCliAsync from cli.ts.`);
     case "--version":

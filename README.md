@@ -42,6 +42,10 @@ associations.
   boards](docs/pcb/kicad-pcb.md).
 - **Design artboards**: web and iPhone screens, transitions, and code export.
   See [Design artboards](docs/design.md).
+- **Precise app layers**: text, searchable icons, thin borders and styleable controls.
+- **iOS kit and layouts**: editable components, device presets, frame parenting and grid snapping.
+- **Prototype flows**: named starts, storyboard links and interactive desktop or HTML presentations.
+- **App design checks**: find layout and touch-target issues, export artboards and compare reference images.
 - **Appearance**: choose a System, Light or Dark app theme, a Light, Dark or
   Match theme diagram canvas, and a Dark-by-default PCB canvas. See
   [Appearance](docs/editing.md#appearance).

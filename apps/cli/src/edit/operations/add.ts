@@ -5,6 +5,11 @@ import {
   isPlainObject,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { resolveParentPlacement, attachToParent } from "../parent-fields.ts";
+import { applySizingFields } from "../sizing-fields.ts";
+import { isKitShapeId, addKitShape } from "../kit-shapes.ts";
+import { isIconShapeId, iconShapeCreation } from "../icon-shapes.ts";
+import { normalizeTypography } from "../typography-link.ts";
 import { splitVisualRouting } from "../connect-routing.ts";
 import { applyLabel } from "../label-field.ts";
 import { withBoxLabelAlign } from "../visual-patch.ts";
@@ -35,6 +40,12 @@ export function addElement(
       `Unknown element type "${type}". Run "nodetto-cli types".`,
     );
   const page = batch.page(operation["page"], index);
+  if (operation["props"] !== undefined)
+    throw new OperationError(
+      index,
+      '"props" is only accepted on iOS kit shapes',
+    );
+  const placement = resolveParentPlacement(batch, operation, index, page.id);
   const definition = getElementTypeDefinition(type);
   const visual = operation["visual"];
   if (visual !== undefined && !isPlainObject(visual))
@@ -45,10 +56,29 @@ export function addElement(
     isPlainObject(visual)
       ? splitVisualRouting(visual, index)
       : undefined;
-  const visualInput = split?.visual ?? visual;
+  const normalized = normalizeTypography(
+    type,
+    split?.visual ?? visual,
+    undefined,
+    index,
+  );
+  let visualInput = normalized.visual;
+  if (visualInput !== undefined && !isPlainObject(visualInput))
+    throw new OperationError(index, `"visual" must be an object`);
+  if (placement && isPlainObject(visualInput)) {
+    visualInput = {
+      ...visualInput,
+      ...(typeof visualInput["x"] === "number"
+        ? { x: visualInput["x"] + placement.origin.x }
+        : {}),
+      ...(typeof visualInput["y"] === "number"
+        ? { y: visualInput["y"] + placement.origin.y }
+        : {}),
+    };
+  }
   let addVisual = isPlainObject(visualInput)
     ? withBoxLabelAlign(type, visualInput, undefined)
-    : visualInput;
+    : undefined;
   if (
     (type === "node.generic" || type === "shape.geo") &&
     isPlainObject(addVisual) &&
@@ -70,7 +100,10 @@ export function addElement(
     throw new OperationError(index, `"place" must be an object`);
   const positioned = isPlainObject(visual) && ("x" in visual || "y" in visual);
   const autoPlace =
-    definition?.category !== "edge" && !positioned && place === undefined;
+    definition?.category !== "edge" &&
+    !positioned &&
+    place === undefined &&
+    !placement;
   batch.editor.setCurrentPage(page.id);
   const content = autoPlace ? batch.editor.pageBounds(page.id) : null;
   // Given fields are merged over the type's defaults, so an agent states
@@ -115,6 +148,18 @@ export function addElement(
         : content.y;
     batch.moveBoxTo(id, content.x + content.width + PLACE_GAP, y);
   }
+  attachToParent(batch, id, placement, positioned, index);
+  applySizingFields(batch, id, operation, index);
+  if (normalized.detachedStyle)
+    batch.convertWarnings.push({
+      operation: index,
+      op: "add",
+      element: id,
+      type,
+      path: "visual.textStyle",
+      code: "typography.detachedStyle",
+      message: `detached text style ${normalized.detachedStyle} from ${id}`,
+    });
   if (autoPlace) batch.lastPlaced.set(page.id, id);
   batch.record(operation, index, id, type, page.id);
   return id;
@@ -127,6 +172,26 @@ export function addElement(
  * in the shape's text field.
  */
 function addShape(batch: Batch, operation: JsonObject, index: number): string {
+  const shapeId = requireText(operation["shape"], "shape", index);
+  if (isKitShapeId(shapeId) || isIconShapeId(shapeId)) {
+    if (operation["type"] !== undefined)
+      throw new OperationError(index, `use either "shape" or "type", not both`);
+    if (isKitShapeId(shapeId)) return addKitShape(batch, operation, index);
+    const creation = iconShapeCreation(shapeId, index);
+    const { shape: _shape, ...rest } = operation;
+    return addElement(
+      batch,
+      {
+        ...rest,
+        type: creation.type,
+        semantic: deepMerge(creation.semantic, operation["semantic"] ?? {}),
+        visual: isPlainObject(operation["visual"])
+          ? { ...creation.visual, ...operation["visual"] }
+          : (operation["visual"] ?? creation.visual),
+      },
+      index,
+    );
+  }
   const shape = batch.shape(operation, index);
   if (shape.connector)
     throw new OperationError(

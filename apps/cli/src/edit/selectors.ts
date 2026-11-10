@@ -72,7 +72,11 @@ export function resolveElementReference(
       `${JSON.stringify(value)} matches ${matches.length} elements:\n${candidateLines(batch, matches).join("\n")}\nUse an id, or "where" with "page".`,
     );
   }
-  const resolved = resolveId(value, batch.orderedIds(scopePage), batch.refs);
+  const resolved = resolveId(
+    value,
+    value.startsWith("@") ? [] : batch.orderedIds(scopePage),
+    batch.refs,
+  );
   if (!resolved.ok) {
     const page = resolvePageQuery(
       batch.editor.store.listPages(),

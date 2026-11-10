@@ -39,6 +39,7 @@ import {
   isPlainObject,
   PAGE_KINDS,
   PAGE_MODES,
+  STROKE_ALIGNS,
 } from "./types.ts";
 
 const VISUAL_NUMBER_FIELDS = [
@@ -277,6 +278,12 @@ function validateVisual(
     optional: true,
     min: 0,
   });
+  checkEnum(out, raw["textMeasure"], `${path}.textMeasure`, ["proportional"], {
+    optional: true,
+  });
+  checkEnum(out, raw["textTruncate"], `${path}.textTruncate`, ["ellipsis"], {
+    optional: true,
+  });
   const colors = raw["colorTokens"];
   const numbers = raw["numberTokens"];
   checkString(out, raw["textStyle"], `${path}.textStyle`, { optional: true });
@@ -420,6 +427,34 @@ function validateVisual(
   }
   if (!checkObject(out, style, `${path}.style`)) {
     return;
+  }
+  for (const field of ["accentColor", "selectedColor"])
+    checkString(out, style[field], `${path}.style.${field}`, {
+      optional: true,
+    });
+  checkEnum(
+    out,
+    style["strokeAlign"],
+    `${path}.style.strokeAlign`,
+    STROKE_ALIGNS,
+    { optional: true },
+  );
+  const sides = style["strokeSides"];
+  if (
+    sides !== undefined &&
+    checkObject(out, sides, `${path}.style.strokeSides`)
+  ) {
+    for (const [key, value] of Object.entries(sides)) {
+      const at = `${path}.style.strokeSides.${key}`;
+      if (!["top", "right", "bottom", "left"].includes(key))
+        out.push(error("value.key", at, "unknown stroke side"));
+      else if (
+        checkNumber(out, value, at, { min: 0 }) &&
+        typeof value === "number" &&
+        value > 1000
+      )
+        out.push(error("value.range", at, "must be at most 1000"));
+    }
   }
   for (const field of STYLE_NUMBER_FIELDS) {
     checkNumber(out, style[field], `${path}.style.${field}`, {
@@ -909,6 +944,7 @@ export function validateDocument(
     return out;
   }
 
+  const flowNames = new Set<string>();
   const elementIds = new Set<string>();
   const elementById = new Map<string, unknown>();
   for (const [i, element] of elements.entries()) {
@@ -920,6 +956,24 @@ export function validateDocument(
       options.elementPages.has(page)
     ) {
       validateElement(out, element, path, pageIds);
+    }
+    const semantic = readField(element, "semantic");
+    const flowName = readField(semantic, "prototypeFlowName");
+    if (
+      readField(element, "type") === "frame" &&
+      readField(semantic, "prototypeStart") === true &&
+      typeof flowName === "string" &&
+      flowName.length > 0
+    ) {
+      if (flowNames.has(flowName))
+        out.push(
+          warning(
+            "prototype.flowName.duplicate",
+            `${path}.semantic.prototypeFlowName`,
+            "duplicate flow name",
+          ),
+        );
+      flowNames.add(flowName);
     }
     const id = readField(element, "id");
     if (typeof id === "string") {

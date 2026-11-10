@@ -6,7 +6,14 @@
 // object, and no styling. It is the same idea as the accessibility-tree
 // outline agents read instead of a web page's HTML.
 
-import { type Box, Editor, findText, textMatcher } from "@nodetto/core";
+import {
+  type Box,
+  Editor,
+  findText,
+  frameParents,
+  prototypeFlows,
+  textMatcher,
+} from "@nodetto/core";
 import {
   isDatabaseObjectType,
   shortPageId,
@@ -35,8 +42,9 @@ const INSPECT_OPTIONS = new Set([
   "--type",
   "--ids",
   "--text",
+  "--flow",
 ]);
-const INSPECT_FLAGS = new Set(["--regex", "--ignore-case"]);
+const INSPECT_FLAGS = new Set(["--regex", "--ignore-case", "--flows"]);
 const LABEL_FIELDS = ["name", "tableName", "label", "text"] as const;
 const MAX_TEXT = 60;
 
@@ -101,6 +109,7 @@ interface OutlineContext {
   readonly short: (id: string) => string;
   readonly byId: ReadonlyMap<string, Element>;
   readonly bounds: (id: string) => Box | null;
+  readonly relative?: (id: string) => { x: number; y: number } | undefined;
 }
 
 function endpoint(value: unknown, context: OutlineContext): string {
@@ -162,7 +171,8 @@ function headerLine(element: Element, context: OutlineContext): string {
     if (typeof value === "string" && value.length > 0)
       parts.push(`${field}=${value}`);
   }
-  return `${parts.join(" ")}${geometry(element, context.bounds(element.id))}`;
+  const rel = context.relative?.(element.id);
+  return `${parts.join(" ")}${geometry(element, context.bounds(element.id))}${rel ? ` rel ${round(rel.x)},${round(rel.y)}` : ""}`;
 }
 
 function detailLines(element: Element): string[] {
@@ -273,7 +283,16 @@ function pageOutline(
     list.push(element);
     children.set(parent, list);
   }
-  const outlineContext: OutlineContext = { short, byId, bounds };
+  const frameOwners = frameParents(editor.store, page.id, context);
+  const relative = (id: string) => {
+    const owner = frameOwners.get(id);
+    const box = bounds(id);
+    const frame = owner ? bounds(owner) : null;
+    return box && frame
+      ? { x: box.x - frame.x, y: box.y - frame.y }
+      : undefined;
+  };
+  const outlineContext: OutlineContext = { short, byId, bounds, relative };
   const matches = filter;
   const hasMatch = (element: Element): boolean =>
     matches(element) ||
@@ -386,6 +405,53 @@ export function inspectCommand(
   const loaded = loadDocument(io, parsed.positional[0] as string);
   if (typeof loaded === "string") return fail(loaded);
   const document: Document = loaded.document;
+  if (parsed.flags.has("--flows") || parsed.options.has("--flow")) {
+    const editor = new Editor({ document });
+    const result = prototypeFlows(editor.store, editor.createShapeContext(1));
+    const name = parsed.options.get("--flow");
+    if (name !== undefined && !result.flows.some((flow) => flow.name === name))
+      return fail(
+        `Unknown flow ${JSON.stringify(name)}. Available: ${result.flows.map((flow) => flow.name).join(", ")}`,
+        1,
+      );
+    const flows =
+      name === undefined
+        ? result.flows
+        : result.flows.filter((flow) => flow.name === name);
+    if (format === "json")
+      return ok(
+        `${JSON.stringify({ ...result, flows }, null, 2)}\n`,
+        loaded.warnings,
+      );
+    const ids = shortIds(document.elements.map((element) => element.id));
+    const short = (id: string) =>
+      idMode === "full" ? id : (ids.get(id) ?? id);
+    const byId = new Map(
+      document.elements.map((element) => [element.id, element]),
+    );
+    const nameOf = (id: string) => {
+      const element = byId.get(id);
+      return element ? (labelOf(element) ?? "") : "";
+    };
+    const lines: string[] = [];
+    for (const flow of flows) {
+      lines.push(
+        `flow ${quote(flow.name)} start ${short(flow.startId)} ${quote(nameOf(flow.startId))}`,
+      );
+      for (const screen of flow.screens) {
+        lines.push(`  ${short(screen)} ${quote(nameOf(screen))}`);
+        for (const link of flow.links.filter((item) => item.screen === screen))
+          lines.push(
+            `    -> ${short(link.to)} ${quote(nameOf(link.to))} (${link.trigger} ${link.action} from ${short(link.from)})`,
+          );
+      }
+    }
+    if (result.unreachable.length)
+      lines.push(`unreachable: ${result.unreachable.map(short).join(" ")}`);
+    if (result.dangling.length)
+      lines.push(`dangling: ${result.dangling.map(short).join(" ")}`);
+    return ok(`${lines.join("\n")}\n`, loaded.warnings);
+  }
   let pages: readonly Page[] = document.pages;
   const query = parsed.options.get("--page");
   if (query !== undefined) {
@@ -409,13 +475,31 @@ export function inspectCommand(
     document.elements.filter((element) => element.page === page.id);
 
   if (format === "json") {
+    const editor = new Editor({ document });
     const report = {
       document: { id: document.id, title: document.title },
-      pages: pages.map((page) => ({
-        ...page,
-        shortId: shortPageId(page.id),
-        elements: elementsOf(page).filter(filter),
-      })),
+      pages: pages.map((page) => {
+        editor.setCurrentPage(page.id);
+        const context = editor.createShapeContext(1);
+        const owners = frameParents(editor.store, page.id, context);
+        return {
+          ...page,
+          shortId: shortPageId(page.id),
+          elements: elementsOf(page)
+            .filter(filter)
+            .map((element) => {
+              const owner = owners.get(element.id);
+              const box = editor.getBounds(element.id, context);
+              const frame = owner ? editor.getBounds(owner, context) : null;
+              return box && frame
+                ? {
+                    ...element,
+                    rel: { x: box.x - frame.x, y: box.y - frame.y },
+                  }
+                : element;
+            }),
+        };
+      }),
     };
     return ok(`${JSON.stringify(report, null, 2)}\n`, loaded.warnings);
   }

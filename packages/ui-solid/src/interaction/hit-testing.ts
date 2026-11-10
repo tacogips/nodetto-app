@@ -21,6 +21,7 @@ import {
   type ElementId,
 } from "@nodetto/ir";
 import { isPcbElementShown, pcbHiddenLayers } from "../pcb-state.ts";
+import { isPrototypeEdge } from "../shortcuts.ts";
 import { Tool, typedConnectorFor } from "../tools.ts";
 import type { InteractionContext } from "./context.ts";
 import { boxCentre, isSolid } from "./geometry.ts";
@@ -45,7 +46,20 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
   const { editor, options, state } = ctx;
 
   const canvasHitTest = (point: Vec): ElementId | null => {
-    if (!ctx.isPcbPage()) return editor.hitTest(point);
+    if (!ctx.isPcbPage()) {
+      const context = editor.createShapeContext();
+      const hidden = context.isHidden;
+      return editor.hitTest(point, {
+        ...context,
+        isHidden: (id) => {
+          const element = editor.store.get(id);
+          return (
+            Boolean(hidden?.(id)) ||
+            Boolean(element && isPrototypeEdge(element))
+          );
+        },
+      });
+    }
     const context = editor.createShapeContext();
     const elements = editor.store.getPageElements(editor.currentPageId);
     const hidden = pcbHiddenLayers(editor.currentPageId);
@@ -53,6 +67,7 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
       const element = elements[index] as Element | undefined;
       if (
         !element ||
+        isPrototypeEdge(element) ||
         context.isHidden?.(element.id) ||
         context.isLocked?.(element.id)
       )
@@ -75,6 +90,7 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
       if (
         !element ||
         getElementTypeDefinition(element.type)?.category !== "edge" ||
+        isPrototypeEdge(element) ||
         context.isHidden?.(element.id) ||
         context.isLocked?.(element.id) ||
         editor.editableField(element.id) === null
@@ -103,7 +119,7 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
     for (const element of editor.store.getPageElements(editor.currentPageId)) {
       // Members resolve to their outermost group after testing; a group's
       // aggregate bounds would select empty space between rotated members.
-      if (isGroup(element)) continue;
+      if (isGroup(element) || isPrototypeEdge(element)) continue;
       if (context.isHidden?.(element.id) || context.isLocked?.(element.id))
         continue;
       if (overlapsVisibleElement(element, rect, context)) {

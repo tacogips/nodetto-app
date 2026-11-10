@@ -12,6 +12,7 @@
 // keeps actions reachable in short hosts; scrolling the parent closes its submenu.
 
 import type { Vec } from "@nodetto/core";
+import type { ElementId } from "@nodetto/ir";
 import { clampToHost, menuLimits, placeSubmenu } from "./menu-geometry.ts";
 export { clampToHost } from "./menu-geometry.ts";
 import { stepMenuIndex } from "./menu-navigation.ts";
@@ -44,6 +45,7 @@ export interface ContextMenuProps {
   /** The canvas host the menu is clamped to. */
   readonly host: HTMLElement | undefined;
   readonly onClose: () => void;
+  readonly onCompare?: (id: ElementId) => void;
 }
 
 type MenuEntry =
@@ -53,7 +55,8 @@ type MenuEntry =
       readonly label: string;
       readonly items: readonly EditorAction[];
     }
-  | { readonly kind: "separator" };
+  | { readonly kind: "separator" }
+  | { readonly kind: "compare"; readonly id: ElementId };
 
 const EMPTY_CANVAS_ITEMS: readonly ActionId[] = [
   "paste",
@@ -147,7 +150,15 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
       signals.selection().size > 0
         ? selectionEntries(props.simple)
         : actions(EMPTY_CANVAS_ITEMS);
-    return entries.filter(
+    const ids = [...signals.selection()];
+    const id = ids.length === 1 ? ids[0] : undefined;
+    const withCompare: readonly MenuEntry[] =
+      id &&
+      props.onCompare &&
+      props.context.editor.store.get(id)?.type === "frame"
+        ? [...entries, SEPARATOR, { kind: "compare", id }]
+        : entries;
+    return withCompare.filter(
       (entry) =>
         entry.kind !== "action" ||
         entry.action.id !== "straightenConnector" ||
@@ -169,7 +180,10 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
   const navigable = createMemo<readonly number[]>(() => {
     const out: number[] = [];
     entries().forEach((entry, index) => {
-      if (entry.kind === "action" && isEnabled(entry.action)) {
+      if (
+        entry.kind === "compare" ||
+        (entry.kind === "action" && isEnabled(entry.action))
+      ) {
         out.push(index);
       } else if (entry.kind === "submenu" && submenuEnabled(entry.items)) {
         out.push(index);
@@ -290,7 +304,10 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
         }
         const index = active();
         const entry = index === null ? undefined : entries()[index];
-        if (entry?.kind === "action" && index !== null) {
+        if (entry?.kind === "compare") {
+          props.onCompare?.(entry.id);
+          props.onClose();
+        } else if (entry?.kind === "action" && index !== null) {
           run(entry.action);
         } else if (entry?.kind === "submenu" && index !== null) {
           openSubmenuAt(index, true);
@@ -424,6 +441,27 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
         {(entry, index) => {
           if (entry.kind === "separator") {
             return <div class="nodetto-menu-separator" role="separator" />;
+          }
+          if (entry.kind === "compare") {
+            return (
+              <button
+                type="button"
+                tabIndex={-1}
+                role="menuitem"
+                class="nodetto-menu-item"
+                classList={{ "nodetto-menu-active": active() === index() }}
+                onPointerEnter={() => {
+                  setActive(index());
+                  setOpenSubmenu(null);
+                }}
+                onClick={() => {
+                  props.onCompare?.(entry.id);
+                  props.onClose();
+                }}
+              >
+                Compare with reference...
+              </button>
+            );
           }
           if (entry.kind === "action") {
             return (

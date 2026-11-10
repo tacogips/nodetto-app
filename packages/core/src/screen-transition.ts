@@ -93,3 +93,24 @@ export function connectScreenTransition(
     visual: { style: { stroke: "#7c3aed", strokeWidth: 2 } },
   });
 }
+
+/** Create a back link to the source's screen; catalogue target arguments are ignored. */
+export function connectPrototypeBack(
+  editor: Editor,
+  from: ElementId,
+): ElementId | null {
+  const source = editor.store.get(from);
+  const screen = screenFrame(editor, from);
+  if (!source || !screen) return null;
+  return editor.createElement("edge.generic", {
+    page: source.page,
+    semantic: {
+      from,
+      to: screen,
+      prototype: true,
+      prototypeAction: "back",
+      prototypeTransition: "instant",
+    },
+    visual: { style: { stroke: "#7c3aed", strokeWidth: 2 } },
+  });
+}

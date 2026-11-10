@@ -89,6 +89,8 @@ export const SCREEN_KINDS = [
 ] as const;
 export type ScreenKind = (typeof SCREEN_KINDS)[number];
 
+export const FRAME_TITLE_PLACEMENTS = ["inside", "outside"] as const;
+
 export interface FrameSemantic {
   readonly screenKind?: ScreenKind;
   readonly name: string;
@@ -99,15 +101,18 @@ export interface FrameSemantic {
   /** Source artboard for refreshable cross-viewport content/style inheritance. */
   readonly responsiveSource?: ElementId;
   readonly showTitle?: boolean;
+  readonly titlePlacement?: (typeof FRAME_TITLE_PLACEMENTS)[number];
   /** Clip descendants to the frame's exact transformed outline. */
   readonly clipContent?: boolean;
   readonly component?: boolean;
+  readonly kit?: string;
   /** Named family/state for component definitions. */
   readonly variantSet?: string;
   readonly variantName?: string;
   /** Multi-dimensional component state, for example State=Hover, Size=Large. */
   readonly variantProperties?: readonly ComponentVariantProperty[];
   readonly prototypeStart?: boolean;
+  readonly prototypeFlowName?: string;
   /** Preview-only viewport scrolling; omitted is a fixed viewport. */
   readonly prototypeOverflow?: PrototypeOverflow;
   readonly instanceOf?: ElementId;

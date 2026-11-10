@@ -197,3 +197,19 @@ fn oversized_buffers_and_runaway_execution_fail_without_aborting_host() {
         Some(2.0)
     );
 }
+
+#[test]
+fn list_dir_returns_sorted_file_names_only() {
+    let folder = tempfile::tempdir().unwrap();
+    std::fs::write(folder.path().join("z.png"), []).unwrap();
+    std::fs::write(folder.path().join("a.png"), []).unwrap();
+    std::fs::create_dir(folder.path().join("nested")).unwrap();
+    assert_eq!(
+        evaluate(
+            "JSON.parse(native.listDir(native.path('.')))",
+            Input::Mcp(None),
+            Some(folder.path().into())
+        ),
+        json!(["a.png", "z.png"])
+    );
+}

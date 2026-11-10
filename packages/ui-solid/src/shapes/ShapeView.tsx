@@ -1,5 +1,6 @@
 import { StateNodeView } from "./StateNodeView.tsx";
 import { UseCaseNodeView } from "./UseCaseNodeView.tsx";
+import { IconView } from "./IconView.tsx";
 import { UiControlView } from "./UiControlView.tsx";
 import { isDatabaseObjectType } from "@nodetto/ir";
 import { DatabaseObjectView } from "./DatabaseObjectView.tsx";
@@ -217,6 +218,9 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
           </Match>
           <Match when={props.element.type === "draw.path"}>
             <CompoundPathView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "ui.icon"}>
+            <IconView element={props.element} />
           </Match>
           <Match when={props.element.type === "ui.control"}>
             <UiControlView

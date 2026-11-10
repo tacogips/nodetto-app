@@ -50,6 +50,8 @@ export const PROTOTYPE_ACTIONS = [
   "change-to",
   "open-overlay",
   "close-overlay",
+  "back",
+  "swap-overlay",
 ] as const;
 export type PrototypeAction = (typeof PROTOTYPE_ACTIONS)[number];
 

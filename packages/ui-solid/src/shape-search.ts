@@ -10,6 +10,8 @@ import {
   COMMON_SHAPES,
   DIAGRAM_SHAPES,
   INTERACTION_SHAPES,
+  ICON_PALETTE_ITEM,
+  iosKitShapes,
   PCB_SHAPES,
   type ShapePaletteItem,
   UI_CONTROL_SHAPES,
@@ -17,7 +19,7 @@ import {
 import type { ToolKind } from "./tools.ts";
 
 function paletteItems(): readonly ShapePaletteItem[] {
-  const byTool = new Map<ToolKind, ShapePaletteItem>();
+  const byTool = new Map<string, ShapePaletteItem>();
   for (const item of [
     ...COMMON_SHAPES,
     ...DIAGRAM_SHAPES,
@@ -27,8 +29,12 @@ function paletteItems(): readonly ShapePaletteItem[] {
     ...ARTBOARD_SHAPES,
     ...UI_CONTROL_SHAPES,
     ...INTERACTION_SHAPES,
-  ])
-    if (!byTool.has(item.tool)) byTool.set(item.tool, item);
+    ICON_PALETTE_ITEM,
+    ...iosKitShapes(),
+  ]) {
+    const key = item.kitId ?? item.action ?? item.tool;
+    if (!byTool.has(key)) byTool.set(key, item);
+  }
   return [...byTool.values()];
 }
 
@@ -51,7 +57,9 @@ export function searchPaletteShapes(
     .filter(
       (item) =>
         matched.has(item.tool) ||
-        words.every((word) => item.label.toLowerCase().includes(word)),
+        words.every((word) =>
+          `${item.label} ${item.kitId ?? ""}`.toLowerCase().includes(word),
+        ),
     )
     .sort(
       (left, right) =>

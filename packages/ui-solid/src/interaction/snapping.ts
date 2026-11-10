@@ -160,7 +160,7 @@ export function createSnapping(ctx: InteractionContext): Snapping {
               ? { gridLinesY: layoutGrid.yLines }
               : {}),
           }
-        : { threshold, grid: SNAP_GRID }
+        : { threshold, grid: settings.gridSize ?? SNAP_GRID }
       : { threshold };
     const guideLinesX = persistent
       .filter((guide) => guide.axis === "x")

@@ -1,3 +1,4 @@
+import { IOS_KIT } from "@nodetto/core";
 import { Tool, type ToolKind } from "./tools.ts";
 import { workspaceById, type WorkspaceId } from "./workspaces.ts";
 
@@ -85,6 +86,8 @@ export const PALETTE_ICONS = {
 
 export interface ShapePaletteItem {
   readonly tool: ToolKind;
+  readonly action?: "icon-picker" | "ios-kit";
+  readonly kitId?: string;
   readonly label: string;
   readonly icon: keyof typeof PALETTE_ICONS;
 }
@@ -131,6 +134,7 @@ export const COMMON_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.Package, label: "Package", icon: "package" },
   { tool: Tool.Sheet, label: "Sheet", icon: "table" },
   { tool: Tool.Text, label: "Text", icon: "text" },
+  { tool: Tool.TextLayer, label: "Text layer", icon: "text" },
   { tool: Tool.Note, label: "Note", icon: "note" },
   { tool: Tool.Node, label: "Node", icon: "node" },
   { tool: Tool.Connector, label: "Connector", icon: "edge" },
@@ -325,10 +329,32 @@ export const INTERACTION_SHAPES: readonly ShapePaletteItem[] = [
 export const ARTBOARD_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.WebFrame, label: "Web", icon: "frame" },
   { tool: Tool.IPhoneFrame, label: "iPhone", icon: "frame" },
+  { tool: Tool.IPhone393Frame, label: "iPhone 393x852", icon: "frame" },
+  { tool: Tool.IPhone402Frame, label: "iPhone 402x874", icon: "frame" },
+  { tool: Tool.IPhone430Frame, label: "iPhone 430x932", icon: "frame" },
+  { tool: Tool.IPhone440Frame, label: "iPhone 440x956", icon: "frame" },
+  { tool: Tool.IPhone375Frame, label: "iPhone 375x667", icon: "frame" },
   { tool: Tool.AndroidFrame, label: "Android", icon: "frame" },
   { tool: Tool.TabletFrame, label: "Tablet", icon: "frame" },
   { tool: Tool.PaperFrame, label: "Document", icon: "frame" },
 ];
+
+export const ICON_PALETTE_ITEM: ShapePaletteItem = {
+  tool: "icon:picker" as ToolKind,
+  label: "Icon",
+  icon: "star",
+  action: "icon-picker",
+};
+
+export function iosKitShapes(): readonly ShapePaletteItem[] {
+  return IOS_KIT.map(({ id, label }) => ({
+    tool: id as ToolKind,
+    label,
+    icon: "component",
+    action: "ios-kit",
+    kitId: id,
+  }));
+}
 
 /** Ordered authoring priorities; every workspace must make an explicit choice. */
 const PRIMARY_TOOLS = {
@@ -414,10 +440,18 @@ const PRIMARY_TOOLS = {
     Tool.TabletFrame,
     Tool.Rectangle,
     Tool.Text,
+    Tool.TextLayer,
     Tool.Ellipse,
     Tool.Frame,
   ],
-  web: [Tool.WebFrame, Tool.Rectangle, Tool.Text, Tool.Ellipse, Tool.Frame],
+  web: [
+    Tool.WebFrame,
+    Tool.Rectangle,
+    Tool.Text,
+    Tool.TextLayer,
+    Tool.Ellipse,
+    Tool.Frame,
+  ],
   all: [...COMMON_SHAPES, ...DIAGRAM_SHAPES].map((item) => item.tool),
 } as const satisfies Record<WorkspaceId, readonly ToolKind[]>;
 
@@ -476,7 +510,10 @@ export function shapePaletteGroups(
     ...workspaceShapes(id),
     ...additionalShapes(id),
     ...artboardShapes(id),
-    ...(workspaceById(id).design ? UI_CONTROL_SHAPES : []),
+    ...(workspaceById(id).design
+      ? [...UI_CONTROL_SHAPES, ICON_PALETTE_ITEM]
+      : []),
+    ...(id === "app" ? iosKitShapes() : []),
     ...(["web", "app", "all", "flow"].includes(id) ? INTERACTION_SHAPES : []),
     ...(workspaceById(id).design
       ? [{ tool: Tool.Freehand, label: "Freehand", icon: "draw" } as const]
@@ -528,7 +565,12 @@ export function shapePaletteGroups(
   };
   const groups = new Map<string, ShapePaletteItem[]>();
   for (const item of items) {
-    const label = category(item.tool);
+    const label =
+      item.action === "ios-kit"
+        ? "iOS kit"
+        : item.action === "icon-picker"
+          ? "UI controls"
+          : category(item.tool);
     const group = groups.get(label) ?? [];
     group.push(item);
     groups.set(label, group);

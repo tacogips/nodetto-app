@@ -60,10 +60,19 @@ export function textNoteStyle(element: Element): JSX.CSSProperties {
       ? {}
       : { padding: `${element.visual.textPadding}px` };
   const style = element.visual.style;
+  const truncation =
+    element.visual.textTruncate === "ellipsis"
+      ? {
+          "white-space": "nowrap" as const,
+          overflow: "hidden" as const,
+          "text-overflow": "ellipsis" as const,
+        }
+      : {};
   if (!style) {
     return {
       ...padding,
       "white-space": textNoteWhiteSpace(element.visual.textResize),
+      ...truncation,
     };
   }
   return {
@@ -90,6 +99,7 @@ export function textNoteStyle(element: Element): JSX.CSSProperties {
       : fillPaintStyle(element.visual)),
     ...strokeBorderStyle(element.visual),
     "white-space": textNoteWhiteSpace(element.visual.textResize),
+    ...truncation,
   };
 }
 
@@ -107,6 +117,13 @@ export function TextNoteView(props: TextNoteViewProps): JSX.Element {
       <span
         style={{
           "flex-shrink": 0,
+          ...(props.element.visual.textTruncate === "ellipsis"
+            ? {
+                overflow: "hidden",
+                "text-overflow": "ellipsis",
+                "white-space": "nowrap",
+              }
+            : {}),
           "margin-top":
             props.element.visual.style?.verticalAlign &&
             props.element.visual.style.verticalAlign !== "top"

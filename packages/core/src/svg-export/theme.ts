@@ -33,8 +33,12 @@ export interface SvgExportOptions {
   /** Paint behind the diagram. `null` (the default) leaves it transparent. */
   readonly background?: string | null;
   readonly theme?: Partial<SvgTheme>;
+  /** Draw prototype links and flow starts on a page export. */
+  readonly prototypeView?: boolean;
   /** Exact page-space viewport; ignores padding and clips overflow. */
   readonly viewport?: Box;
+  /** Omit these elements and their descendants from an artboard export. */
+  readonly excludeIds?: ReadonlySet<string>;
 }
 
 export const STROKE_WIDTH = 1.5;

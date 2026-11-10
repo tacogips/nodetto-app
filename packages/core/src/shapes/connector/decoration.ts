@@ -6,6 +6,7 @@ import {
   UmlComponentRelationship,
   UmlComponentType,
 } from "@nodetto/ir";
+import { compactPrototypeLabel } from "../../prototype-links.ts";
 import type { MarkerKind } from "./markers.ts";
 
 export interface ConnectorDecoration {
@@ -142,18 +143,12 @@ export function connectorDecoration(element: Element): ConnectorDecoration {
     element.type === "edge.generic" &&
     readField(semantic, "prototype") === true
   ) {
-    const action = readString(semantic, "prototypeAction") ?? "navigate";
-    const trigger = readString(semantic, "prototypeTrigger") ?? "click";
-    const animation = readString(semantic, "prototypeTransition") ?? "instant";
     return {
       start: "dot",
       end: "arrow",
-      label: [
-        readString(semantic, "label"),
-        `${trigger} → ${action} · ${animation}`,
-      ]
-        .filter(Boolean)
-        .join(" · "),
+      label: compactPrototypeLabel(
+        semantic as import("@nodetto/ir").GenericEdgeSemantic,
+      ),
     };
   }
   const arrowheads = readField(semantic, "arrowheads");

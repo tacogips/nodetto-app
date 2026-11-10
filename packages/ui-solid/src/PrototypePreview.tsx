@@ -1,5 +1,6 @@
 import {
   Editor,
+  persistentLayerPairs,
   prototypeDelayedLink,
   prototypeFitScale,
   prototypeScreen,
@@ -25,6 +26,11 @@ import {
 } from "./PrototypeHotspots.tsx";
 import { PrototypeLayer } from "./PrototypeLayer.tsx";
 import { PrototypeOverlaySurface } from "./PrototypeOverlaySurface.tsx";
+import {
+  initialScreen,
+  presentationFlows,
+  presentationKeyAction,
+} from "./prototype-presentation.ts";
 import { PrototypeAnimation } from "./prototype-transition.ts";
 import { PrototypeSurfaceFocus } from "./prototype-surface-focus.ts";
 import {
@@ -51,11 +57,14 @@ export function PrototypePreview(props: {
   editor: Editor;
   onClose: () => void;
   toolbar?: JSX.Element;
+  flow?: string;
 }): JSX.Element {
   let dialog: HTMLDialogElement | undefined;
   let stage: HTMLDivElement | undefined;
   let outgoingLayer: HTMLDivElement | undefined;
   let outgoingTimer: number | undefined;
+  let persistentTimer: number | undefined;
+  let hintTimer: number | undefined;
   let navigationVersion = 0;
   let overlayVersion = 0;
   const animation = new PrototypeAnimation();
@@ -79,6 +88,8 @@ export function PrototypePreview(props: {
   onCleanup(() => {
     navigationVersion += 1;
     if (outgoingTimer !== undefined) window.clearTimeout(outgoingTimer);
+    if (persistentTimer !== undefined) window.clearTimeout(persistentTimer);
+    if (hintTimer !== undefined) window.clearTimeout(hintTimer);
     scrolling.dispose();
     animation.cancel();
     surfaceFocus.dispose();
@@ -102,14 +113,27 @@ export function PrototypePreview(props: {
           !runtime.createShapeContext().isHidden?.(item.id),
       );
   };
-  const start = frames().find(
-    (item) => (item.semantic as FrameSemantic).prototypeStart,
+  const flows = () =>
+    presentationFlows(runtime.store, runtime.createShapeContext());
+  const selectedFrame = frames().find((item) =>
+    props.editor.selection.has(item.id),
+  )?.id;
+  const initial = initialScreen(
+    flows(),
+    props.flow,
+    selectedFrame,
+    frames().map((item) => item.id),
   );
-  const selected =
-    start ??
-    frames().find((item) => props.editor.selection.has(item.id)) ??
-    frames()[0];
-  const [current, setCurrent] = createSignal(selected?.id ?? "");
+  const [current, setCurrent] = createSignal(initial ?? "");
+  const [selectedFlow, setSelectedFlow] = createSignal(
+    flows().find((flow) => flow.startId === initial)?.name ?? "",
+  );
+  const [device, setDevice] = createSignal(false);
+  const [showHotspots, setShowHotspots] = createSignal(false);
+  const [hint, setHint] = createSignal(false);
+  const [persistent, setPersistent] = createSignal<ReadonlySet<string>>(
+    new Set(),
+  );
   const [outgoing, setOutgoing] = createSignal<{
     readonly view: PrototypeView;
     readonly ids: ReadonlySet<string>;
@@ -200,6 +224,8 @@ export function PrototypePreview(props: {
     }
     outgoingLayer = undefined;
     setOutgoing(undefined);
+    if (persistentTimer !== undefined) window.clearTimeout(persistentTimer);
+    setPersistent(new Set<string>());
     setOverlays([]);
     scrolling.reset();
     delayedFired.clear();
@@ -208,13 +234,36 @@ export function PrototypePreview(props: {
     ).matches;
     const hasMotion =
       !reducedMotion && Number.isFinite(duration) && duration > 0;
+    let persistentSources = new Set<string>();
+    if (hasMotion && transition !== "instant") {
+      const pairs = persistentLayerPairs(
+        runtime.store,
+        runtime.createShapeContext(),
+        current(),
+        id,
+      );
+      persistentSources = new Set(pairs.map((pair) => pair.from));
+      setPersistent(new Set(pairs.map((pair) => pair.to)));
+      persistentTimer = window.setTimeout(
+        () => {
+          setPersistent(new Set<string>());
+          persistentTimer = undefined;
+        },
+        Math.min(5000, duration),
+      );
+    }
     const smartPlan =
       transition === "smart"
         ? prototypeSmartPlan(runtime, current(), id)
         : { steps: [], outgoing: [] };
     const source = screen();
     if (hasMotion && source && smartPlan.outgoing.length) {
-      setOutgoing({ view: source, ids: new Set(smartPlan.outgoing) });
+      setOutgoing({
+        view: source,
+        ids: new Set(
+          smartPlan.outgoing.filter((id) => !persistentSources.has(id)),
+        ),
+      });
     }
     const version = ++navigationVersion;
     setCurrent(id);
@@ -235,7 +284,7 @@ export function PrototypePreview(props: {
         }
         animation.playSmart(
           targets,
-          smartPlan.steps,
+          smartPlan.steps.filter((step) => !persistent().has(step.target)),
           duration,
           reducedMotion,
           outgoingLayer,
@@ -262,6 +311,27 @@ export function PrototypePreview(props: {
     if (id === current()) return;
     setHistory([...history(), current()]);
     showScreen(id, transition, duration);
+  };
+  const goBack = (): void => {
+    if (overlays().length) {
+      setOverlays(popPrototypeOverlay(overlays()));
+      return;
+    }
+    const previous = history().at(-1);
+    if (previous) {
+      setHistory(history().slice(0, -1));
+      showScreen(previous);
+    }
+  };
+  const restart = (): void => {
+    const id = initialScreen(
+      flows(),
+      selectedFlow(),
+      selectedFrame,
+      frames().map((item) => item.id),
+    );
+    setHistory([]);
+    if (id) showScreen(id);
   };
   type PreviewLink = PrototypeView["links"][number];
   const animateVariant = (before: Editor, link: PreviewLink): void => {
@@ -313,6 +383,10 @@ export function PrototypePreview(props: {
   };
   const activate = (link: PreviewLink, transient = false): void => {
     if (link.disabled) return;
+    if (link.action === "back") {
+      goBack();
+      return;
+    }
     if (link.action === "change-to") {
       changeVariant(link, transient ? "activate" : "toggle");
       return;
@@ -337,7 +411,7 @@ export function PrototypePreview(props: {
         });
       return;
     }
-    if (link.action === "open-overlay") {
+    if (link.action === "open-overlay" || link.action === "swap-overlay") {
       const entry: PrototypeOverlayEntry = {
         key: `${link.id}-${++overlayVersion}`,
         frameId: link.to,
@@ -349,8 +423,12 @@ export function PrototypePreview(props: {
         transition: link.transition,
         duration: link.duration,
       };
-      const next = pushPrototypeOverlay(overlays(), entry);
-      if (next === overlays()) return;
+      const base =
+        link.action === "swap-overlay"
+          ? popPrototypeOverlay(overlays())
+          : overlays();
+      const next = pushPrototypeOverlay(base, entry);
+      if (next === base) return;
       setOverlays(next);
       queueMicrotask(() => {
         const target = [
@@ -398,6 +476,40 @@ export function PrototypePreview(props: {
     }, delayed.delay);
     onCleanup(() => window.clearTimeout(timer));
   });
+  onMount(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement;
+      if (target.matches("input, textarea, select, [contenteditable=true]"))
+        return;
+      const action = presentationKeyAction(event.key, {
+        overlays: overlays().length,
+        history: history().length,
+      });
+      if (!action) return;
+      event.preventDefault();
+      if (action === "back" || action === "close-overlay") goBack();
+      else if (action === "restart") restart();
+      else props.onClose();
+    };
+    const onPointer = (event: PointerEvent): void => {
+      const target = event.target;
+      if (
+        !(target instanceof globalThis.Element) ||
+        !target.closest('[data-prototype-active-surface="true"]') ||
+        target.closest(".nodetto-prototype-hotspot")
+      )
+        return;
+      setHint(true);
+      if (hintTimer !== undefined) window.clearTimeout(hintTimer);
+      hintTimer = window.setTimeout(() => setHint(false), 600);
+    };
+    dialog?.addEventListener("keydown", onKey, true);
+    dialog?.addEventListener("pointerdown", onPointer, true);
+    onCleanup(() => {
+      dialog?.removeEventListener("keydown", onKey, true);
+      dialog?.removeEventListener("pointerdown", onPointer, true);
+    });
+  });
   const scale = (): number =>
     zoom() === "fit"
       ? prototypeFitScale(
@@ -418,6 +530,9 @@ export function PrototypePreview(props: {
       }}
       class="nodetto-prototype-overlay"
       aria-label="Prototype preview"
+      classList={{
+        "nodetto-prototype-show-hotspots": showHotspots() || hint(),
+      }}
       on:keydown={(event) => event.stopPropagation()}
       on:keyup={(event) => event.stopPropagation()}
       on:cancel={(event) => {
@@ -436,17 +551,43 @@ export function PrototypePreview(props: {
         <button
           type="button"
           disabled={!overlays().length && !history().length}
-          onClick={() => {
-            if (overlays().length) {
-              setOverlays(popPrototypeOverlay(overlays()));
-              return;
-            }
-            const previous = history().at(-1);
-            setHistory(history().slice(0, -1));
-            if (previous) showScreen(previous);
-          }}
+          onClick={goBack}
         >
           Back
+        </button>
+        <Show when={flows().length}>
+          <select
+            aria-label="Preview flow"
+            value={selectedFlow()}
+            onChange={(event) => {
+              const name = event.currentTarget.value;
+              setSelectedFlow(name);
+              const flow = flows().find((item) => item.name === name);
+              setHistory([]);
+              if (flow) showScreen(flow.startId);
+            }}
+          >
+            <For each={flows()}>
+              {(flow) => <option value={flow.name}>{flow.name}</option>}
+            </For>
+          </select>
+        </Show>
+        <button type="button" onClick={restart}>
+          Restart
+        </button>
+        <button
+          type="button"
+          aria-pressed={device()}
+          onClick={() => setDevice(!device())}
+        >
+          Device frame
+        </button>
+        <button
+          type="button"
+          aria-pressed={showHotspots()}
+          onClick={() => setShowHotspots(!showHotspots())}
+        >
+          Show hotspots
         </button>
         <select
           aria-label="Preview screen"
@@ -479,9 +620,7 @@ export function PrototypePreview(props: {
         {(view) => (
           <div class="nodetto-prototype-scroll" ref={setScroll}>
             <div
-              ref={(element) => {
-                stage = element;
-              }}
+              classList={{ "nodetto-prototype-device": device() }}
               style={{
                 position: "relative",
                 width: `${view().bounds.width * scale()}px`,
@@ -502,6 +641,9 @@ export function PrototypePreview(props: {
                 }}
               >
                 <div
+                  ref={(element) => {
+                    stage = element;
+                  }}
                   tabIndex={overlays().length ? -1 : 0}
                   data-prototype-active-surface={
                     !overlays().length ? "true" : undefined
@@ -597,13 +739,20 @@ export function PrototypePreview(props: {
                       )}
                     >
                       {(element) => (
-                        <PrototypeLayer
-                          editor={runtime}
-                          element={element}
-                          elements={elementsById(view())}
-                          markerPrefix={markerPrefix}
-                          context={surfaceContext(view())}
-                        />
+                        <div
+                          classList={{
+                            "nodetto-prototype-persistent-hidden":
+                              persistent().has(element.id),
+                          }}
+                        >
+                          <PrototypeLayer
+                            editor={runtime}
+                            element={element}
+                            elements={elementsById(view())}
+                            markerPrefix={markerPrefix}
+                            context={surfaceContext(view())}
+                          />{" "}
+                        </div>
                       )}
                     </For>
                     <Show when={!overlays().length}>
@@ -628,13 +777,20 @@ export function PrototypePreview(props: {
                       )}
                     >
                       {(element) => (
-                        <PrototypeLayer
-                          editor={runtime}
-                          element={element}
-                          elements={elementsById(view())}
-                          markerPrefix={markerPrefix}
-                          context={surfaceContext(view())}
-                        />
+                        <div
+                          classList={{
+                            "nodetto-prototype-persistent-hidden":
+                              persistent().has(element.id),
+                          }}
+                        >
+                          <PrototypeLayer
+                            editor={runtime}
+                            element={element}
+                            elements={elementsById(view())}
+                            markerPrefix={markerPrefix}
+                            context={surfaceContext(view())}
+                          />{" "}
+                        </div>
                       )}
                     </For>
                     <Show when={!overlays().length}>
@@ -647,6 +803,41 @@ export function PrototypePreview(props: {
                     </Show>
                   </div>
                 </div>
+                <Show when={persistent().size > 0}>
+                  <div
+                    data-prototype-persistent="true"
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      "pointer-events": "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${-view().bounds.x}px`,
+                        top: `${-view().bounds.y}px`,
+                      }}
+                    >
+                      <For
+                        each={visualRoots(view()).filter((element) =>
+                          persistent().has(element.id),
+                        )}
+                      >
+                        {(element) => (
+                          <PrototypeLayer
+                            editor={runtime}
+                            element={element}
+                            elements={elementsById(view())}
+                            markerPrefix={`${markerPrefix}persistent-`}
+                            context={surfaceContext(view())}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                </Show>
                 <For each={overlayViews()}>
                   {(overlay, index) => (
                     <PrototypeOverlaySurface

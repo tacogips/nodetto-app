@@ -3,6 +3,7 @@
 
 import {
   type Element,
+  type FrameSemantic,
   type ImageSemantic,
   isBreadboardElementType,
   isPcbElementType,
@@ -15,8 +16,17 @@ import { resolvedCornerRadii, roundedRectPath } from "../corner-radii.ts";
 import type { Box } from "../geometry.ts";
 import { gradientId } from "../gradient.ts";
 import { croppedImageBox } from "../image-crop.ts";
+import {
+  renderIconMarkup,
+  renderIconPlaceholder,
+} from "../icons/icon-markup.ts";
+import { findIcon } from "../icons/icon-registry.ts";
 import { compoundPathGeometry } from "../shapes/compound-path.ts";
 import { freehandGeometry } from "../shapes/freehand.ts";
+import {
+  FRAME_OUTSIDE_TITLE_GAP,
+  resolveTitlePlacement,
+} from "../shapes/frame.ts";
 import { stateNodeNotation } from "../shapes/state.ts";
 import { useCaseNodeNotation } from "../shapes/usecase.ts";
 import {
@@ -33,6 +43,7 @@ import {
   renderNotationPrimitive,
 } from "./notation.ts";
 import { styled, textStyled } from "./paint.ts";
+import { rectStrokeMarkup, rectStrokeParts } from "./rect-strokes.ts";
 import {
   renderDatabaseObject,
   renderErdTable,
@@ -212,39 +223,58 @@ export function renderShape(
         ) + wrap("g", { "clip-path": `url(#${clipId})` }, painted)
       );
     }
-    case "frame":
+    case "frame": {
+      const semantic = element.semantic as FrameSemantic;
+      const outside = resolveTitlePlacement(semantic) === "outside";
+      const parts = rectStrokeParts(box, element.visual.style);
+      const paint = styled(
+        { fill: "#ffffff", stroke: "#cbd5e1" },
+        element.visual,
+        element.id,
+      );
+      const clipId = `nd-strokes-${Array.from(element.id, (c) => c.codePointAt(0)?.toString(16)).join("-")}`;
       return (
-        tag(
-          element.visual.style?.cornerRadii ? "path" : "rect",
-          styled(
-            element.visual.style?.cornerRadii
-              ? {
-                  d: roundedRectPath(
-                    box,
-                    resolvedCornerRadii(element.visual.style),
-                  ),
-                  fill: "#ffffff",
-                  stroke: "#cbd5e1",
-                  "stroke-width": 1,
-                }
-              : {
-                  ...box,
-                  rx: element.visual.style?.cornerRadius ?? 0,
-                  fill: "#ffffff",
-                  stroke: "#cbd5e1",
-                  "stroke-width": 1,
-                },
-            element.visual,
-            element.id,
-          ),
-        ) +
-        ((element.semantic as { showTitle?: boolean }).showTitle === false
+        (parts
+          ? rectStrokeMarkup(
+              parts,
+              {
+                fill: String(paint.fill),
+                stroke: String(paint.stroke),
+                opacity: element.visual.style?.opacity,
+              },
+              clipId,
+            )
+          : tag(
+              element.visual.style?.cornerRadii ? "path" : "rect",
+              styled(
+                element.visual.style?.cornerRadii
+                  ? {
+                      d: roundedRectPath(
+                        box,
+                        resolvedCornerRadii(element.visual.style),
+                      ),
+                      fill: "#ffffff",
+                      stroke: "#cbd5e1",
+                      "stroke-width": 1,
+                    }
+                  : {
+                      ...box,
+                      rx: element.visual.style?.cornerRadius ?? 0,
+                      fill: "#ffffff",
+                      stroke: "#cbd5e1",
+                      "stroke-width": 1,
+                    },
+                element.visual,
+                element.id,
+              ),
+            )) +
+        (semantic.showTitle === false
           ? ""
           : text(
               textStyled(
                 {
-                  x: box.x + 8,
-                  y: box.y + 16,
+                  x: outside ? box.x : box.x + 8,
+                  y: outside ? box.y - FRAME_OUTSIDE_TITLE_GAP : box.y + 16,
                   fill: theme.ink,
                   "font-size": 12,
                 },
@@ -253,6 +283,7 @@ export function renderShape(
               readString(element.semantic, "name"),
             ))
       );
+    }
     case "shape.geo":
       return renderGeo(element, box, theme);
     case "node.generic":
@@ -286,6 +317,44 @@ export function renderShape(
       return renderUmlClass(element, box, theme);
     case "ui.control":
       return renderUiControl(element, box, theme);
+    case "ui.icon": {
+      const semantic = element.semantic as {
+        icon?: string;
+        path?: string;
+        viewBox?: number;
+      };
+      const style = element.visual.style;
+      const source =
+        semantic.path !== undefined
+          ? { path: semantic.path }
+          : findIcon(semantic.icon ?? "");
+      const stroke = style?.stroke ?? "#000000";
+      const painted = source
+        ? renderIconMarkup(source, box, {
+            stroke,
+            strokeWidth: style?.strokeWidth ?? 2,
+            fill: style?.fill ?? "none",
+            viewBox: semantic.viewBox ?? 24,
+            opacity: style?.opacity,
+          })
+        : wrap(
+            "g",
+            { opacity: style?.opacity },
+            renderIconPlaceholder(box, stroke),
+          );
+      const flipX = element.visual.flipX === true;
+      const flipY = element.visual.flipY === true;
+      if (!flipX && !flipY) return painted;
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      return wrap(
+        "g",
+        {
+          transform: `translate(${fmt(cx)} ${fmt(cy)}) scale(${flipX ? -1 : 1} ${flipY ? -1 : 1}) translate(${fmt(-cx)} ${fmt(-cy)})`,
+        },
+        painted,
+      );
+    }
     case "text.note":
       return renderTextNote(element, box, theme);
     default:

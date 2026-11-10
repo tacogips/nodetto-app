@@ -95,6 +95,10 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             std::fs::read(string(args, 0, ctx)?).map_err(host_error)?,
             ctx,
         ),
+        "listDir" => {
+            let names = files::list_dir(&string(args, 0, ctx)?).map_err(host_error)?;
+            Ok(js_string!(serde_json::to_string(&names).map_err(host_error)?).into())
+        }
         "exists" => Ok(std::path::Path::new(&string(args, 0, ctx)?).exists().into()),
         "writeBytes" => {
             let path = string(args, 0, ctx)?;
@@ -223,7 +227,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
     .map_err(|e| e.to_string())?;
     ctx.eval(Source::from_bytes(r#"
         globalThis.native = Object.fromEntries([
-          'path','readText','readBytes','exists','writeBytes','attachment','open','png','pdf','fontCoverage',
+          'path','readText','readBytes','listDir','exists','writeBytes','attachment','open','png','pdf','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };

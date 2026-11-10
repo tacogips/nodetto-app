@@ -4,6 +4,7 @@ import {
   useCaseRelationshipShapeUtil,
 } from "./usecase.ts";
 import { uiControlShapeUtil } from "./uiControl.ts";
+import { uiIconShapeUtil } from "./ui-icon.ts";
 import { databaseObjectShapeUtils } from "./databaseObject.ts";
 // The default ShapeUtil registry: every element type this build renders.
 //
@@ -107,6 +108,7 @@ export function createDefaultRegistry(): ShapeUtilRegistry {
     .register(compoundPathShapeUtil)
     .register(frameShapeUtil)
     .register(uiControlShapeUtil)
+    .register(uiIconShapeUtil)
     .register(nodeShapeUtil)
     .register(stateNodeShapeUtil)
     .register(stateTransitionShapeUtil)

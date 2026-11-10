@@ -34,6 +34,7 @@ export interface PendingConnection {
 
 export interface SnapSettings {
   readonly grid: boolean;
+  readonly gridSize?: 4 | 8 | 24;
   readonly objects: boolean;
   /** Persistent page-guide snapping; omitted keeps the default enabled. */
   readonly guides?: boolean;

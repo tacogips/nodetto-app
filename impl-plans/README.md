@@ -41,7 +41,7 @@ and lint manifests (`clm-s725-dispatch.json`, `clm-s731-dispatch.json`,
 `clm-s737-dispatch.json`, `clm-s740-dispatch.json`) also stay in `active/`
 with their pre-archive `planPath` values; s740 was the final dispatch and
 the earlier ones must not be dispatched again. The manifests `fss-s751-dispatch.json`, `seq-self-s750-dispatch.json`, `cpf-s748-dispatch.json`
-also stay in `active/` with their
+and `ipd-s772-dispatch.json` (iPhone app design; final dispatch) also stay in `active/` with their
 pre-archive `planPath` values. The spreadsheet table manifests
 `tsh-s776-dispatch.json` and `tsh-s780-dispatch.json` also stay in
 `active/` with their pre-archive `planPath` values; s780 was the final
@@ -50,6 +50,29 @@ dispatch, and s776 must not be dispatched again. The presentation manifest
 `planPath` values.
 
 ## Completed
+
+### iPhone app design
+
+Precise layers, iOS kit, layout, prototyping, lint and comparison are implemented
+(design: `design-docs/specs/design-iphone-app-design.md`; user QA:
+`design-docs/user-qa/iphone-app-design.md`; no GitHub issue). The private
+reproduction exists only under git-ignored `tmp/`. Evidence is under
+`tmp/ipd-s772/<planId>/`; progress logs remain in `progress/`.
+
+Final gates: workspace verify reported 3661 Bun passes, 73 skips and 0 failures;
+CLI tests reported 496 Bun passes and 0 failures, with native parity executed
+and not skipped. The CLI build and workspace typecheck passed. Logs:
+`tmp/ipd-s772/ipd-28-finish/final/`. The adversarial review accepted the
+finish unit; there is no browser E2E suite, so the desktop presentation,
+prototype view and Compare with reference dialog are covered by unit and
+integration tests only.
+
+All 37 ipd plans (`ipd-00-baseline.md` through `ipd-29-desktop-snap-grid.md`,
+including the split units `ipd-07a`, `ipd-07b`, `ipd-27a`, `ipd-27b`,
+`ipd-27c`, `ipd-27k` and `ipd-27p`) are archived to `completed/` by the
+workflow plan-archive node. The final dispatch manifest
+`ipd-s772-dispatch.json` stays in `active/` with its pre-archive `planPath`
+values, like the other historical manifests, and must not be dispatched again.
 
 Presentation (slideshow) mode (session 793; design:
 `design-docs/specs/design-presentation.md`; owner Q&A:

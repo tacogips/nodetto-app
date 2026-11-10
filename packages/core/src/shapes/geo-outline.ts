@@ -272,12 +272,13 @@ function cylinderPath(width: number, height: number): string {
 }
 
 function rectOutline(width: number, height: number): GeoOutline {
+  const inset = width >= 3 && height >= 3 ? 1 : 0;
   return {
     kind: "rect",
-    x: 1,
-    y: 1,
-    width: Math.max(0, width - 2),
-    height: Math.max(0, height - 2),
+    x: inset,
+    y: inset,
+    width: Math.max(0, width - 2 * inset),
+    height: Math.max(0, height - 2 * inset),
     rx: 4,
   };
 }

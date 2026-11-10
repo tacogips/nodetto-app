@@ -3,6 +3,7 @@ import { applyQuiet, extractQuiet } from "./warnings.ts";
 // executable. It imports no Node/Bun APIs; OS operations belong to Rust.
 import { runCli } from "./commands.ts";
 import { exportCommand } from "./export-command.ts";
+import { compareCommand } from "./compare-command.ts";
 import { openCommand } from "./open-command.ts";
 import { desktopOpenLink } from "./open-link.ts";
 import { pdfLayout } from "@nodetto/core";
@@ -12,6 +13,7 @@ declare const native: {
   path(path: string): string;
   readText(path: string): string;
   readBytes(path: string): Uint8Array;
+  listDir(path: string): string;
   writeBytes(path: string, data: Uint8Array): void;
   exists(path: string): boolean;
   readStdin(): string;
@@ -45,6 +47,8 @@ const io = {
   writeBytes: (path: string, bytes: Uint8Array) =>
     native.writeBytes(native.path(path), bytes),
   exists: (path: string) => native.exists(native.path(path)),
+  listDir: (path: string) =>
+    JSON.parse(native.listDir(native.path(path))) as string[],
   readStdin: native.readStdin,
   readAttachment: (document: string, path: string) =>
     new Uint8Array(native.attachment(native.path(document), path)),
@@ -86,9 +90,21 @@ Object.assign(globalThis, {
                 ),
               ),
           })
-        : command === "open" && !help
-          ? await openCommand(io, rest)
-          : runCli(args, io, version);
+        : command === "compare" && !help
+          ? await compareCommand(io, rest, {
+              rasterize: async (svg, scale, fontDir, fallback) =>
+                new Uint8Array(
+                  native.png(
+                    svg,
+                    scale,
+                    fontDir === undefined ? undefined : native.path(fontDir),
+                    fallback ?? false,
+                  ),
+                ),
+            })
+          : command === "open" && !help
+            ? await openCommand(io, rest)
+            : runCli(args, io, version);
     return JSON.stringify(
       extracted.quiet ? applyQuiet(command ?? "", result) : result,
     );

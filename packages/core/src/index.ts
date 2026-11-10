@@ -818,3 +818,87 @@ export {
   type FrameStraddleFinding,
 } from "./diagram-lint/frame-straddle.ts";
 export * from "./presentation/index.ts";
+
+export { APP_FONT_STACK } from "./text-measure.ts";
+export { measureTextWidth, wrapMeasuredLines } from "./text-measure.ts";
+export { truncateToWidth, textMeasureMode } from "./text-measure.ts";
+export type { TextMeasureMode, TextMeasureStyle } from "./text-measure.ts";
+
+export {
+  ICON_SET_VERSION,
+  normalizeIconName,
+  findIcon,
+  iconNames,
+  searchIcons,
+} from "./icons/icon-registry.ts";
+export type { IconNode, IconDefinition } from "./icons/icon-registry.ts";
+export {
+  renderIconMarkup,
+  renderIconPlaceholder,
+} from "./icons/icon-markup.ts";
+export type { IconPaint } from "./icons/icon-markup.ts";
+
+export {
+  resolveTitlePlacement,
+  frameTitleBox,
+  FRAME_OUTSIDE_TITLE_GAP,
+  FRAME_OUTSIDE_TITLE_HEIGHT,
+} from "./shapes/frame.ts";
+export { connectPrototypeBack } from "./screen-transition.ts";
+
+export {
+  rectStrokeParts,
+  rectStrokeMarkup,
+} from "./svg-export/rect-strokes.ts";
+export type { RectStrokeParts } from "./svg-export/rect-strokes.ts";
+
+export { uiIconShapeUtil } from "./shapes/ui-icon.ts";
+
+export { textNoteLines } from "./text-layout.ts";
+export { resolveUiControlPaint } from "./ui-control-paint.ts";
+
+export { findInsertionParent, planAttachToFrame } from "./insertion-parent.ts";
+
+export {
+  compactPrototypeLabel,
+  prototypeLinkGeometry,
+  prototypeFlows,
+  persistentLayerPairs,
+} from "./prototype-links.ts";
+export type {
+  PrototypeLinkGeometry,
+  PrototypeFlow,
+} from "./prototype-links.ts";
+
+export { orderedTopLevelFrames, frameFileStem } from "./frame-order.ts";
+export {
+  pngInfo,
+  leadingNumber,
+  pairByLeadingNumber,
+  parseBand,
+  composeComparisonSvg,
+} from "./compare-images.ts";
+export type { ComparisonBand } from "./compare-images.ts";
+
+export {
+  IOS_KIT,
+  findKitComponent,
+  insertKitComponent,
+  applyKitProps,
+  kitProps,
+  kitComponentOf,
+} from "./kits/ios/index.ts";
+export type {
+  KitComponent,
+  KitProp,
+  KitPropTarget,
+  KitPropType,
+} from "./kits/ios/index.ts";
+export { exportPrototypeHtml } from "./prototype-html.ts";
+
+export {
+  lintAppDesignPage,
+  APP_LINT_RULE_IDS,
+  isAppLintPage,
+} from "./app-design-lint/index.ts";
+export type { AppLintFinding, AppLintRuleId } from "./app-design-lint/index.ts";

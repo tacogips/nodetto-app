@@ -53,7 +53,7 @@ test("screen kinds round-trip and infer navigation or overlay behavior without f
     expect(preview?.links[0]?.to).toBe(target);
     expect(preview?.elements.some((element) => element.id === id)).toBe(false);
     expect(connectorDecoration(edge!).label).toContain(
-      kind === "screen" ? "navigate" : "open-overlay",
+      kind === "screen" ? "fade" : "overlay",
     );
     expect(generateInterfaceCode(editor, target)?.html).toContain(
       `data-screen-kind="${kind}"`,

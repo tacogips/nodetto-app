@@ -1,12 +1,23 @@
 import {
   cornerRadiiCss,
+  FRAME_OUTSIDE_TITLE_GAP,
+  FRAME_OUTSIDE_TITLE_HEIGHT,
+  rectStrokeParts,
+  resolveTitlePlacement,
   layoutGridBands,
   resolvedCornerRadii,
   safeAreaContentBox,
 } from "@nodetto/core";
 import type { AxisLayoutGrid, Element, FrameSemantic } from "@nodetto/ir";
 import { For, type JSX, Show } from "solid-js";
-import { fillPaintStyle, labelStyle, strokeBorderStyle } from "./visual.ts";
+import { RectStrokes } from "./RectStrokes.tsx";
+import { SvgFillGradient } from "./SvgFillGradient.tsx";
+import {
+  fillPaintStyle,
+  labelStyle,
+  strokeBorderStyle,
+  svgStyle,
+} from "./visual.ts";
 
 export function FrameView(props: {
   readonly element: Element;
@@ -15,6 +26,11 @@ export function FrameView(props: {
   const style = () => props.element.visual.style;
   const width = () => props.element.visual.width ?? 390;
   const height = () => props.element.visual.height ?? 844;
+  const outside = () =>
+    resolveTitlePlacement(props.element.semantic as FrameSemantic) ===
+    "outside";
+  const strokeBox = () => ({ x: 0, y: 0, width: width(), height: height() });
+  const hasParts = () => rectStrokeParts(strokeBox(), style()) !== undefined;
   const grids = () =>
     (props.element.semantic as FrameSemantic).layoutGrids ?? [];
   const safeArea = () =>
@@ -40,14 +56,48 @@ export function FrameView(props: {
         height: "100%",
         "box-sizing": "border-box",
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
         "border-radius": cornerRadiiCss(resolvedCornerRadii(style())),
-        ...fillPaintStyle(props.element.visual, "#ffffff"),
-        border: `${style()?.strokeWidth ?? 1}px ${style()?.dash === "dotted" ? "dotted" : style()?.dash === "dashed" ? "dashed" : "solid"} ${style()?.stroke ?? "#cbd5e1"}`,
-        ...strokeBorderStyle(props.element.visual),
+        ...(hasParts() ? {} : fillPaintStyle(props.element.visual, "#ffffff")),
+        border: hasParts()
+          ? "none"
+          : `${style()?.strokeWidth ?? 1}px ${style()?.dash === "dotted" ? "dotted" : style()?.dash === "dashed" ? "dashed" : "solid"} ${style()?.stroke ?? "#cbd5e1"}`,
+        ...(hasParts() ? {} : strokeBorderStyle(props.element.visual)),
         ...labelStyle(props.element.visual),
       }}
     >
+      <Show when={hasParts()}>
+        <svg
+          aria-hidden="true"
+          width={width()}
+          height={height()}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            overflow: "visible",
+            "pointer-events": "none",
+          }}
+        >
+          <SvgFillGradient
+            element={props.element}
+            width={width()}
+            height={height()}
+          />
+          <RectStrokes
+            box={strokeBox()}
+            style={style()}
+            clipId={`nd-frame-strokes-${Array.from(props.element.id, (c) => c.codePointAt(0)?.toString(16)).join("-")}`}
+            fill={
+              svgStyle(props.element.visual, props.element.id).fill ?? "#ffffff"
+            }
+            stroke={
+              svgStyle(props.element.visual, props.element.id).stroke ??
+              "#cbd5e1"
+            }
+          />
+        </svg>
+      </Show>
       <Show when={props.showLayoutGrids}>
         <For each={grids()}>
           {(grid) => (
@@ -128,8 +178,15 @@ export function FrameView(props: {
         <span
           style={{
             display: "block",
-            position: "relative",
-            padding: "4px 8px",
+            position: outside() ? "absolute" : "relative",
+            ...(outside()
+              ? {
+                  left: "0",
+                  top: `-${FRAME_OUTSIDE_TITLE_GAP + FRAME_OUTSIDE_TITLE_HEIGHT}px`,
+                  height: `${FRAME_OUTSIDE_TITLE_HEIGHT}px`,
+                  "line-height": `${FRAME_OUTSIDE_TITLE_HEIGHT}px`,
+                }
+              : { padding: "4px 8px" }),
             "font-size": "12px",
           }}
         >

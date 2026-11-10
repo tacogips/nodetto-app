@@ -8,6 +8,7 @@ import {
   TEXT_NOTE_LINE_HEIGHT,
   TEXT_NOTE_PADDING_Y,
   wrapTextLines,
+  textNoteLines,
 } from "../text-layout.ts";
 import { type Attrs, escapeXml, tag, wrap } from "./markup.ts";
 import { styled, textStyled } from "./paint.ts";
@@ -59,12 +60,16 @@ export function renderTextNote(
       : anchor === "end"
         ? box.x + box.width - paddingX
         : box.x + box.width / 2;
-  const lines = wrapTextLines(
-    textNoteText(element.semantic),
-    Math.max(1, box.width - paddingX * 2),
-    fontSize,
-    style?.letterSpacing ?? 0,
-  );
+  const lines =
+    element.visual.textMeasure === "proportional" ||
+    element.visual.textTruncate === "ellipsis"
+      ? textNoteLines(element).lines
+      : wrapTextLines(
+          textNoteText(element.semantic),
+          Math.max(1, box.width - paddingX * 2),
+          fontSize,
+          style?.letterSpacing ?? 0,
+        );
   const freeHeight = Math.max(
     0,
     box.height - paddingY * 2 - lines.length * lineHeight,
@@ -75,19 +80,37 @@ export function renderTextNote(
       : style?.verticalAlign === "middle"
         ? freeHeight / 2
         : 0;
-  const source = textNoteText(element.semantic);
-  const richSegments = richTextSegments(element.semantic);
+  const originalSource = textNoteText(element.semantic);
+  const singleLine = element.visual.textTruncate === "ellipsis";
+  const source = singleLine
+    ? originalSource.replace(/\r?\n/g, " ")
+    : originalSource;
+  const sourceOffset = (offset: number) =>
+    originalSource.slice(0, offset).replace(/\r?\n/g, " ").length;
+  const richSegments = richTextSegments(element.semantic).map((segment) =>
+    singleLine
+      ? {
+          ...segment,
+          start: sourceOffset(segment.start),
+          end: sourceOffset(segment.end),
+        }
+      : segment,
+  );
   const hasRichText = richSegments.some((segment) => segment.marks.length > 0);
   let sourceCursor = 0;
   const markedLine = (line: string, start: number): string => {
-    const end = start + line.length;
+    const ellipsis =
+      element.visual.textTruncate === "ellipsis" &&
+      textNoteLines(element).truncated &&
+      line.endsWith("…");
+    const visible = ellipsis ? line.slice(0, -1) : line;
+    const end = start + visible.length;
     const content = richSegments
       .filter((segment) => segment.end > start && segment.start < end)
       .map((segment) => {
-        const value = source.slice(
-          Math.max(start, segment.start),
-          Math.min(end, segment.end),
-        );
+        const value = source
+          .slice(Math.max(start, segment.start), Math.min(end, segment.end))
+          .replace(/\r?\n/g, " ");
         const kinds = new Set(segment.marks.map((mark) => mark.kind));
         const attrs: Attrs = {
           ...(kinds.has("bold") ? { "font-weight": 700 } : {}),
@@ -124,7 +147,57 @@ export function renderTextNote(
           : span;
       })
       .join("");
-    return hasRichText && content ? content : escapeXml(line);
+    if (!hasRichText) return escapeXml(line);
+    if (!ellipsis) return content || escapeXml(line);
+    const cut = richSegments.find(
+      (segment) => segment.start <= end && segment.end > end,
+    );
+    const marks = cut?.marks ?? [];
+    const attrs: Attrs = {
+      ...(marks.some((mark) => mark.kind === "bold")
+        ? { "font-weight": 700 }
+        : {}),
+      ...(marks.some((mark) => mark.kind === "italic")
+        ? { "font-style": "italic" }
+        : {}),
+      ...(marks.some((mark) => mark.kind === "code")
+        ? { "font-family": "ui-monospace, SFMono-Regular, Menlo, monospace" }
+        : {}),
+      ...(marks.some((mark) => mark.kind === "link")
+        ? { fill: theme.accent }
+        : {}),
+      ...(marks.some(
+        (mark) =>
+          mark.kind === "underline" ||
+          mark.kind === "link" ||
+          mark.kind === "strike",
+      )
+        ? {
+            "text-decoration":
+              `${marks.some((mark) => mark.kind === "underline" || mark.kind === "link") ? "underline" : ""}${marks.some((mark) => mark.kind === "strike") ? " line-through" : ""}`.trim(),
+          }
+        : {}),
+    };
+    const span = wrap("tspan", attrs, "…");
+    const link = marks.find(
+      (mark): mark is TextMark & { readonly href: string } =>
+        mark.kind === "link" &&
+        typeof mark.href === "string" &&
+        safeTextLinkHref(mark.href) !== null,
+    );
+    return (
+      content +
+      (link
+        ? wrap(
+            "a",
+            {
+              href: safeTextLinkHref(link.href) ?? undefined,
+              rel: "noopener noreferrer",
+            },
+            span,
+          )
+        : span)
+    );
   };
   for (const [at, line] of lines.entries()) {
     const top = box.y + paddingY + verticalOffset + at * lineHeight;

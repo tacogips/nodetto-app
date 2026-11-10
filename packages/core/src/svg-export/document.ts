@@ -4,6 +4,8 @@
 import {
   type Element,
   type ElementId,
+  type FrameSemantic,
+  type GenericEdgeSemantic,
   getElementTypeDefinition,
   type GroupSemantic,
   type ImageSemantic,
@@ -38,6 +40,7 @@ import { createShapeContext } from "../hit-test.ts";
 import { croppedImageBox } from "../image-crop.ts";
 import { containerPaintOrder } from "../paint-order.ts";
 import { selfContained } from "../references.ts";
+import { prototypeFlows, prototypeLinkGeometry } from "../prototype-links.ts";
 import type { ShapeContext, ShapeUtilRegistry } from "../shape-util.ts";
 import {
   connectorDecoration,
@@ -45,13 +48,14 @@ import {
   resolveConnector,
 } from "../shapes/connector.ts";
 import { freehandGeometry } from "../shapes/freehand.ts";
+import { frameTitleBox, resolveTitlePlacement } from "../shapes/frame.ts";
 import { stateNodeLabelBox } from "../shapes/state.ts";
 import { useCaseNodeLabelBox } from "../shapes/usecase.ts";
 import { umlComponentPaintBounds } from "../shapes/umlComponent.ts";
 import { PCB_BOARD_COLOR } from "../pcb-board/view.ts";
 import type { Store } from "../store.ts";
 import { markerDefs, renderConnector } from "./connectors.ts";
-import { fmt, tag, wrap } from "./markup.ts";
+import { fmt, tag, text, wrap } from "./markup.ts";
 import { renderNotationPrimitive } from "./notation.ts";
 import { effectPrimitives, gradientDefinition } from "./paint.ts";
 import { renderShape } from "./shapes.ts";
@@ -108,6 +112,11 @@ export function renderElementsSvg(
   registry: ShapeUtilRegistry,
   context: ShapeContext,
   options: SvgExportOptions = {},
+  prototypeOverlay?: {
+    readonly markup: string;
+    readonly boxes: readonly Box[];
+    readonly omitted: number;
+  },
 ): string | null {
   const theme: SvgTheme = { ...DEFAULT_SVG_THEME, ...(options.theme ?? {}) };
   const padding = options.padding ?? DEFAULT_PADDING;
@@ -116,7 +125,7 @@ export function renderElementsSvg(
   const rendered = new Map<ElementId, string>();
   const renderedKinds = new Map<ElementId, "connector" | "shape">();
   const groups = new Map<ElementId, Element>();
-  const boxes: Box[] = [];
+  const boxes: Box[] = [...(prototypeOverlay?.boxes ?? [])];
   const pcbBoxes: Box[] = [];
   const clips: string[] = [];
   const effects: string[] = [];
@@ -138,6 +147,11 @@ export function renderElementsSvg(
       activeNetlists.set(element.page, element.id);
   }
   for (const element of elements) {
+    if (
+      element.type === "edge.generic" &&
+      (element.semantic as GenericEdgeSemantic).prototype
+    )
+      continue;
     if (
       element.visual.hidden ||
       context.isHidden?.(element.id) ||
@@ -276,6 +290,21 @@ export function renderElementsSvg(
         ),
       );
       renderedKinds.set(element.id, "shape");
+    }
+    if (box && element.type === "frame") {
+      const semantic = element.semantic as FrameSemantic;
+      if (resolveTitlePlacement(semantic) === "outside") {
+        const title = frameTitleBox(box, semantic);
+        if (title) {
+          const rotated = rotatedBox(
+            title,
+            element.visual.rotation ?? 0,
+            boxCenter(box),
+          );
+          const visibleTitle = clip ? intersectClip(rotated, clip) : rotated;
+          if (visibleTitle) boxes.push(visibleTitle);
+        }
+      }
     }
     if (visible !== null) {
       boxes.push(visible);
@@ -526,6 +555,14 @@ export function renderElementsSvg(
       : "",
     wrap("g", { "data-layer": "connectors" }, connectors.join("")),
     wrap("g", { "data-layer": "shapes" }, shapes.join("")),
+    prototypeOverlay?.omitted
+      ? wrap(
+          "desc",
+          {},
+          `${prototypeOverlay.omitted} prototype links to other pages omitted`,
+        )
+      : "",
+    prototypeOverlay?.markup ?? "",
   ]
     .filter((part) => part !== "")
     .join("\n");
@@ -551,12 +588,154 @@ export function renderPageSvg(
   pageId: PageId,
   options: SvgExportOptions = {},
 ): string | null {
-  return renderElementsSvg(
-    store.getPageElements(pageId),
-    registry,
-    createShapeContext(store, registry, 1),
-    options,
-  );
+  const elements = store.getPageElements(pageId);
+  const context = createShapeContext(store, registry, 1);
+  if (!options.prototypeView)
+    return renderElementsSvg(elements, registry, context, options);
+  const boxes: Box[] = [];
+  const parts: string[] = [];
+  let omitted = 0;
+  for (const link of elements) {
+    if (
+      link.type !== "edge.generic" ||
+      link.visual.hidden ||
+      context.isHidden?.(link.id)
+    )
+      continue;
+    const semantic = link.semantic as GenericEdgeSemantic;
+    if (!semantic.prototype || !semantic.from || !semantic.to) continue;
+    const from = store.get(semantic.from);
+    const to = store.get(semantic.to);
+    if (
+      !from ||
+      !to ||
+      context.isHidden?.(from.id) ||
+      context.isHidden?.(to.id)
+    )
+      continue;
+    if (from.page !== pageId || to.page !== pageId) {
+      omitted++;
+      continue;
+    }
+    const geometry = prototypeLinkGeometry(store, context, link);
+    if (!geometry) continue;
+    const { start, end, labelPoint, label } = geometry;
+    if (geometry.kind === "back-tag") {
+      const width = Math.max(36, label.length * 6.6 + 12);
+      boxes.push({ x: start.x, y: start.y - 18, width, height: 18 });
+      parts.push(
+        wrap(
+          "g",
+          { "data-prototype-link": link.id },
+          tag("rect", {
+            x: start.x,
+            y: start.y - 18,
+            width,
+            height: 18,
+            rx: 4,
+            fill: "#7c3aed",
+          }) +
+            text(
+              {
+                x: start.x + 6,
+                y: start.y - 5,
+                fill: "white",
+                "font-size": 11,
+              },
+              label || "back",
+            ),
+        ),
+      );
+      continue;
+    }
+    if (!end || !geometry.d) continue;
+    const k = Math.max(40, Math.abs(end.x - start.x) / 2);
+    const direction = end.x >= start.x ? 1 : -1;
+    const xs = [start.x, end.x, start.x + direction * k, end.x - direction * k];
+    boxes.push({
+      x: Math.min(...xs) - 5,
+      y: Math.min(start.y, end.y) - 5,
+      width: Math.max(...xs) - Math.min(...xs) + 10,
+      height: Math.abs(end.y - start.y) + 10,
+    });
+    let body =
+      tag("path", {
+        d: geometry.d,
+        fill: "none",
+        stroke: "#7c3aed",
+        "stroke-width": 2,
+      }) +
+      tag("circle", { cx: start.x, cy: start.y, r: 3, fill: "#7c3aed" }) +
+      tag("path", {
+        d: `M ${fmt(end.x - direction * 8)} ${fmt(end.y - 4)} L ${fmt(end.x)} ${fmt(end.y)} L ${fmt(end.x - direction * 8)} ${fmt(end.y + 4)} Z`,
+        fill: "#7c3aed",
+      });
+    if (label) {
+      const width = label.length * 6.6 + 10;
+      boxes.push({
+        x: labelPoint.x - width / 2,
+        y: labelPoint.y - 10,
+        width,
+        height: 18,
+      });
+      body +=
+        tag("rect", {
+          x: labelPoint.x - width / 2,
+          y: labelPoint.y - 10,
+          width,
+          height: 18,
+          rx: 4,
+          fill: "white",
+        }) +
+        text(
+          {
+            x: labelPoint.x,
+            y: labelPoint.y + 3,
+            "text-anchor": "middle",
+            "font-size": 11,
+            fill: "#7c3aed",
+          },
+          label,
+        );
+    }
+    parts.push(wrap("g", { "data-prototype-link": link.id }, body));
+  }
+  for (const flow of prototypeFlows(store, context).flows) {
+    const frame = store.get(flow.startId);
+    if (!frame || frame.page !== pageId || context.isHidden?.(frame.id))
+      continue;
+    const box = context.boundsOf(frame.id);
+    if (!box) continue;
+    const title = frameTitleBox(box, frame.semantic as FrameSemantic);
+    const y =
+      (title &&
+      resolveTitlePlacement(frame.semantic as FrameSemantic) === "outside"
+        ? title.y
+        : box.y) - 8;
+    const width = 16 + flow.name.length * 6.6;
+    boxes.push({ x: box.x, y: y - 12, width, height: 16 });
+    parts.push(
+      wrap(
+        "g",
+        { "data-prototype-flow": flow.name },
+        tag("path", {
+          d: `M ${fmt(box.x)} ${fmt(y - 10)} L ${fmt(box.x + 10)} ${fmt(y - 5)} L ${fmt(box.x)} ${fmt(y)} Z`,
+          fill: "#7c3aed",
+        }) +
+          text(
+            { x: box.x + 15, y, "font-size": 11, fill: "#7c3aed" },
+            flow.name,
+          ),
+      ),
+    );
+  }
+  return renderElementsSvg(elements, registry, context, options, {
+    boxes,
+    omitted,
+    markup: parts.length
+      ? wrap("g", { "data-layer": "prototype" }, parts.join(""))
+      : "",
+  });
 }
 
 /**
@@ -571,6 +750,11 @@ export function renderSelectionSvg(
   ids: ReadonlySet<ElementId>,
   options: SvgExportOptions = {},
 ): string | null {
+  if (ids.size === 1) {
+    const id = ids.values().next().value;
+    if (id && store.get(id)?.type === "frame" && store.get(id)?.page === pageId)
+      return renderArtboardSvg(store, registry, id, options);
+  }
   const context = createShapeContext(store, registry, 1);
   const expanded = new Set(expandContainers(store, ids, context));
   const picked = store
@@ -594,8 +778,13 @@ export function renderArtboardSvg(
   if (!box) return null;
   const viewport = rotatedBox(box, frame.visual.rotation ?? 0);
   const ids = new Set(expandContainers(store, [id], context));
+  const excluded = options.excludeIds
+    ? new Set(expandContainers(store, options.excludeIds, context))
+    : undefined;
   const elements = selfContained(
-    store.getPageElements(frame.page).filter((element) => ids.has(element.id)),
+    store
+      .getPageElements(frame.page)
+      .filter((element) => ids.has(element.id) && !excluded?.has(element.id)),
   ).map((element) =>
     element.id === id
       ? {

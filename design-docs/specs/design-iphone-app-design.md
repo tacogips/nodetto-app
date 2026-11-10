@@ -1,6 +1,6 @@
 # iPhone app design: precise layers, iOS kit, CLI layout, prototype flows
 
-Status: DESIGNED, 2026-11-10, base f59bef4 ("Release Nodetto 0.8.9"), branch
+Status: IMPLEMENTED, 2026-11-11, gates passed (see impl-plans/README.md), base f59bef4 ("Release Nodetto 0.8.9"), branch
 `feat/iphone-app-design`. No GitHub issue; the source is an operator request
 (2026-11-10). Owner questions are in
 `design-docs/user-qa/iphone-app-design.md`. Q1, Q3 and Q4 are open; this design

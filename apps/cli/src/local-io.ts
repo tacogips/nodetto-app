@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { fontCoverage } from "./font-coverage.ts";
 import type { CommandIo } from "./commands.ts";
 import { readLocalAttachment } from "./attachments.ts";
@@ -17,5 +17,9 @@ export function localIo(): CommandIo {
     writeText: writeFileAtomic,
     writeBytes: writeFileAtomic,
     exists: (path) => existsSync(path),
+    listDir: (path) =>
+      readdirSync(path)
+        .filter((name) => statSync(`${path}/${name}`).isFile())
+        .sort(),
   };
 }

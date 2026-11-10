@@ -5,6 +5,8 @@ import { type CommandIo, type CommandResult, runCli } from "./commands.ts";
 import { applyQuiet, extractQuiet } from "./warnings.ts";
 import { openCommand } from "./open-command.ts";
 import { exportCommand } from "./export-command.ts";
+import { compareCommand } from "./compare-command.ts";
+import { rasterize } from "./raster-backend.ts";
 
 const ASYNC_COMMANDS: Readonly<
   Record<
@@ -13,6 +15,7 @@ const ASYNC_COMMANDS: Readonly<
   >
 > = {
   export: exportCommand,
+  compare: (io, args) => compareCommand(io, args, { rasterize }),
   open: openCommand,
 };
 

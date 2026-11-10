@@ -6,6 +6,20 @@ use std::{
 
 pub use nodetto_native::{attachments::read as attachment, fs::write_atomic};
 
+pub fn list_dir(path: &str) -> io::Result<Vec<String>> {
+    let mut names = Vec::new();
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        if entry.file_type()?.is_file() {
+            if let Ok(name) = entry.file_name().into_string() {
+                names.push(name);
+            }
+        }
+    }
+    names.sort();
+    Ok(names)
+}
+
 /// `link` is a nodetto:// link for the same file that selects a page; the
 /// file still goes first so a sandboxed macOS app is granted access to it.
 pub fn open_document(path: &str, app: Option<String>, link: Option<String>) -> io::Result<()> {

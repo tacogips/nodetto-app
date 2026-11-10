@@ -1,7 +1,15 @@
 import { Portal } from "solid-js/web";
 import { paletteDragPreview } from "./palette-drag.ts";
 import { ShapeView } from "./shapes/ShapeView.tsx";
-import type { Editor, Vec } from "@nodetto/core";
+import {
+  findInsertionParent,
+  insertKitComponent,
+  planAttachToFrame,
+  type Editor,
+  type Vec,
+} from "@nodetto/core";
+import type { FrameSemantic } from "@nodetto/ir";
+import { IconPicker } from "./IconPicker.tsx";
 import { For, Show, createSignal, type JSX, onCleanup } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
 import {
@@ -26,6 +34,64 @@ import {
 import type { WorkspaceId } from "./workspaces.ts";
 import { searchPaletteShapes } from "./shape-search.ts";
 import "./ShapePalette.css";
+
+function insertionLocation(editor: Editor, point: Vec) {
+  const page = editor.currentPageId;
+  const parentId = findInsertionParent(
+    editor.store,
+    page,
+    { ...point, width: 0, height: 0 },
+    editor.createShapeContext(),
+  );
+  const frame = parentId ? editor.store.get(parentId) : undefined;
+  const safe = frame ? (frame.semantic as FrameSemantic).safeArea : undefined;
+  return {
+    page,
+    parentId,
+    x: frame ? (frame.visual.x ?? 0) + (safe?.left ?? 0) : point.x,
+    y: frame ? (frame.visual.y ?? 0) + (safe?.top ?? 0) : point.y,
+  };
+}
+
+export function insertPaletteKit(editor: Editor, id: string, point: Vec) {
+  const location = insertionLocation(editor, point);
+  editor.beginBatch();
+  try {
+    const instance = insertKitComponent(editor, id, location);
+    editor.endBatch();
+    editor.selection.set([instance]);
+    return instance;
+  } catch (error) {
+    editor.abortBatch();
+    throw error;
+  }
+}
+
+export function insertPaletteIcon(editor: Editor, name: string, point: Vec) {
+  const location = insertionLocation(editor, point);
+  editor.beginBatch();
+  try {
+    const id = editor.createElement("ui.icon", {
+      page: location.page,
+      semantic: { icon: name },
+      visual: {
+        x: location.x,
+        y: location.y,
+        width: 24,
+        height: 24,
+        style: { stroke: "#000000" },
+      },
+    });
+    if (location.parentId)
+      editor.apply(planAttachToFrame(editor.store, location.parentId, id));
+    editor.endBatch();
+    editor.selection.set([id]);
+    return id;
+  } catch (error) {
+    editor.abortBatch();
+    throw error;
+  }
+}
 
 export function ShapePalette(props: {
   readonly editor: Editor;
@@ -114,6 +180,12 @@ export function ShapePalette(props: {
     window.removeEventListener("pointercancel", cancelPointer, true);
     cancelDrag();
   });
+  const [iconPicker, setIconPicker] = createSignal(false);
+  const centre = () =>
+    props.editor.camera.screenToPage({
+      x: props.context.viewport.width / 2,
+      y: props.context.viewport.height / 2,
+    });
   const [query, setQuery] = createSignal("");
   const results = () => searchPaletteShapes(query());
   const signals = createEditorSignals(props.editor);
@@ -134,7 +206,7 @@ export function ShapePalette(props: {
             type="button"
             class="nodetto-shape-tile"
             aria-label={`Draw ${item.label.toLowerCase()}`}
-            aria-pressed={props.tool === item.tool}
+            aria-pressed={!item.action && props.tool === item.tool}
             title={
               item.tool === Tool.Relation
                 ? "Relation — connect columns to document a join path; no database constraint or DDL"
@@ -157,7 +229,12 @@ export function ShapePalette(props: {
                                 : `${item.label} — select, then click the canvas`
             }
             on:pointerdown={(event) => {
-              if (event.button !== 0 || !creationFor(item.tool) || readOnly())
+              if (
+                item.action ||
+                event.button !== 0 ||
+                !creationFor(item.tool) ||
+                readOnly()
+              )
                 return;
               event.preventDefault();
               suppressClick = false;
@@ -177,10 +254,20 @@ export function ShapePalette(props: {
               if (drag?.id === event.pointerId) cancelDrag();
             }}
             onDragStart={(event) => event.preventDefault()}
-            disabled={!canUseTool(item.tool, readOnly())}
+            disabled={
+              item.action ? readOnly() : !canUseTool(item.tool, readOnly())
+            }
             onClick={() => {
               if (suppressClick) {
                 suppressClick = false;
+                return;
+              }
+              if (item.action === "ios-kit" && item.kitId) {
+                insertPaletteKit(props.editor, item.kitId, centre());
+                return;
+              }
+              if (item.action === "icon-picker") {
+                setIconPicker(true);
                 return;
               }
               if (canUseTool(item.tool, props.editor.readOnly))
@@ -281,6 +368,15 @@ export function ShapePalette(props: {
             {tiles(results())}
           </section>
         </Show>
+      </Show>
+      <Show when={iconPicker()}>
+        <IconPicker
+          onClose={() => setIconPicker(false)}
+          onPick={(name) => {
+            insertPaletteIcon(props.editor, name, centre());
+            setIconPicker(false);
+          }}
+        />
       </Show>
       <div class="nodetto-palette-actions" role="group" aria-label="Grouping">
         {action("frameSelection", "Frame selection")}

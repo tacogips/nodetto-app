@@ -14,6 +14,7 @@ import {
   FABRICATION_LAYER_KINDS,
   FABRICATION_LAYER_SIDES,
   FRAME_PLATFORMS,
+  FRAME_TITLE_PLACEMENTS,
   SCREEN_KINDS,
   PROTOTYPE_OVERFLOWS,
 } from "../semantics.ts";
@@ -35,15 +36,18 @@ export const FRAME: ElementTypeDefinition = {
       "responsiveSource",
       "memberIds",
       "showTitle",
+      "titlePlacement",
       "layout",
       "layoutGrids",
       "component",
+      "kit",
       "variantSet",
       "variantName",
       "variantProperties",
       "instanceOf",
       "autoRefresh",
       "prototypeStart",
+      "prototypeFlowName",
       "prototypeOverflow",
       "clipContent",
       "instanceBindings",
@@ -151,6 +155,36 @@ export const FRAME: ElementTypeDefinition = {
       checkBoolean(out, semantic["showTitle"], `${path}.showTitle`, {
         optional: true,
       });
+      checkEnum(
+        out,
+        semantic["titlePlacement"],
+        `${path}.titlePlacement`,
+        FRAME_TITLE_PLACEMENTS,
+        { optional: true },
+      );
+      const flow = semantic["prototypeFlowName"];
+      if (
+        checkString(out, flow, `${path}.prototypeFlowName`, {
+          optional: true,
+        }) &&
+        typeof flow === "string" &&
+        flow.length > 80
+      )
+        out.push(
+          error(
+            "value.range",
+            `${path}.prototypeFlowName`,
+            "must be at most 80 characters",
+          ),
+        );
+      const kit = semantic["kit"];
+      if (
+        kit !== undefined &&
+        (typeof kit !== "string" || !/^[a-z]+:[a-z0-9-]+@[0-9]+$/.test(kit))
+      )
+        out.push(
+          error("value.format", `${path}.kit`, "invalid kit identifier"),
+        );
       const bindings = semantic["instanceBindings"];
       if (
         bindings !== undefined &&

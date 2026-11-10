@@ -63,6 +63,9 @@ import {
   SLOT_LAYER_CLASS,
   type SnapSettings,
 } from "./interaction.ts";
+import { prototypeViewState, isPrototypeEdge } from "./shortcuts.ts";
+import { PrototypeViewLayer } from "./PrototypeViewLayer.tsx";
+import { FlowsPanel } from "./FlowsPanel.tsx";
 import { ConnectorMarkers } from "./shapes/ConnectorView.tsx";
 import { BreadboardOverlay } from "./BreadboardOverlay.tsx";
 import { PcbOverlay } from "./PcbOverlay.tsx";
@@ -115,6 +118,7 @@ export interface NodettoCanvasProps {
 
 export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
+  const prototype = prototypeViewState(props.editor);
   const [probeRevision, setProbeRevision] = createSignal(0);
   onCleanup(
     props.editor.onBreadboardProbeChange(() =>
@@ -269,7 +273,9 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   const connectors = createMemo(() =>
     paintElements().filter(
       (element) =>
-        isConnector(element) && !groupOf(props.editor.store, element.id),
+        isConnector(element) &&
+        !isPrototypeEdge(element) &&
+        !groupOf(props.editor.store, element.id),
     ),
   );
 
@@ -321,8 +327,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       }}
       tabindex="0"
       style={{
-        "background-size": `${GRID_SPACING * signals.camera().z}px ${
-          GRID_SPACING * signals.camera().z
+        "background-size": `${(props.snap.gridSize ?? GRID_SPACING) * signals.camera().z}px ${
+          (props.snap.gridSize ?? GRID_SPACING) * signals.camera().z
         }px`,
         "background-position": `${signals.camera().x * signals.camera().z}px ${
           signals.camera().y * signals.camera().z
@@ -412,6 +418,13 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
               draft={interaction.pcbDraft}
             />
           </Show>
+          <Show when={prototype.view()}>
+            <PrototypeViewLayer
+              editor={props.editor}
+              revision={signals.rev}
+              onSelect={(id) => props.editor.selection.set([id])}
+            />
+          </Show>
           <SelectionOutlines
             marquee={interaction.marquee}
             selectionBoxes={targets.selectionBoxes}
@@ -459,6 +472,17 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
           {props.children}
         </div>
       </div>
+      <Show when={prototype.view()}>
+        <FlowsPanel
+          editor={props.editor}
+          revision={signals.rev()}
+          viewport={viewport}
+          onPresent={(flow) => {
+            prototype.setFlow(flow);
+            prototype.setPresenting(true);
+          }}
+        />
+      </Show>
       <Show when={isPcbPage()}>
         <PcbLayersPanel editor={props.editor} revision={signals.rev} />
       </Show>

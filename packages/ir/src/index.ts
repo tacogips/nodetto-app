@@ -125,6 +125,7 @@ export {
   type ScreenKind,
   FRAME_PLATFORMS,
   type FramePlatform,
+  FRAME_TITLE_PLACEMENTS,
   type SafeAreaInsets,
   type ComponentVariantProperty,
   type LayoutGrid,
@@ -222,6 +223,9 @@ export {
   type UnknownRecord,
   type Visual,
   type VisualStyle,
+  STROKE_ALIGNS,
+  type StrokeAlign,
+  type StrokeSides,
 } from "./types.ts";
 export {
   assertValidDocument,
@@ -324,10 +328,18 @@ export {
 export { decodeRasterDataUrl, encodeRasterDataUrl } from "./image.ts";
 
 export {
+  TAB_INDICATORS,
   UI_CONTROL_KINDS,
   type UiControlKind,
   type UiControlSemantic,
 } from "./ui-controls.ts";
+
+export {
+  ICON_NAME_PATTERN,
+  MAX_ICON_PATH_LENGTH,
+  uiIconDefinition,
+  type UiIconSemantic,
+} from "./registry/icons.ts";
 
 export {
   shortPageId,

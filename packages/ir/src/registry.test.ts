@@ -43,6 +43,7 @@ describe("registry contents", () => {
         "erd.procedure",
         "image.raster",
         "ui.control",
+        "ui.icon",
         "design.token",
         "design.guide",
         "review.comment",

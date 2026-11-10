@@ -3,7 +3,16 @@ import {
   type SaveHtmlBundle,
 } from "./inspector/HtmlExportSection.tsx";
 import { isDatabaseObjectType, shortPageId } from "@nodetto/ir";
-import { type Editor, fabricationLayerGroups } from "@nodetto/core";
+import {
+  type Editor,
+  fabricationLayerGroups,
+  orderedTopLevelFrames,
+  frameFileStem,
+  prototypeFlows,
+  exportPrototypeHtml,
+} from "@nodetto/core";
+import { encodeStoredZip } from "../../core/src/zip.ts";
+import { rasterizeSvg } from "./raster-export.ts";
 import { availableMermaidKinds } from "@nodetto/io";
 import {
   BREADBOARD_EXPORTS,
@@ -56,7 +65,9 @@ type Format =
   | "gerber"
   | "pcb"
   | "code"
-  | "html";
+  | "html"
+  | "artboards"
+  | "prototype";
 
 export interface ExportDialogProps {
   readonly editor: Editor;
@@ -69,6 +80,7 @@ export interface ExportDialogProps {
   readonly exportPcb?: () => Promise<void>;
   readonly error?: string | null;
   readonly onClose: () => void;
+  readonly onCompare?: () => void;
 }
 
 export function ExportDialog(props: ExportDialogProps): JSX.Element {
@@ -80,6 +92,14 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       ? "pcb"
       : "svg",
   );
+  const [artboardFormat, setArtboardFormat] = createSignal<"png" | "svg">(
+    "png",
+  );
+  const [scale, setScale] = createSignal(2);
+  const [flow, setFlow] = createSignal("");
+  const [device, setDevice] = createSignal(true);
+  const [exportError, setExportError] = createSignal("");
+  const [exportBusy, setExportBusy] = createSignal(false);
   let dialog: HTMLDialogElement | undefined;
   const page = createMemo(() => {
     signals.rev();
@@ -111,6 +131,8 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
           ).length > 0,
       },
       { id: "html", label: "HTML", enabled: true },
+      { id: "artboards", label: "All artboards (ZIP)", enabled: true },
+      { id: "prototype", label: "Prototype (HTML)", enabled: true },
       { id: "d2", label: "D2", enabled: true },
       { id: "drawio", label: "draw.io", enabled: true },
       {
@@ -151,13 +173,13 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const active = () =>
     formats().find((t) => t.id === format())?.enabled ? format() : "svg";
   const formatGroups: readonly { label: string; ids: readonly Format[] }[] = [
-    { label: "Artwork", ids: ["svg", "png", "pdf"] },
+    { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
     {
       label: "Diagram source",
       ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
     },
     { label: "Fabrication", ids: ["pcb"] },
-    { label: "Web & developer", ids: ["html", "code"] },
+    { label: "Web & developer", ids: ["html", "prototype", "code"] },
   ];
   const descriptions: Record<Format, string> = {
     svg: "Scalable vector artwork for editing and sharing.",
@@ -175,12 +197,66 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     pcb: "Gerber copper, solder mask, silkscreen, outline and drill files.",
     html: "A website ZIP containing artboard HTML, CSS and assets.",
     code: "Design details, web code and native code for the selected element.",
+    artboards: "Export each artboard as an image in a ZIP archive.",
+    prototype: "Export a self-contained interactive prototype.",
   };
   const artworkFormat = (): ExportFormat | undefined => {
     const value = active();
     return value === "svg" || value === "png" || value === "pdf"
       ? value
       : undefined;
+  };
+  const flows = createMemo(() => {
+    signals.rev();
+    return prototypeFlows(
+      props.editor.store,
+      props.editor.createShapeContext(),
+    ).flows.filter(
+      (item) =>
+        props.editor.store.get(item.startId)?.page ===
+        props.editor.currentPageId,
+    );
+  });
+  const saveFile = async (name: string, blob: Blob, extension: string) => {
+    if (props.saveHtmlBundle)
+      return props.saveHtmlBundle(name, blob, extension);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  };
+  const runExtraExport = async () => {
+    if (exportBusy()) return;
+    setExportBusy(true);
+    setExportError("");
+    try {
+      if (active() === "prototype") {
+        const html = exportSelectedPrototype(props.editor, flow(), device());
+        await saveFile(
+          "prototype.html",
+          new Blob([html], { type: "text/html" }),
+          "html",
+        );
+      } else {
+        const bytes = await exportArtboardsZip(
+          props.editor,
+          artboardFormat(),
+          scale(),
+        );
+        await saveFile(
+          "artboards.zip",
+          new Blob([bytes], { type: "application/zip" }),
+          "zip",
+        );
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Export failed.");
+    } finally {
+      setExportBusy(false);
+    }
   };
   onMount(() => {
     const previous = document.activeElement;
@@ -286,6 +362,78 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                 save={props.saveHtmlBundle}
               />
             </Match>
+            <Match when={active() === "artboards"}>
+              <section>
+                <label>
+                  Image format
+                  <select
+                    aria-label="Artboard image format"
+                    value={artboardFormat()}
+                    onChange={(e) =>
+                      setArtboardFormat(
+                        e.currentTarget.value === "svg" ? "svg" : "png",
+                      )
+                    }
+                  >
+                    <option value="png">PNG</option>
+                    <option value="svg">SVG</option>
+                  </select>
+                </label>
+                <Show when={artboardFormat() === "png"}>
+                  <label>
+                    Resolution
+                    <select
+                      aria-label="Artboard export scale"
+                      value={scale()}
+                      onChange={(e) => setScale(Number(e.currentTarget.value))}
+                    >
+                      <option value="1">1×</option>
+                      <option value="2">2×</option>
+                      <option value="3">3×</option>
+                    </select>
+                  </label>
+                </Show>
+                <button
+                  type="button"
+                  disabled={exportBusy()}
+                  onClick={() => void runExtraExport()}
+                >
+                  Export artboards ZIP
+                </button>
+              </section>
+            </Match>
+            <Match when={active() === "prototype"}>
+              <section>
+                <label>
+                  Flow
+                  <select
+                    aria-label="Prototype flow"
+                    value={flow()}
+                    onChange={(e) => setFlow(e.currentTarget.value)}
+                  >
+                    <option value="">Default</option>
+                    <For each={flows()}>
+                      {(item) => <option value={item.name}>{item.name}</option>}
+                    </For>
+                  </select>
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={device()}
+                    onChange={(e) => setDevice(e.currentTarget.checked)}
+                  />{" "}
+                  Show device frame
+                </label>
+                <button
+                  type="button"
+                  disabled={exportBusy()}
+                  onClick={() => void runExtraExport()}
+                >
+                  Export prototype HTML
+                </button>
+              </section>
+            </Match>
             <Match when={active() === "mermaid"}>
               <Mermaid
                 editor={props.editor}
@@ -339,10 +487,61 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
             </Match>
           </Switch>
         </Suspense>
+        <Show when={exportError()}>
+          <p role="alert">{exportError()}</p>
+        </Show>
+        <Show when={props.onCompare}>
+          <button type="button" onClick={() => props.onCompare?.()}>
+            Compare with reference...
+          </button>
+        </Show>
         <Show when={props.error}>
           {(error) => <p role="alert">{error()}</p>}
         </Show>
       </div>
     </dialog>
   );
+}
+
+/** Generate the ordered artboard archive using the same names as CLI export. */
+export async function exportArtboardsZip(
+  editor: Editor,
+  format: "png" | "svg",
+  scale: number,
+  rasterize = rasterizeSvg,
+): Promise<Uint8Array> {
+  const ids = orderedTopLevelFrames(
+    editor.store,
+    editor.currentPageId,
+    editor.createShapeContext(),
+  );
+  if (!ids.length) throw new Error("Create an artboard to export.");
+  const files = [];
+  for (const [index, id] of ids.entries()) {
+    const frame = editor.store.get(id);
+    const svg = editor.exportArtboardSvg(id);
+    if (!frame || !svg) throw new Error("Cannot export an artboard.");
+    const contents =
+      format === "svg"
+        ? new TextEncoder().encode(svg)
+        : new Uint8Array(await (await rasterize(svg, scale)).arrayBuffer());
+    files.push({
+      path: `${frameFileStem(index, (frame.semantic as { name?: string }).name ?? "Frame")}.${format}`,
+      contents,
+    });
+  }
+  return encodeStoredZip(files, "Artboards");
+}
+
+/** Export the flow chosen in the prototype panel. */
+export function exportSelectedPrototype(
+  editor: Editor,
+  flow: string,
+  device: boolean,
+): string {
+  return exportPrototypeHtml(editor, {
+    pageId: editor.currentPageId,
+    ...(flow ? { flow } : {}),
+    device: device ? "frame" : "none",
+  });
 }

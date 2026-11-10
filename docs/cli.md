@@ -409,3 +409,60 @@ The `convert` edit operation accepts `id` or `where` with `expect`, and `type` a
 For `ddl --frame`, `memberIds` lists are authoritative except non-empty lists containing only frames, so `memberIds: []` is a closed frame. Open frames (no list or only frames) also include fully contained, unclaimed tables by position, regardless of z-order or nested positional frame edges. A straddling table excluded from a selected frame or another ambiguous exclusion produces a named warning; `--strict` exits 3. Canvas ownership may differ from DDL scope. `lint` reports `frame-straddle` as a warning naming the table and frame without changing its exit code.
 
 Sequence participant rendering uses a stick figure with the name below for `actor`, a cylinder for `db`, and a rounded box for `service`, in export and on the canvas; all retain their lifelines. `types sequence.participant` describes this in text and its JSON `rendering` key.
+
+## Designing phone apps with the CLI
+
+This generic walkthrough starts with a minimal document. Run it in an empty
+working directory. For an existing document, omit the first `printf` and use a
+unique page name. A checkout can run `nodetto-cli` as
+`bun /path/to/nodetto-app/apps/cli/src/main.ts`.
+
+```bash
+printf '%s\n' '{"kind":"document","schemaVersion":1,"id":"doc","title":"Phone"}' '{"kind":"page","id":"p1","name":"Main","pageKind":"freeform"}' > phone.jsonl
+nodetto-cli edit phone.jsonl --ops - <<'JSON'
+[{"op":"add-page","name":"Phone","kind":"freeform","mode":"app"}]
+JSON
+nodetto-cli draw phone.jsonl frame:iphone --page Phone --label Home --at 0,0
+nodetto-cli shapes icon bell
+nodetto-cli shapes ios:list-row
+nodetto-cli edit phone.jsonl --ops - <<'JSON'
+[
+  {"op":"select","where":{"page":"Phone","name":"Home"},"ref":"home"},
+  {"op":"update","id":"@home","semantic":{"prototypeStart":true,"prototypeFlowName":"Main"}},
+  {"op":"add","page":"Phone","shape":"ios:status-bar","parent":"@home","props":{}},
+  {"op":"add","page":"Phone","shape":"ios:nav-bar","parent":"@home","visual":{"x":0,"y":48},"props":{"title":"Home"}},
+  {"op":"add","page":"Phone","shape":"ios:tab-bar","parent":"@home","visual":{"x":0,"y":760},"props":{"active":0}},
+  {"op":"add","page":"Phone","shape":"frame","parent":"@home","ref":"list","visual":{"x":0,"y":120,"width":390,"height":200}},
+  {"op":"add","page":"Phone","shape":"ios:list-row","parent":"@list","props":{"title":"First"}},
+  {"op":"add","page":"Phone","shape":"ios:list-row","parent":"@list","props":{"title":"Second"}},
+  {"op":"layout","id":"@list","direction":"vertical","gap":8},
+  {"op":"add","page":"Phone","shape":"icon:bell","parent":"@home","visual":{"x":16,"y":360}},
+  {"op":"add","page":"Phone","shape":"text:layer","parent":"@home","label":"Updates","visual":{"x":48,"y":360,"width":100,"height":32}},
+  {"op":"add","page":"Phone","shape":"frame:iphone","ref":"detail","label":"Detail","visual":{"x":500,"y":0}},
+  {"op":"connect","shape":"prototype:transition","from":"@home","to":"@detail","semantic":{"prototypeTrigger":"tap"}},
+  {"op":"connect","shape":"prototype:back","from":"@detail"}
+]
+JSON
+nodetto-cli lint phone.jsonl --page Phone
+mkdir -p frames reference comparisons
+nodetto-cli export phone.jsonl --page Phone --frames --format png --output-dir frames --scale 2
+cp frames/*.png reference/ # Replace these copies with numbered reference PNGs for a real comparison.
+nodetto-cli compare frames reference --output comparisons --scale 2 --band 0:844:0 --grid 8
+nodetto-cli export phone.jsonl --page Phone --format png --prototype --output storyboard.png
+nodetto-cli export phone.jsonl --page Phone --format prototype --output prototype.html --flow Main --device frame
+```
+
+The example uses `parent` for membership; an added child's `visual.x` and
+`visual.y` are relative to that parent. `props` sets the kit's exposed
+properties; use `shapes ios:<name>` to inspect them. Kit component definitions
+are created on the `iOS kit` page. The list frame's vertical layout places its
+rows in order. Use `shapes icon <query>` to discover icons, and `text:layer`
+for precise text. Replace the example screen-wide links with links from specific
+hotspots where needed. Run lint and resolve app findings until none remain.
+
+Frame exports are numbered in reading order, so comparison directories pair
+images by leading number. Each comparison shows reference, actual and difference.
+Repeat `--band y0:y1:dy` for reference-coordinate bands when added system bars
+shift content; `dy` is the corresponding actual-image shift in points. Default
+page exports hide prototype links; `--prototype` makes a storyboard and
+`--format prototype` makes a click-through HTML file.

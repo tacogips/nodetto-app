@@ -8,6 +8,7 @@ These examples contain no flattened screenshot layers.
 | --- | --- | --- |
 | [Web app](web-workspace/design.jsonl) | Overview, project board, workspace settings | 1280 × 900 |
 | [iPhone app](iphone-planner/design.jsonl) | Today, task detail, inbox | 390 × 844 |
+| [Garden journal](iphone-kit/README.md) | Plants, plant detail, settings, add entry | 390 × 844 |
 
 In Nodetto, choose **File > New from template** (also available in the macOS
 File menu, Cmd+Alt+N), or open one of these `design.jsonl` files. The template
@@ -29,3 +30,5 @@ bun apps/cli/scripts/generate-design-examples.ts
 The design source is `packages/core/src/templates/design-templates.ts`.
 These are static UI design examples; they do not implement application logic.
 Their primary action has a prototype link to the second artboard in Nodetto.
+
+To rebuild the garden journal from CLI operations, run `bun apps/cli/scripts/generate-iphone-kit-example.ts`.

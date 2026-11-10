@@ -23,6 +23,7 @@ Draw and edit
   nodetto-cli arrange <doc>       Arrange one page: tidy, overlaps, layered or route
 Render
   nodetto-cli export <doc>        Export a page or selected artwork
+  nodetto-cli compare <actual> <reference>  Compare PNGs side by side
 Convert and check
   nodetto-cli merge <base> <ours> <theirs>  Merge document versions
   nodetto-cli ddl <doc>           Database DDL from an ERD page
@@ -33,7 +34,6 @@ Convert and check
   nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
   nodetto-cli pcb import|gerber   KiCad board to a PCB page, Gerber and drill export
   nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
-
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
   nodetto-cli authorize [folder]  Grant project-folder access for the Store CLI
@@ -138,6 +138,8 @@ ${EXIT_CODES}`,
                            [--ids short|full]
 
 Print what the document contains.
+  --flows lists named prototype flow starts; --flow <name> selects a flow.
+  Outline positions include rel x,y for children relative to their frame.
 
   --format outline  (default) One line per page and element, indented under its
                     frame or container: type, id, name or label, position @x,y,
@@ -254,6 +256,19 @@ uml.port, bpmn.boundaryEvent and PCB tracks follow their hosts.
 For a pool or lane with child lanes, false rejects heights below the lanes'
 minimum; pool width must be greater than 30 per lane depth and at least the
 nested lanes' extent. These geometry errors exit 2 without writing.
+
+App design operations:
+  add accepts parent (coordinates relative to the parent), memberIndex and props
+  for kit instances. add and update accept sizing (fixed, hug, fill) and
+  absolute; cross-axis fill requires the parent layout align to be stretch.
+  layout sets direction, gap, padding, alignment and sizing on a frame. align
+  accepts to: selection, parent, safe-area or an element reference; distribute
+  accepts gap; snap accepts grid 1, 2, 4 or 8.
+  textAlign accepts left/start, center and right/end aliases. Overriding a
+  linked typography style can detach it and emits a typography warning.
+  connect supports prototype:back with only from; tap aliases click, and actions
+  include back and swap-overlay. Set prototypeStart and prototypeFlowName on
+  a frame to name a flow.
 
 Operations (a JSON array, or JSON Lines; --ops - reads stdin):
   set-cells updates spreadsheet table cells in one operation.
@@ -392,6 +407,11 @@ category. Draw one with "nodetto-cli draw <doc> <shape-id>" or with
   --no-connectors  Only shapes placed on their own.
   --format         text (default) or json.
 
+Use nodetto-cli shapes icon <query> [--all] to search icons, then add
+icon:<name>. Use ios:<name> for iOS kit instances; inspect a shape to see its
+properties. text:layer creates precise text; frame:iphone and other frame
+presets create device artboards. prototype:back creates a back link.
+
 With one shape ID, print what it creates: the element type, the semantic and
 visual defaults it starts from, and ready-to-use draw and edit commands.
 
@@ -464,6 +484,12 @@ ${EXIT_CODES}`,
 --quiet suppresses warning lines. Repeated document-load and text-layout
 warnings collapse as " (and <n> more like this)"; other format warnings print
 one per line. --strict still exits 3 where supported.
+
+App design: --frames --output-dir <dir> exports top-level frames in reading
+order as numbered PNG or SVG files (NN-name.ext). --prototype includes storyboard links;
+page SVG/PNG/PDF exports omit prototype links by default. Use --format
+prototype --output <file.html> [--flow <name>] [--device none|frame] for a
+click-through HTML prototype.
 
 Render one page exactly as the app's page export does.
 Text exports (SVG, Mermaid, D2, draw.io) depend only on canonical content and
@@ -642,10 +668,26 @@ are warnings.
 
 ${EXIT_CODES}`,
 
+  compare: `Usage: nodetto-cli compare <actual> <reference> --output <png|dir>
+                           [--scale <n>] [--band y0:y1:dy]... [--grid <n>]
+
+Compare two PNG files or two directories, pairing directory entries by their
+leading number. Output panels show reference, nodetto and difference. Bands
+use reference points and shift actual rows by dy; --grid overlays a point grid
+on the difference. Default scale is 2. Each panel uses the reference size;
+actual is scaled uniformly to its width, with a warning if dimensions differ.
+Output size is 3 * reference width / scale + 32 by reference height / scale +
+24 pixels. Directory output names are NN-compare.png.
+
+Exit codes: 0 success, 1 input or comparison error.`,
+
   lint: `Usage: nodetto-cli lint <document.jsonl|file.bpmn> [--page <short-id|id|name>]
                         [--config <file>] [--format text|json] [--fix] [--metrics]
                         [--font-dir <dir>]
 
+App/web-mode pages get app-off-frame, app-text-overflow, app-text-truncated,
+app-control-overlap, app-off-grid, app-misaligned and app-touch-target checks.
+Instance descendants are checked with instance context in text and JSON findings.
 --fix wraps text and moves colliding labels; .bpmn exits 2.
 --metrics reports edge crossings, label overlaps and segmentOverlaps; it never changes the exit code.
 Text: metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s), <k> overlapping segment pair(s).

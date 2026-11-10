@@ -93,3 +93,10 @@ describe("shape catalogue", () => {
     expect(editor.store.get(edge ?? "")?.type).toBe("edge.generic");
   });
 });
+
+test("iPhone design catalogue entries", () => {
+  expect(findShape("text:layer")?.type).toBe("text.note");
+  for (const size of ["393x852", "402x874", "430x932", "440x956", "375x667"])
+    expect(findShape(`frame:iphone-${size}`)?.type).toBe("frame");
+  expect(findShape("prototype:back")?.connector).toBe(true);
+});

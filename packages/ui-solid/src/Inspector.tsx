@@ -73,6 +73,7 @@ import { TableSheetSection } from "./inspector/TableSheetSection.tsx";
 import { ColorBindingsSection } from "./inspector/ColorBindingsSection.tsx";
 import { NumberBindingsSection } from "./inspector/NumberBindingsSection.tsx";
 import { TextStyleBindingsSection } from "./inspector/TextStyleBindingsSection.tsx";
+import { IconSection } from "./inspector/IconSection.tsx";
 import { StrokeSection } from "./inspector/StrokeSection.tsx";
 import { PathSection } from "./inspector/PathSection.tsx";
 import { Field, Section, TextInput } from "./inspector/controls.tsx";
@@ -192,6 +193,7 @@ export function Inspector(props: InspectorProps): JSX.Element {
     if (type === "pcb.graphic") return "Graphic";
     const labels: Record<string, string> = {
       "ui.control": "Control",
+      "ui.icon": "Icon",
       "erd.table": "Table",
       "table.sheet": "Table (sheet)",
       "uml.class": "Class",
@@ -254,6 +256,9 @@ export function Inspector(props: InspectorProps): JSX.Element {
           </Match>
           <Match when={element().type === "sequence.message"}>
             <SequenceMessageSection editor={props.editor} element={element()} />
+          </Match>
+          <Match when={element().type === "ui.icon"}>
+            <IconSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type === "ui.control"}>
             <UiControlSection editor={props.editor} element={element()} />

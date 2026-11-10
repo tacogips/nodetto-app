@@ -7,6 +7,33 @@ import type { ShapeUtil } from "../shape-util.ts";
 import type { FramePlatform, FrameSemantic, SafeAreaInsets } from "@nodetto/ir";
 
 export const FRAME_TITLE_BAND = 24;
+export const FRAME_OUTSIDE_TITLE_GAP = 6;
+export const FRAME_OUTSIDE_TITLE_HEIGHT = 16;
+
+export function resolveTitlePlacement(
+  semantic: FrameSemantic,
+): "inside" | "outside" {
+  return (
+    semantic.titlePlacement ??
+    (semantic.platform !== undefined || semantic.screenKind !== undefined
+      ? "outside"
+      : "inside")
+  );
+}
+
+export function frameTitleBox(
+  bounds: Box,
+  semantic: FrameSemantic,
+): Box | undefined {
+  if (semantic.showTitle === false) return undefined;
+  return resolveTitlePlacement(semantic) === "inside"
+    ? { ...bounds, height: FRAME_TITLE_BAND }
+    : {
+        ...bounds,
+        y: bounds.y - FRAME_OUTSIDE_TITLE_GAP - FRAME_OUTSIDE_TITLE_HEIGHT,
+        height: FRAME_OUTSIDE_TITLE_HEIGHT,
+      };
+}
 
 export interface FramePreset {
   readonly name: string;
@@ -25,6 +52,41 @@ export const FRAME_PRESETS = {
     height: 844,
     platform: "ios",
     safeArea: { top: 47, right: 0, bottom: 34, left: 0 },
+  },
+  "iphone-393x852": {
+    name: "iPhone 393×852",
+    width: 393,
+    height: 852,
+    platform: "ios",
+    safeArea: { top: 59, right: 0, bottom: 34, left: 0 },
+  },
+  "iphone-402x874": {
+    name: "iPhone 402×874",
+    width: 402,
+    height: 874,
+    platform: "ios",
+    safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+  },
+  "iphone-430x932": {
+    name: "iPhone 430×932",
+    width: 430,
+    height: 932,
+    platform: "ios",
+    safeArea: { top: 59, right: 0, bottom: 34, left: 0 },
+  },
+  "iphone-440x956": {
+    name: "iPhone 440×956",
+    width: 440,
+    height: 956,
+    platform: "ios",
+    safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+  },
+  "iphone-375x667": {
+    name: "iPhone 375×667",
+    width: 375,
+    height: 667,
+    platform: "ios",
+    safeArea: { top: 20, right: 0, bottom: 0, left: 0 },
   },
   android: {
     name: "Android",
@@ -97,7 +159,9 @@ export const frameShapeUtil: ShapeUtil = {
         point.x >= box.x + box.width - 8 ||
         point.y <=
           box.y +
-            ((element.semantic as FrameSemantic).showTitle === false
+            ((element.semantic as FrameSemantic).showTitle === false ||
+            resolveTitlePlacement(element.semantic as FrameSemantic) ===
+              "outside"
               ? 8
               : FRAME_TITLE_BAND) ||
         point.y >= box.y + box.height - 8)

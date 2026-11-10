@@ -11,6 +11,7 @@ import {
   type UseCaseRelationshipKind,
   type Visual,
 } from "@nodetto/ir";
+import { APP_FONT_STACK } from "./text-measure.ts";
 import { FRAME_PRESETS } from "./shapes/frame.ts";
 import { USECASE_NODE_SIZES } from "./shapes/usecase.ts";
 
@@ -65,6 +66,7 @@ export const Tool = {
   Crop: "crop",
   Connector: "edge",
   ScreenTransition: "prototype:transition",
+  PrototypeBack: "prototype:back",
   PopupFrame: "frame:popup",
   BottomSheetFrame: "frame:bottom-sheet",
   PopoverFrame: "frame:popover",
@@ -83,6 +85,7 @@ export const Tool = {
   Progress: "ui:progress",
   Node: "node.generic",
   Text: "text.note",
+  TextLayer: "text:layer",
   Note: "text.note:note",
   Table: "erd.table",
   Sheet: "table.sheet",
@@ -122,6 +125,11 @@ export const Tool = {
   Frame: "frame",
   WebFrame: "frame:web",
   IPhoneFrame: "frame:iphone",
+  IPhone393Frame: "frame:iphone-393x852",
+  IPhone402Frame: "frame:iphone-402x874",
+  IPhone430Frame: "frame:iphone-430x932",
+  IPhone440Frame: "frame:iphone-440x956",
+  IPhone375Frame: "frame:iphone-375x667",
   AndroidFrame: "frame:android",
   TabletFrame: "frame:tablet",
   PaperFrame: "frame:paper",
@@ -464,6 +472,11 @@ const GEO_KINDS = {
 const FRAME_KINDS = {
   [Tool.WebFrame]: "web",
   [Tool.IPhoneFrame]: "iphone",
+  [Tool.IPhone393Frame]: "iphone-393x852",
+  [Tool.IPhone402Frame]: "iphone-402x874",
+  [Tool.IPhone430Frame]: "iphone-430x932",
+  [Tool.IPhone440Frame]: "iphone-440x956",
+  [Tool.IPhone375Frame]: "iphone-375x667",
   [Tool.AndroidFrame]: "android",
   [Tool.TabletFrame]: "tablet",
   [Tool.PaperFrame]: "paper",
@@ -665,6 +678,11 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     }
     case Tool.WebFrame:
     case Tool.IPhoneFrame:
+    case Tool.IPhone393Frame:
+    case Tool.IPhone402Frame:
+    case Tool.IPhone430Frame:
+    case Tool.IPhone440Frame:
+    case Tool.IPhone375Frame:
     case Tool.AndroidFrame:
     case Tool.TabletFrame:
     case Tool.PaperFrame: {
@@ -768,6 +786,27 @@ export function creationFor(tool: ToolKind): CreationTool | null {
         },
       };
     }
+    case Tool.TextLayer:
+      return {
+        type: "text.note",
+        semantic: { text: "Text" },
+        visual: {
+          width: 40,
+          height: 22,
+          textPadding: 0,
+          textResize: "auto-width",
+          textMeasure: "proportional",
+          style: {
+            fontFamily: APP_FONT_STACK,
+            fontSize: 17,
+            fontWeight: 400,
+            lineHeight: 1.29,
+            color: "#000000",
+            textAlign: "start",
+            verticalAlign: "top",
+          },
+        },
+      };
     case Tool.Note:
       return {
         type: "text.note",
@@ -789,6 +828,7 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.Comment:
     case Tool.Connector:
     case Tool.ScreenTransition:
+    case Tool.PrototypeBack:
     case Tool.Relation:
     case Tool.ForeignKey:
     case Tool.Association:
@@ -849,6 +889,7 @@ export function isConnectorTool(tool: ToolKind): boolean {
   return (
     tool === Tool.Connector ||
     tool === Tool.ScreenTransition ||
+    tool === Tool.PrototypeBack ||
     typedConnectorFor(tool) !== undefined ||
     componentRelationshipFor(tool) !== undefined ||
     useCaseRelationshipFor(tool) !== undefined

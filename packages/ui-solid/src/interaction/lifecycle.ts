@@ -2,6 +2,8 @@
 // owns the canvas, and how a gesture commits, cancels or is discarded so
 // every `beginBatch` meets its `endBatch` (see interaction.ts).
 
+import { expandContainers, findInsertionParent } from "@nodetto/core";
+import type { FrameSemantic } from "@nodetto/ir";
 import type { InteractionContext } from "./context.ts";
 
 export interface GestureLifecycle {
@@ -31,6 +33,35 @@ export function createGestureLifecycle(
     ctx.discardDragFrame();
     if (latest) applyPointerMove(latest);
     const gesture = state.gesture;
+    if (gesture.kind === "translating" && gesture.moved) {
+      const moving = new Set(gesture.origins.keys());
+      const context = editor.createShapeContext();
+      const descendants = new Set<string>();
+      for (const id of moving) {
+        const type = editor.store.get(id)?.type;
+        if (type !== "frame" && type !== "group") continue;
+        for (const child of expandContainers(editor.store, [id], context)) {
+          if (child !== id) descendants.add(child);
+        }
+      }
+      for (const id of moving) {
+        if (descendants.has(id)) continue;
+        const element = editor.store.get(id);
+        const bounds = editor.getBounds(id);
+        if (!element || !bounds) continue;
+        const parent = findInsertionParent(
+          editor.store,
+          element.page,
+          bounds,
+          context,
+          moving,
+        );
+        const frame = parent && editor.store.get(parent);
+        const members = frame && (frame.semantic as FrameSemantic).memberIds;
+        if (parent && members && !members.includes(id))
+          editor.reparentElement(id, parent);
+      }
+    }
     if (
       gesture.kind === "translating" ||
       gesture.kind === "sequence-reorder" ||

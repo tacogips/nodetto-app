@@ -5,7 +5,10 @@
 
 import { CONNECTOR_ENDPOINT_TYPES, type ElementId } from "@nodetto/ir";
 import type { Editor } from "./editor.ts";
-import { connectScreenTransition } from "./screen-transition.ts";
+import {
+  connectPrototypeBack,
+  connectScreenTransition,
+} from "./screen-transition.ts";
 import {
   componentRelationshipFor,
   type CreationTool,
@@ -74,6 +77,7 @@ const LISTINGS: Readonly<Record<ShapeCategoryId, Listing>> = {
     [Tool.StickFigure, "Stick figure"],
     [Tool.Package, "Package"],
     [Tool.Text, "Text"],
+    [Tool.TextLayer, "Text layer"],
     [Tool.Note, "Note"],
     [Tool.Node, "Node"],
     [Tool.Sheet, "Sheet"],
@@ -193,6 +197,11 @@ const LISTINGS: Readonly<Record<ShapeCategoryId, Listing>> = {
   artboard: [
     [Tool.WebFrame, "Web"],
     [Tool.IPhoneFrame, "iPhone"],
+    [Tool.IPhone393Frame, "iPhone 393×852"],
+    [Tool.IPhone402Frame, "iPhone 402×874"],
+    [Tool.IPhone430Frame, "iPhone 430×932"],
+    [Tool.IPhone440Frame, "iPhone 440×956"],
+    [Tool.IPhone375Frame, "iPhone 375×667"],
     [Tool.AndroidFrame, "Android"],
     [Tool.TabletFrame, "Tablet"],
     [Tool.PaperFrame, "Document"],
@@ -213,12 +222,17 @@ const LISTINGS: Readonly<Record<ShapeCategoryId, Listing>> = {
     [Tool.BottomSheetFrame, "Bottom sheet"],
     [Tool.PopoverFrame, "Popover"],
     [Tool.ScreenTransition, "Screen transition"],
+    [Tool.PrototypeBack, "Back link"],
   ],
 };
 
 /** The element type a connector tool creates. */
 function connectorTypeFor(tool: ToolKind): string | undefined {
-  if (tool === Tool.Connector || tool === Tool.ScreenTransition)
+  if (
+    tool === Tool.Connector ||
+    tool === Tool.ScreenTransition ||
+    tool === Tool.PrototypeBack
+  )
     return "edge.generic";
   if (componentRelationshipFor(tool)) return "uml.component-relationship";
   return typedConnectorFor(tool);
@@ -317,6 +331,7 @@ export function connectShape(
   if (useCaseKind) return editor.connectUseCase(from, to, useCaseKind);
   if (id === Tool.Relation || id === Tool.ForeignKey)
     return editor.connectErdRelation(from, to, id === Tool.Relation);
+  if (id === Tool.PrototypeBack) return connectPrototypeBack(editor, from);
   if (id === Tool.ScreenTransition)
     return connectScreenTransition(editor, from, to);
   if (id === Tool.Connector) {

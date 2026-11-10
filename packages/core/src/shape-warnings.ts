@@ -15,6 +15,7 @@ import {
   isRasterAttachmentPath,
 } from "@nodetto/ir";
 import { erdForeignKeyWarning } from "./erd-foreign-key.ts";
+import { findIcon } from "./icons/icon-registry.ts";
 import type { ShapeContext } from "./shape-util.ts";
 
 type WarningContext = Pick<ShapeContext, "resolve" | "resolveAsset">;
@@ -76,6 +77,14 @@ function computeAuthoringWarnings(
 ): readonly string[] {
   const warnings: string[] = [];
   const semantic = element.semantic as Record<string, unknown>;
+  if (
+    element.type === "ui.icon" &&
+    typeof semantic.icon === "string" &&
+    !findIcon(semantic.icon)
+  )
+    warnings.push(
+      `Unknown icon "${semantic.icon}". Search with nodetto-cli shapes icon <query>.`,
+    );
   const fk = erdForeignKeyWarning(element, (id) => context.resolve(id));
   if (fk) warnings.push(fk);
   warnings.push(

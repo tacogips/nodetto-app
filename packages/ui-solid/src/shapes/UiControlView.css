@@ -1,8 +1,22 @@
 .nodetto-ui-control {
+  position: relative;
   width: 100%;
   height: 100%;
   color: var(--nodetto-ink);
   font-family: inherit;
+}
+.nodetto-control-strokes {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.nodetto-control-strokes ~ button,
+.nodetto-control-strokes ~ input,
+.nodetto-control-strokes ~ textarea,
+.nodetto-control-strokes ~ select,
+.nodetto-control-strokes ~ .nodetto-ui-tabs {
+  position: relative;
 }
 .nodetto-ui-control > button,
 .nodetto-ui-control > input,
@@ -36,7 +50,7 @@
   width: 18px;
   height: 18px;
   margin: 0;
-  accent-color: #137e7e;
+  accent-color: var(--nd-control-accent, #137e7e);
 }
 .nodetto-ui-control[data-control="switch"] > label > input {
   appearance: none;
@@ -47,7 +61,7 @@
   position: relative;
 }
 .nodetto-ui-control[data-control="switch"] > label > input:checked {
-  background: #137e7e;
+  background: var(--nd-control-accent, #137e7e);
 }
 .nodetto-ui-control[data-control="switch"] > label > input::after {
   content: "";
@@ -69,7 +83,7 @@
   height: 100%;
   overflow: hidden;
   box-sizing: border-box;
-  background: #f1f5f9;
+  background: var(--nd-control-fill, #f1f5f9);
 }
 .nodetto-ui-tabs > button {
   flex: 1;
@@ -85,14 +99,57 @@
   text-overflow: ellipsis;
 }
 .nodetto-ui-tabs > button[aria-selected="true"] {
-  border-bottom-color: #137e7e;
-  background: #d6ecef;
+  border-bottom-color: var(--nd-control-accent, #137e7e);
+  background: var(--nd-control-selected-fill, #d6ecef);
+  color: var(--nd-control-selected, inherit);
   font-weight: 600;
+}
+.nodetto-ui-tabs[data-indicator="underline"] > button[aria-selected="true"] {
+  background: transparent;
+  border-bottom-width: 2px;
+}
+.nodetto-ui-tabs[data-indicator="pill"] > button[aria-selected="true"] {
+  background: var(--nd-control-accent, #137e7e);
+  border-bottom-color: transparent;
+  border-radius: 999px;
+  margin: 2px;
+}
+.nodetto-control-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.nodetto-control-icon-leading {
+  left: 10px;
+}
+.nodetto-control-icon-trailing {
+  right: 10px;
+}
+.nodetto-control-badge {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--nd-control-accent, #137e7e);
+  color: white;
+  font: bold 11px / 18px sans-serif;
+  text-align: center;
+}
+.nodetto-control-badge-dot {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
 }
 .nodetto-ui-control > progress {
   width: 100%;
   height: 100%;
-  accent-color: #137e7e;
+  accent-color: var(--nd-control-accent, #137e7e);
   appearance: none;
   border: 0;
   border-radius: 999px;
@@ -100,14 +157,14 @@
 }
 
 .nodetto-ui-control > progress::-webkit-progress-bar {
-  background: #e2e8f0;
+  background: var(--nd-control-progress-fill, #e2e8f0);
   border-radius: 999px;
 }
 .nodetto-ui-control > progress::-webkit-progress-value {
-  background: #137e7e;
+  background: var(--nd-control-accent, #137e7e);
   border-radius: 999px;
 }
 .nodetto-ui-control > progress::-moz-progress-bar {
-  background: #137e7e;
+  background: var(--nd-control-accent, #137e7e);
   border-radius: 999px;
 }

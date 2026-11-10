@@ -36,6 +36,7 @@ const GOLDEN = [
   "bpmn",
   "breadboard",
   "pcb",
+  "ui-icon",
 ] as const;
 
 describe("golden files", () => {

@@ -1,3 +1,4 @@
+import { createSignal, type Accessor, type Setter } from "solid-js";
 import {
   canStraightenConnector,
   straightenConnectors,
@@ -37,6 +38,35 @@ import {
 } from "@nodetto/core";
 import { selectedCommentTarget } from "./comment-target.ts";
 import type { BooleanOperation, ElementId } from "@nodetto/ir";
+
+// Ephemeral per-editor chrome state, independent of document and undo history.
+type PrototypeViewState = {
+  view: Accessor<boolean>;
+  setView: Setter<boolean>;
+  flow: Accessor<string | undefined>;
+  setFlow: Setter<string | undefined>;
+  presenting: Accessor<boolean>;
+  setPresenting: Setter<boolean>;
+};
+const prototypeViews = new WeakMap<Editor, PrototypeViewState>();
+export function prototypeViewState(editor: Editor): PrototypeViewState {
+  let state = prototypeViews.get(editor);
+  if (!state) {
+    const [view, setView] = createSignal(false);
+    const [flow, setFlow] = createSignal<string>();
+    const [presenting, setPresenting] = createSignal(false);
+    state = { view, setView, flow, setFlow, presenting, setPresenting };
+    prototypeViews.set(editor, state);
+  }
+  return state;
+}
+export const PROTOTYPE_VIEW_SHORTCUT = "Shift+E";
+export const isPrototypeEdge = (element: {
+  type: string;
+  semantic: unknown;
+}): boolean =>
+  element.type === "edge.generic" &&
+  (element.semantic as { prototype?: boolean }).prototype === true;
 
 export type ActionGroup =
   | "clipboard"

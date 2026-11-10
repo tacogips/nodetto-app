@@ -69,6 +69,11 @@ export function loadEditorPreferences(
       rightPaneOpen: bool("rightPaneOpen"),
       snap: {
         grid: typeof snap["grid"] === "boolean" ? snap["grid"] : true,
+        ...(snap["gridSize"] === 4 ||
+        snap["gridSize"] === 8 ||
+        snap["gridSize"] === 24
+          ? { gridSize: snap["gridSize"] }
+          : {}),
         objects: typeof snap["objects"] === "boolean" ? snap["objects"] : true,
         guides: typeof snap["guides"] === "boolean" ? snap["guides"] : true,
       },

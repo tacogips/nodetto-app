@@ -26,6 +26,8 @@ import {
   actionTitle,
   getAction,
   runAction,
+  prototypeViewState,
+  PROTOTYPE_VIEW_SHORTCUT,
 } from "./shortcuts.ts";
 import { canUseTool, Tool, type ToolKind } from "./tools.ts";
 import "./Toolbar.css";
@@ -226,7 +228,9 @@ export function rememberedTool(
 }
 
 export function Toolbar(props: ToolbarProps): JSX.Element {
-  const [preview, setPreview] = createSignal(false);
+  const prototype = prototypeViewState(props.editor);
+  const preview = prototype.presenting;
+  const setPreview = prototype.setPresenting;
   const [open, setOpen] = createSignal<string | null>(null);
   const [menuPosition, setMenuPosition] = createSignal({ x: 8, y: 44 });
   const signals = createEditorSignals(props.editor);
@@ -246,6 +250,30 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
     );
   };
   onMount(() => {
+    const toggleView = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        !workspace().design ||
+        preview() ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        !event.shiftKey ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.key.toLowerCase() !== "e" ||
+        target?.closest(
+          'input, textarea, select, [contenteditable="true"], [role="dialog"]',
+        )
+      )
+        return;
+      event.preventDefault();
+      prototype.setView((value) => !value);
+    };
+    const shortcutRoot =
+      root?.closest<HTMLElement>("[data-nodetto-editor]") ?? root;
+    shortcutRoot?.addEventListener("keydown", toggleView);
+    onCleanup(() => shortcutRoot?.removeEventListener("keydown", toggleView));
     const dismiss = (event: PointerEvent) => {
       if (root && !root.contains(event.target as Node)) setOpen(null);
     };
@@ -551,6 +579,24 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
           {props.utilitiesContent}
         </div>
         <Show when={workspace().design}>
+          <div role="group" aria-label="Canvas view">
+            <button
+              type="button"
+              aria-pressed={!prototype.view()}
+              title={`Design view (${PROTOTYPE_VIEW_SHORTCUT})`}
+              onClick={() => prototype.setView(false)}
+            >
+              Design
+            </button>
+            <button
+              type="button"
+              aria-pressed={prototype.view()}
+              title={`Prototype view (${PROTOTYPE_VIEW_SHORTCUT})`}
+              onClick={() => prototype.setView(true)}
+            >
+              Prototype
+            </button>
+          </div>
           <button
             type="button"
             class="nodetto-toolbar-icon"
@@ -560,7 +606,10 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
             onClick={(event) => {
               event.currentTarget.focus({ preventScroll: true });
               if (preview()) closePreview();
-              else setPreview(true);
+              else {
+                prototype.setFlow(undefined);
+                setPreview(true);
+              }
             }}
           >
             <Icon name="preview" />
@@ -602,6 +651,7 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
         <Suspense>
           <PrototypePreview
             editor={props.editor}
+            flow={prototype.flow()}
             toolbar={toolbar()}
             onClose={closePreview}
           />

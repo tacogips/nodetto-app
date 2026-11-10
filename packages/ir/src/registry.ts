@@ -1,3 +1,4 @@
+import { uiIconDefinition } from "./registry/icons.ts";
 import { uiControlDefinition } from "./ui-controls.ts";
 import { databaseObjectDefinitions } from "./database-objects.ts";
 // Element type registry (v1). See the product design, section 5.2.
@@ -83,6 +84,7 @@ const DEFINITIONS: readonly ElementTypeDefinition[] = [
   ERD_TABLE,
   TABLE_SHEET,
   uiControlDefinition,
+  uiIconDefinition,
   ...databaseObjectDefinitions,
   ERD_RELATION,
   UML_CLASS,

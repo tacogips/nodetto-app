@@ -39,6 +39,12 @@ import {
   deletePage,
 } from "./operations/pages.ts";
 import { setCells } from "./operations/table.ts";
+import {
+  layoutOperation,
+  alignOperation,
+  distributeOperation,
+  snapOperation,
+} from "./operations/layout.ts";
 import { addElement } from "./operations/add.ts";
 import { connectElements } from "./operations/connect.ts";
 import { convertElements } from "./operations/convert.ts";
@@ -335,6 +341,18 @@ export class Batch {
         return;
       case "delete-page":
         deletePage(this, operation, index);
+        return;
+      case "layout":
+        layoutOperation(this, operation, index);
+        return;
+      case "align":
+        alignOperation(this, operation, index);
+        return;
+      case "distribute":
+        distributeOperation(this, operation, index);
+        return;
+      case "snap":
+        snapOperation(this, operation, index);
         return;
       case "add":
         addElement(this, operation, index);

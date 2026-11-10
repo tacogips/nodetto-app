@@ -710,6 +710,32 @@ multiple HTML/CSS pages. Normal startup still begins with an empty document.
 
 See [editable examples and rendered previews](../examples/design/README.md).
 
+## iPhone app design
+
+Use **Text layer** for precise text without the inset of a shape label, and the
+**Icon** picker to search and insert icons. The **iOS kit** palette group offers
+editable components for common phone screens; their definitions are on the iOS
+kit page. Device frame presets include iPhone sizes such as 390 x 844 and
+402 x 874 points. Device titles appear above the artboard. Elements created or
+dropped inside a frame become its children; moving the frame moves its children.
+
+The app and web workspaces default to an 8-point snap grid, with a 4-point
+option; other workspaces default to 24 points. Use the **Design | Prototype**
+toggle or Shift+E to switch views. Prototype view displays links and a **Flows**
+list for selecting and navigating to named starting points.
+
+Open Preview to present a flow. Choose its flow or screen, toggle the device
+frame and **Show hotspots**, and use Back or Restart. Escape closes an overlay
+or exits preview; Backspace or Left Arrow goes back, and R restarts. Matching
+persistent layers retain their position across transitions.
+
+The **Design check** panel lists app-design findings and lets you select and
+focus the affected element. In Export, **All artboards (ZIP)** exports separate
+artboards. **Compare with reference...** is available in Export and the selected
+artboard's context menu; it compares PNGs with optional bands and grid. Choose
+**Prototype (HTML)** to export a single interactive presentation, with flow and
+device-frame options.
+
 ## Screens, popups and transitions
 
 In Web design and App design, the **Screens & transitions** palette offers a
@@ -718,8 +744,9 @@ Web, iPhone, Android and tablet artboards start as screens. Change an existing
 frame's **Artboard → Kind** without replacing its editable child shapes.
 
 Choose **Screen transition**, then drag from a screen or one of its parts to a
-destination screen or popup. Purple connectors show the trigger, action, and
-animation. Dropping on a child part resolves to its screen, including when the
+destination screen or popup. In Prototype view, purple connectors show the
+trigger, action, and animation. Links are hidden in Design view and default page
+exports. Dropping on a child part resolves to its screen, including when the
 part is nested inside a layout frame. A popup opens as an overlay; a bottom
 sheet opens at the bottom with a slide-up animation. These links are omitted
 from the rendered screen artwork and run in **Preview**.

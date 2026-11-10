@@ -1,4 +1,5 @@
 import type { TableSheetSemantic } from "./semantics/table.ts";
+import type { UiIconSemantic } from "./registry/icons.ts";
 import type { UiControlSemantic } from "./ui-controls.ts";
 import type { DatabaseObjectSemantic } from "./database-objects.ts";
 import type {
@@ -100,6 +101,7 @@ export interface SemanticByType {
   "usecase.node": UseCaseNodeSemantic;
   "usecase.relationship": UseCaseRelationshipSemantic;
   readonly "ui.control": UiControlSemantic;
+  readonly "ui.icon": UiIconSemantic;
   "design.token": DesignTokenSemantic;
   "design.guide": PageGuideSemantic;
   "image.raster": ImageSemantic;

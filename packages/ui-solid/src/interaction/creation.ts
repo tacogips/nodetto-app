@@ -2,6 +2,7 @@
 // `placeTool`) puts on the page.
 
 import type { Box, Vec } from "@nodetto/core";
+import { findInsertionParent, planAttachToFrame } from "@nodetto/core";
 import type { BreadboardElementType, Element } from "@nodetto/ir";
 import { Tool, type ToolKind, creationFor } from "../tools.ts";
 import type { CircuitTools } from "./circuit.ts";
@@ -136,7 +137,21 @@ export function createCreationTools(
         y: point.y - (box?.height ?? 0) / 2,
       },
     };
+    editor.beginBatch();
     editor.apply([{ type: "createElement", element }]);
+    const bounds = editor.getBounds(element.id);
+    const parent =
+      bounds &&
+      findInsertionParent(
+        editor.store,
+        element.page,
+        bounds,
+        editor.createShapeContext(),
+        new Set([element.id]),
+      );
+    if (parent)
+      editor.apply(planAttachToFrame(editor.store, parent, element.id));
+    editor.endBatch();
     editor.selection.set([element.id]);
     options.setTool("select");
     if (EDIT_ON_CREATE.has(creation.type)) {

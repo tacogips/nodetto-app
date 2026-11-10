@@ -3,6 +3,12 @@ import { applyCommands, type Command } from "./commands.ts";
 import { createShapeContext } from "./hit-test.ts";
 import type { ShapeUtilRegistry } from "./shape-util.ts";
 import { textNoteText } from "./shapes/textNote.ts";
+import {
+  measureTextWidth,
+  textMeasureMode,
+  truncateToWidth,
+  wrapMeasuredLines,
+} from "./text-measure.ts";
 import type { Store } from "./store.ts";
 import { clampLayoutSize } from "./size-limits.ts";
 
@@ -105,6 +111,52 @@ export function wrapTextLines(
   return lines;
 }
 
+export function textNoteLines(element: Element): {
+  readonly lines: readonly string[];
+  readonly truncated: boolean;
+  readonly lineHeight: number;
+  readonly fontSize: number;
+} {
+  const style = element.visual.style;
+  const fontSize = Math.max(0.1, style?.fontSize ?? TEXT_NOTE_FONT_SIZE);
+  const lineHeight = fontSize * (style?.lineHeight ?? TEXT_NOTE_LINE_HEIGHT);
+  const measureStyle = {
+    fontSize,
+    fontWeight: style?.fontWeight,
+    letterSpacing: style?.letterSpacing,
+  };
+  const mode = textMeasureMode(element.visual);
+  const text = textNoteText(element.semantic);
+  const width = Math.max(
+    1,
+    (element.visual.width ?? 200) -
+      2 * (element.visual.textPadding ?? TEXT_NOTE_PADDING_X),
+  );
+  if (element.visual.textTruncate === "ellipsis") {
+    if (element.visual.textResize === "auto-width")
+      return {
+        lines: [text.replace(/\r?\n/g, " ")],
+        truncated: false,
+        lineHeight,
+        fontSize,
+      };
+    const result = truncateToWidth(text, width, measureStyle, mode);
+    return {
+      lines: [result.text],
+      truncated: result.truncated,
+      lineHeight,
+      fontSize,
+    };
+  }
+  if (mode === "proportional" && element.visual.textResize === "auto-width")
+    return { lines: paragraphs(text), truncated: false, lineHeight, fontSize };
+  const lines =
+    mode === "proportional"
+      ? wrapMeasuredLines(text, width, measureStyle, mode)
+      : wrapTextLines(text, width, fontSize, style?.letterSpacing ?? 0);
+  return { lines, truncated: false, lineHeight, fontSize };
+}
+
 export function measureTextNote(
   element: Element,
   mode: Exclude<TextResizeMode, "fixed">,
@@ -116,6 +168,47 @@ export function measureTextNote(
   const fontSize = Math.max(0.1, style?.fontSize ?? TEXT_NOTE_FONT_SIZE);
   const lineHeight = fontSize * (style?.lineHeight ?? TEXT_NOTE_LINE_HEIGHT);
   const letterSpacing = style?.letterSpacing ?? 0;
+  if (
+    textMeasureMode(element.visual) === "proportional" ||
+    element.visual.textTruncate === "ellipsis"
+  ) {
+    const measureStyle = {
+      fontSize,
+      fontWeight: style?.fontWeight,
+      letterSpacing,
+    };
+    const measureMode = textMeasureMode(element.visual);
+    const explicitLines =
+      element.visual.textTruncate === "ellipsis"
+        ? [text.replace(/\r?\n/g, " ")]
+        : paragraphs(text);
+    if (mode === "auto-width")
+      return {
+        width: safeSize(
+          Math.max(
+            ...explicitLines.map((line) =>
+              measureTextWidth(line, measureStyle, measureMode),
+            ),
+          ) +
+            paddingX * 2,
+        ),
+        height: safeSize(explicitLines.length * lineHeight + paddingY * 2),
+      };
+    const width = Math.max(1, element.visual.width ?? 200);
+    const lines =
+      element.visual.textTruncate === "ellipsis"
+        ? [""]
+        : wrapMeasuredLines(
+            text,
+            Math.max(1, width - paddingX * 2),
+            measureStyle,
+            measureMode,
+          );
+    return {
+      width,
+      height: safeSize(Math.max(1, lines.length) * lineHeight + paddingY * 2),
+    };
+  }
   if (mode === "auto-width") {
     const explicitLines = paragraphs(text);
     const characters = explicitLines.reduce(

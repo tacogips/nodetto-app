@@ -169,6 +169,7 @@ export function ZoomControls(props: ZoomControlsProps): JSX.Element {
             event.currentTarget.querySelector("summary")?.focus();
             return;
           }
+          if (event.target instanceof HTMLSelectElement) return;
           if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key))
             return;
           event.preventDefault();
@@ -222,6 +223,23 @@ export function ZoomControls(props: ZoomControlsProps): JSX.Element {
               () => props.onShowSlideAreaChange?.(!props.showSlideArea),
             )}
           </Show>
+          <label>
+            Grid size
+            <select
+              aria-label="Grid size"
+              value={props.snap.gridSize ?? 24}
+              onChange={(event) =>
+                props.onSnapChange({
+                  ...props.snap,
+                  gridSize: Number(event.currentTarget.value) as 4 | 8 | 24,
+                })
+              }
+            >
+              <option value="4">4</option>
+              <option value="8">8</option>
+              <option value="24">24</option>
+            </select>
+          </label>
           {toggle(
             "Snap",
             "Snap to other objects (hold Cmd/Ctrl to bypass)",

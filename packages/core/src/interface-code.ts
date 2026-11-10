@@ -11,11 +11,14 @@ import type {
 } from "@nodetto/ir";
 import type { Editor } from "./editor.ts";
 import { inspectDesign } from "./handoff.ts";
+import { findIcon } from "./icons/icon-registry.ts";
+import { renderIconMarkup } from "./icons/icon-markup.ts";
 import { collectInterfaceTree } from "./interface-tree.ts";
 import { layoutHandoff } from "./layout-handoff.ts";
 import { richTextSegments, safeTextLinkHref } from "./rich-text.ts";
 import { type GeoFlip, geoOutline } from "./shapes/geo-outline.ts";
 import { geoFlipOf } from "./shapes/outline.ts";
+import { resolveUiControlPaint } from "./ui-control-paint.ts";
 
 export interface InterfaceCode {
   readonly rootId: ElementId;
@@ -50,26 +53,56 @@ function escapeAttribute(value: string): string {
 
 function controlHtml(element: Element, classes: string): string {
   const s = element.semantic as UiControlSemantic;
+  const paint = resolveUiControlPaint(element, {
+    ink: "#1d2a2e",
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+  });
+  const icon = (name: string | undefined, side: string): string => {
+    const source = name && findIcon(name);
+    if (!source) return "";
+    const size = s.iconSize ?? 20;
+    return `<svg class="nodetto-control-icon nodetto-control-icon-${side}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${renderIconMarkup(source, { x: 0, y: 0, width: size, height: size }, { stroke: paint.color, strokeWidth: 2, fill: "none", viewBox: 24 })}</svg>`;
+  };
+  const decoration = `${icon(s.leadingIcon, "leading")}${icon(s.trailingIcon, "trailing")}${s.badge === undefined ? "" : `<span class="nodetto-control-badge${s.badge === "" ? " nodetto-control-badge-dot" : ""}">${escapeText(s.badge)}</span>`}`;
   const attrs = ` class="${classes}" data-nodetto-id="${escapeAttribute(element.id)}" data-nodetto-type="ui.control" data-control="${s.control}" aria-label="${escapeAttribute(s.label)}"${s.disabled ? " disabled" : ""}`;
+  const childAttrs = attrs.replace(` class="${classes}"`, "");
+  const wrapDecorated = (html: string) =>
+    `<span class="${classes} nodetto-control-wrap">${html}${decoration}</span>`;
   const value = escapeAttribute(s.value ?? "");
   const placeholder = escapeAttribute(s.placeholder ?? "");
   switch (s.control) {
     case "button":
-      return `<button type="button"${attrs}>${escapeText(s.label)}</button>`;
+      return `<button type="button"${attrs}>${icon(s.leadingIcon, "leading")}${escapeText(s.label)}${icon(s.trailingIcon, "trailing")}${s.badge === undefined ? "" : `<span class="nodetto-control-badge${s.badge === "" ? " nodetto-control-badge-dot" : ""}">${escapeText(s.badge)}</span>`}</button>`;
     case "input":
-      return `<input type="${s.inputType ?? "text"}"${attrs} value="${value}" placeholder="${placeholder}">`;
+      return decoration
+        ? wrapDecorated(
+            `<input type="${s.inputType ?? "text"}"${childAttrs} value="${value}" placeholder="${placeholder}">`,
+          )
+        : `<input type="${s.inputType ?? "text"}"${attrs} value="${value}" placeholder="${placeholder}">`;
     case "textarea":
-      return `<textarea${attrs} placeholder="${placeholder}">${escapeText(s.value ?? "")}</textarea>`;
+      return decoration
+        ? wrapDecorated(
+            `<textarea${childAttrs} placeholder="${placeholder}">${escapeText(s.value ?? "")}</textarea>`,
+          )
+        : `<textarea${attrs} placeholder="${placeholder}">${escapeText(s.value ?? "")}</textarea>`;
     case "select":
-      return `<select${attrs}>${(s.options ?? []).map((option) => `<option${option === s.value ? " selected" : ""}>${escapeText(option)}</option>`).join("")}</select>`;
+      return decoration
+        ? wrapDecorated(
+            `<select${childAttrs}>${(s.options ?? []).map((option) => `<option${option === s.value ? " selected" : ""}>${escapeText(option)}</option>`).join("")}</select>`,
+          )
+        : `<select${attrs}>${(s.options ?? []).map((option) => `<option${option === s.value ? " selected" : ""}>${escapeText(option)}</option>`).join("")}</select>`;
     case "tabs":
-      return `<div${attrs} role="tablist">${(s.options ?? []).map((option) => `<button type="button" role="tab" aria-selected="${option === (s.value ?? s.options?.[0])}"${s.disabled ? " disabled" : ""}>${escapeText(option)}</button>`).join("")}</div>`;
+      return `<div${attrs} role="tablist">${(s.options ?? []).map((option) => `<button type="button" role="tab" aria-selected="${option === (s.value ?? s.options?.[0])}"${s.disabled ? " disabled" : ""}>${escapeText(option)}</button>`).join("")}${decoration}</div>`;
     case "progress":
-      return `<progress${attrs} max="100" value="${s.progress ?? 0}">${s.progress ?? 0}%</progress>`;
+      return decoration
+        ? wrapDecorated(
+            `<progress${childAttrs} max="100" value="${s.progress ?? 0}">${s.progress ?? 0}%</progress>`,
+          )
+        : `<progress${attrs} max="100" value="${s.progress ?? 0}">${s.progress ?? 0}%</progress>`;
     case "radio":
     case "checkbox":
     case "switch":
-      return `<label class="${classes}" data-nodetto-type="ui.control" data-control="${s.control}" data-nodetto-id="${escapeAttribute(element.id)}"><input type="${s.control === "radio" ? "radio" : "checkbox"}"${s.control === "switch" ? ' role="switch"' : ""} aria-label="${escapeAttribute(s.label)}"${s.checked ? " checked" : ""}${s.disabled ? " disabled" : ""}> ${escapeText(s.label)}</label>`;
+      return `<label class="${classes}" data-nodetto-type="ui.control" data-control="${s.control}" data-nodetto-id="${escapeAttribute(element.id)}"><input type="${s.control === "radio" ? "radio" : "checkbox"}"${s.control === "switch" ? ' role="switch"' : ""} aria-label="${escapeAttribute(s.label)}"${s.checked ? " checked" : ""}${s.disabled ? " disabled" : ""}> ${icon(s.leadingIcon, "leading")}${escapeText(s.label)}${icon(s.trailingIcon, "trailing")}${s.badge === undefined ? "" : `<span class="nodetto-control-badge${s.badge === "" ? " nodetto-control-badge-dot" : ""}">${escapeText(s.badge)}</span>`}</label>`;
   }
 }
 
@@ -194,7 +227,21 @@ function declarationBody(
       (element.semantic as UiControlSemantic).control,
     )
   )
-    geometry.push("padding: 8px 12px;");
+    geometry.push(
+      element.visual.textPadding === undefined
+        ? "padding: 8px 12px;"
+        : `padding: ${px(element.visual.textPadding)};`,
+    );
+  if (element.type === "ui.control") {
+    const semantic = element.semantic as UiControlSemantic;
+    if (semantic.label.includes("\n")) geometry.push("white-space: pre-line;");
+    if (element.visual.textTruncate === "ellipsis")
+      geometry.push(
+        "white-space: nowrap;",
+        "overflow: hidden;",
+        "text-overflow: ellipsis;",
+      );
+  }
   if (element.type === "image.raster") geometry.push("overflow: hidden;");
   if (element.type === "text.note")
     geometry.push(
@@ -500,12 +547,110 @@ progress[data-control="progress"]::-webkit-progress-bar { background: #e2e8f0; b
 progress[data-control="progress"]::-webkit-progress-value { background: #137e7e; border-radius: 999px; }
 progress[data-control="progress"]::-moz-progress-bar { background: #137e7e; border-radius: 999px; }`
     : "";
+  const controls = included.filter((element) => element.type === "ui.control");
+  const customControlCss = controls
+    .map((element) => {
+      const semantic = element.semantic as UiControlSemantic;
+      const style = element.visual.style;
+      if (
+        !style?.accentColor &&
+        !style?.selectedColor &&
+        !style?.fill &&
+        !semantic.indicator &&
+        semantic.badge === undefined &&
+        !semantic.leadingIcon &&
+        !semantic.trailingIcon
+      )
+        return "";
+      const paint = resolveUiControlPaint(element, {
+        ink: "#1d2a2e",
+        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+      });
+      const selector = `.${nodeClass(element.id)}`;
+      const rules = [
+        `${selector} { --nd-control-accent: ${paint.accent}; --nd-control-selected: ${paint.selected}; }`,
+      ];
+      if (
+        ["input", "textarea", "select"].includes(semantic.control) &&
+        (semantic.leadingIcon ||
+          semantic.trailingIcon ||
+          semantic.badge !== undefined)
+      ) {
+        const padding = element.visual.textPadding ?? 10;
+        const size = (semantic.iconSize ?? 20) + 6;
+        const left =
+          padding +
+          (semantic.leadingIcon && findIcon(semantic.leadingIcon) ? size : 0);
+        const right =
+          padding +
+          (semantic.trailingIcon && findIcon(semantic.trailingIcon) ? size : 0);
+        rules.push(`${selector} { padding: 0; }`);
+        rules.push(
+          `${selector} > ${semantic.control} { padding: ${px(padding)} ${px(right)} ${px(padding)} ${px(left)}; }`,
+        );
+      }
+      if (semantic.control === "tabs") {
+        rules.push(
+          `${selector} { background: ${paint.fill}; border: ${paint.strokeWidth}px solid ${paint.stroke}; border-radius: ${paint.radius}px; }`,
+        );
+        const selected = `${selector} > button[aria-selected="true"]`;
+        if (semantic.indicator === "underline")
+          rules.push(
+            `${selected} { background: transparent; border-bottom: 2px solid ${paint.accent}; color: ${paint.selected}; }`,
+          );
+        else if (semantic.indicator === "pill")
+          rules.push(
+            `${selected} { background: ${paint.accent}; border: 0; border-radius: 999px; margin: 2px; color: ${paint.selected}; }`,
+          );
+        else
+          rules.push(
+            `${selected} { background: ${paint.selectedFill}; border-bottom-color: ${paint.accent}; color: ${paint.selected}; }`,
+          );
+      }
+      return rules.join("\n");
+    })
+    .filter(Boolean)
+    .join("\n");
+  const decorated = controls.some((element) => {
+    const s = element.semantic as UiControlSemantic;
+    return s.leadingIcon || s.trailingIcon || s.badge !== undefined;
+  });
+  const decorationCss = decorated
+    ? ".nodetto-control-wrap { position: relative; display: inline-block; }\n.nodetto-control-icon { vertical-align: middle; margin: 0 6px; }\n.nodetto-control-badge { position: absolute; right: -4px; top: -4px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: var(--nd-control-accent, #137e7e); color: white; font: bold 11px/18px sans-serif; text-align: center; }\n.nodetto-control-badge-dot { min-width: 8px; width: 8px; height: 8px; padding: 0; border-radius: 50%; }"
+    : "";
+  const customOnly =
+    controls.length > 0 &&
+    controls.every((element) => element.visual.style?.accentColor);
+  const hasCustomAccent = controls.some(
+    (element) => element.visual.style?.accentColor,
+  );
+  const accentValue = customOnly
+    ? "var(--nd-control-accent)"
+    : "var(--nd-control-accent, #137e7e)";
+  const controlBase = hasCustomAccent
+    ? controlCss.replaceAll("#137e7e", accentValue)
+    : controlCss;
+  const designBase = hasCustomAccent
+    ? designControlCss.replaceAll("#137e7e", accentValue)
+    : designControlCss;
+  const decorations = customOnly
+    ? decorationCss.replaceAll(
+        "var(--nd-control-accent, #137e7e)",
+        "var(--nd-control-accent)",
+      )
+    : decorationCss;
+  const wrapperCss = decorated
+    ? ".nodetto-control-wrap > input, .nodetto-control-wrap > textarea, .nodetto-control-wrap > select, .nodetto-control-wrap > progress { box-sizing: border-box; width: 100%; height: 100%; font: inherit; color: inherit; }\n.nodetto-control-wrap > .nodetto-control-icon { position: absolute; top: 50%; transform: translateY(-50%); pointer-events: none; }\n.nodetto-control-wrap > .nodetto-control-icon-leading { left: 4px; }\n.nodetto-control-wrap > .nodetto-control-icon-trailing { right: 4px; }"
+    : "";
   const combinedCss = [
     ...css,
     ...imageCss,
     ...layoutCss,
-    controlCss,
-    designControlCss,
+    controlBase,
+    designBase,
+    customControlCss,
+    decorations,
+    wrapperCss,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -515,8 +660,11 @@ progress[data-control="progress"]::-moz-progress-bar { background: #137e7e; bord
     ...linkedCss,
     ...imageCss,
     ...linkedLayoutCss,
-    controlCss,
-    designControlCss,
+    controlBase,
+    designBase,
+    customControlCss,
+    decorations,
+    wrapperCss,
   ]
     .filter(Boolean)
     .join("\n\n");

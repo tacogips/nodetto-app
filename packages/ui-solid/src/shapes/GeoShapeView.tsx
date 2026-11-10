@@ -13,9 +13,11 @@ import {
   geoOutline,
   resolvedCornerRadii,
   roundedRectPath,
+  rectStrokeParts,
 } from "@nodetto/core";
 import type { Element, GeoKind, GeoShapeSemantic } from "@nodetto/ir";
 import { createMemo, For, type JSX, Match, Show, Switch } from "solid-js";
+import { RectStrokes } from "./RectStrokes.tsx";
 import { SvgFillGradient } from "./SvgFillGradient.tsx";
 import { geoLabelAlignStyle } from "./label-align-style.ts";
 import { labelStyle, svgStyle } from "./visual.ts";
@@ -62,6 +64,14 @@ export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
         height={height()}
         viewBox={`0 0 ${width()} ${height()}`}
         preserveAspectRatio="none"
+        style={
+          rectStrokeParts(
+            { x: 0, y: 0, width: width(), height: height() },
+            props.element.visual.style,
+          )
+            ? { overflow: "visible" }
+            : undefined
+        }
       >
         <title>{semantic().label || semantic().geo}</title>
         <SvgFillGradient
@@ -114,6 +124,23 @@ export function GeoShapeView(props: GeoShapeViewProps): JSX.Element {
                 />
               </g>
             )}
+          </Match>
+          <Match
+            when={
+              semantic().geo === "rect" &&
+              rectStrokeParts(
+                { x: 0, y: 0, width: width(), height: height() },
+                props.element.visual.style,
+              )
+            }
+          >
+            <RectStrokes
+              box={{ x: 0, y: 0, width: width(), height: height() }}
+              style={props.element.visual.style}
+              clipId={`nd-strokes-${Array.from(props.element.id, (c) => c.codePointAt(0)?.toString(16)).join("-")}`}
+              fill={attrs().fill}
+              stroke={attrs().stroke}
+            />
           </Match>
           <Match when={asKind(outline(), "rect")}>
             {(shape) => (

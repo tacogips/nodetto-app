@@ -76,12 +76,12 @@ export function boxLabelLayout(
   visual: Visual,
   defaultFontSize = BOX_LABEL_FONT_SIZE,
 ): LabelLayout {
-  return labelLayout(
-    label,
-    width - 2 * TEXT_NOTE_PADDING_X,
-    visual,
-    defaultFontSize,
-  );
+  const padding = visual.textPadding;
+  const inset =
+    typeof padding === "number" && Number.isFinite(padding) && padding >= 0
+      ? padding
+      : TEXT_NOTE_PADDING_X;
+  return labelLayout(label, width - 2 * inset, visual, defaultFontSize);
 }
 
 export function connectorLabelLayout(

@@ -14,12 +14,15 @@ import { encodeRasterDataUrl, isRasterAttachmentPath } from "@nodetto/ir";
 
 import {
   Editor,
+  orderedTopLevelFrames,
+  frameFileStem,
   lintTextLayoutPage,
   TEXT_LAYOUT_LINT_PAGE_KINDS,
   exportHandoff,
   HANDOFF_FORMATS,
   type HandoffFormat,
   exportHtmlBundle,
+  exportPrototypeHtml,
   encodeHtmlBundleZip,
   PDF_PAGE_SIZES,
   type PdfOptions,
@@ -52,6 +55,7 @@ const EXPORT_OPTIONS = new Set([
   "--format",
   "--page",
   "--output",
+  "--output-dir",
   "--padding",
   "--background",
   "--scale",
@@ -62,6 +66,8 @@ const EXPORT_OPTIONS = new Set([
   "--font-dir",
   "--mermaid-kind",
   "--code-format",
+  "--flow",
+  "--device",
 ]);
 
 const EXPORT_FORMATS = [
@@ -69,6 +75,7 @@ const EXPORT_FORMATS = [
   "png",
   "pdf",
   "html",
+  "prototype",
   "mermaid",
   "d2",
   "drawio",
@@ -115,7 +122,11 @@ export async function exportCommand(
   args: readonly string[],
   backend?: RasterBackend,
 ): Promise<CommandResult> {
-  const parsed = parseArgs(args, EXPORT_OPTIONS, new Set());
+  const parsed = parseArgs(
+    args,
+    EXPORT_OPTIONS,
+    new Set(["--prototype", "--frames"]),
+  );
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("export")}`);
   if (parsed.positional.length !== 1)
@@ -131,8 +142,47 @@ export async function exportCommand(
         : `Unsupported format "${format}". Choose ${EXPORT_FORMATS.join(", ")}.`,
     );
   const exportFormat: ExportFormat = format;
+  const prototypeView = parsed.flags.has("--prototype");
+  if (
+    prototypeView &&
+    (parsed.options.has("--element") ||
+      !["svg", "png", "pdf"].includes(exportFormat))
+  )
+    return fail("--prototype draws a whole page; remove --element", 1);
   const outputPath = parsed.options.get("--output");
-  if (["png", "pdf", "html"].includes(exportFormat) && outputPath === undefined)
+  const frames = parsed.flags.has("--frames");
+  const outputDir = parsed.options.get("--output-dir");
+  const device = parsed.options.get("--device") ?? "frame";
+  if (exportFormat === "prototype") {
+    if (prototypeView || frames || parsed.options.has("--element"))
+      return fail(
+        "Prototype export conflicts with --prototype, --frames and --element.",
+        1,
+      );
+    if (!outputPath?.endsWith(".html"))
+      return fail("Prototype export requires --output ending in .html.", 1);
+    if (device !== "none" && device !== "frame")
+      return fail("--device must be none or frame.", 1);
+  } else if (parsed.options.has("--flow") || parsed.options.has("--device")) {
+    return fail("--flow and --device require --format prototype.", 1);
+  }
+  if (frames) {
+    if (!outputDir) return fail("--frames requires --output-dir.", 1);
+    if (exportFormat !== "png" && exportFormat !== "svg")
+      return fail("--frames requires --format png or svg.", 1);
+    if (parsed.options.has("--element") || outputPath !== undefined)
+      return fail("--frames conflicts with --element and --output.", 1);
+    if (!io.exists?.(outputDir))
+      return fail(
+        `output directory ${outputDir} does not exist; create it first`,
+        1,
+      );
+  }
+  if (
+    ["png", "pdf", "html"].includes(exportFormat) &&
+    outputPath === undefined &&
+    !frames
+  )
     return fail(`${exportFormat.toUpperCase()} export requires --output.`);
 
   const mermaidKind = parsed.options.get("--mermaid-kind");
@@ -240,6 +290,36 @@ export async function exportCommand(
     );
   const editor = new Editor({ document: loaded.document });
   editor.setCurrentPage(page.id);
+  if (frames) {
+    const frameIds = orderedTopLevelFrames(
+      editor.store,
+      page.id,
+      editor.createShapeContext(),
+    );
+    const lines: string[] = [];
+    let warnings = "";
+    for (const [index, id] of frameIds.entries()) {
+      const frame = editor.store.get(id);
+      const name =
+        (frame?.semantic as { name?: string } | undefined)?.name ?? "Frame";
+      const filename = `${frameFileStem(index, name)}.${exportFormat}`;
+      const forwarded: string[] = [];
+      for (let i = 0; i < args.length; i += 1) {
+        if (args[i] === "--frames" || args[i] === "--prototype") continue;
+        if (args[i] === "--output-dir") {
+          i += 1;
+          continue;
+        }
+        forwarded.push(args[i] as string);
+      }
+      forwarded.push("--element", id, "--output", `${outputDir}/${filename}`);
+      const result = await exportCommand(io, forwarded, backend);
+      if (result.exitCode !== 0) return result;
+      warnings += result.stderr;
+      lines.push(`${filename}\t${name}`);
+    }
+    return ok(lines.length ? `${lines.join("\n")}\n` : "", warnings);
+  }
   if (
     exportFormat === "mermaid" ||
     exportFormat === "d2" ||
@@ -297,6 +377,22 @@ export async function exportCommand(
     editor.assets.set(source, data);
     return data;
   };
+  if (exportFormat === "prototype") {
+    try {
+      const html = exportPrototypeHtml(editor, {
+        pageId: page.id,
+        flow: parsed.options.get("--flow"),
+        device: device as "none" | "frame",
+        resolveAsset,
+      });
+      const failure = writeOutput(io, outputPath as string, html);
+      return failure
+        ? fail(failure)
+        : ok("", `${loaded.warnings}Wrote ${outputPath}.\n`);
+    } catch (error) {
+      return fail(`Cannot export prototype: ${describe(error)}`);
+    }
+  }
   if (exportFormat === "html") {
     try {
       const bundle = exportHtmlBundle(
@@ -329,7 +425,13 @@ export async function exportCommand(
       }
       if (svg === null)
         return fail(`Element ${elementId} has nothing visible to export.`);
-    } else svg = editor.exportPageSvg({ padding, background, resolveAsset });
+    } else
+      svg = editor.exportPageSvg({
+        padding,
+        background,
+        resolveAsset,
+        prototypeView,
+      });
   } catch (error) {
     return fail(
       `Could not resolve export attachments: ${error instanceof Error ? error.message : String(error)}`,

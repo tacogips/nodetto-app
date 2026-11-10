@@ -6,8 +6,11 @@ import {
   checkNumber,
   checkString,
 } from "./checks.ts";
+import { ICON_NAME_PATTERN } from "./registry/icons.ts";
+import { error } from "./issues.ts";
 import type { ElementTypeDefinition } from "./registry.ts";
 import type { ValidationIssue } from "./issues.ts";
+export const TAB_INDICATORS = ["cell", "underline", "pill"] as const;
 export const UI_CONTROL_KINDS = [
   "button",
   "input",
@@ -39,6 +42,11 @@ export interface UiControlSemantic {
   readonly options?: readonly string[];
   readonly checked?: boolean;
   readonly disabled?: boolean;
+  readonly indicator?: (typeof TAB_INDICATORS)[number];
+  readonly leadingIcon?: string;
+  readonly trailingIcon?: string;
+  readonly iconSize?: number;
+  readonly badge?: string;
 }
 export const uiControlDefinition: ElementTypeDefinition = {
   type: "ui.control",
@@ -56,6 +64,11 @@ export const uiControlDefinition: ElementTypeDefinition = {
       "options",
       "checked",
       "disabled",
+      "indicator",
+      "leadingIcon",
+      "trailingIcon",
+      "iconSize",
+      "badge",
     ],
   },
   validateSemantic(semantic, path) {
@@ -100,6 +113,42 @@ export const uiControlDefinition: ElementTypeDefinition = {
         checkString(out, option, `${path}.options[${index}]`, {
           allowEmpty: true,
         }),
+      );
+    checkEnum(out, semantic.indicator, `${path}.indicator`, TAB_INDICATORS, {
+      optional: true,
+    });
+    for (const key of ["leadingIcon", "trailingIcon"] as const) {
+      const value = semantic[key];
+      if (
+        value !== undefined &&
+        (typeof value !== "string" || !ICON_NAME_PATTERN.test(value))
+      )
+        out.push(error("icon.name", `${path}.${key}`, "invalid icon name"));
+    }
+    const size = semantic.iconSize;
+    if (
+      size !== undefined &&
+      checkNumber(out, size, `${path}.iconSize`) &&
+      typeof size === "number" &&
+      (size <= 0 || size > 256)
+    )
+      out.push(
+        error(
+          "value.range",
+          `${path}.iconSize`,
+          "must be greater than 0 and at most 256",
+        ),
+      );
+    if (
+      checkString(out, semantic.badge, `${path}.badge`, {
+        optional: true,
+        allowEmpty: true,
+      }) &&
+      typeof semantic.badge === "string" &&
+      semantic.badge.length > 16
+    )
+      out.push(
+        error("value.range", `${path}.badge`, "must be at most 16 characters"),
       );
     return out;
   },

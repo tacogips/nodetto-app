@@ -2,6 +2,7 @@ import {
   type ArrangeMode,
   CommandError,
   Editor,
+  findIcon,
   planArrangement,
 } from "@nodetto/core";
 import { parseDocumentResult, serializeDocument } from "@nodetto/io";
@@ -206,6 +207,26 @@ export function applyBatch(
       path: item.path,
       code: issue.code,
       message: issue.message,
+    });
+  }
+  for (const element of snapshot.elements) {
+    const icon = (element.semantic as { icon?: unknown }).icon;
+    const operation = lastTouch.get(element.id);
+    if (
+      element.type !== "ui.icon" ||
+      typeof icon !== "string" ||
+      findIcon(icon) ||
+      operation === undefined
+    )
+      continue;
+    warnings.push({
+      operation,
+      op: String(operations[operation]?.op),
+      element: element.id,
+      type: element.type,
+      path: "semantic.icon",
+      code: "icon.unknown",
+      message: `Unknown icon "${icon}"`,
     });
   }
   warnings.sort(

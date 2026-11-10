@@ -1,4 +1,8 @@
-import { connectScreenTransition, connectShape } from "@nodetto/core";
+import {
+  connectScreenTransition,
+  connectShape,
+  screenFrame,
+} from "@nodetto/core";
 import { type Element, isPlainObject } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
 import { applyLabel } from "../label-field.ts";
@@ -34,7 +38,28 @@ export function connectElements(
       ? undefined
       : batch.page(operation["page"], index).id;
   const from = batch.element(operation["from"], index, page);
-  const to = batch.element(operation["to"], index, from.page);
+  const back = operation["shape"] === "prototype:back";
+  if (back && !screenFrame(batch.editor, from.id))
+    throw new OperationError(index, `from ${from.id} is not inside a screen.`);
+  const to = back ? from : batch.element(operation["to"], index, from.page);
+  if (back && operation["to"] !== undefined)
+    batch.convertWarnings.push({
+      operation: index,
+      op: "connect",
+      element: from.id,
+      type: from.type,
+      path: "to",
+      code: "prototype.back.ignored-target",
+      message: "prototype:back ignores to.",
+    });
+  const semantic: JsonObject | undefined = isPlainObject(operation["semantic"])
+    ? {
+        ...operation["semantic"],
+        ...(operation["semantic"]["prototypeTrigger"] === "tap"
+          ? { prototypeTrigger: "click" }
+          : {}),
+      }
+    : undefined;
   if (from.page !== to.page)
     throw new OperationError(
       index,
@@ -77,7 +102,7 @@ export function connectElements(
               : {}),
           },
           deepMerge(
-            isPlainObject(operation["semantic"]) ? operation["semantic"] : {},
+            semantic ?? {},
             supportsRouting(operation["type"]) ? resolved.routing : {},
           ),
         ),
@@ -92,8 +117,7 @@ export function connectElements(
   batch.editor.setCurrentPage(from.page);
   const id = shape
     ? connectShape(batch.editor, shape.id, from.id, to.id)
-    : isPlainObject(operation["semantic"]) &&
-        operation["semantic"]["prototype"] === true
+    : semantic?.["prototype"] === true
       ? connectScreenTransition(batch.editor, from.id, to.id)
       : batch.editor.connectSmart(from.id, to.id);
   if (id === null)
@@ -144,8 +168,7 @@ export function connectElements(
           : "*:1",
     };
   }
-  if (isPlainObject(operation["semantic"]))
-    patch = deepMerge(patch, operation["semantic"]) as Record<string, Json>;
+  if (semantic) patch = deepMerge(patch, semantic) as Record<string, Json>;
   if (supportsRouting(created.type))
     patch = deepMerge(patch, resolved.routing) as Record<string, Json>;
   if (resolved.visual !== undefined)

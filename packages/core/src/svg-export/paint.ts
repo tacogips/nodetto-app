@@ -244,11 +244,18 @@ export function centredLabel(
     return "";
   }
   const anchor = visual.style?.textAlign ?? "middle";
+  const rawPadding = visual.textPadding;
+  const padding =
+    typeof rawPadding === "number" &&
+    Number.isFinite(rawPadding) &&
+    rawPadding >= 0
+      ? rawPadding
+      : TEXT_PADDING;
   const x =
     anchor === "start"
-      ? box.x + TEXT_PADDING
+      ? box.x + padding
       : anchor === "end"
-        ? box.x + box.width - TEXT_PADDING
+        ? box.x + box.width - padding
         : box.x + box.width / 2;
   const layout = boxLabelLayout(label, box.width, visual, theme.fontSize);
   const top =
@@ -261,7 +268,7 @@ export function centredLabel(
           verticalAlign,
           box.height,
           layout.lines.length * layout.lineHeight,
-          TEXT_PADDING,
+          padding,
         ) +
         layout.lineHeight / 2;
   return layout.lines

@@ -288,7 +288,8 @@ test("raster export snaps the frame to whole pixels so the background covers the
   editor.createElement("shape.geo", {
     semantic: { geo: "rect", label: "" },
     // With the 400 x 300 artboard the page spans 601 x 301 units; with 16
-    // padding a side, 633 x 333 units are 474.75 x 249.75 px at 0.75.
+    // padding a side and the 22-unit outside title, 633 x 355 units
+    // are 474.75 x 266.25 px at 0.75.
     visual: { x: 500, y: 0, width: 101, height: 301 },
   });
   let captured = "";
@@ -315,17 +316,17 @@ test("raster export snaps the frame to whole pixels so the background covers the
     backend,
   );
   expect(result.exitCode).toBe(0);
-  expect(result.stderr).toContain("475x250 px");
-  // A renderer drawing at exactly 0.75 onto the 475 x 250 canvas finds the
+  expect(result.stderr).toContain("475x267 px");
+  // A renderer drawing at exactly 0.75 onto the 475 x 267 canvas finds the
   // frame and its background reaching the last pixel.
   const { width, height } = svgRasterDimensions(captured);
   expect(width * 0.75).toBeGreaterThan(474.99);
   expect(Math.ceil(width * 0.75)).toBe(475);
-  expect(height * 0.75).toBeGreaterThan(249.99);
+  expect(height * 0.75).toBeGreaterThan(266.99);
   const background =
-    /<rect x="-16" y="-16" width="([^"]+)" height="([^"]+)" fill="#ffffff"/.exec(
+    /<rect x="-16" y="-38" width="([^"]+)" height="([^"]+)" fill="#ffffff"/.exec(
       captured,
     );
   expect(Number(background?.[1]) * 0.75).toBeGreaterThanOrEqual(475);
-  expect(Number(background?.[2]) * 0.75).toBeGreaterThanOrEqual(250);
+  expect(Number(background?.[2]) * 0.75).toBeGreaterThanOrEqual(267);
 });
