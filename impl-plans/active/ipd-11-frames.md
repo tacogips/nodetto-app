@@ -22,6 +22,7 @@
   - `apps/cli/src/frame-parent.test.ts`
   - `impl-plans/progress/ipd-11-frames.md`
   - `tmp/ipd-s772/ipd-11-frames`
+  - `packages/ui-solid/src/interaction-creation.test.ts`
 - sharedPaths:
   - `packages/core/src/index.ts`
   - `apps/cli/src/commands.test.ts`
@@ -182,3 +183,7 @@ Verification passes, and the progress log records the before/after drop behavior
 - Read each file fresh before editing it, with pre and post hashes. On drift, re-read, keep the other change and record it.
 - `packages/core/src/index.ts` is shared: append export lines only.
 - No state-changing git commands, no emojis. Evidence files must not match Bun test patterns.
+
+## Amendment 2026-11-10 (operator round 5)
+
+`packages/ui-solid/src/interaction-creation.test.ts` is added to this plan's writePaths. Add the missing `PrototypeBack` entry to the gesture classification expectation that fails today (1 of 172; finding `integration-s781-w1-ui-solid-prototype-back-gesture`) and change nothing else in that file. Verification adds `bun test packages/ui-solid/src/interaction-creation.test.ts` -> 0 fail. Keep the ipd-11 work already in the working tree and continue from it.

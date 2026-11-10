@@ -142,10 +142,10 @@ Verification passes, and the progress log records the test counts and visual not
 
 ## Current implementation status
 
-Implemented and visually inspected; the required aggregate verification remains
-open because the shared `ui.icon` default fails the existing registered-type
-test. See `impl-plans/progress/ipd-08-cli-layout-ops.md` for counts, evidence,
-and the required owner repair and rerun. The done criteria are not yet met.
+Implemented and visually inspected. The dependency-ordered verification rerun
+passed (172 tests, 0 failures); typecheck and scoped Biome passed. See
+`impl-plans/progress/ipd-08-cli-layout-ops.md` for evidence and visual notes.
+Implementation is complete; formal review and workflow finalization remain downstream.
 
 ## Amendment 2026-11-10 (blocked-wave-scope-or-contract, round 2, ordering)
 
