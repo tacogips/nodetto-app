@@ -267,6 +267,10 @@ Only the selected page and its options enter the normal tab order.
 When the bottom page strip overflows, arrow buttons beside it shift the tabs
 one page at a time; dragging with the right mouse button pans the strip and a
 quick release lets it glide. Left-button drag still reorders pages.
+Right-clicking a page tab without dragging (moving less than a few pixels)
+opens that page's options (Rename, Duplicate, Copy shapes from page...,
+Hide/Show in presentation, Delete, Move left, Move right); so do the keyboard
+menu key, Shift+F10 and Control-click on macOS.
 Each page remembers its pan and zoom for the current editing session. Returning
 to a page restores its view; an unvisited page starts at 100% and the origin.
 Remote page updates retain your active page, views and surviving layer selection.
