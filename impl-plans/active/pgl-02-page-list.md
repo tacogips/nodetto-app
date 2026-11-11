@@ -252,3 +252,58 @@ scope, contracts and scenarios are unchanged.
   integration acceptance). This plan's manifest `dependsOn` is therefore
   `[]` and its wave is 1. The page-actions contract it consumes is
   unchanged.
+
+## Amendment 2026-11-11 (blocked-wave-scope-or-contract, round 2)
+
+Blocker: the wave 003 checkpoint amendment from previous checkpoint
+7fc4d85. The authorized install changed the top-level `entities` lockfile
+key from 6.0.1 to 7.0.1 (evidence `tmp/pgl-s835/pgl-02-page-list/install-diff.patch`).
+The round 1 contract required stopping on any other version change, so the
+worker reverted `package.json` and `bun.lock` (hashes confirmed in
+`toolchain.json`) and blocked.
+
+Decision. The observed resolution is permitted. It is a re-hoist, not a
+version change for any existing consumer. Verified in the current `bun.lock`:
+- The only package that depends on `entities` is `parse5@7.3.0`
+  (`"entities": "^6.0.0"`).
+- After the install, the diff adds `"parse5/entities": ["entities@6.0.1",
+  ...]` with the identical sha512 integrity (`aN97NXWF...`). parse5 therefore
+  still resolves to entities 6.0.1.
+- The new top-level `entities@7.0.1` serves only the new `happy-dom@21.0.4`
+  (`"entities": "^7.0.1"`).
+
+Revised lockfile rule. It replaces the round 1 rule that any other
+dependency version change triggers a revert. Accept the install when every
+`bun.lock` change is one of these:
+1. An entry added for a newly added package or one of its transitive
+   dependencies.
+2. A re-hoist. A top-level key moves to a new version only when every
+   pre-existing dependent of the old version gets a nested key
+   (`<dependent>/<name>`) with the identical old version and integrity. The
+   pre-authorized instance is `entities`: top level 7.0.1, plus
+   `parse5/entities` at 6.0.1.
+3. New root `devDependencies` entries in the workspace header.
+
+Any other change is still a stop condition: revert with `git checkout --
+package.json bun.lock`, record the evidence, and report blocked. That
+includes a changed version or integrity for a package that an existing
+package resolves, or a removed entry that is not re-nested as in rule 2.
+
+Exit-code capture fix:
+- Do not assign to the zsh read-only `status` variable. Run the install as
+  `bun add --dev --exact happy-dom@21.0.4 @babel/core@7.29.7 babel-preset-solid@1.9.15 @types/babel__core@7.20.5 > tmp/pgl-s835/pgl-02-page-list/install.log 2>&1; rc=$?`
+  and record `rc` as `installExitCode` in `toolchain.json`.
+  `installExitCode` must be 0.
+- Pin `happy-dom@21.0.4`, the version already resolved.
+
+Record in `toolchain.json`:
+- `lockfileRehoists`: `[{"name":"entities","topLevel":"7.0.1","nested":{"parse5/entities":"6.0.1"},"integrityPreserved":true}]`
+- the `bun.lock` and `package.json` hashes before and after
+
+Also save the new `git diff -- bun.lock` as `install-diff.patch`.
+
+Partial sources from wave 003 are kept and continued, not rewritten from
+scratch: `page-list.ts`, `PageList.test.tsx`, `test-dom/setup.ts` and
+`test-dom/bunfig.toml`. Re-read each one fresh and record its pre-hash
+before editing. Scope, contracts, the 8 scenarios and verification commands
+are unchanged.
