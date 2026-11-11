@@ -37,8 +37,10 @@ nativeTest(
     }
   },
   // Eight CLI launches per fixture (TypeScript and native, four commands);
-  // the budget guards each launch, so it grows with the fixture count.
-  goldenFixtures.length * 5000,
+  // the budget guards each launch, so it grows with the fixture count. The
+  // 0.8.10 Linux release runner used 72 s of 5 s per fixture and 0.9.0's ran
+  // out, so 10 s per fixture keeps it a hang guard, not a runner-speed check.
+  goldenFixtures.length * 10000,
 );
 
 nativeTest(
