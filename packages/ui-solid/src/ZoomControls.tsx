@@ -2,7 +2,9 @@
 //
 // Zoom out, an editable percentage, reset, zoom in and fit come
 // from the action table; the grid and snap toggles are shell state passed
-// in and handed back, because the canvas reads them too.
+// in and handed back, because the canvas reads them too. When `compact`,
+// only a menu button stays in the bar and the zoom group and ruler toggle
+// move into the menu, so a narrow footer keeps the page tabs on its row.
 
 import { type JSX, onCleanup, onMount, Show } from "solid-js";
 import { MIN_ZOOM, MAX_ZOOM } from "@nodetto/core";
@@ -33,6 +35,8 @@ export interface ZoomControlsProps {
   readonly onShowRulersChange?: (show: boolean) => void;
   readonly onSnapChange: (snap: SnapSettings) => void;
   readonly onShowGridChange: (show: boolean) => void;
+  /** Fold every control into the menu (for a narrow footer). */
+  readonly compact?: boolean;
 }
 
 export function formatZoom(z: number): string {
@@ -109,52 +113,67 @@ export function ZoomControls(props: ZoomControlsProps): JSX.Element {
     </button>
   );
 
-  return (
-    <div class="nodetto-zoom-controls" role="toolbar" aria-label="Zoom">
-      <div class="nodetto-zoom-group">
-        {button("zoomOut", <Icon name="zoomOut" />, true)}
-        <div class="nodetto-zoom-level">
-          <NumberInput
-            label="Zoom percent"
-            value={Math.round(signals.camera().z * 10000) / 100}
-            min={MIN_ZOOM * 100}
-            max={MAX_ZOOM * 100}
-            step={10}
-            onCommit={(percent) =>
-              props.context.editor.camera.zoomTo(
-                percent / 100,
-                viewportCenter(props.context.viewport),
-              )
-            }
-          />
-          <span aria-hidden="true">%</span>
-        </div>
-        {button("zoomIn", <Icon name="zoomIn" />, true)}
-        {button("zoomFit", <Icon name="fit" />, true)}
+  const zoomGroup = (): JSX.Element => (
+    <div class="nodetto-zoom-group">
+      {button("zoomOut", <Icon name="zoomOut" />, true)}
+      <div class="nodetto-zoom-level">
+        <NumberInput
+          label="Zoom percent"
+          value={Math.round(signals.camera().z * 10000) / 100}
+          min={MIN_ZOOM * 100}
+          max={MAX_ZOOM * 100}
+          step={10}
+          onCommit={(percent) =>
+            props.context.editor.camera.zoomTo(
+              percent / 100,
+              viewportCenter(props.context.viewport),
+            )
+          }
+        />
+        <span aria-hidden="true">%</span>
       </div>
-      <Show when={props.onShowRulersChange}>
-        <button
-          type="button"
-          class="nodetto-zoom-button nodetto-zoom-toggle nodetto-ruler-toggle"
-          classList={{ "nodetto-active": props.showRulers !== false }}
-          aria-label="Rulers"
-          aria-pressed={props.showRulers !== false}
-          title={props.showRulers !== false ? "Hide rulers" : "Show rulers"}
-          onClick={() => props.onShowRulersChange?.(props.showRulers === false)}
+      {button("zoomIn", <Icon name="zoomIn" />, true)}
+      {button("zoomFit", <Icon name="fit" />, true)}
+    </div>
+  );
+
+  const rulerButton = (): JSX.Element => (
+    <Show when={props.onShowRulersChange}>
+      <button
+        type="button"
+        class="nodetto-zoom-button nodetto-zoom-toggle nodetto-ruler-toggle"
+        classList={{ "nodetto-active": props.showRulers !== false }}
+        aria-label="Rulers"
+        aria-pressed={props.showRulers !== false}
+        title={props.showRulers !== false ? "Hide rulers" : "Show rulers"}
+        onClick={() => props.onShowRulersChange?.(props.showRulers === false)}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          aria-hidden="true"
         >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            aria-hidden="true"
-          >
-            <rect x="3" y="6" width="18" height="12" rx="1" />
-            <path d="M6 6v5m3-5v3m3-3v5m3-5v3m3-3v5" />
-          </svg>
-        </button>
+          <rect x="3" y="6" width="18" height="12" rx="1" />
+          <path d="M6 6v5m3-5v3m3-3v5m3-5v3m3-3v5" />
+        </svg>
+      </button>
+    </Show>
+  );
+
+  return (
+    <div
+      class="nodetto-zoom-controls"
+      classList={{ "nodetto-zoom-compact": props.compact === true }}
+      role="toolbar"
+      aria-label="Zoom"
+    >
+      <Show when={!props.compact}>
+        {zoomGroup()}
+        {rulerButton()}
       </Show>
       <details
         class="nodetto-view-menu"
@@ -198,15 +217,26 @@ export function ZoomControls(props: ZoomControlsProps): JSX.Element {
       >
         <summary
           class="nodetto-zoom-icon-button"
-          aria-label="View options"
-          title="View options"
+          aria-label={props.compact ? "Zoom and view options" : "View options"}
+          title={props.compact ? "Zoom and view options" : "View options"}
           onClick={(event) =>
             event.currentTarget.focus({ preventScroll: true })
           }
         >
-          <Icon name="viewOptions" />
+          <Icon name={props.compact ? "menu" : "viewOptions"} />
         </summary>
         <div class="nodetto-view-menu-body">
+          <Show when={props.compact}>
+            {zoomGroup()}
+            <Show when={props.onShowRulersChange}>
+              {toggle(
+                "Rulers",
+                "Show rulers",
+                () => props.showRulers !== false,
+                () => props.onShowRulersChange?.(props.showRulers === false),
+              )}
+            </Show>
+          </Show>
           {button("zoomReset", "Reset to 100%")}
           {button("zoomSelection", "Fit selection")}
           {toggle(

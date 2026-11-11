@@ -6,6 +6,7 @@ export function Icon(props: {
     | "zoomOut"
     | "fit"
     | "viewOptions"
+    | "menu"
     | "select"
     | "hand"
     | "undo"
@@ -55,6 +56,7 @@ export function Icon(props: {
     zoomOut: "M4 10h12",
     fit: "M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4M7 7h6v6H7z",
     viewOptions: "M3 5h14M3 10h14M3 15h14M7 3v4m6 1v4m-7 1v4",
+    menu: "M3 5h14M3 10h14M3 15h14",
 
     select: "M5 3l11 8-6 1 3 7-2 1-3-7-4 4z",
     hand: "M7 11V5a1 1 0 012 0v5V3a1 1 0 012 0v7V4a1 1 0 012 0v6V6a1 1 0 012 0v7c0 3-2 5-5 5-3 0-5-2-5-5v-3a1 1 0 012 0v1z",
@@ -108,6 +110,7 @@ export function Icon(props: {
     "zoomOut",
     "fit",
     "viewOptions",
+    "menu",
     "preview",
     "frame",
     "rect",

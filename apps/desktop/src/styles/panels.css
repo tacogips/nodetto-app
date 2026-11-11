@@ -456,6 +456,32 @@
   min-height: 32px;
 }
 
+/* Compact: the menu also holds the zoom group, so it may be wider than the
+   lone menu button that anchors it. */
+.nodetto-zoom-compact .nodetto-view-menu-body {
+  width: 220px;
+  max-width: none;
+}
+.nodetto-zoom-compact .nodetto-view-menu-body .nodetto-zoom-group {
+  flex-wrap: nowrap;
+  margin-bottom: 4px;
+  box-shadow: none;
+}
+.nodetto-zoom-compact
+  .nodetto-view-menu-body
+  .nodetto-zoom-group
+  .nodetto-zoom-button {
+  min-height: 28px;
+  text-align: center;
+  border-right: 1px solid var(--nodetto-line);
+}
+.nodetto-zoom-compact
+  .nodetto-view-menu-body
+  .nodetto-zoom-group
+  .nodetto-zoom-button:last-child {
+  border-right: 0;
+}
+
 /* Page IDs never change: show them as selectable text, not as a field. */
 .app-pane .nodetto-input.nodetto-readonly-value {
   padding-inline: 0;

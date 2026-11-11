@@ -70,6 +70,13 @@
   position: relative;
 }
 
+/* The collapse button floats over the pane's top right corner (right 24px,
+   24px wide); the shape search beneath it ends short of the button so the
+   two never overlap, however narrow the pane is. */
+.app-pane-left .nodetto-shape-palette .nodetto-palette-search {
+  width: calc(100% - 42px);
+}
+
 .app-pane-left .app-pane-content {
   flex-direction: column;
   overflow-x: hidden;
@@ -279,7 +286,8 @@
 .app-viewer-footer {
   display: flex;
   flex: 0 0 auto;
-  flex-wrap: wrap;
+  /* One row: a narrow footer folds the zoom controls into a menu instead. */
+  flex-wrap: nowrap;
   align-items: center;
   gap: 4px 8px;
   min-width: 0;
@@ -328,8 +336,9 @@
   position: relative;
   right: auto;
   bottom: auto;
-  flex: 0 1 auto;
-  max-width: 100%;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  max-width: none;
   margin-left: auto;
   gap: 4px;
 }

@@ -102,6 +102,7 @@ import {
 import { createDocumentCommands } from "./shell/document-commands.ts";
 import { DocumentBanners, DocumentStatus } from "./shell/DocumentStatus.tsx";
 import { createExportHandlers } from "./shell/export-handlers.ts";
+import { watchCompactFooter } from "./shell/footer-width.ts";
 import { FileActions } from "./shell/FileActions.tsx";
 import { createPaneLayout } from "./shell/pane-layout.ts";
 import { createPresencePublisher } from "./shell/presence.ts";
@@ -192,6 +193,12 @@ export function App(props: AppProps): JSX.Element {
   };
   const editorSignals = createEditorSignals(props.editor);
   const [tool, setTool] = createSignal<ToolKind>("select");
+  // A narrow viewer footer folds the zoom controls into a menu button.
+  const [compactFooter, setCompactFooter] = createSignal(false);
+  let footerHost: HTMLDivElement | undefined;
+  onMount(() => {
+    if (footerHost) onCleanup(watchCompactFooter(footerHost, setCompactFooter));
+  });
   const [pendingComment, setPendingComment] = createSignal<{
     readonly input: NewReviewMessage;
     readonly target: ElementId | undefined;
@@ -1010,7 +1017,11 @@ export function App(props: AppProps): JSX.Element {
               )}
             </Show>
           </div>
-          <div class="app-viewer-footer" style={panes.viewerMargins()}>
+          <div
+            class="app-viewer-footer"
+            style={panes.viewerMargins()}
+            ref={footerHost}
+          >
             <PageTabs
               editor={props.editor}
               placement="bottom"
@@ -1028,6 +1039,7 @@ export function App(props: AppProps): JSX.Element {
                 setShowSlideArea(!effectiveSlideArea())
               }
               onShowRulersChange={changeShowRulers}
+              compact={compactFooter()}
             />
           </div>
         </div>
