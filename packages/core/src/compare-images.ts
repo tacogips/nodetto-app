@@ -82,7 +82,13 @@ export function parseBand(text: string): ComparisonBand {
   if (parts.length !== 3 || parts.some((part) => !part.trim()))
     throw new Error(`invalid band: ${text}`);
   const [y0, y1, dy] = parts.map(Number);
-  if (![y0, y1, dy].every(Number.isFinite) || y0 >= y1)
+  if (
+    y0 === undefined ||
+    y1 === undefined ||
+    dy === undefined ||
+    ![y0, y1, dy].every(Number.isFinite) ||
+    y0 >= y1
+  )
     throw new Error(`invalid band: ${text}`);
   return { y0, y1, dy };
 }
@@ -95,14 +101,16 @@ function base64(bytes: Uint8Array): string {
     let chunk = "";
     const end = Math.min(start + 12288, bytes.length);
     for (let i = start; i < end; i += 3) {
-      const a = bytes[i];
+      const a = bytes[i] ?? 0;
       const b = bytes[i + 1] ?? 0;
       const c = bytes[i + 2] ?? 0;
       chunk +=
-        BASE64[a >> 2] +
-        BASE64[((a & 3) << 4) | (b >> 4)] +
-        (i + 1 < bytes.length ? BASE64[((b & 15) << 2) | (c >> 6)] : "=") +
-        (i + 2 < bytes.length ? BASE64[c & 63] : "=");
+        BASE64.charAt(a >> 2) +
+        BASE64.charAt(((a & 3) << 4) | (b >> 4)) +
+        (i + 1 < bytes.length
+          ? BASE64.charAt(((b & 15) << 2) | (c >> 6))
+          : "=") +
+        (i + 2 < bytes.length ? BASE64.charAt(c & 63) : "=");
     }
     chunks.push(chunk);
   }
@@ -182,7 +190,7 @@ export function composeComparisonSvg(options: {
   const body = panels
     .map(
       (panel, i) =>
-        `<g transform="translate(${i * (w + 16)} 0)"><text x="0" y="16" font-size="12">${escapeXml(labels[i])}</text><g transform="translate(0 24)">${panel}</g></g>`,
+        `<g transform="translate(${i * (w + 16)} 0)"><text x="0" y="16" font-size="12">${escapeXml(labels[i] ?? "")}</text><g transform="translate(0 24)">${panel}</g></g>`,
     )
     .join("");
   return {

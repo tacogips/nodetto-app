@@ -25,7 +25,9 @@ export function orderedTopLevelFrames(
   const rows: (typeof frames)[] = [];
   for (const frame of frames) {
     const row = rows[rows.length - 1];
-    if (!row || frame.y >= row[0].y + row[0].height / 2) rows.push([frame]);
+    const first = row?.[0];
+    if (!row || !first || frame.y >= first.y + first.height / 2)
+      rows.push([frame]);
     else row.push(frame);
   }
   return rows.flatMap((row) =>
