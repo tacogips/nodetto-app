@@ -310,11 +310,14 @@ nativeTest(
         });
         const bunDoc = readFileSync(doc, "utf8");
         writeFileSync(doc, source);
-        const start = performance.now();
         const native = Bun.spawnSync([binary as string, ...args], {
           timeout: 60000,
         });
-        times.push(performance.now() - start);
+        // CPU time, not wall time: a loaded machine or CI runner stretches
+        // wall time without the CLI doing more work. Per-core speed still
+        // varies between machines, so the absolute limit only catches a hang
+        // and the ratio between the first and last batch checks the scaling.
+        times.push(Number(native.resourceUsage.cpuTime.total) / 1000);
         const nativeDoc = readFileSync(doc, "utf8");
         expect(bun.exitCode).toBe(0);
         expect(native.exitCode).toBe(bun.exitCode);
@@ -338,7 +341,7 @@ nativeTest(
         );
         source = nativeDoc;
       }
-      for (const time of times) expect(time).toBeLessThan(5000);
+      for (const time of times) expect(time).toBeLessThan(30000);
       expect(times[3] as number).toBeLessThan((times[0] as number) * 4);
     } finally {
       rmSync(dir, { recursive: true, force: true });
