@@ -134,3 +134,39 @@ export class PageTabPan {
     this.pending = null;
   }
 }
+
+// A context menu event that arrives this soon after a right-button press
+// belongs to that press (macOS fires it on press, Windows and Linux on
+// release) and is ignored; the press itself decides on release.
+const CONTEXT_MENU_PRESS_WINDOW_MS = 1000;
+
+/**
+ * Tells a right-button click on a page tab, which opens the tab's page menu,
+ * from a right-button drag, which pans the strip (PageTabPan). A press that
+ * moved past the pan slop is a pan and opens nothing. A context menu event
+ * with no right press behind it (the keyboard menu key, Shift+F10, or
+ * Control-click on macOS) opens the menu directly.
+ */
+export class PageTabContextPress {
+  private tab: string | null = null;
+  private pressedAt = Number.NEGATIVE_INFINITY;
+
+  /** A right-button press began on `tab` (null: not on a tab). */
+  press(tab: string | null, time: number): void {
+    this.tab = tab;
+    this.pressedAt = time;
+  }
+  /** The press ended; returns the tab whose menu opens, if any. */
+  release(moved: boolean): string | null {
+    const tab = this.tab;
+    this.tab = null;
+    return moved ? null : tab;
+  }
+  cancel(): void {
+    this.tab = null;
+  }
+  /** A context menu event on `tab`; returns the tab whose menu opens. */
+  contextMenu(tab: string | null, time: number): string | null {
+    return time - this.pressedAt < CONTEXT_MENU_PRESS_WINDOW_MS ? null : tab;
+  }
+}

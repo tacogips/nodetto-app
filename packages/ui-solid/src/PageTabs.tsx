@@ -37,6 +37,7 @@ import {
   PRESENTATION_HIDDEN_TITLE_SUFFIX,
 } from "./page-presentation-toggle.ts";
 import {
+  PageTabContextPress,
   pageTabFlingStep,
   pageTabRevealTarget,
   pageTabScrollEdges,
@@ -188,12 +189,22 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
     });
   };
   const pan = new PageTabPan();
+  const contextPress = new PageTabContextPress();
+  const tabAt = (target: EventTarget | null): PageId | null =>
+    (target instanceof Element &&
+      target.closest<HTMLElement>("[data-page-drag-target]")?.dataset
+        .pageDragTarget) ||
+    null;
   const endPan = (event: PointerEvent): void => {
     if (!pan.owns(event.pointerId)) return;
+    const moved = pan.moved;
     const velocity = pan.finish(event.pointerId, event.timeStamp);
     if (list?.hasPointerCapture(event.pointerId))
       list.releasePointerCapture(event.pointerId);
-    startFling(velocity);
+    // A right click (no pan) opens the pressed tab's page menu.
+    const menuTab = contextPress.release(moved);
+    if (menuTab !== null) openMenu(menuTab);
+    else startFling(velocity);
   };
   const resize =
     typeof ResizeObserver === "undefined"
@@ -439,6 +450,7 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
             (event.target instanceof Element && event.target.closest("input"))
           )
             return;
+          contextPress.press(tabAt(event.target), event.timeStamp);
           pan.start(
             event.pointerId,
             event.clientX,
@@ -461,18 +473,29 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
           stepTarget = null;
         }}
         onPointerCancel={(event) => {
-          if (pan.owns(event.pointerId)) pan.cancel();
+          if (!pan.owns(event.pointerId)) return;
+          pan.cancel();
+          contextPress.cancel();
         }}
         onLostPointerCapture={(event) => {
-          if (pan.owns(event.pointerId)) pan.cancel();
+          if (!pan.owns(event.pointerId)) return;
+          pan.cancel();
+          contextPress.cancel();
         }}
-        // Right-button drag scrolls the strip, so no menu on the press; the
-        // rename field keeps its text menu.
+        // Right-button drag scrolls the strip and a right click opens the
+        // tab's page menu on release (endPan), so the browser menu never
+        // shows; a context menu with no right press behind it (menu key,
+        // Shift+F10, Control-click) opens the page menu here. The rename
+        // field keeps its text menu.
         onContextMenu={(event) => {
-          if (
-            !(event.target instanceof Element && event.target.closest("input"))
-          )
-            event.preventDefault();
+          if (event.target instanceof Element && event.target.closest("input"))
+            return;
+          event.preventDefault();
+          const tab = contextPress.contextMenu(
+            tabAt(event.target),
+            event.timeStamp,
+          );
+          if (tab !== null) openMenu(tab);
         }}
       >
         <For each={pageIds()}>
@@ -505,7 +528,7 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
                         aria-selected={currentId() === id}
                         tabindex={currentId() === id ? 0 : -1}
                         onKeyDown={(event) => tabKey(event, id)}
-                        title={`${page().name} (${page().kind})${readOnly() ? "" : ". Double-click to rename"}${page().hiddenInPresentation === true ? PRESENTATION_HIDDEN_TITLE_SUFFIX : ""}`}
+                        title={`${page().name} (${page().kind})${readOnly() ? "" : ". Right-click for page options; double-click to rename"}${page().hiddenInPresentation === true ? PRESENTATION_HIDDEN_TITLE_SUFFIX : ""}`}
                         draggable={false}
                         onPointerDown={(event) => {
                           suppressClick = false;

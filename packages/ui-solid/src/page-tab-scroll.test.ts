@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  PageTabContextPress,
   pageTabFlingStep,
   pageTabRevealTarget,
   pageTabScrollEdges,
@@ -105,4 +106,33 @@ test("reveal scrolls only as far as needed to show a tab", () => {
   expect(pageTabRevealTarget({ start: 100, end: 400 }, strip)).toBe(100);
   // Sub-pixel overflow is ignored.
   expect(pageTabRevealTarget({ start: 150, end: 250.5 }, strip)).toBeNull();
+});
+
+test("a right click on a tab opens its menu; a right drag only pans", () => {
+  const press = new PageTabContextPress();
+  press.press("page-b", 100);
+  expect(press.release(false)).toBe("page-b");
+  press.press("page-b", 200);
+  expect(press.release(true)).toBeNull();
+  // A press beside the tabs opens nothing.
+  press.press(null, 300);
+  expect(press.release(false)).toBeNull();
+  // A cancelled press opens nothing.
+  press.press("page-c", 400);
+  press.cancel();
+  expect(press.release(false)).toBeNull();
+});
+
+test("the context menu event of a right press is ignored; a keyboard one opens", () => {
+  const press = new PageTabContextPress();
+  // No right press yet: the menu key or Control-click opens the menu.
+  expect(press.contextMenu("page-a", 50)).toBe("page-a");
+  press.press("page-a", 100);
+  // macOS fires on press, Windows and Linux on release.
+  expect(press.contextMenu("page-a", 101)).toBeNull();
+  expect(press.release(false)).toBe("page-a");
+  expect(press.contextMenu("page-a", 400)).toBeNull();
+  // Much later, a keyboard menu key opens it again.
+  expect(press.contextMenu("page-a", 5000)).toBe("page-a");
+  expect(press.contextMenu(null, 6000)).toBeNull();
 });
