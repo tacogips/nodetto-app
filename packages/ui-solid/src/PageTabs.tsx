@@ -33,6 +33,7 @@ import {
 } from "./page-presentation-toggle.ts";
 import {
   pageTabFlingStep,
+  pageTabRevealTarget,
   pageTabScrollEdges,
   pageTabScrollStep,
   PageTabPan,
@@ -214,6 +215,38 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
   onCleanup(() => {
     resize?.disconnect();
     stopFling();
+  });
+  // Keep the current tab visible whenever the page changes from anywhere (a
+  // nodetto://open link, the layers panel, a comment jump, leaving a
+  // presentation), not only from the strip itself. Only a page change
+  // scrolls, so a strip scrolled by hand stays put while editing; focus is
+  // left alone so the canvas keeps the keyboard.
+  const activeId = createMemo((): PageId => {
+    signals.rev();
+    return props.editor.currentPageId;
+  });
+  createEffect(() => {
+    const id = activeId();
+    queueMicrotask(() => {
+      if (!list) return;
+      const tab = Array.from(list.children).find(
+        (element) =>
+          element instanceof HTMLElement &&
+          element.dataset.pageDragTarget === id,
+      );
+      if (!tab) return;
+      const origin = list.getBoundingClientRect().left - list.scrollLeft;
+      const box = tab.getBoundingClientRect();
+      const target = pageTabRevealTarget(
+        { start: box.left - origin, end: box.right - origin },
+        viewportOf(list),
+      );
+      if (target === null) return;
+      stopFling();
+      stepTarget = null;
+      list.scrollLeft = target;
+      syncEdges();
+    });
   });
 
   const focusPage = (id: PageId): void => {

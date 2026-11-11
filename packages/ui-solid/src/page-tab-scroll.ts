@@ -49,6 +49,26 @@ export function pageTabScrollStep(
   return Math.min(max, Math.max(0, target));
 }
 
+/**
+ * The scroll offset that brings `span` fully into view, or null when it is
+ * already visible. A tab wider than the strip aligns its start.
+ */
+export function pageTabRevealTarget(
+  span: PageTabSpan,
+  view: PageTabViewport,
+): number | null {
+  const max = Math.max(0, view.scrollWidth - view.width);
+  const left = view.scrollLeft;
+  const right = left + view.width;
+  let target: number;
+  if (span.start < left - EDGE || span.end - span.start > view.width)
+    target = span.start;
+  else if (span.end > right + EDGE) target = span.end - view.width;
+  else return null;
+  const clamped = Math.min(max, Math.max(0, target));
+  return Math.abs(clamped - left) < EDGE ? null : clamped;
+}
+
 /** Advance a release glide by `elapsed` ms; it stops once it slows down. */
 export function pageTabFlingStep(
   velocity: number,

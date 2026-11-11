@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   pageTabFlingStep,
+  pageTabRevealTarget,
   pageTabScrollEdges,
   pageTabScrollStep,
   PageTabPan,
@@ -83,4 +84,25 @@ test("a glide decelerates and comes to rest", () => {
   expect(frames).toBeLessThan(200);
   expect(travelled).toBeGreaterThan(500);
   expect(travelled).toBeLessThan(1500);
+});
+
+test("reveal scrolls only as far as needed to show a tab", () => {
+  const strip = { scrollLeft: 0, width: 250, scrollWidth: 610 };
+  // Fully visible: no scroll.
+  expect(pageTabRevealTarget({ start: 102, end: 202 }, strip)).toBeNull();
+  // Past the right edge: align its end with the strip's right edge.
+  expect(pageTabRevealTarget({ start: 408, end: 508 }, strip)).toBe(258);
+  // Last tab clamps to the maximum scroll.
+  expect(pageTabRevealTarget({ start: 510, end: 610 }, strip)).toBe(360);
+  // Before the left edge: align its start.
+  expect(
+    pageTabRevealTarget(
+      { start: 102, end: 202 },
+      { ...strip, scrollLeft: 300 },
+    ),
+  ).toBe(102);
+  // Wider than the strip: align its start.
+  expect(pageTabRevealTarget({ start: 100, end: 400 }, strip)).toBe(100);
+  // Sub-pixel overflow is ignored.
+  expect(pageTabRevealTarget({ start: 150, end: 250.5 }, strip)).toBeNull();
 });
