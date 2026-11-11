@@ -47,6 +47,7 @@ import {
   HelpHint,
   Inspector,
   Layers,
+  PageList,
   PageTabs,
   PresentationView,
   ReviewCommentPins,
@@ -264,6 +265,9 @@ export function App(props: AppProps): JSX.Element {
   const [exportRequest, setExportRequest] = createSignal(0);
   const [exportError, setExportError] = createSignal<string | null>(null);
   const [canvasHost, setCanvasHost] = createSignal<HTMLDivElement>();
+  const [pagesListOpen, setPagesListOpen] = createSignal(
+    preferences.pagesListOpen,
+  );
   const panes = createPaneLayout({
     leftPaneOpen: preferences.leftPaneOpen,
     rightPaneOpen: preferences.rightPaneOpen,
@@ -276,6 +280,7 @@ export function App(props: AppProps): JSX.Element {
           ? {}
           : { showSlideArea: showSlideArea() }),
         showRulers: showRulers(),
+        pagesListOpen: pagesListOpen(),
         leftPaneOpen: panes.leftPaneOpen(),
         rightPaneOpen: panes.rightPaneOpen(),
         snap: snap(),
@@ -836,6 +841,12 @@ export function App(props: AppProps): JSX.Element {
             onToolChange={setActiveTool}
             context={actionContext()}
             onShapeDrop={(tool, client) => setShapeDrop({ tool, client })}
+          />
+          <PageList
+            editor={props.editor}
+            open={pagesListOpen()}
+            onOpenChange={setPagesListOpen}
+            onCopyShapesFrom={openCopyShapes}
           />
           <Layers
             simple={simpleWorkspace()}

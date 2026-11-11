@@ -307,3 +307,10 @@ scratch: `page-list.ts`, `PageList.test.tsx`, `test-dom/setup.ts` and
 `test-dom/bunfig.toml`. Re-read each one fresh and record its pre-hash
 before editing. Scope, contracts, the 8 scenarios and verification commands
 are unchanged.
+
+## Implementation progress 2026-11-11
+
+- [x] Standalone component, helpers and eight-scenario DOM lane implemented.
+- [x] Authorized dependency install audited, including entities re-hoist.
+- [x] All five assigned verification gates passed; commands and logs are recorded in `impl-plans/progress/pgl-02-page-list.md`.
+- [x] Step 7 adversarial review accepted it (comm-019216). pgl-03-wiring then landed, and the combined-tree integration review accepted pgl-01..03 (comm-019230; logs under `tmp/pgl-s835/reconcile-wave-005/`). It is ready to be archived to `impl-plans/completed/`.

@@ -10,6 +10,7 @@ export interface EditorPreferences {
   readonly showGrid: boolean;
   readonly showSlideArea?: boolean;
   readonly showRulers: boolean;
+  readonly pagesListOpen: boolean;
   readonly leftPaneOpen: boolean;
   readonly rightPaneOpen: boolean;
   readonly snap: SnapSettings;
@@ -23,6 +24,7 @@ type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 const defaults: EditorPreferences = {
   showGrid: true,
   showRulers: true,
+  pagesListOpen: true,
   leftPaneOpen: true,
   rightPaneOpen: true,
   snap: { grid: true, objects: true, guides: true },
@@ -47,7 +49,12 @@ export function loadEditorPreferences(
         ? (value["snap"] as Record<string, unknown>)
         : {};
     const bool = (
-      key: "showGrid" | "showRulers" | "leftPaneOpen" | "rightPaneOpen",
+      key:
+        | "showGrid"
+        | "showRulers"
+        | "pagesListOpen"
+        | "leftPaneOpen"
+        | "rightPaneOpen",
     ) =>
       typeof value[key] === "boolean" ? (value[key] as boolean) : defaults[key];
     const delay = value["autosaveDelayMs"];
@@ -57,6 +64,7 @@ export function loadEditorPreferences(
         ? { showSlideArea: value["showSlideArea"] }
         : {}),
       showRulers: bool("showRulers"),
+      pagesListOpen: bool("pagesListOpen"),
       leftPaneOpen: bool("leftPaneOpen"),
       rightPaneOpen: bool("rightPaneOpen"),
       snap: {

@@ -255,6 +255,15 @@ and can be removed in one undo step.
 
 ## Page navigation
 
+The **Pages list** in the Shapes and layers pane shows the page count. Expand or
+fold it to show or hide rows; this choice is remembered locally and is never
+saved in the document. Each row shows its number and name and marks pages hidden
+in presentation. The current page is highlighted and kept in view. Click a row
+or press Enter or Space to open it; Up, Down, Home and End move focus. Press F2
+or double-click to rename. Use the "..." button or right-click for page options,
+including Move up and Move down, and use "+" to add a page. In read-only mode,
+the list remains available without editing actions.
+
 Review comments can be filtered across all pages and searched by feedback,
 author, target or page name. Show on canvas opens the thread's page and centers
 its location while retaining that page's zoom. Thread numbers remain local to

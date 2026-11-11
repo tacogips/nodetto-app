@@ -71,6 +71,7 @@ export {
   ZoomControls,
   type ZoomControlsProps,
 } from "./ZoomControls.tsx";
+export { PageList, type PageListProps } from "./PageList.tsx";
 export { PageTabs, type PageTabsProps } from "./PageTabs.tsx";
 export {
   type ConnectorEnd,

@@ -1,0 +1,26 @@
+.nodetto-page-list-rows {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.nodetto-page-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+.nodetto-page-list-number {
+  min-width: 1.5em;
+  text-align: right;
+}
+.nodetto-page-list-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nodetto-page-list-active {
+  background: var(--nodetto-selection, #dceaff);
+}
+.nodetto-page-list-hidden .nodetto-page-list-name::after {
+  content: " ◌";
+}

@@ -516,3 +516,18 @@ Slide sizing, editing overlay and copying shapes between pages. Verification log
 | [sac-06-slide-area-overlay](completed/sac-06-slide-area-overlay.md) | slide area overlay |
 | [sac-07-settings-and-picker-ui](completed/sac-07-settings-and-picker-ui.md) | settings and picker ui |
 | [sac-08-wiring](completed/sac-08-wiring.md) | wiring |
+
+## Pages list (pgl-s835)
+
+Collapsible Pages list in the desktop left pane, with shared page actions
+extracted from the tab menu. Design:
+[design-page-list](../design-docs/specs/design-page-list.md). Verification
+logs: `tmp/pgl-s835/reconcile-wave-005/`. The dispatch manifest
+[pgl-s835-dispatch.json](active/pgl-s835-dispatch.json) remains in `active/`;
+the archive node moves the plans.
+
+| Plan | Scope |
+| --- | --- |
+| [pgl-01-page-actions](completed/pgl-01-page-actions.md) | shared page actions |
+| [pgl-02-page-list](completed/pgl-02-page-list.md) | PageList component and DOM tests |
+| [pgl-03-wiring](completed/pgl-03-wiring.md) | preference, App wiring, docs |

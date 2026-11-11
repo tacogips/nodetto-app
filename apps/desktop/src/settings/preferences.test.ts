@@ -134,6 +134,29 @@ test("malformed JSON returns all appearance defaults", () => {
   expect(preferences.pcbCanvasBackground).toBe("dark");
 });
 
+test("pages list preference defaults open and persists boolean values", () => {
+  const store = storage();
+  expect(loadEditorPreferences(store).pagesListOpen).toBe(true);
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({ showGrid: false }),
+  );
+  expect(loadEditorPreferences(store).pagesListOpen).toBe(true);
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({ pagesListOpen: "no" }),
+  );
+  expect(loadEditorPreferences(store).pagesListOpen).toBe(true);
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({ pagesListOpen: false }),
+  );
+  const preferences = loadEditorPreferences(store);
+  expect(preferences.pagesListOpen).toBe(false);
+  storeEditorPreferences(preferences, store);
+  expect(loadEditorPreferences(store)).toEqual(preferences);
+});
+
 test("slide area preference is optional and boolean only", () => {
   const store = storage();
   expect(loadEditorPreferences(store).showSlideArea).toBeUndefined();

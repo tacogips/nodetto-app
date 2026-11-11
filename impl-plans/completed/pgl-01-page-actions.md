@@ -174,4 +174,4 @@ pageMenuItems(editor, id, options: { copyShapes: boolean;
 
 ## Implementation status
 
-- Implementation and assigned verification complete; see `impl-plans/progress/pgl-01-page-actions.md`. Formal review and downstream plans remain pending.
+- Completed: implementation and verification are in `impl-plans/progress/pgl-01-page-actions.md`. The wave 001 integration review accepted it, and the combined-tree integration review accepted pgl-01..03 (comm-019230; logs under `tmp/pgl-s835/reconcile-wave-005/`). It is ready to be archived to `impl-plans/completed/`.

@@ -133,3 +133,7 @@ under Active, in the existing prose style.
 - All commands exit 0, with logs under `tmp/pgl-s835/pgl-03-wiring/`. The
   progress log records each command, its exit code and its log path, plus
   per-edit pre and post hashes.
+
+## Implementation status
+
+Completed: Step 6 implemented and verified it. Step 7 adversarial review accepted it (comm-019225), and the combined-tree integration review accepted pgl-01..03 (comm-019230; logs under `tmp/pgl-s835/reconcile-wave-005/`). It is ready to be archived to `impl-plans/completed/`.

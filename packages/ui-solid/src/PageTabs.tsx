@@ -21,6 +21,12 @@ import {
 import { createEditorSignals } from "./adapter.ts";
 import { Icon } from "./Icon.tsx";
 import {
+  deletePageWithConfirm,
+  duplicatePageAction,
+  pageMenuItems,
+  togglePagePresentation,
+} from "./page-actions.ts";
+import {
   PageTabDrag,
   type PageTabDrop,
   type PageTabBox,
@@ -29,7 +35,6 @@ import { pageRenameDraft } from "./page-rename.ts";
 import {
   PRESENTATION_HIDDEN_TAB_CLASS,
   PRESENTATION_HIDDEN_TITLE_SUFFIX,
-  presentationToggleLabel,
 } from "./page-presentation-toggle.ts";
 import {
   pageTabFlingStep,
@@ -54,11 +59,6 @@ const viewportOf = (list: HTMLElement): PageTabViewport => ({
   width: list.clientWidth,
   scrollWidth: list.scrollWidth,
 });
-
-const DELETE_PROMPT = (page: Page, count: number): string =>
-  `Delete page "${page.name}" and the ${count} element${
-    count === 1 ? "" : "s"
-  } on it?`;
 
 export function PageTabs(props: PageTabsProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
@@ -327,7 +327,17 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
     signals.rev();
     return props.editor.currentPageId;
   };
-  const canDelete = (): boolean => !readOnly() && pages().length > 1;
+  const menuItems = createMemo(() => {
+    signals.rev();
+    const id = menuFor();
+    return id === null
+      ? []
+      : pageMenuItems(props.editor, id, {
+          copyShapes: Boolean(props.onCopyShapesFrom),
+          axis: "horizontal",
+        });
+  });
+  const menuKeys = createMemo(() => menuItems().map((item) => item.key));
 
   const startRename = (id: PageId): void => {
     if (props.editor.readOnly) return;
@@ -355,22 +365,17 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
 
   const remove = (page: Page): void => {
     setMenuFor(null);
-    if (!canDelete()) {
-      return;
-    }
-    const count = props.editor.store.getPageElements(page.id).length;
-    if (count > 0 && !window.confirm(DELETE_PROMPT(page, count))) {
-      focusPage(page.id);
-      return;
-    }
-    props.editor.deletePage(page.id);
-    focusPage(props.editor.currentPageId);
+    const result = deletePageWithConfirm(props.editor, page.id, (message) =>
+      window.confirm(message),
+    );
+    if (result === "cancelled") focusPage(page.id);
+    else if (result === "deleted") focusPage(props.editor.currentPageId);
   };
 
   const duplicate = (page: Page): void => {
     if (props.editor.readOnly) return;
     setMenuFor(null);
-    props.editor.duplicatePage(page.id);
+    duplicatePageAction(props.editor, page.id);
     focusPage(props.editor.currentPageId);
   };
 
@@ -663,94 +668,53 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
                         }
                       }}
                     >
-                      <button
-                        type="button"
-                        role="menuitem"
-                        tabindex="-1"
-                        class="nodetto-menu-item"
-                        title="Rename page"
-                        onClick={() => startRename(id)}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        tabindex="-1"
-                        class="nodetto-menu-item"
-                        title="Duplicate page and everything on it"
-                        onClick={() => duplicate(page())}
-                      >
-                        Duplicate
-                      </button>
-                      <Show when={props.onCopyShapesFrom}>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          tabindex="-1"
-                          class="nodetto-menu-item"
-                          disabled={readOnly() || pages().length <= 1}
-                          onClick={() => {
-                            props.onCopyShapesFrom?.(id);
-                            setMenuFor(null);
-                          }}
-                        >
-                          Copy shapes from page...
-                        </button>
-                      </Show>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        tabindex="-1"
-                        class="nodetto-menu-item"
-                        disabled={readOnly()}
-                        onClick={() => {
-                          props.editor.setPageHiddenInPresentation(
-                            id,
-                            !(page().hiddenInPresentation === true),
+                      <For each={menuKeys()}>
+                        {(key) => {
+                          const item = () =>
+                            menuItems().find((entry) => entry.key === key);
+                          return (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              tabindex="-1"
+                              class="nodetto-menu-item"
+                              title={item()?.title}
+                              disabled={item()?.disabled}
+                              onClick={() => {
+                                switch (key) {
+                                  case "rename":
+                                    startRename(id);
+                                    break;
+                                  case "duplicate":
+                                    duplicate(page());
+                                    break;
+                                  case "copyShapes":
+                                    props.onCopyShapesFrom?.(id);
+                                    setMenuFor(null);
+                                    break;
+                                  case "presentation":
+                                    togglePagePresentation(props.editor, id);
+                                    setMenuFor(null);
+                                    break;
+                                  case "delete":
+                                    remove(page());
+                                    break;
+                                  case "moveBack":
+                                  case "moveForward":
+                                    props.editor.reorderPage(
+                                      id,
+                                      key === "moveBack" ? -1 : 1,
+                                    );
+                                    setMenuFor(null);
+                                    focusPage(id);
+                                    break;
+                                }
+                              }}
+                            >
+                              {item()?.label}
+                            </button>
                           );
-                          setMenuFor(null);
                         }}
-                      >
-                        {presentationToggleLabel(
-                          page().hiddenInPresentation === true,
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        tabindex="-1"
-                        class="nodetto-menu-item"
-                        title={
-                          canDelete()
-                            ? "Delete page"
-                            : "The last page cannot be deleted"
-                        }
-                        disabled={!canDelete()}
-                        onClick={() => remove(page())}
-                      >
-                        Delete
-                      </button>
-                      <For each={[-1, 1] as const}>
-                        {(delta) => (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            tabindex="-1"
-                            class="nodetto-menu-item"
-                            disabled={
-                              pages()[delta === -1 ? 0 : pages().length - 1]
-                                ?.id === id
-                            }
-                            onClick={() => {
-                              props.editor.reorderPage(id, delta);
-                              setMenuFor(null);
-                              focusPage(id);
-                            }}
-                          >
-                            Move {delta === -1 ? "left" : "right"}
-                          </button>
-                        )}
                       </For>
                     </div>
                   </Show>
