@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { binary, cliEntry, nativeTest } from "./harness.ts";
 
@@ -165,9 +166,7 @@ function compareGenerated(args: string[], path: string, source: string) {
 }
 
 test("two generator runs agree after generated-value normalization", () => {
-  const cwd = mkdtempSync(
-    join(process.cwd(), "tmp/ipd-s772/ipd-26-example-sample/generator-"),
-  );
+  const cwd = mkdtempSync(join(tmpdir(), "nodetto-iphone-kit-generator-"));
   try {
     const signatures = [];
     for (const output of ["first", "second"]) {
@@ -294,7 +293,7 @@ nativeTest(
   "the iPhone kit example operations agree across runtimes and repeated runs",
   () => {
     const cwd = mkdtempSync(
-      join(process.cwd(), "tmp/ipd-s772/ipd-26-example-sample/native-parity-"),
+      join(tmpdir(), "nodetto-iphone-kit-native-parity-"),
     );
     try {
       const doc = join(cwd, "design.jsonl");
