@@ -475,29 +475,34 @@ export function inspectCommand(
     document.elements.filter((element) => element.page === page.id);
 
   if (format === "json") {
-    const editor = new Editor({ document });
+    // Frame-relative positions need an editor and its geometry, which is
+    // slow in the native engine; pages without frames skip both.
+    let editor: Editor | undefined;
     const report = {
       document: { id: document.id, title: document.title },
       pages: pages.map((page) => {
+        const elements = elementsOf(page);
+        const base = { ...page, shortId: shortPageId(page.id) };
+        if (!elements.some((element) => element.type === "frame"))
+          return { ...base, elements: elements.filter(filter) };
+        editor ??= new Editor({ document });
         editor.setCurrentPage(page.id);
         const context = editor.createShapeContext(1);
         const owners = frameParents(editor.store, page.id, context);
         return {
-          ...page,
-          shortId: shortPageId(page.id),
-          elements: elementsOf(page)
-            .filter(filter)
-            .map((element) => {
-              const owner = owners.get(element.id);
-              const box = editor.getBounds(element.id, context);
-              const frame = owner ? editor.getBounds(owner, context) : null;
-              return box && frame
-                ? {
-                    ...element,
-                    rel: { x: box.x - frame.x, y: box.y - frame.y },
-                  }
-                : element;
-            }),
+          ...base,
+          elements: elements.filter(filter).map((element) => {
+            const owner = owners.get(element.id);
+            if (!owner || !editor) return element;
+            const box = editor.getBounds(element.id, context);
+            const frame = editor.getBounds(owner, context);
+            return box && frame
+              ? {
+                  ...element,
+                  rel: { x: box.x - frame.x, y: box.y - frame.y },
+                }
+              : element;
+          }),
         };
       }),
     };
