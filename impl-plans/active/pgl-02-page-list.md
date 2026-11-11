@@ -199,3 +199,56 @@ DOM lane (design 8.2):
 - `package.json` changes only its `devDependencies`.
 - For every edit: re-read the file fresh first, record pre and post
   `git hash-object` values, and stop if the file has drifted unexpectedly.
+
+## Amendment 2026-11-11 (blocked-wave-scope-or-contract, round 1)
+
+Blocker: wave 002 checkpoint amendment from previous checkpoint e599787. It
+needs an approved install location for the DOM test dependencies:
+`node_modules/happy-dom` is absent, and `bun install` writes outside the
+artifact roots `target` and `apps/desktop/dist`.
+
+Decision. This authorizes the dependency install output only. Design, plan
+scope, contracts and scenarios are unchanged.
+
+- New `writePaths` that are also `artifactRoots`. They hold generated install
+  output only and are never authored or committed (gitignored):
+  - `node_modules`
+  - `packages/ui-solid/node_modules`
+  - `packages/core/node_modules`
+  - `packages/io/node_modules`
+  - `packages/ir/node_modules`
+  - `packages/collab/node_modules`
+  - `apps/desktop/node_modules`
+  - `apps/cli/node_modules`
+- Install method. Run one command from the repository root:
+  `bun add --dev --exact happy-dom@<latest-stable> @babel/core@7.29.7 babel-preset-solid@1.9.15 @types/babel__core@7.20.5`.
+  - It may only change `package.json` `devDependencies`, `bun.lock`, and the
+    `node_modules` roots listed above.
+  - Do not run `bun install --force`, upgrade other packages or edit
+    `overrides`.
+  - If the command changes any other dependency version in `bun.lock`, revert
+    with `git checkout -- package.json bun.lock`, record the evidence, and
+    report blocked.
+- Tracked audit manifest:
+  `tmp/pgl-s835/pgl-02-page-list/toolchain.json`. It sits inside the
+  existing writePath `tmp/pgl-s835/pgl-02-page-list` and records:
+  - the `bun --version` output
+  - the exact install command and its exit code
+  - the resolved `happy-dom` version
+  - `git hash-object bun.lock` and `package.json`, before and after
+  - the sha256 of `node_modules/happy-dom/package.json`
+- Module resolution. Root `node_modules` serves `happy-dom`, `@babel/core`
+  and `babel-preset-solid` to `packages/ui-solid/src/test-dom/setup.ts` and
+  to the child process started by `PageList.test.tsx`. Nothing is installed
+  under `target` or `apps/desktop/dist`.
+- If registry access is unavailable, record the failing command, its exit
+  code and its log in `toolchain.json`, then report blocked. Do not vendor
+  packages, and do not fall back to helper-only coverage.
+- Added done criterion: `node_modules/happy-dom/package.json` exists,
+  `toolchain.json` records a zero install exit code, and
+  `git diff e599787 -- package.json` shows only `devDependencies` lines.
+- Dependency admission. The landed pgl-01-page-actions is now recorded in
+  the manifest's `acceptedDependencies` (commit e599787 plus the wave-001
+  integration acceptance). This plan's manifest `dependsOn` is therefore
+  `[]` and its wave is 1. The page-actions contract it consumes is
+  unchanged.

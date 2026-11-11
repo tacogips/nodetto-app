@@ -171,3 +171,7 @@ pageMenuItems(editor, id, options: { copyShapes: boolean;
 - The progress log, the only progress file this worker edits, records each
   command, its exit code and its log path, plus per-edit pre and post
   `git hash-object` values after a fresh re-read. Stop on unexpected drift.
+
+## Implementation status
+
+- Implementation and assigned verification complete; see `impl-plans/progress/pgl-01-page-actions.md`. Formal review and downstream plans remain pending.

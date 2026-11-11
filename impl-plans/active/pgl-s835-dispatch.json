@@ -10,8 +10,18 @@
   "evidenceRoot": "tmp/pgl-s835",
   "designReferences": ["design-docs/specs/design-page-list.md"],
   "designDocPaths": ["design-docs/specs/design-page-list.md"],
-  "acceptedDependencies": [],
-  "waves": [["pgl-01-page-actions"], ["pgl-02-page-list"], ["pgl-03-wiring"]],
+  "acceptedDependencies": [
+    {
+      "planId": "pgl-01-page-actions",
+      "planPath": "impl-plans/active/pgl-01-page-actions.md",
+      "commit": "e59978764255657373f2059417fea339ffb67645",
+      "provides": [
+        "page-actions.ts: deletePagePrompt, canDeletePage, deletePageWithConfirm, duplicatePageAction, togglePagePresentation, pageMenuItems, PageMenuItem, PageMenuItemKey",
+        "PageTabs.tsx uses the helpers with a key-string-keyed menu. Accepted at integration review wave 001; the working-tree blobs are PageTabs.tsx c8888f6, page-actions.ts eb932f6 and page-actions.test.ts 93259c4."
+      ]
+    }
+  ],
+  "waves": [["pgl-02-page-list"], ["pgl-03-wiring"]],
   "reconcile": {
     "note": "Each wave has one plan, so no same-wave write clash is possible. The lockfile (bun.lock) is owned by pgl-02 alone. Workspace-wide lint, verify and build gates run in pgl-03 and in integration review."
   },
@@ -38,7 +48,8 @@
       {"decision": "Skip drag-to-reorder and offer Move up/Move down through editor.reorderPage.", "rationale": "pageTabDropAt hit-tests a horizontal strip only, and the intake allowed drag only if PageTabDrag could be reused as-is (design section 1)."},
       {"decision": "The reveal sets only the row box's scrollTop through pageListRevealTop, which wraps pageTabRevealTarget.", "rationale": "page-tab-scroll.ts stays unchanged and the reveal never moves focus or scrolls outer panes (design sections 3-4)."},
       {"decision": "Add an isolated DOM test lane (test-dom with happy-dom, run in a child process).", "rationale": "The existing preload compiles TSX with solid-js/h on the server build, so it cannot test reactive interactions (design sections 1 and 8.2)."},
-      {"decision": "Rows use For over a PageId string memo, and menus use For over key strings.", "rationale": "Focused nodes survive revision bumps (PGL-PLAN-001, verified-fixed)."}
+      {"decision": "Rows use For over a PageId string memo, and menus use For over key strings.", "rationale": "Focused nodes survive revision bumps (PGL-PLAN-001, verified-fixed)."},
+      {"decision": "Amendment 2026-11-11 round 1: authorize the pgl-02-page-list dependency install output (root node_modules plus seven workspace node_modules directories as writePaths and artifactRoots) for one audited `bun add --dev --exact` of happy-dom, @babel/core@7.29.7, babel-preset-solid@1.9.15 and @types/babel__core@7.20.5, and record pgl-01-page-actions as an acceptedDependency so pgl-02 has dependsOn [].", "rationale": "Blocked plan ids: pgl-02-page-list (reason blocked-wave-scope-or-contract, previousCheckpointCommit e599787, summary tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-835/wave-002/wave-summary.json). Resolved gap: no approved install location for the DOM test dependencies (node_modules/happy-dom was absent and bun install writes outside target and apps/desktop/dist). The install is audited in tmp/pgl-s835/pgl-02-page-list/toolchain.json. Wave 001 integration review accepted pgl-01-page-actions (21 pass, 0 fail; typecheck, biome and strict-index clean; logs under tmp/pgl-s835/reconcile-wave-001). The amendment review was accepted at step5-impl-plan-review comm-019194. Design, contracts, scenarios and plan IDs are unchanged."}
     ],
     "supportedEdgeCases": [
       "A single page: Delete and Copy shapes are disabled.",
@@ -64,47 +75,18 @@
   },
   "plans": [
     {
-      "planId": "pgl-01-page-actions",
-      "planPath": "impl-plans/active/pgl-01-page-actions.md",
-      "progressPath": "impl-plans/progress/pgl-01-page-actions.md",
-      "wave": 1,
-      "dependsOn": [],
-      "acceptanceCriteria": [
-        "page-actions.ts exports deletePagePrompt, canDeletePage, deletePageWithConfirm, duplicatePageAction, togglePagePresentation, pageMenuItems, PageMenuItem and PageMenuItemKey with the pinned signatures.",
-        "PageTabs.tsx uses the helpers. Tab menu labels, titles, order, disabled rules and focus behavior are identical, and the activeId reveal effect is unchanged.",
-        "page-actions.test.ts covers both axes, read-only, single page, first/last page and the delete outcomes, and the existing page-tab tests stay green.",
-        "The PageTabs menu renders with For over PageMenuItemKey strings (or Index), so an open menu's buttons survive revision changes. `git grep -n \"For each={menuItems()}\" packages/ui-solid/src/PageTabs.tsx` returns nothing."
-      ],
-      "writePaths": [
-        "packages/ui-solid/src/page-actions.ts",
-        "packages/ui-solid/src/page-actions.test.ts",
-        "packages/ui-solid/src/PageTabs.tsx",
-        "impl-plans/progress/pgl-01-page-actions.md",
-        "tmp/pgl-s835/pgl-01-page-actions",
-        "target",
-        "apps/desktop/dist"
-      ],
-      "sharedPaths": [],
-      "artifactRoots": ["target", "apps/desktop/dist"],
-      "verification": [
-        "bun test packages/ui-solid/src/page-actions.test.ts packages/ui-solid/src/page-tab-drag.test.ts packages/ui-solid/src/page-tab-scroll.test.ts packages/ui-solid/src/page-rename.test.ts packages/ui-solid/src/page-presentation-toggle.test.ts",
-        "bun run typecheck",
-        "bunx biome check packages/ui-solid/src/page-actions.ts packages/ui-solid/src/page-actions.test.ts packages/ui-solid/src/PageTabs.tsx",
-        "mkdir -p tmp/pgl-s835/pgl-01-page-actions && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/pgl-s835/pgl-01-page-actions/strict-index.log 2>&1; ! grep 'error TS' tmp/pgl-s835/pgl-01-page-actions/strict-index.log | grep -e 'page-actions.ts' -e 'PageTabs.tsx'"
-      ]
-    },
-    {
       "planId": "pgl-02-page-list",
       "planPath": "impl-plans/active/pgl-02-page-list.md",
       "progressPath": "impl-plans/progress/pgl-02-page-list.md",
-      "wave": 2,
-      "dependsOn": ["pgl-01-page-actions"],
+      "wave": 1,
+      "dependsOn": [],
       "acceptanceCriteria": [
         "page-list.ts exports pageListRows, pageListVisibleRows, pageListKeyAction and pageListRevealTop, and page-list.test.ts covers them against a real Editor.",
         "PageList.tsx (exporting PageListProps) renders the details section, the listbox rows, the menu built from pageMenuItems with the vertical axis, a '+' button, read-only gating, and a scrollTop-only reveal.",
         "PageList.test.tsx runs test-dom/page-list.dom.tsx in a child process. It requires exit 0 and 'ok <name>' for rows, highlight, click, keyboard, fold, read-only, rename and menu.",
         "The root bunfig.toml, mise.toml, PageTabs.tsx and page-tab-scroll.ts are unchanged, and package.json changes only devDependencies.",
-        "Rows render with For over a pageIds string memo (the PageTabs.tsx:325 pattern) and menu items with For over key strings or Index. The keyboard, click and rename DOM scenarios assert that the same focused node survives a revision change: Enter on row 2 keeps the row-2 node focused and ArrowDown then focuses row 3, and the rename input survives an unrelated editor change and keeps focus."
+        "Rows render with For over a pageIds string memo (the PageTabs.tsx:325 pattern) and menu items with For over key strings or Index. The keyboard, click and rename DOM scenarios assert that the same focused node survives a revision change: Enter on row 2 keeps the row-2 node focused and ArrowDown then focuses row 3, and the rename input survives an unrelated editor change and keeps focus.",
+        "The dependency install (a single `bun add --dev --exact` from the repo root) changes only package.json devDependencies, bun.lock and the declared node_modules artifact roots. tmp/pgl-s835/pgl-02-page-list/toolchain.json records the bun version, the install command, exit code 0, the resolved happy-dom version, and the before and after hashes of bun.lock and package.json."
       ],
       "writePaths": [
         "packages/ui-solid/src/page-list.ts",
@@ -120,10 +102,29 @@
         "impl-plans/progress/pgl-02-page-list.md",
         "tmp/pgl-s835/pgl-02-page-list",
         "target",
-        "apps/desktop/dist"
+        "apps/desktop/dist",
+        "node_modules",
+        "packages/ui-solid/node_modules",
+        "packages/core/node_modules",
+        "packages/io/node_modules",
+        "packages/ir/node_modules",
+        "packages/collab/node_modules",
+        "apps/desktop/node_modules",
+        "apps/cli/node_modules"
       ],
       "sharedPaths": [],
-      "artifactRoots": ["target", "apps/desktop/dist"],
+      "artifactRoots": [
+        "target",
+        "apps/desktop/dist",
+        "node_modules",
+        "packages/ui-solid/node_modules",
+        "packages/core/node_modules",
+        "packages/io/node_modules",
+        "packages/ir/node_modules",
+        "packages/collab/node_modules",
+        "apps/desktop/node_modules",
+        "apps/cli/node_modules"
+      ],
       "verification": [
         "bun test packages/ui-solid/src/page-list.test.ts packages/ui-solid/src/PageList.test.tsx",
         "bun run typecheck",
@@ -136,7 +137,7 @@
       "planId": "pgl-03-wiring",
       "planPath": "impl-plans/active/pgl-03-wiring.md",
       "progressPath": "impl-plans/progress/pgl-03-wiring.md",
-      "wave": 3,
+      "wave": 2,
       "dependsOn": ["pgl-02-page-list"],
       "acceptanceCriteria": [
         "EditorPreferences.pagesListOpen defaults to true, round-trips false, and ignores non-boolean or legacy values (preferences.test.ts).",
