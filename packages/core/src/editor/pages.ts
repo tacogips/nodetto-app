@@ -98,12 +98,28 @@ export function planPageElementsCopy(
     editor.store,
     editor.store.getPageElements(fromPageId).map((element) => element.id),
   );
-  return planPaste(payload, {
+  const linkIds = new Map<string, string>();
+  const sourceUpdates: Command[] = [];
+  for (const element of payload.elements) {
+    const source = editor.store.get(element.id);
+    const linkId = source?.visual.linkId ?? element.id;
+    linkIds.set(element.id, linkId);
+    if (source && source.visual.linkId === undefined) {
+      sourceUpdates.push({
+        type: "updateVisual",
+        id: element.id,
+        visual: { linkId },
+      });
+    }
+  }
+  const plan = planPaste(payload, {
     page: toPageId,
     idSource,
     nextIndex: () => editor.nextIndex(toPageId),
     offset: { x: 0, y: 0 },
+    linkIds,
   });
+  return { ...plan, commands: [...sourceUpdates, ...plan.commands] };
 }
 
 /**

@@ -3,10 +3,9 @@ import {
   currentSlide,
   fitSlide,
   reducePresentation,
-  resolveSlideRect,
+  planSlideTransition,
   slideCounter,
   slideList,
-  slideSource,
   startIndex,
   svgSize,
   type Editor,
@@ -15,6 +14,7 @@ import {
   type SlideSize,
 } from "@nodetto/core";
 import type { PageId } from "@nodetto/ir";
+import { renderSlide } from "./slide-render.ts";
 import { presentationKeyAction, type PresentationKey } from "./keys.ts";
 
 export interface PresentationKeyEvent extends PresentationKey {
@@ -41,6 +41,15 @@ export function createPresentationController({
   let state: PresentationState | null =
     index === null ? null : createPresentationState(slides, index);
   let exited = false;
+  let transition: {
+    fromPage: PageId;
+    toPage: PageId;
+    fromSvg: string;
+    toSvg: string;
+    fromRect: NonNullable<ReturnType<typeof renderSlide>["rect"]>;
+    toRect: NonNullable<ReturnType<typeof renderSlide>["rect"]>;
+    plan: Extract<ReturnType<typeof planSlideTransition>, { kind: "animate" }>;
+  } | null = null;
   let cache:
     | {
         page: PageId;
@@ -58,13 +67,54 @@ export function createPresentationController({
   function dispatch(action: PresentationAction | "exit") {
     if (!state || exited) return;
     if (action === "exit") {
+      transition = null;
       if (state.digits)
         state = reducePresentation(state, { type: "clearDigits" });
       else exit(currentSlide(state));
     } else {
-      const previous = currentSlide(state);
-      state = reducePresentation(state, action);
-      if (!state) exit(previous);
+      const before = state;
+      const previous = currentSlide(before);
+      state = reducePresentation(before, action);
+      if (!state) {
+        transition = null;
+        exit(previous);
+        return;
+      }
+      if (action.type === "digit" || action.type === "clearDigits") return;
+      transition = null;
+      const adjacent =
+        action.type === "next" ||
+        action.type === "prev" ||
+        (action.type === "enter" && !before.digits);
+      if (
+        adjacent &&
+        !before.black &&
+        !state.black &&
+        Math.abs(state.index - before.index) === 1
+      ) {
+        const toPage = currentSlide(state);
+        const from = renderSlide(editor, previous);
+        const to = renderSlide(editor, toPage);
+        if (from.rect && to.rect) {
+          const plan = planSlideTransition(editor.store, editor.registry, {
+            from: { page: previous, rect: from.rect },
+            to: { page: toPage, rect: to.rect },
+          });
+          if (plan.kind === "animate") {
+            const emptySvg = (rect: typeof from.rect & {}) =>
+              `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${rect.x} ${rect.y} ${rect.width} ${rect.height}"></svg>`;
+            transition = {
+              fromPage: previous,
+              toPage,
+              fromSvg: from.svg ?? emptySvg(from.rect),
+              toSvg: to.svg ?? emptySvg(to.rect),
+              fromRect: from.rect,
+              toRect: to.rect,
+              plan,
+            };
+          }
+        }
+      }
     }
   }
   function slide() {
@@ -72,44 +122,28 @@ export function createPresentationController({
     const page = currentSlide(state);
     if (cache?.page === page && cache.revision === editor.revision)
       return cache.result;
-    const slideSize = editor.store.getMeta().slideSize;
-    let result: { src: string | null; size: SlideSize | null };
-    if (slideSize) {
-      const rect = resolveSlideRect(editor.store, editor.registry, page, {
-        slideSize,
-        slideOrigin: editor.store.getPage(page)?.slideOrigin,
-      });
-      if (!rect) throw new Error("Explicit slide rect is missing");
-      const { x, y, width, height } = rect;
-      const svg =
-        editor.store.getPageElements(page).length === 0
-          ? null
-          : editor.exportPageSvgOf(page, { viewport: { x, y, width, height } });
-      result = {
-        src: svg
-          ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-          : null,
-        size: { width, height },
-      };
-    } else {
-      const source = slideSource(editor.store, editor.registry, page);
-      const svg =
-        (source.kind === "artboard"
-          ? editor.exportArtboardSvg(source.frameId)
-          : null) ?? editor.exportPageSvgOf(page, { padding: 0 });
-      result = {
-        src: svg
-          ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-          : null,
-        size: svg ? svgSize(svg) : null,
-      };
-    }
+    const { svg, rect } = renderSlide(editor, page);
+    const result = {
+      src: svg
+        ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+        : null,
+      size:
+        editor.store.getMeta().slideSize && rect
+          ? { width: rect.width, height: rect.height }
+          : svg
+            ? svgSize(svg)
+            : null,
+    };
     cache = { page, revision: editor.revision, result };
     return result;
   }
   return {
     state: () => state,
     dispatch,
+    transition: () => transition,
+    clearTransition: () => {
+      transition = null;
+    },
     refresh: () =>
       dispatch({
         type: "reconcile",

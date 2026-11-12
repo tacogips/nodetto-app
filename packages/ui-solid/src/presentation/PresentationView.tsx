@@ -6,8 +6,12 @@ import {
   createSignal,
   onCleanup,
   onMount,
+  Show,
 } from "solid-js";
 import { createEditorSignals } from "../adapter.ts";
+import { presentationKeyAction } from "./keys.ts";
+import { TransitionLayer } from "./TransitionLayer.tsx";
+import { SlideTransitionRunner } from "./transition-runner.ts";
 import { createPresentationController } from "./controller.ts";
 import "./Presentation.css";
 
@@ -19,6 +23,9 @@ export interface PresentationViewProps {
 export function PresentationView(props: PresentationViewProps) {
   const controller = createPresentationController(props);
   const { rev } = createEditorSignals(props.editor);
+  const runner = new SlideTransitionRunner();
+  const [transition, setTransition] =
+    createSignal<ReturnType<typeof controller.transition>>(null);
   const [version, setVersion] = createSignal(0);
   const [viewport, setViewport] = createSignal({
     width: window.innerWidth,
@@ -28,8 +35,25 @@ export function PresentationView(props: PresentationViewProps) {
   let root!: HTMLDivElement;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const update = () => setVersion((v) => v + 1);
+  const cancel = () => {
+    runner.cancel();
+    setTransition(null);
+  };
   const dispatch = (action: Parameters<typeof controller.dispatch>[0]) => {
+    const keepsTransition =
+      typeof action !== "string" &&
+      (action.type === "digit" || action.type === "clearDigits");
+    if (!keepsTransition) cancel();
     controller.dispatch(action);
+    if (!keepsTransition) {
+      const next = controller.transition();
+      if (
+        next &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches !== true
+      )
+        setTransition(next);
+      else controller.clearTransition();
+    }
     update();
   };
   const showControls = () => {
@@ -39,6 +63,8 @@ export function PresentationView(props: PresentationViewProps) {
   };
   createEffect(() => {
     rev();
+    cancel();
+    controller.clearTransition();
     controller.refresh();
     update();
   });
@@ -63,8 +89,11 @@ export function PresentationView(props: PresentationViewProps) {
   onMount(() => {
     const previous = document.activeElement;
     const key = (event: KeyboardEvent) => {
-      controller.handleKeyDown(event);
-      update();
+      if (event.key === "F11") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const action = presentationKeyAction(event);
+      if (action) dispatch(action);
     };
     const resize = () =>
       setViewport({ width: window.innerWidth, height: window.innerHeight });
@@ -76,6 +105,8 @@ export function PresentationView(props: PresentationViewProps) {
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("resize", resize);
       clearTimeout(timer);
+      cancel();
+      controller.clearTransition();
       if (previous instanceof HTMLElement) previous.focus();
     });
   });
@@ -108,8 +139,27 @@ export function PresentationView(props: PresentationViewProps) {
                 src={slide().src ?? undefined}
                 alt="Presentation slide"
                 draggable={false}
+                classList={{ transitioning: transition() !== null }}
               />
             )}
+            <Show when={transition()} keyed>
+              {(current) => (
+                <TransitionLayer
+                  outgoingSvg={current.fromSvg}
+                  incomingSvg={current.toSvg}
+                  fromRect={current.fromRect}
+                  toRect={current.toRect}
+                  plan={current.plan}
+                  runner={runner}
+                  onDone={() => {
+                    if (transition() === current) {
+                      setTransition(null);
+                      controller.clearTransition();
+                    }
+                  }}
+                />
+              )}
+            </Show>
           </div>
         )}
       </div>

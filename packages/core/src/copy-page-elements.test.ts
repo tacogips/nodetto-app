@@ -73,8 +73,14 @@ test("copy remaps all elements above target, selects them, and undoes exactly", 
   const [a, b, edge, group] = ids;
   expect(editor.store.get(edge ?? "")?.semantic).toEqual({ from: a, to: b });
   expect(editor.store.get(group ?? "")?.semantic).toEqual({ memberIds: [a] });
-  expect(editor.store.get(a ?? "")?.visual).toEqual(sourceElements[0]?.visual);
-  expect(editor.store.get(b ?? "")?.visual).toEqual(sourceElements[1]?.visual);
+  expect(editor.store.get(a ?? "")?.visual).toEqual({
+    ...sourceElements[0]?.visual,
+    linkId: "a",
+  });
+  expect(editor.store.get(b ?? "")?.visual).toEqual({
+    ...sourceElements[1]?.visual,
+    linkId: "b",
+  });
   expect(
     editor.store.getPageElements(target.id).map((entry) => entry.id),
   ).toEqual([existing.id, ...ids]);

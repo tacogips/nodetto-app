@@ -38,3 +38,7 @@
   opacity: 0;
   pointer-events: none;
 }
+
+.presentation-slide img.transitioning {
+  visibility: hidden;
+}

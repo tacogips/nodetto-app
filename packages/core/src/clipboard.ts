@@ -163,6 +163,7 @@ export interface PasteOptions {
   /** Called once per element, in payload order, for the new z-order key. */
   readonly nextIndex: () => FractionalIndex;
   readonly offset: Vec;
+  readonly linkIds?: ReadonlyMap<ElementId, string>;
 }
 
 export interface PastePlan {
@@ -207,6 +208,8 @@ export function planPaste(
           };
       }
     }
+    const { linkId: _linkId, ...visual } = source.visual;
+    const linkId = options.linkIds?.get(element.id);
     const created: Element = {
       ...source,
       id,
@@ -215,7 +218,8 @@ export function planPaste(
       semantic: remapReferences(source.type, source.semantic, mapping),
       visual: offsetVisual(
         {
-          ...source.visual,
+          ...visual,
+          ...(linkId !== undefined ? { linkId } : {}),
           ...(source.visual.colorTokens
             ? {
                 colorTokens: Object.fromEntries(

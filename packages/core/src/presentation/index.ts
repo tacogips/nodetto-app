@@ -5,3 +5,5 @@ export * from "./source.ts";
 export * from "./slide-rect.ts";
 export * from "./slide-size.ts";
 export * from "./labels.ts";
+export * from "./slide-transition-types.ts";
+export * from "./slide-transition.ts";

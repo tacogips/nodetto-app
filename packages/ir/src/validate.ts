@@ -267,6 +267,7 @@ function validateVisual(
   checkString(out, raw["componentKey"], `${path}.componentKey`, {
     optional: true,
   });
+  checkString(out, raw["linkId"], `${path}.linkId`, { optional: true });
   checkEnum(
     out,
     raw["textResize"],

@@ -47,7 +47,9 @@ pre-archive `planPath` values. The spreadsheet table manifests
 `active/` with their pre-archive `planPath` values; s780 was the final
 dispatch, and s776 must not be dispatched again. The presentation manifest
 `prs-s793-dispatch.json` also stays in `active/` with its pre-archive
-`planPath` values.
+`planPath` values. The slide link manifest `slk-s855-dispatch.json` also
+stays in `active/` with its pre-archive `planPath` values and must not be
+dispatched again.
 
 ## Completed
 
@@ -97,6 +99,36 @@ test. Progress logs stay in `progress/`.
 | [prs-04-presentation-view](completed/prs-04-presentation-view.md) | `PresentationView`, controller and key map |
 | [prs-05-page-flag-ui](completed/prs-05-page-flag-ui.md) | Page tab menu item and inspector switch |
 | [prs-06-wiring](completed/prs-06-wiring.md) | Desktop shortcuts, menus, fullscreen wiring, docs and README |
+
+Slide links and animated slide transitions, Phase 1 (session 855; design:
+`design-docs/specs/design-slide-link-animation.md`; owner Q&A:
+`design-docs/user-qa/slide-link-animation.md`; no GitHub issue, source is the
+session 855 runtime workflowInput). Elements carry an optional
+`Element.visual.linkId`. Duplicate page and Copy shapes from page link copies
+to their source in one undo step, and ordinary paste strips links. In
+presentation, next/prev animates linked same-type shapes, draws on new shapes,
+grows new connectors and fades out removed ones, using a pure planner in
+`packages/core/src/presentation`; jumps, reduced motion and slide size
+mismatches cut. The inspector Slide link section shows Linked on N pages,
+Unlink and Apply to linked shapes. No new Command kind was added. Gates:
+typecheck, focused and union tests, the strict-index gate against `ccac2d3`,
+`mise run lint` and `mise run verify` exited 0 (Bun 3897 pass, 73 skip,
+0 fail). Logs: `tmp/slk-s855/slk-07-wiring/` and
+`tmp/slk-s855/reconcile-wave-003/`. There is no browser E2E suite; animation
+quality needs a manual check in the Tauri WebView. Progress logs stay in
+`progress/`.
+
+| Plan | Scope |
+|---|---|
+| [slk-overview](completed/slk-overview.md) | Waves, ownership, pinned contracts and final verification |
+| [slk-00-strict-index-gate](completed/slk-00-strict-index-gate.md) | `noUncheckedIndexedAccess` gate script for feature files |
+| [slk-01-link-field](completed/slk-01-link-field.md) | `visual.linkId` in IR types, validation, key order, JSONL and Yjs |
+| [slk-02-transition-contract](completed/slk-02-transition-contract.md) | Serialisable `SlideTransitionPlan` types |
+| [slk-03-copy-links](completed/slk-03-copy-links.md) | Link copies on Duplicate page and Copy shapes from page; strip on paste |
+| [slk-04-transition-planner](completed/slk-04-transition-planner.md) | Pure `planSlideTransition` planner |
+| [slk-05-transition-runner](completed/slk-05-transition-runner.md) | Web Animations runner, inline SVG render and scoped def ids |
+| [slk-06-link-inspector](completed/slk-06-link-inspector.md) | Slide link inspector section and edits |
+| [slk-07-wiring](completed/slk-07-wiring.md) | Presentation controller and view wiring, inspector mount, docs and README |
 
 Spreadsheet table element `table.sheet` (sessions 776, 778 and 780; design:
 `design-docs/specs/design-table-sheet.md`; owner Q&A:

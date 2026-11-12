@@ -1,3 +1,4 @@
+import { SlideLinkSection } from "./inspector/SlideLinkSection.tsx";
 import { PresentationSection } from "./inspector/PresentationSection.tsx";
 import { UiControlSection } from "./inspector/UiControlSection.tsx";
 import { DATABASE_OBJECT_LABELS, isDatabaseObjectType } from "@nodetto/ir";
@@ -489,6 +490,10 @@ export function Inspector(props: InspectorProps): JSX.Element {
                         element={element()}
                       />
                     </details>
+                    <SlideLinkSection
+                      editor={props.editor}
+                      element={element()}
+                    />
                     <details class="nodetto-inspector-details">
                       <summary>Accessibility</summary>
                       <Suspense>

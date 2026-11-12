@@ -338,6 +338,8 @@ export interface Visual {
   readonly textStyle?: ElementId;
   /** Unique within a component definition; matches layers across variants. */
   readonly componentKey?: string;
+  /** Shared by copies of one shape on several pages; drives slide transitions. */
+  readonly linkId?: string;
   readonly horizontalConstraint?:
     | "start"
     | "end"

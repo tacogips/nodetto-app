@@ -253,6 +253,21 @@ Previous page is the default when available; choose another source if needed.
 Shapes are copied at the same coordinates on top of existing content, selected,
 and can be removed in one undo step.
 
+### Slide links and animated transitions
+
+Duplicate page and Copy shapes from page link copies to their source shapes.
+Ordinary paste does not create links. Changes remain independent on each page;
+select a linked shape and the Slide link inspector shows how many pages it is
+linked on. Use Unlink to remove its link, or Apply to linked shapes to copy its
+style, and optionally its position and size relative to the slide, to linked
+shapes on other pages. Each action is one undo step.
+
+Next and previous slide transitions animate linked shapes and the differences
+between slides: linked shapes of the same type move and restyle, new shapes draw
+on, new connectors grow along their path, and removed shapes fade out. Linked
+shapes of different types fade out and draw on instead. Jumps to a numbered, first or last slide cut immediately. Reduced
+motion also switches immediately, as do slides with different sizes.
+
 ## Page navigation
 
 The **Pages list** in the Shapes and layers pane shows the page count. Expand or

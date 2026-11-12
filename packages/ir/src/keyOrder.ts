@@ -110,6 +110,7 @@ export const VISUAL_KEY_ORDER: KeyOrder = {
     "horizontalConstraint",
     "verticalConstraint",
     "componentKey",
+    "linkId",
     "layerName",
     "layoutGrow",
     "layoutPosition",

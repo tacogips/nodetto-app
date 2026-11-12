@@ -17,7 +17,7 @@
 This plan pins the serialisable transition-plan contract and the timing
 constants. It also adds two pure SVG string helpers that the runner needs:
 unique def ids per inlined SVG, and reading the viewBox. The exact type
-names and fields are in `impl-plans/active/slk-overview.md` ("Pinned
+names and fields are in `impl-plans/completed/slk-overview.md` ("Pinned
 contracts"); copy them verbatim. The core barrel already re-exports
 `./presentation/index.ts` (`packages/core/src/index.ts:820`).
 

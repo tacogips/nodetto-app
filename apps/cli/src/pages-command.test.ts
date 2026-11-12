@@ -322,8 +322,14 @@ test("pages copy-shapes copies references and handles no-write cases", () => {
   const copiedElements = copied.map((id) =>
     doc.elements.find((element) => element.id === id),
   );
-  expect(copiedElements[0]?.visual).toEqual(source.store.get(first)?.visual);
-  expect(copiedElements[1]?.visual).toEqual(source.store.get(second)?.visual);
+  expect(copiedElements[0]?.visual).toEqual({
+    ...source.store.get(first)?.visual,
+    linkId: first,
+  });
+  expect(copiedElements[1]?.visual).toEqual({
+    ...source.store.get(second)?.visual,
+    linkId: second,
+  });
   expect(copiedElements[2]?.semantic).toEqual({
     from: copied[0],
     to: copied[1],
