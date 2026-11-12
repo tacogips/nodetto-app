@@ -23,7 +23,12 @@ Goals:
    JSONL page record and edited from the page tab menu and the page
    inspector.
 
-Non-goals: transitions or animations, speaker notes, presenter view, a
+Amendment 2026-11-12: animated slide transitions and element `linkId` are
+added by `design-docs/specs/design-slide-link-animation.md`. The resting
+slide stays an `<img>` (section 5); only the transient transition layer
+inlines SVG, with def ids scoped per SVG.
+
+Non-goals: transitions or animations (see the amendment above), speaker notes, presenter view, a
 second-monitor presenter, laser pointer, auto-advance, a CLI command, a new
 core `Command` kind, PDF/PPTX slide export, and prototype-link navigation
 (the existing prototype preview is unchanged).
