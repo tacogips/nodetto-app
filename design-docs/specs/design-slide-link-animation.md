@@ -12,6 +12,18 @@ public `nodetto-app` repository only (`packages/ir`, `packages/io`,
 Owner decisions with a default already applied are in
 `design-docs/user-qa/slide-link-animation.md`.
 
+Phase 2 (per-slide transition settings and per-shape animation settings)
+is specified in `design-docs/specs/design-slide-transition-settings.md`.
+All Phase 2 settings, including the per-slide ones
+(`visual.animation.slide` on one artwork-free `presentation.slide`
+resource element per page), live in `Element.visual.animation`. They are
+written with `createElement`, `updateVisual` / `replaceVisual` and
+`deleteElements`. The Worker rejects new `updatePage` keys (user-qa Q7).
+The Phase 2 change to `packages/core/src/commands.ts` is limited to
+validation wiring (Phase 2 section 3.3), so the section 9 "empty diff"
+check below applies to Phase 1 only. There is no `Page` field and no
+`Command` change. Where Phase 2 differs from this document, Phase 2 wins.
+
 ## 1. Goals and non-goals
 
 Goals:
