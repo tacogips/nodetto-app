@@ -46,6 +46,7 @@ describe("registry contents", () => {
         "ui.icon",
         "design.token",
         "design.guide",
+        "presentation.slide",
         "review.comment",
         "design.text-style",
         "bpmn.participant",

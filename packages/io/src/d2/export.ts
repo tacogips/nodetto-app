@@ -562,7 +562,9 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
   if (hasSkippedBreadboard)
     warnings.push({ message: "Breadboard elements are not exported to D2." });
   const visible = visibleBeforeBreadboard.filter(
-    (element) => !isBreadboardElementType(element.type),
+    (element) =>
+      !isBreadboardElementType(element.type) &&
+      element.type !== "presentation.slide",
   );
   const alias = aliases(visible);
   const byId = new Map(visible.map((element) => [element.id, element]));
@@ -580,6 +582,7 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
       ![
         "design.token",
         "design.guide",
+        "presentation.slide",
         "design.text-style",
         "review.comment",
       ].includes(element.type),

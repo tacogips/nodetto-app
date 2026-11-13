@@ -7,6 +7,7 @@ import {
   type Page,
   type PageId,
   SCHEMA_VERSION,
+  SLIDE_SETTINGS_TYPE,
 } from "@nodetto/ir";
 import { copyElements, planPaste, type PastePlan } from "../clipboard.ts";
 import type { Command } from "../commands.ts";
@@ -93,14 +94,21 @@ export function planPageElementsCopy(
   idSource: IdSource,
   fromPageId: PageId,
   toPageId: PageId,
+  carrier: "keep" | "skip" = "skip",
 ): PastePlan {
   const payload = copyElements(
     editor.store,
-    editor.store.getPageElements(fromPageId).map((element) => element.id),
+    editor.store
+      .getPageElements(fromPageId)
+      .filter(
+        (element) => carrier === "keep" || element.type !== SLIDE_SETTINGS_TYPE,
+      )
+      .map((element) => element.id),
   );
   const linkIds = new Map<string, string>();
   const sourceUpdates: Command[] = [];
   for (const element of payload.elements) {
+    if (element.type === SLIDE_SETTINGS_TYPE) continue;
     const source = editor.store.get(element.id);
     const linkId = source?.visual.linkId ?? element.id;
     linkIds.set(element.id, linkId);
@@ -118,6 +126,7 @@ export function planPageElementsCopy(
     nextIndex: () => editor.nextIndex(toPageId),
     offset: { x: 0, y: 0 },
     linkIds,
+    keepSlideCarrier: carrier === "keep",
   });
   return { ...plan, commands: [...sourceUpdates, ...plan.commands] };
 }
@@ -157,7 +166,7 @@ export function planDuplicatePage(
       ? { connectorRouting: source.connectorRouting }
       : {}),
   };
-  const plan = planPageElementsCopy(editor, idSource, id, page.id);
+  const plan = planPageElementsCopy(editor, idSource, id, page.id, "keep");
   return {
     page,
     commands: [

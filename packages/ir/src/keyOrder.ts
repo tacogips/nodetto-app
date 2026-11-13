@@ -111,6 +111,7 @@ export const VISUAL_KEY_ORDER: KeyOrder = {
     "verticalConstraint",
     "componentKey",
     "linkId",
+    "animation",
     "layerName",
     "layoutGrow",
     "layoutPosition",
@@ -122,6 +123,20 @@ export const VISUAL_KEY_ORDER: KeyOrder = {
     "style",
   ],
   children: {
+    animation: {
+      keys: [
+        "enter",
+        "enterFrom",
+        "exit",
+        "exitTo",
+        "linked",
+        "delayMs",
+        "durationMs",
+        "order",
+        "slide",
+      ],
+      children: { slide: { keys: ["mode", "durationMs", "stagger"] } },
+    },
     labelBounds: {
       keys: ["x", "y", "width", "height"],
       coordinates: ["x", "y", "width", "height"],

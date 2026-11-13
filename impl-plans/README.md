@@ -47,9 +47,9 @@ pre-archive `planPath` values. The spreadsheet table manifests
 `active/` with their pre-archive `planPath` values; s780 was the final
 dispatch, and s776 must not be dispatched again. The presentation manifest
 `prs-s793-dispatch.json` also stays in `active/` with its pre-archive
-`planPath` values. The slide link manifest `slk-s855-dispatch.json` also
-stays in `active/` with its pre-archive `planPath` values and must not be
-dispatched again.
+`planPath` values. The slide link manifests `slk-s855-dispatch.json` and
+`slt-s856-dispatch.json` also stay in `active/` with their pre-archive
+`planPath` values and must not be dispatched again.
 
 ## Completed
 
@@ -129,6 +129,37 @@ quality needs a manual check in the Tauri WebView. Progress logs stay in
 | [slk-05-transition-runner](completed/slk-05-transition-runner.md) | Web Animations runner, inline SVG render and scoped def ids |
 | [slk-06-link-inspector](completed/slk-06-link-inspector.md) | Slide link inspector section and edits |
 | [slk-07-wiring](completed/slk-07-wiring.md) | Presentation controller and view wiring, inspector mount, docs and README |
+
+Slide transition and slide animation settings, Phase 2 (session 856; issue
+reference `slk-s855-phase2`; design:
+`design-docs/specs/design-slide-transition-settings.md`). Per-slide settings
+(Auto, Cut or Fade, duration, stagger) live in `visual.animation.slide` on one
+artwork-free `presentation.slide` carrier element per page, so `updatePage`
+is unchanged. Per-shape entrance, exit and linked effects with delay,
+duration and order live in `Element.visual.animation`. Slide N owns the
+transition between N-1 and N in both directions, and going back mirrors the
+effects. With no settings the planner reproduces the pinned Phase 1 plan. The
+inspector gets Slide transition (no selection, every page) and Slide
+animation (single and multi-selection) sections. No new Command kind was
+added. Gates: typecheck, the strict-index union gate against `ccac2d3` (124
+baseline diagnostics, none new), `mise run lint` and `mise run verify` (attempt
+1, Bun 3937 pass, 73 skip, 0 fail) exited 0. Logs:
+`tmp/slt-s856/slt-07-wiring/` and `tmp/slt-s856/reconcile-wave-004/`. There
+is no browser E2E suite; Web Animations playback and the inspector sections
+need a manual check in the Tauri WebView. The manifest `slt-s856-dispatch.json`
+stays in `active/` with its pre-archive `planPath` values and must not be
+dispatched again. Progress logs stay in `progress/`.
+
+| Plan | Scope |
+|---|---|
+| [slt-overview](completed/slt-overview.md) | Waves, ownership, pinned contracts and final verification |
+| [slt-01-settings-fields](completed/slt-01-settings-fields.md) | `visual.animation` and `presentation.slide` carrier in IR types, validation and key order; command validation wiring |
+| [slt-02-plan-contract](completed/slt-02-plan-contract.md) | New step kinds, cut reason and `SlideNavigation` in the plan types |
+| [slt-03-settings-plumbing](completed/slt-03-settings-plumbing.md) | Carrier shape util, copy and duplicate rules, Select all exclusion, exporters, JSONL and Yjs tests |
+| [slt-04-planner-settings](completed/slt-04-planner-settings.md) | Settings-aware planner and Phase 1 pin test |
+| [slt-05-runner-effects](completed/slt-05-runner-effects.md) | Runner keyframes for the new effects |
+| [slt-06-inspector-sections](completed/slt-06-inspector-sections.md) | Slide transition and Slide animation sections and edits |
+| [slt-07-wiring](completed/slt-07-wiring.md) | Controller navigation, inspector mount, docs and README |
 
 Spreadsheet table element `table.sheet` (sessions 776, 778 and 780; design:
 `design-docs/specs/design-table-sheet.md`; owner Q&A:

@@ -1,5 +1,6 @@
 import {
   comparePageOrder,
+  SLIDE_SETTINGS_TYPE,
   type Document,
   type Element,
   type ElementId,
@@ -511,7 +512,11 @@ export class EditorCore {
 
   /** Select every top-level element on the current page. */
   selectAll(): void {
-    this.selection.set(topLevelIds(this.store, this.pageId));
+    this.selection.set(
+      topLevelIds(this.store, this.pageId).filter(
+        (id) => this.store.get(id)?.type !== SLIDE_SETTINGS_TYPE,
+      ),
+    );
   }
 
   /**

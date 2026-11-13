@@ -1,4 +1,8 @@
-import { UmlComponentType, type UmlPortSemantic } from "@nodetto/ir";
+import {
+  SLIDE_SETTINGS_TYPE,
+  UmlComponentType,
+  type UmlPortSemantic,
+} from "@nodetto/ir";
 // Copy, cut, paste and duplicate, as data.
 //
 // A copied fragment is a detached snapshot: structurally cloned, so nothing
@@ -164,6 +168,7 @@ export interface PasteOptions {
   readonly nextIndex: () => FractionalIndex;
   readonly offset: Vec;
   readonly linkIds?: ReadonlyMap<ElementId, string>;
+  readonly keepSlideCarrier?: boolean;
 }
 
 export interface PastePlan {
@@ -185,14 +190,19 @@ export function planPaste(
   payload: ClipboardPayload,
   options: PasteOptions,
 ): PastePlan {
+  const elements = options.keepSlideCarrier
+    ? payload.elements
+    : payload.elements.filter(
+        (element) => element.type !== SLIDE_SETTINGS_TYPE,
+      );
   const mapping = new Map<ElementId, ElementId>();
-  for (const element of payload.elements) {
+  for (const element of elements) {
     mapping.set(element.id, options.idSource());
   }
 
   const commands: Command[] = [];
   const ids: ElementId[] = [];
-  for (const element of payload.elements) {
+  for (const element of elements) {
     const id = mapping.get(element.id) as ElementId;
     // A second paste of the same payload must not share structure with the
     // first, so the source is cloned before anything is rewritten.

@@ -287,6 +287,41 @@ export interface VisualStyle {
   readonly extensions?: Extensions;
 }
 
+export type SlideSide = "left" | "right" | "top" | "bottom";
+export type SlideMode = "auto" | "cut" | "fade";
+export type SlideEnterEffect =
+  | "auto"
+  | "none"
+  | "fade-in"
+  | "draw-on"
+  | "grow"
+  | "scale-in"
+  | "slide-in";
+export type SlideExitEffect =
+  | "auto"
+  | "none"
+  | "fade-out"
+  | "undraw"
+  | "scale-out"
+  | "slide-out";
+export type SlideLinkedMotion = "auto" | "cut" | "crossfade";
+export interface SlideSettings {
+  readonly mode?: SlideMode;
+  readonly durationMs?: number;
+  readonly stagger?: boolean;
+}
+export interface ElementAnimation {
+  readonly enter?: SlideEnterEffect;
+  readonly enterFrom?: SlideSide;
+  readonly exit?: SlideExitEffect;
+  readonly exitTo?: SlideSide;
+  readonly linked?: SlideLinkedMotion;
+  readonly delayMs?: number;
+  readonly durationMs?: number;
+  readonly order?: number;
+  readonly slide?: SlideSettings;
+}
+
 /**
  * Presentation payload of an element. Everything is optional: derived
  * layouts (sequence diagrams) leave coordinates unset, and connectors carry
@@ -340,6 +375,8 @@ export interface Visual {
   readonly componentKey?: string;
   /** Shared by copies of one shape on several pages; drives slide transitions. */
   readonly linkId?: string;
+  /** Authored slide animation settings. */
+  readonly animation?: ElementAnimation;
   readonly horizontalConstraint?:
     | "start"
     | "end"

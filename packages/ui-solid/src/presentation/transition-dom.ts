@@ -4,6 +4,7 @@ import {
   drawOnKeyframes,
   type DrawOnProbe,
   stepKeyframes,
+  undrawKeyframes,
 } from "./transition-keyframes.ts";
 
 export type SlideNodeLookup = ReadonlyArray<{
@@ -134,6 +135,57 @@ export function prepareTransition(
       (step.to !== undefined && !incoming)
     )
       continue;
+    if (step.kind === "slide-fade") {
+      const frames = stepKeyframes(step, origins);
+      if (frames.outgoing)
+        jobs.push({ target: outgoingSvg, ...frames.outgoing });
+      if (frames.incoming)
+        jobs.push({ target: incomingSvg, ...frames.incoming });
+      continue;
+    }
+    if (step.kind === "undraw") {
+      if (!outgoing) continue;
+      const wrapper = wrap(outgoing);
+      const nodes = Array.from(outgoing.querySelectorAll(painted)).filter(
+        (node) => isPainted(node, outgoing),
+      );
+      const probes = nodes.map((node) => probe(node, outgoing));
+      const classes = classifyDrawOn(probes);
+      const isConnector =
+        markerNames.some((name) => outgoing.hasAttribute(name)) ||
+        outgoing.querySelector("[marker-start],[marker-mid],[marker-end]") !==
+          null;
+      const restore = removeMarkers(outgoing);
+      const options: KeyframeAnimationOptions = {
+        delay: step.start,
+        duration: step.duration,
+        easing: "ease-in-out",
+        fill: "both",
+      };
+      const start = jobs.length;
+      if (!classes.includes("outline")) {
+        jobs.push({
+          target: wrapper,
+          keyframes: [{ opacity: 1 }, { opacity: 0 }],
+          options,
+        });
+      } else {
+        nodes.forEach((node, index) => {
+          const cls = classes[index];
+          const item = probes[index];
+          if (cls && item && cls !== "none")
+            jobs.push({
+              target: node,
+              keyframes: undrawKeyframes(cls, item, isConnector),
+              options,
+            });
+        });
+      }
+      const first = jobs[start];
+      if (first) jobs[start] = { ...first, onFinish: restore };
+      else restore();
+      continue;
+    }
     if (step.kind === "draw-on" || step.kind === "grow") {
       if (!incoming) continue;
       const wrapper = wrap(incoming);

@@ -78,6 +78,121 @@ const STROKE_CAP_VALUES = ["butt", "round", "square"] as const;
 const STROKE_JOIN_VALUES = ["miter", "round", "bevel"] as const;
 const TEXT_ALIGN_VALUES = ["start", "middle", "end"] as const;
 
+export const ANIMATION_LIMITS = {
+  slideDurationMs: [100, 5000],
+  durationMs: [50, 5000],
+  delayMs: [0, 5000],
+  order: [-999, 999],
+} as const;
+
+export function validateElementAnimation(
+  value: unknown,
+  path: string,
+): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  if (!checkObject(out, value, path)) return out;
+  const enums = {
+    enter: [
+      "auto",
+      "none",
+      "fade-in",
+      "draw-on",
+      "grow",
+      "scale-in",
+      "slide-in",
+    ],
+    enterFrom: ["left", "right", "top", "bottom"],
+    exit: ["auto", "none", "fade-out", "undraw", "scale-out", "slide-out"],
+    exitTo: ["left", "right", "top", "bottom"],
+    linked: ["auto", "cut", "crossfade"],
+  } as const;
+  for (const key of Object.keys(enums) as (keyof typeof enums)[])
+    checkEnum(out, value[key], `${path}.${key}`, enums[key], {
+      optional: true,
+    });
+  const range = (
+    item: unknown,
+    itemPath: string,
+    limits: readonly [number, number],
+  ) => {
+    if (
+      item !== undefined &&
+      (typeof item !== "number" ||
+        !Number.isInteger(item) ||
+        item < limits[0] ||
+        item > limits[1])
+    )
+      out.push(
+        error(
+          "range.animation",
+          itemPath,
+          `expected an integer from ${limits[0]} to ${limits[1]}`,
+        ),
+      );
+  };
+  for (const key of ["delayMs", "durationMs", "order"] as const)
+    range(value[key], `${path}.${key}`, ANIMATION_LIMITS[key]);
+  const slide = value["slide"];
+  if (slide !== undefined && checkObject(out, slide, `${path}.slide`)) {
+    checkEnum(
+      out,
+      slide["mode"],
+      `${path}.slide.mode`,
+      ["auto", "cut", "fade"],
+      { optional: true },
+    );
+    checkBoolean(out, slide["stagger"], `${path}.slide.stagger`, {
+      optional: true,
+    });
+    range(
+      slide["durationMs"],
+      `${path}.slide.durationMs`,
+      ANIMATION_LIMITS.slideDurationMs,
+    );
+    if (Object.hasOwn(slide, "extensions"))
+      out.push(
+        warning(
+          "field.unknown",
+          `${path}.slide.extensions`,
+          "unknown slide field; preserved but ignored",
+        ),
+      );
+    warnUnknownFields(
+      out,
+      slide,
+      ["mode", "durationMs", "stagger"],
+      `${path}.slide`,
+      "slide",
+    );
+  }
+  if (Object.hasOwn(value, "extensions"))
+    out.push(
+      warning(
+        "field.unknown",
+        `${path}.extensions`,
+        "unknown animation field; preserved but ignored",
+      ),
+    );
+  warnUnknownFields(
+    out,
+    value,
+    [
+      "enter",
+      "enterFrom",
+      "exit",
+      "exitTo",
+      "linked",
+      "delayMs",
+      "durationMs",
+      "order",
+      "slide",
+    ],
+    path,
+    "animation",
+  );
+  return out;
+}
+
 function asArray(value: unknown): readonly unknown[] | undefined {
   return Array.isArray(value) ? value : undefined;
 }
@@ -268,6 +383,10 @@ function validateVisual(
     optional: true,
   });
   checkString(out, raw["linkId"], `${path}.linkId`, { optional: true });
+  if (raw["animation"] !== undefined)
+    out.push(
+      ...validateElementAnimation(raw["animation"], `${path}.animation`),
+    );
   checkEnum(
     out,
     raw["textResize"],

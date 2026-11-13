@@ -56,6 +56,7 @@ import {
   BPMN_ASSOCIATION,
   BPMN_DATA_ASSOCIATION,
 } from "./registry/bpmn.ts";
+import { PRESENTATION_SLIDE } from "./registry/presentation-slide.ts";
 import { BREADBOARD_DEFINITIONS } from "./registry/breadboard.ts";
 import { PCB_DEFINITIONS } from "./registry/pcb.ts";
 import {
@@ -77,6 +78,7 @@ const DEFINITIONS: readonly ElementTypeDefinition[] = [
   ...BREADBOARD_DEFINITIONS,
   ...PCB_DEFINITIONS,
   DESIGN_GUIDE,
+  PRESENTATION_SLIDE,
   DESIGN_TOKEN,
   IMAGE_RASTER,
   GENERIC_NODE,

@@ -2,6 +2,8 @@ import {
   type Element,
   type PageId,
   getElementTypeDefinition,
+  readSlideSettings,
+  SLIDE_SETTINGS_TYPE,
 } from "@nodetto/ir";
 import { compareFractional } from "../fractional.ts";
 import type { Box } from "../geometry.ts";
@@ -9,17 +11,25 @@ import { createShapeContext } from "../hit-test.ts";
 import type { ShapeUtilRegistry } from "../shape-util.ts";
 import type { Store } from "../store.ts";
 import {
-  SLIDE_ENTRANCE_MS,
-  SLIDE_ENTRANCE_OFFSET_MS,
-  SLIDE_FADE_OUT_MS,
   SLIDE_MOVE_MS,
   type SlideAppearance,
   type SlideBox,
+  type SlideNavigation,
   type SlideTransitionPlan,
   type SlideTransitionStep,
   type SlideViewBox,
   staggerStart,
 } from "./slide-transition-types.ts";
+
+import {
+  mirrorEnter,
+  mirrorExit,
+  resolveEntrance,
+  resolveExit,
+  resolveLinked,
+  slideOffset,
+  slideTiming,
+} from "./slide-transition-settings.ts";
 
 type Item = { element: Element; bounds: Box; key: string };
 type Slide = { readonly page: PageId; readonly rect: SlideViewBox };
@@ -80,18 +90,28 @@ function unique(items: Item[]): Map<string, Item> {
 export function planSlideTransition(
   store: Store,
   registry: ShapeUtilRegistry,
-  input: { readonly from: Slide; readonly to: Slide },
+  input: {
+    readonly from: Slide;
+    readonly to: Slide;
+    readonly navigation?: SlideNavigation;
+  },
 ): SlideTransitionPlan {
   if (
     Math.abs(input.from.rect.width - input.to.rect.width) > 0.5 ||
     Math.abs(input.from.rect.height - input.to.rect.height) > 0.5
   )
     return { kind: "cut", reason: "size-mismatch" };
+  const backward = input.navigation === "backward";
+  const settings = readSlideSettings(
+    store.getPageElements(backward ? input.from.page : input.to.page),
+  );
+  if (settings?.mode === "cut") return { kind: "cut", reason: "setting" };
   const context = createShapeContext(store, registry, 1);
   function items(page: PageId): Item[] {
     const result: Item[] = [];
     for (const element of store.getPageElements(page)) {
       if (
+        element.type === SLIDE_SETTINGS_TYPE ||
         element.type === "group" ||
         (element.type === "edge.generic" &&
           (element.semantic as { prototype?: boolean } | null)?.prototype) ||
@@ -120,6 +140,19 @@ export function planSlideTransition(
   const incoming = items(input.to.page);
   if (!outgoing.length && !incoming.length)
     return { kind: "cut", reason: "empty" };
+  if (settings?.mode === "fade") {
+    const duration = settings.durationMs ?? SLIDE_MOVE_MS;
+    return {
+      kind: "animate",
+      duration,
+      steps: [
+        { kind: "slide-fade", start: 0, duration, easing: "ease-in-out" },
+      ],
+    };
+  }
+  const timing = slideTiming(settings?.durationMs);
+  const stagger = (rank: number, count: number) =>
+    settings?.stagger === false ? 0 : staggerStart(rank, count, timing);
   const fromKeys = unique(outgoing);
   const toKeys = unique(incoming);
   const pairs: { from: Item; to: Item }[] = [];
@@ -136,26 +169,61 @@ export function planSlideTransition(
   const matchedTo = new Set(pairs.map((pair) => pair.to.element.id));
   const exits = outgoing.filter((item) => !matchedFrom.has(item.element.id));
   const entrances = incoming.filter((item) => !matchedTo.has(item.element.id));
-  const steps: SlideTransitionStep[] = exits.map(({ element }) => ({
-    kind: "fade-out",
-    from: element.id,
-    start: 0,
-    duration: SLIDE_FADE_OUT_MS,
-    easing: "ease-in-out",
-  }));
-  pairs.forEach(({ from, to }, rank) => {
+  const steps: SlideTransitionStep[] = exits.map((item) => {
+    const animation = item.element.visual.animation;
+    const effect = backward
+      ? mirrorEnter(animation?.enter, animation?.enterFrom)
+      : { effect: animation?.exit, side: animation?.exitTo };
+    const kind = resolveExit(item.element, effect.effect);
+    return {
+      kind,
+      from: item.element.id,
+      start: animation?.delayMs ?? 0,
+      duration:
+        kind === "disappear"
+          ? 0
+          : (animation?.durationMs ??
+            (kind === "fade-out" ? timing.fadeOut : timing.move)),
+      easing: "ease-in-out",
+      ...(kind === "scale-out" ? { fromBox: box(item, input.from.rect) } : {}),
+      ...(kind === "slide-out"
+        ? {
+            offset: slideOffset(
+              box(item, input.from.rect),
+              input.from.rect,
+              effect.side,
+            ),
+          }
+        : {}),
+    };
+  });
+  const owner = (pair: { from: Item; to: Item }) =>
+    backward ? pair.from : pair.to;
+  pairs.sort(
+    (a, b) =>
+      (owner(a).element.visual.animation?.order ?? 0) -
+      (owner(b).element.visual.animation?.order ?? 0),
+  );
+  pairs.forEach((pair, rank) => {
+    const { from, to } = pair;
+    const animation = owner(pair).element.visual.animation;
+    const kind = resolveLinked(animation?.linked, edge(to));
+    const baseStart = stagger(rank, pairs.length);
     const common = {
       from: from.element.id,
       to: to.element.id,
-      start: staggerStart(rank, pairs.length),
-      duration: SLIDE_MOVE_MS,
+      start:
+        animation?.delayMs === undefined
+          ? baseStart
+          : baseStart + animation.delayMs,
+      duration: kind === "swap" ? 0 : (animation?.durationMs ?? timing.move),
       easing: "ease-in-out" as const,
     };
     steps.push(
-      edge(to)
-        ? { kind: "crossfade", ...common }
+      kind !== "transform"
+        ? { kind, ...common }
         : {
-            kind: "transform",
+            kind,
             ...common,
             fromBox: box(from, input.from.rect),
             toBox: box(to, input.to.rect),
@@ -166,21 +234,41 @@ export function planSlideTransition(
           },
     );
   });
-  const offset = steps.length ? SLIDE_ENTRANCE_OFFSET_MS : 0;
-  entrances.forEach((item, rank) =>
-    steps.push({
-      kind: edge(item)
-        ? "grow"
-        : item.element.type === "text.note" ||
-            item.element.type === "image.raster"
-          ? "fade-in"
-          : "draw-on",
-      to: item.element.id,
-      start: offset + staggerStart(rank, entrances.length),
-      duration: SLIDE_ENTRANCE_MS,
-      easing: "ease-in-out",
-    }),
+  const offset = steps.length ? timing.entranceOffset : 0;
+  entrances.sort(
+    (a, b) =>
+      (a.element.visual.animation?.order ?? 0) -
+      (b.element.visual.animation?.order ?? 0),
   );
+  entrances.forEach((item, rank) => {
+    const animation = item.element.visual.animation;
+    const effect = backward
+      ? mirrorExit(animation?.exit, animation?.exitTo)
+      : { effect: animation?.enter, side: animation?.enterFrom };
+    const kind = resolveEntrance(item.element, effect.effect);
+    const baseStart = offset + stagger(rank, entrances.length);
+    steps.push({
+      kind,
+      to: item.element.id,
+      start:
+        animation?.delayMs === undefined
+          ? baseStart
+          : baseStart + animation.delayMs,
+      duration:
+        kind === "appear" ? 0 : (animation?.durationMs ?? timing.entrance),
+      easing: "ease-in-out",
+      ...(kind === "scale-in" ? { toBox: box(item, input.to.rect) } : {}),
+      ...(kind === "slide-in"
+        ? {
+            offset: slideOffset(
+              box(item, input.to.rect),
+              input.to.rect,
+              effect.side,
+            ),
+          }
+        : {}),
+    });
+  });
   return {
     kind: "animate",
     duration: Math.max(...steps.map((step) => step.start + step.duration)),

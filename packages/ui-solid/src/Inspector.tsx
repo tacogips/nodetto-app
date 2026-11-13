@@ -1,3 +1,6 @@
+import { SlideAnimationSection } from "./inspector/SlideAnimationSection.tsx";
+import { SlideTransitionSection } from "./inspector/SlideTransitionSection.tsx";
+import { SLIDE_SETTINGS_TYPE } from "@nodetto/ir";
 import { SlideLinkSection } from "./inspector/SlideLinkSection.tsx";
 import { PresentationSection } from "./inspector/PresentationSection.tsx";
 import { UiControlSection } from "./inspector/UiControlSection.tsx";
@@ -132,6 +135,16 @@ export function Inspector(props: InspectorProps): JSX.Element {
   const selectedIds = createMemo<readonly ElementId[]>(() => [
     ...signals.selection(),
   ]);
+
+  const animationElements = createMemo<readonly Element[]>(() => {
+    signals.rev();
+    return selectedIds()
+      .map((id) => props.editor.store.get(id))
+      .filter(
+        (element): element is Element =>
+          element !== undefined && element.type !== SLIDE_SETTINGS_TYPE,
+      );
+  });
 
   const leaves = createMemo<readonly Element[]>(() => {
     signals.rev();
@@ -430,6 +443,10 @@ export function Inspector(props: InspectorProps): JSX.Element {
                 <>
                   <PageSection editor={props.editor} page={current()} />
                   <PresentationSection editor={props.editor} page={current()} />
+                  <SlideTransitionSection
+                    editor={props.editor}
+                    pageId={current().id}
+                  />
                 </>
               )}
             </Show>
@@ -475,6 +492,12 @@ export function Inspector(props: InspectorProps): JSX.Element {
               </Show>
               <Show when={selectedIds().length > 1}>
                 <SelectionGeometrySection editor={props.editor} />
+                <Show when={animationElements().length > 0}>
+                  <SlideAnimationSection
+                    editor={props.editor}
+                    elements={animationElements()}
+                  />
+                </Show>
               </Show>
               <Show when={leaves().length > 0}>
                 <StyleSection editor={props.editor} leaves={leaves()} />
@@ -494,6 +517,12 @@ export function Inspector(props: InspectorProps): JSX.Element {
                       editor={props.editor}
                       element={element()}
                     />
+                    <Show when={element().type !== SLIDE_SETTINGS_TYPE}>
+                      <SlideAnimationSection
+                        editor={props.editor}
+                        elements={[element()]}
+                      />
+                    </Show>
                     <details class="nodetto-inspector-details">
                       <summary>Accessibility</summary>
                       <Suspense>

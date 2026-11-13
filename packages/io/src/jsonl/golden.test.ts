@@ -37,6 +37,7 @@ const GOLDEN = [
   "breadboard",
   "pcb",
   "ui-icon",
+  "slide-settings",
 ] as const;
 
 describe("golden files", () => {

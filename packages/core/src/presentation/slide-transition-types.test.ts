@@ -4,6 +4,11 @@ import { Store } from "../store.ts";
 import { renderPageSvg } from "../svg-export.ts";
 import { document, element, TEST_PAGE } from "../test-helpers.ts";
 import {
+  PHASE1_TIMING,
+  SLIDE_STAGGER_BUDGET_MS,
+  SLIDE_STAGGER_MS,
+  type SlideTransitionPlan,
+  type SlideTransitionStep,
   scopeSvgIds,
   staggerStart,
   svgViewBox,
@@ -121,4 +126,45 @@ test("viewBox requires four finite values and positive dimensions", () => {
   expect(svgViewBox('<svg><g viewBox="0 0 1 1"/></svg>')).toBeNull();
   expect(svgViewBox('<svg viewBox="0 0 0 10"/>')).toBeNull();
   expect(svgViewBox('<svg viewBox="0 NaN 10 10"/>')).toBeNull();
+});
+
+test("default stagger remains bit-identical to Phase 1", () => {
+  for (const [rank, count] of [
+    [0, 1],
+    [1, 2],
+    [3, 9],
+    [5, 20],
+  ] as const) {
+    const original =
+      count <= 1
+        ? 0
+        : rank *
+          Math.min(SLIDE_STAGGER_MS, SLIDE_STAGGER_BUDGET_MS / (count - 1));
+    expect(Object.is(staggerStart(rank, count), original)).toBe(true);
+    expect(
+      Object.is(
+        staggerStart(rank, count),
+        staggerStart(rank, count, PHASE1_TIMING),
+      ),
+    ).toBe(true);
+  }
+});
+
+test("custom timing controls stagger and its budget", () => {
+  const timing = { ...PHASE1_TIMING, stagger: 120, staggerBudget: 960 };
+  expect(staggerStart(1, 2, timing)).toBe(2 * staggerStart(1, 2));
+  expect(staggerStart(20, 21, timing)).toBe(960);
+});
+
+test("new transition fields remain JSON serialisable", () => {
+  const step: SlideTransitionStep = {
+    kind: "slide-in",
+    start: 0,
+    duration: 700,
+    easing: "ease-in-out",
+    offset: { x: -10, y: 0 },
+  };
+  const plan: SlideTransitionPlan = { kind: "cut", reason: "setting" };
+  expect(JSON.parse(JSON.stringify(step))).toEqual(step);
+  expect(JSON.parse(JSON.stringify(plan))).toEqual(plan);
 });

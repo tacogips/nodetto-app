@@ -94,6 +94,10 @@ export * from "./semantics/bpmn.ts";
 export * from "./semantics/breadboard.ts";
 export * from "./semantics/table.ts";
 
+export interface PresentationSlideSemantic {
+  readonly note?: string;
+}
+
 /** Maps every registered element type to its semantic payload type. */
 export interface SemanticByType {
   "state.node": StateNodeSemantic;
@@ -104,6 +108,7 @@ export interface SemanticByType {
   readonly "ui.icon": UiIconSemantic;
   "design.token": DesignTokenSemantic;
   "design.guide": PageGuideSemantic;
+  "presentation.slide": PresentationSlideSemantic;
   "image.raster": ImageSemantic;
   "node.generic": GenericNodeSemantic;
   "edge.generic": GenericEdgeSemantic;

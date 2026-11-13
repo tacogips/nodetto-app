@@ -417,3 +417,20 @@ export {
   type PcbXY,
   type PcbZoneSemantic,
 } from "./pcb.ts";
+
+export type {
+  SlideSide,
+  SlideMode,
+  SlideEnterEffect,
+  SlideExitEffect,
+  SlideLinkedMotion,
+  SlideSettings,
+  ElementAnimation,
+} from "./types.ts";
+export type { PresentationSlideSemantic } from "./semantics.ts";
+export {
+  PRESENTATION_SLIDE,
+  SLIDE_SETTINGS_TYPE,
+  readSlideSettings,
+} from "./registry/presentation-slide.ts";
+export { ANIMATION_LIMITS, validateElementAnimation } from "./validate.ts";

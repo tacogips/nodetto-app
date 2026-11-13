@@ -109,7 +109,10 @@ in `transition-dom.test.ts` (no new dependency).
 
 ## Done criteria
 
-- Every new kind has a keyframe test and a DOM test where it touches the
+- [x] Every new kind has a keyframe test and a DOM test where it touches the
   DOM.
-- All Phase 1 presentation tests pass unchanged.
-- Only writePaths changed.
+- [x] All Phase 1 presentation tests pass unchanged.
+- [x] Only writePaths changed by this plan.
+
+Implementation complete; formal review and combined-tree verification remain
+in the downstream workflow. See `impl-plans/progress/slt-05-runner-effects.md`.

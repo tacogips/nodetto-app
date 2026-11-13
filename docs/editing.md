@@ -268,6 +268,20 @@ on, new connectors grow along their path, and removed shapes fade out. Linked
 shapes of different types fade out and draw on instead. Jumps to a numbered, first or last slide cut immediately. Reduced
 motion also switches immediately, as do slides with different sizes.
 
+#### Slide transition and slide animation
+
+With no selection, use Slide transition to choose Auto, Cut or Fade, set an
+optional duration and turn stagger on or off. Reset restores the defaults.
+The settings belong to the slide, work on empty slides and survive deleting
+shapes. Duplicate page keeps them; copying and pasting shapes does not transfer
+them.
+
+Select one or more shapes to configure Slide animation: entrance and exit
+effects, sides for slide effects, linked motion, delay, duration and order.
+Slide N owns the transition between N-1 and N in both directions. Going back
+mirrors entrance and exit effects, including their slide sides. Each inspector
+edit is one undo step.
+
 ## Page navigation
 
 The **Pages list** in the Shapes and layers pane shows the page count. Expand or

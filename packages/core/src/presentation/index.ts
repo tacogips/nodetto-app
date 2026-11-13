@@ -7,3 +7,4 @@ export * from "./slide-size.ts";
 export * from "./labels.ts";
 export * from "./slide-transition-types.ts";
 export * from "./slide-transition.ts";
+export * from "./slide-transition-settings.ts";

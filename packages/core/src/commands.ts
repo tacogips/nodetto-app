@@ -32,6 +32,7 @@ import {
   type ValidationIssue,
   type Visual,
   validateAccessibilityMetadata,
+  validateElementAnimation,
 } from "@nodetto/ir";
 import {
   detachReference,
@@ -345,6 +346,11 @@ function validateVisualFields(visual: Visual): ValidationIssue[] {
         "unknown auto-layout position mode",
       ),
     ];
+  if (visual.animation !== undefined)
+    return validateElementAnimation(
+      visual.animation,
+      "visual.animation",
+    ).filter((issue) => issue.severity === "error");
   return [];
 }
 

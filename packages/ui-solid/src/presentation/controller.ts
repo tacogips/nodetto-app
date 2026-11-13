@@ -99,6 +99,7 @@ export function createPresentationController({
           const plan = planSlideTransition(editor.store, editor.registry, {
             from: { page: previous, rect: from.rect },
             to: { page: toPage, rect: to.rect },
+            navigation: state.index > before.index ? "forward" : "backward",
           });
           if (plan.kind === "animate") {
             const emptySvg = (rect: typeof from.rect & {}) =>

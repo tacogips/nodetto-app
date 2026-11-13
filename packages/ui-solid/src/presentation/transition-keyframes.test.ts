@@ -5,6 +5,7 @@ import {
   poseTransform,
   shortestDelta,
   stepKeyframes,
+  undrawKeyframes,
   type DrawOnProbe,
 } from "./transition-keyframes.ts";
 
@@ -21,6 +22,111 @@ const probe: DrawOnProbe = {
 };
 
 describe("slide transition keyframes", () => {
+  test("scales around each slide origin and translates slide effects", () => {
+    const origins = { from: { x: -10, y: 5 }, to: origin };
+    const timing = { start: 30, duration: 200, easing: "ease-in-out" as const };
+    const scaleIn = stepKeyframes(
+      { kind: "scale-in", toBox: box, ...timing },
+      origins,
+    );
+    expect(scaleIn.incoming?.keyframes).toEqual([
+      {
+        transform: "translate(160px, -10px) scale(0) translate(-160px, 10px)",
+        opacity: 0,
+      },
+      {
+        transform: "translate(160px, -10px) scale(1) translate(-160px, 10px)",
+        opacity: 1,
+      },
+    ]);
+    const scaleOut = stepKeyframes(
+      { kind: "scale-out", fromBox: box, ...timing },
+      origins,
+    );
+    expect(scaleOut.outgoing?.keyframes).toEqual([
+      {
+        transform: "translate(50px, 45px) scale(1) translate(-50px, -45px)",
+        opacity: 1,
+      },
+      {
+        transform: "translate(50px, 45px) scale(0) translate(-50px, -45px)",
+        opacity: 0,
+      },
+    ]);
+    const offset = { x: -120, y: 0 };
+    expect(
+      stepKeyframes({ kind: "slide-in", offset, ...timing }, origins).incoming
+        ?.keyframes,
+    ).toEqual([
+      { transform: "translate(-120px, 0px)" },
+      { transform: "translate(0px, 0px)" },
+    ]);
+    expect(
+      stepKeyframes({ kind: "slide-out", offset, ...timing }, origins).outgoing
+        ?.keyframes,
+    ).toEqual([
+      { transform: "translate(0px, 0px)" },
+      { transform: "translate(-120px, 0px)" },
+    ]);
+    for (const kind of [
+      "scale-in",
+      "scale-out",
+      "slide-in",
+      "slide-out",
+    ] as const)
+      expect(stepKeyframes({ kind, ...timing }, origins)).toEqual({});
+  });
+  test("instant effects and slide fade use the expected targets and timing", () => {
+    const origins = { from: origin, to: origin };
+    const timing = { start: 85, duration: 0, easing: "ease-in-out" as const };
+    const appear = stepKeyframes({ kind: "appear", ...timing }, origins);
+    const disappear = stepKeyframes({ kind: "disappear", ...timing }, origins);
+    const swap = stepKeyframes({ kind: "swap", ...timing }, origins);
+    const incoming = [{ opacity: 0 }, { opacity: 1 }];
+    const outgoing = [{ opacity: 1 }, { opacity: 0 }];
+    expect(appear.incoming?.keyframes).toEqual(incoming);
+    expect(appear.outgoing).toBeUndefined();
+    expect(disappear.outgoing?.keyframes).toEqual(outgoing);
+    expect(disappear.incoming).toBeUndefined();
+    expect(swap.incoming?.keyframes).toEqual(incoming);
+    expect(swap.outgoing?.keyframes).toEqual(outgoing);
+    for (const frames of [
+      appear.incoming,
+      disappear.outgoing,
+      swap.incoming,
+      swap.outgoing,
+    ])
+      expect(frames?.options).toEqual({
+        delay: 85,
+        duration: 0,
+        easing: "ease-in-out",
+        fill: "both",
+      });
+    const fade = stepKeyframes(
+      { kind: "slide-fade", ...timing, duration: 300 },
+      origins,
+    );
+    expect(fade.incoming?.keyframes).toEqual(incoming);
+    expect(fade.outgoing?.keyframes).toEqual(outgoing);
+    expect(fade.incoming?.options.duration).toBe(300);
+  });
+  test("undraw exactly reverses draw-on and grow schedules", () => {
+    for (const cls of ["outline", "fill", "other", "none"] as const) {
+      for (const connector of [false, true]) {
+        const forward = drawOnKeyframes(
+          cls,
+          probe,
+          connector ? "grow" : "draw-on",
+        );
+        expect(undrawKeyframes(cls, probe, connector)).toEqual(
+          forward
+            .slice()
+            .reverse()
+            .map((frame) => ({ ...frame, offset: 1 - (frame.offset ?? 0) })),
+        );
+      }
+    }
+  });
   test("poses preserve identity, translation, zero width and shortest rotation", () => {
     expect(poseTransform(box, box, origin)).toBe(
       "translate(160px, -10px) rotate(0deg) scale(1, 1) rotate(0deg) translate(-160px, 10px)",

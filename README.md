@@ -33,6 +33,8 @@ associations.
   the next slide, animate linked shapes between slides, and navigate pages in
   the collapsible Pages list. See
   [Presentation](docs/editing.md#presentation).
+- **Slide animation settings**: choose slide transitions and shape entrance, exit,
+  and linked motion effects in the inspector.
 - **Import and export**: Mermaid, draw.io, D2, BPMN XML, SVG, PNG, PDF and
   static websites. See [Import and export](docs/import-export.md).
 - **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,

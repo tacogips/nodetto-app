@@ -37,6 +37,39 @@ export function stepKeyframes(
   };
   const incoming = (keyframes: Keyframe[]): Frames => ({ keyframes, options });
   const outgoing = (keyframes: Keyframe[]): Frames => ({ keyframes, options });
+  if (step.kind === "scale-in" || step.kind === "scale-out") {
+    const box = step.kind === "scale-in" ? step.toBox : step.fromBox;
+    if (!box) return {};
+    const origin = step.kind === "scale-in" ? origins.to : origins.from;
+    const x = box.x + box.width / 2 + origin.x;
+    const y = box.y + box.height / 2 + origin.y;
+    const frame = (scale: number): Keyframe => ({
+      transform: `translate(${x}px, ${y}px) scale(${scale}) translate(${-x}px, ${-y}px)`,
+      opacity: scale,
+    });
+    return step.kind === "scale-in"
+      ? { incoming: incoming([frame(0), frame(1)]) }
+      : { outgoing: outgoing([frame(1), frame(0)]) };
+  }
+  if (step.kind === "slide-in" || step.kind === "slide-out") {
+    if (!step.offset) return {};
+    const shifted = {
+      transform: `translate(${step.offset.x}px, ${step.offset.y}px)`,
+    };
+    const normal = { transform: "translate(0px, 0px)" };
+    return step.kind === "slide-in"
+      ? { incoming: incoming([shifted, normal]) }
+      : { outgoing: outgoing([normal, shifted]) };
+  }
+  if (step.kind === "appear")
+    return { incoming: incoming([{ opacity: 0 }, { opacity: 1 }]) };
+  if (step.kind === "disappear")
+    return { outgoing: outgoing([{ opacity: 1 }, { opacity: 0 }]) };
+  if (step.kind === "swap" || step.kind === "slide-fade")
+    return {
+      incoming: incoming([{ opacity: 0 }, { opacity: 1 }]),
+      outgoing: outgoing([{ opacity: 1 }, { opacity: 0 }]),
+    };
   if (step.kind === "transform" && step.fromBox && step.toBox) {
     const from = step.fromBox;
     const to = step.toBox;
@@ -142,4 +175,14 @@ export function drawOnKeyframes(
     frames.sort((a, b) => (a.offset ?? 0) - (b.offset ?? 0));
   }
   return frames;
+}
+
+export function undrawKeyframes(
+  cls: DrawOnClass,
+  probe: DrawOnProbe,
+  isConnector: boolean,
+): Keyframe[] {
+  return drawOnKeyframes(cls, probe, isConnector ? "grow" : "draw-on")
+    .reverse()
+    .map((frame) => ({ ...frame, offset: 1 - (frame.offset ?? 0) }));
 }

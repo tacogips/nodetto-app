@@ -179,3 +179,126 @@ test("grow restores markers and does not modify definitions", () => {
   jobs[0]?.onFinish?.();
   expect(path?.getAttribute("marker-end")).toBe("url(#m)");
 });
+
+test("undraw reverses an outgoing connector and restores its markers", () => {
+  const outgoing = svg(
+    '<svg><g data-id="edge"><defs><marker id="m"><path marker-end="inside" /></marker></defs><path stroke="black" fill="none" marker-end="url(#m)" /></g></svg>',
+  );
+  const path = outgoing.querySelector('g[data-id="edge"] > path');
+  expect(path).not.toBeNull();
+  if (!path) throw new Error("Missing connector path");
+  Object.defineProperty(path, "getTotalLength", { value: () => 100 });
+  const jobs = prepareTransition(
+    outgoing,
+    svg("<svg></svg>"),
+    plan(step("undraw", { from: "edge" })),
+    origins,
+  );
+  expect(jobs).toHaveLength(1);
+  expect(jobs[0]?.target).toBe(path);
+  expect(jobs[0]?.keyframes).toEqual([
+    { offset: 0, strokeDasharray: "100", strokeDashoffset: "0" },
+    { offset: 1, strokeDasharray: "100", strokeDashoffset: "100" },
+  ]);
+  expect(path?.getAttribute("marker-end")).toBeNull();
+  expect(
+    outgoing.querySelector("marker path")?.getAttribute("marker-end"),
+  ).toBe("inside");
+  jobs[0]?.onFinish?.();
+  expect(path?.getAttribute("marker-end")).toBe("url(#m)");
+});
+
+test("undraw falls back to outgoing wrapper fade for unmeasurable geometry", () => {
+  const outgoing = svg(exportedRect());
+  const jobs = prepareTransition(
+    outgoing,
+    svg("<svg></svg>"),
+    plan(step("undraw", { from: "rect" })),
+    origins,
+  );
+  expect(jobs).toHaveLength(1);
+  expect(jobs[0]?.keyframes).toEqual([{ opacity: 1 }, { opacity: 0 }]);
+  expect(
+    (jobs[0]?.target as Element).querySelector('g[data-id="rect"]'),
+  ).not.toBeNull();
+});
+
+test("slide-fade targets the two SVG roots", () => {
+  const outgoing = svg("<svg></svg>");
+  const incoming = svg("<svg></svg>");
+  const jobs = prepareTransition(
+    outgoing,
+    incoming,
+    plan(step("slide-fade", {})),
+    origins,
+  );
+  expect(jobs).toHaveLength(2);
+  expect(jobs.find((job) => job.target === outgoing)?.keyframes).toEqual([
+    { opacity: 1 },
+    { opacity: 0 },
+  ]);
+  expect(jobs.find((job) => job.target === incoming)?.keyframes).toEqual([
+    { opacity: 0 },
+    { opacity: 1 },
+  ]);
+});
+
+test("swap animates both wrappers at the scheduled instant", () => {
+  const outgoing = svg('<svg><g data-id="old"><rect /></g></svg>');
+  const incoming = svg('<svg><g data-id="new"><rect /></g></svg>');
+  const jobs = prepareTransition(
+    outgoing,
+    incoming,
+    plan({ ...step("swap", { from: "old", to: "new" }), duration: 0 }),
+    origins,
+  );
+  expect(jobs).toHaveLength(2);
+  expect(jobs.map((job) => job.keyframes)).toEqual([
+    [{ opacity: 1 }, { opacity: 0 }],
+    [{ opacity: 0 }, { opacity: 1 }],
+  ]);
+  expect(
+    jobs.every(
+      (job) =>
+        job.options.duration === 0 &&
+        job.options.delay === 120 &&
+        job.options.fill === "both",
+    ),
+  ).toBe(true);
+  expect(
+    (jobs[0]?.target as Element).querySelector('[data-id="old"]'),
+  ).not.toBeNull();
+  expect(
+    (jobs[1]?.target as Element).querySelector('[data-id="new"]'),
+  ).not.toBeNull();
+});
+
+test("scale, slide and instant effects target their corresponding wrappers", () => {
+  const box = { x: 0, y: 0, width: 10, height: 10, rotation: 0 };
+  for (const kind of [
+    "scale-in",
+    "scale-out",
+    "slide-in",
+    "slide-out",
+    "appear",
+    "disappear",
+  ] as const) {
+    const entrance = kind.endsWith("-in") || kind === "appear";
+    const outgoing = svg('<svg><g data-id="old"><rect /></g></svg>');
+    const incoming = svg('<svg><g data-id="new"><rect /></g></svg>');
+    const effect = {
+      ...step(kind, entrance ? { to: "new" } : { from: "old" }),
+      fromBox: box,
+      toBox: box,
+      offset: { x: -120, y: 0 },
+      duration: kind === "appear" || kind === "disappear" ? 0 : 700,
+    };
+    const jobs = prepareTransition(outgoing, incoming, plan(effect), origins);
+    expect(jobs).toHaveLength(1);
+    expect(
+      (jobs[0]?.target as Element).querySelector(
+        entrance ? '[data-id="new"]' : '[data-id="old"]',
+      ),
+    ).not.toBeNull();
+  }
+});

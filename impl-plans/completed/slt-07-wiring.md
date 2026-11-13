@@ -99,3 +99,8 @@ Connect the finished pieces and own the shared registration files:
 - Both sections appear in the Inspector, disabled when read-only.
 - The docs are updated.
 - Only writePaths changed.
+
+## Implementation progress
+
+- Wiring, navigation tests and documentation are implemented. All listed gates passed on the combined tree; logs are in `tmp/slt-s856/slt-07-wiring/`.
+- Formal test-integrity, adversarial and integration review remain downstream.

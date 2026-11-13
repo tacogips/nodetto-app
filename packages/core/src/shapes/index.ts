@@ -46,6 +46,14 @@ import { pcbShapeUtils } from "./pcb.ts";
 export function createDefaultRegistry(): ShapeUtilRegistry {
   const registry = new ShapeUtilRegistry(unknownShapeUtil)
     .register({
+      type: "presentation.slide",
+      canResize: false,
+      getBounds: () => null,
+      hitTest: () => false,
+      defaultSemantic: () => ({}),
+      defaultVisual: () => ({}),
+    })
+    .register({
       type: "design.guide",
       canResize: false,
       getBounds: () => null,

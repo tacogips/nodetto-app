@@ -35,6 +35,7 @@ export type {
 const SILENT_TYPES = new Set([
   "design.token",
   "design.guide",
+  "presentation.slide",
   "design.text-style",
   "review.comment",
   "group",
