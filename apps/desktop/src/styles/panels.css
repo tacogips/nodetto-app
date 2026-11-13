@@ -258,66 +258,6 @@
   right: 100%;
 }
 
-/* Floating selection toolbar */
-
-.nodetto-selection-toolbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  max-width: calc(100% - 8px);
-  padding: 4px 6px;
-  border: 1px solid var(--nodetto-line);
-  border-radius: 8px;
-  background: var(--nodetto-surface);
-  box-shadow: 0 4px 14px var(--app-shadow-medium);
-  will-change: transform;
-  user-select: none;
-}
-
-.nodetto-float-group {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  padding-right: 6px;
-  border-right: 1px solid var(--nodetto-line);
-}
-
-.nodetto-float-group:last-child {
-  padding-right: 0;
-  border-right: 0;
-}
-
-.nodetto-float-colours {
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-start;
-}
-
-.nodetto-float-button {
-  min-height: 24px;
-  padding: 0 7px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: var(--nodetto-ink);
-  background: transparent;
-  font-size: 0.74rem;
-  cursor: pointer;
-}
-
-.nodetto-float-button:hover:not(:disabled) {
-  background: var(--nodetto-accent-soft);
-}
-
-.nodetto-float-button:disabled {
-  color: var(--app-disabled-soft-ink);
-  cursor: default;
-}
-
 .nodetto-swatch-row {
   display: flex;
   gap: 3px;

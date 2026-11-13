@@ -6,10 +6,26 @@
 // the primary button is held on the host — a drag, a marquee, a resize — and
 // comes back on release.
 //
-// Colour swatches write through `setSelectionStyle`; every other button is
-// an entry of the shared action table.
+// Colour swatches and text controls write through `setSelectionStyle`;
+// action buttons use the shared action table.
 
-import type { Editor, Vec } from "@nodetto/core";
+import {
+  leafElements,
+  type Editor,
+  type StylePatch,
+  type Vec,
+} from "@nodetto/core";
+import { ToolbarIcon, type ToolbarIconKey } from "./ToolbarIcon.tsx";
+import {
+  boldPatch,
+  italicPatch,
+  decorationPatch,
+  fontSizePatch,
+  textAlignPatch,
+  verticalAlignPatch,
+  supportsVerticalAlign,
+  textFormatState,
+} from "./text-format.ts";
 import {
   createEffect,
   createMemo,
@@ -95,13 +111,16 @@ export function placeAbove(
   };
 }
 
-const ARRANGE_BUTTONS: readonly { id: ActionId; label: string }[] = [
-  { id: "alignLeft", label: "Align left" },
-  { id: "alignHCenter", label: "Center horizontally" },
-  { id: "alignRight", label: "Align right" },
-  { id: "alignTop", label: "Align top" },
-  { id: "alignVCenter", label: "Center vertically" },
-  { id: "alignBottom", label: "Align bottom" },
+export const ARRANGE_BUTTONS: readonly {
+  id: ActionId;
+  icon: ToolbarIconKey;
+}[] = [
+  { id: "alignLeft", icon: "alignLeft" },
+  { id: "alignHCenter", icon: "alignHCenter" },
+  { id: "alignRight", icon: "alignRight" },
+  { id: "alignTop", icon: "alignTop" },
+  { id: "alignVCenter", icon: "alignVCenter" },
+  { id: "alignBottom", icon: "alignBottom" },
 ];
 
 export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
@@ -203,17 +222,45 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
     );
   };
 
-  const button = (id: ActionId, label: string): JSX.Element => {
+  const leaves = createMemo(() => {
+    signals.rev();
+    return leafElements(editor().store, signals.selection());
+  });
+  const textStyle = () => leaves()[0]?.visual.style;
+  const state = () => textFormatState(textStyle());
+  const apply = (patch: StylePatch) => editor().setSelectionStyle(patch);
+  const textButton = (
+    icon: ToolbarIconKey,
+    label: string,
+    click: () => void,
+    pressed?: boolean,
+    disabled = false,
+  ): JSX.Element => (
+    <button
+      type="button"
+      class="nodetto-float-button"
+      title={label}
+      aria-label={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={click}
+    >
+      <ToolbarIcon name={icon} />
+    </button>
+  );
+
+  const button = (id: ActionId, icon: ToolbarIconKey): JSX.Element => {
     const action = getAction(id);
     return (
       <button
         type="button"
         class="nodetto-float-button"
         title={actionTitle(action)}
+        aria-label={actionTitle(action)}
         disabled={!isEnabled(action)}
         onClick={() => runAction(action, props.context)}
       >
-        {label}
+        <ToolbarIcon name={icon} />
       </button>
     );
   };
@@ -233,6 +280,7 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
               "nodetto-swatch-stroke": field === "stroke",
             }}
             title={`${field === "fill" ? "Fill" : "Stroke"}: ${swatch.label}`}
+            aria-label={`${field === "fill" ? "Fill" : "Stroke"}: ${swatch.label}`}
             style={
               swatch.value === null
                 ? undefined
@@ -263,40 +311,152 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
         onPointerDown={(event) => event.stopPropagation()}
       >
         <div class="nodetto-float-group">
-          {button("duplicate", "Duplicate")}
-          {button("delete", "Delete")}
-          {button("comment", "Comment")}
+          {button("duplicate", "duplicate")}
+          {button("delete", "delete")}
+          {button("comment", "comment")}
           <Show when={isEnabled(getAction("straightenConnector"))}>
-            {button("straightenConnector", "Straighten")}
+            {button("straightenConnector", "straightenConnector")}
           </Show>
         </div>
         <details class="nodetto-selection-disclosure" onKeyDown={disclosureKey}>
-          <summary>Colors</summary>
+          <summary
+            class="nodetto-float-button"
+            title="Colors"
+            aria-label="Colors"
+          >
+            <ToolbarIcon name="colors" />
+          </summary>
           <div class="nodetto-selection-disclosure-body nodetto-float-colours">
             {swatches("fill", FILL_PALETTE)}
             {swatches("stroke", STROKE_PALETTE)}
           </div>
         </details>
         <details class="nodetto-selection-disclosure" onKeyDown={disclosureKey}>
-          <summary>Arrange</summary>
+          <summary class="nodetto-float-button" title="Text" aria-label="Text">
+            <ToolbarIcon name="text" />
+          </summary>
+          <div class="nodetto-selection-disclosure-body nodetto-float-text">
+            <div>
+              {textButton(
+                "fontSmaller",
+                "Smaller text",
+                () => {
+                  const patch = fontSizePatch(textStyle(), -1);
+                  if (patch) apply(patch);
+                },
+                undefined,
+                fontSizePatch(textStyle(), -1) === null,
+              )}
+              <output class="nodetto-float-size" aria-label="Font size">
+                {state().fontSize}
+              </output>
+              {textButton(
+                "fontLarger",
+                "Larger text",
+                () => {
+                  const patch = fontSizePatch(textStyle(), 1);
+                  if (patch) apply(patch);
+                },
+                undefined,
+                fontSizePatch(textStyle(), 1) === null,
+              )}
+            </div>
+            <div>
+              {textButton(
+                "bold",
+                "Bold",
+                () => apply(boldPatch(textStyle())),
+                state().bold,
+              )}
+              {textButton(
+                "italic",
+                "Italic",
+                () => apply(italicPatch(textStyle())),
+                state().italic,
+              )}
+              {textButton(
+                "underline",
+                "Underline",
+                () => apply(decorationPatch(textStyle(), "underline")),
+                state().underline,
+              )}
+              {textButton(
+                "strikethrough",
+                "Strikethrough",
+                () => apply(decorationPatch(textStyle(), "line-through")),
+                state().strikethrough,
+              )}
+            </div>
+            <div>
+              {textButton(
+                "textAlignStart",
+                "Align text left (click again for default)",
+                () => apply(textAlignPatch(textStyle(), "start")),
+                state().textAlign === "start",
+              )}
+              {textButton(
+                "textAlignMiddle",
+                "Center text (click again for default)",
+                () => apply(textAlignPatch(textStyle(), "middle")),
+                state().textAlign === "middle",
+              )}
+              {textButton(
+                "textAlignEnd",
+                "Align text right (click again for default)",
+                () => apply(textAlignPatch(textStyle(), "end")),
+                state().textAlign === "end",
+              )}
+            </div>
+            <Show when={supportsVerticalAlign(leaves())}>
+              <div>
+                {textButton(
+                  "verticalTop",
+                  "Align text top",
+                  () => apply(verticalAlignPatch(textStyle(), "top")),
+                  state().verticalAlign === "top",
+                )}
+                {textButton(
+                  "verticalMiddle",
+                  "Align text middle",
+                  () => apply(verticalAlignPatch(textStyle(), "middle")),
+                  state().verticalAlign === "middle",
+                )}
+                {textButton(
+                  "verticalBottom",
+                  "Align text bottom",
+                  () => apply(verticalAlignPatch(textStyle(), "bottom")),
+                  state().verticalAlign === "bottom",
+                )}
+              </div>
+            </Show>
+          </div>
+        </details>
+        <details class="nodetto-selection-disclosure" onKeyDown={disclosureKey}>
+          <summary
+            class="nodetto-float-button"
+            title="Arrange"
+            aria-label="Arrange"
+          >
+            <ToolbarIcon name="arrange" />
+          </summary>
           <div class="nodetto-selection-disclosure-body">
-            {button("bringToFront", "Bring to front")}
-            {button("sendToBack", "Send to back")}
+            {button("bringToFront", "bringToFront")}
+            {button("sendToBack", "sendToBack")}
             <Show when={!props.simple}>
-              {button("frameSelection", "Frame selection")}
+              {button("frameSelection", "frameSelection")}
             </Show>
-            {button("group", "Group")}
+            {button("group", "group")}
             <Show when={!props.simple}>
-              {button("booleanUnion", "Union")}
-              {button("booleanSubtract", "Subtract")}
-              {button("booleanIntersect", "Intersect")}
-              {button("booleanExclude", "Exclude")}
-              {button("flattenBoolean", "Flatten")}
+              {button("booleanUnion", "booleanUnion")}
+              {button("booleanSubtract", "booleanSubtract")}
+              {button("booleanIntersect", "booleanIntersect")}
+              {button("booleanExclude", "booleanExclude")}
+              {button("flattenBoolean", "flattenBoolean")}
             </Show>
-            {button("ungroup", "Ungroup")}
+            {button("ungroup", "ungroup")}
             <Show when={isEnabled(getAction("alignLeft"))}>
               <For each={ARRANGE_BUTTONS}>
-                {(entry) => button(entry.id, entry.label)}
+                {(entry) => button(entry.id, entry.icon)}
               </For>
             </Show>
           </div>
@@ -306,9 +466,10 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
             type="button"
             class="nodetto-float-button"
             title="Edit selection properties"
+            aria-label="Edit selection properties"
             onClick={() => props.onMore()}
           >
-            Properties
+            <ToolbarIcon name="properties" />
           </button>
         </div>
       </div>

@@ -395,6 +395,14 @@ Automatic saves pending edits after the usual quiet period. Quitting waits for
 pending automatic writes; unsaved manual edits or failed saves require a discard
 decision. Outside file changes continue to appear live in either mode.
 
+The selection toolbar uses icon buttons. Hover over one to see its name and
+keyboard shortcut, if it has one. The **Text** menu offers smaller and larger
+font sizes, shows the current size, and toggles bold, italic, underline and
+strikethrough. It also sets left, centre or right alignment; click the active
+alignment again to return to the default. Text notes also get top, middle and
+bottom alignment. Each click is one undo step and applies to every shape in the
+selection, including shapes inside selected groups.
+
 To straighten a bent connector, select it and choose **Straighten** on the
 selection toolbar or **Straighten connector** in its context menu. Double-click
 a bend handle to remove just that point; removing the final bend makes the line

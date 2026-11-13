@@ -49,7 +49,9 @@ dispatch, and s776 must not be dispatched again. The presentation manifest
 `prs-s793-dispatch.json` also stays in `active/` with its pre-archive
 `planPath` values. The slide link manifests `slk-s855-dispatch.json` and
 `slt-s856-dispatch.json` also stay in `active/` with their pre-archive
-`planPath` values and must not be dispatched again.
+`planPath` values and must not be dispatched again. The selection toolbar
+manifest `stb-s857-dispatch.json` also stays in `active/` with its
+pre-archive `planPath` values and must not be dispatched again.
 
 ## Completed
 
@@ -160,6 +162,30 @@ dispatched again. Progress logs stay in `progress/`.
 | [slt-05-runner-effects](completed/slt-05-runner-effects.md) | Runner keyframes for the new effects |
 | [slt-06-inspector-sections](completed/slt-06-inspector-sections.md) | Slide transition and Slide animation sections and edits |
 | [slt-07-wiring](completed/slt-07-wiring.md) | Controller navigation, inspector mount, docs and README |
+
+Selection toolbar icon buttons and text formatting (session 857; design:
+`design-docs/specs/design-selection-toolbar-icons.md`; no GitHub issue, source
+is the session 857 runtime workflowInput). The floating selection toolbar
+shows only icons from the vendored Lucide set, with a native tooltip equal to
+the aria-label (`actionTitle` for actions) and `aria-pressed` on toggles. A
+Text disclosure sets font size steps, bold, italic, underline, strikethrough,
+horizontal alignment and, for `text.note` only, vertical alignment. Each click
+is one `setSelectionStyle` undo step. All toolbar CSS now lives in
+`packages/ui-solid/src/SelectionToolbar.css`, and the `.nodetto-float-*` rules
+were removed from `apps/desktop/src/styles/panels.css`. No new Command kind,
+dependency or CSS custom property was added. Gates: typecheck, the
+strict-index gate against `b07fd34` (124 baseline diagnostics, none new),
+`mise run lint` and `mise run verify` (attempt 1, Bun 3946 pass, 73 skip, 0
+fail) exited 0. Logs: `tmp/stb-s857/stb-03-toolbar-wiring/` and
+`tmp/stb-s857/reconcile-wave-002/`. There is no browser E2E suite or DOM
+render test; icon rendering, tooltips and both themes need a manual check in
+the desktop app. Progress logs stay in `progress/`.
+
+| Plan | Scope |
+|---|---|
+| [stb-01-text-format](completed/stb-01-text-format.md) | DOM-free text-format state, patches and font-size steps |
+| [stb-02-toolbar-icon](completed/stb-02-toolbar-icon.md) | `ToolbarIcon` component, `TOOLBAR_ICONS` record and registry test |
+| [stb-03-toolbar-wiring](completed/stb-03-toolbar-wiring.md) | Icon toolbar, Text disclosure, scoped CSS, panels.css cleanup and docs |
 
 Spreadsheet table element `table.sheet` (sessions 776, 778 and 780; design:
 `design-docs/specs/design-table-sheet.md`; owner Q&A:

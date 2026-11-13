@@ -35,6 +35,9 @@ associations.
   [Presentation](docs/editing.md#presentation).
 - **Slide animation settings**: choose slide transitions and shape entrance, exit,
   and linked motion effects in the inspector.
+- **Selection toolbar**: icon buttons with hover names and shortcuts, plus a
+  Text menu for font size, bold, italic, underline, strikethrough and
+  alignment. See [Editing diagrams](docs/editing.md).
 - **Import and export**: Mermaid, draw.io, D2, BPMN XML, SVG, PNG, PDF and
   static websites. See [Import and export](docs/import-export.md).
 - **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,
