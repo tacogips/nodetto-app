@@ -1,0 +1,79 @@
+.nodetto-table-sheet {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--nodetto-surface);
+  color: var(--nodetto-ink);
+  font-size: 12px;
+}
+.nodetto-table-sheet-border {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--nodetto-ink);
+  pointer-events: none;
+}
+.nodetto-table-sheet-header,
+.nodetto-table-sheet-stripe,
+.nodetto-table-sheet-fill,
+.nodetto-table-sheet-cell,
+.nodetto-table-sheet-grid-v,
+.nodetto-table-sheet-grid-h {
+  position: absolute;
+  box-sizing: border-box;
+}
+.nodetto-table-sheet-header {
+  left: 0;
+  top: 0;
+  width: 100%;
+  background: var(--nodetto-accent-soft);
+  border-bottom: 1px solid var(--nodetto-ink);
+}
+.nodetto-table-sheet-grid-v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--nodetto-line);
+}
+.nodetto-table-sheet-grid-h {
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--nodetto-line);
+}
+.nodetto-table-sheet-cell {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  overflow: hidden;
+}
+.nodetto-table-sheet-cell > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nodetto-table-sheet-heading {
+  font-weight: 700;
+}
+.nodetto-table-sheet-checkbox {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--nodetto-ink);
+  border-radius: 3px;
+  box-sizing: border-box;
+  line-height: 12px;
+  text-align: center;
+}
+.nodetto-table-sheet-checkbox.checked {
+  background: var(--nodetto-accent);
+  color: var(--nodetto-surface);
+  border-color: var(--nodetto-accent);
+}
+.nodetto-table-sheet-pill {
+  box-sizing: border-box;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 6px;
+  line-height: 18px;
+}

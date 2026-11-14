@@ -1,0 +1,179 @@
+{
+  "taskId": "crl-s749",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-749",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "1e8f43d224d7b43e200eb2229e7be17b39ca033c",
+  "designDocPaths": [
+    "design-docs/specs/design-connector-routing-arranging.md",
+    "design-docs/user-qa/connector-routing-arranging.md",
+    "design-docs/specs/design-cli-layout-merge-lint.md",
+    "design-docs/specs/design-cli-ai-drawing.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/crl-00-overview.md",
+  "evidenceRoot": "tmp/crl-s749",
+  "evidenceLayout": "Per-plan evidence under tmp/crl-s749/<planId>/ with gate runs under tmp/crl-s749/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/.",
+  "reviewContext": {
+    "workflowMode": "issue-resolution",
+    "issueReference": "none: no issue URL, repository or number supplied; the workflowInput of opus-terra-design-and-implement-review-loop-session-749 is the sole source",
+    "userProblem": "In nodetto-cli, connect drops or lacks routing so edges cross boxes, routing stored under visual exports as a straight line, layered and route leave collinear overlapping segments and can raise crossings, connector labels stay overlapped, and self-loops share sides with other edges.",
+    "requiredOutcomes": [
+      "R1: connect applies its visual, accepts routing and routingAvoidObstacles shorthand, and follows an explicit page default and the page convention, with precedence explicit field > page default > page convention > existing default; Bun and native parity tests cover it.",
+      "R2: export of an orthogonal obstacle-avoiding edge without waypoints routes around obstacles exactly like the app canvas; deterministic test on SVG geometry.",
+      "R3: lint --metrics reports overlapping segments; on the 17-state, 47-transition, 4-frame fixture, layered then route yields zero or a documented minimal count of overlapping segments and crossings not above the input.",
+      "R4: arrange route and layered and lint --fix move connector labels off edges, labels and elements and report what moved; label overlaps reach 0 on the fixture.",
+      "R5: self-loops are placed on unused sides in a documented order, with labels kept clear; tested.",
+      "Native: the existing obstacle-routing deadline tests still pass, and layered plus route on the fixture runs within a few seconds on the release binary.",
+      "CARGO_TERM_QUIET=true mise run verify and mise run test-cli pass; help and docs describe every new field, op, flag and metric."
+    ],
+    "nonGoals": [
+      "Inspector controls for the new fields.",
+      "Changing the app's connect tool or connectSmart.",
+      "Changing the routing of a connect on a page with no default and no convention; it stays straight (user-qa Q3).",
+      "Rust changes; server, auth or deployment code; pushes, merges or tags.",
+      "Relaxing any test deadline or listing a binary-less native parity command."
+    ],
+    "constraints": [
+      "All fixtures, ids and text are self-authored and neutral; no external issue numbers, organizations, reporters or downstream names in code, tests, docs, plans or commit messages.",
+      "Strict TypeScript, and no unchecked index lookups in packages/core, enforced by discipline because no tsconfig enables noUncheckedIndexedAccess and there is no verify-cloud task.",
+      "Boa rules for shared-engine code: no regex split on whole documents, no per-point destructuring in hot geometry loops, no node:* imports.",
+      "Native deadline timeouts get 3 attempts before counting as failure, and CPU time is compared with /usr/bin/time -p against target/crl-baseline/nodetto-cli.",
+      "Raster tests, if any, must not depend on a platform font; acceptance tests assert on SVG geometry and metrics.",
+      "New ops, flags and fields are additive; existing outputs change only as listed in the design section 'Existing outputs that may change'; obstacle-routing-batch goldens must not change.",
+      "Workers follow impl-plans/active/crl-00-overview.md: own paths only, per-edit git hash-object records in their own progress log, no state-changing git commands, no broad formatting, no cargo clean.",
+      "tmp/crl-s749 is untracked and holds only data such as logs, JSON and digests. AGENTS.md: English, no emojis, CARGO_TERM_QUIET=true for cargo."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "All five changes live in the shared TypeScript engine, with no Rust change.", "rationale": "The Bun CLI and the Boa-hosted native CLI then behave the same."},
+      {"decision": "R2 is fixed in resolve.ts: routing is read from semantic, then visual, then visual.extensions (user-qa Q2).", "rationale": "Canvas, export and lint already share resolveConnector, and parseVisual moves these keys to visual.extensions, so one read fixes every consumer without rewriting documents."},
+      {"decision": "Separation is stored as routingLane plus a routingBend offset, chosen by a count-bounded search of 9 evaluations per connector.", "rationale": "Route mode stores inputs and never waypoints, bend dragging keeps working, and the search is deterministic with no time budget."},
+      {"decision": "layered selects the best measured of rank, input and barycenter orderings; a candidate with no commands wins a tie before candidate order (user-qa Q4).", "rationale": "A page where rank is not strictly beaten keeps today's placement, and a second layered run stays a no-op."},
+      {"decision": "evaluate always uses resetManual true on its draft; the final planRoute stays under the user's --reset-manual flag.", "rationale": "The metric depends on layout only and not on ports or lanes stored by an earlier run."},
+      {"decision": "lint --fix plans label moves on in-memory post-wrap text from applyBatch, with one combined runOperations call.", "rationale": "Keeps one atomic write, so the existing 'fix writes once' test stays unchanged."},
+      {"decision": "Self-loop side order is top, right, bottom, left (user-qa Q1), and a side is freed by reassigning movable ends when all four are used.", "rationale": "This is the order in the request; a self-loop on an otherwise unused element moves from right to top."},
+      {"decision": "Three feature wave 1 plans and three wave 2 plans, with crl-07 alone owning shared registration, help and docs.", "rationale": "Maximum concurrency with dependencies only for real contracts and at most 2 waves before wiring."},
+      {"decision": "The two baseline design documents get only pointer notes to the new design.", "rationale": "Their decisions stay except A2, A3, A4, A5 and the lint --metrics fields, which the new design names as revised."},
+      {"decision": "Amendment round 1: the six finished plans move to acceptedDependencies, and crl-07 has an empty dependsOn.", "rationale": "All six were reported successful by wave outcomes, so crl-07 has no pending dependency and no admission comparison to repeat. Final acceptance stays with the serial integration review of the combined tree."},
+      {"decision": "Amendment 2026-11-06 round 1: redispatch crl-07-wiring with crl-01 to crl-06 recorded as acceptedDependencies, an empty dependsOn, six sibling test paths for serial repair, and added verification 8.", "rationale": "Blocked plan: crl-07-wiring (blocked-wave-scope-or-contract, evidence fingerprint 21fe0fdcbc2f1878cdfb46587f5afed8cd9890f584c4eddfd55f248249f7eb99). Resolved gap: the worker reported crl-05-lanes-self-loops absent from fanoutItem.acceptedPlanIds, but wave-007/fanout-join.json lists it and wave-006/wave-summary.json classifies it as successful, so no dependency stays pending. No design change; plan id, scope and acceptance criteria are unchanged."},
+      {"decision": "Amendment 2026-11-06 round 2: redispatch crl-07-wiring with target/crl-baseline/src removed once the baseline digest is recorded, added verification 9, and no change to repository test configuration or existing verification commands.", "rationale": "Blocked plan: crl-07-wiring (blocked-wave-scope-or-contract, evidence fingerprint db73444dfc87eaaf224a029e2bf97b57d89854514e8046fc59eba79286547b8c). A bun test path is a filter over a discovery tree that includes target, so the archived tests ran against the current binary. The audit is the progress log record, the binary and the source commit, so the archived source is disposable. Changing only one command string would leave mise run test-cli and mise run verify exposed. No design change; plan id, write paths and acceptance criteria are unchanged."}
+    ],
+    "intentionalTradeoffs": [
+      "layered is not a general guarantee that crossings stay at or below the input; the acceptance test measures the fixture (user-qa Q4).",
+      "A connect on a page with no default and no convention stays straight and may cross a box (user-qa Q3).",
+      "Selection measures manual connectors as automatic, so a page with many manual connectors may keep an order that is not the best for their stored routes.",
+      "The fixture's transition formula repeats every 17 indexes, so its 43 transitions cover 17 distinct state pairs; it stresses parallel edges with less variety than the requested page.",
+      "Repo-wide typecheck in a wave may read a sibling's unfinished file; such a failure is recorded and rerun after that sibling finishes."
+    ],
+    "supportedEdgeCases": [
+      "A connector carrying routing under visual, including after reload through visual.extensions.",
+      "sequence.message: an explicit routing field is an OperationError, and the default and convention are skipped.",
+      "A page convention with any peer absent or manual means no convention.",
+      "More overlapping routes than lanes: the lowest overlap count wins, without a throw.",
+      "A label with no zero-score candidate keeps its lowest-score position and stays visible in lint --metrics.",
+      "All four sides used by other ends: a side with only movable ends is freed, otherwise the loop shares the side with the fewest ends and its positions are reserved.",
+      "BPMN flows with visual.labelBounds stay fixed and reserved, and bpmn.* connectors get no label offsets.",
+      "A second arrange --mode route is a no-op."
+    ],
+    "outOfScopeEdgeCases": [
+      "Moving coincident manual ports without --reset-manual; lint --metrics still reports them.",
+      "Manual self-loops, self-loops without arranging and erd.relation self-relations keep their geometry.",
+      "BPMN layered member ordering; planLayeredBpmn keeps its order and only gets the route stage changes.",
+      "Migrating routing stored under visual to semantic on load.",
+      ".bpmn input to lint --fix keeps exiting 2.",
+      "A label field under sequence.message, which does not list routing."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-connector-routing-arranging.md",
+      "design-docs/user-qa/connector-routing-arranging.md",
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/specs/design-cli-ai-drawing.md",
+      "impl-plans/active/crl-00-overview.md",
+      "impl-plans/active/crl-01-ir-resolver.md",
+      "impl-plans/active/crl-02-metric-fixture.md",
+      "impl-plans/active/crl-03-label-placement.md",
+      "impl-plans/active/crl-04-connect.md",
+      "impl-plans/active/crl-05-lanes-self-loops.md",
+      "impl-plans/active/crl-06-layered-order.md",
+      "impl-plans/active/crl-07-wiring.md"
+    ],
+    "residualRisks": [
+      "Fixture acceptance, native timing, the R2 root cause, rerun idempotency and the single-write result come from reading code and stay unmeasured until the implementation plans run.",
+      "bun run typecheck does not check noUncheckedIndexedAccess, so compliance rests on the plan discipline.",
+      "User-qa Q1 to Q4 are open with defaults kept; a different answer changes only the section each names.",
+      "A wave-006 review probe of rank-order layered then route on the fixture gave 1 label overlap, 11 segment overlaps and 196 crossings, without selectLayeredOrder, so crl-07 may need serial repair or a documented bound.",
+      "crl-05 refined 'first zero overlap wins': a lane candidate that crosses more non-endpoint boxes than the base route is excluded. It is recorded only in impl-plans/progress/crl-05-lanes-self-loops.md, for the final combined-tree review to confirm."
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "crl-01-ir-resolver", "planPath": "impl-plans/active/crl-01-ir-resolver.md", "progressPath": "impl-plans/progress/crl-01-ir-resolver.md", "acceptedInWave": 2, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "PageConnectorRouting, Page.connectorRouting, MAX_ROUTING_LANE, routingLane, labelOffsetX, labelOffsetY, setPageConnectorRouting, resolver reads of routing under visual"},
+    {"planId": "crl-02-metric-fixture", "planPath": "impl-plans/active/crl-02-metric-fixture.md", "progressPath": "impl-plans/progress/crl-02-metric-fixture.md", "acceptedInWave": 1, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "PageMetrics.segmentOverlaps, countRouteOverlaps, connectorArrangeDocument, CONNECTOR_ARRANGE_STATE_PAGE, CONNECTOR_ARRANGE_ARCHITECTURE_PAGE, lint --metrics overlap count"},
+    {"planId": "crl-03-label-placement", "planPath": "impl-plans/active/crl-03-label-placement.md", "progressPath": "impl-plans/progress/crl-03-label-placement.md", "acceptedInWave": 4, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "placeConnectorLabels, planLabelFixes, LabelFields, LabelMoveFix"},
+    {"planId": "crl-04-connect", "planPath": "impl-plans/active/crl-04-connect.md", "progressPath": "impl-plans/progress/crl-04-connect.md", "acceptedInWave": 3, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "connect visual and routing fields with documented precedence, set-page-routing, add-page connectorRouting"},
+    {"planId": "crl-05-lanes-self-loops", "planPath": "impl-plans/active/crl-05-lanes-self-loops.md", "progressPath": "impl-plans/progress/crl-05-lanes-self-loops.md", "acceptedInWave": 6, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "planRoute lane search, RouteOptions.separation, self-loop side order, placeConnectorLabels call in the route stage"},
+    {"planId": "crl-06-layered-order", "planPath": "impl-plans/active/crl-06-layered-order.md", "progressPath": "impl-plans/progress/crl-06-layered-order.md", "acceptedInWave": 2, "commit": null, "checkpointCommit": "d4843e58b679160142ac07225bcf4b4519f17433", "deliverableState": "uncommitted on the shared working tree", "provides": "LayeredOptions.memberOrder, selectLayeredOrder, LayeredEvaluate, pure orderings in arrange-layered-order.ts"}
+  ],
+  "plans": [
+    {
+      "planId": "crl-07-wiring",
+      "planPath": "impl-plans/active/crl-07-wiring.md",
+      "progressPath": "impl-plans/progress/crl-07-wiring.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/index.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/arrange-modes.test.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/lint-diagram.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/commands.test.ts",
+        "apps/cli/src/cli-wiring.test.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/connector-arrange.test.ts",
+        "apps/cli/src/native-parity/connector-arrange.test.ts",
+        "docs/cli.md",
+        "docs/editing.md",
+        "README.md",
+        "packages/core/src/arrange-route.ts",
+        "packages/core/src/arrange-route.test.ts",
+        "packages/core/src/arrange-route-lanes.ts",
+        "packages/core/src/arrange-route-lanes.test.ts",
+        "packages/core/src/arrange-layered.ts",
+        "packages/core/src/arrange-layered.test.ts",
+        "packages/core/src/arrange-layered-order.ts",
+        "packages/core/src/arrange-layered-order.test.ts",
+        "packages/core/src/connector-label-placement.ts",
+        "packages/core/src/connector-label-placement.test.ts",
+        "apps/cli/src/connector-arrange-route.test.ts",
+        "impl-plans/progress/crl-07-wiring.md",
+        "tmp/crl-s749/crl-07-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "On the fixture after layered and route, segmentOverlaps and labelOverlaps reach 0 or a bound documented in docs/cli.md with its geometric reason, edgeCrossings do not exceed the input, and self-loops sit on unused sides or the documented shared case.",
+        "lint --fix moves labels with one atomic write and reports them, the 'fix writes once' assertion stays, and arrange reports moved labels on stderr without changing stdout or --check exit codes.",
+        "The architecture A to B connect exports around C, in Bun and native parity, with byte-identical repeated runs.",
+        "Help and docs describe every new field, op, flag and metric, and the fixture generator is unchanged by this plan.",
+        "Native parity runs with no skipped tests, no deadline is relaxed, and the progress log holds before and after fixture metrics, native timing, CPU ratios and the target/crl-baseline/nodetto-cli audit record with a matching sha256.",
+        "All plan verification commands exit 0 with complete logs, including CARGO_TERM_QUIET=true mise run verify and mise run test-cli, with 3 attempts on native deadline timeouts."
+      ],
+      "verification": [
+        "bun test apps/cli/src/connector-arrange.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/lint-metrics.test.ts apps/cli/src/cli-wiring.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/arrange-modes.ts apps/cli/src/lint-diagram.ts apps/cli/src/connector-arrange.test.ts apps/cli/src/native-parity/connector-arrange.test.ts",
+        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/connector-arrange.test.ts apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/edit-performance.test.ts'",
+        "test -x target/crl-baseline/nodetto-cli",
+        "CARGO_TERM_QUIET=true mise run verify",
+        "CARGO_TERM_QUIET=true mise run test-cli",
+        "bun test packages/core/src/arrange-route.test.ts packages/core/src/arrange-route-lanes.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-order.test.ts packages/core/src/connector-label-placement.test.ts apps/cli/src/connector-arrange-route.test.ts",
+        "test ! -e target/crl-baseline/src"
+      ]
+    }
+  ]
+}

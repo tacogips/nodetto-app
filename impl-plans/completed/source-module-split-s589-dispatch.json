@@ -1,0 +1,340 @@
+{
+  "taskId": "source-module-split-s589",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-589",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "9e6ccc7a7abad708165913148e1e3398d39c7373",
+  "supersedes": [
+    "impl-plans/active/source-module-split-s583-dispatch.json",
+    "impl-plans/active/source-module-split-s579-dispatch.json",
+    "impl-plans/active/source-module-split-s575-dispatch.json"
+  ],
+  "comparisonBase": "b52e4dbe5509f739a3c1e996377ee2ac0e70059b. Since b52e4db the only source changes are the sms-01 edits in 9ef8639 (under review in this run); 9ef8639..9e6ccc7 changes only the design, plans, the s583 manifest, impl-plans/README.md and the sms-01 progress log. apps/cli/src/edit-command.ts, apps/cli/src/native-parity.test.ts, apps/cli/native/README.md, packages/core/src/index.ts, editor/types.ts and editor/components.ts are byte-identical to b52e4db. The export-surface and git diff gates keep comparing against b52e4db (design 'Rollout constraints'). The CPU-time reference is /opt/homebrew/bin/nodetto-cli 0.8.5 (tag v0.8.5 = f033691, an ancestor of b52e4db with no CLI, core or io source difference).",
+  "designDocPaths": [
+    "design-docs/specs/design-source-module-split.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/source-module-split-s589",
+  "evidenceLayout": "Per-plan baselines and review files under tmp/source-module-split-s589/<planId>/; each gate run in its own subdirectory (sms-01: final/; sms-02: move/ then final/; sms-03: final/), which is the design's $d. Before repeating a gate run, mv that subdirectory to attempt-<n>/ inside the plan's evidence directory. The retry loops write <cmd>-1.log..<cmd>-3.log and copy the green attempt to verify.log, test-cli.log or cpu-time.log. Reconciliation output under tmp/source-module-split-s589/reconcile/. Session 579 and 583 evidence under tmp/source-module-split-s579/ and tmp/source-module-split-s583/ is read-only input. tmp/ is git-ignored (.gitignore line 41). Write only .log and .txt files there, never .ts, because bun test collects stray .ts files under tmp/. mise run verify and mise run test-cli build into the git-ignored target/ (.gitignore line 12), including target/release/nodetto-cli; every plan declares artifactRoots [\"target\"].",
+  "reviewContext": {
+    "issueReference": "none (no GitHub issue; local:design-docs/specs/design-source-module-split.md; the inline workflowInput.requestedOutcome of workflow execution opus-terra-design-and-implement-review-loop-session-589 is the issue text; it continues session 583 (blocked only by load-bound test-cli deadline timeouts, 166 pass / 6 fail at load average 87.94), session 579 (sms-01 implemented in 9ef8639, review failed with a provider error) and session 575)",
+    "userProblem": "The source module split designed at 1b6b669 is one third done. sms-01 (Editor facade chain, editor.ts 267 lines, facade/*.ts at most 531) is implemented in 9ef8639 but not independently reviewed. apps/cli/src/edit-command.ts (1372 lines) and apps/cli/src/native-parity.test.ts (1012 lines, 17 nativeTest blocks) are still unsplit. The shared machine is heavily loaded, so wall-clock test deadlines fail intermittently.",
+    "requiredOutcomes": [
+      "sms-01 gets a full independent test-integrity and adversarial review (design 1.4); every finding is fixed or explicitly dispositioned.",
+      "Each target is split into responsibility-named modules; no file in packages/core/src/editor.ts, packages/core/src/editor, apps/cli/src/edit-command.ts, apps/cli/src/edit or apps/cli/src/native-parity exceeds 700 lines; editor.ts <= 450 and edit-command.ts <= 300 lines; no numbered file names.",
+      "Public exports of @nodetto/core and apps/cli/src/edit-command.ts are unchanged (typecheck of every dependent plus the design command 7 export-surface comparison against b52e4db).",
+      "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify, run inside the three-attempt retry loop, passes with 0 fail; pass count 2945 after sms-01 and 2956 (2945 + 11 focused tests) after sms-02 and sms-03.",
+      "CARGO_TERM_QUIET=true mise run test-cli, run inside the three-attempt retry loop, passes with 0 fail and no skip line, so all 17 parity blocks run and pass on target/release/nodetto-cli (design command 3, D9); pass count 172 after sms-01 and 183 after sms-02 and sms-03; the binary-less collection check reports 17 skip.",
+      "The CPU-time check (design command 10) passes after every test-cli gate: target/release/nodetto-cli user time over validate/format/inspect of packages/io/src/__fixtures__/*.jsonl is at most 1.15 times that of /opt/homebrew/bin/nodetto-cli 0.8.5.",
+      "Focused tests for the newly extracted pure helpers unknownFieldKey, countPageChanges, issueLine and formatEditReport.",
+      "Module boundaries documented briefly in docs/development.md and apps/cli/native/README.md.",
+      "The three sms plans and the s575 and s579 manifests are archived to impl-plans/completed; impl-plans/README.md matches; the s583 and this s589 manifest stay in impl-plans/active (design D10, D12)."
+    ],
+    "nonGoals": [
+      "Any runtime behavior change: CLI output, exit codes, JSONL output, export bytes, MCP responses, error messages or check order.",
+      "Changing any test deadline, timeout, test name or assertion, or mise.toml.",
+      "Reimplementing sms-01; changes to packages/core/src/index.ts, editor/types.ts, editor/components.ts, component-*.ts, apps/cli/src/commands.ts, draw-command.ts, ai-commands.test.ts, __fixtures__, examples/, packages/io (including packages/io/src/bpmn) or packages/core/src/bpmn/notation.ts.",
+      "Updating completed design records that mention native-parity.test.ts.",
+      "Version bumps, tags, releases or pushes; server, auth or deployment code."
+    ],
+    "constraints": [
+      "Pure refactor; the Editor class keeps every public member with the same signature, and Object.keys(new Editor()) keeps the same names and order.",
+      "Every existing test name and assertion is kept; the 17 parity blocks only move and are still collected by bun test apps/cli/src.",
+      "New modules have no module-level side effects other than constants; no regex splitting of long strings, deep recursion, per-operation closures or handler tables (the native CLI runs the code in Boa).",
+      "Moved and new packages/core code type-checks with noUncheckedIndexedAccess (design command 8).",
+      "Load-tolerant gates (design D11): mise run verify and mise run test-cli run only inside the design's three-attempt sh -c loops; command 10 runs directly after the test-cli loop. If all three attempts fail, the gate fails; it is never waived as load.",
+      "Every verification command exits 0 once its plan's changes are in; native parity is verified only through mise run test-cli (design D9); there is no standalone parity run.",
+      "Every plan declares artifactRoots [\"target\"]; every file a plan edits is in its writePaths (docs/development.md for sms-01 and sms-02, apps/cli/native/README.md for sms-03).",
+      "Strictly typed code in the surrounding style; no emojis; cargo with CARGO_TERM_QUIET=true; no tool attribution in commits."
+    ],
+    "designDecisionsAndRationale": [
+      "D1-D6 reused unchanged (class chain, component members in Editor, lowest-chain-class planner types, Batch class with module-level handlers and the switch in Batch.apply, parity topic files with a non-test harness, focused tests only for newly extracted helpers).",
+      "D8: sms-01 is reviewed, not reimplemented; its plan is the design 1.4 review-and-repair pass with the same write paths and gates.",
+      "D9: native parity is verified only through mise run test-cli (0 fail, no skip line, exact pass count) plus a binary-less collection check (17 skip).",
+      "D10: the s575 and s579 manifests are both archived to impl-plans/completed as the workflow input requires.",
+      "D11: verify and test-cli each get up to three attempts and pass on the first fully green attempt, whose log is copied to verify.log or test-cli.log; a CPU-time check with a 15% limit against 0.8.5 guards against real slowdowns; deadlines and timeouts are unchanged.",
+      "D12: this s589 manifest is the final dispatch and stays in impl-plans/active; the dispatched-but-unfinished s583 manifest also stays in active/ under the README convention."
+    ],
+    "intentionalTradeoffs": [
+      "Single-inheritance class chain (at most six levels) instead of delegation stubs (D1, Risks).",
+      "Component and responsive-variant members stay in Editor, the last chain class (D2).",
+      "Batch members used by handlers (record, resolveReferences, boundsOf, targets, shape, moveBoxTo, lastPlaced) lose private; Batch and handlers stay unexported from edit-command.ts (design 2.2).",
+      "add-page keeps its own unchecked refs.set instead of batch.record, so no new error case is introduced (design 2.3).",
+      "Only newly extracted helpers get focused tests (D6).",
+      "Gates retry up to three times under load instead of loosening deadlines; the CPU-time check (also up to three attempts, reference measured right before the new binary) catches real slowdowns that a lucky green attempt could hide (D11).",
+      "If the 0.8.5 reference binary is missing, workers stop with a blocker and the orchestrator builds the b52e4db reference; workers never create git worktrees."
+    ],
+    "supportedEdgeCases": [
+      "Object.keys(new Editor()) keeps the same names and order (fields only in EditorCore, requireAsset last; design command 7).",
+      "Existing deep imports of packages/core/src/editor.ts (including the private nodetto-cloud consumer) keep working with the same re-exported types.",
+      "Every edit failure path keeps the same error message and the same first failing check, including the unknown-op error from the switch in Batch.apply.",
+      "unknownFieldKey with a matching path, a non-matching path and an out-of-range element index; countPageChanges with added, updated, removed, unchanged and multiple pages (apply-batch.test.ts).",
+      "formatEditReport text output (applied, dry run, created with and without ref, replaced, warnings) and JSON output where the replaced key appears only when non-empty (report.test.ts).",
+      "goldenFixtures stays in documents.test.ts because the first block's timeout reads it at registration; block-local variables named source stay; import.meta.dir appears only in harness.ts.",
+      "bun test apps/cli/src (test-cli) still finds all 17 parity blocks, and bun test apps/cli/src/native-parity without the binary reports exactly 17 skip.",
+      "A test-cli or verify attempt that fails on deadlines under load is retried by the loop; the count checks read only the green copy; a third failure is a hard gate failure."
+    ],
+    "outOfScopeEdgeCases": [
+      "packages/core/src/bpmn/notation.ts (970 lines), packages/io/src/bpmn and examples/ sample CSS are not split.",
+      "Completed design records that still mention native-parity.test.ts are not updated.",
+      "Behavior changes or fixes discovered while splitting (other than the behavior-neutral deduplication in design 2.3) are not made in this run.",
+      "Byte drift of the tracked apps/desktop/src-tauri/gen/schemas/*.json from the tauri build script is not committed; it is only surfaced by git status --short."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-source-module-split.md",
+      "impl-plans/active/sms-01-editor-facade.md",
+      "impl-plans/active/sms-02-cli-edit.md",
+      "impl-plans/active/sms-03-native-parity.md",
+      "impl-plans/progress/sms-01-editor-facade.md",
+      "packages/core/src/editor.ts",
+      "packages/core/src/editor",
+      "packages/core/src/index.ts",
+      "apps/cli/src/edit-command.ts",
+      "apps/cli/src/native-parity.test.ts",
+      "apps/cli/native/README.md",
+      "docs/development.md",
+      "mise.toml"
+    ],
+    "residualRisks": [
+      "If the machine stays heavily loaded, all three verify or test-cli attempts can fail; that is a hard blocker by design (D11), never waived.",
+      "Command 10 has not yet run end to end in this repository; its parts were checked statically in the design review (0.8.5 bundle version, --version output 'nodetto-cli <version>', 19 fixtures). Its first run is in wave 1.",
+      "mise run verify compiles the desktop crate whose tauri build script may rewrite the tracked apps/desktop/src-tauri/gen/schemas/*.json (normally byte-identical); commits stage explicit paths only and the final git status --short shows any drift."
+    ]
+  },
+  "plans": [
+    {
+      "planId": "sms-01-editor-facade",
+      "planPath": "impl-plans/active/sms-01-editor-facade.md",
+      "progressPath": "impl-plans/progress/sms-01-editor-facade.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/editor.ts",
+        "packages/core/src/editor/facade",
+        "packages/core/src/editor/paste.ts",
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/editor/sequence.ts",
+        "packages/core/src/editor/bpmn.ts",
+        "packages/core/src/editor/breadboard.ts",
+        "packages/core/src/editor/connections.ts",
+        "docs/development.md",
+        "impl-plans/progress/sms-01-editor-facade.md",
+        "tmp/source-module-split-s589/sms-01-editor-facade",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "docsEdit": "docs/development.md (write path, wave 1): the Editor-chain paragraph from 9ef8639 is reviewed (R10); edit it only if the review finds it inaccurate; record sha256 before and after any edit.",
+      "acceptanceCriteria": [
+        "The progress log's 'Session 589 review' section has SMS01-R1..R10 with evidence files under tmp/source-module-split-s589/sms-01-editor-facade/, and every finding is dispositioned (fixed, or no change needed with a reason); no high or mid finding stays open.",
+        "Chain, field order (requireAsset last, fields only in EditorCore), visibility, planner type-only changes, unlockedFrame/frameSemantic check order and the docs paragraph match design 1.2-1.4.",
+        "Every verification command exits 0: final/verify.log ' 2945 pass' and ' 0 fail'; final/test-cli.log ' 172 pass', ' 0 fail', no skip line; collection ' 17 skip'; final/cpu-time.log within 1.15x of 0.8.5; commands 5-9 (editor scope) pass; no test file differs from b52e4db; mise.toml unchanged.",
+        "If no repair was needed, git diff --stat 9ef8639 -- packages docs is empty."
+      ],
+      "verification": [
+        "mkdir -p tmp/source-module-split-s589/sms-01-editor-facade/final",
+        "bun run typecheck",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/verify-[123].log \"$d/verify.log\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > \"$d/verify-$i.log\" 2>&1 && cp \"$d/verify-$i.log\" \"$d/verify.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/sms-01-editor-facade/final",
+        "grep -E '^ *0 fail$' tmp/source-module-split-s589/sms-01-editor-facade/final/verify.log",
+        "grep -Ex ' *2945 pass' tmp/source-module-split-s589/sms-01-editor-facade/final/verify.log",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/test-cli-[123].log \"$d/test-cli.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/sms-01-editor-facade/final",
+        "bash -c '\nd=\"$1\"; base=\"$2\"; want=\"${3-}\"; new=target/release/nodetto-cli\n[ -z \"$want\" ] || \"$base\" --version | grep -qF \"$want\" || { echo \"reference binary is not $want\"; exit 1; }\nuser() { /usr/bin/time -p bash -c \"for f in packages/io/src/__fixtures__/*.jsonl; do for a in validate format inspect; do \\\"$1\\\" \\\"\\$a\\\" \\\"\\$f\\\" > /dev/null 2>&1; done; done\" 2>&1 > /dev/null | awk \"\\$1 == \\\"user\\\" { print \\$2 }\"; }\nmkdir -p \"$d\" && rm -f \"$d\"/cpu-time-[123].log \"$d/cpu-time.log\"\nfor i in 1 2 3; do\n  b=\"$(user \"$base\")\"; n=\"$(user \"$new\")\"\n  echo \"attempt $i: reference $base user $b s; new $new user $n s\" > \"$d/cpu-time-$i.log\"\n  awk -v b=\"$b\" -v n=\"$n\" \"BEGIN { exit !(b > 0 && n > 0 && n <= b * 1.15) }\" && cp \"$d/cpu-time-$i.log\" \"$d/cpu-time.log\" && exit 0\ndone\nexit 1' bash tmp/source-module-split-s589/sms-01-editor-facade/final /opt/homebrew/bin/nodetto-cli 0.8.5",
+        "grep -E '^ *0 fail$' tmp/source-module-split-s589/sms-01-editor-facade/final/test-cli.log",
+        "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s589/sms-01-editor-facade/final/test-cli.log)\"",
+        "grep -Ex ' *172 pass' tmp/source-module-split-s589/sms-01-editor-facade/final/test-cli.log",
+        "env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s589/sms-01-editor-facade/final/parity-collect.log 2>&1",
+        "grep -Ex ' *17 skip' tmp/source-module-split-s589/sms-01-editor-facade/final/parity-collect.log",
+        "find packages/core/src/editor.ts packages/core/src/editor -name '*.ts' -exec awk 'FNR == 701 { print FILENAME \" exceeds 700 lines\"; bad = 1 } END { exit bad }' {} +",
+        "test \"$(wc -l < packages/core/src/editor.ts)\" -le 450",
+        "test -z \"$(find packages/core/src/editor -name '*[0-9]*')\"",
+        "base=\"$(mktemp -d)\" && git archive b52e4dbe5509f739a3c1e996377ee2ac0e70059b packages apps/cli/src | tar -x -C \"$base\" && for d in packages/* apps/cli; do if [ -e \"$d/node_modules\" ]; then ln -s \"$PWD/$d/node_modules\" \"$base/$d/node_modules\"; fi; done && BASE=\"$base\" bun -e '\nconst chain = (C) => { const s = new Set(); for (let p = C.prototype; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) for (const n of Object.getOwnPropertyNames(p)) if (n !== \"constructor\") s.add(n); return s; };\nconst keys = (m) => Object.keys(m).sort().join(\",\");\nconst coreBefore = await import(`${process.env.BASE}/packages/core/src/index.ts`);\nconst coreAfter = await import(`${process.cwd()}/packages/core/src/index.ts`);\nconst cliBefore = await import(`${process.env.BASE}/apps/cli/src/edit-command.ts`);\nconst cliAfter = await import(`${process.cwd()}/apps/cli/src/edit-command.ts`);\nconst missing = [...chain(coreBefore.Editor)].filter((n) => !chain(coreAfter.Editor).has(n));\nconst fields = (E) => Object.keys(new E()).join(\",\");\nconst problems = [\n  keys(coreBefore) !== keys(coreAfter) && \"core value exports differ\",\n  keys(cliBefore) !== keys(cliAfter) && \"edit-command value exports differ\",\n  missing.length > 0 && `Editor members missing: ${missing.join(\",\")}`,\n  fields(coreBefore.Editor) !== fields(coreAfter.Editor) && \"Editor instance fields differ\",\n].filter(Boolean);\nif (problems.length) { console.error(problems.join(\"\\n\")); process.exit(1); }\nconsole.log(\"export surface unchanged\");\n'",
+        "test -z \"$(bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess 2>&1 | grep -E '^packages/core/src/(editor\\.ts|editor/)')\"",
+        "bun -e '\nconst fs = require(\"node:fs\");\nconst ts = new Bun.Transpiler({ loader: \"ts\" });\nconst js = new Bun.Transpiler({ loader: \"js\" });\nconst names = \"(core|element-editing|selection-editing|page-editing|notation-editing)\";\nconst viaDir = new RegExp(`facade/${names}\\\\.ts$`);\nconst local = new RegExp(`^\\\\./${names}\\\\.ts$`);\nconst allowed = {\n  \"packages/core/src/editor/facade/core.ts\": [],\n  \"packages/core/src/editor/facade/element-editing.ts\": [\"./core.ts\"],\n  \"packages/core/src/editor/facade/selection-editing.ts\": [\"./element-editing.ts\"],\n  \"packages/core/src/editor/facade/page-editing.ts\": [\"./selection-editing.ts\"],\n  \"packages/core/src/editor/facade/notation-editing.ts\": [\"./page-editing.ts\"],\n  \"packages/core/src/editor.ts\": [\"./editor/facade/notation-editing.ts\"],\n};\nconst bad = [];\nfor (const file of new Bun.Glob(\"packages/core/src/**/*.ts\").scanSync(\".\")) {\n  const inFacade = file.startsWith(\"packages/core/src/editor/facade/\");\n  const runtime = js.scanImports(ts.transformSync(fs.readFileSync(file, \"utf8\"))).map((i) => i.path);\n  for (const path of runtime)\n    if ((viaDir.test(path) || (inFacade && local.test(path))) && !(allowed[file] ?? []).includes(path))\n      bad.push(`${file} -> ${path}`);\n}\nif (bad.length) { console.error(bad.join(\"\\n\")); process.exit(1); }\nconsole.log(\"facade imports ok\");\n'",
+        "git diff --exit-code b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- packages/core/src/index.ts packages/core/src/editor/types.ts packages/core/src/editor/components.ts",
+        "test -z \"$(git diff --name-only b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- '*.test.ts' '*.test.tsx')\"",
+        "git diff --exit-code 9e6ccc7a7abad708165913148e1e3398d39c7373 -- mise.toml"
+      ]
+    },
+    {
+      "planId": "sms-02-cli-edit",
+      "planPath": "impl-plans/active/sms-02-cli-edit.md",
+      "progressPath": "impl-plans/progress/sms-02-cli-edit.md",
+      "wave": 2,
+      "dependsOn": [
+        "sms-01-editor-facade"
+      ],
+      "writePaths": [
+        "apps/cli/src/edit-command.ts",
+        "apps/cli/src/edit",
+        "docs/development.md",
+        "impl-plans/progress/sms-02-cli-edit.md",
+        "tmp/source-module-split-s589/sms-02-cli-edit",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "docsEdit": "docs/development.md (write path, wave 2, after sms-01's paragraph): append at most three sentences to that paragraph, or right after it, describing nodetto-cli edit: edit-command.ts is the entry point and retry loop, edit/batch.ts holds batch state and dispatch, edit/operations/* holds the handlers by domain. Keep sms-01's paragraph intact; no other edit; record sha256 before and after.",
+      "acceptanceCriteria": [
+        "apps/cli/src/edit/ holds operation-input.ts, types.ts, batch.ts, operations/pages.ts, operations/add.ts, operations/connect.ts, operations/elements.ts, operations/groups.ts, apply-batch.ts, report.ts, apply-batch.test.ts and report.test.ts with the plan's pinned signatures (handler (batch, operation, index), placePage, unknownFieldKey, countPageChanges, issueLine, formatEditReport).",
+        "edit-command.ts (<= 300 lines) exports exactly the values parseOperations, deepMerge, applyBatch, editCommand, runOperations and EXIT_CONTENDED and the types EditWarning and RunOptions; Batch and the handlers are not exported from it; OperationError is defined once, in edit/operation-input.ts.",
+        "Handlers import Batch with import type only; the op switch stays in Batch.apply with the unknown-op error unchanged; no handler table, per-operation closures, regex splitting or new recursion.",
+        "Behavior-neutral deduplication runs as a separate step after the move passes its gates in move/: add and connect call batch.record (add-page keeps its unchecked refs.set), a local definitionOf in operations/elements.ts, and issueLine at both applyBatch formatting sites with their own wrappers.",
+        "apply-batch.test.ts (7 tests) and report.test.ts (4 tests) contain every case listed in the plan; commands.ts, draw-command.ts and ai-commands.test.ts are unchanged from b52e4db; mise.toml is unchanged; docs/development.md gains only the edit sentences.",
+        "Every verification command exits 0 with logs under tmp/source-module-split-s589/sms-02-cli-edit/final/: verify ' 2956 pass'; edit-unit ' 11 pass'; test-cli ' 183 pass', ' 0 fail', no skip line; collection ' 17 skip'; cpu-time within 1.15x of 0.8.5; the progress log records baselines B1-B3, hashes, gate exit codes, the green attempt per loop, log paths and final wc -l."
+      ],
+      "verification": [
+        "mkdir -p tmp/source-module-split-s589/sms-02-cli-edit/final",
+        "bun run typecheck",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/verify-[123].log \"$d/verify.log\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > \"$d/verify-$i.log\" 2>&1 && cp \"$d/verify-$i.log\" \"$d/verify.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/sms-02-cli-edit/final",
+        "grep -E '^ *0 fail$' tmp/source-module-split-s589/sms-02-cli-edit/final/verify.log",
+        "grep -Ex ' *2956 pass' tmp/source-module-split-s589/sms-02-cli-edit/final/verify.log",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/edit/ > tmp/source-module-split-s589/sms-02-cli-edit/final/edit-unit.log 2>&1",
+        "grep -Ex ' *11 pass' tmp/source-module-split-s589/sms-02-cli-edit/final/edit-unit.log",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/test-cli-[123].log \"$d/test-cli.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/sms-02-cli-edit/final",
+        "bash -c '\nd=\"$1\"; base=\"$2\"; want=\"${3-}\"; new=target/release/nodetto-cli\n[ -z \"$want\" ] || \"$base\" --version | grep -qF \"$want\" || { echo \"reference binary is not $want\"; exit 1; }\nuser() { /usr/bin/time -p bash -c \"for f in packages/io/src/__fixtures__/*.jsonl; do for a in validate format inspect; do \\\"$1\\\" \\\"\\$a\\\" \\\"\\$f\\\" > /dev/null 2>&1; done; done\" 2>&1 > /dev/null | awk \"\\$1 == \\\"user\\\" { print \\$2 }\"; }\nmkdir -p \"$d\" && rm -f \"$d\"/cpu-time-[123].log \"$d/cpu-time.log\"\nfor i in 1 2 3; do\n  b=\"$(user \"$base\")\"; n=\"$(user \"$new\")\"\n  echo \"attempt $i: reference $base user $b s; new $new user $n s\" > \"$d/cpu-time-$i.log\"\n  awk -v b=\"$b\" -v n=\"$n\" \"BEGIN { exit !(b > 0 && n > 0 && n <= b * 1.15) }\" && cp \"$d/cpu-time-$i.log\" \"$d/cpu-time.log\" && exit 0\ndone\nexit 1' bash tmp/source-module-split-s589/sms-02-cli-edit/final /opt/homebrew/bin/nodetto-cli 0.8.5",
+        "grep -E '^ *0 fail$' tmp/source-module-split-s589/sms-02-cli-edit/final/test-cli.log",
+        "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s589/sms-02-cli-edit/final/test-cli.log)\"",
+        "grep -Ex ' *183 pass' tmp/source-module-split-s589/sms-02-cli-edit/final/test-cli.log",
+        "env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s589/sms-02-cli-edit/final/parity-collect.log 2>&1",
+        "grep -Ex ' *17 skip' tmp/source-module-split-s589/sms-02-cli-edit/final/parity-collect.log",
+        "find apps/cli/src/edit-command.ts apps/cli/src/edit -name '*.ts' -exec awk 'FNR == 701 { print FILENAME \" exceeds 700 lines\"; bad = 1 } END { exit bad }' {} +",
+        "test \"$(wc -l < apps/cli/src/edit-command.ts)\" -le 300",
+        "test -z \"$(find apps/cli/src/edit -name '*[0-9]*')\"",
+        "base=\"$(mktemp -d)\" && git archive b52e4dbe5509f739a3c1e996377ee2ac0e70059b packages apps/cli/src | tar -x -C \"$base\" && for d in packages/* apps/cli; do if [ -e \"$d/node_modules\" ]; then ln -s \"$PWD/$d/node_modules\" \"$base/$d/node_modules\"; fi; done && BASE=\"$base\" bun -e '\nconst chain = (C) => { const s = new Set(); for (let p = C.prototype; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) for (const n of Object.getOwnPropertyNames(p)) if (n !== \"constructor\") s.add(n); return s; };\nconst keys = (m) => Object.keys(m).sort().join(\",\");\nconst coreBefore = await import(`${process.env.BASE}/packages/core/src/index.ts`);\nconst coreAfter = await import(`${process.cwd()}/packages/core/src/index.ts`);\nconst cliBefore = await import(`${process.env.BASE}/apps/cli/src/edit-command.ts`);\nconst cliAfter = await import(`${process.cwd()}/apps/cli/src/edit-command.ts`);\nconst missing = [...chain(coreBefore.Editor)].filter((n) => !chain(coreAfter.Editor).has(n));\nconst fields = (E) => Object.keys(new E()).join(\",\");\nconst problems = [\n  keys(coreBefore) !== keys(coreAfter) && \"core value exports differ\",\n  keys(cliBefore) !== keys(cliAfter) && \"edit-command value exports differ\",\n  missing.length > 0 && `Editor members missing: ${missing.join(\",\")}`,\n  fields(coreBefore.Editor) !== fields(coreAfter.Editor) && \"Editor instance fields differ\",\n].filter(Boolean);\nif (problems.length) { console.error(problems.join(\"\\n\")); process.exit(1); }\nconsole.log(\"export surface unchanged\");\n'",
+        "git diff --exit-code b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- apps/cli/src/commands.ts apps/cli/src/draw-command.ts apps/cli/src/ai-commands.test.ts",
+        "git diff --exit-code 9e6ccc7a7abad708165913148e1e3398d39c7373 -- mise.toml"
+      ]
+    },
+    {
+      "planId": "sms-03-native-parity",
+      "planPath": "impl-plans/active/sms-03-native-parity.md",
+      "progressPath": "impl-plans/progress/sms-03-native-parity.md",
+      "wave": 3,
+      "dependsOn": [
+        "sms-02-cli-edit"
+      ],
+      "writePaths": [
+        "apps/cli/src/native-parity.test.ts",
+        "apps/cli/src/native-parity",
+        "apps/cli/native/README.md",
+        "impl-plans/progress/sms-03-native-parity.md",
+        "tmp/source-module-split-s589/sms-03-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "docsEdit": "apps/cli/native/README.md (write path): in the last paragraph, the native-parity.test.ts sentence names apps/cli/src/native-parity/ (harness.ts plus topic files for documents, drawing, export, PCB and text layout); the mcp-stdio.test.ts sentence stays.",
+      "acceptanceCriteria": [
+        "apps/cli/src/native-parity/ holds harness.ts (binary, cliSrcDir, cliEntry, fixtureRoot, nativeTest, compare; constants and functions only, no file system access at import time) and documents.test.ts, drawing.test.ts, export.test.ts, pcb.test.ts and text-layout.test.ts with 5+4+3+3+2 = 17 nativeTest blocks whose names, bodies, timeouts and in-file order are unchanged; apps/cli/src/native-parity.test.ts no longer exists.",
+        "Every old join(import.meta.dir, X) becomes join(cliSrcDir, X); every reference to the old module-level `source` (compare at old line 35 and old lines 217, 678, 709, 748 and 945) becomes cliEntry while block-local `source` variables stay; only harness.ts contains import.meta.dir; text-layout fixtures are imported from ../__fixtures__/text-layout.ts; no describe wrappers.",
+        "apps/cli/native/README.md names apps/cli/src/native-parity/ (harness.ts plus the topic files) and keeps the mcp-stdio.test.ts sentence.",
+        "The combined-tree final verification (design commands 1-10) exits 0 with logs under tmp/source-module-split-s589/sms-03-native-parity/final/: verify ' 2956 pass' and ' 25 skip'; test-cli ' 183 pass', ' 0 fail', no skip line; collection ' 17 skip'; cpu-time within 1.15x of 0.8.5; mise.toml unchanged.",
+        "The progress log records baselines, hashes (including the deleted file's pre-delete hash), gate exit codes, the green attempt per loop, log paths, drift events and final-wc.txt."
+      ],
+      "verification": [
+        "mkdir -p tmp/source-module-split-s589/sms-03-native-parity/final",
+        "bun run typecheck",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/verify-[123].log \"$d/verify.log\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > \"$d/verify-$i.log\" 2>&1 && cp \"$d/verify-$i.log\" \"$d/verify.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/sms-03-native-parity/final",
+        "grep -E '^ *0 fail$' tmp/source-module-split-s589/sms-03-native-parity/final/verify.log",
+        "grep -Ex ' *2956 pass' tmp/source-module-split-s589/sms-03-native-parity/final/verify.log",
+        "grep -Ex ' *25 skip' tmp/source-module-split-s589/sms-03-native-parity/final/verify.log",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/test-cli-[123].log \"$d/test-cli.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/sms-03-native-parity/final",
+        "bash -c '\nd=\"$1\"; base=\"$2\"; want=\"${3-}\"; new=target/release/nodetto-cli\n[ -z \"$want\" ] || \"$base\" --version | grep -qF \"$want\" || { echo \"reference binary is not $want\"; exit 1; }\nuser() { /usr/bin/time -p bash -c \"for f in packages/io/src/__fixtures__/*.jsonl; do for a in validate format inspect; do \\\"$1\\\" \\\"\\$a\\\" \\\"\\$f\\\" > /dev/null 2>&1; done; done\" 2>&1 > /dev/null | awk \"\\$1 == \\\"user\\\" { print \\$2 }\"; }\nmkdir -p \"$d\" && rm -f \"$d\"/cpu-time-[123].log \"$d/cpu-time.log\"\nfor i in 1 2 3; do\n  b=\"$(user \"$base\")\"; n=\"$(user \"$new\")\"\n  echo \"attempt $i: reference $base user $b s; new $new user $n s\" > \"$d/cpu-time-$i.log\"\n  awk -v b=\"$b\" -v n=\"$n\" \"BEGIN { exit !(b > 0 && n > 0 && n <= b * 1.15) }\" && cp \"$d/cpu-time-$i.log\" \"$d/cpu-time.log\" && exit 0\ndone\nexit 1' bash tmp/source-module-split-s589/sms-03-native-parity/final /opt/homebrew/bin/nodetto-cli 0.8.5",
+        "grep -E '^ *0 fail$' tmp/source-module-split-s589/sms-03-native-parity/final/test-cli.log",
+        "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s589/sms-03-native-parity/final/test-cli.log)\"",
+        "grep -Ex ' *183 pass' tmp/source-module-split-s589/sms-03-native-parity/final/test-cli.log",
+        "test \"$(cat apps/cli/src/native-parity/*.test.ts | grep -c '^nativeTest(')\" -eq 17",
+        "env -u NODETTO_CLI_TEST_BINARY bun test apps/cli/src/native-parity > tmp/source-module-split-s589/sms-03-native-parity/final/parity-collect.log 2>&1",
+        "grep -Ex ' *17 skip' tmp/source-module-split-s589/sms-03-native-parity/final/parity-collect.log",
+        "find packages/core/src/editor.ts packages/core/src/editor apps/cli/src/edit-command.ts apps/cli/src/edit apps/cli/src/native-parity -name '*.ts' -exec awk 'FNR == 701 { print FILENAME \" exceeds 700 lines\"; bad = 1 } END { exit bad }' {} +",
+        "test \"$(wc -l < packages/core/src/editor.ts)\" -le 450 && test \"$(wc -l < apps/cli/src/edit-command.ts)\" -le 300",
+        "test -z \"$(find packages/core/src/editor apps/cli/src/edit apps/cli/src/native-parity -name '*[0-9]*')\" && test ! -e apps/cli/src/native-parity.test.ts",
+        "base=\"$(mktemp -d)\" && git archive b52e4dbe5509f739a3c1e996377ee2ac0e70059b packages apps/cli/src | tar -x -C \"$base\" && for d in packages/* apps/cli; do if [ -e \"$d/node_modules\" ]; then ln -s \"$PWD/$d/node_modules\" \"$base/$d/node_modules\"; fi; done && BASE=\"$base\" bun -e '\nconst chain = (C) => { const s = new Set(); for (let p = C.prototype; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) for (const n of Object.getOwnPropertyNames(p)) if (n !== \"constructor\") s.add(n); return s; };\nconst keys = (m) => Object.keys(m).sort().join(\",\");\nconst coreBefore = await import(`${process.env.BASE}/packages/core/src/index.ts`);\nconst coreAfter = await import(`${process.cwd()}/packages/core/src/index.ts`);\nconst cliBefore = await import(`${process.env.BASE}/apps/cli/src/edit-command.ts`);\nconst cliAfter = await import(`${process.cwd()}/apps/cli/src/edit-command.ts`);\nconst missing = [...chain(coreBefore.Editor)].filter((n) => !chain(coreAfter.Editor).has(n));\nconst fields = (E) => Object.keys(new E()).join(\",\");\nconst problems = [\n  keys(coreBefore) !== keys(coreAfter) && \"core value exports differ\",\n  keys(cliBefore) !== keys(cliAfter) && \"edit-command value exports differ\",\n  missing.length > 0 && `Editor members missing: ${missing.join(\",\")}`,\n  fields(coreBefore.Editor) !== fields(coreAfter.Editor) && \"Editor instance fields differ\",\n].filter(Boolean);\nif (problems.length) { console.error(problems.join(\"\\n\")); process.exit(1); }\nconsole.log(\"export surface unchanged\");\n'",
+        "git diff --exit-code b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- packages/core/src/index.ts",
+        "test -z \"$(bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess 2>&1 | grep -E '^packages/core/src/(editor\\.ts|editor/)')\"",
+        "bun -e '\nconst fs = require(\"node:fs\");\nconst ts = new Bun.Transpiler({ loader: \"ts\" });\nconst js = new Bun.Transpiler({ loader: \"js\" });\nconst names = \"(core|element-editing|selection-editing|page-editing|notation-editing)\";\nconst viaDir = new RegExp(`facade/${names}\\\\.ts$`);\nconst local = new RegExp(`^\\\\./${names}\\\\.ts$`);\nconst allowed = {\n  \"packages/core/src/editor/facade/core.ts\": [],\n  \"packages/core/src/editor/facade/element-editing.ts\": [\"./core.ts\"],\n  \"packages/core/src/editor/facade/selection-editing.ts\": [\"./element-editing.ts\"],\n  \"packages/core/src/editor/facade/page-editing.ts\": [\"./selection-editing.ts\"],\n  \"packages/core/src/editor/facade/notation-editing.ts\": [\"./page-editing.ts\"],\n  \"packages/core/src/editor.ts\": [\"./editor/facade/notation-editing.ts\"],\n};\nconst bad = [];\nfor (const file of new Bun.Glob(\"packages/core/src/**/*.ts\").scanSync(\".\")) {\n  const inFacade = file.startsWith(\"packages/core/src/editor/facade/\");\n  const runtime = js.scanImports(ts.transformSync(fs.readFileSync(file, \"utf8\"))).map((i) => i.path);\n  for (const path of runtime)\n    if ((viaDir.test(path) || (inFacade && local.test(path))) && !(allowed[file] ?? []).includes(path))\n      bad.push(`${file} -> ${path}`);\n}\nif (bad.length) { console.error(bad.join(\"\\n\")); process.exit(1); }\nconsole.log(\"facade imports ok\");\n'",
+        "test -z \"$(grep -rn 'import.meta.dir' apps/cli/src/native-parity | grep -v '/harness.ts:')\"",
+        "grep -q 'apps/cli/src/native-parity/' apps/cli/native/README.md",
+        "git diff --exit-code 9e6ccc7a7abad708165913148e1e3398d39c7373 -- mise.toml",
+        "wc -l packages/core/src/editor.ts packages/core/src/editor/*.ts packages/core/src/editor/facade/*.ts apps/cli/src/edit-command.ts apps/cli/src/edit/*.ts apps/cli/src/edit/operations/*.ts apps/cli/src/native-parity/*.ts > tmp/source-module-split-s589/sms-03-native-parity/final/final-wc.txt"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "sms-01-editor-facade"
+      ],
+      [
+        "sms-02-cli-edit"
+      ],
+      [
+        "sms-03-native-parity"
+      ]
+    ],
+    "afterWave": [
+      "bun run typecheck",
+      "sh -c 'd=tmp/source-module-split-s589/reconcile; mkdir -p \"$d\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic bun test packages/core apps/cli/src > \"$d/after-wave-$i.log\" 2>&1 && exit 0; done; exit 1'"
+    ],
+    "knownTransientFailures": [
+      "Test deadlines (parity blocks, MCP stdio) can be exceeded under heavy machine load (session 579 retry2-native-parity.log; session 583 test-cli.log: 166 pass, 6 fail at load average 87.94). The three-attempt loops absorb this; if all three attempts fail, the gate fails and is routed by writePaths. Deadlines are never loosened."
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Finalization (plan-archive node), not a worker task: replace the Active source-module-split paragraph with a Completed entry listing sms-01..03 with the final verification outcomes, naming source-module-split-s575-dispatch.json and source-module-split-s579-dispatch.json as superseded (archived to completed/), source-module-split-s583-dispatch.json as the dispatched but unfinished session-583 attempt kept in active/, and source-module-split-s589-dispatch.json as the final dispatch kept in active/; links must point at actual file locations (design section 4)."
+      },
+      {
+        "path": "impl-plans/completed",
+        "intendedEdit": "Finalization (plan-archive node): move sms-01-editor-facade.md, sms-02-cli-edit.md, sms-03-native-parity.md, source-module-split-s575-dispatch.json and source-module-split-s579-dispatch.json from impl-plans/active/ to impl-plans/completed/, each plan with a short status note. The s583 and this s589 manifest stay in impl-plans/active with pre-archive planPath values (design D10, D12)."
+      }
+    ],
+    "routing": "Strictly blocking. Route failures by writePaths: Editor chain, planner types, facade imports, strict-index issues and the editor paragraph of docs/development.md to sms-01; edit modules, focused edit tests, the edit export surface and the edit sentences of docs/development.md to sms-02; parity file layout, block counts and README to sms-03. A parity, test-cli or CPU-time failure in wave 2 or 3 caused by sms-01- or sms-02-owned code is routed back to that plan. A missing or non-0.8.5 /opt/homebrew/bin/nodetto-cli is an orchestrator blocker: build the b52e4db reference as design command 10 describes and pass its path as the second argument with no third argument.",
+    "commitPolicy": "Commit on main, staging explicit paths only. Never git add -A, never stage tmp/ or target/, never push (gitPush=false). No tool attribution in commit messages. No version bump, tag or release.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-source-module-split.md",
+        "impl-plans/active/sms-01-editor-facade.md",
+        "impl-plans/active/sms-02-cli-edit.md",
+        "impl-plans/active/sms-03-native-parity.md",
+        "impl-plans/active/source-module-split-s575-dispatch.json",
+        "impl-plans/active/source-module-split-s579-dispatch.json",
+        "impl-plans/active/source-module-split-s583-dispatch.json",
+        "impl-plans/active/source-module-split-s589-dispatch.json",
+        "impl-plans/README.md"
+      ]
+    },
+    "finalVerification": [
+      "mkdir -p tmp/source-module-split-s589/reconcile",
+      "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/verify-[123].log \"$d/verify.log\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > \"$d/verify-$i.log\" 2>&1 && cp \"$d/verify-$i.log\" \"$d/verify.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/reconcile",
+      "grep -E '^ *0 fail$' tmp/source-module-split-s589/reconcile/verify.log",
+      "grep -Ex ' *2956 pass' tmp/source-module-split-s589/reconcile/verify.log",
+      "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/test-cli-[123].log \"$d/test-cli.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1' sh tmp/source-module-split-s589/reconcile",
+      "bash -c '\nd=\"$1\"; base=\"$2\"; want=\"${3-}\"; new=target/release/nodetto-cli\n[ -z \"$want\" ] || \"$base\" --version | grep -qF \"$want\" || { echo \"reference binary is not $want\"; exit 1; }\nuser() { /usr/bin/time -p bash -c \"for f in packages/io/src/__fixtures__/*.jsonl; do for a in validate format inspect; do \\\"$1\\\" \\\"\\$a\\\" \\\"\\$f\\\" > /dev/null 2>&1; done; done\" 2>&1 > /dev/null | awk \"\\$1 == \\\"user\\\" { print \\$2 }\"; }\nmkdir -p \"$d\" && rm -f \"$d\"/cpu-time-[123].log \"$d/cpu-time.log\"\nfor i in 1 2 3; do\n  b=\"$(user \"$base\")\"; n=\"$(user \"$new\")\"\n  echo \"attempt $i: reference $base user $b s; new $new user $n s\" > \"$d/cpu-time-$i.log\"\n  awk -v b=\"$b\" -v n=\"$n\" \"BEGIN { exit !(b > 0 && n > 0 && n <= b * 1.15) }\" && cp \"$d/cpu-time-$i.log\" \"$d/cpu-time.log\" && exit 0\ndone\nexit 1' bash tmp/source-module-split-s589/reconcile /opt/homebrew/bin/nodetto-cli 0.8.5",
+      "grep -E '^ *0 fail$' tmp/source-module-split-s589/reconcile/test-cli.log",
+      "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/source-module-split-s589/reconcile/test-cli.log)\"",
+      "grep -Ex ' *183 pass' tmp/source-module-split-s589/reconcile/test-cli.log",
+      "test \"$(cat apps/cli/src/native-parity/*.test.ts | grep -c '^nativeTest(')\" -eq 17",
+      "find packages/core/src/editor.ts packages/core/src/editor apps/cli/src/edit-command.ts apps/cli/src/edit apps/cli/src/native-parity -name '*.ts' -exec awk 'FNR == 701 { print FILENAME \" exceeds 700 lines\"; bad = 1 } END { exit bad }' {} +",
+      "test -z \"$(find packages/core/src/editor apps/cli/src/edit apps/cli/src/native-parity -name '*[0-9]*')\" && test ! -e apps/cli/src/native-parity.test.ts",
+      "git diff --exit-code b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- packages/core/src/index.ts",
+      "git diff --exit-code 9e6ccc7a7abad708165913148e1e3398d39c7373 -- mise.toml",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  }
+}

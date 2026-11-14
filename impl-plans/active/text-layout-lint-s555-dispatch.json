@@ -1,0 +1,319 @@
+{
+  "taskId": "text-layout-lint-s555",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-555",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "5b65f9693c12abe5145701cae7f9f23cd9c6b9ec",
+  "designDocPaths": [
+    "design-docs/specs/design-text-layout-lint.md",
+    "design-docs/user-qa/text-layout-lint.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/tll-06-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/text-layout-lint-s555",
+  "evidenceLayout": "Per-plan logs go under tmp/text-layout-lint-s555/<planId>/ (one attempt-<n>/ subdirectory per retry) and reconciliation output under tmp/text-layout-lint-s555/reconcile/. tmp/ is git-ignored. No *.test.ts file may be written under tmp/. Session 552 evidence stays under tmp/text-layout-lint-s552/.",
+  "acceptedDependencies": [
+    {
+      "planId": "tll-01-core-lint",
+      "planPath": "impl-plans/active/tll-01-core-lint.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "packages/core/src/text-layout-lint (rules.ts, engine.ts, index.ts), TEXT_LAYOUT_LINT_PAGE_KINDS, lintTextLayoutPage, estimatedTextWidth export, apps/cli/src/__fixtures__/text-layout.ts builders and TEXT_LAYOUT_EXPECTED"
+    },
+    {
+      "planId": "tll-02-cli-help-docs",
+      "planPath": "impl-plans/active/tll-02-cli-help-docs.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "First-version text-layout lint text in apps/cli/src/help.ts and docs/cli.md (superseded by tll-08)"
+    },
+    {
+      "planId": "tll-03-cli-lint",
+      "planPath": "impl-plans/active/tll-03-cli-lint.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "lint page filter on TEXT_LAYOUT_LINT_PAGE_KINDS and lintTextLayoutPage routing in apps/cli/src/commands.ts; apps/cli/src/text-layout-lint.test.ts"
+    },
+    {
+      "planId": "tll-04-cli-export",
+      "planPath": "impl-plans/active/tll-04-cli-export.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "whole-page svg/png/pdf export warning gate on TEXT_LAYOUT_LINT_PAGE_KINDS in apps/cli/src/export-command.ts; apps/cli/src/text-layout-export.test.ts"
+    },
+    {
+      "planId": "tll-05-native-parity",
+      "planPath": "impl-plans/active/tll-05-native-parity.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "native parity block 'native CLI matches text-layout lint and export, including dense pages' in apps/cli/src/native-parity.test.ts; closed out for the revised behavior by tll-11"
+    },
+    {
+      "planId": "tll-07-wide-width",
+      "planPath": "impl-plans/active/tll-07-wide-width.md",
+      "commit": "5b65f9693c12abe5145701cae7f9f23cd9c6b9ec",
+      "provides": "packages/core/src/wide-text-width.ts (WIDE_GLYPH_WIDTH, EAST_ASIAN_WIDE_RANGES, isWideCodePoint, wideAwareTextWidth, wideAwareLineCount) and its test; export keyword on graphemes in packages/core/src/text-layout.ts. Accepted in session 552."
+    },
+    {
+      "planId": "tll-08-help-docs",
+      "planPath": "impl-plans/active/tll-08-help-docs.md",
+      "commit": "5b65f9693c12abe5145701cae7f9f23cd9c6b9ec",
+      "provides": "apps/cli/src/help.ts and docs/cli.md name BPMN, breadboard, architecture, freeform and flowchart pages and the 1 em wide-character measurement. Accepted in session 552."
+    }
+  ],
+  "reviewContext": {
+    "issueReference": "none (no GitHub issue supplied; scope from runtimeVariables.workflowInput.requestedOutcome of session opus-terra-design-and-implement-review-loop-session-555, continuing session 552)",
+    "userProblem": "The text-layout lint revision (wide-aware width Q2, architecture/freeform/flowchart page kinds Q1) is partly implemented at 5b65f96: tll-07 and tll-08 accepted, tll-09 implemented but unreviewed, tll-10 and tll-11 not implemented. The previous run stopped on a plan-ordering verification issue: the CLI test updates owned by tll-10 were needed by gates of other plans.",
+    "requiredOutcomes": [
+      "Review the tll-09 implementation at 5b65f96 (label-overflow uses wideAwareTextWidth; note-overflow wide-line and wide wrapped-height findings; TEXT_LAYOUT_LINT_PAGE_KINDS = ['architecture', 'freeform', 'flowchart']; wide fixture textLayoutWideDocument and TEXT_LAYOUT_WIDE_EXPECTED).",
+      "LINT_NO_PAGES becomes 'The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.'; CLI tests cover freeform/flowchart lint and export warnings, uml as the not-lintable control, and the wide fixture (tll-10).",
+      "Native parity covers a wide-character label document and freeform and flowchart problem pages; CARGO_TERM_QUIET=true mise run test-cli passes with the release binary and the new block runs (1 pass, 0 skip) (tll-11).",
+      "All existing export golden/snapshot tests pass unchanged; lint-ts, check and typecheck pass; tll-00..11 archived during serial finalization."
+    ],
+    "nonGoals": [
+      "Changing export wrapping or geometry: wrapTextLines, glyphAdvance, estimatedTextWidth, measureTextNote, label-layout.ts, node-label.ts, svg-export/** stay byte-identical.",
+      "Wide-aware label-collision, note proximity or label height; new JSON fields; lint configuration; export --strict (Q4 default); --element warnings (Q3 default); page kinds other than the three.",
+      "Any change to packages/io/src/bpmn, apps/cli/native/**, Cargo.toml, Cargo.lock, packages/io/src/__fixtures__ goldens, examples/**, apps/cli/src/export-command.ts, apps/cli/src/help.ts or docs/cli.md.",
+      "Re-dispatching tll-07 or tll-08; version bumps, releases, pushes; server, auth or deployment code."
+    ],
+    "constraints": [
+      "Export output must not change for any document; prove it with the existing export/golden tests and an empty git diff --stat 45cc69f on renderer, io, native and Cargo paths.",
+      "packages/core/src/wide-text-width.ts is imported only by text-layout-lint/rules.ts and its own test; text-layout.ts differs from 45cc69f only by the export keyword on graphemes.",
+      "BPMN/breadboard lint output and order unchanged; rule ids label-overflow, label-collision, note-overflow stable; lint exit codes unchanged.",
+      "Fixtures are self-authored generic examples; no external issue, customer, organisation, person, product or file names.",
+      "Waves are strictly serial (tll-09 -> tll-10 -> tll-11); no plan gates on a later plan's test updates (design 'Rollout constraints', 'Verification order').",
+      "Workers follow impl-plans/active/tll-06-overview.md 'Per-worker protocol'; bun tests with BUN_OPTIONS=--jsx-runtime=classic; cargo with CARGO_TERM_QUIET=true; no emojis; no tool attribution in commits."
+    ],
+    "designDecisionsAndRationale": [
+      "Wide-aware measurement is lint-side only, in a helper the export never imports, because changing wrapTextLines would change export wrapping and golden output (user-qa Q2).",
+      "Widening page kinds is a constant change because the CLI lint filter (commands.ts:291-296) and export gate (export-command.ts:337) already read TEXT_LAYOUT_LINT_PAGE_KINDS.",
+      "Tests that used freeform as the not-lintable control switch to uml pages; page kind does not affect rendering, so byte-equality references still hold.",
+      "tll-11 depends on tll-10 because mise run test-cli runs all of bun test apps/cli/src, including the tll-10-owned tests.",
+      "The native CLI runs the same TS bundle in Boa with an Intl.Segmenter shim, so no Rust change; parity is proven by an appended native-parity block."
+    ],
+    "intentionalTradeoffs": [
+      "Ambiguous (A) width graphemes are treated as narrow.",
+      "Existing freeform/flowchart/architecture documents with wide text may get new warning-only findings; export bytes and exit codes are unchanged.",
+      "Serial waves trade parallelism for gates that never depend on a later plan."
+    ],
+    "supportedEdgeCases": [
+      "node.generic 140x60 with the CJK label -> 'Label line 1 of 1 is 195 wide but the text area is 120 wide at 13px; export clips it.'; same box with 'Payment gateway' -> no finding.",
+      "shape.geo 140x60 with the CJK label -> one label-overflow 'is 195 wide but the text area is 124 wide' ending 'export draws it past the label padding.'.",
+      "Fixed text.note 120x44 with a 16-grapheme CJK text -> wide-line finding (182 vs 104) and wide-height finding (3 lines, 58.8 vs 44).",
+      "Empty freeform page via --page is clean (exit 0, empty stdout); uml-only document -> EXIT_ERROR with the new LINT_NO_PAGES, also with --page missing."
+    ],
+    "outOfScopeEdgeCases": [
+      "Real per-font glyph metrics, kerning and Ambiguous-width locale handling.",
+      "UML, ERD, sequence, usecase, state and other page kinds; --element and non-svg/png/pdf export warnings (Q3); export --strict (Q4).",
+      "Frame clipping via clipOf."
+    ],
+    "reviewFindingsCarriedForward": [
+      "Resolved in session 555: tll-06 'Known transient state' and the tll-09 informational run include apps/cli/src/breadboard-commands.test.ts:141-160.",
+      "Resolved in session 555: tll-11 depends on tll-10, so its mise run test-cli gate is a real pass/fail gate and never pending-join.",
+      "Resolved in session 555: tll-11 cites the existing parity block as native-parity.test.ts:916-958.",
+      "Low: the W/F table transcription is only covered by representative code-point tests (accepted residual risk, tll-07).",
+      "tll-09 is dispatched in wave 1 in re-validation mode so the review step reviews the 5b65f96 implementation."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-text-layout-lint.md",
+      "design-docs/user-qa/text-layout-lint.md",
+      "impl-plans/active/tll-06-overview.md",
+      "impl-plans/active/tll-09-core-rules.md",
+      "impl-plans/active/tll-10-cli-lint-export.md",
+      "impl-plans/active/tll-11-native-parity.md",
+      "impl-plans/active/text-layout-lint-s552-dispatch.json",
+      "impl-plans/progress/tll-09-core-rules.md",
+      "packages/core/src/wide-text-width.ts",
+      "packages/core/src/text-layout-lint/rules.ts",
+      "apps/cli/src/commands.ts",
+      "apps/cli/src/export-command.ts",
+      "apps/cli/src/__fixtures__/text-layout.ts",
+      "apps/cli/src/native-parity.test.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "tll-09-core-rules",
+      "planPath": "impl-plans/active/tll-09-core-rules.md",
+      "progressPath": "impl-plans/progress/tll-09-core-rules.md",
+      "wave": 1,
+      "dependsOn": [
+        "tll-07-wide-width"
+      ],
+      "writePaths": [
+        "packages/core/src/text-layout-lint/rules.ts",
+        "packages/core/src/text-layout-lint/rules.test.ts",
+        "packages/core/src/text-layout-lint/engine.test.ts",
+        "apps/cli/src/__fixtures__/text-layout.ts",
+        "impl-plans/progress/tll-09-core-rules.md",
+        "tmp/text-layout-lint-s555/tll-09-core-rules"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Session 555 re-validation: the worker appends a '## Session 555' section to the progress log with fresh sha256 per writePath, an item-by-item matches/differs check against the plan's File-level changes and test cases, and reruns every verification command; it edits a writePath only to fix a failing check, a differing item or a review correction.",
+        "TEXT_LAYOUT_LINT_PAGE_KINDS equals ['architecture', 'freeform', 'flowchart']; engine.test.ts pins it; engine.ts and packages/core/src/index.ts unchanged from 45cc69f.",
+        "labelOverflow width loop uses wideAwareTextWidth with the same arguments; all other label logic and message templates unchanged.",
+        "The note loop adds the wide-line and wide wrapped-height note-overflow findings with the exact message templates in tll-09, before the rotation continue, with separate wideFree/wideOffset.",
+        "rules.test.ts 'wide characters' cases pass (195 vs 120, 195 vs 124, 182 vs 104, 3 lines 58.8 vs 44, alignment variants, ASCII 200x21.6 guard, renderer agreement); existing tests and TEXT_LAYOUT_EXPECTED unchanged.",
+        "apps/cli/src/__fixtures__/text-layout.ts exports textLayoutWideDocument(kind = 'architecture') and TEXT_LAYOUT_WIDE_EXPECTED; the bun -e check prints [[\"label-overflow\",\"node-wide\"],[\"label-overflow\",\"geo-wide\"],[\"note-overflow\",\"note-wide\"],[\"note-overflow\",\"note-wide\"]].",
+        "bun test packages/core and packages/io pass unchanged; only rules.ts and wide-text-width.test.ts reference wide-text-width; export boundary diff empty; text-layout.ts numstat '1 1'.",
+        "Informational run of text-layout-lint.test.ts, text-layout-export.test.ts and breadboard-commands.test.ts shows exactly the three tll-10-owned failures named in tll-06 'Known transient state'; it is not a pass/fail gate.",
+        "Progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s555/tll-09-core-rules",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/text-layout-lint packages/core/src/wide-text-width.test.ts > tmp/text-layout-lint-s555/tll-09-core-rules/core-lint.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core > tmp/text-layout-lint-s555/tll-09-core-rules/core-all.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io > tmp/text-layout-lint-s555/tll-09-core-rules/io-all.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/core/src/text-layout-lint apps/cli/src/__fixtures__/text-layout.ts > tmp/text-layout-lint-s555/tll-09-core-rules/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/text-layout-lint-s555/tll-09-core-rules/typecheck.log 2>&1; echo \"exit=$?\"",
+        "bun -e 'import {lintTextLayoutPage} from \"@nodetto/core\"; import {parseDocument} from \"@nodetto/io\"; import {textLayoutWideDocument} from \"./apps/cli/src/__fixtures__/text-layout.ts\"; console.log(JSON.stringify(lintTextLayoutPage(parseDocument(textLayoutWideDocument()), \"page-architecture\").map(f => [f.ruleId, f.elementId])))' > tmp/text-layout-lint-s555/tll-09-core-rules/fixture-check.log 2>&1; echo \"exit=$?\"",
+        "grep -rln wide-text-width packages apps --include=*.ts",
+        "git diff --stat 45cc69f -- packages/core/src/text-layout-lint/engine.ts packages/core/src/index.ts",
+        "git diff --stat 45cc69f -- packages/core/src/svg-export packages/core/src/label-layout.ts packages/core/src/node-label.ts packages/io/src apps/cli/native Cargo.toml Cargo.lock",
+        "git diff --numstat 45cc69f -- packages/core/src/text-layout.ts",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/text-layout-lint.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/breadboard-commands.test.ts > tmp/text-layout-lint-s555/tll-09-core-rules/cli-informational.log 2>&1; echo \"exit=$?\""
+      ]
+    },
+    {
+      "planId": "tll-10-cli-lint-export",
+      "planPath": "impl-plans/active/tll-10-cli-lint-export.md",
+      "progressPath": "impl-plans/progress/tll-10-cli-lint-export.md",
+      "wave": 2,
+      "dependsOn": [
+        "tll-09-core-rules"
+      ],
+      "writePaths": [
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/text-layout-lint.test.ts",
+        "apps/cli/src/text-layout-export.test.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "impl-plans/progress/tll-10-cli-lint-export.md",
+        "tmp/text-layout-lint-s555/tll-10-cli-lint-export"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "LINT_NO_PAGES is 'The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.'; no other change in commands.ts (numstat at most 2/2); export-command.ts unchanged from 45cc69f.",
+        "breadboard-commands.test.ts uses a uml page instead of freeform and expects the new LINT_NO_PAGES in both assertions; test name kept.",
+        "text-layout-lint.test.ts: freeform and flowchart problem pages produce TEXT_LAYOUT_EXPECTED and the same --page Architecture stdout as architecture; empty freeform page clean; uml-only document and --page on a uml page fail with EXIT_ERROR; wide document yields TEXT_LAYOUT_WIDE_EXPECTED, the exact node-wide message and no node-ascii finding.",
+        "text-layout-export.test.ts: uml replaces freeform as the no-warnings reference; freeform and flowchart SVG stdout and stderr equal the architecture document's; wide export warns label-overflow node-wide, not node-ascii, with SVG bytes equal to the uml variant.",
+        "Baseline focused run before editing shows exactly the three known transient failures; afterwards the focused run, the unchanged-tests run and the full bun test apps/cli/src gate all exit 0; no file under apps/cli/src still contains 'no BPMN, breadboard or architecture pages'.",
+        "commands.test.ts, bpmn-commands.test.ts and export-command.test.ts unchanged and passing; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s555/tll-10-cli-lint-export",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/text-layout-lint.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/breadboard-commands.test.ts > tmp/text-layout-lint-s555/tll-10-cli-lint-export/baseline.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/text-layout-lint.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/breadboard-commands.test.ts > tmp/text-layout-lint-s555/tll-10-cli-lint-export/focused.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/commands.test.ts apps/cli/src/bpmn-commands.test.ts apps/cli/src/export-command.test.ts > tmp/text-layout-lint-s555/tll-10-cli-lint-export/unchanged.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src > tmp/text-layout-lint-s555/tll-10-cli-lint-export/cli-all.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/commands.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/breadboard-commands.test.ts > tmp/text-layout-lint-s555/tll-10-cli-lint-export/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/text-layout-lint-s555/tll-10-cli-lint-export/typecheck.log 2>&1; echo \"exit=$?\"",
+        "git diff --stat 45cc69f -- apps/cli/src/export-command.ts",
+        "git diff --numstat 45cc69f -- apps/cli/src/commands.ts",
+        "grep -rn \"no BPMN, breadboard or architecture pages\" apps/cli/src"
+      ]
+    },
+    {
+      "planId": "tll-11-native-parity",
+      "planPath": "impl-plans/active/tll-11-native-parity.md",
+      "progressPath": "impl-plans/progress/tll-11-native-parity.md",
+      "wave": 3,
+      "dependsOn": [
+        "tll-09-core-rules",
+        "tll-10-cli-lint-export"
+      ],
+      "writePaths": [
+        "apps/cli/src/native-parity.test.ts",
+        "impl-plans/progress/tll-11-native-parity.md",
+        "tmp/text-layout-lint-s555/tll-11-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "native-parity.test.ts imports textLayoutWideDocument and appends one nativeTest block 'native CLI matches wide-character and freeform/flowchart text-layout lint and export' (budget 120000 with launch-count comment) comparing TS and native lint, lint --format json and export --format svg for wide.jsonl, problem-freeform.jsonl and problem-flowchart.jsonl plus lint problem-flowchart.jsonl --page Architecture, all exit 0, in a temp dir removed in finally.",
+        "Native results show 'warning: label-overflow node-wide:' without node-ascii for the wide export, note-overflow in wide lint stdout, and 'warning: label-overflow node-clipped:' for freeform and flowchart exports.",
+        "Without NODETTO_CLI_TEST_BINARY the block is skipped; with the release binary it runs (1 pass, 0 skip) and the full file has 0 fail, 0 skip; existing blocks and budgets byte-unchanged; no change under apps/cli/native, Cargo.toml or Cargo.lock.",
+        "CARGO_TERM_QUIET=true mise run test-cli exits 0 with the new block passing (tll-10 already done; never pending-join).",
+        "Progress log records cargo/rustc versions, sha256 of target/release/nodetto-cli (artifact digest manifest), every command with exit code and log path, and ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s555/tll-11-native-parity",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s555/tll-11-native-parity/parity-skip.log 2>&1; echo \"exit=$?\"",
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > tmp/text-layout-lint-s555/tll-11-native-parity/cargo-build.log 2>&1; echo \"exit=$?\"",
+        "shasum -a 256 target/release/nodetto-cli > tmp/text-layout-lint-s555/tll-11-native-parity/artifact-sha256.txt 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=$PWD/target/release/nodetto-cli bun test apps/cli/src/native-parity.test.ts -t \"wide-character and freeform\" > tmp/text-layout-lint-s555/tll-11-native-parity/parity-new.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=$PWD/target/release/nodetto-cli bun test apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s555/tll-11-native-parity/parity-all.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run test-cli > tmp/text-layout-lint-s555/tll-11-native-parity/test-cli.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s555/tll-11-native-parity/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/text-layout-lint-s555/tll-11-native-parity/typecheck.log 2>&1; echo \"exit=$?\"",
+        "git diff --stat 45cc69f -- apps/cli/native Cargo.toml Cargo.lock"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "tll-09-core-rules"
+      ],
+      [
+        "tll-10-cli-lint-export"
+      ],
+      [
+        "tll-11-native-parity"
+      ]
+    ],
+    "afterWave": [
+      "bun run typecheck",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core packages/io",
+      "after wave 2 and wave 3 only: BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src"
+    ],
+    "knownTransientFailures": [
+      "Between tll-09 (already at 5b65f96) and tll-10 done: apps/cli/src/text-layout-lint.test.ts 'freeform pages are not lintable or selectable', apps/cli/src/text-layout-export.test.ts 'layout warnings exclude freeform, element, clean and semantic exports' and apps/cli/src/breadboard-commands.test.ts 'lint reports the combined no-page message' fail because freeform becomes lintable; all are owned and fixed by tll-10. No plan gates on them before tll-10."
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Add a Completed text-layout lint section with the tll-00..11 plan table and verification outcomes, and name text-layout-lint-s551-dispatch.json, text-layout-lint-s552-dispatch.json and text-layout-lint-s555-dispatch.json as historical manifests in the Active section; finalization only, not a worker task."
+      },
+      {
+        "path": "impl-plans/active",
+        "intendedEdit": "Move tll-00..tll-11 plan files to impl-plans/completed/ during finalization (plan-archive node); keep the three text-layout dispatch manifests in impl-plans/active with their pre-archive planPath values."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths. Rule logic, page kinds, wide fixture or core test mismatches go to tll-09; LINT_NO_PAGES and CLI lint/export test issues to tll-10; native parity mismatches are recorded by tll-11 and routed to tll-09 or tll-10. Helper width/table issues (tll-07) and help/docs text (tll-08) are accepted dependencies; a defect there is a new small pending plan, never an edit by tll-09..11.",
+    "commitPolicy": "Commit on main, staging explicit paths only. Never git add -A, never stage tmp/ or target/, never push (gitPush=false). No tool attribution in commit messages.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-text-layout-lint.md",
+        "design-docs/user-qa/text-layout-lint.md",
+        "impl-plans/active/tll-06-overview.md",
+        "impl-plans/active/tll-09-core-rules.md",
+        "impl-plans/active/tll-10-cli-lint-export.md",
+        "impl-plans/active/tll-11-native-parity.md",
+        "impl-plans/active/text-layout-lint-s555-dispatch.json",
+        "impl-plans/README.md"
+      ]
+    },
+    "finalVerification": [
+      "mkdir -p tmp/text-layout-lint-s555/reconcile",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/wide-text-width.test.ts packages/core/src/text-layout-lint apps/cli/src > tmp/text-layout-lint-s555/reconcile/lint-cli.log 2>&1; echo \"exit=$?\"",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core packages/io > tmp/text-layout-lint-s555/reconcile/core-io.log 2>&1; echo \"exit=$?\"",
+      "bun run typecheck > tmp/text-layout-lint-s555/reconcile/typecheck.log 2>&1; echo \"exit=$?\"",
+      "mise run lint-ts > tmp/text-layout-lint-s555/reconcile/lint-ts.log 2>&1; echo \"exit=$?\"",
+      "CARGO_TERM_QUIET=true mise run check > tmp/text-layout-lint-s555/reconcile/check.log 2>&1; echo \"exit=$?\"",
+      "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run test-cli > tmp/text-layout-lint-s555/reconcile/test-cli.log 2>&1; echo \"exit=$?\"",
+      "grep -rln wide-text-width packages apps --include=*.ts",
+      "git diff --stat 45cc69f -- packages/core/src/svg-export packages/core/src/label-layout.ts packages/core/src/node-label.ts packages/io/src apps/cli/native Cargo.toml Cargo.lock",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  }
+}

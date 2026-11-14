@@ -1,0 +1,4 @@
+{"kind":"document","schemaVersion":1,"id":"slide-doc","title":"Slides"}
+{"kind":"page","id":"p1","name":"Slide","pageKind":"freeform"}
+{"kind":"element","id":"carrier","page":"p1","type":"presentation.slide","index":"a1","semantic":{},"visual":{"animation":{"slide":{"mode":"fade","durationMs":700,"stagger":false}}}}
+{"kind":"element","id":"shape","page":"p1","type":"shape.geo","index":"a2","semantic":{"geo":"rect"},"visual":{"x":10,"y":20,"width":100,"height":80,"linkId":"linked","animation":{"enter":"slide-in","enterFrom":"left","exit":"undraw","delayMs":100,"durationMs":500,"order":2}}}

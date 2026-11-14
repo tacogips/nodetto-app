@@ -1,0 +1,11 @@
+/* The text being edited shows only in the editor, never twice. */
+.nodetto-text-editing .nodetto-label,
+.nodetto-text-editing .nodetto-node-label,
+.nodetto-text-editing .nodetto-text-note {
+  visibility: hidden;
+}
+/* An edge label sits on its line and often over other shapes: an opaque
+   editor keeps those lines from showing through the text like a strike. */
+.nodetto-text-editor.nodetto-text-editor-edge {
+  background: var(--nodetto-surface, #fffdf8);
+}
