@@ -1,0 +1,552 @@
+{
+  "taskId": "ipd-s772",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-772",
+  "implementationBranch": "feat/iphone-app-design",
+  "baseBranch": "feat/iphone-app-design",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "f59bef4a6774948d731bc404a7fac88fd41e1883",
+  "designDocPaths": [
+    "design-docs/specs/design-iphone-app-design.md",
+    "design-docs/user-qa/iphone-app-design.md",
+    "design-docs/specs/design-cli-ai-drawing.md",
+    "design-docs/specs/design-web-app-roundtrip.md"
+  ],
+  "evidenceRoot": "tmp/ipd-s772",
+  "evidenceLayout": "Per-plan evidence under tmp/ipd-s772/<planId>/ with final/ and attempt-<n>/ subdirectories. tmp/ is git-ignored and holds only data (logs, JSON, digests, PNG exports and comparison images); never authored source. Cargo output goes to target/ and the sidecar to apps/desktop/src-tauri/binaries/, declared as artifactRoots only by the plans that build them, which are ordered by dependsOn.",
+  "reviewContext": {
+    "issueReference": "operator-request-2026-11-10 (no GitHub issue)",
+    "userProblem": "An iPhone app design drawn with nodetto-cli 0.8.9 came out misaligned and sloppy. Defects D1-D10: ui.control ignores textAlign (D1); tabs ignore fill/stroke/accent and options are not styleable (D2); newline labels render monospace on one line (D3); geo rects under 3 units vanish (D4); no precise text layer, text.note ignores fontSize/fontWeight on update (D5); no icon element (D6); elements added inside a frame are not its children and nothing clips or snaps (D7); auto layout cannot be driven from the CLI (D8); prototype links are drawn across artboards with verbose labels and there is no prototype view, flow start, storyboard or presentation (D9); frame titles overlap content and there is no easy per-frame side-by-side comparison (D10).",
+    "requiredOutcomes": [
+      "Decision 1: precise text layer on text.note (text:layer shape, no implicit padding, auto-width/auto-height/fixed, alignment, font size/weight, line height, letter spacing, color, single-line ellipsis, honored on add and update).",
+      "Decision 2: ui.icon element backed by vendored Lucide (ISC) with LICENSE and THIRD_PARTY_NOTICES.md, name lookup from palette and `nodetto-cli shapes icon <query>`, size/color/stroke width, custom SVG path icons.",
+      "Decision 3: dividers and borders of any thickness >= 0.5 render; per-side borders and stroke alignment.",
+      "Decision 4: ui.control honors alignment, padding, font, color, radius, leading/trailing icons; tabs/segmented with underline and pill indicators, selected/unselected colors, per-option overrides; badges.",
+      "Decision 5: iOS component kit on the component/instance system with overridable properties, insertable by ios:<name> shape ID from palette and CLI.",
+      "Decision 6: frame auto-parenting (CLI add with parent or by containment), children move with frame, clip content, safe-area and layout-grid guides, iPhone presets including 390x844 and 402x874, titles above the artboard.",
+      "Decision 7: CLI layout/sizing (direction, gap, padding, alignment, hug/fill/fixed, absolute children), align, distribute, snap, and an 8/4 point desktop snap grid.",
+      "Decision 8: Figma-style prototyping concepts: hotspot or frame links with trigger/action (incl. back, swap-overlay)/animation, prototype view toggle with curved compact links, named flow starts, storyboard overview, desktop and HTML click-through presentation with persistent elements.",
+      "Decision 9: app-design lint (off-frame, text overflow/truncation, overlapping controls, off-grid, misaligned siblings, touch targets under 44 points).",
+      "Decision 10: export of all frames of a page as individual PNGs and a side-by-side comparison helper in CLI (`compare`) and desktop app.",
+      "Item 11: reproduction of the ten private reference screens built only through nodetto-cli operations into the operator-named git-ignored output directory, validate and app lint with zero findings, prototype links and one flow start, per-frame PNGs compared side by side with every reference screenshot (drift <= 4 points, correct icons, colors and type).",
+      "Generic iPhone sample under examples/ exercising the kit and prototype flows; CLI help and docs for AI agents.",
+      "TypeScript and native Rust CLI parity covered by mise run test-cli; final gates mise run verify, test-cli, build-cli and typecheck with no new failures versus the ipd-00 baseline."
+    ],
+    "nonGoals": [
+      "No server, auth or deployment code (public repo).",
+      "No proprietary Figma assets or internal names; concepts only.",
+      "No schemaVersion bump or migration; all additions are optional fields plus the ui.icon type and two prototype action values.",
+      "No new native Rust host primitive is planned; parity comes from running shared TypeScript in the Boa-hosted CLI.",
+      "No push, merge, rebase, release, signing or upload; no changes to other repos or worktrees.",
+      "No tracked copy of any private reference material (names, texts, colors, screenshots)."
+    ],
+    "constraints": [
+      "Work only in /Users/taco/gits/tacogips/nodetto-app-iphone-design on feat/iphone-app-design from f59bef4; gitPush false.",
+      "Privacy: reference and reproduction directories stay under git-ignored tmp/; ipd-28 scans tracked and untracked files against tmp/ipd-s772/ipd-27-reproduction/private-terms.txt.",
+      "AGENTS.md: CARGO_TERM_QUIET=true, no emojis, stage by explicit path, no tool attribution in commits.",
+      "Existing documents stay valid and render byte-identically except the rows in the design's Accepted output changes table.",
+      "Problems outside a unit's writePaths are findings, never blockers; finding statuses use the fixed vocabulary.",
+      "Broad suites gate on no new failures versus the ipd-00 Baseline failures table with explicit excludes.",
+      "Visual evidence is mandatory for rendering/UI work: export PNGs with the built CLI and inspect them.",
+      "packages/core/src/index.ts and packages/ui-solid/src/index.ts are append-only shared files: re-read before writing, never reorder or remove lines."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Extend existing element types (text.note, ui.control, frame, edge.generic prototype links, component frames); the only new type is ui.icon.",
+        "rationale": "Operator constraint to prefer extension; no existing type can hold a named vector reference (design Global rules, Decision 2)."
+      },
+      {
+        "decision": "One implementation in TypeScript (packages/core, apps/cli/src) runs in both Bun and the native Boa-hosted CLI; parity proven by apps/cli/src/native-parity topic tests (ipd-23, ipd-24).",
+        "rationale": "Command parity requirement without duplicating logic in Rust."
+      },
+      {
+        "decision": "Vendored Lucide (ISC) as a lazily parsed generated JSON string; Liberation Sans advance metrics (OFL) for proportional text measurement.",
+        "rationale": "Permissive licenses with committed license files; bundle size recorded against the ipd-00 baseline with a curated-subset fallback (user-QA Q3)."
+      },
+      {
+        "decision": "Prototype links hidden from page SVG/PNG/PDF export unless --prototype; compact curved links in prototype view; separate single-file --format prototype HTML export.",
+        "rationale": "D9: links crossing artboards made design exports unreadable."
+      },
+      {
+        "decision": "Device frame titles render above the artboard.",
+        "rationale": "D10: titles overlapped content; listed as an accepted output change with regenerated examples/design previews."
+      },
+      {
+        "decision": "Reproduction uses the user-QA Q1 default: 390x844 device layout with status bar 0-47, top content shifted +47, bottom content above the home indicator, compared in two bands per screen.",
+        "rationale": "The reference screenshots lack the status bar; the default satisfies both the 390x844 frame and the 4-point drift requirement. Q1, Q3, Q4 remain open with defaults implemented."
+      },
+      {
+        "decision": "Desktop app gets Compare with reference using the same composeComparisonSvg as the CLI (user-QA Q2 resolved).",
+        "rationale": "Acceptance criteria require comparison from both desktop and CLI."
+      },
+      {
+        "decision": "ipd-00 records the f59bef4 baseline alone before any source edit; ipd-28 gates on no new failures versus it.",
+        "rationale": "Operator constraint for broad suites that may already fail."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 1: blocked-wave-scope-or-contract operator amendment for session-772 wave 2 blockers: (a) ipd-01-ir-schema owns packages/ir/src/registry.test.ts and updates its complete ELEMENT_TYPES expectation to include ui.icon; (b) ipd-03-icon-data pins lucide-static 1.70.0 (the release already downloaded and recorded) and the generator accepts a `fill` attribute on child geometry elements only with the values `currentColor` or `none`; it stores a per-node `fill` flag, the markup renders `fill=\"currentColor\"` nodes filled with the icon color (and `none` as unfilled, the default), and any other fill value still fails the script with the icon name; (c) ipd-00-baseline, ipd-02-text-measure, ipd-04-cli-edit-contracts and ipd-29-desktop-snap-grid are accepted dependencies whose code is already in the working tree; do not redo them.",
+        "rationale": "Blocked plans: ipd-01-ir-schema and ipd-03-icon-data (gaps resolved: registry.test.ts ownership; lucide-static version pin and fill allowlist). ipd-01 could not pass `bun test packages/ir` because registry.test.ts asserts the full element-type list and was outside its writePaths. Lucide 1.70.0 (latest stable) has fill=\"currentColor\" on a child of brain-circuit.svg (a filled dot); rejecting it would block the whole icon set, while a two-value fill flag keeps the strict allowlist and renders the icon as upstream intends. The run died at wave-2 reconcile from a network outage (ENOTFOUND), not a code failure."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 2 (integration-paths-outside-writePaths, session-775 checkpoint amendment): ipd-01-ir-schema owns packages/io/src/jsonl/golden.test.ts (append exactly one GOLDEN entry \"ui-icon\" at the end; nothing else) and the new fixture packages/io/src/__fixtures__/ui-icon.jsonl (one page with two ui.icon elements: semantic {icon:\"bell\"} and {path:\"M0 0L24 24\",viewBox:24}, canonical bytes produced by serializeDocument(parseDocument(...))). No existing fixture is modified, the coverage assertion is not loosened, and ui.icon semantics and registry order are unchanged. apps/cli/src/edit/label-field.test.ts stays with ipd-07-icon-core-cli: it reads defaultSemantic() from the core shape registry, which ipd-07 supplies through packages/core/src/shapes/ui-icon.ts, so no test edit is authorized.",
+        "rationale": "Integration review finding integration-s775-w1-golden-ui-icon (mid): ipd-01 registered ui.icon in ELEMENT_TYPES, so golden.test.ts 'covers every registered element type at least once' fails with missing [\"ui.icon\"], and no plan owned packages/io. The failure blocks mise run verify and ipd-28. The fix is the smallest one that restores the gate and pins ui.icon serialization round-trip."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 2 (ordering, Step 5 finding S5-R2-IPD08-GATE): ipd-08-cli-layout-ops dependsOn gains ipd-07-icon-core-cli (wave 3 -> 5) and reruns its unchanged verification aggregate (including apps/cli/src/edit) after ipd-07 is accepted; its layout source edits are already in the working tree and are not reimplemented. ipd-07-icon-core-cli verification step 1 adds apps/cli/src/edit/label-field.test.ts (expect exit 0, 0 fail) and an acceptance line that the ui.icon defaultSemantic {icon:\"square\"} validates. label-field.test.ts is run only, never edited, skipped or loosened; writePaths of both plans are unchanged and disjoint.",
+        "rationale": "label-field.test.ts creates every ELEMENT_TYPES entry from the core registry defaultSemantic(); ui.icon is registered by ipd-01 but its core shape comes only from ipd-07 (packages/core/src/shapes/ui-icon.ts), so ipd-08's aggregate could not exit 0 in wave 3 and the owner had no gate on the failing test. Only ipd-23, ipd-24 and ipd-25 depend on ipd-08 and they already follow ipd-07, so no downstream plan is delayed."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 3: operator ipd-07a split (session-775 wave 2 blocker, blocked-wave-scope-or-contract):ipd-01-ir-schema is accepted (IR 156/156, golden 57/57, typecheck clean). New root unit ipd-07a-icon-shape takes the minimal ui.icon core shape util (defaultSemantic {icon: \"square\"}) and its createDefaultRegistry registration out of ipd-07; ipd-05, ipd-06, ipd-07, ipd-09 and ipd-12 depend on it; ipd-07 keeps SVG export, warnings, catalogue and CLI work and treats ui-icon.ts as a shared path.",
+        "rationale": "apps/cli/src/edit/label-field.test.ts creates every registered element type from its core default; with the IR type registered but no core util, ui.icon's fallback default lacks icon/path and createElement throws, so every unit running bun test packages apps/cli/src before ipd-07 failed the progress gate. ipd-01 could not fix it inside its IR scope."
+      },
+      {
+        "decision": "Step 4 rerun 2026-11-10 (session-777): the operator round-3 split is normalized without scope change. ipd-07a-icon-shape gets the standard ownership block and plan contract; ipd-07's markdown drops the prose writePaths entry and lists packages/core/src/shapes/ui-icon.ts as a sharedPath with a note; ipd-05, ipd-06, ipd-07, ipd-08, ipd-09 and ipd-12 headers name ipd-07a (directly or via ipd-07) and accepted dependencies separately, with dated round-3 amendment sections; waves recomputed (ipd-07a 1; ipd-05, ipd-06 2; ipd-07, ipd-09, ipd-12 3; ipd-08 4). ipd-08 keeps dependsOn ipd-07 (the Step 5 S5-R2-IPD08-GATE repair) and ipd-07 keeps label-field.test.ts in its verification. The tmp plan-check inputs are resynced and check-md.ts matches ipd-NNx plan files.",
+        "rationale": "Step 5 S5-R2-IPD08-GATE and S5-R2-L1 required the ordering repair to be explicit and the checkers to exit 0; the operator round-3 working-tree amendment left a prose path entry in ipd-07 and a non-standard ipd-07a header that the markdown checker could not parse."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 4 (session-779 waves 3-4): ipd-07a-icon-shape, ipd-05-core-catalogue, ipd-06-geo-strokes, ipd-09-text-layer and ipd-12-controls are accepted dependencies. ipd-07-icon-core-cli unknown-icon rule is: `Did you mean: a, b, c?` only when searchIcons(name, 5) returns at least one match; otherwise `Search with nodetto-cli shapes icon <query>`. Its edit test cases are therefore: `icon:bel` -> exit 2 (EXIT_ERROR), message contains `Did you mean` and `bell`; `icon:not-an-icon` -> exit 2 (EXIT_ERROR), message contains `unknown icon` and `Search with nodetto-cli shapes icon`. Keep the ipd-07 work already in the working tree and continue from it. Unknown-icon edit operations use the existing operation-error path and exit 2; exit 1 is EXIT_DRIFT and the CLI exit-code contract does not change.",
+        "rationale": "The ipd-07 plan required search guidance when there are no matches but also required `icon:not-an-icon` (which has no matches) to report `Did you mean`; the implementer followed the no-match rule and the unit blocked twice on the contradiction (session-779 waves 3 and 4). In wave 4 the corrected plan still said exit 1, contradicting the CLI contract (EXIT_ERROR 2, EXIT_DRIFT 1), and the unit blocked again."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 4 Step 5 s781 repairs (accepted): ipd-28 step 7 emoji gate runs rg directly over git diff --name-only f59bef4 plus git ls-files -o --exclude-standard with a whitespace precheck and positive control (IPD-R5); new plan ipd-07b-icon-data-ascii (dependsOn ipd-07-icon-core-cli) escapes non-ASCII code units in scripts/vendor-lucide.ts output and regenerates packages/core/src/icons/lucide-data.generated.ts from tmp/ipd-s772/ipd-03-icon-data/src/package with an unchanged runtime hash; ipd-23-parity-shapes dependsOn gains ipd-07b so ipd-24, 26, 27 and 28 follow it; ipd-07 fixes one exit code per outcome (search no match 0, unknown icon 2, exit 1 banned) (IPD-R6).",
+        "rationale": "Step 5 (session-781) accepted the repairs: the repaired ipd-28 gate found raw emoji in the accepted ipd-03 output (rg -c gives 1 matching line in lucide-data.generated.ts); excluding the vendored file would hide real matches, so a dedicated owner plan is the smallest correct choice. ipd-07 had conflicting exit-code text. Plan checkers exit 0 (21 plans, 0 problems)."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 5 (session-781 wave 2): ipd-07-icon-core-cli, ipd-07b-icon-data-ascii, ipd-08-cli-layout-ops and ipd-10-icon-desktop are accepted dependencies. ipd-11-frames owns packages/ui-solid/src/interaction-creation.test.ts and adds the missing PrototypeBack entry to its gesture classification expectation (finding integration-s781-w1-ui-solid-prototype-back-gesture); change nothing else in that test. Keep the ipd-11 work already in the working tree and continue from it.",
+        "rationale": "bun test packages/ui-solid/src/interaction-creation.test.ts fails 1/172 on the gesture classification list, which lacks the new PrototypeBack gesture; the file was outside ipd-11's writePaths, and integration-review stalled on the repeated finding (2 visits)."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 6 (session-783 wave 1): ipd-11-frames also owns packages/ui-solid/src/interaction/lifecycle.ts, pointer.ts, events.ts and types.ts. Drop-time and creation-time reparenting into a frame must run inside the same history batch, before finishGesture closes it, so one undo reverts the move and the reparent together. Keep the ipd-11 work already in the working tree and continue from it.",
+        "rationale": "The creation/drop attachment regressions in packages/ui-solid/src/frame-parent-interaction.test.ts fail because finishGesture in lifecycle.ts closes the batch before reparenting; those integration files were outside ipd-11's writePaths. No other pending plan owns them (ipd-18 owns hit-testing.ts, ipd-22 owns context-menu.ts), so the adjacent integration points are granted at once to avoid another single-file scope round."
+      },
+      {
+        "decision": "Step 4 rerun 2026-11-10 (session-784, Step 5 repair S5-s784-R1): ownership, dependsOn and waves are unchanged. ipd-11-frames round-6 verification now also runs interaction-dragging-camera, interaction-rotate-resize, interaction-connectors, interaction-keyboard-menus, interaction-selection-snapping and snap-grid-size tests (with insertion-parent, frame-parent-interaction and interaction-creation) -> 0 fail. The typecheck gate also covers packages/ui-solid/src/interaction/snapping.ts, and SnapSettings.gridSize (ipd-29) stays unchanged. New binding pitfalls: reparent only in create/translate gestures; endBatch/abortBatch exactly once per gesture kind listed in finishGesture/cancelGesture; cancelGesture never reparents.",
+        "rationale": "Round 6 gave ipd-11 the shared gesture lifecycle and interaction/types.ts without widening its regression and typecheck scope. A batching regression in resize, rotate, routing or nudge undo, or the loss of the accepted ipd-29 grid size, would otherwise pass ipd-11 and surface only at ipd-28."
+      },
+      {
+        "decision": "2026-11-10 checkpoint amendment round 7 (integration-paths-outside-writePaths, session-784): ipd-11-frames owns apps/cli/src/export-command.test.ts and updates only the raster-snap test ('raster export snaps the frame to whole pixels so the background covers the raster') expectations and comments to the accepted outside-title page bounds (design 6.6, Accepted output changes row 1): stderr '475x267 px', height bound just below 266.25 px, background rect origin and height from the captured SVG. The shared fixture(), other tests, product code and apps/cli/src/export-command.ts stay unchanged; snap assertions keep equal strength. ipd-11 verification step 1 adds apps/cli/src/export-command.test.ts, plus a broad bun test packages apps/cli/src gate (0 fail). Ownership of other paths, dependsOn, plan IDs and waves W1-W9 are unchanged.",
+        "rationale": "Finding integration-s784-ipd11-export-command-stale-raster-height (mid): the fixture frame has platform 'web', so its title resolves outside and ipd-11's page export bounds add 22 units of height (475x250 -> 475x267 px). The product behavior is the accepted design; the test expectation is stale and was owned by no plan, while ipd-13, ipd-16 and ipd-21 run it as a 0-fail gate and the ipd-28 broad gate depends on it. Same precedent as round 5 (interaction-creation.test.ts)."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 8 (session-784 wave 3): ipd-11-frames is an accepted dependency. ipd-13-prototype-core-cli owns packages/core/src/screen-transition.test.ts and updates only the stale verbose prototype label expectation (line ~55) to the Decision 8.3 compact label, keeping every semantic and round-trip assertion. ipd-14-kit-core now depends on ipd-13-prototype-core-cli so it runs on a settled tree. Keep the ipd-13 and ipd-14 work already in the working tree and continue from it.",
+        "rationale": "ipd-13 passed 103/104 tests; the one failure is an out-of-scope test expecting the pre-Decision-8.3 verbose label. ipd-14's typecheck failed only on ipd-13's in-progress prototype files (connect.ts, prototype-links.ts, decoration.ts) in the shared tree, so the two cannot run concurrently."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 9 (session-786 wave 2): ipd-13-prototype-core-cli and ipd-16-frames-export-compare are accepted dependencies. ipd-19-desktop-presentation owns packages/core/src/prototype.ts and changes prototypeScreen so back and swap-overlay links reach the presentation (keep every existing navigate/overlay behavior and test). ipd-14-kit-core and ipd-21-html-prototype now depend on ipd-19-desktop-presentation. Keep the ipd-14 and ipd-19 work already in the working tree and continue from it.",
+        "rationale": "ipd-19 passed 29/30; the browser regression lacked back and swap-overlay hotspots because prototypeScreen in core prototype.ts filters those links out, and that file (previously ipd-13's) was outside ipd-19's writePaths. ipd-14's typecheck gate failed only on ipd-19's in-progress PrototypePreview.tsx (lines 212, 224) in the shared tree, so ipd-14 must run after ipd-19; ipd-21 consumes prototypeScreen too, so it also waits for the fix."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 10 (session-789 waves 3-4): ipd-14-kit-core, ipd-17-desktop-palette, ipd-18-desktop-prototype-view, ipd-19-desktop-presentation and ipd-21-html-prototype are accepted dependencies. ipd-15-kit-content owns packages/core/src/kits/ios/props.ts, types.ts, style.ts and kit-core.test.ts and extends the kit property contract additively: a property may declare derived effects beyond raw field assignment, namely (a) conditional geometry (for example a list row grows to its subtitle height when subtitle is non-empty), (b) enum properties that select one of a fixed set of child configurations (accessory: none, chevron, value, switch, checkmark), (c) value-to-style mappings (chip selected -> fill/stroke/text colors from kit tokens) and (d) per-side stroke settings (card accent stroke on chosen sides via the Decision 3 per-side borders). Existing raw-assignment properties, ipd-14's kit-core.test.ts expectations and all inserted-instance output stay unchanged unless a test only needs a new optional field added. Keep the ipd-15 work already in the working tree and continue from it.",
+        "rationale": "ipd-15 blocked twice (session-789 waves 3 and 4) because the accepted kit property contract only assigns raw values to fixed fields, which cannot express the content components' required behavior, and the contract files belong to the accepted ipd-14."
+      },
+      {
+        "decision": "2026-11-10 step4 s790: ipd-15-kit-content ownership bullets are plain paths (annotations moved to the amendment text), its Non-goals no longer forbid the round-10 contract files, and its typecheck and biome gates plus the bun test regression set (kit-cli, shapes-command, components, component-refresh) now cover the round-10 owned files. Markdown and manifest gate strings are identical. Ownership, dependsOn and plan IDs are unchanged.",
+        "rationale": "check-manifest.ts reported 5 problems (4 prose path bullets and one md/manifest writePaths mismatch); after the fix it exits 0 with 0 problems."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 11 (session-790 wave 2): ipd-15-kit-content is an accepted dependency. The iOS 44-point minimum touch target wins: ipd-20-app-lint owns packages/core/src/kits/ios/content.ts and kit-content.test.ts and changes only the default ios:composer geometry so its interactive input is at least 44 points tall (the composer container grows to fit; keep its width, padding, send button and every other kit default unchanged), updating the matching kit-content.test.ts expectations. The touch-target rule and the zero-findings requirement for every default kit stay as specified. Keep the ipd-20 work already in the working tree and continue from it.",
+        "rationale": "The lint correctly reports the default composer's 314x36 input below the 44-point iOS touch target; the plan also requires zero findings for every default kit, so the kit default is the defect, not the rule. content.ts belongs to the accepted ipd-15 and was outside ipd-20's writePaths."
+      },
+      {
+        "decision": "2026-11-10 step4 s791: ipd-20-app-lint round-11 ownership bullets are plain paths (scope limit moved to the amendment text); its bun test aggregate adds packages/core/src/kits and apps/cli/src/kit-cli.test.ts as kit regressions, and its typecheck regex and biome arguments include content.ts and kit-content.test.ts. Two composer acceptance criteria were added. Markdown and manifest gate strings are identical. planId, dependsOn, sharedPaths and artifactRoots are unchanged.",
+        "rationale": "check-manifest.ts reported 3 problems (2 prose path bullets, 1 md/manifest writePaths mismatch); after the fix it exits 0 with 0 problems."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 12 (session-791 wave 4): ipd-20-app-lint, ipd-22-desktop-export-compare-check, ipd-23-parity-shapes and ipd-25-docs-help are accepted dependencies. ipd-24-parity-flows compares PNG outputs (frame exports and the compare diff image) between Bun and native by decoded content, not encoded bytes: use the existing harness decodeRgbaPng and assert equal width, height and RGBA pixels (exact equality; any pixel difference still fails). Encoded PNG bytes may differ because the two encoders compress differently. Text, JSON, SVG and HTML outputs keep their existing exact or normalized comparisons. ipd-24 then completes its remaining cases (kit insertion and property cases, DR-02 lint cases, remaining comparison assertions). Keep the ipd-24 work already in the working tree and continue from it.",
+        "rationale": "ipd-24 failed only because the single-file compare operation's PNG bytes differ between Bun and native; the two PNG encoders produce different compressed streams for the same image, so a byte assertion is the wrong contract. apps/cli/src/native-parity/harness.ts already provides decodeRgbaPng for this."
+      },
+      {
+        "decision": "Step 5 s794 IPD-R7 (2026-11-10): the plans[ipd-28-finish].verification emoji gate now matches the IPD-R5 markdown gate (ipd-28-finish.md step 7). The single stale `xargs grep -nP ...; test $? -eq 1` entry is replaced by three sh -c entries, in order: (1) ripgrep positive control on U+2705, which must exit 0; (2) build tmp/ipd-s772/ipd-28-finish/final/emoji-files.txt from the union of git diff --name-only f59bef4 and git ls-files -o --exclude-standard, filtered to md/ts/tsx/json/html existing files, then require a non-empty list with no whitespace in paths; (3) refuse an empty or whitespace list (exit 2, because rg with no path arguments would search the working directory), run rg -n --no-messages over the list with stdout and stderr captured in emoji-scan.out and emoji-scan.err, and pass only when rg exits 1 and both files are empty. No other manifest field changed.",
+        "rationale": "Step 5 s794 showed that on darwin BSD grep has no -P: xargs returned 1, so the stale manifest gate exited 0 on a file containing U+2705 and scanned nothing. Round 4 (IPD-R5) fixed only the markdown. Step 4 s794b controls: the new scan entry fails on a known-emoji list and passes on a clean list, and check-manifest.ts now flags grep -P in pending verification and requires emoji gate strings to appear verbatim in the plan markdown."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 13 (session-794 wave 1): ipd-24-parity-flows uses two edit-parity mechanisms. (1) Exact: harness compareFile, unchanged, for every edit whose input document uses fixed element ids and that creates no new element (update, move, align, prototype settings on existing ids), as ipd-23 does. (2) Normalized: for edits that create elements with generated ids (connect/prototype links, kit insertion, add), a test-local helper inside apps/cli/src/native-parity/app-design-flows.test.ts runs Bun and native exactly like compareFile, then replaces every generated id matching the ULID pattern /\\b01[0-9A-HJKMNP-TV-Z]{24}\\b/ (and any short id prefix the CLI prints for it), and asserts equal exit codes, equal normalized stdout and stderr, and equal normalized documents. Step 5 IPD-R8 repair: the normalization does not depend on id order. Stdout and stderr mask every generated id and printed prefix to the single token <ID>. created arrays keep operation order (apps/cli/src/edit/batch.ts:301); any stdout list the CLI sorts by id is compared as a sorted masked list and recorded. Documents: parse each JSONL record, compute its masked canonical text (generated ids deep-replaced by <ID>, object keys sorted), and assign ordinals ID1..IDn by sorting on (masked page, memberIds containment depth, masked canonical text). The ordinals are used only to print the failure diff. Records that tie on all three keys are interchangeable (multiset semantics). Equality requires (a) equal sorted lists of masked canonical record texts and (b) equal sorted lists of reference edges maskedText(source)|fieldPath-with-array-index|maskedText(target). Pitfall: packages/io/src/jsonl/serialize.ts:146-152 sorts elements by page and then by element id. ULIDs minted in the same millisecond (packages/core/src/ids.ts:38-40, packages/core/src/editor/components.ts:162 and 289) therefore order randomly, so file order is not stable across hosts. Required plain-test self-checks: permuted generated ids with a different id-sorted line order -> equal; a changed non-id field (visual.x or a prop) on a minted element -> not equal; child memberships swapped between two distinct frames -> not equal. The test file is run three times, and each run must exit 0 with 0 fail and 0 skip. harness.ts, serialize.ts, ids.ts and engine source stay unchanged. PNG outputs keep the round-12 decoded RGBA comparison. Then complete the remaining DR-02 and clean-kit lint cases. Keep the ipd-24 work already in the working tree and continue from it.",
+        "rationale": "The exact compareFile contract cannot hold for operations that mint ids independently in each runtime; ipd-23 passed by avoiding id-minting edits. A normalizer that only rewrites generated ids keeps every other byte under test, so real behavioral drift still fails."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 14 (session-796 wave 1): Z-order comparison (operator round 14, binding): an element's fractional z-order `index` is randomized when the element is created, independently in Bun and native, so the normalized comparison must NOT compare raw `index` strings of elements created by the compared edit. Instead, per page, sort all elements by `index` (the engine's ordering) and assert the two hosts yield the same sequence of normalized element ids (ID placeholders and fixed ids). Raw `index` values of elements that already existed in the input document are compared exactly. Every other field is compared exactly after id normalization. Do not change engine or harness code.",
+        "rationale": "Round 13's relative-order clause was lost when step 4 rewrote the plan, so ipd-24 compared randomized fractional indexes exactly and failed (2 of 4). Relative z-order of the normalized ids preserves the behavior under test (stacking order) without depending on random index strings. The rule is now in ipd-24's manifest acceptanceCriteria so a plan rewrite cannot drop it."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 15 (session-797 wave 1): Generated-value comparison (operator round 15, binding; supersedes the narrower round-13 and round-14 wording): an edit may create values at random independently in Bun and native. In the normalized comparison: (1) every generated identifier (element ids, page ids, any ULID-like id and its printed short prefix) is replaced with ordinal placeholders by first appearance; (2) every generated ordering key, meaning element `index`, page `order` and any other fractional ordering key that the compared edit created, is not compared as a string; instead assert that both hosts give the same order of the normalized ids within that collection (pages sorted by `order`; elements per page sorted by `index`); (3) every value that already existed in the input document, and every other field, is compared exactly after normalization. Do not change engine or harness code.",
+        "rationale": "Kit insertion also creates an iOS kit page whose `order` key is randomized independently per host; round 14 covered only element indexes. Generalizing to every generated id and ordering key keeps the behavior under test (which elements and pages exist, their content and their order) while ignoring only random tokens."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 16 (session-799 wave 2): ipd-24-parity-flows is an accepted dependency. Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
+        "rationale": "ipd-26 found that two identical kit-insertion edits produce documents with 16 different generated ids, so an exact-byte determinism gate can never pass; ipd-27 (reproduction) and ipd-28 (finish) would hit the same wall, so the contract is set for all three at once instead of one round per unit."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 17 (session-801 wave 1): Kit quality fix (operator round 17, binding): ipd-26-example-sample owns the iOS kit sources and tests (packages/core/src/kits/ios/bars.ts, content.ts, style.ts, insert.ts, props.ts, types.ts, kit-core.test.ts, kit-content.test.ts). (a) Round every computed kit child position and size to whole points, so no default kit instance or child is off the 1-point grid. (b) Size every default kit text box to fit its default text at its font, so no default kit instance reports note-overflow. (c) Afterwards every default kit component, inserted with its defaults into a 390x844 iPhone frame, lints with zero findings; add one regression test that inserts each kit component and asserts zero app-design lint findings. Do not change the lint rules. Update existing kit test expectations only where (a) or (b) changes a number. (d) The sample's prototype links target the specific child control (tab item, back button, send button) inside the kit instance, not the whole instance, and no link label overlaps another control. (e) Do not regenerate template HTML/CSS or other existing outputs beyond the design doc's accepted output changes; revert any unrequired regeneration. The round-16 determinism contract still applies.",
+        "rationale": "The generic sample's zero-findings lint gate failed with 19 warnings: 16 app-off-grid on children of kit instances (fractional coordinates from unrounded centering), 2 note-overflow in kit text boxes 18 high whose default text needs two lines, and 1 label collision in the sample's own links. The kit defaults are the defect and the reproduction (ipd-27) uses the same kit, so they are fixed once at the source."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 18 (session-802 wave 2): ipd-26-example-sample is an accepted dependency. Layout rule (operator round 18, binding for every reproduction part): the reference screenshots are a 390x844 web view with no iOS status bar or home indicator. In each 390x844 iPhone frame: iOS status bar 0-47; top-anchored content shifted +47; bottom-anchored chrome (tab bar, floating action buttons, composer) shifted up by the 34-point home indicator, with the home indicator below it; the empty middle absorbs the difference. Where shifted top content would collide with bottom chrome (one screen in this set), that content area is a scroll region: put the content inside a frame clipped at the top edge of the tab bar (clip content on), so rows below the visible area are hidden as in the running app; floating action buttons stay as an intentional overlay above the content exactly as in the reference. Compare such a screen with two bands (top content above the clip line, bottom chrome) and record the number of clipped rows in the progress log by number only. The reproduction is split into sequential parts sharing one document: ipd-27a-reproduction-chrome (shared chrome + screens 01-03) -> ipd-27b-reproduction-detail (04-06) -> ipd-27c-reproduction-search-more (07-10) -> ipd-27-reproduction (links, flow start, full gates, all comparisons, copy). Keep the ipd-27 work already in tmp/ipd-s772/ipd-27-reproduction and continue from it.",
+        "rationale": "ipd-27 asked for an approved treatment of one screen where the +47/-35 shifts make the content overlap the bottom chrome; the running app scrolls that content under the tab bar with the floating buttons overlaid, so a clipped scroll region reproduces it faithfully. The single unit also ran out of continuations with 329 lint warnings and visible defects on five draft screens; ten screens are too much for one unit, so it is split by screen group."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 19 (session-805 wave 1): Kit fix (operator round 19, binding for ipd-27a): ipd-27a-reproduction-chrome owns the iOS kit sources and tests. (a) The tab bar distributes its item widths in whole points for any item count (the widths sum to the bar width; for example 98, 97, 98, 97 for four items on 390), and places every icon, label and badge on the 1-point grid, with or without a badge. (b) The default floating action button has no offset dark shadow (no visible crescent); use none or a subtle centered shadow. Add kit regression tests: a tab bar with 2 to 5 items, with and without a badge, and a floating action button each lint with zero findings. Do not change lint rules. Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` (\"nearly aligns\") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate. Visual acceptance (operator round 19): fix every drift visible in the side-by-side comparisons, including floating action button icon stroke width and color, border color, card accent bar width, button and badge positions, so each screen is within 4 points and matches icon weight and color. Keep the ipd-27a work already in tmp/ipd-s772/ipd-27-reproduction and continue from it.",
+        "rationale": "ipd-27a ran out of continuations with 66 lint findings: 46 app-misaligned near-alignments that reproduce the reference's own geometry, 6 off-grid tab-bar children (390/4 = 97.5-point items), 11 note-overflow and 3 app-text-overflow. The comparisons are already close; the remaining visible drift is floating-button icon weight/color, an offset shadow crescent, a card accent width and small button/badge offsets. Kit defaults are fixed at the source, the near-alignment heuristic is scoped to the reproduction, and real overflow stays a hard gate."
+      },
+      {
+        "decision": "2026-11-10 step 4 s806 round-19 plan consistency: (1) the ipd-27a ownership bullets are plain backticked paths (the prose suffix broke check-manifest.ts, which exited 1 with 9 problems). (2) The reproduction lint gate in ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction now implements the operator round-19 rule: it exits 0 only when summary.errors === 0 and every finding has ruleId app-misaligned. Each remaining app-misaligned finding must be justified in the progress log as matching the reference within 4 points, with a per-screen count. (3) The progress-log and ipd-28 privacy gates first check test -s on private-terms.txt, so a missing terms file fails instead of passing. (4) ipd-27a, which now owns the iOS kit files, gets the ipd-26 round-17 kit gates: kit and lint tests, an owned-file typecheck, biome on the 8 kit files, and native kit parity.",
+        "rationale": "The uncommitted round-19 amendment added the misaligned allowance but left summary.problems === 0 gates. The working document has 66 warnings, 46 of them app-misaligned, so the old gate could never pass under the new rule. The ownership suffix made the md and manifest declarations disagree. The kit owner had no kit regression, typecheck, biome or parity gate."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 20 (session-806 wave 1): new root unit ipd-27k-kit-grid owns the iOS kit sources and finishes the round-19 kit fix (whole-point tab-bar item widths and child positions for 2-5 items with and without a badge; keep the centered floating-button shadow). ipd-27a-reproduction-chrome depends on it, no longer owns kit sources, and builds the chrome and screens 01-03.",
+        "rationale": "ipd-27a centered the floating-button shadow and added the tab-bar regression (2-5 items, badge), which now fails on a child at x 85.5 (kit aggregate 42/43); carrying the kit fix plus three screens in one unit keeps exhausting its continuations, so the small kit fix becomes its own unit."
+      },
+      {
+        "decision": "2026-11-11 step 4 s808 round-20 consistency: ipd-27k-kit-grid gets a full plan (ownership block with sharedPaths none and artifactRoots tmp/ipd-s772/ipd-27k-kit-grid, dependsOn header, intent, pitfalls, test cases, done criteria, progress log). Its verification uses the scoped kit tests, the owned-file typecheck gate and biome on the 8 kit files instead of the bare 'bun run typecheck' and the directory biome argument. ipd-27a drops the 8 kit files from its ownership block, names ipd-27k-kit-grid in its dependsOn header, forbids all source edits, and drops the kit typecheck and biome gates; the kit tests and native parity stay as read-only regression gates.",
+        "rationale": "check-manifest.ts exited 1 with 11 problems after the operator round-20 manifest change: no ownership block for ipd-27k, an ipd-27a md/manifest writePaths mismatch, 8 biome arguments not owned by ipd-27a, and a missing dependsOn in the ipd-27a header. A bare workspace typecheck gate is rejected by the S5-s786-R2 rule."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 21 (session-808 wave 1): Shared center line (operator round 21, binding for ipd-27k): within each tab-bar slot, the icon, the label box and the badge anchor share one whole-point center line. Compute the slot's integer center c = slot.x + floor(slot.width / 2) (relative to the bar), place the icon at c - icon.width/2 (icon widths are even), and give the label box an even width (slot.width, minus 1 when slot.width is odd) with x = c - labelWidth/2, so the icon and label centers coincide exactly and every value is a whole point. Rewriting label and indicator geometry for this purpose is authorized even though their integer assertions pass. Lint rules stay unchanged; the zero-findings regression for 2 to 5 items with and without a badge (and the 402-point bar) must pass.",
+        "rationale": "After whole-point rounding, odd-width slots (for example 97 on a 390 bar with four items) put a 24-wide icon center at 48 while a full-slot label box centers at 48.5; app-misaligned correctly reports the half-point offset (3 findings, kit tests 17/18). Sharing one integer center line removes the offset without touching lint."
+      },
+      {
+        "decision": "2026-11-11 step 4 s810 (resolves S5-s809-1): the ipd-27k plan body is reconciled with the binding round-21 center line. The Math.round icon and badge offsets are replaced by c = slot.x + floor(slot.width / 2). Label and Indicator are rewritten to the even-width box at c - width/2 and join Icon, Badge and BadgeBackground in the single keepMembers set. The bars.ts tab build uses the same center line. Badge and badge background top move to slot y + 3. insert.ts passes count on a tab-bar width change. Measured state updated to 17 pass, 1 fail, 3 app-misaligned. The round-20 and round-21 verbatim sections are unchanged.",
+        "rationale": "A read-only Step 4 simulation through the public editor API (tmp/ipd-s772/plan-check/step4-s810/sim.log and sim-badge-y.log) shows three things. The center line alone clears every no-badge case. A visible badge still gets 2 app-misaligned findings until its top equals the icon top. A default 402 insert without count gives 80.4-point slots and 16 app-off-grid findings. With all three changes, 0 findings for 2-5 items, with and without a badge, on 390 and 402 bars. No lint rule changes are needed."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 22 (session-809 wave 2): ipd-27k-kit-grid is an accepted dependency. Scratch rule (operator round 22, binding for every remaining plan): temporary directories that test harnesses create under the operating system temp dir (mkdtemp under os.tmpdir(), for example nodetto-*-parity-*) are authorized scratch and are not write-scope violations. The reproduction plans do not run the native parity suites (they belong to accepted ipd-23 and ipd-24); their required gates are build-cli plus the reproduction gates. Rebuild rule (operator round 22, binding for ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction): the reproduction document is rebuilt from an empty document on the fixed kit by a generator script kept under tmp/ipd-s772/ipd-27-reproduction/ (git-ignored). The script writes the ops files and applies them with nodetto-cli edit. Ops never hard-code generated element ids: build each screen in one edit batch using `ref` and `@ref`, and resolve cross-batch targets (for example prototype link targets) by element name through nodetto-cli inspect --format json inside the script. Each part reruns the script from scratch for its screens plus all earlier parts, so the document always reflects the current kit.",
+        "rationale": "ipd-27a blocked because the native parity test it ran writes mkdtemp scratch under the OS temp dir, which the gate read as outside its artifact roots; the preserved reproduction was built before the kit fix (66 lint findings, 20 hard) and its correction ops hard-code generated ids from that document, so it must be rebuilt by a script that never depends on generated ids."
+      },
+      {
+        "decision": "2026-11-11 step 4 s811 (round-22 consistency; the imported Step 5 findings IPD-R1, IPD-R2 and IPD-R3 were already resolved by round 1 and are re-confirmed): the ipd-27a header dependsOn no longer names the accepted ipd-27k-kit-grid. The s808 rule that kept the ipd-27a native parity item 10 is superseded and the item is removed, and the manifest acceptance text no longer mentions native-parity tests. All four reproduction plans get one shared generator contract: gen/build.ts --through <NN>, a rebuild from an empty document, ref/@ref inside each batch, name lookup through inspect --format json across batches, no literal generated ids, and the pre-fix ops/ files kept as reference only. Plan IDs, dependsOn, writePaths, sharedPaths, artifactRoots and verification strings are unchanged.",
+        "rationale": "Operator round 22 made ipd-27k accepted, removed native parity from the reproduction gates and required a script rebuild. Before this change, ipd-27a still kept the parity gate and still named ipd-27k as pending, and the plans did not say how the serial parts share one generator."
+      },
+      {
+        "decision": "2026-11-11 step 4 s812 (review finding S5-s811-1): in the generator contract of ipd-27a, ipd-27b, ipd-27c and ipd-27-reproduction, cross-batch references are written into gen/ops/ as names (name:<exact name>, or select+where{name,page}+expect 1 then @ref), and the flow start is an update with id name:<start frame name>. inspect --format json is only a check that each name is unique before a batch is written. The s811 grep count is replaced by a fail-closed literal-id gate, added to each of the four verification lists after validate. It rejects a full 26-character Crockford id under any key or in any array, an id prefix as the whole value of id, target, parent, page, from or to or inside memberIds or ids, and indented ops lines, and it exits 2 when gen/ops/ is empty. Step 4 tested it on 10 scratch samples (tmp/ipd-s772/plan-check/step4-s812/gates.log). For ipd-27a, ipd-27b and ipd-27c, a new acceptance criterion states that the round-18 Scope wording ('ops files under .../ops/', 'appending to the document the previous part left') is superseded by the round-22 rebuild rule. Plan IDs, dependsOn, writePaths, sharedPaths, artifactRoots, the 31 accepted dependencies, taskId, originalHead and evidenceRoot are unchanged.",
+        "rationale": "The s811 text told the script to put ids found through inspect into gen/ops/ while its own regex counted such ids as failures, and that regex missed connect from/to, page and arrays. The CLI already resolves name: and select+where within a batch, and rejects missing or ambiguous names, so no id ever needs to be written. The round-18 Scope wording still described appending to an existing document, which contradicted the round-22 rebuild."
+      },
+      {
+        "decision": "2026-11-10 operator amendment round 23 (session-811 wave 1): ipd-27a-reproduction-chrome is accepted by the operator after visual inspection of its three comparisons (all elements within 4 points, icons/colors/weight correct, one badge about 2 points off). Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.",
+        "rationale": "ipd-27a rebuilt the document on the fixed kit and passed every gate except its own per-finding justification of 32 app-misaligned near-alignments, which exhausted its continuations. Bulk justification through the compare tool keeps the 4-point fidelity requirement while removing per-finding busywork."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 24 (session-812 wave 1): new root unit ipd-27p-native-edit-perf; ipd-27b-reproduction-detail depends on it. Native edit performance (operator round 24, binding): native nodetto-cli edit scales superlinearly with document size (a synthetic-like 135-operation batch takes over 90 s on a 300-element document, batches on 151/233/298 elements take 6/39/59 s), while the Bun CLI runs the same batches in about 1 s. macOS sample shows the time in the embedded Boa engine's garbage collector (GcHeader inc_ref_count, GC dropping, mark_heap), which points to per-operation work proportional to the whole document (cloning, rescanning or reserializing the document or its indexes for every operation, for example in auto-parenting containment, selection or kit insertion). Profile with `bun --cpu-prof` and with `sample` on the native binary, find the per-operation O(document) work in the edit path, and make batch application near-linear without changing any result (all parity, edit and kit tests stay green). Add a generic synthetic regression to apps/cli/src/native-parity/edit-performance.test.ts: build about 300 elements in several 390x844 iPhone frames over 3 to 4 edit batches that use parent, select and kit insertion; assert every native batch finishes in under 3 s and the batch on the largest document takes under 3 times the first batch. No private reference content in the fixture.",
+        "rationale": "ipd-27b's screen 05 native edit stayed CPU-bound for over six minutes. The operator reproduced it: native batch times grow superlinearly (1/6/39/59 s at 97/151/233/298 elements, over 90 s for the next batch) while Bun takes about 1 s; the profile is dominated by Boa GC activity, so the edit path does per-operation whole-document work. A 300-element app design is small, so this is a product defect to fix before the reproduction continues."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 25 (session-814 wave 1): Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.",
+        "rationale": "The operator re-timed the reproduction batches on the new build: 1.3/2.5/3.0/7.7 s at 151/233/298/457 elements (previously 6/39/59/over 90 s), so the defect that blocked the reproduction is fixed in practice. ipd-27p stopped only because a required suite writes git-ignored scratch under apps/desktop/tmp/ and its largest synthetic batches sit slightly above 3 s."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 26 (session-815 wave 1): General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.",
+        "rationale": "ipd-27p met the round-25 performance target (synthetic regression 5/5 passed, batches 2.2-3.8 s, down from 8.1-21.3 s) but blocked a third time on scratch: the accepted ipd-26 example test writes into tmp/ipd-s772/ipd-26-example-sample/. Scratch boundaries were granted one directory per round; a single rule over all git-ignored scratch ends that loop while still forbidding stray tracked or untracked files."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 27 (session-816 wave 2): ipd-27p-native-edit-perf and ipd-27b-reproduction-detail are accepted dependencies. Required correction (operator round 27, binding for ipd-27-reproduction): on the screen with the clipped scroll region, the current-day marker is too narrow (8 points wide) so its digit is clipped; widen the marker to fit its digit with at least 2 points of padding on each side, keep its color and corner radius, and keep it on the 1-point grid. Elements covered by the floating action buttons on that screen are the intentional overlay of the round-18 layout rule and do not count as missing.",
+        "rationale": "ipd-27b certified screens 04 and 06 but not screen 05 because the floating overlay covers an element visible in the web-view reference; adding the status bar makes that overlap unavoidable and the running app scrolls content under the floating buttons. The operator inspected the comparisons, found only the narrow current-day marker as a real defect, and moved its fix into the final reproduction pass."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 28 (session-818 wave 2): ipd-27c-reproduction-search-more is an accepted dependency. Operator decision (round 28, binding for ipd-27-reproduction): (1) The round-18 intentional-overlay rule applies to every screen, not only the one with the clipped scroll region: wherever the floating action buttons cover part of content that is visible in the web-view reference (screen 09 row accessories included), that is the intended overlay of the running app and is neither a missing element nor a visual failure. (2) Screen 10's reference shows the bottom tab bar without the badge; remove the badge from screen 10's tab bar (every other screen keeps its badge as in its reference), then re-export and recompare screen 10. After both, the reproduction is complete when the existing gates still pass; copy the final document, frames and comparisons to the output directory again.",
+        "rationale": "ipd-27-reproduction added 56 prototype transitions and the flow start, fixed the current-day marker and passed validate, lint (only near-alignment findings, allowed), flow, frame and comparison checks, then asked for a decision on the screen 09 overlay. The operator also found that screen 10 shows a tab-bar badge that its reference does not have."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 29 (session-820 wave 2): ipd-27-reproduction is an accepted dependency. Formatting authority (operator round 29, binding for ipd-28-finish): ipd-28 may apply formatting-only fixes (`bunx biome check --write` or `bunx biome format --write` limited to files changed on this branch versus f59bef4, and `cargo fmt` for changed Rust files) to any such file, even outside its writePaths, provided `git diff` of those files after formatting shows only whitespace and formatting changes and every behavioral test still passes; record the formatted paths in the progress log. Then rerun every required gate.",
+        "rationale": "ipd-28 stopped at mise run verify on a single Biome formatting diagnostic at packages/core/src/index.ts:897 (an app-design-lint export line), a file outside its writePaths; the baseline passed verify cleanly, so formatting must be restored without behavior change."
+      },
+      {
+        "decision": "2026-11-11 operator amendment round 30 (session-821 wave 1): Test-discovery hygiene (operator round 30, binding for ipd-28-finish): the operator renamed the four test-named scratch copies under git-ignored tmp/ (two ipd-21 pre-format copies and two step-4 simulations) to *.test.ts.evidence, preserving their content, so the workspace `bun test` in `mise run verify` no longer collects them. Never write files named *.test.ts or *.test.tsx under tmp/; save copies with an .evidence suffix. Rerun every required gate; the formatting fix to packages/core/src/index.ts is already applied.",
+        "rationale": "ipd-28's mise run verify passed 3663 tests and failed only on two test-file copies saved as evidence under tmp/ipd-s772/ipd-21-html-prototype/edits/pre-format/, which Bun discovers and whose relative imports break."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Text wrapping can differ between canvas and resvg; PNG export is the reference.",
+      "ipd-27 copies deliverables into the operator-named git-ignored output directory, a documented exception to its writePaths so the private name never appears in tracked files.",
+      "target and apps/desktop/src-tauri/binaries are artifactRoots shared only by dependency-ordered plans; ipd-24 depends on ipd-23 to serialize cargo builds.",
+      "Downloads (ipd-02 metrics, ipd-03 icons) need the network; without it the plan records a blocker finding rather than hand-written data."
+    ],
+    "supportedEdgeCases": [
+      "Documents without the new fields render and export byte-identically to f59bef4 (except accepted output changes).",
+      "Rects thinner than 3 units down to 0.5 render at their exact box.",
+      "Back links whose to is the hotspot's own frame; several flow starts per document with unique names (duplicate is a validation warning).",
+      "CLI connect accepts tap as an alias of click.",
+      "Custom SVG path icons up to 8 KiB."
+    ],
+    "outOfScopeEdgeCases": [
+      "Headless browser inspection of the HTML prototype may be unavailable (ipd-21, ipd-26); recorded as residual risk.",
+      "Owner questions Q1, Q3, Q4 alternatives; only the defaults are implemented."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-iphone-app-design.md",
+      "design-docs/user-qa/iphone-app-design.md",
+      "design-docs/specs/design-cli-ai-drawing.md",
+      "design-docs/specs/design-web-app-roundtrip.md",
+      "design-docs/specs/design-text-layout-lint.md",
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/specs/design-appearance.md",
+      "design-docs/specs/design-z-order.md",
+      "AGENTS.md"
+    ],
+    "planReview": "step5-impl-plan-review accepted (comm-017687): IPD-R1, IPD-R2, IPD-R3, IPD-L1, IPD-L2 resolved/addressed; no new high or mid findings."
+  },
+  "plans": [
+    {
+      "planId": "ipd-28-finish",
+      "planPath": "impl-plans/active/ipd-28-finish.md",
+      "progressPath": "impl-plans/progress/ipd-28-finish.md",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/README.md",
+        "design-docs/specs/design-iphone-app-design.md",
+        "impl-plans/progress/ipd-28-finish.md",
+        "tmp/ipd-s772/ipd-28-finish",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-28-finish",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "acceptanceCriteria": [
+        "All of steps 1-8 of the plan are satisfied (verify, test-cli and build-cli with no new failures versus the ipd-00 baseline table, typecheck exit 0, privacy scans clean, license files present, no emojis, lockfile unchanged), the README entry exists, and the design status is updated.",
+        "Determinism contract (operator round 16, binding for ipd-26, ipd-27 and ipd-28): documents built through nodetto-cli edit operations contain values generated at random (element and component ids, including the ids minted internally by kit insertion, and fractional ordering keys such as element `index` and page `order`). Repeated-run and Bun-versus-native determinism checks therefore use the round-15 generated-value comparison from ipd-24 (ids replaced by ordinal placeholders without numbering them by file position; generated ordering keys compared by relative order within their collection; every other field and every pre-existing value compared exactly), never raw byte equality. The committed example document is generated once and committed; its own regression test validates it, lints it with zero findings and renders it, but does not regenerate it byte for byte. Do not change engine id generation.",
+        "Reproduction lint gate (operator round 19, binding for ipd-27a, ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish; replaces the plain zero-findings wording for the reproduction document only): `app-off-grid`, `note-overflow`, `app-text-overflow`, touch-target, overlap and every error must be zero. `app-misaligned` (\"nearly aligns\") findings are allowed only for elements whose position matches the reference screenshot within 4 points, because the reference itself is not pixel-aligned; record their count per screen in the progress log. The generic example and kit tests keep the strict zero-findings gate.",
+        "Scratch rule (operator round 22, binding for every remaining plan): temporary directories that test harnesses create under the operating system temp dir (mkdtemp under os.tmpdir(), for example nodetto-*-parity-*) are authorized scratch and are not write-scope violations. The reproduction plans do not run the native parity suites (they belong to accepted ipd-23 and ipd-24); their required gates are build-cli plus the reproduction gates.",
+        "Near-alignment justification (operator round 23, binding for ipd-27b, ipd-27c, ipd-27-reproduction and ipd-28-finish): justify `app-misaligned` findings in bulk, not one by one. For each screen, export the frame and run nodetto-cli compare against its reference with the 4-point grid. If the comparison shows the flagged elements within 4 points of their reference positions, record a single line per screen in the progress log: screen number, count of app-misaligned findings, and 'within 4 points of reference'. A part is done when hard findings are zero, the per-screen lines are recorded, and the operator-style visual checklist (positions within 4 points, icons, colors, weight, nothing missing) is met for its screens. Do not spend continuations on cosmetic differences under 4 points.",
+        "Performance target and scratch (operator round 25, binding for ipd-27p and every remaining plan): the git-ignored apps/desktop/tmp/ directory created by existing test suites is authorized scratch, like OS temp directories. For ipd-27p, the synthetic native timing regression passes when every native batch finishes in under 5 s and the batch on the largest document takes under 4 times the first batch (this replaces the 3 s / 3x wording; the constraint-planning guard already cut batches from 8.1-21.3 s to 2.2-3.8 s). Keep looking for remaining per-operation whole-document work only while it is cheap; then complete the verification suite and record before/after timings.",
+        "General scratch rule (operator round 26, binding for every remaining plan; supersedes the narrower round-22 and round-25 scratch wording): files that test harnesses or CLI commands write while running a plan's required verification are not write-scope violations when they land in git-ignored scratch: anywhere under the repository tmp/ (including other plans' tmp/ipd-s772/* artifact roots, for example tmp/ipd-s772/ipd-26-example-sample/ written by apps/cli/src/native-parity/iphone-kit-example.test.ts), apps/desktop/tmp/, target/, or the operating system temp directory. A plan's own source edits must still stay within its writePaths, and `git status --porcelain` must show no new tracked or untracked non-ignored files outside them.",
+        "Formatting authority (operator round 29, binding for ipd-28-finish): ipd-28 may apply formatting-only fixes (`bunx biome check --write` or `bunx biome format --write` limited to files changed on this branch versus f59bef4, and `cargo fmt` for changed Rust files) to any such file, even outside its writePaths, provided `git diff` of those files after formatting shows only whitespace and formatting changes and every behavioral test still passes; record the formatted paths in the progress log. Then rerun every required gate.",
+        "Test-discovery hygiene (operator round 30, binding for ipd-28-finish): the operator renamed the four test-named scratch copies under git-ignored tmp/ (two ipd-21 pre-format copies and two step-4 simulations) to *.test.ts.evidence, preserving their content, so the workspace `bun test` in `mise run verify` no longer collects them. Never write files named *.test.ts or *.test.tsx under tmp/; save copies with an .evidence suffix. Rerun every required gate; the formatting fix to packages/core/src/index.ts is already applied."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true mise run verify",
+        "CARGO_TERM_QUIET=true mise run test-cli",
+        "CARGO_TERM_QUIET=true mise run build-cli",
+        "sh -c 'mkdir -p tmp/ipd-s772/ipd-28-finish/final && bun run typecheck --pretty false > tmp/ipd-s772/ipd-28-finish/final/typecheck.log 2>&1'",
+        "sh -c 'test \"$(git ls-files tmp | wc -l | tr -d \" \")\" -eq 0'",
+        "sh -c 'test \"$(git ls-files -o --exclude-standard | grep -c ^tmp/)\" -eq 0'",
+        "sh -c 'test -s tmp/ipd-s772/ipd-27-reproduction/private-terms.txt && ! git grep --untracked -l -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt -- . \":!tmp\"'",
+        "test -f THIRD_PARTY_NOTICES.md && test -f packages/core/src/icons/LICENSE-lucide.txt && test -f packages/core/src/text-metrics/LICENSE-liberation-sans.txt",
+        "sh -c 'printf \"a\\xe2\\x9c\\x85b\\n\" | rg -n \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\"'",
+        "sh -c 'D=tmp/ipd-s772/ipd-28-finish/final; mkdir -p \"$D\" && { git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E \"\\.(md|ts|tsx|json|html)$\" | while read -r f; do test -f \"$f\" && echo \"$f\"; done > \"$D/emoji-files.txt\"; test -s \"$D/emoji-files.txt\" && test \"$(grep -c \"[[:space:]]\" \"$D/emoji-files.txt\")\" -eq 0 && wc -l < \"$D/emoji-files.txt\"'",
+        "sh -c 'D=tmp/ipd-s772/ipd-28-finish/final; L=\"$D/emoji-files.txt\"; test -s \"$L\" && test \"$(grep -c \"[[:space:]]\" \"$L\")\" -eq 0 || exit 2; rg -n --no-messages \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\" $(cat \"$L\") > \"$D/emoji-scan.out\" 2> \"$D/emoji-scan.err\"; rc=$?; echo \"exit=$rc\"; test \"$rc\" -eq 1 && test ! -s \"$D/emoji-scan.out\" && test ! -s \"$D/emoji-scan.err\"'",
+        "git diff --exit-code f59bef4 -- bun.lock package.json"
+      ]
+    }
+  ],
+  "acceptedDependencies": [
+    {
+      "planId": "ipd-00-baseline",
+      "planPath": "impl-plans/active/ipd-00-baseline.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-02-text-measure",
+      "planPath": "impl-plans/active/ipd-02-text-measure.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-04-cli-edit-contracts",
+      "planPath": "impl-plans/active/ipd-04-cli-edit-contracts.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-29-desktop-snap-grid",
+      "planPath": "impl-plans/active/ipd-29-desktop-snap-grid.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-03-icon-data",
+      "planPath": "impl-plans/active/ipd-03-icon-data.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-775 (successfulPlanIds; adversarial and test-integrity reviews accepted); repair ipd-03-branch-1 resolved: bunx biome check packages/core/src/index.ts exits 0 (tmp/ipd-s772/plan-check/amend-s775/index-biome-r2.log); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-01-ir-schema",
+      "planPath": "impl-plans/active/ipd-01-ir-schema.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted by the operator after amendment round 2 (session-775): bun test packages/ir 156/156, golden 57/57, typecheck clean; its only aggregate failure (label-field.test.ts ui.icon default) is owned by ipd-07a-icon-shape"
+    },
+    {
+      "planId": "ipd-07a-icon-shape",
+      "planPath": "impl-plans/active/ipd-07a-icon-shape.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-05-core-catalogue",
+      "planPath": "impl-plans/active/ipd-05-core-catalogue.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-06-geo-strokes",
+      "planPath": "impl-plans/active/ipd-06-geo-strokes.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-09-text-layer",
+      "planPath": "impl-plans/active/ipd-09-text-layer.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-12-controls",
+      "planPath": "impl-plans/active/ipd-12-controls.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-779 waves 1-4 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-07-icon-core-cli",
+      "planPath": "impl-plans/active/ipd-07-icon-core-cli.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-781 waves 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-07b-icon-data-ascii",
+      "planPath": "impl-plans/active/ipd-07b-icon-data-ascii.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-781 waves 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-08-cli-layout-ops",
+      "planPath": "impl-plans/active/ipd-08-cli-layout-ops.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-781 waves 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-10-icon-desktop",
+      "planPath": "impl-plans/active/ipd-10-icon-desktop.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-781 waves 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-11-frames",
+      "planPath": "impl-plans/active/ipd-11-frames.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-784 waves 1-2 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-13-prototype-core-cli",
+      "planPath": "impl-plans/active/ipd-13-prototype-core-cli.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-786 waves 1-2 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-16-frames-export-compare",
+      "planPath": "impl-plans/active/ipd-16-frames-export-compare.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-786 waves 1-2 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-14-kit-core",
+      "planPath": "impl-plans/active/ipd-14-kit-core.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-17-desktop-palette",
+      "planPath": "impl-plans/active/ipd-17-desktop-palette.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-18-desktop-prototype-view",
+      "planPath": "impl-plans/active/ipd-18-desktop-prototype-view.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-19-desktop-presentation",
+      "planPath": "impl-plans/active/ipd-19-desktop-presentation.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-21-html-prototype",
+      "planPath": "impl-plans/active/ipd-21-html-prototype.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-789 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-15-kit-content",
+      "planPath": "impl-plans/active/ipd-15-kit-content.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-790 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-20-app-lint",
+      "planPath": "impl-plans/active/ipd-20-app-lint.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-22-desktop-export-compare-check",
+      "planPath": "impl-plans/active/ipd-22-desktop-export-compare-check.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-23-parity-shapes",
+      "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-25-docs-help",
+      "planPath": "impl-plans/active/ipd-25-docs-help.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-791 waves 1-3 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-24-parity-flows",
+      "planPath": "impl-plans/active/ipd-24-parity-flows.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-799 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-26-example-sample",
+      "planPath": "impl-plans/active/ipd-26-example-sample.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-802 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-27k-kit-grid",
+      "planPath": "impl-plans/active/ipd-27k-kit-grid.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-809 wave 1 (passed test-integrity, adversarial and integration reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-27a-reproduction-chrome",
+      "planPath": "impl-plans/active/ipd-27a-reproduction-chrome.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted by the operator after session-811 wave 1: rebuilt document validates, passes the reproduction lint gate with zero hard findings, no literal generated ids; the operator inspected the three side-by-side comparisons and judged every element within 4 points with matching icons, colors and weight (one badge about 2 points off). Its work is in tmp/ipd-s772/ipd-27-reproduction."
+    },
+    {
+      "planId": "ipd-27p-native-edit-perf",
+      "planPath": "impl-plans/active/ipd-27p-native-edit-perf.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-816 wave 1 (passed test-integrity, adversarial and integration reviews); native batches 2.2-3.8 s"
+    },
+    {
+      "planId": "ipd-27b-reproduction-detail",
+      "planPath": "impl-plans/active/ipd-27b-reproduction-detail.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted by the operator after session-816 wave 2: the operator inspected the three comparisons; screens 04 and 06 are within 4 points with matching icons, colors and weight; on screen 05 the floating action buttons cover part of the last visible row, which is the intentional overlay of the round-18 layout rule, and one required correction is handed to ipd-27-reproduction"
+    },
+    {
+      "planId": "ipd-27c-reproduction-search-more",
+      "planPath": "impl-plans/active/ipd-27c-reproduction-search-more.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-818 wave 1 (passed test-integrity, adversarial and integration reviews); the operator inspected screens 07-10"
+    },
+    {
+      "planId": "ipd-27-reproduction",
+      "planPath": "impl-plans/active/ipd-27-reproduction.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-820 wave 1; the operator verified the copied document (validate ok, lint only allowed near-alignments, flow Main with a start, 56 prototype transitions) and inspected screen 10 without the extra badge"
+    }
+  ]
+}

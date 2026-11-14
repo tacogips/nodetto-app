@@ -1,0 +1,221 @@
+{
+  "taskId": "sac-s830",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-830",
+  "implementationBranch": "feat/slide-area-copy-shapes",
+  "baseBranch": "feat/slide-area-copy-shapes",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+  "evidenceRoot": "tmp/sac-s830",
+  "continuationOf": "sac-s826",
+  "overviewPath": "impl-plans/active/sac-00-overview.md",
+  "designReferences": [
+    "design-docs/specs/design-slide-area-copy-shapes.md",
+    "design-docs/specs/design-presentation.md",
+    "design-docs/user-qa/slide-area-copy-shapes.md"
+  ],
+  "designDocPaths": [
+    "design-docs/specs/design-slide-area-copy-shapes.md",
+    "design-docs/specs/design-presentation.md",
+    "design-docs/user-qa/slide-area-copy-shapes.md"
+  ],
+  "acceptedDependencies": [
+    {
+      "planId": "sac-00-overview",
+      "planPath": "impl-plans/active/sac-00-overview.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["Overview, wave layout and shared invariants for sac-01..sac-08"]
+    },
+    {
+      "planId": "sac-01-slide-data",
+      "planPath": "impl-plans/active/sac-01-slide-data.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["Optional document slideSize and page slideOrigin in IR, validation and canonical JSONL", "updateDocument core Command kind with exact undo"]
+    },
+    {
+      "planId": "sac-02-copy-shapes-core",
+      "planPath": "impl-plans/active/sac-02-copy-shapes-core.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["Shared page-element clone/remap helper with duplicate page", "Copy-shapes planner and editor facade copyPageElements"]
+    },
+    {
+      "planId": "sac-03-slide-rect-core",
+      "planPath": "impl-plans/active/sac-03-slide-rect-core.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["Slide rect resolution, presets and slide labels in packages/core/src/presentation"]
+    },
+    {
+      "planId": "sac-04-slide-collab-duplicate",
+      "planPath": "impl-plans/active/sac-04-slide-collab-duplicate.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["Yjs round-trip of slideSize (meta) and slideOrigin (page)", "Duplicate page carries slideOrigin"]
+    },
+    {
+      "planId": "sac-05-cli-copy-shapes",
+      "planPath": "impl-plans/active/sac-05-cli-copy-shapes.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["nodetto pages copy-shapes --from <page|prev|next> --to <page> in pagesCommand"]
+    },
+    {
+      "planId": "sac-06-slide-area-overlay",
+      "planPath": "impl-plans/active/sac-06-slide-area-overlay.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["SlideAreaOverlay, effectiveShowSlideArea, NodettoCanvasProps.showSlideArea and presentation slide clipping"]
+    },
+    {
+      "planId": "sac-07-settings-and-picker-ui",
+      "planPath": "impl-plans/active/sac-07-settings-and-picker-ui.md",
+      "commit": "ee4c04c8219a8af7ddd103d8d6c81d7e11550963",
+      "provides": ["PresentationSection inspector component", "CopyShapesDialog and PageTabsProps.onCopyShapesFrom"]
+    }
+  ],
+  "acceptedDependenciesEvidence": "Landed and committed at ee4c04c; bun run typecheck, lint and bun test (3669 pass) were clean at that commit (session 826).",
+  "checkpointAmendments": [
+    "2026-11-11 session 830: sac-08-wiring.md amended stale-only (checked by symbol at ee4c04c): one NodettoCanvas and one PageTabs in App.tsx; no core index.ts or CLI commands.ts edit; evidence root tmp/sac-s830; one presentation overlay-absence assertion; impl-plans/README.md listing added; file archiving left to the plan-archive node. Design section 7 wording aligned with the no-menu-bar desktop shell already accepted in sac-s826."
+  ],
+  "waves": [
+    [
+      "sac-08-wiring"
+    ]
+  ],
+  "reconcile": {
+    "strictIndexGateNote": "Production-only noUncheckedIndexedAccess gate (SAC-PLAN-001) runs in sac-08 verification. tsconfig is unchanged; baseline errors in *.test.ts and apps/desktop/scripts are filtered out."
+  },
+  "reviewContext": {
+    "issueReference": "none; runtime workflowInput of opus-terra-design-and-implement-review-loop-session-830 is authoritative (continuation of sac-s826)",
+    "userProblem": "sac-01..sac-07 landed but are not reachable from the desktop app, CLI help or docs; sac-08 wiring was blocked in session 826 by a dependency-admission mismatch.",
+    "requiredOutcomes": [
+      "Show slide area toggle (ZoomControls) as an optional boolean UI preference with automatic default; never stored in the document or Yjs.",
+      "CopyShapesDialog opened from the page tab menu and a FileActions header button for the current page.",
+      "PresentationSection mounted after PageSection in the no-selection inspector block.",
+      "ui-solid index exports CopyShapesDialog, PresentationSection and effectiveShowSlideArea.",
+      "CLI help, docs/cli.md, docs/editing.md (Slide size, Slide area, Copy shapes from page) and README updated.",
+      "impl-plans/README.md lists sac-00..sac-08 as completed; the plan-archive node moves the files."
+    ],
+    "constraints": [
+      "Exactly one new core Command kind, updateDocument (landed in sac-01); add no further kinds; state it and the private sync Worker follow-up in the final summary.",
+      "noUncheckedIndexedAccess-safe code.",
+      "The overlay never reaches exports or presentation rendering.",
+      "No core, IR, collab, controller or overlay logic changes.",
+      "Public repository only, gitPush false, no emojis."
+    ],
+    "nonGoals": [
+      "Fit to slide",
+      "copy-shapes shortcut",
+      "per-page slide size",
+      "slide-size-aware export",
+      "changes to the private nodetto-cloud sync Worker"
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Continuation manifest sac-s830 dispatches only sac-08-wiring; sac-00..sac-07 are acceptedDependencies landed at ee4c04c.",
+        "rationale": "Session 826 blocked because the progress gate treated landed wave-2 plans as missing dependencies of sac-08-wiring; sac-08 dependsOn is [] and the landed plans are admitted through acceptedDependencies."
+      },
+      {
+        "decision": "sac-08 is amended only where stale against the landed code, verified by symbol at HEAD.",
+        "rationale": "Step5 review comm-019059 confirmed CopyShapesDialog, PresentationSection, effectiveShowSlideArea, PageTabsProps.onCopyShapesFrom and NodettoCanvasProps.showSlideArea exist; no feature redesign or re-plan."
+      },
+      {
+        "decision": "Exactly one new core Command kind, updateDocument, landed in sac-01; no further kinds.",
+        "rationale": "Accepted in the design; the private nodetto-cloud sync Worker needs a matching case, which must be stated in the final summary."
+      },
+      {
+        "decision": "A FileActions header button opens Copy shapes from page for the current page, alongside the page tab menu item.",
+        "rationale": "The desktop shell has no Edit/Page menu bar; the divergence is recorded in the sac-08 amendment and design section 7."
+      },
+      {
+        "decision": "Show slide area is an optional UI preference saved only when set; toggling stores the negation of the effective value.",
+        "rationale": "The default follows whether a document slide size is set; the preference is never stored in the document or Yjs."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Fit to slide and a copy-shapes shortcut are deferred.",
+      "Overlay and dialog DOM have no automated DOM tests; the pure logic is tested.",
+      "File archiving is done by the plan-archive node; sac-08 only updates the impl-plans/README.md listing."
+    ],
+    "supportedEdgeCases": [
+      "Unset Show slide area preference follows the document slide size; an explicit on/off overrides it.",
+      "Copy shapes from Previous page on the first page is disabled with a clear error; source equal to target is rejected.",
+      "Documents without slideSize/slideOrigin round-trip byte-identically and keep the frame/content-bounds slide fallback.",
+      "Hidden pages are labeled Hidden from presentation in the overlay."
+    ],
+    "outOfScopeEdgeCases": [
+      "Per-page slide size.",
+      "Slide-size-aware SVG/PNG/PDF export.",
+      "Thumbnail renderer paths (none exist in this repository).",
+      "Private sync Worker updateDocument handling."
+    ],
+    "residualRisks": [
+      "The private sync Worker needs an updateDocument case.",
+      "SlideAreaOverlay and CopyShapesDialog DOM have no automated DOM test; logic is covered by pure modules.",
+      "No thumbnail renderer exists in this repository, so thumbnail-path absence is vacuous; absence is asserted for renderPageSvg and the presentation src."
+    ],
+    "sourcePaths": [
+      "apps/desktop/src",
+      "packages/ui-solid/src",
+      "apps/cli/src/help.ts",
+      "docs/editing.md",
+      "docs/cli.md",
+      "README.md",
+      "impl-plans"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "sac-08-wiring",
+      "planPath": "impl-plans/active/sac-08-wiring.md",
+      "progressPath": "impl-plans/progress/sac-08-wiring.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/settings/preferences.ts",
+        "apps/desktop/src/settings/preferences.test.ts",
+        "apps/desktop/src/shell/FileActions.tsx",
+        "packages/ui-solid/src/ZoomControls.tsx",
+        "packages/ui-solid/src/Inspector.tsx",
+        "packages/ui-solid/src/index.ts",
+        "packages/ui-solid/src/presentation/slide-clip.test.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/cli-wiring.test.ts",
+        "docs/editing.md",
+        "docs/cli.md",
+        "README.md",
+        "impl-plans/README.md",
+        "impl-plans/progress/sac-08-wiring.md",
+        "tmp/sac-s830/sac-08-wiring",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "apps/desktop/dist"
+      ],
+      "verification": [
+        "bun test ./apps/desktop/src/settings/preferences.test.ts ./apps/desktop/src/shell/window-input.test.ts",
+        "bun test ./apps/cli/src/cli-wiring.test.ts ./apps/cli/src/pages-command.test.ts ./packages/ui-solid/src/presentation/slide-clip.test.ts ./packages/ui-solid/src/canvas/slide-area.test.ts",
+        "bun run typecheck",
+        "mkdir -p tmp/sac-s830/sac-08-wiring/final && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/sac-s830/sac-08-wiring/final/strict-index.log 2>&1; ! grep 'error TS' tmp/sac-s830/sac-08-wiring/final/strict-index.log | grep -v -e '\\.test\\.ts' -e '^apps/desktop/scripts/'",
+        "CARGO_TERM_QUIET=true mise run lint",
+        "CARGO_TERM_QUIET=true mise run verify",
+        "bun run build"
+      ],
+      "acceptanceCriteria": [
+        "Every verification exited 0 with tests run and zero failures; full logs are under tmp/sac-s830/sac-08-wiring/final/; build output stays in the gitignored apps/desktop/dist.",
+        "The showSlideArea preference is optional and boolean-only (missing or non-boolean loads undefined); the ZoomControls 'Slide area' toggle shows effectiveShowSlideArea and stores the negation of the effective value; it is never stored in the document or Yjs.",
+        "App.tsx passes showSlideArea to the single NodettoCanvas, hosts CopyShapesDialog, and wires PageTabs.onCopyShapesFrom; the FileActions 'Copy shapes from page...' button targets the current page and is disabled with one page or read-only.",
+        "PresentationSection is mounted directly after PageSection in the no-selection inspector block.",
+        "packages/ui-solid/src/index.ts exports CopyShapesDialog, PresentationSection and effectiveShowSlideArea; packages/core/src/index.ts and apps/cli/src/commands.ts are unchanged.",
+        "The presentation slide src contains no nodetto-slide-area for explicit and unset slide sizes (slide-clip.test.ts).",
+        "help.ts documents 'pages copy-shapes <doc.jsonl> --from <page|prev|next> --to <page> [--dry-run] [--format text|json]'; docs/cli.md, docs/editing.md (Slide size, Slide area, Copy shapes from page) and README are updated.",
+        "impl-plans/README.md lists sac-00..sac-08 under completed/ (grep -c \"completed/sac-0\" prints 9); this plan does not move files under impl-plans/active or impl-plans/completed (archive is the plan-archive node).",
+        "help.ts, docs and README do not change pages-copy-shapes behavior; the \"Nothing was written.\" error wording in docs/cli.md matches apps/cli/src/pages-copy-shapes.ts.",
+        "The production-only noUncheckedIndexedAccess gate exited 0 (log tmp/sac-s830/sac-08-wiring/final/strict-index.log).",
+        "No new core Command kind beyond updateDocument; the final summary states updateDocument and the private sync Worker follow-up.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    }
+  ]
+}

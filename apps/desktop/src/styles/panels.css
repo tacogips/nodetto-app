@@ -1,0 +1,433 @@
+/* Editor body layout, page tabs, menus, the floating selection toolbar
+   and the zoom widget.
+   Imported in cascade order from style.css. */
+
+/* ---- A2: panels and menus ---- */
+
+/* Editor body: canvas host and the Inspector column side by side. */
+
+.app-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-viewer-column > .app-canvas-host {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-inspector {
+  width: 280px;
+  flex: 0 0 280px;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+  outline: none;
+}
+
+.app-inspector:focus-visible {
+  box-shadow: inset 2px 0 0 var(--nodetto-accent);
+}
+
+/* Page tabs */
+
+.nodetto-page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: stretch;
+  padding: 4px 12px 0;
+  border-bottom: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+}
+
+.nodetto-page-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--nodetto-line);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--nodetto-canvas);
+  font-size: 0.78rem;
+}
+
+.nodetto-page-tab.is-dragging {
+  opacity: 0.55;
+}
+.nodetto-page-tab.is-drop-before {
+  box-shadow: inset 3px 0 var(--nodetto-accent);
+}
+.nodetto-page-tab.is-drop-after {
+  box-shadow: inset -3px 0 var(--nodetto-accent);
+}
+.nodetto-page-tab-name {
+  touch-action: none;
+  user-select: none;
+}
+
+.nodetto-page-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.nodetto-page-tab-scroll {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+}
+
+.nodetto-page-tab-scroll-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 4px;
+  border: 0;
+  color: var(--nodetto-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.nodetto-page-tab-scroll-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.nodetto-page-tab-scroll-button:hover:not(:disabled) {
+  color: var(--nodetto-accent);
+}
+
+.nodetto-page-tab-name:focus-visible,
+.nodetto-page-menu-button:focus-visible,
+.nodetto-page-add:focus-visible {
+  outline: 2px solid var(--nodetto-accent);
+  outline-offset: -2px;
+}
+
+.nodetto-page-tab.nodetto-active {
+  background: var(--nodetto-surface);
+  box-shadow: 0 1px 0 var(--nodetto-surface);
+  font-weight: 600;
+}
+
+.nodetto-page-tab-name,
+.nodetto-page-menu-button,
+.nodetto-page-add {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  color: var(--nodetto-ink);
+  background: transparent;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.nodetto-page-menu-button {
+  padding: 0 6px;
+  color: var(--nodetto-muted);
+}
+
+.nodetto-page-menu-button:hover,
+.nodetto-page-add:hover {
+  color: var(--nodetto-accent);
+}
+
+.nodetto-page-add {
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+
+.nodetto-page-rename {
+  min-width: 80px;
+  max-width: 160px;
+  height: 22px;
+  margin: 0 4px;
+  padding: 0 6px;
+  border: 1px solid var(--nodetto-accent);
+  border-radius: 4px;
+  color: var(--nodetto-ink);
+  background: var(--nodetto-surface);
+  font-size: inherit;
+  outline: none;
+}
+
+.nodetto-page-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 6px;
+  background: var(--nodetto-surface);
+  box-shadow: 0 6px 18px var(--app-shadow-strong);
+  font-weight: 400;
+}
+
+/* Menus (context menu, page menu) */
+
+.nodetto-context-menu {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 6px;
+  background: var(--nodetto-surface);
+  box-shadow: 0 6px 18px var(--app-shadow-strong);
+  font-size: 0.8rem;
+  outline: none;
+  user-select: none;
+}
+
+.nodetto-menu-item {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--nodetto-ink);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nodetto-context-menu > .nodetto-menu-item,
+.nodetto-context-menu > .nodetto-menu-submenu-host,
+.nodetto-context-menu > .nodetto-menu-separator {
+  flex-shrink: 0;
+}
+
+.nodetto-context-menu .nodetto-menu-label,
+.nodetto-context-menu .nodetto-menu-shortcut {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nodetto-menu-item:hover:not(:disabled),
+.nodetto-menu-item.nodetto-menu-active:not(:disabled) {
+  background: var(--nodetto-accent-soft);
+}
+
+.nodetto-menu-item:disabled {
+  color: var(--app-disabled-soft-ink);
+  cursor: default;
+}
+
+.nodetto-menu-shortcut {
+  color: var(--nodetto-muted);
+  font-size: 0.72rem;
+}
+
+.nodetto-menu-item:disabled .nodetto-menu-shortcut {
+  color: inherit;
+}
+
+.nodetto-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--nodetto-line);
+}
+
+.nodetto-menu-submenu-host {
+  position: relative;
+}
+
+.nodetto-submenu {
+  top: -5px;
+  left: 100%;
+  min-width: 220px;
+}
+
+.nodetto-submenu.nodetto-submenu-left {
+  left: auto;
+  right: 100%;
+}
+
+.nodetto-swatch-row {
+  display: flex;
+  gap: 3px;
+}
+
+.nodetto-swatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nodetto-swatch-stroke {
+  border-width: 3px;
+  background: var(--nodetto-surface);
+}
+
+.nodetto-swatch-none {
+  background: linear-gradient(
+    135deg,
+    transparent 45%,
+    var(--app-swatch-red) 45%,
+    var(--app-swatch-red) 55%,
+    transparent 55%
+  );
+}
+
+.nodetto-swatch:hover {
+  transform: scale(1.15);
+}
+
+/* Zoom widget */
+
+.nodetto-zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+  justify-content: flex-end;
+  gap: 6px;
+  align-items: center;
+  user-select: none;
+}
+
+.nodetto-zoom-group {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 6px;
+  background: var(--nodetto-surface);
+  box-shadow: 0 2px 8px var(--app-shadow-soft);
+  overflow: hidden;
+}
+
+.nodetto-zoom-button {
+  min-width: 28px;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--nodetto-line);
+  color: var(--nodetto-ink);
+  background: transparent;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.nodetto-zoom-button:last-child {
+  border-right: 0;
+}
+
+.nodetto-zoom-button:hover:not(:disabled) {
+  background: var(--nodetto-accent-soft);
+}
+
+.nodetto-zoom-button:disabled {
+  color: var(--app-disabled-soft-ink);
+  cursor: default;
+}
+
+.nodetto-zoom-level {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-right: 1px solid var(--nodetto-line);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.nodetto-zoom-level .nodetto-input {
+  width: 58px;
+  min-height: 26px;
+  padding: 2px 4px;
+  text-align: right;
+  border: 0;
+  border-radius: 0;
+}
+
+.nodetto-zoom-toggle.nodetto-active {
+  color: var(--nodetto-surface);
+  background: var(--nodetto-accent);
+}
+
+.nodetto-view-menu > summary {
+  padding: 5px 8px;
+  border: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.nodetto-view-menu-body {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: grid;
+  width: 190px;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+  box-shadow: 0 2px 8px var(--app-shadow-soft);
+}
+
+.nodetto-view-menu-body .nodetto-zoom-button {
+  text-align: left;
+  border: 0;
+  min-height: 32px;
+}
+
+/* Compact: the menu also holds the zoom group, so it may be wider than the
+   lone menu button that anchors it. */
+.nodetto-zoom-compact .nodetto-view-menu-body {
+  width: 220px;
+  max-width: none;
+}
+.nodetto-zoom-compact .nodetto-view-menu-body .nodetto-zoom-group {
+  flex-wrap: nowrap;
+  margin-bottom: 4px;
+  box-shadow: none;
+}
+.nodetto-zoom-compact
+  .nodetto-view-menu-body
+  .nodetto-zoom-group
+  .nodetto-zoom-button {
+  min-height: 28px;
+  text-align: center;
+  border-right: 1px solid var(--nodetto-line);
+}
+.nodetto-zoom-compact
+  .nodetto-view-menu-body
+  .nodetto-zoom-group
+  .nodetto-zoom-button:last-child {
+  border-right: 0;
+}
+
+/* Page IDs never change: show them as selectable text, not as a field. */
+.app-pane .nodetto-input.nodetto-readonly-value {
+  padding-inline: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--nodetto-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: text;
+}

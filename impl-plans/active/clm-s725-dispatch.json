@@ -1,0 +1,398 @@
+{
+  "taskId": "clm-s725",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-727",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "7f52302cb3e296dd7a2914832a35d05dad0b57dc",
+  "designDocPaths": [
+    "design-docs/specs/design-cli-layout-merge-lint.md",
+    "design-docs/user-qa/cli-layout-merge-lint.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/clm-00-overview.md",
+  "supersededDraftPlans": [
+    "impl-plans/active/clm-02-edit-perf.md",
+    "impl-plans/active/clm-05-connector-fields.md",
+    "impl-plans/active/clm-06-route-core.md",
+    "impl-plans/active/clm-09-arrange-cli.md"
+  ],
+  "evidenceRoot": "tmp/clm-s725",
+  "evidenceLayout": "Per-plan evidence under tmp/clm-s725/<planId>/ (baselines and progress evidence) with gate runs under tmp/clm-s725/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/ inside the plan directory. Retry loops write <name>-1.log..<name>-3.log and copy the green attempt to <name>.log. Reconciliation output goes under tmp/clm-s725/reconcile/. tmp/ is git-ignored; store only .log, .txt and .json data there, never binaries or .ts files, because bun test collects stray .ts files. Cargo output goes to the git-ignored target/, which every plan declares as artifactRoots [\"target\"]; clm-02's pre-change baseline binary lives at target/clm-baseline/nodetto-cli (amendment round 1) and must survive until clm-09 (no cargo clean).",
+  "reviewContext": {
+    "issueReference": "none (inline workflowInput.requestedOutcome of workflow execution opus-terra-design-and-implement-review-loop-session-727; no GitHub issue supplied; design and draft plans from commit 7f52302)",
+    "userProblem": "Users of nodetto-cli lack: deterministic layered and route-only arranging with label placement, port spreading and self-loop sides (A1-A5); a frame-move opt-out (A6); acceptable native performance when an edit batch enables routingAvoidObstacles on about 50 edges (over two minutes today, A7); a three-way JSONL merge usable as a git merge driver and a determinism guarantee for SVG export (B1-B3); update with label, rejection of unknown operation fields with suggestions, collapsed warnings and --quiet (C1-C3); and lint for ERD/node overlaps, --fix text wrapping with CJK breaking, and missing image references (D1-D3).",
+    "requiredOutcomes": [
+      "A1-A7: arrange --mode layered (--direction LR|TB, --frames) and --mode route (--ids, --reset-manual) exist with deterministic, idempotent, tested output; label placement avoids overlaps and lint --metrics reports edge-crossing and edge-label-overlap counts; ports spread along sides; self-loops use unused sides; carryMembers:false moves only the frame and the default is documented; the A7 obstacle-routing batch fixture (20 states, 50 edges, 3 frames) passes natively within 10000 ms with byte-identical output.",
+      "B1-B3: nodetto-cli merge performs a per-element, per-field three-way merge (ours kept on conflicts, arrays atomic, delete rules from design B1), reports conflicts on stderr and exits 0/1/2; a git end-to-end test with .gitattributes merge=nodetto passes; export determinism is tested and documented.",
+      "C1-C3: update accepts label for every labeled type; unknown fields in every edit operation are rejected with a suggestion and the valid list; identical warnings collapse with a count; global --quiet suppresses warnings without changing exit codes.",
+      "D1-D3: lint reports node-overlap on erd, state, flowchart and uml pages; lint --fix wraps overflowing label/note text with CJK-aware breaking; lint reports image-missing for unresolvable relative semantic.src through CommandIo.",
+      "Bun and native parity tests cover the new commands and flags; CARGO_TERM_QUIET=true mise run verify and mise run test-cli pass (3-attempt retry on native deadlines); help and docs describe every new command, mode, flag and field."
+    ],
+    "nonGoals": [
+      "Rust or native host changes (an A7 host-side root cause is a Step-5 blocker, not in any writePaths).",
+      "Changing tidy, overlaps, edit --arrange, move, the frame-move default, the app's live mergeDocuments, or text-layout export warnings.",
+      "Item-by-item list merge, a --format flag for merge, an SVG merge driver, UI inspector controls.",
+      "Text-layout rules on erd, state or uml pages (Q1).",
+      "Relaxing any existing test deadline; any binary-less native parity run; version bumps, tags, releases or pushes; server, auth or deployment code."
+    ],
+    "constraints": [
+      "Maximum concurrency: feature plans write only their own modules; only clm-09 edits commands.ts, help.ts, cli.ts, main.ts, native-engine.ts, mcp.ts, packages/core/src/index.ts, docs/cli.md, README.md, design-docs/specs/export.md and design-cli-ai-drawing.md. Five plans run in wave 1, two in wave 2, wiring in wave 3.",
+      "Feature CLI modules import new core symbols by relative path until clm-09 adds the exports and switches to @nodetto/core.",
+      "Strict TS; core code safe under noUncheckedIndexedAccess; Boa rules: no regex split on whole documents, no per-point destructuring in hot geometry loops.",
+      "Neutral self-authored fixtures (widgets, orders, Idle, Running, Stage0-Stage2); never name external issues, organizations, reporters or downstream products.",
+      "Every verification command exits 0 and runs tests; native parity always sets NODETTO_CLI_TEST_BINARY; native deadline tests get 3 attempts; CPU time compared with /usr/bin/time -p against clm-02's pre-change baseline binary.",
+      "Every plan declares artifactRoots [\"target\"] and lists every edited file in writePaths; each plan edits only its own progress log; no worktrees, branches, commits, broad formatters or lockfile changes by workers.",
+      "Additive and backward compatible; AGENTS.md applies; no emojis; cargo with CARGO_TERM_QUIET=true."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Reuse the accepted design (commit 7f52302) unchanged in behavior; only its 'Plan partition (maximum concurrency)' section was revised.",
+        "rationale": "The owner asked to reuse the reviewed design and restructure the plans for maximum concurrency; the step-5 reviewer confirmed design consistency."
+      },
+      {
+        "decision": "Drafts clm-02-edit-perf and clm-05-connector-fields merge into clm-02-connector-edit-perf; clm-06-route-core and clm-09-arrange-cli are replaced by clm-06-route-arrange and clm-09-wiring.",
+        "rationale": "The two drafts conflicted only on shapes/connector/resolve.ts; merging removes serialization. A single final wiring plan owns every shared registration file."
+      },
+      {
+        "decision": "apps/cli/src/cli.ts is added to the shared files owned by clm-09.",
+        "rationale": "The real --quiet export entry is cli.ts:runCliAsync, called by main.ts (clm-00)."
+      },
+      {
+        "decision": "clm-08 dependsOn is clm-03 plus clm-04 in this manifest, although clm-08's plan text lists only clm-03; waves are unchanged (clm-04 is wave 1, clm-08 wave 2).",
+        "rationale": "Step-5 review finding (low): clm-08 calls edit-command.ts:runOperations, whose C2 validation and warning output clm-04 changes in wave 1. Encoding the edge in the DAG prevents a DAG-only scheduler from starting clm-08 while clm-04 is editing. It is a real call dependency and adds no wave."
+      },
+      {
+        "decision": "Contracts in clm-00 and the design are binding names; plans may add optional parameters or extra exports and record them in their progress logs.",
+        "rationale": "Allows wave-2 plans to build against wave-1 contracts without renegotiation."
+      },
+      {
+        "decision": "Amendment 2026-11-04 round 1: clm-02's pre-change baseline binary moves to target/clm-baseline/nodetto-cli inside the declared artifact root (check becomes 'test -x target/clm-baseline/nodetto-cli'; clm-09 timing reads the same path); clm-07 gains packages/core/src/shapes/frame.ts in writePaths for one additive export FRAME_TITLE_BAND = 24 used by hitTest and arrange-layered.ts, plus frame.test.ts, biome and grep checks; accepted clm-01, clm-03, clm-04 and clm-08 are recorded as acceptedDependencies. No design change.",
+        "rationale": "Blocked plans clm-02-connector-edit-perf (baseline binary location was inside the source path tmp/clm-s725/clm-02-connector-edit-perf) and clm-07-layered-core (title-band API in shapes/frame.ts was outside writePaths; arrange-layered.ts copied 24). Both gaps are resolved: frame.ts is written only by clm-07, and clm-02 writePaths and artifactRoots are unchanged."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Unknown top-level operation fields now fail (C2), add with type applies label (C1, Q5), lint reports new rules on previously skipped pages (D1, D3), and text warnings collapse (C3); existing tests passing extra fields are fixed in clm-04 and wording assertions in clm-09.",
+      "The full core suite runs only in clm-09's mise run verify because wave-1 siblings edit core files concurrently; per-plan gates run targeted tests plus typecheck.",
+      "A planRoute performance problem in Boa is detected only by clm-09's native layered deadline in wave 3.",
+      "On merge conflict the canonical result keeps ours for conflicting fields and lists conflicts on stderr (exit 1) instead of inserting conflict markers."
+    ],
+    "supportedEdgeCases": [
+      "Merge: same change on both sides, both-added ids, delete versus modify in either direction, deleted pages with added elements, deleted referenced nodes, shuffled input order, --output equal to the ours path, validation failure writes nothing.",
+      "Route: manual settings kept unless --reset-manual; fixed ports at 0.6667 and rounding collisions; self-loops with all sides used; reruns plan nothing.",
+      "Layered: no initial state, cycles, disconnected components, nested frames, explicit --frames order, TB direction, shuffled creation order.",
+      "Lint: identical, contained, partial and touching boxes; uml system boundary exemption; CJK line-start prohibition; vertical-only overflow gives no fix; data URLs skipped; files outside the document folder; .bpmn --fix rejected.",
+      "Warnings: --quiet after -- stays positional; --strict --quiet still exits 3; JSON output never collapsed."
+    ],
+    "outOfScopeEdgeCases": [
+      "A host-side (Rust) A7 root cause.",
+      "Text-layout overflow rules on erd, state and uml pages.",
+      "carryMembers on move; collapsing JSON warnings.",
+      "Item-level array merge and SVG merge drivers."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/user-qa/cli-layout-merge-lint.md",
+      "impl-plans/active/clm-00-overview.md",
+      "impl-plans/active/clm-01-merge.md",
+      "impl-plans/active/clm-02-connector-edit-perf.md",
+      "impl-plans/active/clm-03-lint-core.md",
+      "impl-plans/active/clm-04-edit-usability.md",
+      "impl-plans/active/clm-06-route-arrange.md",
+      "impl-plans/active/clm-07-layered-core.md",
+      "impl-plans/active/clm-08-lint-cli.md",
+      "impl-plans/active/clm-09-wiring.md",
+      "apps/cli/src/commands.ts",
+      "apps/cli/src/edit-command.ts",
+      "apps/cli/src/edit/apply-batch.ts",
+      "packages/core/src/document-merge.ts",
+      "packages/core/src/shapes/connector/resolve.ts",
+      "packages/core/src/editor/transaction.ts",
+      "mise.toml"
+    ],
+    "residualRisks": [
+      "If all three native deadline attempts fail under machine load, the gate fails; deadlines are never relaxed.",
+      "mise run verify may rewrite tracked apps/desktop/src-tauri/gen/schemas/*.json through the tauri build script; commits stage explicit paths only."
+    ]
+  },
+  "acceptedDependencies": [
+    {
+      "planId": "clm-01-merge",
+      "planPath": "impl-plans/active/clm-01-merge.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "VersionConflict and mergeDocumentVersions (packages/core/src/document-merge.ts); mergeCommand and MERGE_USAGE (apps/cli/src/merge-command.ts); export determinism test (apps/cli/src/export-determinism.test.ts). Implementation accepted in the shared working tree, uncommitted."
+    },
+    {
+      "planId": "clm-03-lint-core",
+      "planPath": "impl-plans/active/clm-03-lint-core.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "NODE_OVERLAP_PAGE_KINDS, NodeOverlapFinding, lintNodeOverlaps (packages/core/src/diagram-lint/node-overlap.ts); wrapTextToWidth (packages/core/src/text-wrap.ts); planTextWrapFixes and TextWrapFix (packages/core/src/text-layout-lint/fix.ts). Implementation accepted in the shared working tree, uncommitted."
+    },
+    {
+      "planId": "clm-04-edit-usability",
+      "planPath": "impl-plans/active/clm-04-edit-usability.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "labelField and applyLabel (apps/cli/src/edit/label-field.ts); operation field checks (apps/cli/src/edit/operation-fields.ts); collapseWarnings, issueWarningKey, extractQuiet, applyQuiet (apps/cli/src/warnings.ts); update carryMembers:false. Implementation accepted in the shared working tree, uncommitted."
+    },
+    {
+      "planId": "clm-08-lint-cli",
+      "planPath": "impl-plans/active/clm-08-lint-cli.md",
+      "commit": "ee2cb43938ca5e66289ed87d925f6354c223b14b",
+      "provides": "LINT_NO_PAGES_MESSAGE, diagramLintApplies, DiagramLintRow, DiagramLintResult, lintDiagramPages, formatFixLines (apps/cli/src/lint-diagram.ts). Implementation accepted in the shared working tree, uncommitted."
+    }
+  ],
+  "plans": [
+    {
+      "planId": "clm-02-connector-edit-perf",
+      "planPath": "impl-plans/active/clm-02-connector-edit-perf.md",
+      "progressPath": "impl-plans/progress/clm-02-connector-edit-perf.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/semantics/connectors.ts",
+        "packages/ir/src/registry/generic.ts",
+        "packages/ir/src/registry/uml.ts",
+        "packages/ir/src/registry/erd.ts",
+        "packages/ir/src/registry/bpmn.ts",
+        "packages/ir/src/connector-positions.test.ts",
+        "packages/core/src/shapes/connector/resolve.ts",
+        "packages/core/src/shapes/connector/boundary.ts",
+        "packages/core/src/shapes/connector/route.ts",
+        "packages/core/src/shapes/connector/label-box.ts",
+        "packages/core/src/connector-positions.test.ts",
+        "packages/core/src/orthogonal-routing.ts",
+        "packages/core/src/frame-translation.ts",
+        "packages/core/src/frame-tree.ts",
+        "packages/core/src/manual-route-preservation.ts",
+        "packages/core/src/editor/transaction.ts",
+        "apps/cli/src/edit/apply-batch.ts",
+        "apps/cli/src/__fixtures__/obstacle-routing-batch.ts",
+        "apps/cli/src/__fixtures__/obstacle-routing-batch.expected.jsonl",
+        "apps/cli/src/edit-performance.test.ts",
+        "apps/cli/src/native-parity/edit-performance.test.ts",
+        "impl-plans/progress/clm-02-connector-edit-perf.md",
+        "tmp/clm-s725/clm-02-connector-edit-perf",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Baseline (Bun expected output and native /usr/bin/time -p with target/clm-baseline/nodetto-cli, inside artifact root target; logs stay under tmp/clm-s725/clm-02-connector-edit-perf/) is recorded before any source change; the expected file hash is unchanged at the end.",
+        "The confirmed A7 root cause is recorded and fixed with allowed techniques (per-batch memoisation, skipping inapplicable planners, avoiding per-operation full copies); output stays byte-identical; native edit of the fixture runs under 10000 ms wall time.",
+        "ConnectorRoutingSemantic gains labelPosition, fromPortPosition and toPortPosition with [0,1] validation and the semantic.portPositionWithoutPort warning; keyOrder lists updated; connectorLabelBoxAt and pointAlongRoute are exported; same-side self-loop resolver case added; documents without the fields render byte-identically (no golden changes).",
+        "Verification commands exit 0; the progress log has baseline timing, root cause, after CPU time and ratio."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit-performance.test.ts apps/cli/src/edit/apply-batch.test.ts",
+        "bun test packages/ir/src packages/core/src/connector-positions.test.ts packages/core/src/connector-endpoints.test.ts packages/core/src/connector-policy.test.ts packages/core/src/connector-outlines.test.ts",
+        "bun test packages/core/src/frame-translation.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/frame-selection.test.ts packages/core/src/orthogonal-routing.test.ts packages/core/src/manual-route-preservation.test.ts packages/core/src/svg-export.test.ts packages/io/src/jsonl/golden.test.ts",
+        "bun run typecheck",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/native-[123].log \"$d/native.log\"; CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > \"$d/native-build.log\" 2>&1 || exit 1; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/edit-performance.test.ts > \"$d/native-$i.log\" 2>&1 && cp \"$d/native-$i.log\" \"$d/native.log\" && exit 0; done; exit 1' sh tmp/clm-s725/clm-02-connector-edit-perf/final",
+        "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s725/clm-02-connector-edit-perf/final/native.log",
+        "grep -E '^ *0 fail$' tmp/clm-s725/clm-02-connector-edit-perf/final/native.log",
+        "bunx biome check packages/ir/src/semantics/connectors.ts packages/ir/src/registry/generic.ts packages/ir/src/registry/uml.ts packages/ir/src/registry/erd.ts packages/ir/src/registry/bpmn.ts packages/ir/src/connector-positions.test.ts packages/core/src/shapes/connector/resolve.ts packages/core/src/shapes/connector/boundary.ts packages/core/src/shapes/connector/route.ts packages/core/src/shapes/connector/label-box.ts packages/core/src/connector-positions.test.ts packages/core/src/orthogonal-routing.ts packages/core/src/frame-translation.ts packages/core/src/frame-tree.ts packages/core/src/manual-route-preservation.ts packages/core/src/editor/transaction.ts apps/cli/src/edit/apply-batch.ts apps/cli/src/__fixtures__/obstacle-routing-batch.ts apps/cli/src/edit-performance.test.ts apps/cli/src/native-parity/edit-performance.test.ts",
+        "grep -n 'export function connectorLabelBoxAt' packages/core/src/shapes/connector/label-box.ts",
+        "grep -n 'export function pointAlongRoute' packages/core/src/shapes/connector/route.ts",
+        "test -x target/clm-baseline/nodetto-cli"
+      ]
+    },
+    {
+      "planId": "clm-07-layered-core",
+      "planPath": "impl-plans/active/clm-07-layered-core.md",
+      "progressPath": "impl-plans/progress/clm-07-layered-core.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/arrange-layered.ts",
+        "packages/core/src/arrange-layered.test.ts",
+        "packages/core/src/shapes/frame.ts",
+        "impl-plans/progress/clm-07-layered-core.md",
+        "tmp/clm-s725/clm-07-layered-core",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/shapes/frame.ts",
+          "intendedEdit": "Amendment round 1: additive export FRAME_TITLE_BAND = 24; hitTest uses it in place of its literal 24; no other change. arrange-layered.ts imports it; packages/core/src/index.ts is not edited."
+        }
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "LAYERED_PAGE_KINDS, LayeredOptions, planLayered and columnFrames exist exactly as in the contract.",
+        "Column frames, units, BFS rank, frame order, LR/TB geometry (COLUMN_GAP 120, MEMBER_GAP 60, FRAME_PADDING 40, title band from frame layout code) follow design A1; all written numbers are integers; members keep their frame parent; rerun plans nothing; shuffled creation order gives the same commands.",
+        "FRAME_TITLE_BAND is exported from packages/core/src/shapes/frame.ts and used by hitTest and arrange-layered.ts (no copied 24); the frame.ts diff shows only the export and the literal replacement; tests cover in-degree-0 start without an initial state, cycle-only start, disconnected components, exact TB transposition and shuffled creation order.",
+        "No frames and non-column frameOrder ids return errors.",
+        "Verification commands exit 0 with logs under tmp/clm-s725/clm-07-layered-core/."
+      ],
+      "verification": [
+        "bun test packages/core/src/arrange-layered.test.ts packages/core/src/arrange.test.ts packages/core/src/frame.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts packages/core/src/shapes/frame.ts",
+        "grep -n 'export function planLayered' packages/core/src/arrange-layered.ts",
+        "grep -n 'export const FRAME_TITLE_BAND' packages/core/src/shapes/frame.ts",
+        "sh -c '! grep -q \"? 24\" packages/core/src/arrange-layered.ts'"
+      ]
+    },
+    {
+      "planId": "clm-06-route-arrange",
+      "planPath": "impl-plans/active/clm-06-route-arrange.md",
+      "progressPath": "impl-plans/progress/clm-06-route-arrange.md",
+      "wave": 2,
+      "dependsOn": ["clm-02-connector-edit-perf", "clm-07-layered-core"],
+      "writePaths": [
+        "packages/core/src/arrange-route.ts",
+        "packages/core/src/arrange-route.test.ts",
+        "packages/core/src/diagram-lint/metrics.ts",
+        "packages/core/src/diagram-lint/metrics.test.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/arrange-modes.test.ts",
+        "apps/cli/src/lint-metrics.ts",
+        "apps/cli/src/lint-metrics.test.ts",
+        "impl-plans/progress/clm-06-route-arrange.md",
+        "tmp/clm-s725/clm-06-route-arrange",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "ROUTE_PAGE_KINDS, RouteOptions, planRoute, PageMetrics, pageMetrics, arrangeLayeredOrRoute, lintMetrics and formatMetricsLines exist with the contract signatures.",
+        "planRoute never moves elements; implements reset, manual rules, port assignment, self-loop sides (A5), port spreading with the A4 gap allocation and 0.0001 collision rule, 4-decimal rounding, and label placement candidates (A3) scored with the shared metrics predicate; reruns plan nothing.",
+        "pageMetrics counts proper edge crossings (excluding points within 1 unit of endpoints) and label overlaps.",
+        "arrangeLayeredOrRoute handles --mode, --direction, --page, --frames, --ids, --reset-manual, --write, --check with the exit codes in the plan; the A7 fixture layered run completes in Bun under 10000 ms (wall time recorded).",
+        "Verification commands exit 0 with logs under tmp/clm-s725/clm-06-route-arrange/."
+      ],
+      "verification": [
+        "bun test packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/connector-positions.test.ts",
+        "bun test apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/arrange-route.ts packages/core/src/arrange-route.test.ts packages/core/src/diagram-lint/metrics.ts packages/core/src/diagram-lint/metrics.test.ts apps/cli/src/arrange-modes.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-metrics.test.ts",
+        "grep -n 'export function planRoute' packages/core/src/arrange-route.ts",
+        "grep -n 'export function arrangeLayeredOrRoute' apps/cli/src/arrange-modes.ts"
+      ]
+    },
+    {
+      "planId": "clm-09-wiring",
+      "planPath": "impl-plans/active/clm-09-wiring.md",
+      "progressPath": "impl-plans/progress/clm-09-wiring.md",
+      "wave": 3,
+      "dependsOn": [
+        "clm-01-merge",
+        "clm-02-connector-edit-perf",
+        "clm-03-lint-core",
+        "clm-04-edit-usability",
+        "clm-06-route-arrange",
+        "clm-07-layered-core",
+        "clm-08-lint-cli"
+      ],
+      "writePaths": [
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/cli.ts",
+        "apps/cli/src/main.ts",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/mcp.ts",
+        "packages/core/src/index.ts",
+        "apps/cli/src/merge-command.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/lint-metrics.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/cli-wiring.test.ts",
+        "apps/cli/src/merge-git.test.ts",
+        "apps/cli/src/native-parity/layout.test.ts",
+        "apps/cli/src/native-parity/merge.test.ts",
+        "apps/cli/src/native-parity/edit-usability.test.ts",
+        "apps/cli/src/native-parity/lint-rules.test.ts",
+        "apps/cli/src/ai-commands.test.ts",
+        "apps/cli/src/commands.test.ts",
+        "apps/cli/src/mcp.test.ts",
+        "apps/cli/src/mcp-stdio.test.ts",
+        "apps/cli/src/text-layout-lint.test.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "docs/cli.md",
+        "README.md",
+        "design-docs/specs/export.md",
+        "design-docs/specs/design-cli-ai-drawing.md",
+        "impl-plans/progress/clm-09-wiring.md",
+        "tmp/clm-s725/clm-09-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {
+          "path": "apps/cli/src/merge-command.ts",
+          "intendedEdit": "merge-command.ts (clm-01), arrange-modes.ts and lint-metrics.ts (clm-06) and lint-diagram.ts (clm-08): switch relative core imports to @nodetto/core only; no logic changes. These plans are dependencies, so the edits are sequential."
+        },
+        {
+          "path": "apps/cli/src/commands.test.ts",
+          "intendedEdit": "Existing tests (ai-commands, commands, mcp, mcp-stdio, text-layout-lint, breadboard-commands): update only assertions that the wiring intentionally changes (LINT_NO_PAGES wording, MCP tool list with nodetto_merge, help text, ERD-only documents now linting); record each change. clm-04 edits some of these files earlier, in wave 1."
+        },
+        {
+          "path": "apps/cli/src/main.ts",
+          "intendedEdit": "main.ts and mcp.ts: edit only if cli.ts and help.ts are not enough; record whether they were touched."
+        },
+        {
+          "path": "design-docs/specs/design-cli-ai-drawing.md",
+          "intendedEdit": "Update the pointer line only if the help wording differs."
+        }
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "runCli strips --quiet with extractQuiet and applies applyQuiet; merge is dispatched; arrange --mode layered|route dispatches to arrangeLayeredOrRoute and new flags with tidy/overlaps exit 2; loadDocument and validate collapse warnings while --strict still exits 3; lint selects pages with diagramLintApplies, supports --fix and --metrics, and output without the new flags is unchanged.",
+        "cli.ts:runCliAsync and native-engine.ts:nodettoRun apply --quiet for export/open paths.",
+        "packages/core/src/index.ts exports every new contract symbol and the four feature CLI modules import from @nodetto/core.",
+        "help.ts, docs/cli.md and README.md describe every new command, mode, flag and field, the git merge driver recipe, SVG regeneration and the export determinism guarantee; design-docs/specs/export.md gains the Goals and Rollout bullets.",
+        "cli-wiring, merge-git (real git, no skip) and the four new native parity topic files pass with NODETTO_CLI_TEST_BINARY set.",
+        "CARGO_TERM_QUIET=true mise run verify and mise run test-cli pass (3 attempts); the A7 fixture native edit CPU time is recorded against clm-02's baseline binary target/clm-baseline/nodetto-cli (target about 3 s CPU) in tmp/clm-s725/clm-09-wiring/final/timing.log."
+      ],
+      "verification": [
+        "bun test apps/cli/src/cli-wiring.test.ts apps/cli/src/merge-git.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/commands.test.ts apps/cli/src/mcp.test.ts apps/cli/src/mcp-stdio.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts",
+        "bun test apps/cli/src/merge-command.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/warnings.test.ts apps/cli/src/edit-performance.test.ts",
+        "bun run typecheck",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/native-[123].log \"$d/native.log\"; CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > \"$d/native-build.log\" 2>&1 || exit 1; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/merge.test.ts apps/cli/src/native-parity/edit-usability.test.ts apps/cli/src/native-parity/lint-rules.test.ts apps/cli/src/native-parity/edit-performance.test.ts apps/cli/src/merge-git.test.ts > \"$d/native-$i.log\" 2>&1 && cp \"$d/native-$i.log\" \"$d/native.log\" && exit 0; done; exit 1' sh tmp/clm-s725/clm-09-wiring/final",
+        "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s725/clm-09-wiring/final/native.log",
+        "grep -E '^ *0 fail$' tmp/clm-s725/clm-09-wiring/final/native.log",
+        "bunx biome check apps/cli/src/commands.ts apps/cli/src/help.ts apps/cli/src/cli.ts apps/cli/src/main.ts apps/cli/src/native-engine.ts apps/cli/src/mcp.ts packages/core/src/index.ts apps/cli/src/merge-command.ts apps/cli/src/arrange-modes.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-diagram.ts apps/cli/src/cli-wiring.test.ts apps/cli/src/merge-git.test.ts apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/merge.test.ts apps/cli/src/native-parity/edit-usability.test.ts apps/cli/src/native-parity/lint-rules.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/commands.test.ts apps/cli/src/mcp.test.ts apps/cli/src/mcp-stdio.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/verify-[123].log \"$d/verify.log\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > \"$d/verify-$i.log\" 2>&1 && cp \"$d/verify-$i.log\" \"$d/verify.log\" && exit 0; done; exit 1' sh tmp/clm-s725/clm-09-wiring/final",
+        "grep -E '^ *0 fail$' tmp/clm-s725/clm-09-wiring/final/verify.log",
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/test-cli-[123].log \"$d/test-cli.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1' sh tmp/clm-s725/clm-09-wiring/final",
+        "grep -E '^ *0 fail$' tmp/clm-s725/clm-09-wiring/final/test-cli.log",
+        "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/clm-s725/clm-09-wiring/final/test-cli.log)\"",
+        "bash -c 'd=\"$1\"; base=\"$2\"; mkdir -p \"$d\"; w=\"$(mktemp -d)\"; W=\"$w\" bun -e \"const m = await import(process.cwd() + \\\"/apps/cli/src/__fixtures__/obstacle-routing-batch.ts\\\"); const f = m.obstacleRoutingBatch(); await Bun.write(process.env.W + \\\"/doc.jsonl\\\", f.document); await Bun.write(process.env.W + \\\"/ops.json\\\", f.operations);\" || exit 1; cpu() { awk \"\\$1 == \\\"user\\\" || \\$1 == \\\"sys\\\" { s += \\$2 } END { print s }\" \"$1\"; }; : > \"$d/timing.log\"; for i in 1 2 3; do cp \"$w/doc.jsonl\" \"$w/new.jsonl\"; /usr/bin/time -p target/release/nodetto-cli edit \"$w/new.jsonl\" --ops \"$w/ops.json\" > \"$w/new.out\" 2> \"$w/new.time\" || { cat \"$w/new.time\" >> \"$d/timing.log\"; exit 1; }; n=\"$(cpu \"$w/new.time\")\"; echo \"attempt $i: new user+sys $n s\" >> \"$d/timing.log\"; awk -v n=\"$n\" \"BEGIN { exit !(n > 0 && n <= 10) }\" && break; [ \"$i\" -lt 3 ] || exit 1; done; if [ -x \"$base\" ]; then cp \"$w/doc.jsonl\" \"$w/base.jsonl\"; /usr/bin/time -p \"$base\" edit \"$w/base.jsonl\" --ops \"$w/ops.json\" > \"$w/base.out\" 2> \"$w/base.time\"; b=\"$(cpu \"$w/base.time\")\"; echo \"baseline $base user+sys $b s; ratio new/base $(awk -v n=\"$n\" -v b=\"$b\" \"BEGIN { if (b > 0) print n / b; else print \\\"n/a\\\" }\")\" >> \"$d/timing.log\"; else echo \"verification gap: baseline binary $base missing; compare with tmp/clm-s725/clm-02-connector-edit-perf/baseline-native.log\" >> \"$d/timing.log\"; fi; cat \"$d/timing.log\"' bash tmp/clm-s725/clm-09-wiring/final target/clm-baseline/nodetto-cli",
+        "grep -n 'arrangeLayeredOrRoute' apps/cli/src/commands.ts",
+        "grep -n 'lintDiagramPages' apps/cli/src/commands.ts",
+        "grep -n 'extractQuiet' apps/cli/src/commands.ts",
+        "grep -n '\"merge\"' apps/cli/src/commands.ts apps/cli/src/help.ts",
+        "test -z \"$(grep -n 'packages/core/src' apps/cli/src/merge-command.ts apps/cli/src/arrange-modes.ts apps/cli/src/lint-metrics.ts apps/cli/src/lint-diagram.ts)\""
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      ["clm-02-connector-edit-perf", "clm-07-layered-core"],
+      ["clm-06-route-arrange"],
+      ["clm-09-wiring"]
+    ],
+    "afterWave": [
+      "bun run typecheck",
+      "sh -c 'd=tmp/clm-s725/reconcile; mkdir -p \"$d\"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir packages/core packages/io apps/cli/src > \"$d/after-wave-$i.log\" 2>&1 && exit 0; done; exit 1'"
+    ],
+    "knownTransientFailures": [
+      "Native and MCP stdio deadlines can be exceeded under heavy machine load; the three-attempt loops absorb this; three failures are a hard gate failure. Deadlines are never relaxed.",
+      "A wave-1 or wave-2 typecheck or native build failure caused only by a sibling plan's in-progress file is drift: record it, wait, and rerun; never edit the sibling's file."
+    ],
+    "routing": "Route failures by writePaths. A7 performance, connector fields and resolver geometry to clm-02; merge engine and merge command to clm-01; node-overlap, text wrap and fix planner to clm-03; label, field checks, warnings and carryMembers to clm-04; layered placement to clm-07; route planning, metrics and arrange-modes/lint-metrics modules to clm-06; lint-diagram to clm-08; registration, help, docs, re-exports and CLI-level/native parity/git tests to clm-09. A host-side (Rust) A7 root cause is an orchestrator blocker.",
+    "commitPolicy": "Commit on main, staging explicit paths only. Never git add -A, never stage tmp/ or target/, never push (gitPush=false). No tool attribution in commit messages. No version bump, tag or release.",
+    "orchestratorOwnedPaths": [
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/user-qa/cli-layout-merge-lint.md",
+      "impl-plans/active/clm-00-overview.md",
+      "impl-plans/active/clm-s725-dispatch.json"
+    ]
+  }
+}

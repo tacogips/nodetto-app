@@ -1,0 +1,359 @@
+{
+  "taskId": "cpf-s748",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-748",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "1e8f43d224d7b43e200eb2229e7be17b39ca033c",
+  "designDocPaths": [
+    "design-docs/specs/design-convert-participant-frame-scope.md",
+    "design-docs/specs/design-cli-ai-drawing.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/cpf-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/cpf-s748",
+  "evidenceLayout": "Per-plan evidence under tmp/cpf-s748/<planId>/. tmp/ holds only .log, .txt, .json and .jsonl data, never binaries or .ts files. Cargo output goes to target/ (artifactRoots [\"target\"] in every plan); target/cpf-baseline is the pre-change baseline and must never be deleted (no cargo clean).",
+  "reviewContext": {
+    "issueReference": "none; authoritative workflowInput E1-E3 of opus-terra-design-and-implement-review-loop-session-748",
+    "userProblem": "Changing an element's shape today means delete plus add, which changes the id and drops connected edges, because convert is an unknown op and update rejects a type field. sequence.participant kinds actor, service and db all render as the same rounded box in SVG, PNG and PDF export and on the canvas. ddl --frame silently loses a table that straddles a nested positional frame's edge, and misses a table below a positional frame in z-order, with exit 0 under --strict and nothing from lint.",
+    "requiredOutcomes": [
+      "E1: convert keeps id, geometry, z-order, membership, mapped text and connected connectors; reports unmovable fields; --dry-run lists them; invalid targets fail atomically; delete reconnectTo works; Bun and native parity tests (cpf-01, cpf-04, cpf-05, cpf-08).",
+      "E2: actor, service and db participants render distinctly in SVG/PNG/PDF export and the desktop canvas, with lifelines attached; types describes them; tests on export geometry and a canvas view test (cpf-02, cpf-07, cpf-08).",
+      "E3: tables fully inside a frame are in its DDL regardless of nested positional frame edges and z-order; ambiguous exclusions fail --strict with a named warning; lint reports straddling tables; existing DDL output unchanged; tests in Bun and native (cpf-03, cpf-06, cpf-08).",
+      "Final, serial, on the combined tree: CARGO_TERM_QUIET=true mise run verify and CARGO_TERM_QUIET=true mise run test-cli exit 0 (3 attempts for native deadline timeouts only; native parity tests run, not skip); help and docs describe every new op, field and rule (cpf-06)."
+    ],
+    "nonGoals": [
+      "No change to frameParents, expandContainers, frame-membership.ts, mergeDocuments, CLI merge, validateDocument, shape sizing defaults or sequence layout.",
+      "No app UI for conversion, no connector retyping, no conversion of edges, frames or groups.",
+      "No DDL scope change for views or other database objects, or for page-wide DDL.",
+      "No schema change, migration, version bump, release or push; no server, auth or deployment code."
+    ],
+    "constraints": [
+      "Plans edit only their writePaths; writePaths are disjoint apart from the target artifact root. Only cpf-06 edits packages/core/src/index.ts, apps/cli/src/commands.ts, apps/cli/src/help.ts, docs/cli.md and README.md.",
+      "Workers read fresh before each edit, record git hash-object before and after in their own progress log, make no git state changes, create no worktrees, run no broad formatters and change no lockfiles.",
+      "Strict TypeScript, no unchecked index lookups in packages/core, no String.prototype.split with a regex on whole documents, no per-point destructuring in hot loops, no emojis.",
+      "Fixtures and all text use self-authored neutral names; no external references and no image files.",
+      "Cargo commands use CARGO_TERM_QUIET=true. Native deadline tests get up to 3 attempts for timeouts only, CPU time is compared against the pre-change binary, and deadlines are never relaxed.",
+      "Raster tests must not assume a platform font."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Unmappable fields are dropped and reported, not kept as unknown fields.", "rationale": "The result always validates against the target type, and the report and --dry-run show exactly what was lost."},
+      {"decision": "An invalid connector endpoint fails the batch atomically; connectors are never adapted or retyped.", "rationale": "A conversion never silently changes a connector's type. BPMN flows use resolveBpmnConnection and treat corrected:true as a failure, and planBpmnReconnect is not used because it retypes the flow."},
+      {"decision": "Edges, frames and groups are not convertible.", "rationale": "Container conversion would change membership, and connector conversion would need retyping."},
+      {"decision": "A new convertElement core command changes the type in place, keeping id, page and index, with another convertElement as its inverse and a re-check of every edge that references the id.", "rationale": "Element type has no mutation today, delete plus create cascades connectors, and the existing post-apply check covers only updateSemantic and createElement."},
+      {"decision": "A successful conversion always keeps resolved bounds; a target that cannot keep them fails atomically with no warning-only success.", "rationale": "frameParents depends on id, index, resolved bounds and frame memberIds, so equal bounds keep explicit and positional membership unchanged. Existing shape sizing is not changed to make a conversion fit."},
+      {"decision": "A dirty desktop session returns null from planOutsideChange when a conversion conflicts with a concurrent edit, the merge has validation errors, or a dependent no longer suits the new type.", "rationale": "mergeDocuments merges type and semantic independently and session.ts commits before raising a conflict. null reuses the existing banner path, so no invalid element reaches the store and no local edit is lost silently."},
+      {"decision": "Participant geometry and bounds stay unchanged; new paint stays inside the head band, and export and canvas share sequenceParticipantNotation.", "rationale": "Messages and lifelines need no change, service output stays byte-identical, and PNG and PDF follow because they rasterize the SVG."},
+      {"decision": "cpf-07 renders primitives directly from primitiveAttributes rather than through BpmnNotationPrimitiveView, with smart paint only on the actor head and db cylinder.", "rationale": "BpmnNotationPrimitiveView takes only primitive and forwards no attributes, and BpmnShapeView.tsx is not in the plan. Open limb paths would fill during an svgPaintKeyframe transition."},
+      {"decision": "DDL scope is a separate resolver, erdFrameScope, and frameParents, expandContainers and frame-membership.ts stay unchanged.", "rationale": "Canvas selection, carrying, clipping, where.parent and paint order must not change. Everything in expandContainers stays included, so frame output only grows."},
+      {"decision": "A memberIds list naming only frames does not restrict direct table content; any other list does, including an empty list.", "rationale": "This is the structure of the requested catalog and zone repro, and an explicit list of content elements stays authoritative."},
+      {"decision": "Feature plans stay in their own modules and cpf-06 alone owns shared registration; wave 4 follows wiring.", "rationale": "Maximum concurrency requirement with at most 2 waves before wiring. cpf-07 and cpf-08 need the new index exports or the final help text."}
+    ],
+    "intentionalTradeoffs": [
+      "Converting to a type that derives its size from content usually fails until the element is resized to match. The error tells the caller the size to use.",
+      "Decision on frames-only memberIds changes DDL for an existing document with such a list and an unlisted, unclaimed table fully inside. The request requires it and tests pin it.",
+      "A table moved out of a frames-only frame on the canvas but left geometrically inside it is adopted in DDL. Docs state this, so canvas ownership can differ from DDL scope.",
+      "ddl --frame --strict can newly exit 3 on existing documents with a straddling or closed case. The SQL is unchanged.",
+      "A dirty desktop session that receives a concurrent conversion raises the whole-file banner rather than merging, and conflicts are reported per file, not per element.",
+      "Actor and db drop the uppercase kind caption on the canvas, because the shape states the kind. A gradient fill falls back to a solid value on the canvas SVG, and actor limbs do not animate paint."
+    ],
+    "supportedEdgeCases": [
+      "convert by id or where with expect, multi-match, same-type shape change on a semantic-only participant (visual untouched), and shape.geo with semantic.geo.",
+      "An earlier update in the same batch that resizes to the target's derived size lets the conversion succeed; a valid earlier op with an incompatible convert writes nothing.",
+      "A target without connection ports keeps connector ports byte-identical, falls back to automatic attachment, and reports the kept port.",
+      "Explicit and positional frame members, below and above the frame in z-order, keep the same frameParents output after conversion.",
+      "delete with reconnectTo: self-loops allowed only on state.node and erd.table, and erd.relation column ids remapped by same-name column.",
+      "Reconciliation: local move plus remote conversion merges; a BPMN flow unchanged from base merges; an existing endpoint warning on an unconverted element stays a warning; both directions of new message, activation and flow raise the banner.",
+      "E3: table straddling a nested positional frame, positional frame above a table, partially overlapping competing frames, closed frames including memberIds [], claimed-elsewhere tables, and touching an edge without area overlap.",
+      "E2: palette shapes sequence.actor and sequence.database, style overrides on primitives, and long names that must not move the lifeline or bounds."
+    ],
+    "outOfScopeEdgeCases": [
+      "App UI for conversion, connector retyping, and conversion of edges, frames or groups.",
+      "DDL scope for views and other database objects, and page-wide DDL.",
+      "Canvas ownership for straddling tables, which stays on frameParents.",
+      "Per-element conflict reporting in the desktop banner, and changes to mergeDocuments or CLI merge.",
+      "Gradient handling on the canvas participant SVG and a DOM test environment for canvas transitions."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-convert-participant-frame-scope.md",
+      "design-docs/specs/design-cli-ai-drawing.md",
+      "impl-plans/active/cpf-00-overview.md",
+      "impl-plans/active/cpf-01-convert-command.md",
+      "impl-plans/active/cpf-02-participant-export.md",
+      "impl-plans/active/cpf-03-ddl-frame-scope.md",
+      "impl-plans/active/cpf-04-edit-convert-op.md",
+      "impl-plans/active/cpf-05-desktop-reconcile.md",
+      "impl-plans/active/cpf-06-wiring.md",
+      "impl-plans/active/cpf-07-canvas-view.md",
+      "impl-plans/active/cpf-08-native-parity.md"
+    ],
+    "residualRisks": [
+      "cpf-08: the Unknown op baseline proof comes from apps/cli and does not show that packages/core is pre-change. A worker can add an SVG probe showing a head rect for an actor. Exposure is limited to the timing comparison.",
+      "cpf-08: the 1.25 CPU ratio comes from an earlier plan and the 300-node fixture is unproven. Exceeding the ratio is reported as a finding, and deadlines are not relaxed.",
+      "cpf-06: the per-kind rule lists at apps/cli/src/help.ts:604-606 and docs/cli.md:292-293 are not named in the plan. They need frame-straddle added for erd so they do not go stale, and the test only checks that the term is present.",
+      "cpf-06: existing ERD fixtures may gain frame-straddle warnings. Any failure is reported, not silenced.",
+      "cpf-07: with no DOM test environment, a running smart transition on a participant is not exercised. Coverage is the view model and source checks, as the design accepts."
+    ]
+  },
+  "acceptedDependencies": [],
+  "plans": [
+    {
+      "planId": "cpf-01-convert-command",
+      "planPath": "impl-plans/active/cpf-01-convert-command.md",
+      "progressPath": "impl-plans/progress/cpf-01-convert-command.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/commands.ts",
+        "packages/core/src/editor/transaction.ts",
+        "packages/core/src/editor/dirty-pages.ts",
+        "packages/core/src/editor/bpmn.ts",
+        "packages/core/src/editor/facade/notation-editing.ts",
+        "packages/core/src/convert-element.test.ts",
+        "impl-plans/progress/cpf-01-convert-command.md",
+        "tmp/cpf-s748/cpf-01-convert-command",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "packages/core/src/commands.ts has the convertElement union member and case; the command keeps id, page, index and accessibility, and undo and redo round-trip.",
+        "A converted endpoint with an incompatible typed connector throws CommandError with connector.endpointType and leaves the store unchanged; invalid semantic and unknown elementType do the same; a locked element stays unchanged.",
+        "Editor methods nextParticipantOrderOn and bpmnFlowIssue exist with the pinned signatures, and bpmnFlowIssue treats a corrected flow type as an issue.",
+        "packages/core/src/index.ts and packages/core/src/frame-tree.ts are unchanged, and all listed tests pass with evidence in the progress log."
+      ],
+      "verification": [
+        "bun test packages/core/src/convert-element.test.ts",
+        "bun test packages/core/src/bpmn/connection.test.ts packages/core/src/connector-policy.test.ts",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-02-participant-export",
+      "planPath": "impl-plans/active/cpf-02-participant-export.md",
+      "progressPath": "impl-plans/progress/cpf-02-participant-export.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/shapes/sequence-participant-notation.ts",
+        "packages/core/src/shapes/sequence-participant-notation.test.ts",
+        "packages/core/src/svg-export/basic-shapes.ts",
+        "apps/cli/src/types-command.ts",
+        "apps/cli/src/sequence-participant-export.test.ts",
+        "impl-plans/progress/cpf-02-participant-export.md",
+        "tmp/cpf-s748/cpf-02-participant-export",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "sequenceParticipantNotation exists with the pinned signature, returns null for service, a missing kind and any other value, and keeps all primitives and labelBox inside the head box.",
+        "SVG export draws actor as a circle and fill none path and db as a cylinder path with no head rect; service and missing kind markup is byte-identical to the markup captured before the edit.",
+        "Lifeline coordinates relative to the box and message paths are equal across kinds; PNG bytes differ per kind with a single-space name, and PDF export succeeds per kind.",
+        "types sequence.participant states how each kind renders in text and in a JSON rendering key; other types' output is unchanged.",
+        "sequence-layout.ts, shapes/sequence.ts and shapes/connector are unchanged, and the progress log records the centredLabel long-name observation and evidence."
+      ],
+      "verification": [
+        "bun test packages/core/src/shapes/sequence-participant-notation.test.ts apps/cli/src/sequence-participant-export.test.ts",
+        "bun test packages/core/src/svg-export.test.ts packages/core/src/sequence-layout.test.ts packages/core/src/hit-test.test.ts packages/core/src/shapes/connection-points.test.ts packages/core/src/sequence-authoring.test.ts apps/cli/src/export-paint-order.test.ts",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-03-ddl-frame-scope",
+      "planPath": "impl-plans/active/cpf-03-ddl-frame-scope.md",
+      "progressPath": "impl-plans/progress/cpf-03-ddl-frame-scope.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/erd-frame-scope.ts",
+        "packages/core/src/erd-frame-scope.test.ts",
+        "packages/core/src/diagram-lint/frame-straddle.ts",
+        "packages/core/src/diagram-lint/frame-straddle.test.ts",
+        "packages/core/src/database-ddl.ts",
+        "apps/cli/src/ddl-frame-scope.test.ts",
+        "impl-plans/progress/cpf-03-ddl-frame-scope.md",
+        "tmp/cpf-s748/cpf-03-ddl-frame-scope",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "erdFrameScope applies the design's ordered cases: everything in expandContainers stays included, and warnings are one per table, deterministic, named and first in the DDL warnings.",
+        "With gadgets straddling zone inside catalog, ddl --frame catalog --strict exits 0 and lists both tables; ddl --frame zone --strict exits 3 and names gadgets. A positional frame above a table includes that table.",
+        "An unambiguous document's SQL equals a literal expected string with and without --frame, and existing database-ddl tests pass unchanged.",
+        "lintFrameStraddles exists with the pinned signature and returns one finding per table and frame pair on ERD pages only.",
+        "frame-tree.ts, frame-membership.ts and database-ddl.test.ts are unchanged, and the progress log lists evidence."
+      ],
+      "verification": [
+        "bun test packages/core/src/erd-frame-scope.test.ts packages/core/src/diagram-lint/frame-straddle.test.ts apps/cli/src/ddl-frame-scope.test.ts",
+        "bun test packages/core/src/database-ddl.test.ts packages/core/src/database-ddl-tables.test.ts packages/core/src/database-objects.test.ts packages/core/src/database-ddl-expressions.test.ts packages/core/src/erd-definition-edit.test.ts apps/desktop/src/design-workflow.test.ts",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-04-edit-convert-op",
+      "planPath": "impl-plans/active/cpf-04-edit-convert-op.md",
+      "progressPath": "impl-plans/progress/cpf-04-edit-convert-op.md",
+      "wave": 2,
+      "dependsOn": ["cpf-01-convert-command"],
+      "writePaths": [
+        "apps/cli/src/edit/operations/convert.ts",
+        "apps/cli/src/edit/operations/convert.test.ts",
+        "apps/cli/src/edit/operations/elements.ts",
+        "apps/cli/src/edit/batch.ts",
+        "apps/cli/src/edit/apply-batch.ts",
+        "apps/cli/src/edit/operation-fields.ts",
+        "apps/cli/src/edit/operation-fields.test.ts",
+        "apps/cli/src/edit/types.ts",
+        "apps/cli/src/edit/report.ts",
+        "apps/cli/src/edit/report.test.ts",
+        "impl-plans/progress/cpf-04-edit-convert-op.md",
+        "tmp/cpf-s748/cpf-04-edit-convert-op",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "convert by id or where with expect keeps id, resolved bounds, index and frameParents output, leaves connectors deep-equal, and maps text to the target's field.",
+        "Dropped fields appear in the report and as convert.fieldDropped warnings; --dry-run runs the same code, so its errors and report lines match a real run.",
+        "Edge, frame, group and locked sources or targets, invalid connectors, BPMN flows that would be retyped, non-edge dependents, invalid semantics and bounds changes all fail with named errors and write nothing.",
+        "delete with reconnectTo moves connectors with label, ports, route and labelPosition deep-equal, and its failure cases are atomic; delete without reconnectTo keeps today's output.",
+        "Reports gain converted and reconnected only when non-empty, and all listed tests pass with evidence in the progress log."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit",
+        "bun test apps/cli/src/edit-order.test.ts apps/cli/src/edit-scale-text-group.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/edit-performance.test.ts",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-05-desktop-reconcile",
+      "planPath": "impl-plans/active/cpf-05-desktop-reconcile.md",
+      "progressPath": "impl-plans/progress/cpf-05-desktop-reconcile.md",
+      "wave": 2,
+      "dependsOn": ["cpf-01-convert-command"],
+      "writePaths": [
+        "apps/desktop/src/file/session-reconcile.ts",
+        "apps/desktop/src/file/session-external.test.ts",
+        "apps/desktop/src/file/session.ts",
+        "impl-plans/progress/cpf-05-desktop-reconcile.md",
+        "tmp/cpf-s748/cpf-05-desktop-reconcile",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "planOutsideChange returns null in the dirty branch for all three conversion checks, before any store commit; each banner case keeps the store deep-equal to the pre-event snapshot with no autosave pending.",
+        "A clean session takes a conversion in place. A local move plus remote conversion, a BPMN flow unchanged from base, and an existing endpoint warning on an unconverted element all merge with no banner.",
+        "Documents with no type change return early from the check, and existing tests pass unchanged.",
+        "document-merge.ts and validate.ts are unchanged; session.ts is unchanged unless the progress log names the failing test that required the change."
+      ],
+      "verification": [
+        "bun test apps/desktop/src/file/session-external.test.ts packages/core/src/document-merge.test.ts",
+        "bun test apps/desktop/src/file",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-06-wiring",
+      "planPath": "impl-plans/active/cpf-06-wiring.md",
+      "progressPath": "impl-plans/progress/cpf-06-wiring.md",
+      "wave": 3,
+      "dependsOn": [
+        "cpf-02-participant-export",
+        "cpf-03-ddl-frame-scope",
+        "cpf-04-edit-convert-op",
+        "cpf-05-desktop-reconcile"
+      ],
+      "writePaths": [
+        "packages/core/src/index.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/lint-diagram.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/help-convert-frame.test.ts",
+        "docs/cli.md",
+        "README.md",
+        "impl-plans/progress/cpf-06-wiring.md",
+        "tmp/cpf-s748/cpf-06-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "packages/core/src/index.ts additively exports sequenceParticipantNotation, lintFrameStraddles and their types, and does not export the DDL scope resolver or predicates.",
+        "lint reports frame-straddle as a warning row after node-overlap rows on ERD pages, naming table and frame, with exit code and existing findings unchanged.",
+        "help edit, ddl, lint and types, docs/cli.md and README.md describe convert, reconnectTo, the frame membership rule, frame-straddle and participant rendering; existing asserted help wording stays exact.",
+        "apps/cli/src/commands.ts is unchanged unless the progress log explains the change, and any frame-straddle fixture failure is reported, not silenced."
+      ],
+      "verification": [
+        "bun test apps/cli/src/lint-diagram.test.ts apps/cli/src/help-convert-frame.test.ts apps/cli/src/help-style-export.test.ts apps/cli/src/cli-wiring.test.ts apps/cli/src/commands.test.ts",
+        "bun test apps/cli/src/lint-metrics.test.ts apps/cli/src/ai-commands.test.ts",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-07-canvas-view",
+      "planPath": "impl-plans/active/cpf-07-canvas-view.md",
+      "progressPath": "impl-plans/progress/cpf-07-canvas-view.md",
+      "wave": 4,
+      "dependsOn": ["cpf-02-participant-export", "cpf-06-wiring"],
+      "writePaths": [
+        "packages/ui-solid/src/shapes/SequenceParticipantView.tsx",
+        "packages/ui-solid/src/shapes/ShapeView.tsx",
+        "packages/ui-solid/src/sequence-participant-view.test.ts",
+        "apps/desktop/src/styles/canvas.css",
+        "impl-plans/progress/cpf-07-canvas-view.md",
+        "tmp/cpf-s748/cpf-07-canvas-view",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "sequenceParticipantViewModel returns null for service and a missing kind, whose markup stays unchanged; actor and db draw the shared notation's primitives inside the 54 px band, and style overrides win.",
+        "ShapeView.tsx passes box, the lifeline stays at top 54px, both modifier classes exist, and smart paint is set only for the participant-head and participant-cylinder roles.",
+        "sequence.ts and sequence-layout.ts are unchanged; the progress log records the gradient fallback, the limbs not animating paint, the divergence from BpmnNotationPrimitiveView, and evidence."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/sequence-participant-view.test.ts packages/ui-solid/src/text-note-view.test.ts packages/ui-solid/src/canvas-paint-order.test.ts",
+        "bun test packages/ui-solid/src/shapes",
+        "bun run typecheck"
+      ]
+    },
+    {
+      "planId": "cpf-08-native-parity",
+      "planPath": "impl-plans/active/cpf-08-native-parity.md",
+      "progressPath": "impl-plans/progress/cpf-08-native-parity.md",
+      "wave": 4,
+      "dependsOn": ["cpf-04-edit-convert-op", "cpf-06-wiring"],
+      "writePaths": [
+        "apps/cli/src/native-parity/convert.test.ts",
+        "apps/cli/src/native-parity/frame-scope.test.ts",
+        "apps/cli/src/native-parity/sequence-participant.test.ts",
+        "impl-plans/progress/cpf-08-native-parity.md",
+        "tmp/cpf-s748/cpf-08-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Native and Bun CLIs produce identical stdout, stderr, exit code and file bytes for the listed convert, reconnectTo, ddl --frame, lint, participant SVG and types cases; the native test log shows 0 skip.",
+        "The pre-change binary is built from target/cpf-baseline/.src with no non-hidden test files under target/cpf-baseline, and timing.txt holds median user CPU for both binaries.",
+        "A shared command above 1.25 times the baseline is reported as a finding, and no deadline is relaxed.",
+        "harness.ts, apps/cli/native and crates are unchanged, no cargo clean runs, and the progress log lists evidence."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/convert.test.ts apps/cli/src/native-parity/frame-scope.test.ts apps/cli/src/native-parity/sequence-participant.test.ts",
+        "bun run typecheck"
+      ]
+    }
+  ],
+  "finalVerification": [
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true mise run test-cli"
+  ]
+}

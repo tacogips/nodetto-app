@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="180" y1="110" x2="850" y2="950" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#24685D"/>
+      <stop offset="0.52" stop-color="#143F3A"/>
+      <stop offset="1" stop-color="#092A29"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="200" y1="100" x2="800" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A9DAC4" stop-opacity="0.48"/>
+      <stop offset="0.5" stop-color="#5E9D89" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#061E20" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="330" y1="290" x2="710" y2="730" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFF3"/>
+      <stop offset="1" stop-color="#D5EADA"/>
+    </linearGradient>
+    <linearGradient id="node" x1="650" y1="230" x2="760" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE7A1"/>
+      <stop offset="1" stop-color="#D6AD55"/>
+    </linearGradient>
+  </defs>
+  <!-- macOS optical inset; the surrounding canvas remains transparent. -->
+  <rect x="96" y="112" width="832" height="832" rx="188" fill="#061F20" opacity="0.18"/>
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#tile)"/>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="none" stroke="url(#rim)" stroke-width="8"/>
+  <!-- One continuous connector makes an N: a canvas, a node, an idea. -->
+  <path d="M330 704V320L694 704V320" fill="none" stroke="#061F20" stroke-opacity="0.28" stroke-width="90" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 12)"/>
+  <path d="M330 704V320L694 704V320" fill="none" stroke="url(#stroke)" stroke-width="80" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="330" cy="704" r="57" fill="#E7F2E5"/>
+  <circle cx="330" cy="704" r="19" fill="#205B50"/>
+  <circle cx="694" cy="304" r="69" fill="#0F3934"/>
+  <circle cx="694" cy="304" r="57" fill="url(#node)"/>
+  <circle cx="694" cy="304" r="19" fill="#205349"/>
+</svg>
