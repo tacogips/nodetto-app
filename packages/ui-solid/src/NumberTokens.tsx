@@ -1,0 +1,150 @@
+import {
+  createNumberToken,
+  type Editor,
+  numberTokens,
+  setNumberTokenAlias,
+  updateNumberToken,
+} from "@nodetto/core";
+import { createMemo, createSignal, For, type JSX, Show } from "solid-js";
+import { createEditorSignals } from "./adapter.ts";
+import { HelpHint } from "./HelpHint.tsx";
+
+/** Document-wide measurements used by sizing, spacing, radii and typography. */
+export function NumberTokens(props: { readonly editor: Editor }): JSX.Element {
+  const signals = createEditorSignals(props.editor);
+  const [name, setName] = createSignal("");
+  const [value, setValue] = createSignal(8);
+  const tokens = createMemo(() => {
+    signals.rev();
+    return numberTokens(props.editor);
+  });
+  return (
+    <section
+      class="nodetto-number-tokens"
+      aria-label="Shared sizes and spacing"
+      onKeyDown={(event) => event.stopPropagation()}
+      onKeyUp={(event) => event.stopPropagation()}
+    >
+      <h2>
+        Sizes and spacing{" "}
+        <HelpHint text="Save sizes in pixels, then apply them in Properties under Shared styles. These values follow the page theme chosen in Colors." />
+      </h2>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (createNumberToken(props.editor, name(), value())) setName("");
+        }}
+      >
+        <input
+          aria-label="Size name"
+          placeholder="e.g. Card padding"
+          required
+          value={name()}
+          onInput={(event) => setName(event.currentTarget.value)}
+        />
+        <input
+          type="number"
+          aria-label="Size in pixels"
+          min="0"
+          step="any"
+          required
+          value={value()}
+          onInput={(event) => setValue(event.currentTarget.valueAsNumber)}
+        />
+        <button
+          type="submit"
+          disabled={!name().trim() || !Number.isFinite(value())}
+        >
+          Save size
+        </button>
+      </form>
+      <For each={tokens()}>
+        {(token) => {
+          const locked = () => {
+            signals.rev();
+            return (
+              props.editor.createShapeContext().isLocked?.(token.id) === true
+            );
+          };
+          return (
+            <div class="nodetto-color-entry">
+              <input
+                aria-label={`Rename ${token.name}`}
+                value={token.name}
+                disabled={locked()}
+                onChange={(event) => {
+                  if (
+                    !updateNumberToken(
+                      props.editor,
+                      token.id,
+                      event.currentTarget.value,
+                      token.value,
+                    )
+                  )
+                    event.currentTarget.value = token.name;
+                }}
+              />
+              <input
+                type="number"
+                aria-label={`${token.name} value`}
+                min="0"
+                step="any"
+                value={token.value}
+                disabled={locked() || token.aliasId !== null}
+                onChange={(event) => {
+                  if (
+                    !updateNumberToken(
+                      props.editor,
+                      token.id,
+                      token.name,
+                      event.currentTarget.valueAsNumber,
+                    )
+                  )
+                    event.currentTarget.value = String(token.value);
+                }}
+              />
+              <details>
+                <summary>Use another size</summary>
+                <select
+                  aria-label={`Size used by ${token.name}`}
+                  value={token.aliasId ?? ""}
+                  disabled={locked()}
+                  onChange={(event) => {
+                    if (
+                      !setNumberTokenAlias(
+                        props.editor,
+                        token.id,
+                        event.currentTarget.value || null,
+                      )
+                    )
+                      event.currentTarget.value = token.aliasId ?? "";
+                  }}
+                >
+                  <option value="">Custom size</option>
+                  <For each={tokens().filter((entry) => entry.id !== token.id)}>
+                    {(entry) => (
+                      <option value={entry.id}>Use {entry.name}</option>
+                    )}
+                  </For>
+                </select>
+              </details>
+              <Show when={token.broken}>
+                <span role="status">
+                  Referenced size is missing; showing the saved size
+                </span>
+              </Show>
+              <button
+                type="button"
+                disabled={locked()}
+                title={`Remove ${token.name}; linked measurements retain their current value`}
+                onClick={() => props.editor.deleteElements([token.id])}
+              >
+                Remove
+              </button>
+            </div>
+          );
+        }}
+      </For>
+    </section>
+  );
+}
