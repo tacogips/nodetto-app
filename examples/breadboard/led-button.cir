@@ -1,0 +1,7 @@
+* LED and button / LED and button (nodetto breadboard)
+VBT1 VCC 0 DC 5
+D1 N_D1_1 0 D_LED
+R1 N_R1_1 N_D1_1 220
+* SW1 push button (open): 1-2 VCC, 3-4 N_R1_1
+.model D_LED D
+.end
