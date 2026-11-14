@@ -1,0 +1,13 @@
+{"kind":"document","schemaVersion":1,"id":"usecase-example","title":"Lending desk use cases"}
+{"kind":"page","id":"p1","name":"Use cases","pageKind":"uml"}
+{"kind":"element","id":"borrow","page":"p1","type":"usecase.node","index":"g","semantic":{"name":"Borrow item","kind":"usecase"},"visual":{"x":300,"y":100,"width":160,"height":72}}
+{"kind":"element","id":"borrow-checks-card","page":"p1","type":"usecase.relationship","index":"z","semantic":{"from":"borrow","to":"check-card","kind":"include"}}
+{"kind":"element","id":"check-card","page":"p1","type":"usecase.node","index":"k","semantic":{"name":"Check member card","kind":"usecase"},"visual":{"x":300,"y":240,"width":160,"height":72}}
+{"kind":"element","id":"desk","page":"p1","type":"usecase.node","index":"a","semantic":{"name":"Lending desk","kind":"system"},"visual":{"x":240,"y":40,"width":400,"height":420}}
+{"kind":"element","id":"helper","page":"p1","type":"usecase.node","index":"c","semantic":{"name":"Volunteer","kind":"actor"},"visual":{"x":40,"y":300,"width":64,"height":112}}
+{"kind":"element","id":"helper-is-member","page":"p1","type":"usecase.relationship","index":"zw","semantic":{"from":"helper","to":"member","kind":"generalization"}}
+{"kind":"element","id":"late-fee","page":"p1","type":"usecase.node","index":"m","semantic":{"name":"Charge late fee","kind":"usecase"},"visual":{"x":300,"y":360,"width":160,"height":72}}
+{"kind":"element","id":"late-fee-extends","page":"p1","type":"usecase.relationship","index":"zt","semantic":{"from":"late-fee","to":"borrow","kind":"extend","label":"returned late","routing":"orthogonal"}}
+{"kind":"element","id":"member","page":"p1","type":"usecase.node","index":"b","semantic":{"name":"Member","kind":"actor"},"visual":{"x":40,"y":80,"width":64,"height":112}}
+{"kind":"element","id":"member-borrows","page":"p1","type":"usecase.relationship","index":"y","semantic":{"from":"member","to":"borrow","kind":"association"}}
+{"kind":"element","id":"records","page":"p1","type":"shape.geo","index":"q","semantic":{"geo":"package","label":"Records"},"visual":{"x":700,"y":40,"width":200,"height":140}}

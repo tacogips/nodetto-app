@@ -1,0 +1,134 @@
+[
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "usecase.node",
+    "ref": "desk",
+    "semantic": {
+      "name": "Lending desk",
+      "kind": "system"
+    },
+    "visual": {
+      "x": 240,
+      "y": 40,
+      "width": 400,
+      "height": 340
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "usecase.node",
+    "ref": "member",
+    "semantic": {
+      "name": "Member",
+      "kind": "actor"
+    },
+    "visual": {
+      "x": 40,
+      "y": 80
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "usecase.node",
+    "ref": "volunteer",
+    "semantic": {
+      "name": "Volunteer",
+      "kind": "actor"
+    },
+    "visual": {
+      "x": 40,
+      "y": 320
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "usecase.node",
+    "ref": "borrow",
+    "semantic": {
+      "name": "Borrow item",
+      "kind": "usecase"
+    },
+    "visual": {
+      "x": 360,
+      "y": 90
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "usecase.node",
+    "ref": "card",
+    "semantic": {
+      "name": "Check member card",
+      "kind": "usecase"
+    },
+    "visual": {
+      "x": 270,
+      "y": 260
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "usecase.node",
+    "ref": "fee",
+    "semantic": {
+      "name": "Charge late fee",
+      "kind": "usecase"
+    },
+    "visual": {
+      "x": 460,
+      "y": 260
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "records",
+    "semantic": {
+      "geo": "package",
+      "label": "Records"
+    },
+    "visual": {
+      "x": 700,
+      "y": 40,
+      "width": 200,
+      "height": 140
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@member",
+    "to": "@borrow"
+  },
+  {
+    "op": "connect",
+    "from": "@borrow",
+    "to": "@card",
+    "semantic": {
+      "kind": "include"
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@fee",
+    "to": "@borrow",
+    "label": "returned late",
+    "semantic": {
+      "kind": "extend"
+    }
+  },
+  {
+    "op": "connect",
+    "from": "@volunteer",
+    "to": "@member",
+    "semantic": {
+      "kind": "generalization"
+    }
+  }
+]
