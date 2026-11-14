@@ -39,12 +39,14 @@ const expectedIcons = {
   verticalTop: "align-vertical-justify-start",
   verticalMiddle: "align-vertical-justify-center",
   verticalBottom: "align-vertical-justify-end",
+  distributeHorizontal: "align-horizontal-distribute-center",
+  distributeVertical: "align-vertical-distribute-center",
 } as const;
 
 test("toolbar icon mapping matches the accepted contract", () => {
-  expect(Object.keys(TOOLBAR_ICONS)).toHaveLength(36);
+  expect(Object.keys(TOOLBAR_ICONS)).toHaveLength(38);
   expect(TOOLBAR_ICONS).toEqual(expectedIcons);
-  expect(new Set(Object.values(TOOLBAR_ICONS)).size).toBe(36);
+  expect(new Set(Object.values(TOOLBAR_ICONS)).size).toBe(38);
 });
 
 test("every toolbar icon exists in the registry", () => {

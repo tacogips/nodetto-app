@@ -9,6 +9,7 @@
 // text for a drag; wheel events keep bubbling so the canvas can still zoom.
 
 import {
+  boxLabelVerticalAlign,
   type EditableField,
   type Editor,
   ERD_TABLE_HEADER_HEIGHT,
@@ -37,6 +38,7 @@ import { createEditorSignals } from "./adapter.ts";
 import { textEditorRotation } from "./text-editor-rotation.ts";
 import { alignTextEditor } from "./text-editor-alignment.ts";
 import { textEditDraft } from "./text-edit-draft.ts";
+import "./TextEditor.css";
 
 export interface TextEditorTarget {
   readonly id: ElementId;
@@ -55,6 +57,12 @@ const BASE_FONT_SIZE = 13;
 const CONNECTOR_FONT_SIZE = 11;
 const LINE_HEIGHT = 1.2;
 const CONNECTOR_EDITOR_WIDTH = 160;
+/** Leaf shapes whose whole text the editor replaces while it is open. */
+const HIDES_OWN_TEXT: ReadonlySet<string> = new Set([
+  "shape.geo",
+  "node.generic",
+  "text.note",
+]);
 
 interface Placement {
   readonly x: number;
@@ -176,9 +184,18 @@ function placeEditor(
   // A label: a single line band centred in the box, so most of the shape
   // stays visible around it.
   const height = Math.min(box.height, fontSize * LINE_HEIGHT + 8);
+  // The band sits where the label is drawn: centred unless the box label
+  // opted in to top or bottom alignment.
+  const vertical = boxLabelVerticalAlign(element.visual);
+  const inset = Math.min(4, Math.max(0, (box.height - height) / 2));
   return {
     x: box.x + 4,
-    y: box.y + (box.height - height) / 2,
+    y:
+      vertical === "top"
+        ? box.y + inset
+        : vertical === "bottom"
+          ? box.y + box.height - height - inset
+          : box.y + (box.height - height) / 2,
     width: Math.max(24, box.width - 8),
     height,
     fontSize,
@@ -225,12 +242,38 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
   });
 
   const alignEditor = (): void => {
-    if (!done && textarea && multiline() && !edgeLabel())
-      alignTextEditor(
-        textarea,
-        props.editor.store.get(props.target.id)?.visual.style?.verticalAlign,
-      );
+    if (done || !textarea || !multiline() || edgeLabel()) return;
+    const element = props.editor.store.get(props.target.id);
+    // A node label is a box label (centred unless it opted in); a text note
+    // follows its own vertical alignment.
+    alignTextEditor(
+      textarea,
+      element?.type === "node.generic"
+        ? boxLabelVerticalAlign(element.visual)
+        : element?.visual.style?.verticalAlign,
+    );
   };
+
+  // While editing, the element's own text is hidden so only the editor's
+  // copy shows: otherwise a label drawn outside the editor band (wrapped
+  // lines, another alignment) stays visible next to the text being typed.
+  const markEditing = (on: boolean): void => {
+    const element = props.editor.store.get(props.target.id);
+    const id = props.target.id;
+    for (const node of document.querySelectorAll(".nodetto-text-editing")) {
+      if (!on || node.getAttribute("data-element-id") !== id)
+        node.classList.remove("nodetto-text-editing");
+    }
+    if (!on || !element || !HIDES_OWN_TEXT.has(element.type)) return;
+    for (const node of document.querySelectorAll("[data-element-id]")) {
+      if (node.getAttribute("data-element-id") === id)
+        node.classList.add("nodetto-text-editing");
+    }
+  };
+  createEffect(() => {
+    signals.rev();
+    if (!done) queueMicrotask(() => markEditing(!done));
+  });
   createEffect(() => {
     placement();
     queueMicrotask(alignEditor);
@@ -249,6 +292,7 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
       }
     }
     done = true;
+    markEditing(false);
     props.onDone();
     if (restoreFocus && previouslyFocused?.isConnected) {
       previouslyFocused.focus();
@@ -304,6 +348,7 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
     }
   });
   onCleanup(() => {
+    markEditing(false);
     document.removeEventListener("pointerdown", onOutsidePointerDown, true);
   });
 
@@ -314,7 +359,10 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
           <textarea
             ref={textarea}
             class="nodetto-text-editor"
-            classList={{ "nodetto-text-editor-multiline": multiline() }}
+            classList={{
+              "nodetto-text-editor-multiline": multiline(),
+              "nodetto-text-editor-edge": edgeLabel(),
+            }}
             aria-label="Edit text"
             aria-invalid={conflict() || undefined}
             aria-describedby={conflict() ? conflictId : undefined}

@@ -23,7 +23,8 @@ import {
   fontSizePatch,
   textAlignPatch,
   verticalAlignPatch,
-  supportsVerticalAlign,
+  verticalAlignKind,
+  verticalAlignValue,
   textFormatState,
 } from "./text-format.ts";
 import {
@@ -433,27 +434,31 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
                 state().textAlign === "end",
               )}
             </div>
-            <Show when={supportsVerticalAlign(leaves())}>
-              <div>
-                {textButton(
-                  "verticalTop",
-                  "Align text top",
-                  () => apply(verticalAlignPatch(textStyle(), "top")),
-                  state().verticalAlign === "top",
-                )}
-                {textButton(
-                  "verticalMiddle",
-                  "Align text middle",
-                  () => apply(verticalAlignPatch(textStyle(), "middle")),
-                  state().verticalAlign === "middle",
-                )}
-                {textButton(
-                  "verticalBottom",
-                  "Align text bottom",
-                  () => apply(verticalAlignPatch(textStyle(), "bottom")),
-                  state().verticalAlign === "bottom",
-                )}
-              </div>
+            <Show when={verticalAlignKind(leaves())} keyed>
+              {(kind) => (
+                <div>
+                  {textButton(
+                    "verticalTop",
+                    "Align text top",
+                    () => apply(verticalAlignPatch(textStyle(), "top", kind)),
+                    verticalAlignValue(textStyle(), kind) === "top",
+                  )}
+                  {textButton(
+                    "verticalMiddle",
+                    "Align text middle",
+                    () =>
+                      apply(verticalAlignPatch(textStyle(), "middle", kind)),
+                    verticalAlignValue(textStyle(), kind) === "middle",
+                  )}
+                  {textButton(
+                    "verticalBottom",
+                    "Align text bottom",
+                    () =>
+                      apply(verticalAlignPatch(textStyle(), "bottom", kind)),
+                    verticalAlignValue(textStyle(), kind) === "bottom",
+                  )}
+                </div>
+              )}
             </Show>
           </div>
         </details>

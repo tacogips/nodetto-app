@@ -38,6 +38,8 @@ export const TOOLBAR_ICONS = {
   verticalTop: "align-vertical-justify-start",
   verticalMiddle: "align-vertical-justify-center",
   verticalBottom: "align-vertical-justify-end",
+  distributeHorizontal: "align-horizontal-distribute-center",
+  distributeVertical: "align-vertical-distribute-center",
 } as const;
 
 export type ToolbarIconKey = keyof typeof TOOLBAR_ICONS;

@@ -1,3 +1,4 @@
+import { AlignSection } from "./inspector/AlignSection.tsx";
 import { SlideAnimationSection } from "./inspector/SlideAnimationSection.tsx";
 import { SlideTransitionSection } from "./inspector/SlideTransitionSection.tsx";
 import { SLIDE_SETTINGS_TYPE } from "@nodetto/ir";
@@ -456,6 +457,7 @@ export function Inspector(props: InspectorProps): JSX.Element {
             <p class="nodetto-inspector-summary">
               {`${selectedIds().length} elements selected`}
             </p>
+            <AlignSection editor={props.editor} />
           </Show>
 
           <Show when={!typeLabel()}>{specificFields()}</Show>

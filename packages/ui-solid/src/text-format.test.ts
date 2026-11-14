@@ -12,7 +12,9 @@ import {
   supportsVerticalAlign,
   textAlignPatch,
   textFormatState,
+  verticalAlignKind,
   verticalAlignPatch,
+  verticalAlignValue,
 } from "./text-format";
 
 describe("text formatting", () => {
@@ -129,5 +131,37 @@ describe("text formatting", () => {
     expect(
       supportsVerticalAlign([{ type: "text.note" }, { type: "shape.geo" }]),
     ).toBe(false);
+  });
+
+  test("box labels opt in to vertical alignment and clear back to centred", () => {
+    expect(verticalAlignKind([{ type: "shape.geo" }])).toBe("box");
+    expect(
+      verticalAlignKind([{ type: "shape.geo" }, { type: "node.generic" }]),
+    ).toBe("box");
+    expect(verticalAlignKind([{ type: "text.note" }])).toBe("note");
+    expect(
+      verticalAlignKind([{ type: "shape.geo" }, { type: "text.note" }]),
+    ).toBeNull();
+    expect(verticalAlignKind([{ type: "edge.generic" }])).toBeNull();
+    expect(supportsVerticalAlign([{ type: "shape.geo" }])).toBe(true);
+    expect(verticalAlignValue(undefined, "box")).toBe("middle");
+    expect(verticalAlignValue({ verticalAlign: "top" }, "box")).toBe("middle");
+    expect(
+      verticalAlignValue({ verticalAlign: "top", boxLabelAlign: true }, "box"),
+    ).toBe("top");
+    expect(verticalAlignValue(undefined, "note")).toBe("top");
+    expect(verticalAlignPatch(undefined, "bottom", "box")).toEqual({
+      verticalAlign: "bottom",
+      boxLabelAlign: true,
+    });
+    const top = { verticalAlign: "top", boxLabelAlign: true } as const;
+    expect(verticalAlignPatch(top, "top", "box")).toEqual({
+      verticalAlign: null,
+      boxLabelAlign: null,
+    });
+    expect(verticalAlignPatch(top, "middle", "box")).toEqual({
+      verticalAlign: null,
+      boxLabelAlign: null,
+    });
   });
 });
