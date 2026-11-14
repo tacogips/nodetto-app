@@ -222,6 +222,23 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
     );
   };
 
+  // Popovers hang below the toolbar; opening one closes the others.
+  const disclosureToggle = (event: Event) => {
+    const details = event.currentTarget as HTMLDetailsElement;
+    if (!details.open) return;
+    const open = root?.querySelectorAll<HTMLDetailsElement>("details[open]");
+    if (!open) return;
+    for (const other of open) if (other !== details) other.open = false;
+  };
+  // Keep a popover inside the host: hang it from whichever toolbar edge is
+  // further from the host's edge.
+  const popoverEnd = (): boolean => {
+    const host = props.host;
+    const at = anchor();
+    if (!host || !at) return false;
+    return at.x + size().width / 2 > host.clientWidth / 2;
+  };
+
   const leaves = createMemo(() => {
     signals.rev();
     return leafElements(editor().store, signals.selection());
@@ -299,6 +316,7 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
     <Show when={visible()}>
       <div
         class="nodetto-selection-toolbar"
+        classList={{ "nodetto-selection-toolbar-end": popoverEnd() }}
         role="toolbar"
         aria-label="Selection"
         ref={measure}
@@ -318,7 +336,11 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
             {button("straightenConnector", "straightenConnector")}
           </Show>
         </div>
-        <details class="nodetto-selection-disclosure" onKeyDown={disclosureKey}>
+        <details
+          class="nodetto-selection-disclosure"
+          onKeyDown={disclosureKey}
+          onToggle={disclosureToggle}
+        >
           <summary
             class="nodetto-float-button"
             title="Colors"
@@ -331,7 +353,11 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
             {swatches("stroke", STROKE_PALETTE)}
           </div>
         </details>
-        <details class="nodetto-selection-disclosure" onKeyDown={disclosureKey}>
+        <details
+          class="nodetto-selection-disclosure"
+          onKeyDown={disclosureKey}
+          onToggle={disclosureToggle}
+        >
           <summary class="nodetto-float-button" title="Text" aria-label="Text">
             <ToolbarIcon name="text" />
           </summary>
@@ -431,7 +457,11 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
             </Show>
           </div>
         </details>
-        <details class="nodetto-selection-disclosure" onKeyDown={disclosureKey}>
+        <details
+          class="nodetto-selection-disclosure"
+          onKeyDown={disclosureKey}
+          onToggle={disclosureToggle}
+        >
           <summary
             class="nodetto-float-button"
             title="Arrange"
@@ -439,25 +469,33 @@ export function SelectionToolbar(props: SelectionToolbarProps): JSX.Element {
           >
             <ToolbarIcon name="arrange" />
           </summary>
-          <div class="nodetto-selection-disclosure-body">
-            {button("bringToFront", "bringToFront")}
-            {button("sendToBack", "sendToBack")}
+          <div class="nodetto-selection-disclosure-body nodetto-float-arrange">
+            <div>
+              {button("bringToFront", "bringToFront")}
+              {button("sendToBack", "sendToBack")}
+            </div>
+            <div>
+              <Show when={!props.simple}>
+                {button("frameSelection", "frameSelection")}
+              </Show>
+              {button("group", "group")}
+              {button("ungroup", "ungroup")}
+            </div>
             <Show when={!props.simple}>
-              {button("frameSelection", "frameSelection")}
+              <div>
+                {button("booleanUnion", "booleanUnion")}
+                {button("booleanSubtract", "booleanSubtract")}
+                {button("booleanIntersect", "booleanIntersect")}
+                {button("booleanExclude", "booleanExclude")}
+                {button("flattenBoolean", "flattenBoolean")}
+              </div>
             </Show>
-            {button("group", "group")}
-            <Show when={!props.simple}>
-              {button("booleanUnion", "booleanUnion")}
-              {button("booleanSubtract", "booleanSubtract")}
-              {button("booleanIntersect", "booleanIntersect")}
-              {button("booleanExclude", "booleanExclude")}
-              {button("flattenBoolean", "flattenBoolean")}
-            </Show>
-            {button("ungroup", "ungroup")}
             <Show when={isEnabled(getAction("alignLeft"))}>
-              <For each={ARRANGE_BUTTONS}>
-                {(entry) => button(entry.id, entry.icon)}
-              </For>
+              <div>
+                <For each={ARRANGE_BUTTONS}>
+                  {(entry) => button(entry.id, entry.icon)}
+                </For>
+              </div>
             </Show>
           </div>
         </details>

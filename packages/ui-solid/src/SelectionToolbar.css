@@ -5,10 +5,8 @@
   z-index: 20;
   box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  max-width: min(calc(100% - 8px), 420px);
   padding: 4px 6px;
   border: 1px solid var(--nodetto-line, #d8d2c3);
   border-radius: 0;
@@ -27,11 +25,6 @@
 .nodetto-selection-toolbar .nodetto-float-group:last-child {
   padding-right: 0;
   border-right: 0;
-}
-.nodetto-selection-toolbar .nodetto-selection-disclosure {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
 }
 .nodetto-selection-toolbar .nodetto-float-button {
   width: 26px;
@@ -64,27 +57,35 @@
 .nodetto-selection-toolbar .nodetto-float-button:focus-visible {
   outline: 2px solid var(--nodetto-accent, #335c67);
 }
+.nodetto-selection-toolbar details[open] > summary {
+  background: var(--nodetto-accent-soft, #dbe6e8);
+}
+/* A popover below the toolbar: the toolbar row itself never reflows. */
 .nodetto-selection-toolbar .nodetto-selection-disclosure-body {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -1px;
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-  width: 360px;
-  max-width: 100%;
-  margin-top: 4px;
-  padding: 4px;
-  border: 1px solid var(--nodetto-line, #d8d2c3);
-  border-radius: 0;
+  gap: 4px 10px;
+  align-items: center;
+  width: max-content;
+  max-width: 340px;
+  padding: 5px 6px;
   background: var(--nodetto-surface, #fffdf8);
+  box-shadow: 0 4px 14px var(--app-shadow-medium, rgba(29, 42, 46, 0.12));
+}
+.nodetto-selection-toolbar-end .nodetto-selection-disclosure-body {
+  right: -1px;
+  left: auto;
 }
 .nodetto-selection-toolbar .nodetto-float-colours {
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   align-items: flex-start;
 }
-.nodetto-selection-toolbar .nodetto-float-text {
-  flex-direction: column;
-}
-.nodetto-selection-toolbar .nodetto-float-text > div {
+.nodetto-selection-toolbar .nodetto-float-text > div,
+.nodetto-selection-toolbar .nodetto-float-arrange > div {
   display: flex;
   gap: 2px;
   align-items: center;
