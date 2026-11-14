@@ -1,0 +1,254 @@
+{
+  "taskId": "bpmn-export-ownership-s550",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-550",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "none configured",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "a9728e640279a5a3ef20f7c36c46d0bcb08009f3",
+  "designDocPaths": [
+    "design-docs/specs/design-bpmn.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/bpmn-export-ownership-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/bpmn-export-ownership-s550",
+  "evidenceLayout": "Per-plan logs go under tmp/bpmn-export-ownership-s550/<planId>/ (one attempt-<n>/ subdirectory per retry) and reconciliation output under tmp/bpmn-export-ownership-s550/reconcile/. tmp/ is git-ignored (.gitignore line 41). The plan 04 reproduction script repro.ts lives only under its plan evidence directory and is never committed.",
+  "reviewContext": {
+    "issueReference": "none (no GitHub issue; workflowInput.requestedOutcome is the issue text; intake comm-010417/comm-010418; design comm-010419; design review comm-010420 accepted; plan comm-010421; plan review comm-010422 accepted; workflow execution opus-terra-design-and-implement-review-loop-session-550)",
+    "userProblem": "A bpmn.boundaryEvent with semantic.attachedTo but no semantic.parent is exported into an extra Process_orphan_<pageId> with the pool-less warning, so strict export exits non-zero (N1). Parentless groups and text annotations also force that orphan process. A sequence flow whose source is such a boundary event is emitted twice under one id, and importBpmnXml rejects the file with 'duplicate BPMN id' (N2).",
+    "requiredOutcomes": [
+      "A boundary event with no parent inherits its attachedTo host's process ownership, lane membership (flowNodeRef in the host's lane) and sub-process scope; attachedToRef and BPMNDI stay correct (plan 03).",
+      "Parentless text annotations and groups on a page with participants are written into bpmn:collaboration and never create the orphan process; associations go to the source owner's process, else the target owner's, else the collaboration (plan 03).",
+      "Every sequence flow is emitted exactly once, in its source endpoint's container (plan 03).",
+      "Genuinely pool-less flow nodes and data still produce Process_orphan_<pageId> and the warning 'Pool-less elements were exported in an extra unreferenced process.' (plan 03).",
+      "The importer reads textAnnotation, group and association children of bpmn:collaboration with no parent (plan 01).",
+      "duplicateIdWarnings(root: XmlElement): BpmnExportWarning[] reports each repeated BPMN model or BPMNDI id once as 'Duplicate BPMN id <id> was emitted.' and is wired into exportBpmnXml before serialization (plans 02 and 04).",
+      "The boundary-event-plus-group page exports with warnings [], re-imports without errors or warnings, and re-exports byte-identically; no id is duplicated (plan 04).",
+      "Existing BPMN export/import/roundtrip/reference tests and CLI BPMN tests pass; mise run lint-ts and mise run check pass."
+    ],
+    "nonGoals": [
+      "Native nodetto-cli parity: crates/native and apps/cli/native contain no BPMN exporter, so mise run test-cli is not required.",
+      "Emitting the group name through categoryValueRef, or the secondary BPMNDI plane for collapsed sub-processes (design 5.3.1 out of scope).",
+      "Changes to export-diagram.ts, equivalence.ts, ids.ts, xml.ts, index.ts, BPMN fixtures, packages/core, apps, version bumps or releases.",
+      "Server, auth, secret or deployment code."
+    ],
+    "constraints": [
+      "Output for every existing test and fixture stays byte-identical.",
+      "The duplicate-id safeguard only warns; it never throws, drops or renames, and does not enter bpmn:extensionElements or non-MODEL/BPMNDI namespaces.",
+      "Test fixtures and names are self-authored and generic ('Review order', 'Timeout', 'Escalate order', 'Note', urn:example:ext); no external issue, customer, organization or person names.",
+      "Workers follow impl-plans/active/bpmn-export-ownership-00-overview.md 'Rules for every worker' 1-12: write only own writePaths, sha256 pre/post evidence, no git operations, no dependency or lockfile changes, biome only on owned files.",
+      "Strictly typed code matching the surrounding style; no emojis; no tool attribution in commits; no push (gitPush=false)."
+    ],
+    "designDecisionsAndRationale": [
+      "Effective parent mirrors core bpmn/model.ts parentOf: a boundary event whose attachedTo names a non-boundary-event record uses the host's parent; otherwise its own parent. The fallback keeps stored placement for invalid hosts instead of moving them to the orphan process (design 5.3.1).",
+      "The ancestor walk keeps a visited set so a parent cycle cannot hang the export (design 5.3.1).",
+      "Each sequence flow is placed once in its source's container, which for a legal flow is the container owning both endpoints; this removes the N2 duplicate by construction (design 5.3.1).",
+      "Unowned artifacts and associations go into bpmn:collaboration, matching the tCollaboration sequence (participant, messageFlow, artifact); the importer reads them back so the round trip is lossless (design 5.2, 5.3 Order item 1).",
+      "The duplicate-id scan covers the id space the importer enforces plus model/DI XML ID uniqueness; extension vocabularies have their own id scopes (design 5.3.1, review DR-1)."
+    ],
+    "intentionalTradeoffs": [
+      "An illegal cross-container sequence flow is emitted once in its source's container rather than in every container holding an endpoint (design 5.3.1).",
+      "A source XML boundary event outside its host's lane gets its lane rewritten to the host's lane on the second import; bpmnSemanticProjection parent may differ; equivalence.ts and import lane mapping are not changed (design 14). The implementer stops if reference.test.ts fails on it.",
+      "The safeguard warns rather than repairs, so strict export exits 3 instead of writing a file the importer rejects (design 5.3.1, section 8)."
+    ],
+    "supportedEdgeCases": [
+      "Boundary event with no parent attached to a task in a lane of a pool (plan 03 test 1, plan 04 test 1).",
+      "Boundary event with no parent attached to a task inside an expanded sub-process (plan 03 test 2).",
+      "Pool-less task plus parentless text annotation: orphan process keeps the task, annotation goes to the collaboration (plan 03 test 3).",
+      "Associations to a pooled task vs. to a participant (plan 03 test 4).",
+      "Lane parent cycle on a pool-less page terminates (plan 03 test 5).",
+      "Model id colliding with a derived DI id (A and A_di) is reported; repeated ids inside extensionElements are not (plans 02 and 04).",
+      "Boundary event whose host is missing, is a boundary event, or is pool-less keeps its own parent or goes with its host to the orphan process.",
+      "Collapsed participant content stays unexported with its existing warning; flows from it are not emitted."
+    ],
+    "outOfScopeEdgeCases": [
+      "Two dataObjectReferences sharing one dataObjectRef would emit the same bpmn:dataObject id twice (pre-existing; the new guard warns; no fixture has it).",
+      "attachedTo chains through boundary events are never followed.",
+      "group categoryValueRef name emission and collapsed sub-process secondary planes."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-bpmn.md",
+      "impl-plans/active/bpmn-export-ownership-00-overview.md",
+      "impl-plans/active/bpmn-export-ownership-01-import-collab-artifacts.md",
+      "impl-plans/active/bpmn-export-ownership-02-duplicate-id-guard.md",
+      "impl-plans/active/bpmn-export-ownership-03-export-placement.md",
+      "impl-plans/active/bpmn-export-ownership-04-roundtrip-integration.md",
+      "packages/io/src/bpmn/export-scope.ts",
+      "packages/io/src/bpmn/export-process.ts",
+      "packages/io/src/bpmn/export.ts",
+      "packages/io/src/bpmn/import.ts",
+      "packages/io/src/bpmn/roundtrip.test.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "bpmn-export-ownership-01-import-collab-artifacts",
+      "planPath": "impl-plans/active/bpmn-export-ownership-01-import-collab-artifacts.md",
+      "progressPath": "impl-plans/progress/bpmn-export-ownership-01-import-collab-artifacts.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/io/src/bpmn/import.ts",
+        "packages/io/src/bpmn/import.test.ts",
+        "impl-plans/progress/bpmn-export-ownership-01-import-collab-artifacts.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "In the collaboration block, before the messageFlow loop, textAnnotation and group children are imported in document order as bpmn.textAnnotation/bpmn.group with the same semantic keys as the process walk and no parent key, then association children as bpmn.association {from, to, direction} exactly as addFlows maps them.",
+        "Annotation/group semantic construction is shared through one module-level helper; process-walk output stays byte-identical.",
+        "New import test: Note_A (text 'Note', no parent), Group_A (no parent), Assoc_A (from Note_A, to Task_Review, direction one); warnings []; order Task_Review < Note_A, Group_A < Assoc_A, Note_A < Assoc_A.",
+        "Existing import tests pass unchanged; progress log records hashes, commands, exit codes and log paths."
+      ],
+      "verification": [
+        "mkdir -p tmp/bpmn-export-ownership-s550/bpmn-export-ownership-01-import-collab-artifacts",
+        "bun test packages/io/src/bpmn/import.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-01-import-collab-artifacts/import-test.log 2>&1; echo \"exit=$?\"",
+        "bun test packages/io/src/bpmn > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-01-import-collab-artifacts/bpmn-tests.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/io/src/bpmn/import.ts packages/io/src/bpmn/import.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-01-import-collab-artifacts/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-01-import-collab-artifacts/typecheck.log 2>&1; echo \"exit=$?\""
+      ]
+    },
+    {
+      "planId": "bpmn-export-ownership-02-duplicate-id-guard",
+      "planPath": "impl-plans/active/bpmn-export-ownership-02-duplicate-id-guard.md",
+      "progressPath": "impl-plans/progress/bpmn-export-ownership-02-duplicate-id-guard.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/io/src/bpmn/export-duplicates.ts",
+        "packages/io/src/bpmn/export-duplicates.test.ts",
+        "impl-plans/progress/bpmn-export-ownership-02-duplicate-id-guard.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "export-duplicates.ts exports duplicateIdWarnings(root: XmlElement): BpmnExportWarning[] exactly; it is not exported from packages/io/src/bpmn/index.ts.",
+        "Only elements with ns MODEL or BPMNDI are visited; bpmn:extensionElements and other-namespace subtrees are not entered; only the unprefixed id attribute is collected.",
+        "One warning { message: 'Duplicate BPMN id <id> was emitted.' } per repeated id, ordered by first occurrence; pure, never throws, mutates or renames.",
+        "At least 7 tests pass in export-duplicates.test.ts covering clean, double, triple, model-vs-DI, extensionElements, foreign wrapper and ordering cases."
+      ],
+      "verification": [
+        "mkdir -p tmp/bpmn-export-ownership-s550/bpmn-export-ownership-02-duplicate-id-guard",
+        "bun test packages/io/src/bpmn/export-duplicates.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-02-duplicate-id-guard/guard-test.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/io/src/bpmn/export-duplicates.ts packages/io/src/bpmn/export-duplicates.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-02-duplicate-id-guard/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-02-duplicate-id-guard/typecheck.log 2>&1; echo \"exit=$?\""
+      ]
+    },
+    {
+      "planId": "bpmn-export-ownership-03-export-placement",
+      "planPath": "impl-plans/active/bpmn-export-ownership-03-export-placement.md",
+      "progressPath": "impl-plans/progress/bpmn-export-ownership-03-export-placement.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/io/src/bpmn/export-scope.ts",
+        "packages/io/src/bpmn/export-process.ts",
+        "packages/io/src/bpmn/export.ts",
+        "packages/io/src/bpmn/export.test.ts",
+        "impl-plans/progress/bpmn-export-ownership-03-export-placement.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "BpmnExportScope exposes effectiveParent, collaborationArtifacts and associationOwner; ancestor walks effectiveParent with a visited set; orphanContent no longer includes artifacts.",
+        "export-process.ts uses effectiveParent for lane flowNodeRef membership and sub-process children; sequence flows are emitted once in the source's container (the members.some top-level filter is gone); artifacts are never emitted into the orphan process; associations follow associationOwner.",
+        "collaborationArtifactElements(scope) is exported from export-process.ts and appended by export.ts after message flows (associations, then text annotations and groups); export.ts gets no duplicate-id wiring here.",
+        "Five new export.test.ts cases pass (parentless boundary event in pool lane, in sub-process, orphan kept for pool-less task but not annotation, association placement, parent-cycle termination); existing roundtrip/reference/xml and CLI BPMN tests pass byte-identically."
+      ],
+      "verification": [
+        "mkdir -p tmp/bpmn-export-ownership-s550/bpmn-export-ownership-03-export-placement",
+        "bun test packages/io/src/bpmn/export.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-03-export-placement/export-test.log 2>&1; echo \"exit=$?\"",
+        "bun test packages/io/src/bpmn/roundtrip.test.ts packages/io/src/bpmn/reference.test.ts packages/io/src/bpmn/xml.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-03-export-placement/existing-bpmn.log 2>&1; echo \"exit=$?\"",
+        "bun test apps/cli/src/bpmn-commands.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-03-export-placement/cli-bpmn.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/io/src/bpmn/export-scope.ts packages/io/src/bpmn/export-process.ts packages/io/src/bpmn/export.ts packages/io/src/bpmn/export.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-03-export-placement/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-03-export-placement/typecheck.log 2>&1; echo \"exit=$?\""
+      ]
+    },
+    {
+      "planId": "bpmn-export-ownership-04-roundtrip-integration",
+      "planPath": "impl-plans/active/bpmn-export-ownership-04-roundtrip-integration.md",
+      "progressPath": "impl-plans/progress/bpmn-export-ownership-04-roundtrip-integration.md",
+      "wave": 2,
+      "dependsOn": [
+        "bpmn-export-ownership-01-import-collab-artifacts",
+        "bpmn-export-ownership-02-duplicate-id-guard",
+        "bpmn-export-ownership-03-export-placement"
+      ],
+      "writePaths": [
+        "packages/io/src/bpmn/roundtrip.test.ts",
+        "impl-plans/progress/bpmn-export-ownership-04-roundtrip-integration.md"
+      ],
+      "sharedPaths": [
+        "packages/io/src/bpmn/export.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/io/src/bpmn/export.ts",
+          "intendedEdit": "Wave 2 only, after plan 03: import duplicateIdWarnings from ./export-duplicates.ts and, in exportBpmnXml after root is built and before serializeXml(root), append ...duplicateIdWarnings(root) to warnings. No other edit; plan 03's changes stay; record sha256 before and after."
+        }
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "export.ts imports duplicateIdWarnings and calls it exactly once before serialization.",
+        "Round-trip test: the boundary-event-plus-group page exports with warnings [], re-imports with no throw and warnings [], Group_Notes has no parent and Event_Timeout.parent === 'Lane_Review', re-export is byte-identical, every id is unique.",
+        "Safeguard tests: tasks A and A_di give exactly one 'Duplicate BPMN id A_di was emitted.'; repeated ext:field ids inside extensionElements give none and are preserved; fixture exports give none.",
+        "Existing roundtrip tests unchanged; full packages/io/src/bpmn suite and CLI BPMN tests have 0 failures; typecheck exits 0. No exporter or importer logic changes to make tests pass; failures are recorded as blockers for the owning plan."
+      ],
+      "verification": [
+        "mkdir -p tmp/bpmn-export-ownership-s550/bpmn-export-ownership-04-roundtrip-integration",
+        "bun test packages/io/src/bpmn > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-04-roundtrip-integration/bpmn-tests.log 2>&1; echo \"exit=$?\"",
+        "bun test apps/cli/src/bpmn-commands.test.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-04-roundtrip-integration/cli-bpmn.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/io/src/bpmn/roundtrip.test.ts packages/io/src/bpmn/export.ts > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-04-roundtrip-integration/biome.log 2>&1; echo \"exit=$?\"",
+        "bun run typecheck > tmp/bpmn-export-ownership-s550/bpmn-export-ownership-04-roundtrip-integration/typecheck.log 2>&1; echo \"exit=$?\"",
+        "grep -n 'duplicateIdWarnings' packages/io/src/bpmn/export.ts"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "bpmn-export-ownership-01-import-collab-artifacts",
+        "bpmn-export-ownership-02-duplicate-id-guard",
+        "bpmn-export-ownership-03-export-placement"
+      ],
+      [
+        "bpmn-export-ownership-04-roundtrip-integration"
+      ]
+    ],
+    "afterWave": [
+      "bun test packages/io/src/bpmn",
+      "bun run typecheck"
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Index bpmn-export-ownership-00..04 and archive the plans during serial finalization; not a worker task."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths; export.ts failures before wave 2 belong to plan 03, the duplicateIdWarnings wiring to plan 04.",
+    "commitPolicy": "Commit on main, staging explicit paths only. Never git add -A, never stage tmp/, never push (gitPush=false). No tool attribution in commit messages.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-bpmn.md",
+        "impl-plans/active/bpmn-export-ownership-00-overview.md",
+        "impl-plans/active/bpmn-export-ownership-s550-dispatch.json",
+        "impl-plans/README.md"
+      ]
+    },
+    "finalVerification": [
+      "mkdir -p tmp/bpmn-export-ownership-s550/reconcile",
+      "bun test packages/io/src/bpmn > tmp/bpmn-export-ownership-s550/reconcile/bpmn-tests.log 2>&1; echo \"exit=$?\"",
+      "bun test packages/io apps/cli/src/bpmn-commands.test.ts > tmp/bpmn-export-ownership-s550/reconcile/io-cli.log 2>&1; echo \"exit=$?\"",
+      "mise run lint-ts > tmp/bpmn-export-ownership-s550/reconcile/lint-ts.log 2>&1; echo \"exit=$?\"",
+      "CARGO_TERM_QUIET=true mise run check > tmp/bpmn-export-ownership-s550/reconcile/check.log 2>&1; echo \"exit=$?\"",
+      "git diff --quiet -- packages/io/src/__fixtures__; echo \"exit=$?\"",
+      "git status --short"
+    ]
+  }
+}

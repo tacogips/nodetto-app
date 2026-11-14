@@ -1,0 +1,23 @@
+.nodetto-table-editor {
+  position: absolute;
+  box-sizing: border-box;
+  z-index: 20;
+  border: 2px solid var(--app-accent, #477bdb);
+  background: var(--app-surface, white);
+  color: var(--app-text, black);
+  padding: 2px 6px;
+  font: inherit;
+}
+.nodetto-table-range,
+.nodetto-table-active {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 19;
+}
+.nodetto-table-range {
+  background: color-mix(in srgb, var(--app-accent, #477bdb) 18%, transparent);
+}
+.nodetto-table-active {
+  border: 2px solid var(--app-accent, #477bdb);
+}

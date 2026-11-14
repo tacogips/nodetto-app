@@ -1,0 +1,227 @@
+# clm-11-container-carry
+
+## Continuation 4 2026-11-05 (clm-s737) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s737-dispatch.json`, source commit
+`c5484577164daf4c4f5b57d888e1b291f84d7867`, evidence `tmp/clm-s737/clm-11-container-carry/`. wave: 1; dependsOn:
+none. clm-02 runs at the same time in the same working directory. Replace older `tmp/clm-s7xx` paths with
+`tmp/clm-s737`. Contract, rules, messages and tests below are unchanged and still binding.
+
+- Why there is no dependency now: `ApplyOptions.keepMembers` is at HEAD (`editor/types.ts`), forwarded in
+  `editor/facade/core.ts` and used by `editor/transaction.ts`. Under D3', clm-02 changes `applyBatch`, the
+  validator, the parser and the serializer, not `Editor.apply`, unless a marginal ratio fails.
+- Non-goals: do not edit `apps/cli/src/edit/apply-batch.ts`, `packages/core/src/editor/dirty-pages.ts`, or the
+  shared registration files. Help text is clm-09's. No default carry change. A defect in a clm-02-owned file is a
+  finding in the progress log.
+- `apps/cli/src/edit-frame-carry.test.ts:31` pins `carryMembers applies only to frames`. Change it to the E1
+  non-container message; this is the intended update.
+- `apps/cli/src/edit/operation-fields.ts` already lists `carryMembers`. Edit it only if a test proves a gap.
+- Shared with clm-02: `packages/core/src/frame-translation.ts` and `packages/core/src/editor/transaction.ts`. Edit
+  them only for a `keepMembers` defect an E1 test reveals, only in `keepMembers` branches. Read fresh before each
+  edit, record pre and post `git hash-object` in the progress log, and stop on unexpected drift. Without
+  `keepMembers`, output stays byte-identical.
+- Resize coverage: resize with `carryMembers:false` is tested for frame, pool, lane (height only), sub-process and
+  board. Group and non-container kinds are error cases only. "None" in the E1 table's default-on-resize column does not
+  exempt a kind. Tests to add in `apps/cli/src/edit/carry-members.test.ts`, on top of the list below:
+  - Expanded sub-process, width or height shrink that leaves one inner task outside -> task position unchanged, task
+    re-parented, `validateDocument` reports no errors.
+  - Sub-process top-left resize (x, y and width change) -> inner tasks unchanged.
+  - Board resize with `carryMembers:false` -> plugged parts keep their absolute positions. If the board's geometry
+    rejects the resize, assert that command's existing error and record it in the progress log; do not add board
+    behavior beyond the E1 table.
+- Done criteria: all manifest verification commands exit 0; one test per E1 kind on move, and a resize test for frame,
+  pool, lane (height only), sub-process and board; the E1 messages appear verbatim in `carry-members.ts`. This plan file
+  stays unchanged by the worker.
+
+## Continuation 3 2026-11-05 (clm-s736) - superseded by Continuation 4 where they differ
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
+base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence
+`tmp/clm-s736/clm-11-container-carry/`. wave: 2; dependsOn: clm-02-connector-edit-perf. Replace
+`tmp/clm-s732` and `tmp/clm-s731` with `tmp/clm-s736` below. Scope, rules, messages and tests
+below are unchanged.
+
+- Status at HEAD: `packages/core/src/keep-members.test.ts` (5 tests) exists and
+  `ApplyOptions.keepMembers` reaches the planners. `apps/cli/src/edit/carry-members.ts` does not
+  exist, and the A6 block is still at `apps/cli/src/edit/operations/elements.ts:126-153`. Start
+  there; there is no progress log yet.
+- Why it waits for clm-02: D3 may still change `Editor.apply` and the scoped planning that
+  `keepMembers` passes through, and these tests must verify the accepted behavior. If a test fails
+  only because a scoped apply dropped a held member, that is a defect fixed here under the
+  pre-authorized core paths, with a case in `keep-members.test.ts`.
+- Owner decision D1 does not change E1: `planLayeredBpmn` may write lane boxes, but `update` with
+  `carryMembers:false` on a lane still allows only `height`.
+- Do not change the default carry, and do not edit `arrange-layered-bpmn.ts` or the shared
+  registration files. Help text is clm-09's.
+
+Amendment 2026-11-05 (clm-s732, round 1): workflow mode is `issue-resolution` (manifest
+`workflowMode`). Scope, writePaths and dependsOn are unchanged.
+
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`: nothing of this plan has
+started. Scope and rules below are unchanged. Replace `tmp/clm-s731` with
+`tmp/clm-s732` in every path. Manifest: `impl-plans/active/clm-s732-dispatch.json`.
+
+- wave: 2; dependsOn: clm-02-connector-edit-perf only. The dependency is a real
+  call: `editor.apply(commands, { keepMembers })` does not type-check until clm-02
+  adds `ApplyOptions.keepMembers`. clm-13 has landed, so the A6 block is at
+  `apps/cli/src/edit/operations/elements.ts:126-153`. It is the only block replaced.
+- writePaths additions (pre-authorized):
+  - `apps/cli/src/edit/selectors.test.ts`: one `where` plus `carryMembers:false`
+    case, additive.
+  - `apps/cli/src/edit/operation-input.ts`: only if a validation helper is needed.
+  - For defects in `keepMembers` that the E1 tests reveal, smallest fix plus a case
+    in `packages/core/src/keep-members.test.ts`: `packages/core/src/bpmn/containment.ts`,
+    `packages/core/src/breadboard/board-carry.ts`,
+    `packages/core/src/frame-translation.ts`, `packages/core/src/constraints.ts`,
+    `packages/core/src/editor/transaction.ts`. No other plan writes these files in
+    wave 2. Without `keepMembers`, output must stay byte-identical. This replaces
+    the pitfall below that says to stop and record a finding against clm-02.
+- Extra pitfall: attachments are not members. `bpmn.boundaryEvent` on a moved
+  sub-process or task must end on its host boundary after `planBpmnMembership`,
+  even when `descendantsOf` returns it in the held set. If it does not, remove
+  boundary events attached to the updated element from the held set.
+- Extra tests:
+  - Expanded sub-process with a boundary event on itself, move with
+    `carryMembers:false` -> event on the new boundary, inner tasks unchanged.
+  - `where` matching two pools with `carryMembers:false` -> the held set is computed
+    per match, and tasks of both pools keep their positions.
+  - Resize of a pool and of a frame are separate cases from move. The full resize list is in
+    Continuation 4.
+- Done criteria add: the E1 messages appear verbatim in `carry-members.ts`, and
+  manifest verification commands exit 0.
+
+---
+
+- planId: clm-11-container-carry
+- planPath: impl-plans/active/clm-11-container-carry.md
+- progressPath: impl-plans/progress/clm-11-container-carry.md
+- wave: 2
+- dependsOn: clm-02-connector-edit-perf (the `ApplyOptions.keepMembers`
+  engine option and the planner `keep`/`reparent` parameters). It runs after
+  wave 1, so `apps/cli/src/edit/operations/elements.ts` (edited by clm-13 in
+  wave 1) is already in its final wave-1 form.
+- Design: `design-docs/specs/design-cli-layout-merge-lint.md`, E1 (table,
+  error texts, mechanics), A6 (frame default kept), contracts (clm-11 block),
+  Verification row E1. Owner question Q7 (default implemented).
+- writePaths:
+  - `apps/cli/src/edit/carry-members.ts` (new)
+  - `apps/cli/src/edit/carry-members.test.ts` (new)
+  - `apps/cli/src/edit/operations/elements.ts`
+  - `apps/cli/src/edit-frame-carry.test.ts`
+  - `impl-plans/progress/clm-11-container-carry.md`
+  - `tmp/clm-s731/clm-11-container-carry`
+  - `target`
+- sharedPaths: none
+- sharedPathNotes:
+  - `apps/cli/src/edit/operations/elements.ts`: replace only the A6
+    `carryMembers` block inside `updateOne` (introduced by clm-13) with a call
+    to `heldMembers`; pass `{ keepMembers }` instead of `{ placed }`. No other
+    edit in this file.
+- artifactRoots: `target`
+
+## Intent and context
+
+`carryMembers:false` on `update` must keep members at their absolute
+positions for every carrying container kind, on move and on resize. Today
+(A6, clm-04) only frames are accepted, and only via `placed`, which does not
+stop `planConstraints`, BPMN or breadboard carry. clm-02 adds the engine
+option `ApplyOptions.keepMembers` honored by `planFrameTranslations`,
+`planConstraints`, `planBpmnTranslations`, `planBreadboardTranslations` and
+(as re-parent set) `planBpmnMembership`.
+
+Code to imitate: the current A6 block in
+`apps/cli/src/edit/operations/elements.ts` (frame descendants through
+`frameParents`, transitive walk), `packages/core/src/bpmn/model.ts:buildBpmnModel`
+(`descendantsOf`), `OperationError` usage in `apps/cli/src/edit/operation-input.ts`.
+
+## Contract (binding)
+
+```ts
+export const CARRY_CONTAINER_TYPES: readonly string[];
+// ["frame", "bpmn.participant", "bpmn.lane", "bpmn.subProcess", "breadboard.board"]
+export function heldMembers(editor: Editor, element: Element, visual: unknown, index: number): ReadonlySet<ElementId>;
+// throws OperationError with the E1 messages
+```
+
+## Rules (implement exactly; messages are fixed strings)
+
+- Called only when `carryMembers === false` (boolean validation stays as in
+  A6: `"carryMembers" must be true or false`). `carryMembers: true` or absent
+  -> today's behavior (no option passed).
+- `group` -> `carryMembers does not apply to a group: a group has no box of its own; move its members, or ungroup it.`
+- Type not in `CARRY_CONTAINER_TYPES` and not `group` ->
+  `carryMembers applies only to frame, bpmn.participant, bpmn.lane, bpmn.subProcess and breadboard.board; <type> does not move other elements.`
+- `frame` with a truthy `semantic.layout` ->
+  `carryMembers:false cannot be used on frame "<name>": it lays out its members ("layout"); remove "layout" first.`
+  (`<name>` = `semantic.name`, else the short id.)
+- `bpmn.lane`: if `visual` (the op's `visual` object) sets `x`, `y` or
+  `width` to a value different from the lane's current value ->
+  `carryMembers:false on lane "<name>": a lane's x, y and width follow its pool; change the pool, or change only "height".`
+- Held set, computed from the state before the update:
+  - frame: transitive descendants from `frameParents` (today's A6 walk).
+  - `bpmn.participant`, `bpmn.lane`, `bpmn.subProcess`:
+    `buildBpmnModel(snapshot, page).descendantsOf(id)` minus every
+    `bpmn.lane`.
+  - `breadboard.board`: every other element on the board's page.
+- The update handler applies `editor.apply(commands, { keepMembers })`.
+- With `where` (clm-13), `updateOne` runs per match, so the set is computed
+  per element.
+
+## Pitfalls
+
+- Do not reintroduce `placed` for frames: `keepMembers` also covers
+  `planConstraints` on resize, which `placed` did not.
+- Lanes are never in the held set (they are pool bands and must follow the
+  pool through `planBpmnLaneLayout`).
+- Members placed by earlier operations of the same batch must keep those
+  positions (the held set is read from the current store, which already
+  contains them).
+- Do not edit core files; if `keepMembers` behaves wrongly, record a finding
+  against clm-02 in the progress log and stop that item.
+
+## Tests
+
+`apps/cli/src/edit/carry-members.test.ts` (direct import with an `Editor`),
+and `apps/cli/src/edit-frame-carry.test.ts` (through `runCli edit`), neutral
+names (`Orders` pool, `Intake`/`Shipping` lanes, `Check order` task,
+`Stage0` frame, `widgets`):
+- frame move `carryMembers:false` -> members unchanged, frame moved; default
+  move -> members carried (existing test kept).
+- frame resize from top-left (x, y, width change) with a child that has
+  `visual.constraints` -> child unchanged with `false`; moved by default.
+- frame with explicit `memberIds` -> members unchanged, `memberIds` unchanged.
+- frame with `semantic.layout` -> exit 2 with the layout message.
+- pool move `false` -> lanes follow pool (lane.x = pool.x + 30), tasks keep
+  absolute x/y, tasks now outside their lane are re-parented (to the
+  geometric container or none); `validateDocument` has no errors.
+- pool resize `false` -> lanes restacked inside the pool, tasks unchanged.
+- lane `height` change `false` -> lane members unchanged; a sibling lane below
+  moves down and its own members move with it.
+- lane `x` change `false` -> exit 2 with the lane message.
+- expanded sub-process move `false` -> inner tasks unchanged and re-parented.
+- breadboard board move `false` -> plugged parts unchanged.
+- group `false` -> group message; `node.generic` `false` -> generic message.
+- batch: a task moved by op 0, then pool moved with `false` by op 1 -> the
+  task keeps the op-0 position.
+- each case: nothing written when the op fails.
+
+## Working rules
+
+- Fresh read before each edit; record pre/post hashes in the progress log;
+  edit only writePaths; logs under `tmp/clm-s731/clm-11-container-carry/`.
+
+## Verification (each must exit 0)
+
+1. `bun test apps/cli/src/edit/carry-members.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/edit/operation-fields.test.ts apps/cli/src/edit/selectors.test.ts` -> 0 fail.
+2. `bun test packages/core/src/keep-members.test.ts packages/core/src/bpmn/containment.test.ts` -> 0 fail.
+3. `bun run typecheck`.
+4. `bunx biome check apps/cli/src/edit/carry-members.ts apps/cli/src/edit/carry-members.test.ts apps/cli/src/edit/operations/elements.ts apps/cli/src/edit-frame-carry.test.ts`.
+5. `grep -n "keepMembers" apps/cli/src/edit/operations/elements.ts` matches and
+   `sh -c '! grep -n "carryMembers applies only to frames" apps/cli/src/edit/operations/elements.ts'`.
+
+## Done criteria
+
+- Verification 1-5 exit 0 with logs; one test per kind in the E1 table is
+  present; only writePaths changed by this plan.

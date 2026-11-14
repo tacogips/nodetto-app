@@ -1,0 +1,229 @@
+{
+  "taskId": "crl-s759",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-759",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "00542c537b05560422dbc03c2fdf9f7ffc030fd5",
+  "designDocPaths": [
+    "design-docs/specs/design-connector-routing-arranging.md",
+    "design-docs/user-qa/connector-routing-arranging.md"
+  ],
+  "evidenceRoot": "tmp/crl-s759",
+  "evidenceLayout": "Per-plan evidence under tmp/crl-s759/<planId>/ with gate runs under final/. Before repeating a gate run, move final/ to attempt-<n>/. No file there may match a Bun test name pattern. Logs from earlier runs stay read-only under tmp/crl-s753/ and tmp/crl-s754/.",
+  "reviewContext": {
+    "workflowMode": "issue-resolution",
+    "issueReference": "none: no issue URL or number supplied; the effective workflowInput is the source (local continuation of crl-09-parity-e2e and crl-10-finish)",
+    "userProblem": "crl-09 is implemented and committed but stopped on outdated performance wording, and the final gates and plan archive have not run.",
+    "requiredOutcomes": [
+      "crl-09's threshold wording matches the owner decision, its verification list passes, and the decision is recorded in its progress log and the design.",
+      "The shared fixture reaches 0 overlapping segment pairs and 0 label overlaps after layered then route, crossings not above the input, deterministic and idempotent, with the assertion and fixture unchanged.",
+      "All crl plans and manifests archived, impl-plans/README.md updated, help and docs current, and mise run verify and mise run test-cli pass on the merged tree."
+    ],
+    "nonGoals": [
+      "Performance work of any kind.",
+      "Redesign or new features; new CLI flags, operations or IR fields.",
+      "Changing the fixture, weakening its assertion, or relaxing any deadline.",
+      "Server, auth or deployment code; pushes or merges."
+    ],
+    "constraints": [
+      "Self-authored neutral fixtures, ids and text only.",
+      "Strict TypeScript; no unchecked index lookups in packages/core.",
+      "Boa rules: no regex split on whole documents, no per-point destructuring in hot geometry loops, no node:* imports in shared-engine modules.",
+      "The baseline binary is built from 1e8f43d in a temporary directory outside the repository working tree.",
+      "Connect routing precedence is explicit field > page default > page convention > existing default.",
+      "Native deadline timeouts get 3 attempts; CPU time is compared with /usr/bin/time -p against the baseline binary.",
+      "Raster tests must not depend on a platform font; these tests assert on SVG geometry and metrics."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Each native arrange command on the shared fixture uses at most 6 user seconds when uncontended; the combined layered plus route figure is not a gate.", "rationale": "Final owner decision. Recorded uncontended means are layered 4.873 and route 3.890."},
+      {"decision": "The target is a recorded manual check, and timing is repeated only if non-test source on the arrange path changes from 00542c5.", "rationale": "A timing test would be flaky under contention, and repeating timing on unchanged source adds no evidence."},
+      {"decision": "crl-10 moves crl-00 to crl-08, crl-s749-dispatch.json, crl-s753-dispatch.json and crl-s754-dispatch.json; the plan-archive node moves this run's plans and this manifest, as recorded in reconciliation.deferredSharedEdits.", "rationale": "Those earlier files are not dispatched in this run, and workers never move a plan or manifest in the run."},
+      {"decision": "crl-08 is not recorded as an accepted dependency.", "rationale": "It is committed, so no plan here waits on it, and crl-10 alone moves its plan file. crl-01 to crl-06 were handled the same way in the replaced manifest."}
+    ],
+    "intentionalTradeoffs": [
+      "The CPU ratio against baseline is a record, not a gate, because arrange does more work by design.",
+      "crl manifests move to completed, unlike other features' manifests, because the request names them.",
+      "The plans run in sequence, because crl-10's gates must run on crl-09's final tree. This also keeps any timing uncontended."
+    ],
+    "supportedEdgeCases": [
+      "A gate-required fix on the arrange path repeats the two arrange timing rows once with nothing else running."
+    ],
+    "outOfScopeEdgeCases": [
+      "Reducing arrange time below the owner target.",
+      "A geometric bound for the shared fixture, which must reach 0."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-connector-routing-arranging.md",
+      "design-docs/user-qa/connector-routing-arranging.md",
+      "impl-plans/active/crl-09-parity-e2e.md",
+      "impl-plans/active/crl-10-finish.md"
+    ],
+    "residualRisks": [
+      "Semantic conflicts on the merged tree stay unknown until crl-10 runs the gates.",
+      "The plan-archive instruction for crl-09, crl-10 and this manifest is recorded in reconciliation.deferredSharedEdits; final review confirms the result."
+    ]
+  },
+  "reconciliation": {
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/completed",
+        "intendedEdit": "Finalization (plan-archive node), not a worker task, after the final gates and reviews pass: move crl-09-parity-e2e.md, crl-10-finish.md and crl-s759-dispatch.json from impl-plans/active/ to impl-plans/completed/. planPath values keep the pre-archive active/ locations. Progress logs are not moved."
+      }
+    ]
+  },
+  "acceptedDependencies": [],
+  "plans": [
+    {
+      "planId": "crl-09-parity-e2e",
+      "planPath": "impl-plans/active/crl-09-parity-e2e.md",
+      "progressPath": "impl-plans/progress/crl-09-parity-e2e.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/native-parity/connect-routing.test.ts",
+        "apps/cli/src/native-parity/connector-arrange.test.ts",
+        "apps/cli/src/native-parity/harness.ts",
+        "apps/cli/src/connector-routing-e2e.test.ts",
+        "apps/cli/src/connector-arrange.test.ts",
+        "apps/cli/src/arrange-modes.test.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/lint-diagram.test.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/lint-metrics.test.ts",
+        "apps/cli/src/lint-metrics.ts",
+        "apps/cli/src/edit/connect-routing.ts",
+        "apps/cli/src/edit/operations/connect.ts",
+        "apps/cli/src/edit/operations/pages.ts",
+        "packages/core/src/arrange-route.ts",
+        "packages/core/src/arrange-route-lanes.ts",
+        "packages/core/src/connector-label-placement.ts",
+        "packages/core/src/shapes/connector/resolve.ts",
+        "packages/core/src/orthogonal-routing.ts",
+        "impl-plans/progress/crl-09-parity-e2e.md",
+        "tmp/crl-s759/crl-09-parity-e2e",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Every verification command in the amended plan exits 0, with native parity 0 skipped.",
+        "The fixture test and its assertion pass unchanged: 0 overlapping segment pairs and 0 label overlaps after layered then route.",
+        "The progress log has a Continuation 3 section that records the owner decision and its evidence, and the source-diff result that decides whether timing is carried forward.",
+        "No deadline changes and no performance work."
+      ],
+      "verification": [
+        "bun test apps/cli/src/connector-routing-e2e.test.ts apps/cli/src/connector-arrange.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/connector-routing-e2e.test.ts apps/cli/src/native-parity/connect-routing.test.ts apps/cli/src/native-parity/connector-arrange.test.ts",
+        "sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/connect-routing.test.ts apps/cli/src/native-parity/connector-arrange.test.ts apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/edit-performance.test.ts'",
+        "test ! -e target/crl-baseline",
+        "git diff --exit-code -- apps/cli/src/__fixtures__/connector-arrange.ts",
+        "grep -q 'expect(after.segmentOverlaps).toBe(0)' apps/cli/src/connector-arrange.test.ts",
+        "grep -q 'at most 6 user seconds' impl-plans/active/crl-09-parity-e2e.md",
+        "grep -q 'at most 6 user seconds' design-docs/specs/design-connector-routing-arranging.md",
+        "grep -q 'at most 6 user seconds' impl-plans/progress/crl-09-parity-e2e.md"
+      ]
+    },
+    {
+      "planId": "crl-10-finish",
+      "planPath": "impl-plans/active/crl-10-finish.md",
+      "progressPath": "impl-plans/progress/crl-10-finish.md",
+      "wave": 2,
+      "dependsOn": ["crl-09-parity-e2e"],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/commands.test.ts",
+        "apps/cli/src/cli-wiring.test.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/arrange-modes.test.ts",
+        "apps/cli/src/connector-arrange.test.ts",
+        "apps/cli/src/connector-routing-e2e.test.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/lint-diagram.test.ts",
+        "apps/cli/src/sequence-self-golden.test.ts",
+        "apps/cli/src/__fixtures__/sequence-golden",
+        "apps/cli/src/edit/operations/convert.ts",
+        "apps/cli/src/edit/operations/convert.test.ts",
+        "apps/cli/src/native-parity/connect-routing.test.ts",
+        "apps/cli/src/native-parity/connector-arrange.test.ts",
+        "apps/cli/src/native-parity/convert.test.ts",
+        "apps/cli/src/native-parity/frame-scope.test.ts",
+        "apps/cli/src/native-parity/sequence-participant.test.ts",
+        "apps/cli/src/native-parity/sequence-self.test.ts",
+        "apps/cli/src/native-parity/sequence-self-help.test.ts",
+        "packages/core/src/index.ts",
+        "packages/core/src/arrange-route.ts",
+        "packages/core/src/arrange-route-lanes.ts",
+        "packages/core/src/connector-label-placement.ts",
+        "packages/core/src/orthogonal-routing.ts",
+        "packages/core/src/shapes/connector/resolve.ts",
+        "packages/core/src/svg-export/connectors.ts",
+        "packages/core/src/svg-export/document.ts",
+        "docs/cli.md",
+        "docs/editing.md",
+        "README.md",
+        "design-docs/specs/design-connector-routing-arranging.md",
+        "impl-plans/README.md",
+        "impl-plans/active/crl-00-overview.md",
+        "impl-plans/active/crl-01-ir-resolver.md",
+        "impl-plans/active/crl-02-metric-fixture.md",
+        "impl-plans/active/crl-03-label-placement.md",
+        "impl-plans/active/crl-04-connect.md",
+        "impl-plans/active/crl-05-lanes-self-loops.md",
+        "impl-plans/active/crl-06-layered-order.md",
+        "impl-plans/active/crl-07-wiring.md",
+        "impl-plans/active/crl-08-repair-labels.md",
+        "impl-plans/active/crl-s749-dispatch.json",
+        "impl-plans/active/crl-s753-dispatch.json",
+        "impl-plans/active/crl-s754-dispatch.json",
+        "impl-plans/completed/crl-00-overview.md",
+        "impl-plans/completed/crl-01-ir-resolver.md",
+        "impl-plans/completed/crl-02-metric-fixture.md",
+        "impl-plans/completed/crl-03-label-placement.md",
+        "impl-plans/completed/crl-04-connect.md",
+        "impl-plans/completed/crl-05-lanes-self-loops.md",
+        "impl-plans/completed/crl-06-layered-order.md",
+        "impl-plans/completed/crl-07-wiring.md",
+        "impl-plans/completed/crl-08-repair-labels.md",
+        "impl-plans/completed/crl-s749-dispatch.json",
+        "impl-plans/completed/crl-s753-dispatch.json",
+        "impl-plans/completed/crl-s754-dispatch.json",
+        "impl-plans/progress/crl-10-finish.md",
+        "tmp/crl-s759/crl-10-finish",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify and CARGO_TERM_QUIET=true mise run test-cli exit 0 on the merged tree, with native parity not skipped.",
+        "Help and docs describe the repair behavior and the nearest free position, and offer no fixture bound.",
+        "crl-00 to crl-08, crl-s749-dispatch.json, crl-s753-dispatch.json and crl-s754-dispatch.json are in impl-plans/completed, with a closing note on crl-07; impl-plans/README.md is updated.",
+        "Every changed existing test has its reason recorded."
+      ],
+      "verification": [
+        "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify",
+        "CARGO_TERM_QUIET=true mise run test-cli",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/help.ts",
+        "grep -q 'explicit field > page default > page convention > existing default' docs/cli.md",
+        "grep -q 'nearest free' docs/cli.md",
+        "test -f impl-plans/completed/crl-07-wiring.md",
+        "test ! -e impl-plans/active/crl-s749-dispatch.json",
+        "grep -q 'crl-s753-dispatch.json' impl-plans/README.md",
+        "git diff --exit-code -- apps/cli/src/__fixtures__/connector-arrange.ts",
+        "test ! -e impl-plans/active/crl-s753-dispatch.json",
+        "grep -q 'crl-s754-dispatch.json' impl-plans/README.md",
+        "grep -q 'crl-s759-dispatch.json' impl-plans/README.md",
+        "test -f impl-plans/completed/crl-08-repair-labels.md",
+        "test ! -e impl-plans/active/crl-08-repair-labels.md",
+        "test ! -e impl-plans/active/crl-s754-dispatch.json"
+      ]
+    }
+  ]
+}
