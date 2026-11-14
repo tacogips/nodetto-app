@@ -1,0 +1,302 @@
+// Byte transport for document files.
+//
+// Nothing in this module understands JSONL. The frontend owns parsing and
+// serialization (`@nodetto/io`); Rust only moves the exact bytes it is
+// handed, so the file format can change without a Rust release.
+
+use std::fs;
+#[cfg(not(target_os = "macos"))]
+use std::fs::File;
+use std::io;
+#[cfg(not(target_os = "macos"))]
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Manager;
+
+/// Distinguishes concurrent writes to the same target within one process.
+static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(any(not(target_os = "macos"), test))]
+fn missing_file_name(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidInput,
+        format!("{} has no file name", path.display()),
+    )
+}
+
+/// The temp file a write goes through: hidden, in the target's own
+/// directory so the final rename stays on one filesystem and is atomic.
+#[cfg(any(not(target_os = "macos"), test))]
+fn temp_sibling(path: &Path) -> io::Result<PathBuf> {
+    let name = path.file_name().ok_or_else(|| missing_file_name(path))?;
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
+    let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let temp_name = format!(".{}.{nanos}-{counter}.tmp", name.to_string_lossy());
+    let directory = path.parent().unwrap_or_else(|| Path::new("."));
+    Ok(directory.join(temp_name))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn write_then_rename(temp: &Path, target: &Path, contents: &[u8]) -> io::Result<()> {
+    let mut file = File::create(temp)?;
+    file.write_all(contents)?;
+    // Durability before visibility: the rename must never publish a name
+    // that points at a half-written file.
+    file.sync_all()?;
+    drop(file);
+    fs::rename(temp, target)
+}
+
+/// Replace `path` with `contents` atomically: write a sibling temp file,
+/// flush it to disk, then rename over the target. A reader either sees the
+/// previous file or the complete new one, never a partial write.
+pub fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
+    write_bytes_atomic(path, contents.as_bytes())
+}
+
+// Foundation's atomic writer uses the system's replacement-file mechanism.
+// A sandbox grant for an individual document does not permit us to create
+// an arbitrary sibling in its parent directory.
+#[cfg(target_os = "macos")]
+pub fn write_bytes_atomic(path: &Path, contents: &[u8]) -> io::Result<()> {
+    use objc2_foundation::{NSData, NSDataWritingOptions, NSString, NSURL};
+
+    let path = path.to_str().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "file path is not valid UTF-8")
+    })?;
+    let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+    NSData::with_bytes(contents)
+        .writeToURL_options_error(&url, NSDataWritingOptions::Atomic)
+        .map_err(|error| io::Error::other(error.to_string()))
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn write_bytes_atomic(path: &Path, contents: &[u8]) -> io::Result<()> {
+    let temp = temp_sibling(path)?;
+    match write_then_rename(&temp, path, contents) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            // Best effort: a failed write must not leave litter next to the
+            // user's document, but the original error is what matters.
+            let _ = fs::remove_file(&temp);
+            Err(error)
+        }
+    }
+}
+
+/// Marks "this file is not there" in a read error, so the frontend can drop
+/// a dead recent-files entry without also dropping one that merely lives on
+/// a share that happens to be offline. The wording is a contract: it is
+/// matched in `apps/desktop/src/file/session.ts`.
+pub const MISSING_FILE_MESSAGE: &str = "file not found";
+
+/// Allocate a managed document name without creating an empty file.
+fn autosave_path(directory: &Path) -> io::Result<PathBuf> {
+    fs::create_dir_all(directory)?;
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    Ok(directory.join(format!("Untitled-{nanos}-{counter}.jsonl")))
+}
+
+#[tauri::command]
+pub fn autosave_document_path(app: tauri::AppHandle) -> Result<String, String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("documents");
+    autosave_path(&directory)
+        .map(|path| path.to_string_lossy().into_owned())
+        .map_err(|error| format!("could not allocate autosave path: {error}"))
+}
+
+#[tauri::command]
+pub fn read_document(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|error| match error.kind() {
+        io::ErrorKind::NotFound => format!("{MISSING_FILE_MESSAGE}: {path}"),
+        _ => format!("failed to read {path}: {error}"),
+    })
+}
+
+#[tauri::command]
+pub fn write_document_atomic(path: String, contents: String) -> Result<(), String> {
+    write_atomic(Path::new(&path), &contents)
+        .map_err(|error| format!("failed to write {path}: {error}"))
+}
+
+#[tauri::command]
+pub fn write_export_atomic(path: String, contents: Vec<u8>) -> Result<(), String> {
+    write_bytes_atomic(Path::new(&path), &contents)
+        .map_err(|error| format!("failed to write {path}: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn temp_siblings(directory: &Path) -> Vec<PathBuf> {
+        fs::read_dir(directory)
+            .expect("directory is readable")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().is_some_and(|extension| extension == "tmp"))
+            .collect()
+    }
+
+    #[test]
+    fn autosave_names_are_unique_and_do_not_create_empty_files() {
+        let directory = tempdir().expect("temp dir");
+        let documents = directory.path().join("documents");
+        let first = autosave_path(&documents).expect("first path");
+        let second = autosave_path(&documents).expect("second path");
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), Some(documents.as_path()));
+        assert_eq!(fs::read_dir(&documents).expect("directory").count(), 0);
+        write_atomic(&first, "shape\n").expect("first actual save");
+        assert_eq!(fs::read_to_string(first).expect("read"), "shape\n");
+    }
+
+    #[test]
+    fn binary_exports_preserve_bytes_and_replace_atomically() {
+        let directory = tempdir().expect("temp dir");
+        let target = directory.path().join("diagram.pdf");
+        write_atomic(&target, "old").expect("old file");
+        let bytes = [0, 255, 128, 37, 80, 68, 70, 10];
+        write_export_atomic(target.to_string_lossy().into_owned(), bytes.to_vec()).expect("export");
+        assert_eq!(fs::read(&target).expect("read"), bytes);
+        assert!(temp_siblings(directory.path()).is_empty());
+    }
+
+    #[test]
+    fn creates_a_new_file() {
+        let directory = tempdir().expect("temp dir");
+        let target = directory.path().join("document.jsonl");
+
+        write_atomic(&target, "one\ntwo\n").expect("write succeeds");
+
+        assert_eq!(
+            fs::read_to_string(&target).expect("read back"),
+            "one\ntwo\n"
+        );
+    }
+
+    #[test]
+    fn replaces_existing_content() {
+        let directory = tempdir().expect("temp dir");
+        let target = directory.path().join("document.jsonl");
+        fs::write(&target, "stale contents that are longer\n").expect("seed file");
+
+        write_atomic(&target, "fresh\n").expect("write succeeds");
+
+        assert_eq!(fs::read_to_string(&target).expect("read back"), "fresh\n");
+    }
+
+    #[test]
+    fn leaves_no_temp_file_behind_on_success() {
+        let directory = tempdir().expect("temp dir");
+        let target = directory.path().join("document.jsonl");
+
+        write_atomic(&target, "one\n").expect("first write");
+        write_atomic(&target, "two\n").expect("second write");
+
+        assert_eq!(temp_siblings(directory.path()), Vec::<PathBuf>::new());
+    }
+
+    #[test]
+    fn leaves_no_temp_file_behind_on_failure() {
+        let directory = tempdir().expect("temp dir");
+        let missing_parent = directory.path().join("nope");
+        let target = missing_parent.join("document.jsonl");
+
+        let result = write_atomic(&target, "one\n");
+
+        assert!(
+            result.is_err(),
+            "writing into a missing directory must fail"
+        );
+        assert!(
+            !missing_parent.exists(),
+            "the write must not create the directory"
+        );
+        assert_eq!(temp_siblings(directory.path()), Vec::<PathBuf>::new());
+    }
+
+    #[test]
+    fn temp_sibling_lives_next_to_the_target() {
+        let target = Path::new("/tmp/nodetto/document.jsonl");
+
+        let temp = temp_sibling(target).expect("target has a file name");
+
+        assert_eq!(temp.parent(), target.parent());
+        assert!(
+            temp.file_name()
+                .expect("temp has a file name")
+                .to_string_lossy()
+                .starts_with(".document.jsonl."),
+            "unexpected temp name: {}",
+            temp.display()
+        );
+    }
+
+    #[test]
+    fn temp_sibling_rejects_a_path_without_a_file_name() {
+        assert!(temp_sibling(Path::new("/")).is_err());
+    }
+
+    #[test]
+    fn read_document_reports_a_missing_file() {
+        let directory = tempdir().expect("temp dir");
+        let missing = directory.path().join("absent.jsonl");
+
+        let error = read_document(missing.to_string_lossy().into_owned())
+            .expect_err("reading a missing file fails");
+
+        // The frontend matches this wording to tell a dead recent-files
+        // entry from a temporarily unreachable one.
+        assert!(
+            error.starts_with(MISSING_FILE_MESSAGE),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn read_document_reports_other_failures_differently() {
+        let directory = tempdir().expect("temp dir");
+
+        // A directory exists but is not readable as a document; that is not
+        // a missing file and must not be reported as one.
+        let error = read_document(directory.path().to_string_lossy().into_owned())
+            .expect_err("reading a directory fails");
+
+        assert!(
+            !error.starts_with(MISSING_FILE_MESSAGE),
+            "unexpected error: {error}"
+        );
+        assert!(
+            error.contains("failed to read"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn commands_round_trip_text_verbatim() {
+        let directory = tempdir().expect("temp dir");
+        let target = directory.path().join("document.jsonl");
+        let path = target.to_string_lossy().into_owned();
+        // Trailing newline, unicode and an empty line: the transport must
+        // not normalize any of it.
+        let contents = "{\"kind\":\"document\"}\n\n{\"note\":\"ラベル\"}\n";
+
+        write_document_atomic(path.clone(), contents.to_string()).expect("write succeeds");
+
+        assert_eq!(read_document(path).expect("read succeeds"), contents);
+    }
+}
