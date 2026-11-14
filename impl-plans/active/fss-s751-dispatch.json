@@ -1,0 +1,280 @@
+{
+  "taskId": "fss-s751",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-751",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "1e8f43d224d7b43e200eb2229e7be17b39ca033c",
+  "designDocPaths": [
+    "design-docs/specs/design-file-save-stability.md",
+    "design-docs/specs/design-web-app-roundtrip.md",
+    "design-docs/specs/design-document-change-source.md"
+  ],
+  "overviewPath": "impl-plans/active/fss-00-overview.md",
+  "evidenceRoot": "tmp/fss-s751",
+  "evidenceLayout": "Per-plan logs under tmp/fss-s751/<planId>/, with log file names given in each plan. Before repeating a gate run, move the earlier logs to attempt-<n>/ inside the plan's evidence directory. The directory holds data only and stays untracked.",
+  "reviewContext": {
+    "issueReference": "none; workflowInput of opus-terra-design-and-implement-review-loop-session-751 is authoritative",
+    "userProblem": "With a document open in the desktop app and left open while another program edits it, the app saved the document again after a few seconds and rewrote every image.raster whose semantic.src was a relative path into a copy under artifacts/<sha256>.<ext>. This repeated on every external edit until the app quit. A small document with one relative image did not reproduce it, so the trigger may depend on size, timing or hydration.",
+    "requiredOutcomes": [
+      "External changes reloaded or merged by the app do not trigger a save without unsaved in-app changes; unchanged records are written byte-identically when a save happens.",
+      "No save path rewrites relative image references into artifacts/ copies; only embedded data-URL images are stored as artifacts; Save As behavior is documented and tested.",
+      "Session tests with many relative images across pages and an external edit pass; no artifacts/ directory is created.",
+      "mise run verify passes; docs state both rules."
+    ],
+    "nonGoals": [
+      "No Rust, Tauri command, IR, core, collab, ui-solid or CLI change. store_attachment and its Rust tests stay as they are.",
+      "serializeDocument output and options do not change, and the CLI does not call the new serializer.",
+      "hydrateDocumentAttachments, reconcileDerivedState itself and collab reconciliation do not change.",
+      "Explicit Save and Save As are not gated.",
+      "A change arriving during backend.writeDocument keeps its current conflict handling.",
+      "changeWorkspace keeps recording a page mode as an unsaved edit.",
+      "No edits to existing tests, except additions to attachments.test.ts. No README.md or impl-plans/README.md edit by any plan, and no archiving by any plan."
+    ],
+    "constraints": [
+      "Fixtures, example names, ids and text are self-authored and neutral, such as thumbs/widget-1.png, widgets and orders. Never mention external issue numbers, organizations, reporters, downstream product names or downstream file names in code, tests, docs, plans or commit messages.",
+      "Keep TypeScript strictly typed and keep shared code safe under noUncheckedIndexedAccess, with no unchecked index lookups.",
+      "Shared packages run in the native CLI's Boa interpreter: do not use String.prototype.split with a regular expression on whole documents.",
+      "Every plan verification command must exit 0 and actually run tests once that plan lands. Never relax existing test deadlines.",
+      "mise run test-cli is required only if CLI code changes. This design changes none, and fss-04 records the empty git status for apps/cli.",
+      "Same branch and working directory for all plans. No worktrees, private branches, git commit, stash, checkout, reset, push or merge by workers.",
+      "Workers edit only their writePaths and their own progress log, record sha256 before and after each edit, and run Biome on owned files only.",
+      "If bun run typecheck fails only in a file a sibling plan owns, record the output and retry once that sibling finishes. It must exit 0 on the final tree.",
+      "Do not use emojis. Follow AGENTS.md."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Automatic writes to the open file first compare the current document with lastSavedText through serializeDocumentPreservingText. If equal, nothing is written, dirty is cleared and the call returns true.",
+        "rationale": "The guarantee holds for any dirty source, which matters because the first dirty source in the reported case is not established. Returning true keeps quit from asking about discarding, because disk already holds the document."
+      },
+      {
+        "decision": "resolveConflict(\"keep\") sets lastSavedText to conflict.diskText.",
+        "rationale": "The gate needs lastSavedText to mean the bytes last seen on disk. Otherwise it would skip the overwrite the user just chose."
+      },
+      {
+        "decision": "reconcileDerivedState runs in applyOutsideChange only when merging into unsaved edits.",
+        "rationale": "A clean take then matches what reopening the file shows, which keeps the gate comparison exact. Derived repairs during a merge are app changes saved with the user's edits."
+      },
+      {
+        "decision": "performWrite repeats attachment preparation from a fresh snapshot while editor.store.revision changed, and serializes only the last pass.",
+        "rationale": "Code reading found a size-dependent race: an outside change merged during slow preparation was overwritten by the stale snapshot."
+      },
+      {
+        "decision": "prepareDocumentAttachments decides once per distinct src using the binding table in the design. A relative src in the same directory is kept with no read, no store and no failure.",
+        "rationale": "This is rule 2. A missing file no longer blocks saving, because the reference is not made any worse and hydration still reports the missing file."
+      },
+      {
+        "decision": "A new serializeDocumentPreservingText compares canonical lines by record key instead of reusing sourceLines.",
+        "rationale": "sourceLines is keyed by object identity and cannot survive editor snapshots. A canonical base still yields exactly serializeDocument(document), and migrated or unparseable bases fall back to it."
+      },
+      {
+        "decision": "Save As copies are reported through PreparedAttachments.copied and SessionState.copiedAttachments, and shown in DocumentStatus.",
+        "rationale": "The request requires copy-and-report when a relative reference is not resolvable in the new folder. Copies reuse storeAttachment, so no Tauri command changes."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "A same-folder save with a missing image file now succeeds and leaves the reference alone instead of failing.",
+      "Same-directory detection compares directory path strings. A false negative, such as a symlinked path, falls into the Save As rows and still keeps the reference when the bytes match.",
+      "The gate patches only dirty, so an earlier error banner stays visible after a no-op autosave. This keeps hydration errors visible and does not affect file contents.",
+      "Blank lines may be dropped by canonical-order output, while the identity return and base-order output keep them.",
+      "Embedded images still externalize on the next real save. Opening or reloading such a file writes nothing."
+    ],
+    "supportedEdgeCases": [
+      "Non-canonical key order or spacing, CRLF, BOM, blank lines, foreign record order and missing trailing newline in the base text.",
+      "Unknown record kinds, including two identical unknown records.",
+      "Migrated base, different document id and unparseable base, all falling back to serializeDocument.",
+      "Element moved to another page or changed page order, landing at the canonical position in canonical-order output.",
+      "Edit then undo in automatic mode, and flush in that no-op state.",
+      "An outside change or a document switch during attachment preparation.",
+      "Detached documents whose relative images exist only in the asset cache, which still store on first save.",
+      "All Save As rows: destination equal, destination readable with source unreadable, destination absent or different, neither readable, and a backend that cannot store."
+    ],
+    "outOfScopeEdgeCases": [
+      "A change arriving during backend.writeDocument, which keeps the conflict banner.",
+      "Identifying the first dirty source in the reported case, unless a clean-session red check fails. In that case fix it at its origin if the origin is in writePaths; otherwise stop and report the path as a blocker.",
+      "UI-originated automatic edits, which headless session tests cannot catch."
+    ],
+    "implementerNotesFromPlanReview": [
+      {
+        "path": "impl-plans/active/fss-03-session.md",
+        "line": 82,
+        "note": "In the non-canonical line test, the external edit must be a text-level append. Another Editor's serializeDocument would canonicalize that line."
+      },
+      {
+        "path": "impl-plans/active/fss-03-session.md",
+        "line": 94,
+        "note": "The red-check list is not exhaustive. The reconcile spy, non-canonical line and copiedAttachments tests are also expected to fail before the fix. Only an unexpected failure in the no-write clean-session tests means a missing dirty source."
+      },
+      {
+        "path": "impl-plans/active/fss-03-session.md",
+        "line": 103,
+        "note": "Targeted verification omits session-concurrency.test.ts and offline.test.ts. The fss-04 mise run verify runs them, so a regression there would surface one wave later."
+      },
+      {
+        "path": "impl-plans/active/fss-04-docs-final.md",
+        "line": 38,
+        "note": "The Save As doc text in the plan does not mention the design table row that keeps a reference when the destination has the file and the source is unreadable."
+      },
+      {
+        "path": "design-docs/specs/design-file-save-stability.md",
+        "line": 50,
+        "note": "The first dirty source is not established and session tests are headless. The gate, snapshot loop and preserving serializer hold for any dirty source."
+      }
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-file-save-stability.md",
+      "design-docs/specs/design-web-app-roundtrip.md",
+      "design-docs/specs/design-document-change-source.md",
+      "impl-plans/active/fss-00-overview.md",
+      "impl-plans/active/fss-01-preserving-serializer.md",
+      "impl-plans/active/fss-02-attachments.md",
+      "impl-plans/active/fss-03-session.md",
+      "impl-plans/active/fss-04-docs-final.md",
+      "apps/desktop/src/file/attachments.ts",
+      "apps/desktop/src/file/session.ts",
+      "apps/desktop/src/file/session-reconcile.ts",
+      "packages/io/src/jsonl/serialize.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "fss-01-preserving-serializer",
+      "planPath": "impl-plans/active/fss-01-preserving-serializer.md",
+      "progressPath": "impl-plans/progress/fss-01-preserving-serializer.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/io/src/jsonl/serialize.ts",
+        "packages/io/src/jsonl/preserve-text.ts",
+        "packages/io/src/jsonl/preserve-text.test.ts",
+        "packages/io/src/index.ts",
+        "impl-plans/progress/fss-01-preserving-serializer.md",
+        "tmp/fss-s751/fss-01-preserving-serializer",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "packages/io/src/index.ts exports serializeDocumentPreservingText(document, baseText), and apps/cli/src does not call it.",
+        "An unchanged document returns the base text verbatim, including non-canonical lines, blank lines, BOM and CRLF.",
+        "A canonical base yields exactly serializeDocument(document) for edit, add, remove and move across pages.",
+        "With a non-canonical or foreign-order base, unchanged records keep their raw lines and existing relative order.",
+        "Migrated, different-id and unparseable bases fall back to serializeDocument; an invalid document throws.",
+        "golden.test.ts and roundtrip.test.ts have no diff, and serializeDocument behavior is unchanged."
+      ],
+      "verification": [
+        "bun test packages/io/src/jsonl/preserve-text.test.ts packages/io/src/jsonl/roundtrip.test.ts packages/io/src/jsonl/source-lines.test.ts packages/io/src/jsonl/golden.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/io/src/jsonl/serialize.ts packages/io/src/jsonl/preserve-text.ts packages/io/src/jsonl/preserve-text.test.ts packages/io/src/index.ts"
+      ]
+    },
+    {
+      "planId": "fss-02-attachments",
+      "planPath": "impl-plans/active/fss-02-attachments.md",
+      "progressPath": "impl-plans/progress/fss-02-attachments.md",
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/file/attachments.ts",
+        "apps/desktop/src/file/attachments.test.ts",
+        "impl-plans/progress/fss-02-attachments.md",
+        "tmp/fss-s751/fss-02-attachments",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "A same-directory save keeps relative src unchanged with no readAttachment or storeAttachment call and no failure, including a missing file and a backend without storeAttachment.",
+        "Only data URLs, detached-document images and reported Save As copies reach storeAttachment.",
+        "Every row of the design's attachment table is implemented and tested, with copied populated only for Save As copies, one entry per distinct source.",
+        "Existing attachments tests pass unchanged; git diff on attachments.test.ts only adds lines.",
+        "No change under apps/desktop/src-tauri."
+      ],
+      "verification": [
+        "bun test apps/desktop/src/file/attachments.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/desktop/src/file/attachments.ts apps/desktop/src/file/attachments.test.ts"
+      ]
+    },
+    {
+      "planId": "fss-03-session",
+      "planPath": "impl-plans/active/fss-03-session.md",
+      "progressPath": "impl-plans/progress/fss-03-session.md",
+      "dependsOn": [
+        "fss-01-preserving-serializer",
+        "fss-02-attachments"
+      ],
+      "writePaths": [
+        "apps/desktop/src/file/session.ts",
+        "apps/desktop/src/file/session-types.ts",
+        "apps/desktop/src/file/session-reconcile.ts",
+        "apps/desktop/src/shell/DocumentStatus.tsx",
+        "apps/desktop/src/file/session-save-stability.test.ts",
+        "apps/desktop/src/file/session-test-helpers.ts",
+        "impl-plans/progress/fss-03-session.md",
+        "tmp/fss-s751/fss-03-session",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "A clean session with 160 relative images across 4 pages and external edits on a 5th page writes nothing, stores nothing, stays not dirty and shows the new shape.",
+        "An unsaved local edit plus an external edit produces exactly one write, with every thumbs/ line byte-identical, no artifacts/ reference and no stores.",
+        "An outside change during attachment preparation is in the first write with no conflict banner, and a document switch during preparation writes nothing.",
+        "Edit then undo in automatic mode writes nothing and clears dirty, and flush resolves true.",
+        "resolveConflict(\"keep\") followed by autosave still overwrites the file.",
+        "Save As copies appear in copiedAttachments and in the DocumentStatus note, and the next local edit clears them.",
+        "Existing session test files have no diff, and the progress log has the red check table and states the clean-session result."
+      ],
+      "verification": [
+        "bun test apps/desktop/src/file/session-save-stability.test.ts apps/desktop/src/file/session.test.ts apps/desktop/src/file/session-external.test.ts apps/desktop/src/file/session-open.test.ts apps/desktop/src/file/attachments.test.ts apps/desktop/src/file/close.test.ts apps/desktop/src/shell/document-commands.test.ts",
+        "bun test apps/desktop/src/file/cli-live.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/desktop/src/file/session.ts apps/desktop/src/file/session-types.ts apps/desktop/src/file/session-reconcile.ts apps/desktop/src/shell/DocumentStatus.tsx apps/desktop/src/file/session-save-stability.test.ts apps/desktop/src/file/session-test-helpers.ts"
+      ]
+    },
+    {
+      "planId": "fss-04-docs-final",
+      "planPath": "impl-plans/active/fss-04-docs-final.md",
+      "progressPath": "impl-plans/progress/fss-04-docs-final.md",
+      "dependsOn": [
+        "fss-03-session"
+      ],
+      "writePaths": [
+        "docs/editing.md",
+        "docs/design.md",
+        "docs/cli.md",
+        "impl-plans/progress/fss-04-docs-final.md",
+        "tmp/fss-s751/fss-04-docs-final",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "docs/editing.md states rule 1, rule 2 and Save As handling in plain words; docs/design.md and docs/cli.md match the delivered behavior.",
+        "git diff --stat -- docs lists only the three named docs.",
+        "git status --short apps/cli is empty and recorded in the progress log.",
+        "mise run verify on the combined tree exits 0 with 0 test failures, and the progress log records the test counts."
+      ],
+      "verification": [
+        "grep -n \"byte-identical\" docs/editing.md",
+        "grep -n \"byte-identical\" docs/cli.md",
+        "grep -n \"thumbs/widget.png\" docs/editing.md",
+        "CARGO_TERM_QUIET=true mise run verify"
+      ]
+    }
+  ]
+}

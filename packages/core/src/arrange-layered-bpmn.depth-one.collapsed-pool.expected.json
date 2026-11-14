@@ -1,0 +1,82 @@
+{
+ "schemaVersion": 1,
+ "id": "doc-1",
+ "title": "Test",
+ "pages": [
+  {
+   "id": "page-1",
+   "name": "BPMN",
+   "kind": "bpmn"
+  }
+ ],
+ "elements": [
+  {
+   "id": "a",
+   "page": "page-1",
+   "type": "bpmn.task",
+   "index": "a1",
+   "semantic": {
+    "name": "a",
+    "taskType": "user",
+    "loop": "none",
+    "parent": "p"
+   },
+   "visual": {
+    "x": 70,
+    "y": 40,
+    "width": 100,
+    "height": 60
+   }
+  },
+  {
+   "id": "b",
+   "page": "page-1",
+   "type": "bpmn.task",
+   "index": "a1",
+   "semantic": {
+    "name": "b",
+    "taskType": "user",
+    "loop": "none",
+    "parent": "q"
+   },
+   "visual": {
+    "x": 70,
+    "y": 300,
+    "width": 100,
+    "height": 60
+   }
+  },
+  {
+   "id": "p",
+   "page": "page-1",
+   "type": "bpmn.participant",
+   "index": "a1",
+   "semantic": {
+    "name": "p",
+    "collapsed": false
+   },
+   "visual": {
+    "x": 0,
+    "y": 0,
+    "width": 210,
+    "height": 140
+   }
+  },
+  {
+   "id": "q",
+   "page": "page-1",
+   "type": "bpmn.participant",
+   "index": "a1",
+   "semantic": {
+    "name": "q",
+    "collapsed": true
+   },
+   "visual": {
+    "x": 0,
+    "y": 260,
+    "width": 210,
+    "height": 240
+   }
+  }
+ ]
+}

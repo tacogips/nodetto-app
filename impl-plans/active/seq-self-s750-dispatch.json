@@ -1,0 +1,343 @@
+{
+  "taskId": "seq-self-s750",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-750",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "1e8f43d224d7b43e200eb2229e7be17b39ca033c",
+  "designDocPaths": [
+    "design-docs/specs/design-sequence-self-messages.md",
+    "design-docs/user-qa/sequence-self-messages.md"
+  ],
+  "supersededManifests": [],
+  "evidenceRoot": "tmp/seq-self-s750",
+  "evidenceLayout": "Per-plan logs under tmp/seq-self-s750/<planId>/, with per-attempt subdirectories attempt-<n>/ for repeated gate runs. Retry loops write <name>-1.log..<name>-3.log. tmp/ is git-ignored (.gitignore line 41). Store only data there (logs, JSON, digests, generated JSONL and SVG), never .ts files, because bun test collects stray .ts files under tmp/. Cargo output goes to target/ (artifactRoots [\"target\"] in every plan). target/seq-self-baseline/nodetto-cli is the pre-change reference and must never be deleted (no cargo clean).",
+  "openDecisions": [
+    {"id": "Q1", "path": "design-docs/user-qa/sequence-self-messages.md", "default": "return is the reply kind; no alias", "blocking": false},
+    {"id": "Q2", "path": "design-docs/user-qa/sequence-self-messages.md", "default": "only the message tool self-connects on the canvas", "blocking": false}
+  ],
+  "reviewContext": {
+    "workflowMode": "issue-resolution",
+    "issueReference": "none; effective workflowInput is authoritative",
+    "userProblem": "A sequence participant cannot connect to itself in the CLI or app, and an equal-ends message exports as a short straight arrow rather than a self-call loop.",
+    "requiredOutcomes": [
+      "connect from a participant to itself creates a message on the next row for sync, async and return, in Bun, native and the app message tool.",
+      "A self-message renders as a loop with its label beside it, in SVG, PNG, PDF and on the canvas, and following rows do not overlap.",
+      "Rows, activations and lifelines account for the loop height.",
+      "Help, types and docs describe self-messages.",
+      "Documents without self-messages render byte-identically, proven by literal golden fixtures from base commit 1e8f43d.",
+      "mise run verify and mise run test-cli pass; native CPU is compared against the pre-change binary."
+    ],
+    "nonGoals": [
+      "No new IR type, semantic field or stored geometry; no adapter or Rust change.",
+      "No reply alias and no self-connect from port-handle or generic connector drags (Q1 and Q2 defaults).",
+      "No DOM test dependency; no relaxed deadline; no binary-less native parity; no push, merge, tag or release."
+    ],
+    "constraints": [
+      "Neutral self-authored fixtures only.",
+      "Strict TS, noUncheckedIndexedAccess-safe core, and Boa rules: no regex split on whole documents, no per-point destructuring in hot geometry loops.",
+      "Raster assertions must not depend on a platform font.",
+      "Only seq-self-07-wiring edits help.ts, docs/cli.md, README.md, commands.ts and packages/core/src/index.ts."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "A self-message is any sequence.message whose from equals its to; no new IR type, semantic field or stored geometry.", "rationale": "Existing documents that already hold one render as a loop without migration (design section 1)."},
+      {"decision": "Loop width 40, height 32 and label gap 8 live in packages/core/src/sequence-layout.ts.", "rationale": "The canvas and export both read routes from resolveConnector, so they cannot drift (design section 2). Height 32 is below the row pitch 52 and lifeline tail margin 60, so saved geometry stays free of overlap."},
+      {"decision": "Self-message label text is left-aligned at labelStartX through an optional ConnectorEndpoints field.", "rationale": "Centred labels use an estimated width, and real fonts could run back over the loop (design section 4)."},
+      {"decision": "Every layout rule adds sequenceMessageExtent or a self-message count, which is zero without self-messages.", "rationale": "This keeps documents without self-messages byte-identical (design section 5)."},
+      {"decision": "The export viewBox adds one box per labelled self-message, sized at 1.15 em per character plus positive letter spacing.", "rationale": "A label on the rightmost lifeline would otherwise clip; the bound is a clipping bound, not an average (design section 6)."},
+      {"decision": "Delivery uses seq-self-01-contract alone in wave 1, plans 02 to 05 in wave 2, then plans 06 and 07 in wave 3.", "rationale": "Plans depend only on the contract, and this gives 2 waves before wiring. It refines the design section 11 table; ownership and contracts stay consistent (plan review finding SEQ-SELF-L2-WAVE-DIVERGENCE)."},
+      {"decision": "Amendment 2026-11-06 round 1: seq-self-01-contract also owns packages/core/src/sequence-authoring.test.ts and replaces only the line 154 null assertion with the accepted self-connect behavior; seq-self-04-authoring keeps the file and extends it afterwards, ordered by dependsOn.", "rationale": "Blocked plan: seq-self-01-contract. Resolved gap: the existing assertion that a participant self-connect returns null contradicted the accepted connect rule, and the file was outside that plan's writePaths. No design change."}
+    ],
+    "intentionalTradeoffs": [
+      "An export can have unused space on the right, up to the 1.15 em bound, when a self-message label is the rightmost content (design section 6).",
+      "The repo has no DOM test harness, so the canvas component test imports a pure label helper through the .tsx module rather than mounting the view (design section 10).",
+      "docs/editing.md gets no self-message text; docs/cli.md covers the behaviour (plan review finding SEQ-SELF-L4-EDITING-DOC).",
+      "Plan headers do not list writePaths, sharedPaths or artifactRoots; this manifest is the single source for them (plan review finding SEQ-SELF-L1-PLAN-HEADERS)."
+    ],
+    "supportedEdgeCases": [
+      "An existing document with a saved-y self-message paints a loop without any geometry rewrite; this is the requested change.",
+      "Saved visual.y and visual.height stay authoritative and are not rewritten on open.",
+      "Wrapped labels are centred on the loop, and the viewBox box uses the longest wrapped line.",
+      "Positive letterSpacing widens the bound; negative letterSpacing adds nothing.",
+      "A self-connect on a locked participant returns null, and uml.class and usecase.node keep refusing.",
+      "Two distinct participants at the same x keep the straight stub output.",
+      "A click on a lifeline with the message tool creates nothing; a drag of at least 4 screen pixels that ends on the source creates one undoable self-message."
+    ],
+    "outOfScopeEdgeCases": [
+      "scale with a factor well below 1 can shrink saved row spacing below the fixed loop height (design section 12).",
+      "A custom fontFamily whose glyphs advance more than 1.15 em can still clip on the rightmost lifeline (design section 12).",
+      "labelPosition, ports, routing and routingWaypoints do not apply to self-messages.",
+      "A reply alias, and self-connect from port-handle or generic connector drags (user-QA Q1 and Q2 defaults).",
+      "Other connector labels keep having no viewBox protection."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-sequence-self-messages.md",
+      "design-docs/user-qa/sequence-self-messages.md",
+      "impl-plans/active/seq-self-01-contract.md",
+      "impl-plans/active/seq-self-02-export.md",
+      "impl-plans/active/seq-self-03-shape-bounds.md",
+      "impl-plans/active/seq-self-04-authoring.md",
+      "impl-plans/active/seq-self-05-canvas.md",
+      "impl-plans/active/seq-self-06-cli.md",
+      "impl-plans/active/seq-self-07-wiring.md",
+      "packages/core/src/sequence-layout.ts",
+      "packages/core/src/shapes/connector/resolve.ts",
+      "packages/core/src/editor/connections.ts",
+      "packages/ui-solid/src/interaction/geometry.ts"
+    ],
+    "residualRisks": [
+      "Q1 and Q2 in design-docs/user-qa/sequence-self-messages.md remain open and non-blocking; the plans implement their defaults.",
+      "The 0xC0 glyph rule and the 1.15 em bound are unconfirmed until PNG containment runs on Linux with DejaVu and on macOS.",
+      "Loop picking and rendered appearance have been read from code, not executed. If plan 03 needs the hit-test fallback, plan 05 re-runs after plan 03 lands.",
+      "The 1.25 CPU ratio is a plan threshold, not a design value; exceeding it stops work as a finding.",
+      "SEQ-SELF-L6-TIMING-ORDER: the seq-self-06-cli timing fixture must assign each message a distinct semantic.order, because the sequence.message default is a1; otherwise the rows and the omitted-geometry path are not exercised."
+    ]
+  },
+  "amendments": [
+    {
+      "round": 1,
+      "date": "2026-11-06",
+      "reason": "blocked-wave-scope-or-contract",
+      "previousCheckpointCommit": "2e2b985a977f44c27abe5df9f23c29b461bd7be1",
+      "blockedPlanIds": ["seq-self-01-contract"],
+      "paths": ["packages/core/src/sequence-authoring.test.ts"],
+      "decision": "Add the test file to seq-self-01-contract writePaths so it can replace the line 154 null assertion, which contradicts the accepted connect rule. seq-self-04-authoring keeps the file and edits it afterwards, ordered by dependsOn. No design change."
+    }
+  ],
+  "acceptedDependencies": [],
+  "plans": [
+    {
+      "planId": "seq-self-01-contract",
+      "planPath": "impl-plans/active/seq-self-01-contract.md",
+      "progressPath": "impl-plans/progress/seq-self-01-contract.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/sequence-layout.ts",
+        "packages/core/src/sequence-layout.test.ts",
+        "packages/core/src/sequence-self-route.test.ts",
+        "packages/core/src/shapes/connector/route.ts",
+        "packages/core/src/shapes/connector/resolve.ts",
+        "packages/core/src/editor/connections.ts",
+        "packages/core/src/connector-policy.test.ts",
+        "packages/core/src/sequence-authoring.test.ts",
+        "apps/cli/src/sequence-self-golden.test.ts",
+        "apps/cli/src/__fixtures__/sequence-golden",
+        "impl-plans/progress/seq-self-01-contract.md",
+        "tmp/seq-self-s750/seq-self-01-contract",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/sequence-authoring.test.ts", "intendedEdit": "Replace only the line 154 null assertion with the accepted self-connect behavior (amendment round 1); seq-self-04-authoring extends the file afterwards."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Golden files and target/seq-self-baseline/nodetto-cli exist, and both cmp checks pass.",
+        "All geometry exports exist with the exact names and values.",
+        "connectSmart(p, p) returns a message whose route has four points.",
+        "The aggregate bun test command exits 0, and sequence-authoring.test.ts differs only by the amended assertion."
+      ],
+      "verification": [
+        "sh -c 'target/seq-self-baseline/nodetto-cli export packages/io/src/__fixtures__/sequence.jsonl --format svg | cmp - apps/cli/src/__fixtures__/sequence-golden/io-sequence.expected.svg'",
+        "sh -c 'target/seq-self-baseline/nodetto-cli export apps/cli/src/__fixtures__/sequence-golden/omitted-geometry.jsonl --format svg | cmp - apps/cli/src/__fixtures__/sequence-golden/omitted-geometry.expected.svg'",
+        "bun test packages/core/src/sequence-layout.test.ts packages/core/src/sequence-self-route.test.ts packages/core/src/connector-policy.test.ts packages/core/src/sequence-authoring.test.ts packages/core/src/svg-export.test.ts apps/cli/src/sequence-self-golden.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/sequence-layout.ts packages/core/src/sequence-layout.test.ts packages/core/src/sequence-self-route.test.ts packages/core/src/shapes/connector/route.ts packages/core/src/shapes/connector/resolve.ts packages/core/src/editor/connections.ts packages/core/src/connector-policy.test.ts packages/core/src/sequence-authoring.test.ts apps/cli/src/sequence-self-golden.test.ts"
+      ]
+    },
+    {
+      "planId": "seq-self-02-export",
+      "planPath": "impl-plans/active/seq-self-02-export.md",
+      "progressPath": "impl-plans/progress/seq-self-02-export.md",
+      "wave": 2,
+      "dependsOn": ["seq-self-01-contract"],
+      "writePaths": [
+        "packages/core/src/svg-export/connectors.ts",
+        "packages/core/src/svg-export/document.ts",
+        "packages/core/src/svg-export-self-message.test.ts",
+        "impl-plans/progress/seq-self-02-export.md",
+        "tmp/seq-self-s750/seq-self-02-export",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Self-message label text is start-anchored at labelStartX.",
+        "Both clipping reproductions fit the viewBox formula, and other connectors add no box.",
+        "Goldens stay byte-identical."
+      ],
+      "verification": [
+        "bun test packages/core/src/svg-export-self-message.test.ts packages/core/src/svg-export.test.ts apps/cli/src/sequence-self-golden.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/svg-export/connectors.ts packages/core/src/svg-export/document.ts packages/core/src/svg-export-self-message.test.ts"
+      ]
+    },
+    {
+      "planId": "seq-self-03-shape-bounds",
+      "planPath": "impl-plans/active/seq-self-03-shape-bounds.md",
+      "progressPath": "impl-plans/progress/seq-self-03-shape-bounds.md",
+      "wave": 2,
+      "dependsOn": ["seq-self-01-contract"],
+      "writePaths": [
+        "packages/core/src/shapes/sequence.ts",
+        "packages/core/src/sequence-self-bounds.test.ts",
+        "packages/core/src/hit-test.test.ts",
+        "impl-plans/progress/seq-self-03-shape-bounds.md",
+        "tmp/seq-self-s750/seq-self-03-shape-bounds",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Omitted-height lifelines and activations cover a trailing loop; saved geometry wins.",
+        "A pick on the loop's legs returns the message, and the hollow and lifeline return the participant.",
+        "The progress log states whether the hit-test fallback was needed."
+      ],
+      "verification": [
+        "bun test packages/core/src/sequence-self-bounds.test.ts packages/core/src/hit-test.test.ts packages/core/src/sequence-layout.test.ts",
+        "bun test apps/cli/src/sequence-self-golden.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/shapes/sequence.ts packages/core/src/sequence-self-bounds.test.ts packages/core/src/hit-test.test.ts"
+      ]
+    },
+    {
+      "planId": "seq-self-04-authoring",
+      "planPath": "impl-plans/active/seq-self-04-authoring.md",
+      "progressPath": "impl-plans/progress/seq-self-04-authoring.md",
+      "wave": 2,
+      "dependsOn": ["seq-self-01-contract"],
+      "writePaths": [
+        "packages/core/src/editor/sequence.ts",
+        "packages/core/src/sequence-authoring.test.ts",
+        "impl-plans/progress/seq-self-04-authoring.md",
+        "tmp/seq-self-s750/seq-self-04-authoring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The next message after a self-message sits 32 + 52 below it, and lifelines and activations cover the loop.",
+        "Existing authoring tests, as plan 01 left them, pass unedited, and pitch without self-messages stays 52."
+      ],
+      "verification": [
+        "bun test packages/core/src/sequence-authoring.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/editor/sequence.ts packages/core/src/sequence-authoring.test.ts"
+      ]
+    },
+    {
+      "planId": "seq-self-05-canvas",
+      "planPath": "impl-plans/active/seq-self-05-canvas.md",
+      "progressPath": "impl-plans/progress/seq-self-05-canvas.md",
+      "wave": 2,
+      "dependsOn": ["seq-self-01-contract"],
+      "writePaths": [
+        "packages/ui-solid/src/interaction/geometry.ts",
+        "packages/ui-solid/src/interaction/connectors.ts",
+        "packages/ui-solid/src/shapes/ConnectorView.tsx",
+        "packages/ui-solid/src/connector-geometry.ts",
+        "packages/ui-solid/src/interaction-connectors.test.ts",
+        "packages/ui-solid/src/connector-view-self-message.test.ts",
+        "impl-plans/progress/seq-self-05-canvas.md",
+        "tmp/seq-self-s750/seq-self-05-canvas",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "A message-tool drag on one participant creates one undoable self-message; a click creates nothing.",
+        "Other connector tools keep their behavior.",
+        "The canvas label uses connectorLabelTextAttrs, and sameConnectorGeometry compares labelStartX."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/connector-view-self-message.test.ts packages/ui-solid/src/connector-routing.test.ts packages/ui-solid/src/interaction-creation.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/ui-solid/src/interaction/geometry.ts packages/ui-solid/src/interaction/connectors.ts packages/ui-solid/src/shapes/ConnectorView.tsx packages/ui-solid/src/connector-geometry.ts packages/ui-solid/src/interaction-connectors.test.ts packages/ui-solid/src/connector-view-self-message.test.ts"
+      ]
+    },
+    {
+      "planId": "seq-self-06-cli",
+      "planPath": "impl-plans/active/seq-self-06-cli.md",
+      "progressPath": "impl-plans/progress/seq-self-06-cli.md",
+      "wave": 3,
+      "dependsOn": ["seq-self-02-export", "seq-self-03-shape-bounds", "seq-self-04-authoring"],
+      "writePaths": [
+        "apps/cli/src/types-command.ts",
+        "apps/cli/src/sequence-self-commands.test.ts",
+        "apps/cli/src/native-parity/sequence-self.test.ts",
+        "apps/cli/src/native-parity/harness.ts",
+        "apps/cli/src/native-parity/export.test.ts",
+        "apps/cli/src/__fixtures__/sequence-self-timing.ts",
+        "impl-plans/progress/seq-self-06-cli.md",
+        "tmp/seq-self-s750/seq-self-06-cli",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/native-parity/harness.ts", "intendedEdit": "Receive the exported decodeRgbaPng moved from export.test.ts; nothing else changes."},
+        {"path": "apps/cli/src/native-parity/export.test.ts", "intendedEdit": "Import decodeRgbaPng from harness.ts and drop the unused inflateSync import; assertions are unchanged."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All kinds work through Bun and native with byte parity, and native reproduces the golden bytes.",
+        "PNG containment passes for both reproductions with whatever font the platform resolves.",
+        "CPU values are recorded, and the median user-time ratio is at or below 1.25."
+      ],
+      "verification": [
+        "bun test apps/cli/src/sequence-self-commands.test.ts apps/cli/src/sequence-self-golden.test.ts",
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "sh -c 'NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/sequence-self.test.ts apps/cli/src/native-parity/export.test.ts'",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/types-command.ts apps/cli/src/native-parity/harness.ts apps/cli/src/native-parity/export.test.ts apps/cli/src/native-parity/sequence-self.test.ts apps/cli/src/sequence-self-commands.test.ts apps/cli/src/__fixtures__/sequence-self-timing.ts"
+      ]
+    },
+    {
+      "planId": "seq-self-07-wiring",
+      "planPath": "impl-plans/active/seq-self-07-wiring.md",
+      "progressPath": "impl-plans/progress/seq-self-07-wiring.md",
+      "wave": 3,
+      "dependsOn": ["seq-self-02-export", "seq-self-03-shape-bounds", "seq-self-04-authoring", "seq-self-05-canvas"],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/sequence-self-help.test.ts",
+        "apps/cli/src/native-parity/sequence-self-help.test.ts",
+        "docs/cli.md",
+        "README.md",
+        "packages/core/src/index.ts",
+        "impl-plans/progress/seq-self-07-wiring.md",
+        "tmp/seq-self-s750/seq-self-07-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/commands.ts", "intendedEdit": "None expected; listed because this plan owns shared registration."},
+        {"path": "packages/core/src/index.ts", "intendedEdit": "None expected; edit only if a sibling plan recorded a needed root export."},
+        {"path": "README.md", "intendedEdit": "Edit only if its connect summary contradicts the new rule."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Help and docs state the rule, the three kinds and the example.",
+        "Help tests pass in Bun, and native help parity ran and passed."
+      ],
+      "verification": [
+        "bun test apps/cli/src/sequence-self-help.test.ts apps/cli/src/ai-commands.test.ts",
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "sh -c 'NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/sequence-self-help.test.ts'",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/help.ts apps/cli/src/sequence-self-help.test.ts apps/cli/src/native-parity/sequence-self-help.test.ts",
+        "grep -n 'self-call' docs/cli.md",
+        "grep -nF '\"from\":\"@a\",\"to\":\"@a\"' docs/cli.md"
+      ]
+    }
+  ],
+  "finalVerification": [
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true mise run test-cli"
+  ],
+  "finalVerificationPolicy": "Run after reconciliation on the stable tree. Retry mise run test-cli up to 3 attempts only on native deadline timeouts, and never relax a deadline."
+}

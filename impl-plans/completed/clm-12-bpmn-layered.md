@@ -1,0 +1,496 @@
+# clm-12-bpmn-layered
+
+## Continuation 3 2026-11-05 (clm-s736) - authoritative
+
+Workflow mode: `issue-resolution`. Manifest: `impl-plans/active/clm-s736-dispatch.json`,
+base HEAD `d5b9bac98e29bba2159f7e6791dc39938e392953`, evidence
+`tmp/clm-s736/clm-12-bpmn-layered/`. wave: 1; dependsOn: none. This section overrides
+everything below where they differ. Replace `tmp/clm-s732` and `tmp/clm-s731` with
+`tmp/clm-s736` in every older section. Design: E2.1 of
+`design-docs/specs/design-cli-layout-merge-lint.md`, including "Open conflict".
+
+### Intent
+
+Close IR-S732-CLM12-LANE-RESTACK and IR-S732-CLM12-DEEP-INSET under owner decisions D1
+and D2, in `planLayeredBpmn`. Fix the existing planner; do not rewrite it. The free row,
+first-leaf routing, collapsed pool carry and leaf order are committed, and must stay as
+they are.
+
+### Open owner decision Q11 (read this first)
+
+`design-docs/user-qa/cli-layout-merge-lint.md` Q11 is blocking and has no default. Until
+the owner answers it:
+
+- A page with `D` up to 1 must keep the exact HEAD d5b9bac output on every input. Do not
+  implement Option A.
+- Do not add a test or an expected file for a depth-one input whose HEAD output breaks
+  containment (for example, the Q11 reproduction), either way.
+- The progress log must end with the line
+  `Q11 open: depth-one containment not accepted for conflict inputs`. Do not claim the
+  depth-one containment criterion is met for those inputs.
+
+### Contract change
+
+Result type gains one required field; existing names stay:
+`{ containerCommands; settleCommands: Command[]; unitCommands; placed } | { error: string }`.
+Every return path sets it, including the no-units path. No other code consumes this type
+yet; clm-09 adds the dispatch.
+
+### File-level changes
+
+`packages/core/src/arrange-layered-bpmn.ts`:
+
+1. Compute `D`: the deepest leaf lane of any non-collapsed pool on the page, with a lane
+   directly under its pool at depth 1, and 0 without lanes. Compute it during the existing
+   `visit` walk, before the pool width.
+2. Inset: `I = POOL_LABEL * max(1, D) + FRAME_PADDING`, replacing the literal 70 in column
+   x (keep the `pools.length ? ... : 0` free-only case) and the 110 in pool width
+   (`I + FRAME_PADDING`). This replaces rule 6's column and pool-width lines below.
+3. `D` up to 1: container commands stay exactly as at HEAD (pool box, ancestor and leaf
+   lane heights), and `settleCommands` is empty.
+4. `D` of at least 2: replaces rule 7 below. After the pool's command, write lanes top-down
+   in the same depth-first order as `visit`. For a lane at depth `d`:
+   `x = pool.x + 30 * d`, `width = pool.width - 30 * d`, `y` = the top of its first leaf
+   row, `height` = the sum of its leaf rows. Emit one `updateVisual` with all four fields
+   when any differs. Lanes of a collapsed pool are not written.
+5. `D` of at least 2, settling: apply `containerCommands` to the existing draft `Editor`.
+   Compare every planned pool and lane box of a non-collapsed pool, including lanes that
+   received no container command, with the draft. A lane with no command can still be carried
+   by an ancestor move. Also compare collapsed pool boxes, which are planned too. Each
+   difference gets a full-box `updateVisual` in `settleCommands`, top-down; apply that list once to the
+   draft and compare again. If anything still differs, return the design's error, verbatim,
+   with `<name>` being the pool's `semantic.name`, else its id:
+   `arrange --mode layered cannot restack the lanes of pool "<name>": set its lane heights so that they fill the pool, then rerun.`
+6. Compute `unitCommands` against the draft after settling, as now.
+
+Imitate: `packages/core/src/bpmn/containment.ts:planBpmnLaneLayout` for the lane formula;
+`current` from the draft in the existing unit loop for "planned versus actual".
+
+New `packages/core/src/arrange-layered-bpmn.fixtures.ts`: exports
+`DEPTH_ONE_FIXTURES: readonly { name: string; build: () => Editor }[]`, built with
+`test-helpers.ts`, neutral names, these `name` values: `two-pools-message-flow`,
+`pool-no-lanes-free-row`, `collapsed-pool`, `subprocess-boundary`.
+
+New expected files `packages/core/src/arrange-layered-bpmn.depth-one.<name>.expected.json`:
+`JSON.stringify(editor.getSnapshot(), null, 1)` plus a newline, after applying the plan.
+
+### Order of work
+
+1. Write the fixtures module and a capture script, using only relative imports and `@nodetto/*`.
+   Capture must run from an export of d5b9bac, never from the working tree, because clm-02 edits
+   `Editor.apply`, `transaction.ts`, `store.ts` and `commands.ts` in the same wave:
+   `mkdir -p target/clm-s736-clm-12/head && git archive d5b9bac98e29bba2159f7e6791dc39938e392953 packages tsconfig.json tsconfig.base.json package.json | tar -x --exclude='*.test.ts' --exclude='*.test.tsx' -C target/clm-s736-clm-12/head`
+   The directory must be empty first. This command writes only under `target`.
+   `bun test` discovers files by pattern, so the export must contain no test file; otherwise
+   stale copies could run in later gates.
+   The export has no `node_modules`, and `packages/core` imports the third-party
+   `polygon-clipping`, so also copy that pinned dependency and its own dependencies:
+   `mkdir -p target/clm-s736-clm-12/head/node_modules && cp -RL node_modules/.bun/polygon-clipping@0.15.7/node_modules/. target/clm-s736-clm-12/head/node_modules/`
+   Copy nothing under `@nodetto`.
+2. Copy the fixtures module to `target/clm-s736-clm-12/head/packages/core/src/` and the capture
+   script to `target/clm-s736-clm-12/head/capture-depth-one.ts`. Run the script with that directory
+   as the working directory, passing the repository root as an argument for its output paths.
+3. The script first writes `tmp/clm-s736/clm-12-bpmn-layered/capture-provenance.txt`, one line each:
+   `commit d5b9bac98e29bba2159f7e6791dc39938e392953`, then `resolved @nodetto/core <absolute path>`,
+   and likewise `@nodetto/ir` and `@nodetto/io`, using `Bun.resolveSync` from the export directory.
+4. If any resolved path is outside `target/clm-s736-clm-12/head/`, stop with a finding and capture
+   nothing. Resolving through the exported tsconfig paths has not been verified, so this check is
+   mandatory. Do not work around a failure by capturing from the working tree.
+5. The script checks containment on each result. A candidate whose HEAD output breaks it is not
+   captured: report it under Q11 and change the fixture's geometry, then repeat steps 2 to 5.
+6. Write the four expected files and record their `git hash-object` values in the progress log.
+   Do not change the fixtures module after this.
+7. Change the planner. The expected files are never regenerated. A later difference is a defect to
+   fix.
+
+### Tests (`packages/core/src/arrange-layered-bpmn.test.ts`, input -> expected)
+
+Change the `apply` helper to apply all three lists in order, and every empty-rerun assertion
+to include `settleCommands`. Existing assertions stay, except that nested-lane positions and
+widths change to the D2 values; record each such change in the progress log.
+
+- One column 100 wide, pool at x = 0, `D = 1` -> pool width 210, lane x 30 width 180, unit x
+  70.
+- Same, `D = 2` -> pool width 240, lanes x 30 and 60, widths 210 and 180, unit x 100.
+- Same, `D = 3` -> pool width 270, lanes x 30, 60, 90, widths 240, 210, 180, unit x 130.
+- One unit of width 20, `D = 3` -> pool width 190, lane widths 160, 130, 100, unit x 130,
+  centre 140 in the leaf, parent still the leaf. Also run a width-20 unit at `D = 1` and `D = 2`.
+- For each of `D` = 1, 2, 3: each lane inside its parent and pool, siblings stacked without gaps
+  in model order, parent height equal to its children's sum, each unit parented to its own
+  leaf with its centre inside, rerun returns three empty lists, `validateDocument` clean.
+- A depth-1 pool beside a depth-3 pool on one page -> both use `I = 130`.
+- `D = 2`, lane heights change with an unchanged pool box -> lanes restacked to plan.
+- `D = 2`, a leaf lane whose planned box equals its old box while an ancestor moves. Input, as
+  (x, y, width, height): pool (0, 0, 240, 360); lanes `p1` (30, 0, 210, 170) and `p2`
+  (30, 170, 210, 190) under the pool; lanes `c1` (60, 170, 180, 70) and `c2` (60, 240, 180, 120)
+  under `p2`. One unconnected `bpmn.task` per leaf lane, each 100 wide and 40 high: (100, 40) in
+  `p1`, (100, 185) in `c1`, (100, 280) in `c2`. All columns collapse to one column 100 wide,
+  every planned leaf row is 120, the pool box does not change, and `I = 100`. No container
+  command targets `c2`, and the container apply carries it to y 190 ->
+  `settleCommands` contains `c2`; final boxes are `p1` (30, 0, 210, 120), `p2` (30, 120, 210, 240),
+  `c1` (60, 120, 180, 120), `c2` (60, 240, 180, 120); each task keeps its leaf parent; a rerun
+  returns three empty lists.
+- `D = 2`, child heights that do not sum to the parent -> final boxes equal plan, rerun empty.
+- Each `DEPTH_ONE_FIXTURES` entry -> snapshot text equals its expected file, containment
+  holds, rerun empty, and `settleCommands` is empty.
+- `D` up to 1 fixtures -> no container command sets a lane's `x`, `y` or `width`.
+
+### Non-goals and forbidden changes
+
+- No edit to `packages/core/src/bpmn/containment.ts`, `bpmn/model.ts`,
+  `editor/transaction.ts`, `arrange-modes.ts` or this plan file. The planner writes no
+  `semantic.parent`, and does not use `keepMembers`.
+- No lane box writes or settling at `D` up to 1.
+
+### Pitfalls
+
+- `planBpmnLaneLayout` stacks children from `parent.y` and gives the last child the remaining
+  height, so a parent height that is not the exact sum of its children changes the last child.
+- `planBpmnMembership` only reconsiders moved elements (round 2 below).
+- `Editor.apply` may change under clm-02 in the same wave. A failure caused by its in-progress
+  edit is drift: record it, wait, rerun. Never edit its files. The expected files come from the
+  export, so this drift cannot reach them.
+- Boa rules and `noUncheckedIndexedAccess`-safe access apply to every new line.
+- Keep `.ts` files out of `tmp/`.
+
+### Done criteria (mechanical)
+
+All manifest verification commands exit 0. The progress log has the four capture hashes, the
+Bun timing for 3 pools, 6 lanes and 60 units, and the Q11 line above. `git status --short`
+shows only this plan's writePaths changed by it.
+
+## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 2) - authoritative
+
+Dispatch flagged this plan file again as a path outside `writePaths`, because finding
+IR-S732-CLM12-PARENT-CONTRACT cites it. The manifest now lists
+`impl-plans/active/clm-12-bpmn-layered.md` in this plan's `writePaths` for ownership and
+snapshot tracking only.
+
+- Do not edit this file. If the plan needs a change, stop and record an amendment request
+  in the progress log. The new last manifest verification command,
+  `git diff --quiet HEAD -- impl-plans/active/clm-12-bpmn-layered.md`, must exit 0.
+- The worker changes and the forbidden list in round 1 below are unchanged.
+- Pitfall: `planBpmnMembership` runs only for a moved element. A first-leaf-case unit
+  already at its planned coordinates gets no command and keeps its parent, and the rerun
+  stays a no-op. Build parent-change test fixtures so that the unit actually moves.
+
+## Amendment 2026-11-05 (integration-paths-outside-writePaths, round 1) - authoritative
+
+Workflow mode: `issue-resolution` (manifest `workflowMode`). Proceed with implementation.
+
+Finding IR-S732-CLM12-PARENT-CONTRACT: the contract contradicted itself.
+`planBpmnMembership` (`packages/core/src/bpmn/containment.ts`, read-only here) gives a
+moved element the deepest lane containing its centre. Leaf lanes fill their parent lane,
+so a unit sent to a first leaf row is always reparented to that leaf. The test
+`non-leaf lane member uses first leaf` therefore fails with expected `parent`, received
+`one` (`tmp/clm-s732/serial-reconcile/clm12-gate1.log`). A scratch probe that changed
+only that expectation passed 21 of 21 (`tmp/clm-s732/serial-reconcile/clm12-alt-contract-probe.log`).
+
+Decision (design E2.1 amended): the parent changes in exactly two first-leaf cases, and
+only through the existing geometry rule. The two cases are a unit directly under a
+non-leaf lane and a unit directly under a pool with lanes.
+
+Continue from the current working tree. The uncommitted planner and test edits are this
+plan's work: keep them, and do not restart or revert them.
+
+Ordered worker changes:
+
+1. In `packages/core/src/arrange-layered-bpmn.test.ts`, test `non-leaf lane member uses
+   first leaf`: change only the parent expectation from `"parent"` to `"one"`. Keep the
+   `visual.y` assertion and `noOp(e)`.
+2. Record the decision and the pre/post hashes in the progress log.
+3. Evidence layout: `tmp/` may not hold `.ts` files. Move
+   `tmp/clm-s732/clm-12-bpmn-layered/timing.ts` to `target/clm-s732-clm-12/timing.ts`,
+   and record that path in the progress log.
+
+Forbidden:
+
+- Editing `packages/core/src/bpmn/containment.ts` or `packages/core/src/editor/transaction.ts`.
+- Writing `semantic.parent` from the planner.
+- Removing or skipping the non-leaf test.
+- Changing a parent expectation for a unit that is already inside a leaf lane.
+
+Done when all manifest verification commands exit 0 with at least 21 tests and 0
+failures (the `find` command shows that no `.ts` file remains under this plan's evidence
+directory), and test-integrity and adversarial reviews have run on the result.
+
+## Continuation 2 2026-11-05 (clm-s732) - authoritative
+
+Status at HEAD `29f8691135fb6098a9496495f4a417e93ce0625e`:
+`arrange-layered-bpmn.ts` (262 lines) and 10 tests are committed. The free-row
+rule (amendment below) is not implemented, and the listed regressions are missing.
+Fix the existing planner; do not rewrite it. Replace `tmp/clm-s731` with
+`tmp/clm-s732` in every path below. Manifest:
+`impl-plans/active/clm-s732-dispatch.json`. wave: 1; dependsOn: none.
+
+### Remaining changes in `packages/core/src/arrange-layered-bpmn.ts`
+
+1. Free row, per design E2.1 and the amendment below:
+   - No `FRAME_PADDING` and no `MIN_ROW`: its height is its tallest cell stack.
+     Stacks start at the row top and shorter cells are centred within that
+     height.
+   - With pools: shared column x positions; top = `POOL_GAP` below the last
+     pool's bottom. At HEAD `free.y` already uses that y, but
+     `(row.height - stack) / 2` and `height + 80` still apply padding.
+   - Without pools: column 0's left edge is `origin.x` (HEAD uses
+     `originX + 70` for every row) and the top is `origin.y`.
+2. Row lookup. At HEAD, `rows.find((r) => r.id === (lane?.id ?? pool?.id)) ?? free`
+   sends a unit to the free row, outside its pool, in two cases. Fix both:
+   - A unit directly under a non-leaf lane -> the first leaf lane under that lane
+     in model order.
+   - A unit directly under a pool that has lanes -> the pool's first row.
+   In both cases `planBpmnMembership` then sets that leaf lane as the unit's parent;
+   these are the only allowed parent changes. Record them in the progress log.
+3. Collapsed pools: a unit inside a collapsed pool is not a unit. It is carried
+   with the pool and never goes to the free row. Add it to `placed`.
+4. Any further fix that a regression below reveals, inside this file only.
+
+These three cases resolve what the design leaves unstated, and they keep its
+"Units end inside their own row". They do not change design geometry.
+
+### Non-goals
+
+- No `--frames`/TB handling and no dispatch; clm-09 owns both.
+- Do not edit `bpmn/containment.ts`, `bpmn/model.ts`, `editor/transaction.ts` or
+  `arrange-modes.ts`. If a regression needs a change in one of them, stop and record
+  an amendment request.
+
+### Tests to add (input -> expected)
+
+Keep the 10 existing tests. Add, applying `containerCommands` then `unitCommands`
+through `Editor.apply`:
+
+- Free-only page, one task at (0,0) -> no commands, task stays at (0,0).
+- Free-only page, start event -> task chain -> column 0 at origin.x, top at
+  origin.y, rerun returns two empty lists.
+- Free row with one pool -> free units `POOL_GAP` below the pool and aligned to the
+  pool's column x values; rerun returns empty lists.
+- Nested lanes: pool > lane > two leaf lanes -> rows are the leaf lanes, heights
+  stack without gaps, each lane inside its parent, and the parent lane height
+  equals the sum of its children; rerun empty.
+- Unit directly under a non-leaf lane, and directly under a pool with lanes -> inside
+  the first leaf row, never in the free row.
+- Collapsed pool -> keeps height, gets the common width, is stacked in y order; a
+  unit inside it keeps its offset from the pool.
+- Two pools with a message flow -> equal widths; the flow's ends at the same depth
+  share a column x.
+- Expanded sub-process with two inner tasks -> inner offsets from the sub-process
+  are unchanged; a connector end inside it maps to the sub-process.
+- Boundary event on a task -> still on the host boundary after apply; an edge from
+  it maps to the host.
+- Shuffled creation order on a two-pool page -> identical commands.
+- `validateDocument(editor.getSnapshot())` has no errors after each case above.
+
+### Pitfalls
+
+- Applying one combined list lets `planBpmnTranslations` carry units twice.
+- `planBpmnLaneLayout` skips a lane whose parent box changed and otherwise adds the
+  height delta to the parent, so a container step that changes only a nested lane's
+  height changes its ancestors' heights too. Rerun tests catch a mismatch.
+- `Editor.apply` is being edited by clm-02 in the same wave. A failure caused by
+  its in-progress edit is drift: record it, wait, rerun. Do not edit its files.
+
+### Done criteria (mechanical)
+
+- Manifest verification commands exit 0, with at least 20 tests in the file.
+- The progress log has the Bun timing for 3 pools, 6 lanes, 60 units and pre/post
+  hashes. `git status --short` shows only this plan's writePaths changed by it.
+
+---
+
+- planId: clm-12-bpmn-layered
+- planPath: impl-plans/active/clm-12-bpmn-layered.md
+- progressPath: impl-plans/progress/clm-12-bpmn-layered.md
+- wave: 1
+- dependsOn: none
+- Design: `design-docs/specs/design-cli-layout-merge-lint.md`, E2 table and
+  "E2.1 Layered on BPMN pages", contract `planLayeredBpmn` in "Continuation
+  contracts", Verification row "E2" (BPMN layered part). Owner question Q8
+  (default implemented).
+- writePaths:
+  - `packages/core/src/arrange-layered-bpmn.ts` (new)
+  - `packages/core/src/arrange-layered-bpmn.test.ts` (new)
+  - `impl-plans/progress/clm-12-bpmn-layered.md`
+  - `tmp/clm-s731/clm-12-bpmn-layered`
+  - `target`
+- sharedPaths: none
+- artifactRoots: `target`
+
+## Intent and context
+
+A pure planner that lays out a BPMN page: pools and lanes are rows (lane
+order unchanged), BFS depth gives global columns shared by every pool, units
+in one (row, column) cell stack vertically. It returns two command lists
+that the caller applies in order with `Editor.apply`, because
+`planBpmnTranslations` (`packages/core/src/bpmn/containment.ts`) carries
+every descendant whose position a command did not change. clm-09 adds the
+dispatch from `apps/cli/src/arrange-modes.ts`; this plan does not touch it.
+
+Patterns to imitate:
+- `packages/core/src/arrange-layered.ts:planLayered` (stable id order,
+  `compare`, traversal, `placed` set, integer rounding, `{ error }` result).
+- `packages/core/src/bpmn/model.ts:buildBpmnModel` (`parentOf`,
+  `descendantsOf`, `order`) for containment and lane order.
+- `packages/core/src/bpmn/containment.ts:planBpmnLaneLayout` for lane geometry
+  (`x = pool.x + 30`, `width = pool.width - 30`, lanes stacked from pool.y,
+  minimum height 30, default height 120).
+
+## Contract (binding)
+
+```ts
+export function planLayeredBpmn(
+  store: Store, pageId: PageId, registry: ShapeUtilRegistry,
+): {
+  containerCommands: Command[]; // applied first
+  unitCommands: Command[];      // applied second
+  placed: ReadonlySet<ElementId>;
+} | { error: string };
+```
+
+## Rules (implement exactly)
+
+1. Page must be `kind: "bpmn"`, else `{ error }`. A page with no units ->
+   `{ containerCommands: [], unitCommands: [], placed: empty }`.
+2. Row groups: each `bpmn.participant` with `semantic.collapsed !== true`, in
+   ascending `visual.y`, ties by id. Rows of a pool = its leaf lanes
+   (`bpmn.lane` with no child lane) in model order (depth-first through
+   nested lanes following `model.order`); a pool without lanes is one row.
+   Collapsed pools keep their height, get the common width, and are stacked
+   in the same y order. Units in no pool form one free row placed after all
+   pools.
+3. Units: `bpmn.task`, `bpmn.event` (not `bpmn.boundaryEvent`),
+   `bpmn.gateway`, `bpmn.callActivity`, `bpmn.subProcess`, `bpmn.dataObject`,
+   `bpmn.dataStore`, `bpmn.textAnnotation`, excluding any element that has a
+   `bpmn.subProcess` ancestor (it moves with that sub-process).
+   `bpmn.group` and boundary events are never units. A unit's row is its
+   nearest lane ancestor, else its pool, else the free row.
+4. Edges: every BPMN connector (`bpmn.sequenceFlow`, `bpmn.messageFlow`,
+   `bpmn.association`, `bpmn.dataAssociation`) whose two ends map to units; an
+   end inside a sub-process maps to the outermost sub-process ancestor; a
+   boundary event end maps to its `attachedTo` host. Self-loops ignored.
+   Edges read in id order.
+5. Traversal: the A1 traversal of `planLayered` with this first start: the
+   first `bpmn.event` with `semantic.position === "start"` in id order (this
+   is the design's "bpmn.startEvent"), else first in-degree-0 unit, else first
+   unit. Layer = BFS depth from the start of its search (each restart starts
+   at depth 0). Visit index orders units inside a cell.
+6. Geometry. The column left edge and pool width below are replaced by the inset `I` in
+   "Continuation 3" (constants: `COLUMN_GAP = 120`, `MEMBER_GAP = 60`,
+   `FRAME_PADDING = 40`, `POOL_LABEL = 30`, `POOL_GAP = 120`,
+   `MIN_ROW = 120`):
+   - Origin: integer-rounded top-left of the union of pool boxes and unit
+     boxes (`context.boundsOf`).
+   - Column widths: widest unit per layer across all rows. Column L's left
+     edge = `origin.x + POOL_LABEL + FRAME_PADDING + sum(widths of layers < L) + L * COLUMN_GAP`.
+     Units centred in their column.
+   - Row height = `max(MIN_ROW, tallest cell stack + 2 * FRAME_PADDING)`, cell
+     stack = sum heights + (n-1) * MEMBER_GAP; units stacked from
+     `row.y + FRAME_PADDING`, then centred if the cell is shorter than the
+     tallest (centre the cell stack vertically in the row).
+   - Pool width (all pools, collapsed included) =
+     `POOL_LABEL + FRAME_PADDING + sum(column widths) + (L - 1) * COLUMN_GAP + FRAME_PADDING`.
+     Pool height = sum of its row heights. Pools stacked from origin.y with
+     `POOL_GAP`; the free row follows after the last pool.
+   - All written numbers rounded to integers.
+7. Applies only at `D` up to 1; at `D` of at least 2 see "Continuation 3".
+   `containerCommands`: `updateVisual` for each pool box (`x, y, width,
+   height`) and each leaf lane `height` that differs. Do not write lane x/y/
+   width: `planBpmnLaneLayout` restacks lanes from the pool box.
+8. `unitCommands`: absolute `updateVisual {x, y}` for every unit whose
+   planned position differs from its position after the container step
+   (compute "after container step" by applying `containerCommands` to a
+   draft `Editor`/`Store` with the derived planners, i.e. through
+   `Editor.apply` on a copy, then diff). Sub-process contents are not written;
+   `planBpmnTranslations` carries them when the sub-process moves.
+9. `placed` = every unit id plus every element carried with a sub-process.
+10. Idempotent: running on the result of applying both lists returns two empty
+    lists.
+
+## Amendment 2026-11-04 (integration-paths-outside-writePaths, round 1)
+
+- Finding IR-CLM12-FREEROW: on a page with no pools, rule 6 offsets free-row
+  units by `POOL_LABEL + FRAME_PADDING` (x) and `FRAME_PADDING` (y) from an
+  origin derived from those same units, so every rerun moves them
+  (`tmp/clm-s731/clm-12-bpmn-layered/free-row-redispatch.log`: x = 70, 140,
+  210).
+- Decision (design E2.1, new "Free row" bullet): the free row has no box, so
+  it gets no label band and no padding.
+  - With pools: free-row units use the shared column x positions (the same
+    left edges as the pool columns), and the row top is `POOL_GAP` below the
+    last pool's bottom. Units stack from the row top, with no
+    `FRAME_PADDING`.
+  - Without pools: column 0's left edge is `origin.x` (no `POOL_LABEL` or
+    `FRAME_PADDING`), later columns follow with `COLUMN_GAP`, and the row top
+    is `origin.y`.
+  - Rule 6 is unchanged for pool rows.
+- writePaths are unchanged. The fix is in `packages/core/src/arrange-layered-bpmn.ts`.
+- Tests the worker must add, all from the plan's "Tests" list:
+  - Free-only page with one task at (0,0): the first run gives no commands
+    and the task stays at (0,0).
+  - Free-only page with a start event -> task chain: the second run returns
+    two empty lists.
+  - Free row alongside one pool: free units sit `POOL_GAP` below the pool and
+    are aligned to the pool columns, and a rerun gives empty lists.
+  - Also add every edge case listed in "Tests" that is still missing: nested
+    lanes, collapsed pool, two pools with a message flow, sub-process
+    contents, boundary event, shuffled creation order, validateDocument clean.
+- Done when verification 1-5 exit 0 and those tests exist.
+
+## Pitfalls
+
+- Applying only one combined list would let `planBpmnTranslations` carry
+  units that keep their coordinates; the two-step contract exists to prevent
+  that. Tests must apply both lists in order through `Editor.apply`.
+- Lane order never changes. Never write `semantic.parent`; units end inside
+  their own row, so `planBpmnMembership` keeps parents (assert it), except in the
+  two first-leaf cases of the 2026-11-05 amendment, where the unit's parent becomes
+  that leaf lane.
+- Use indexed loops, `noUncheckedIndexedAccess`-safe access, and no per-point
+  destructuring in loops.
+- Do not import or edit `arrange-modes.ts`, `notation.ts`,
+  `bpmn/containment.ts` or `editor/transaction.ts` (read-only here).
+
+## Tests (`packages/core/src/arrange-layered-bpmn.test.ts`, direct import)
+
+Build documents with neutral names (pool `Orders`, lanes `Intake`,
+`Shipping`, tasks `Check order`, `Pack widgets`, start/end events, a
+gateway). Apply `containerCommands` then `unitCommands` with `Editor.apply`
+and inspect the store.
+- One pool, two lanes, start -> task -> gateway -> two tasks (one per lane) ->
+  end -> layers 0..4 left to right; gateway branches share a column; each
+  task lies inside its lane box; lanes stay inside the pool, stacked without
+  gaps (lane.y = previous lane.y + height, lane.x = pool.x + 30).
+- Parents of units already inside a leaf lane unchanged after apply
+  (`semantic.parent` equal to before).
+- Two pools with a message flow -> both pools same width; columns aligned
+  (message-flow ends share a column x when they are at the same depth).
+- Collapsed pool -> keeps height, gets common width.
+- Unit in no pool -> placed in the free row below all pools.
+- Sub-process with two inner tasks -> inner tasks keep their offset relative
+  to the sub-process.
+- Boundary event on a task -> still on the host boundary after apply.
+- Rerun on the result -> both lists empty.
+- Shuffled element creation order -> identical result.
+- Non-BPMN page -> `{ error }`.
+- `validateDocument(editor.getSnapshot())` has no errors after apply.
+
+## Working rules
+
+- Fresh read before editing; record pre/post hashes in the progress log; edit
+  only writePaths; logs under `tmp/clm-s731/clm-12-bpmn-layered/`.
+- Time the planner on a page with 3 pools, 6 lanes and 60 units in Bun and
+  record it in the progress log (native timing runs in clm-09).
+
+## Verification (each must exit 0)
+
+1. `bun test packages/core/src/arrange-layered-bpmn.test.ts` -> 0 fail, at
+   least 10 tests.
+2. `bun test packages/core/src/bpmn/containment.test.ts packages/core/src/bpmn/editor-bpmn.test.ts` -> unchanged, 0 fail.
+3. `bun run typecheck`.
+4. `bunx biome check packages/core/src/arrange-layered-bpmn.ts packages/core/src/arrange-layered-bpmn.test.ts`.
+5. `grep -n "export function planLayeredBpmn" packages/core/src/arrange-layered-bpmn.ts`.
+
+## Done criteria
+
+- Contract symbol exists; verification 1-5 exit 0 with logs; progress log
+  has the Bun timing and hashes; only writePaths changed by this plan.
