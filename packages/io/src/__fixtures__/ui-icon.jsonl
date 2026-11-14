@@ -1,0 +1,4 @@
+{"kind":"document","schemaVersion":1,"id":"icon-1","title":"Untitled"}
+{"kind":"page","id":"icon-2","name":"Page 1","pageKind":"freeform"}
+{"kind":"element","id":"icon-3","page":"icon-2","type":"ui.icon","index":"4","semantic":{"icon":"bell"},"visual":{"x":20,"y":20,"width":24,"height":24}}
+{"kind":"element","id":"icon-4","page":"icon-2","type":"ui.icon","index":"w","semantic":{"path":"M0 0L24 24","viewBox":24},"visual":{"x":60,"y":20,"width":24,"height":24}}

@@ -1,0 +1,277 @@
+{
+  "taskId": "text-layout-lint-s556",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-556",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "fd2083b4d5c01bb51eb11c7f4f2a27a8a3a06a49",
+  "designDocPaths": [
+    "design-docs/specs/design-text-layout-lint.md",
+    "design-docs/user-qa/text-layout-lint.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/text-layout-lint-s556",
+  "evidenceLayout": "Per-plan logs under tmp/text-layout-lint-s556/<planId>/ (attempt-<n>/ per retry); reconciliation output under tmp/text-layout-lint-s556/reconcile/. tmp/ is git-ignored. No *.test.ts file may be written under tmp/. Earlier evidence stays under tmp/text-layout-lint-s552/ and tmp/text-layout-lint-s555/.",
+  "acceptedDependencies": [
+    {
+      "planId": "tll-01-core-lint",
+      "planPath": "impl-plans/active/tll-01-core-lint.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "packages/core/src/text-layout-lint (rules.ts, engine.ts, index.ts), lintTextLayoutPage, estimatedTextWidth export, CLI text-layout fixtures and TEXT_LAYOUT_EXPECTED"
+    },
+    {
+      "planId": "tll-02-cli-help-docs",
+      "planPath": "impl-plans/active/tll-02-cli-help-docs.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "First-version help and docs text (superseded by tll-08)"
+    },
+    {
+      "planId": "tll-03-cli-lint",
+      "planPath": "impl-plans/active/tll-03-cli-lint.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "lint page filter on TEXT_LAYOUT_LINT_PAGE_KINDS and lintTextLayoutPage routing in apps/cli/src/commands.ts"
+    },
+    {
+      "planId": "tll-04-cli-export",
+      "planPath": "impl-plans/active/tll-04-cli-export.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "whole-page svg/png/pdf export warning gate on TEXT_LAYOUT_LINT_PAGE_KINDS in apps/cli/src/export-command.ts"
+    },
+    {
+      "planId": "tll-05-native-parity",
+      "planPath": "impl-plans/active/tll-05-native-parity.md",
+      "commit": "45cc69f4984649218d070975b6d41b43db84dc6d",
+      "provides": "native parity block 'native CLI matches text-layout lint and export, including dense pages'"
+    },
+    {
+      "planId": "tll-07-wide-width",
+      "planPath": "impl-plans/active/tll-07-wide-width.md",
+      "commit": "5b65f9693c12abe5145701cae7f9f23cd9c6b9ec",
+      "provides": "packages/core/src/wide-text-width.ts and its test; export keyword on graphemes in text-layout.ts. Accepted in session 552."
+    },
+    {
+      "planId": "tll-08-help-docs",
+      "planPath": "impl-plans/active/tll-08-help-docs.md",
+      "commit": "5b65f9693c12abe5145701cae7f9f23cd9c6b9ec",
+      "provides": "help.ts and docs/cli.md text for five lintable kinds and 1 em wide measurement. Accepted in session 552."
+    }
+  ],
+  "supersededPlans": [
+    {
+      "planId": "tll-09-core-rules",
+      "note": "Implemented at 5b65f96 (re-validated s555) but never formally reviewed; its review and any fix are owned by tll-12-core-cli-lint-export."
+    },
+    {
+      "planId": "tll-10-cli-lint-export",
+      "note": "Not executed; superseded by tll-12-core-cli-lint-export."
+    },
+    {
+      "planId": "tll-11-native-parity",
+      "note": "Not executed; superseded by tll-13-native-parity."
+    }
+  ],
+  "reviewContext": {
+    "issueReference": "none (no issueUrl/issueNumber/issueRepository supplied; effective workflowInput.requestedOutcome of session opus-terra-design-and-implement-review-loop-session-556 is the authoritative issue body)",
+    "userProblem": "The wide-aware text-layout lint revision (Q1 page kinds architecture/freeform/flowchart, Q2 wide graphemes at 1 em for detection only) is implemented in core at fd2083b but unreviewed; LINT_NO_PAGES and three CLI tests still encode architecture-only behavior; native parity for the revision is missing; tll plans are not archived. Earlier runs s552 and s555 were blocked by an 'informational' expected-to-fail command in a plan gate.",
+    "requiredOutcomes": [
+      "tll-12: item-by-item review (and fix on mismatch) of packages/core/src/text-layout-lint against the design; LINT_NO_PAGES = 'The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.'; CLI tests cover freeform/flowchart lint and export warnings, uml as the not-lintable control and the wide fixture; help/docs conformance.",
+      "tll-13: one appended nativeTest block 'native CLI matches text-layout lint on wide labels, freeform and flowchart pages'; CARGO_TERM_QUIET=true mise run test-cli exits 0 with that block passing.",
+      "Export bytes unchanged for every document (golden/snapshot tests pass unchanged; boundary git diff --exit-code fd2083b empty).",
+      "Finalization archives tll-00..tll-13 with short notes and updates impl-plans/README.md."
+    ],
+    "nonGoals": [
+      "Changing wrapTextLines, glyphAdvance, estimatedTextWidth, label-layout.ts, node-label.ts, svg-export/**, wide-text-width.ts or packages/core/src/index.ts.",
+      "Any change to packages/io (including packages/io/src/bpmn), apps/cli/native/**, Cargo.toml, Cargo.lock, apps/cli/src/export-command.ts, golden JSONL or examples/**.",
+      "Wide-aware label-collision, note proximity or label height; new JSON fields; lint configuration or export --strict (Q4); --element warnings (Q3); other page kinds.",
+      "Version bumps, releases, pushes; server, auth or deployment code."
+    ],
+    "constraints": [
+      "Every verification command in every plan, afterWave and finalVerification exits 0 once the owning plan's changes are in; no informational or expected-to-fail commands.",
+      "Rule ids label-overflow, label-collision, note-overflow stable; BPMN/breadboard lint output and exit codes unchanged.",
+      "Fixtures self-authored and generic; no emojis; bun tests with BUN_OPTIONS=--jsx-runtime=classic; cargo with CARGO_TERM_QUIET=true; no tool attribution in commits."
+    ],
+    "designDecisionsAndRationale": [
+      "One combined plan (tll-12) owns the core review, LINT_NO_PAGES and all CLI test updates, so its full bun test packages/core packages/io apps/cli/src gate passes on its own.",
+      "tll-13 depends on tll-12 because mise run test-cli runs all of bun test apps/cli/src.",
+      "Wide-aware measurement is lint-only in a helper no export path imports, so export output stays byte-identical (user-qa Q2).",
+      "Dispatch manifests stay in impl-plans/active with pre-archive planPath values, per impl-plans/README.md convention."
+    ],
+    "intentionalTradeoffs": [
+      "East Asian Ambiguous (A) width graphemes are treated as narrow (design line 64, 168).",
+      "Existing architecture/freeform/flowchart documents with wide text may get new warning-only findings; export bytes and exit codes are unchanged.",
+      "Serial waves (tll-12 then tll-13) trade parallelism for gates that never depend on a later plan."
+    ],
+    "supportedEdgeCases": [
+      "node.generic 140x60 with a CJK label -> 'Label line 1 of 1 is 195 wide but the text area is 120 wide at 13px; export clips it.'; same box with a same-length ASCII label -> no finding.",
+      "Fixed text.note 120x44 with a 16-grapheme CJK text -> wide-line finding (182 vs 104) and note-overflow height finding (3 lines, 58.8 vs 44).",
+      "Freeform and flowchart pages are lintable and selectable via --page and get export warnings; a uml-only document -> EXIT_ERROR with the new LINT_NO_PAGES.",
+      "BPMN/breadboard lint output and rule ids unchanged."
+    ],
+    "outOfScopeEdgeCases": [
+      "Real per-font glyph metrics, kerning and Ambiguous-width locale handling.",
+      "UML, ERD, sequence, usecase, state and other page kinds; --element and non-svg/png/pdf export warnings (Q3); export --strict (Q4).",
+      "Frame clipping via clipOf (design line 132)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-text-layout-lint.md",
+      "design-docs/user-qa/text-layout-lint.md",
+      "impl-plans/active/tll-12-core-cli-lint-export.md",
+      "impl-plans/active/tll-13-native-parity.md",
+      "impl-plans/progress/tll-09-core-rules.md",
+      "packages/core/src/text-layout-lint/rules.ts",
+      "apps/cli/src/commands.ts",
+      "apps/cli/src/export-command.ts",
+      "apps/cli/src/__fixtures__/text-layout.ts",
+      "apps/cli/src/native-parity.test.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "tll-12-core-cli-lint-export",
+      "planPath": "impl-plans/active/tll-12-core-cli-lint-export.md",
+      "progressPath": "impl-plans/progress/tll-12-core-cli-lint-export.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/text-layout-lint/rules.ts",
+        "packages/core/src/text-layout-lint/engine.ts",
+        "packages/core/src/text-layout-lint/index.ts",
+        "packages/core/src/text-layout-lint/rules.test.ts",
+        "packages/core/src/text-layout-lint/engine.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/text-layout-lint.test.ts",
+        "apps/cli/src/text-layout-export.test.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "apps/cli/src/__fixtures__/text-layout.ts",
+        "apps/cli/src/help.ts",
+        "docs/cli.md",
+        "impl-plans/progress/tll-12-core-cli-lint-export.md",
+        "tmp/text-layout-lint-s556/tll-12-core-cli-lint-export",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "Progress log records matches/differs for review items A1-A7 and F with file:line citations; every differs item is fixed inside the text-layout-lint files.",
+        "LINT_NO_PAGES is exactly 'The document contains no BPMN, breadboard, architecture, freeform or flowchart pages.'; nothing else in commands.ts changes.",
+        "breadboard-commands.test.ts uses a uml page and expects the new message twice; text-layout-lint.test.ts and text-layout-export.test.ts contain the tests named in the plan with the specified input -> expected cases.",
+        "export-command.ts, renderer, text-layout.ts, label-layout.ts, node-label.ts, wide-text-width.ts, core index.ts, packages/io, apps/cli/native and Cargo files unchanged from fd2083b.",
+        "Gate commands 1-8 exit 0; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s556/tll-12-core-cli-lint-export",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/text-layout-lint packages/core/src/wide-text-width.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/text-layout-export.test.ts apps/cli/src/breadboard-commands.test.ts > tmp/text-layout-lint-s556/tll-12-core-cli-lint-export/focused.log 2>&1",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core packages/io apps/cli/src > tmp/text-layout-lint-s556/tll-12-core-cli-lint-export/core-io-cli.log 2>&1",
+        "grep -rln \"wide-text-width\" packages apps --include='*.ts' > tmp/text-layout-lint-s556/tll-12-core-cli-lint-export/references.log 2>&1",
+        "git diff --exit-code fd2083b -- packages/core/src/svg-export packages/core/src/text-layout.ts packages/core/src/label-layout.ts packages/core/src/node-label.ts packages/core/src/wide-text-width.ts packages/core/src/index.ts packages/io apps/cli/native Cargo.toml Cargo.lock apps/cli/src/export-command.ts > tmp/text-layout-lint-s556/tll-12-core-cli-lint-export/boundary.log 2>&1",
+        "test -z \"$(grep -rn 'no BPMN, breadboard or architecture pages' apps/cli/src)\"",
+        "mise run lint-ts > tmp/text-layout-lint-s556/tll-12-core-cli-lint-export/lint-ts.log 2>&1",
+        "CARGO_TERM_QUIET=true mise run check > tmp/text-layout-lint-s556/tll-12-core-cli-lint-export/check.log 2>&1"
+      ]
+    },
+    {
+      "planId": "tll-13-native-parity",
+      "planPath": "impl-plans/active/tll-13-native-parity.md",
+      "progressPath": "impl-plans/progress/tll-13-native-parity.md",
+      "wave": 2,
+      "dependsOn": [
+        "tll-12-core-cli-lint-export"
+      ],
+      "writePaths": [
+        "apps/cli/src/native-parity.test.ts",
+        "impl-plans/progress/tll-13-native-parity.md",
+        "tmp/text-layout-lint-s556/tll-13-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "native-parity.test.ts imports textLayoutWideDocument and appends exactly one nativeTest block named 'native CLI matches text-layout lint on wide labels, freeform and flowchart pages' (budget 120000 with launch-count comment); existing blocks byte-unchanged.",
+        "The block compares lint, lint --format json and export --format svg for wide.jsonl, problem-freeform.jsonl and problem-flowchart.jsonl plus lint problem-flowchart.jsonl --page Architecture, all exit 0, and asserts node-wide (not node-ascii) and node-clipped export warnings and note-overflow in wide lint stdout.",
+        "CARGO_TERM_QUIET=true mise run test-cli exits 0 and its log ends a line with ' 0 fail'; native-parity.test.ts with the binary exits 0 with a non-zero pass summary and no non-zero skip summary; the -t filtered run shows exactly ' 1 pass' and its JUnit report contains name=\"native CLI matches text-layout lint on wide labels, freeform and flowchart pages\". No check depends on per-test (pass)/(skip) console lines (bun quiet agent mode).",
+        "apps/cli/native, Cargo.toml, Cargo.lock unchanged from fd2083b; progress log records toolchain versions, binary sha256 and ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/text-layout-lint-s556/tll-13-native-parity",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s556/tll-13-native-parity/parity-skip.log 2>&1",
+        "grep -E '^ *[1-9][0-9]* skip$' tmp/text-layout-lint-s556/tll-13-native-parity/parity-skip.log",
+        "CARGO_TERM_QUIET=true mise run test-cli > tmp/text-layout-lint-s556/tll-13-native-parity/test-cli.log 2>&1",
+        "grep -E ' 0 fail$' tmp/text-layout-lint-s556/tll-13-native-parity/test-cli.log",
+        "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s556/tll-13-native-parity/parity-native.log 2>&1",
+        "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/text-layout-lint-s556/tll-13-native-parity/parity-native.log)\"",
+        "grep -E '^ *[1-9][0-9]* pass$' tmp/text-layout-lint-s556/tll-13-native-parity/parity-native.log",
+        "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity.test.ts -t 'native CLI matches text-layout lint on wide labels' > tmp/text-layout-lint-s556/tll-13-native-parity/parity-new.log 2>&1",
+        "grep -Ex ' *1 pass' tmp/text-layout-lint-s556/tll-13-native-parity/parity-new.log",
+        "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity.test.ts -t 'native CLI matches text-layout lint on wide labels' --reporter=junit --reporter-outfile=tmp/text-layout-lint-s556/tll-13-native-parity/parity-new.xml > tmp/text-layout-lint-s556/tll-13-native-parity/parity-new-junit.log 2>&1",
+        "grep -F 'name=\"native CLI matches text-layout lint on wide labels, freeform and flowchart pages\"' tmp/text-layout-lint-s556/tll-13-native-parity/parity-new.xml",
+        "shasum -a 256 target/release/nodetto-cli > tmp/text-layout-lint-s556/tll-13-native-parity/artifact-sha256.txt",
+        "bunx biome check apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s556/tll-13-native-parity/biome.log 2>&1",
+        "mise run lint-ts > tmp/text-layout-lint-s556/tll-13-native-parity/lint-ts.log 2>&1",
+        "git diff --exit-code fd2083b -- apps/cli/native Cargo.toml Cargo.lock > tmp/text-layout-lint-s556/tll-13-native-parity/native-boundary.log 2>&1"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "tll-12-core-cli-lint-export"
+      ],
+      [
+        "tll-13-native-parity"
+      ]
+    ],
+    "afterWave": [
+      "bun run typecheck",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core packages/io apps/cli/src"
+    ],
+    "knownTransientFailures": [],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Finalization (plan-archive node), not a worker task: add a Completed text-layout lint entry with a plan table for tll-00..tll-13 and the final verification outcomes, and name text-layout-lint-s551/s552/s555/s556-dispatch.json in the Active list of historical manifests."
+      },
+      {
+        "path": "impl-plans/active",
+        "intendedEdit": "Finalization (plan-archive node): move tll-00..tll-13 plan files to impl-plans/completed/, each prefixed with a short status note (tll-00..05 first version at 45cc69f; tll-06..08 revision overview and accepted plans; tll-09 implemented, reviewed and accepted under tll-12; tll-10 and tll-11 superseded by tll-12 and tll-13, not executed; tll-12 and tll-13 finishing plans). Dispatch manifests stay in impl-plans/active with pre-archive planPath values. Afterwards no tll-*.md remains in impl-plans/active."
+      }
+    ],
+    "routing": "Strictly blocking. Route failures by writePaths: core rule, fixture, LINT_NO_PAGES, CLI lint/export test and help/docs issues to tll-12; native parity block issues to tll-13 (a native mismatch caused by tll-12-owned code is routed back to tll-12). A defect in wide-text-width.ts (tll-07) or export geometry is a new small pending plan, never an edit by tll-12 or tll-13.",
+    "commitPolicy": "Commit on main, staging explicit paths only. Never git add -A, never stage tmp/ or target/, never push (gitPush=false). No tool attribution in commit messages.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-text-layout-lint.md",
+        "design-docs/user-qa/text-layout-lint.md",
+        "impl-plans/active/tll-12-core-cli-lint-export.md",
+        "impl-plans/active/tll-13-native-parity.md",
+        "impl-plans/active/text-layout-lint-s556-dispatch.json",
+        "impl-plans/README.md"
+      ]
+    },
+    "finalVerification": [
+      "mkdir -p tmp/text-layout-lint-s556/reconcile",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core packages/io apps/cli/src > tmp/text-layout-lint-s556/reconcile/core-io-cli.log 2>&1",
+      "mise run lint-ts > tmp/text-layout-lint-s556/reconcile/lint-ts.log 2>&1",
+      "CARGO_TERM_QUIET=true mise run check > tmp/text-layout-lint-s556/reconcile/check.log 2>&1",
+      "CARGO_TERM_QUIET=true mise run test-cli > tmp/text-layout-lint-s556/reconcile/test-cli.log 2>&1",
+      "grep -E ' 0 fail$' tmp/text-layout-lint-s556/reconcile/test-cli.log",
+      "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity.test.ts > tmp/text-layout-lint-s556/reconcile/parity-native.log 2>&1",
+      "test -z \"$(grep -E '^ *[1-9][0-9]* skip$' tmp/text-layout-lint-s556/reconcile/parity-native.log)\"",
+      "BUN_OPTIONS=--jsx-runtime=classic NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity.test.ts -t 'native CLI matches text-layout lint on wide labels' --reporter=junit --reporter-outfile=tmp/text-layout-lint-s556/reconcile/parity-new.xml > tmp/text-layout-lint-s556/reconcile/parity-new-junit.log 2>&1",
+      "grep -F 'name=\"native CLI matches text-layout lint on wide labels, freeform and flowchart pages\"' tmp/text-layout-lint-s556/reconcile/parity-new.xml",
+      "grep -rln \"wide-text-width\" packages apps --include='*.ts' > tmp/text-layout-lint-s556/reconcile/references.log 2>&1",
+      "git diff --exit-code fd2083b -- packages/core/src/svg-export packages/core/src/text-layout.ts packages/core/src/label-layout.ts packages/core/src/node-label.ts packages/core/src/wide-text-width.ts packages/core/src/index.ts packages/io apps/cli/native Cargo.toml Cargo.lock apps/cli/src/export-command.ts",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  }
+}

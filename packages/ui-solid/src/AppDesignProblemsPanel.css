@@ -1,0 +1,33 @@
+.nodetto-app-problems {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  color: var(--nodetto-ink, var(--app-problem-ink, #20252a));
+  font: inherit;
+  font-size: .85rem;
+}
+.nodetto-app-problems p {
+  margin: 0;
+  font-weight: 600;
+}
+.nodetto-app-problems ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nodetto-app-problems button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--app-chrome-line, #dfe3e6);
+  color: inherit;
+  background: var(--app-chrome-surface, #fff);
+  text-align: left;
+  font: inherit;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}

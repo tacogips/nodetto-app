@@ -1,0 +1,368 @@
+{
+  "taskId": "slt-s856",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/slide-link-animation",
+  "baseBranch": "feat/slide-link-animation",
+  "remote": "origin",
+  "originalHead": "a9abe26bf8ad558b2e82597b58bb35a7a9226970",
+  "designDocPaths": [
+    "design-docs/specs/design-slide-transition-settings.md",
+    "design-docs/specs/design-slide-link-animation.md",
+    "design-docs/user-qa/slide-link-animation.md"
+  ],
+  "evidenceRoot": "tmp/slt-s856",
+  "overviewPath": "impl-plans/active/slt-overview.md",
+  "supersedes": "impl-plans/active/slk-s855-dispatch.json (Phase 1 manifest, all plans completed; to be moved to impl-plans/completed by the workflow plan-archive node)",
+  "reviewContext": {
+    "issueReference": "slk-s855-phase2 (workflowInput; opus-terra-design-and-implement-review-loop-session-856; design accepted at Step 3, comm-020164)",
+    "userProblem": "Phase 1 always plays the automatic slide transition. Authors need to choose per-slide transitions and per-shape entrance/exit/linked effects, with exactly Phase 1 behaviour when nothing is set.",
+    "requiredOutcomes": [
+      "Per-shape Element.visual.animation and per-slide visual.animation.slide on one artwork-free presentation.slide resource element per page; both validate in IR documents and core commands, and round-trip through JSONL and Yjs.",
+      "Pure planner honours cut/fade/auto, duration, stagger, per-shape effects, delay, duration, order, mirrored effects backwards, slide N ownership; no settings gives the pinned Phase 1 plan.",
+      "Runner plays undraw, scale-in/out, slide-in/out, appear, disappear, swap and slide-fade; cancel leaves no stale layer.",
+      "Inspector Slide transition (every page, including empty) and Slide animation (single and multi-selection) sections; one undo step per edit; disabled when read-only.",
+      "No new Command kind; updateDocument unchanged; commands.ts changes limited to validation wiring."
+    ],
+    "nonGoals": [
+      "Page fields or updatePage changes (hosted Worker rejects them)",
+      "Shape-type morphing, glyph-outline text, click-by-click builds, video export, LaTeX, timeline editor",
+      "Animated jumps (goto/first/last)",
+      "Fixing pre-existing noUncheckedIndexedAccess baseline diagnostics"
+    ],
+    "constraints": [
+      "Workers edit only their writePaths, progress file and evidence directory; no git state changes; no new dependencies; no any; no emojis.",
+      "Strict-index gate against target/strict-index/baseline.log (ccac2d3) must exit 0 for each plan's TypeScript writePaths.",
+      "mise run verify gets up to 3 attempts for deadline tests under load; deadlines are never relaxed.",
+      "No push; local commits only; no tool attribution in commit messages."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Per-slide settings live in visual.animation.slide of one artwork-free presentation.slide resource element per page, not on Page.",
+        "rationale": "The unchanged hosted Worker authoring parser whitelists updatePage.page fields (authoring.ts:167-172,197-200) and rejects new ones; createElement, replaceVisual and deleteElements with visual.animation were accepted in the Step 3 diagnostics (8909db, 051f24). Design 3.1 and 3.1.1."
+      },
+      {
+        "decision": "Per-shape settings live in optional Element.visual.animation written with updateVisual/replaceVisual.",
+        "rationale": "Same transport path as Phase 1 linkId; no new Command kind and updateDocument unchanged. Design 3.1."
+      },
+      {
+        "decision": "Slide N owns the transition between N-1 and N in both directions; going backwards mirrors enter/exit effects (draw-on and grow to undraw, fade-in/fade-out, scale-in/scale-out, slide-in/slide-out).",
+        "rationale": "Owner decision in the intake constraints; design section 2."
+      },
+      {
+        "decision": "Absent settings use the Phase 1 timing constants unmultiplied and a stable ranking with key 0, pinned by a fixture test captured from the unmodified a9abe26 planner.",
+        "rationale": "Guarantees identical Phase 1 plans; design 5.2 to 5.4. slide-transition.test.ts is not edited (git diff --exit-code guard in slt-04 and slt-07)."
+      },
+      {
+        "decision": "Inapplicable effects fall back to auto; the planner resolves mirrors and the runner only plays concrete kinds.",
+        "rationale": "Keeps the planner pure and JSON-serialisable and the runner simple; design 5.2 and 11."
+      },
+      {
+        "decision": "Seven plans: two independent foundation plans (slt-01, slt-02), four wave-2 feature plans (slt-03 to slt-06), and one wiring plan (slt-07) that solely owns the shared registration files.",
+        "rationale": "Intake planning rules: at most 2 waves before wiring, disjoint writePaths, maximised concurrency; accepted at Step 5 review."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "A dedicated carrier element instead of a Page field: older builds see an unknown element type (type.unknown warning, payload preserved).",
+      "Two carriers on one page (concurrent creation) resolve deterministically to the first in (index, id) order; the second is ignored.",
+      "Deleting the carrier by explicit id (CLI/API) resets the slide to defaults.",
+      "slt-03 and slt-04 exceed the ~150-line plan guideline because they carry pitfall detail.",
+      "Between slt-01 and slt-03 landing, io golden coverage is temporarily incomplete; slt-03 repairs it in wave 2.",
+      "mise run verify gets up to 3 attempts for deadline tests under load; deadlines are never relaxed."
+    ],
+    "supportedEdgeCases": [
+      "Empty slides: the Slide transition controls create the carrier on a page with no artwork.",
+      "Deleting all artwork keeps slide settings; Select all excludes presentation.slide.",
+      "Duplicate page keeps the carrier; Copy shapes from page and planPaste drop it unless keepSlideCarrier is set.",
+      "Linked pairs whose paint order differs between pages rank by incoming paint order unless the owner sets order.",
+      "Instant kinds swap, appear and disappear have duration 0 and still honour delayMs.",
+      "Multi-selection edits apply to all selected elements as one undo step; read-only documents disable the controls.",
+      "Cancel mid-transition leaves no stale layer and restores markers."
+    ],
+    "outOfScopeEdgeCases": [
+      "Animated jumps (goto/first/last) stay cuts.",
+      "Shape-type morphing, glyph-outline text writing, click-by-click builds, video export, LaTeX/math, timeline editor, document-level setting.",
+      "A future Worker that validates nested visual.animation keys.",
+      "Pre-existing noUncheckedIndexedAccess baseline diagnostics."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-slide-transition-settings.md",
+      "design-docs/specs/design-slide-link-animation.md",
+      "design-docs/user-qa/slide-link-animation.md",
+      "impl-plans/active/slt-overview.md",
+      "impl-plans/active/slt-01-settings-fields.md",
+      "impl-plans/active/slt-02-plan-contract.md",
+      "impl-plans/active/slt-03-settings-plumbing.md",
+      "impl-plans/active/slt-04-planner-settings.md",
+      "impl-plans/active/slt-05-runner-effects.md",
+      "impl-plans/active/slt-06-inspector-sections.md",
+      "impl-plans/active/slt-07-wiring.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "slt-01-settings-fields",
+      "planPath": "impl-plans/active/slt-01-settings-fields.md",
+      "progressPath": "impl-plans/progress/slt-01-settings-fields.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/types.ts",
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/keyOrder.ts",
+        "packages/ir/src/index.ts",
+        "packages/ir/src/registry.ts",
+        "packages/ir/src/semantics.ts",
+        "packages/ir/src/registry/presentation-slide.ts",
+        "packages/ir/src/slide-settings.test.ts",
+        "packages/ir/src/registry.test.ts",
+        "packages/core/src/commands.ts",
+        "packages/core/src/visual-animation-command.test.ts",
+        "impl-plans/progress/slt-01-settings-fields.md",
+        "tmp/slt-s856/slt-01-settings-fields",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All IR names pinned in slt-overview.md are exported from @nodetto/ir; Visual.animation is declared after linkId and ordered after linkId in keyOrder with nested animation/slide child orders.",
+        "validateElementAnimation reports value.enum, type.boolean, range.animation errors and field.unknown warnings at exact paths; presentation.slide is a registered resource type.",
+        "createElement, updateVisual and replaceVisual throw CommandError for invalid animation values without mutating the store, accept warning-only unknown keys, and undo restores exactly.",
+        "The recorded diff tmp/slt-s856/slt-01-settings-fields/commands-diff.log (git diff a9abe26 -- packages/core/src/commands.ts) contains only the validateElementAnimation import and one error-filtered call in validateVisualFields."
+      ],
+      "verification": [
+        "bun test packages/ir packages/core/src/visual-animation-command.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ir/src/types.ts packages/ir/src/validate.ts packages/ir/src/keyOrder.ts packages/ir/src/index.ts packages/ir/src/registry.ts packages/ir/src/semantics.ts packages/ir/src/registry/presentation-slide.ts packages/ir/src/slide-settings.test.ts packages/ir/src/registry.test.ts packages/core/src/commands.ts packages/core/src/visual-animation-command.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-01-settings-fields.log -- packages/ir/src/types.ts packages/ir/src/validate.ts packages/ir/src/keyOrder.ts packages/ir/src/index.ts packages/ir/src/registry.ts packages/ir/src/semantics.ts packages/ir/src/registry/presentation-slide.ts packages/ir/src/slide-settings.test.ts packages/ir/src/registry.test.ts packages/core/src/commands.ts packages/core/src/visual-animation-command.test.ts"
+      ]
+    },
+    {
+      "planId": "slt-02-plan-contract",
+      "planPath": "impl-plans/active/slt-02-plan-contract.md",
+      "progressPath": "impl-plans/progress/slt-02-plan-contract.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/presentation/slide-transition-types.ts",
+        "packages/core/src/presentation/slide-transition-types.test.ts",
+        "impl-plans/progress/slt-02-plan-contract.md",
+        "tmp/slt-s856/slt-02-plan-contract",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "SlideStepKind includes the nine new kinds; SlideTransitionStep has optional offset; cut reason includes setting; SlideNavigation, SlideTiming, PHASE1_TIMING are exported from @nodetto/core.",
+        "staggerStart without a timing argument is bit-identical to Phase 1; with a timing argument it uses timing.stagger and timing.staggerBudget.",
+        "All existing presentation tests pass unchanged."
+      ],
+      "verification": [
+        "bun test packages/core/src/presentation",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/presentation/slide-transition-types.ts packages/core/src/presentation/slide-transition-types.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-02-plan-contract.log -- packages/core/src/presentation/slide-transition-types.ts packages/core/src/presentation/slide-transition-types.test.ts"
+      ]
+    },
+    {
+      "planId": "slt-03-settings-plumbing",
+      "planPath": "impl-plans/active/slt-03-settings-plumbing.md",
+      "progressPath": "impl-plans/progress/slt-03-settings-plumbing.md",
+      "wave": 2,
+      "dependsOn": ["slt-01-settings-fields"],
+      "writePaths": [
+        "packages/core/src/shapes/index.ts",
+        "packages/core/src/clipboard.ts",
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/editor/facade/core.ts",
+        "packages/io/src/drawio/export.ts",
+        "packages/io/src/d2/export.ts",
+        "packages/core/src/slide-settings-carrier.test.ts",
+        "packages/io/src/jsonl/slide-settings.test.ts",
+        "packages/collab/src/slide-settings.test.ts",
+        "packages/io/src/__fixtures__/slide-settings.jsonl",
+        "packages/io/src/jsonl/golden.test.ts",
+        "packages/core/src/handoff.ts",
+        "packages/core/src/interface-tree.ts",
+        "packages/core/src/editor/dirty-pages.ts",
+        "packages/core/src/arrange.ts",
+        "packages/core/src/copy-page-elements.test.ts",
+        "packages/core/src/link-id-copy.test.ts",
+        "packages/core/src/pages.test.ts",
+        "apps/cli/src/edit/label-field.ts",
+        "impl-plans/progress/slt-03-settings-plumbing.md",
+        "tmp/slt-s856/slt-03-settings-plumbing",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/io/src/jsonl/golden.test.ts", "intendedEdit": "Only change: append 'slide-settings' to the GOLDEN array so the coverage test sees presentation.slide."},
+        {"path": "packages/core/src/handoff.ts", "intendedEdit": "Pre-authorised: add presentation.slide to a resource-type list only if a test shows the carrier treated as artwork."},
+        {"path": "packages/core/src/interface-tree.ts", "intendedEdit": "Pre-authorised, same condition as handoff.ts."},
+        {"path": "packages/core/src/editor/dirty-pages.ts", "intendedEdit": "Pre-authorised, same condition as handoff.ts."},
+        {"path": "packages/core/src/arrange.ts", "intendedEdit": "Pre-authorised: exclude the carrier from arrange like design.guide only if needed."},
+        {"path": "apps/cli/src/edit/label-field.ts", "intendedEdit": "Pre-authorised: only if label-field.test.ts fails solely because of the new presentation.slide type."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "presentation.slide has null bounds and no hit area; selectAll excludes it; drawio and d2 exports ignore it.",
+        "Settings survive selectAll+delete of all artwork and later additions, and round-trip through JSONL and Yjs; documents without carriers are byte-identical.",
+        "Duplicate page keeps one carrier with a new id and no linkId; Copy shapes from page and planPaste never create a carrier; other id allocation order is unchanged.",
+        "Carrier createElement/replaceVisual/deleteElements reach a second Yjs binding and one undo restores both.",
+        "New canonical golden fixture packages/io/src/__fixtures__/slide-settings.jsonl (shape with visual.animation, presentation.slide carrier) reserializes byte for byte; 'slide-settings' is appended to GOLDEN as the only golden.test.ts change; the 'covers every registered element type' test passes; freeform.jsonl is unchanged."
+      ],
+      "verification": [
+        "bun test packages/io packages/collab packages/core/src/slide-settings-carrier.test.ts packages/core/src/copy-page-elements.test.ts packages/core/src/link-id-copy.test.ts packages/core/src/pages.test.ts apps/cli/src/edit/label-field.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/shapes/index.ts packages/core/src/clipboard.ts packages/core/src/editor/pages.ts packages/core/src/editor/facade/core.ts packages/io/src/drawio/export.ts packages/io/src/d2/export.ts packages/core/src/slide-settings-carrier.test.ts packages/io/src/jsonl/slide-settings.test.ts packages/collab/src/slide-settings.test.ts packages/io/src/jsonl/golden.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-03-settings-plumbing.log -- packages/core/src/shapes/index.ts packages/core/src/clipboard.ts packages/core/src/editor/pages.ts packages/core/src/editor/facade/core.ts packages/io/src/drawio/export.ts packages/io/src/d2/export.ts packages/core/src/slide-settings-carrier.test.ts packages/io/src/jsonl/slide-settings.test.ts packages/collab/src/slide-settings.test.ts packages/io/src/jsonl/golden.test.ts",
+        "git diff --exit-code a9abe26 -- packages/core/src/editor/facade/page-editing.ts packages/core/src/group.ts packages/io/src/__fixtures__/freeform.jsonl"
+      ]
+    },
+    {
+      "planId": "slt-04-planner-settings",
+      "planPath": "impl-plans/active/slt-04-planner-settings.md",
+      "progressPath": "impl-plans/progress/slt-04-planner-settings.md",
+      "wave": 2,
+      "dependsOn": ["slt-01-settings-fields", "slt-02-plan-contract"],
+      "writePaths": [
+        "packages/core/src/presentation/slide-transition-settings.ts",
+        "packages/core/src/presentation/slide-transition-settings.test.ts",
+        "packages/core/src/presentation/slide-transition-phase1-pin.test.ts",
+        "packages/core/src/presentation/slide-transition.ts",
+        "impl-plans/progress/slt-04-planner-settings.md",
+        "tmp/slt-s856/slt-04-planner-settings",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The Phase 1 pin (forward and backward, including pairs with differing paint order) captured from the unmodified planner passes; slide-transition.test.ts is unchanged and passes.",
+        "Owner page settings drive cut/fade/auto, duration scaling and stagger in both directions.",
+        "Per-shape enter/exit/linked effects, sides, delay, duration and order produce the specified steps; inapplicable effects fall back to auto; backward plays mirrored effects; pair ranking uses incoming paint order as default.",
+        "Plans stay JSON-serialisable; the carrier never produces a step."
+      ],
+      "verification": [
+        "bun test packages/core/src/presentation",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/presentation/slide-transition-settings.ts packages/core/src/presentation/slide-transition-settings.test.ts packages/core/src/presentation/slide-transition-phase1-pin.test.ts packages/core/src/presentation/slide-transition.ts",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-04-planner-settings.log -- packages/core/src/presentation/slide-transition-settings.ts packages/core/src/presentation/slide-transition-settings.test.ts packages/core/src/presentation/slide-transition-phase1-pin.test.ts packages/core/src/presentation/slide-transition.ts",
+        "git diff --exit-code a9abe26 -- packages/core/src/presentation/slide-transition.test.ts"
+      ]
+    },
+    {
+      "planId": "slt-05-runner-effects",
+      "planPath": "impl-plans/active/slt-05-runner-effects.md",
+      "progressPath": "impl-plans/progress/slt-05-runner-effects.md",
+      "wave": 2,
+      "dependsOn": ["slt-02-plan-contract"],
+      "writePaths": [
+        "packages/ui-solid/src/presentation/transition-keyframes.ts",
+        "packages/ui-solid/src/presentation/transition-keyframes.test.ts",
+        "packages/ui-solid/src/presentation/transition-dom.ts",
+        "packages/ui-solid/src/presentation/transition-dom.test.ts",
+        "packages/ui-solid/src/presentation/transition-runner.ts",
+        "packages/ui-solid/src/presentation/transition-runner.test.ts",
+        "packages/ui-solid/src/presentation/TransitionLayer.tsx",
+        "impl-plans/progress/slt-05-runner-effects.md",
+        "tmp/slt-s856/slt-05-runner-effects",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/ui-solid/src/presentation/transition-runner.ts", "intendedEdit": "Pre-authorised only if a test proves a lifecycle change is required."},
+        {"path": "packages/ui-solid/src/presentation/TransitionLayer.tsx", "intendedEdit": "Pre-authorised only if slide-fade root targeting needs layer access."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "stepKeyframes covers scale-in/out, slide-in/out, appear, disappear, swap and slide-fade; undrawKeyframes is the exact reversal of drawOnKeyframes.",
+        "prepareTransition handles undraw on outgoing nodes with marker removal and restore, and slide-fade on the two SVG roots.",
+        "Phase 1 keyframes and DOM jobs are unchanged; all presentation tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/presentation",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/presentation/transition-keyframes.ts packages/ui-solid/src/presentation/transition-keyframes.test.ts packages/ui-solid/src/presentation/transition-dom.ts packages/ui-solid/src/presentation/transition-dom.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-05-runner-effects.log -- packages/ui-solid/src/presentation/transition-keyframes.ts packages/ui-solid/src/presentation/transition-keyframes.test.ts packages/ui-solid/src/presentation/transition-dom.ts packages/ui-solid/src/presentation/transition-dom.test.ts"
+      ]
+    },
+    {
+      "planId": "slt-06-inspector-sections",
+      "planPath": "impl-plans/active/slt-06-inspector-sections.md",
+      "progressPath": "impl-plans/progress/slt-06-inspector-sections.md",
+      "wave": 2,
+      "dependsOn": ["slt-01-settings-fields"],
+      "writePaths": [
+        "packages/ui-solid/src/inspector/slide-transition-edits.ts",
+        "packages/ui-solid/src/inspector/slide-transition-edits.test.ts",
+        "packages/ui-solid/src/inspector/slide-animation-edits.ts",
+        "packages/ui-solid/src/inspector/slide-animation-edits.test.ts",
+        "packages/ui-solid/src/inspector/SlideTransitionSection.tsx",
+        "packages/ui-solid/src/inspector/SlideAnimationSection.tsx",
+        "impl-plans/progress/slt-06-inspector-sections.md",
+        "tmp/slt-s856/slt-06-inspector-sections",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "planSlideSettingsEdit returns exactly one createElement (no carrier, including empty pages), replaceVisual (carrier exists), deleteElements (back to defaults) or [] (no change).",
+        "planAnimationEdit returns one replaceVisual per changed element, never touches animation.slide, removes empty animation; sharedAnimationValue reports mixed.",
+        "Both sections use only existing controls and classes, apply once per edit, and are disabled when read-only."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/inspector/slide-transition-edits.test.ts packages/ui-solid/src/inspector/slide-animation-edits.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/inspector/slide-transition-edits.ts packages/ui-solid/src/inspector/slide-transition-edits.test.ts packages/ui-solid/src/inspector/slide-animation-edits.ts packages/ui-solid/src/inspector/slide-animation-edits.test.ts packages/ui-solid/src/inspector/SlideTransitionSection.tsx packages/ui-solid/src/inspector/SlideAnimationSection.tsx",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-06-inspector-sections.log -- packages/ui-solid/src/inspector/slide-transition-edits.ts packages/ui-solid/src/inspector/slide-transition-edits.test.ts packages/ui-solid/src/inspector/slide-animation-edits.ts packages/ui-solid/src/inspector/slide-animation-edits.test.ts packages/ui-solid/src/inspector/SlideTransitionSection.tsx packages/ui-solid/src/inspector/SlideAnimationSection.tsx"
+      ]
+    },
+    {
+      "planId": "slt-07-wiring",
+      "planPath": "impl-plans/active/slt-07-wiring.md",
+      "progressPath": "impl-plans/progress/slt-07-wiring.md",
+      "wave": 3,
+      "dependsOn": [
+        "slt-01-settings-fields",
+        "slt-02-plan-contract",
+        "slt-03-settings-plumbing",
+        "slt-04-planner-settings",
+        "slt-05-runner-effects",
+        "slt-06-inspector-sections"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/presentation/controller.ts",
+        "packages/ui-solid/src/presentation/controller-navigation.test.ts",
+        "packages/core/src/presentation/index.ts",
+        "packages/core/src/index.ts",
+        "packages/ui-solid/src/index.ts",
+        "packages/ui-solid/src/Inspector.tsx",
+        "docs/editing.md",
+        "README.md",
+        "impl-plans/progress/slt-07-wiring.md",
+        "tmp/slt-s856/slt-07-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/index.ts", "intendedEdit": "Only if a needed export is unreachable from @nodetto/core."},
+        {"path": "packages/ui-solid/src/index.ts", "intendedEdit": "Only if sibling inspector sections are exported there; match SlideLinkSection handling."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The controller passes navigation forward/backward; prev uses slide N settings; cut setting gives an instant switch.",
+        "Inspector mounts Slide transition (no selection, every page) and Slide animation (single and multi-selection, excluding carriers).",
+        "docs/editing.md and README.md describe the feature.",
+        "Union strict-index gate (including golden.test.ts and any optional pre-authorised file actually edited by slt-03/slt-05), mise run lint and mise run verify exit 0; mise run verify may be attempted up to 3 times in total, only when an attempt fails solely on deadline-sensitive tests under load, and deadlines are never relaxed.",
+        "slide-transition.test.ts is unchanged (git diff --exit-code); the recorded commands.ts diff at tmp/slt-s856/slt-07-wiring/commands-diff.log shows validation wiring only."
+      ],
+      "verification": [
+        "bun run typecheck",
+        "bun test packages/ir packages/io packages/collab packages/core/src/presentation packages/ui-solid/src/presentation packages/ui-solid/src/inspector packages/core/src/visual-animation-command.test.ts packages/core/src/slide-settings-carrier.test.ts apps/cli/src/edit/label-field.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slt-07-union.log -- packages/ir/src/types.ts packages/ir/src/validate.ts packages/ir/src/keyOrder.ts packages/ir/src/index.ts packages/ir/src/registry.ts packages/ir/src/semantics.ts packages/ir/src/registry/presentation-slide.ts packages/ir/src/slide-settings.test.ts packages/ir/src/registry.test.ts packages/core/src/commands.ts packages/core/src/visual-animation-command.test.ts packages/core/src/presentation/slide-transition-types.ts packages/core/src/presentation/slide-transition-types.test.ts packages/core/src/shapes/index.ts packages/core/src/clipboard.ts packages/core/src/editor/pages.ts packages/core/src/editor/facade/core.ts packages/io/src/drawio/export.ts packages/io/src/d2/export.ts packages/core/src/slide-settings-carrier.test.ts packages/io/src/jsonl/slide-settings.test.ts packages/collab/src/slide-settings.test.ts packages/io/src/jsonl/golden.test.ts packages/core/src/presentation/slide-transition-settings.ts packages/core/src/presentation/slide-transition-settings.test.ts packages/core/src/presentation/slide-transition-phase1-pin.test.ts packages/core/src/presentation/slide-transition.ts packages/ui-solid/src/presentation/transition-keyframes.ts packages/ui-solid/src/presentation/transition-keyframes.test.ts packages/ui-solid/src/presentation/transition-dom.ts packages/ui-solid/src/presentation/transition-dom.test.ts packages/ui-solid/src/inspector/slide-transition-edits.ts packages/ui-solid/src/inspector/slide-transition-edits.test.ts packages/ui-solid/src/inspector/slide-animation-edits.ts packages/ui-solid/src/inspector/slide-animation-edits.test.ts packages/ui-solid/src/inspector/SlideTransitionSection.tsx packages/ui-solid/src/inspector/SlideAnimationSection.tsx packages/ui-solid/src/presentation/controller.ts packages/ui-solid/src/presentation/controller-navigation.test.ts packages/core/src/presentation/index.ts packages/ui-solid/src/Inspector.tsx",
+        "mise run lint",
+        "mise run verify",
+        "git diff --exit-code a9abe26 -- packages/core/src/presentation/slide-transition.test.ts"
+      ]
+    }
+  ]
+}

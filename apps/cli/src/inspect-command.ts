@@ -1,0 +1,525 @@
+// `nodetto-cli inspect`: what a document contains, as a compact indented
+// outline (default) or as exact JSON records.
+//
+// The outline is meant for AI agents: one line per object, children indented
+// under their container, geometry and the semantic fields that identify an
+// object, and no styling. It is the same idea as the accessibility-tree
+// outline agents read instead of a web page's HTML.
+
+import {
+  type Box,
+  Editor,
+  findText,
+  frameParents,
+  prototypeFlows,
+  textMatcher,
+} from "@nodetto/core";
+import {
+  isDatabaseObjectType,
+  shortPageId,
+  type Document,
+  type Element,
+  getElementTypeDefinition,
+  isKnownElementType,
+  isPlainObject,
+  type Page,
+} from "@nodetto/ir";
+import {
+  type CommandIo,
+  type CommandResult,
+  fail,
+  loadDocument,
+  ok,
+  parseArgs,
+  selectPage,
+} from "./commands.ts";
+import { helpFor } from "./help.ts";
+import { shortIds } from "./ids.ts";
+
+const INSPECT_OPTIONS = new Set([
+  "--page",
+  "--format",
+  "--type",
+  "--ids",
+  "--text",
+  "--flow",
+]);
+const INSPECT_FLAGS = new Set(["--regex", "--ignore-case", "--flows"]);
+const LABEL_FIELDS = ["name", "tableName", "label", "text"] as const;
+const MAX_TEXT = 60;
+
+type Semantic = Readonly<Record<string, unknown>>;
+
+function semanticOf(element: Element): Semantic {
+  return isPlainObject(element.semantic) ? element.semantic : {};
+}
+
+function quote(text: string): string {
+  const flat = text.replace(/\s*\n\s*/g, " / ").trim();
+  const cut =
+    flat.length > MAX_TEXT ? `${flat.slice(0, MAX_TEXT - 3)}...` : flat;
+  return JSON.stringify(cut);
+}
+
+function labelOf(element: Element): string | undefined {
+  const semantic = semanticOf(element);
+  for (const field of LABEL_FIELDS) {
+    const value = semantic[field];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
+}
+
+function round(value: number): number {
+  return Math.round(value);
+}
+
+function geometry(element: Element, bounds: Box | null): string {
+  if (bounds)
+    return ` @${round(bounds.x)},${round(bounds.y)} ${round(bounds.width)}x${round(bounds.height)}`;
+  const { x, y } = element.visual;
+  return typeof x === "number" && typeof y === "number"
+    ? ` @${round(x)},${round(y)}`
+    : "";
+}
+
+/** Containers an element belongs to, innermost first by declaration. */
+function explicitParent(
+  element: Element,
+  byId: ReadonlyMap<string, Element>,
+  memberOf: ReadonlyMap<string, string>,
+): string | undefined {
+  const parent = semanticOf(element)["parent"];
+  if (typeof parent === "string" && byId.has(parent)) return parent;
+  return memberOf.get(element.id);
+}
+
+function contains(outer: Box, inner: Box): boolean {
+  const cx = inner.x + inner.width / 2;
+  const cy = inner.y + inner.height / 2;
+  return (
+    cx >= outer.x &&
+    cx <= outer.x + outer.width &&
+    cy >= outer.y &&
+    cy <= outer.y + outer.height
+  );
+}
+
+interface OutlineContext {
+  readonly short: (id: string) => string;
+  readonly byId: ReadonlyMap<string, Element>;
+  readonly bounds: (id: string) => Box | null;
+  readonly relative?: (id: string) => { x: number; y: number } | undefined;
+}
+
+function endpoint(value: unknown, context: OutlineContext): string {
+  if (typeof value === "string") {
+    const target = context.byId.get(value);
+    const name = target ? labelOf(target) : undefined;
+    return name ? `${context.short(value)}(${name})` : context.short(value);
+  }
+  if (isPlainObject(value) && typeof value["table"] === "string") {
+    const table = context.byId.get(value["table"]);
+    const tableName = table ? labelOf(table) : undefined;
+    const columns = table ? semanticOf(table)["columns"] : undefined;
+    const column = Array.isArray(columns)
+      ? columns.find(
+          (item) => isPlainObject(item) && item["id"] === value["column"],
+        )
+      : undefined;
+    const columnName =
+      isPlainObject(column) && typeof column["name"] === "string"
+        ? column["name"]
+        : undefined;
+    const base = tableName ?? context.short(value["table"]);
+    return columnName ? `${base}.${columnName}` : base;
+  }
+  return "?";
+}
+
+function headerLine(element: Element, context: OutlineContext): string {
+  const semantic = semanticOf(element);
+  const parts: string[] = [element.type, context.short(element.id)];
+  const category = isKnownElementType(element.type)
+    ? getElementTypeDefinition(element.type)?.category
+    : undefined;
+  if (category === "edge" && ("from" in semantic || "to" in semantic)) {
+    parts.push(
+      `${endpoint(semantic["from"], context)} -> ${endpoint(semantic["to"], context)}`,
+    );
+    for (const field of ["cardinality", "kind", "label", "name"] as const) {
+      const value = semantic[field];
+      if (typeof value === "string" && value.length > 0)
+        parts.push(
+          field === "label" || field === "name" ? quote(value) : value,
+        );
+    }
+    if (semantic["logical"] === true) parts.push("logical");
+    return parts.join(" ");
+  }
+  const label = labelOf(element);
+  if (label !== undefined)
+    parts.push(element.type === "erd.table" ? label : quote(label));
+  for (const field of [
+    "kind",
+    "taskType",
+    "gatewayType",
+    "geo",
+    "stereotype",
+  ]) {
+    const value = semantic[field];
+    if (typeof value === "string" && value.length > 0)
+      parts.push(`${field}=${value}`);
+  }
+  const rel = context.relative?.(element.id);
+  return `${parts.join(" ")}${geometry(element, context.bounds(element.id))}${rel ? ` rel ${round(rel.x)},${round(rel.y)}` : ""}`;
+}
+
+function detailLines(element: Element): string[] {
+  const semantic = semanticOf(element);
+  const lines: string[] = [];
+  const list = (field: string): readonly Semantic[] => {
+    const value = semantic[field];
+    return Array.isArray(value) ? value.filter(isPlainObject) : [];
+  };
+  if (element.type === "erd.table") {
+    for (const column of list("columns")) {
+      const flags = [
+        column["pk"] === true ? "pk" : "",
+        column["nullable"] === false && column["pk"] !== true ? "not-null" : "",
+        column["autoIncrement"] === true ? "auto-increment" : "",
+        typeof column["defaultExpression"] === "string"
+          ? `default=${column["defaultExpression"]}`
+          : "",
+      ].filter(Boolean);
+      lines.push(
+        ["column", column["name"], column["dataType"], ...flags]
+          .filter((part) => part !== undefined && part !== "")
+          .join(" "),
+      );
+    }
+    for (const index of list("indexes"))
+      lines.push(
+        `index ${String(index["name"] ?? "")}${index["unique"] === true ? " unique" : ""}${typeof index["where"] === "string" && index["where"].trim() ? ` where ${index["where"].trim()}` : ""}`.trim(),
+      );
+  } else if (isDatabaseObjectType(element.type)) {
+    for (const column of list("columns"))
+      lines.push(
+        `column ${String(column["name"])} ${String(column["dataType"])}`,
+      );
+    for (const parameter of list("parameters"))
+      lines.push(
+        `parameter ${String(parameter["mode"] ?? "in")} ${String(parameter["name"])} ${String(parameter["dataType"])}`,
+      );
+    if (semantic["returnType"])
+      lines.push(`returns ${String(semantic["returnType"])}`);
+    if (semantic["language"])
+      lines.push(`language ${String(semantic["language"])}`);
+    if (semantic["definition"])
+      lines.push(`definition ${quote(String(semantic["definition"]))}`);
+    if (Array.isArray(semantic["dependsOn"]))
+      for (const id of semantic["dependsOn"])
+        lines.push(`depends-on ${String(id)}`);
+  } else if (element.type === "uml.class") {
+    for (const attribute of list("attributes"))
+      lines.push(
+        `attribute ${String(attribute["name"] ?? "")}${attribute["type"] ? `: ${String(attribute["type"])}` : ""}`,
+      );
+    for (const method of list("methods"))
+      lines.push(
+        `method ${String(method["name"] ?? "")}()${method["returnType"] ? `: ${String(method["returnType"])}` : ""}`,
+      );
+  }
+  return lines;
+}
+
+function pageOutline(
+  editor: Editor,
+  page: Page,
+  elements: readonly Element[],
+  filter: (element: Element) => boolean,
+  short: (id: string) => string,
+): string[] {
+  editor.setCurrentPage(page.id);
+  const context = editor.createShapeContext(1);
+  const boundsCache = new Map<string, Box | null>();
+  const bounds = (id: string): Box | null => {
+    if (!boundsCache.has(id))
+      boundsCache.set(id, editor.getBounds(id, context));
+    return boundsCache.get(id) ?? null;
+  };
+  const byId = new Map(elements.map((element) => [element.id, element]));
+  const memberOf = new Map<string, string>();
+  for (const element of elements) {
+    const members = semanticOf(element)["memberIds"];
+    if (Array.isArray(members))
+      for (const member of members)
+        if (typeof member === "string" && !memberOf.has(member))
+          memberOf.set(member, element.id);
+  }
+  const frames = elements.filter((element) => element.type === "frame");
+  const parentOf = new Map<string, string>();
+  for (const element of elements) {
+    const explicit = explicitParent(element, byId, memberOf);
+    if (explicit !== undefined) {
+      parentOf.set(element.id, explicit);
+      continue;
+    }
+    const own = bounds(element.id);
+    if (!own || element.type === "frame") continue;
+    let best: { id: string; area: number } | undefined;
+    for (const frame of frames) {
+      const box = bounds(frame.id);
+      if (!box || !contains(box, own)) continue;
+      const area = box.width * box.height;
+      if (!best || area < best.area) best = { id: frame.id, area };
+    }
+    if (best) parentOf.set(element.id, best.id);
+  }
+  const children = new Map<string | undefined, Element[]>();
+  for (const element of elements) {
+    const parent = parentOf.get(element.id);
+    const list = children.get(parent) ?? [];
+    list.push(element);
+    children.set(parent, list);
+  }
+  const frameOwners = frameParents(editor.store, page.id, context);
+  const relative = (id: string) => {
+    const owner = frameOwners.get(id);
+    const box = bounds(id);
+    const frame = owner ? bounds(owner) : null;
+    return box && frame
+      ? { x: box.x - frame.x, y: box.y - frame.y }
+      : undefined;
+  };
+  const outlineContext: OutlineContext = { short, byId, bounds, relative };
+  const matches = filter;
+  const hasMatch = (element: Element): boolean =>
+    matches(element) ||
+    (children.get(element.id) ?? []).some((child) => hasMatch(child));
+  const isConnector = (element: Element): boolean =>
+    isKnownElementType(element.type) &&
+    getElementTypeDefinition(element.type)?.category === "edge";
+  // Precompute geometry outside the comparator. Pairwise "same row" tolerances
+  // are non-transitive and can panic native Array.sort; use a total order.
+  const ordered = (list: readonly Element[]): Element[] =>
+    list
+      .map((element) => ({
+        element,
+        edge: Number(isConnector(element)),
+        order:
+          typeof semanticOf(element)["order"] === "string"
+            ? String(semanticOf(element)["order"])
+            : undefined,
+        box: bounds(element.id),
+      }))
+      .sort((a, b) => {
+        const edge = a.edge - b.edge;
+        if (edge !== 0) return edge;
+        // Keep authored timeline order in its own category to avoid mixing
+        // pairwise semantic ordering with spatial ordering.
+        const authored =
+          Number(a.order === undefined) - Number(b.order === undefined);
+        if (authored !== 0) return authored;
+        if (
+          a.order !== undefined &&
+          b.order !== undefined &&
+          a.order !== b.order
+        )
+          return a.order < b.order ? -1 : 1;
+        const missing = Number(a.box === null) - Number(b.box === null);
+        if (missing !== 0) return missing;
+        if (a.box && b.box) {
+          const position =
+            a.box.y + a.box.height / 2 - (b.box.y + b.box.height / 2) ||
+            a.box.x - b.box.x;
+          if (position !== 0) return position;
+        }
+        return a.element.id < b.element.id
+          ? -1
+          : a.element.id > b.element.id
+            ? 1
+            : 0;
+      })
+      .map(({ element }) => element);
+  const lines: string[] = [];
+  const walk = (parent: string | undefined, depth: number): void => {
+    for (const element of ordered(children.get(parent) ?? [])) {
+      if (!hasMatch(element)) continue;
+      const indent = "  ".repeat(depth);
+      lines.push(`${indent}${headerLine(element, outlineContext)}`);
+      if (matches(element))
+        for (const detail of detailLines(element))
+          lines.push(`${indent}  ${detail}`);
+      walk(element.id, depth + 1);
+    }
+  };
+  walk(undefined, 2);
+  return lines;
+}
+
+/** One-line summaries (the outline's header line) for any element of a document. */
+export function summarizer(
+  document: Document,
+  short: (id: string) => string,
+): (element: Element) => string {
+  const editor = new Editor({ document });
+  const byId = new Map(
+    document.elements.map((element) => [element.id, element]),
+  );
+  const bounds = (id: string): Box | null => {
+    const element = byId.get(id);
+    if (!element) return null;
+    editor.setCurrentPage(element.page);
+    return editor.getBounds(id, editor.createShapeContext(1));
+  };
+  return (element) => headerLine(element, { short, byId, bounds });
+}
+
+export function inspectCommand(
+  io: CommandIo,
+  args: readonly string[],
+): CommandResult {
+  const parsed = parseArgs(args, INSPECT_OPTIONS, INSPECT_FLAGS);
+  if (typeof parsed === "string")
+    return fail(`${parsed}\n\n${helpFor("inspect")}`);
+  const textQuery = parsed.options.get("--text");
+  const matcher =
+    textQuery === undefined
+      ? undefined
+      : textMatcher(textQuery, {
+          regex: parsed.flags.has("--regex"),
+          ignoreCase: parsed.flags.has("--ignore-case"),
+        });
+  if (typeof matcher === "string") return fail(`--text: ${matcher}`);
+  if (parsed.positional.length !== 1)
+    return fail(
+      `inspect expects exactly one document path.\n\n${helpFor("inspect")}`,
+    );
+  const format = parsed.options.get("--format") ?? "outline";
+  if (format !== "outline" && format !== "json")
+    return fail(`Unsupported format "${format}". Choose outline or json.`);
+  const idMode = parsed.options.get("--ids") ?? "short";
+  if (idMode !== "short" && idMode !== "full")
+    return fail(`Unsupported --ids "${idMode}". Choose short or full.`);
+  const loaded = loadDocument(io, parsed.positional[0] as string);
+  if (typeof loaded === "string") return fail(loaded);
+  const document: Document = loaded.document;
+  if (parsed.flags.has("--flows") || parsed.options.has("--flow")) {
+    const editor = new Editor({ document });
+    const result = prototypeFlows(editor.store, editor.createShapeContext(1));
+    const name = parsed.options.get("--flow");
+    if (name !== undefined && !result.flows.some((flow) => flow.name === name))
+      return fail(
+        `Unknown flow ${JSON.stringify(name)}. Available: ${result.flows.map((flow) => flow.name).join(", ")}`,
+        1,
+      );
+    const flows =
+      name === undefined
+        ? result.flows
+        : result.flows.filter((flow) => flow.name === name);
+    if (format === "json")
+      return ok(
+        `${JSON.stringify({ ...result, flows }, null, 2)}\n`,
+        loaded.warnings,
+      );
+    const ids = shortIds(document.elements.map((element) => element.id));
+    const short = (id: string) =>
+      idMode === "full" ? id : (ids.get(id) ?? id);
+    const byId = new Map(
+      document.elements.map((element) => [element.id, element]),
+    );
+    const nameOf = (id: string) => {
+      const element = byId.get(id);
+      return element ? (labelOf(element) ?? "") : "";
+    };
+    const lines: string[] = [];
+    for (const flow of flows) {
+      lines.push(
+        `flow ${quote(flow.name)} start ${short(flow.startId)} ${quote(nameOf(flow.startId))}`,
+      );
+      for (const screen of flow.screens) {
+        lines.push(`  ${short(screen)} ${quote(nameOf(screen))}`);
+        for (const link of flow.links.filter((item) => item.screen === screen))
+          lines.push(
+            `    -> ${short(link.to)} ${quote(nameOf(link.to))} (${link.trigger} ${link.action} from ${short(link.from)})`,
+          );
+      }
+    }
+    if (result.unreachable.length)
+      lines.push(`unreachable: ${result.unreachable.map(short).join(" ")}`);
+    if (result.dangling.length)
+      lines.push(`dangling: ${result.dangling.map(short).join(" ")}`);
+    return ok(`${lines.join("\n")}\n`, loaded.warnings);
+  }
+  let pages: readonly Page[] = document.pages;
+  const query = parsed.options.get("--page");
+  if (query !== undefined) {
+    const page = selectPage(
+      document,
+      query,
+      document.pages,
+      "The document has no pages.",
+      "pages",
+    );
+    if (typeof page === "string") return fail(page);
+    pages = [page];
+  }
+  const typeFilter = parsed.options.get("--type");
+  // --type keeps elements whose type starts with the prefix; --text keeps
+  // elements whose labels, names or notes contain the text.
+  const filter = (element: Element): boolean =>
+    (typeFilter === undefined || element.type.startsWith(typeFilter)) &&
+    (matcher === undefined || findText(element, matcher).length > 0);
+  const elementsOf = (page: Page): readonly Element[] =>
+    document.elements.filter((element) => element.page === page.id);
+
+  if (format === "json") {
+    // Frame-relative positions need an editor and its geometry, which is
+    // slow in the native engine; pages without frames skip both.
+    let editor: Editor | undefined;
+    const report = {
+      document: { id: document.id, title: document.title },
+      pages: pages.map((page) => {
+        const elements = elementsOf(page);
+        const base = { ...page, shortId: shortPageId(page.id) };
+        if (!elements.some((element) => element.type === "frame"))
+          return { ...base, elements: elements.filter(filter) };
+        editor ??= new Editor({ document });
+        editor.setCurrentPage(page.id);
+        const context = editor.createShapeContext(1);
+        const owners = frameParents(editor.store, page.id, context);
+        return {
+          ...base,
+          elements: elements.filter(filter).map((element) => {
+            const owner = owners.get(element.id);
+            if (!owner || !editor) return element;
+            const box = editor.getBounds(element.id, context);
+            const frame = editor.getBounds(owner, context);
+            return box && frame
+              ? {
+                  ...element,
+                  rel: { x: box.x - frame.x, y: box.y - frame.y },
+                }
+              : element;
+          }),
+        };
+      }),
+    };
+    return ok(`${JSON.stringify(report, null, 2)}\n`, loaded.warnings);
+  }
+
+  const shortMap = shortIds(document.elements.map((element) => element.id));
+  const short = (id: string): string =>
+    idMode === "full" ? id : (shortMap.get(id) ?? id);
+  const editor = new Editor({ document });
+  const lines = [`document ${quote(document.title)}`];
+  for (const page of pages) {
+    const elements = elementsOf(page);
+    lines.push(
+      `  page ${page.id} ${quote(page.name)} ${page.kind} (${elements.length} elements) [${shortPageId(page.id)}]`,
+    );
+    lines.push(...pageOutline(editor, page, elements, filter, short));
+  }
+  return ok(`${lines.join("\n")}\n`, loaded.warnings);
+}

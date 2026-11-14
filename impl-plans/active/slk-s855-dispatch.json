@@ -1,0 +1,389 @@
+{
+  "taskId": "slk-s855",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/slide-link-animation",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "ccac2d37cf4274e35a9fc515086397f20e60d19b",
+  "designDocPaths": [
+    "design-docs/specs/design-slide-link-animation.md",
+    "design-docs/specs/design-presentation.md",
+    "design-docs/specs/design-slide-area-copy-shapes.md",
+    "design-docs/user-qa/slide-link-animation.md"
+  ],
+  "evidenceRoot": "tmp/slk-s855",
+  "overviewPath": "impl-plans/active/slk-overview.md",
+  "reviewContext": {
+    "issueReference": "none: workflowInput; opus-terra-design-and-implement-review-loop-session-855 (design accepted at Step 3, comm-020082; plans accepted at Step 5, comm-020086)",
+    "userProblem": "Presentation mode shows one flat <img> per slide and cuts between slides. The same shape on several pages is unrelated separate elements, so slide changes cannot animate shared content (3Blue1Brown/Manim-style transitions).",
+    "requiredOutcomes": [
+      "Optional Visual.linkId (after componentKey) carried through IR types, validation, key order, JSONL and Yjs; documents without linkId round-trip byte-identical.",
+      "Duplicate page and Copy shapes from page give copies the source linkId (or the source id, also set on the source) in one undoable batch; every planPaste-based paste strips linkId.",
+      "Pure DOM-free planSlideTransition in packages/core/src/presentation returns a serialisable plan: transform/crossfade for uniquely linked same-type pairs, draw-on/grow/fade-in entrances, fade-out exits, staggered paint-order starts, ease-in-out; ambiguous or type-mismatched links do not pair; size mismatch or empty pages cut.",
+      "ui-solid runner executes the plan with the Web Animations API over inline SVG with per-SVG scoped def ids; next/prev animate, jumps cut, reduced motion is instant, cancellation leaves no stale layer and the final slide is always currentSlide(state).",
+      "Inspector 'Slide link' section shows 'Linked on N pages', Unlink, and 'Apply to linked shapes' (style, optional slide-relative geometry) as single undo steps using replaceVisual only.",
+      "No new Command kind; packages/core/src/commands.ts and svg-export unchanged; mise run lint and mise run verify pass."
+    ],
+    "nonGoals": [
+      "Morphing between different shape types",
+      "Glyph-outline text writing",
+      "Per-shape animation settings UI",
+      "In-slide build steps",
+      "Video export",
+      "LaTeX/math",
+      "Document-level transition duration setting (constants are used)",
+      "Animating goto/first/last jumps",
+      "Linking on clipboard paste to another page (user-qa Q1 default)",
+      "Fixing pre-existing noUncheckedIndexedAccess baseline diagnostics"
+    ],
+    "constraints": [
+      "Phase 1 only; nodetto-app public repo; no server, auth, deployment code, Rust, or new dev dependencies.",
+      "Do not name the field 'group id'.",
+      "Strict TypeScript, no any, and no new diagnostics under noUncheckedIndexedAccess in feature-owned files (strict-index gate from slk-00 against baseline ccac2d3).",
+      "New CSS uses existing theme tokens only (slk-07 adds no colours or tokens).",
+      "Workers run no state-changing git commands; each plan edits only its writePaths and its own progress file; workspace-wide lint/verify gates run only in serial slk-07.",
+      "mise run verify gets up to 3 attempts for deadline tests under load; deadlines are never relaxed.",
+      "No push; commits stay local on feat/slide-link-animation; no tool attribution in commit messages; no emojis."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "linkId lives at Element.visual.linkId right after componentKey.",
+        "rationale": "visual is already carried generically by JSONL and the Yjs binding, so only IR types/validate/keyOrder change and legacy documents stay byte-identical (design 2.1-2.3)."
+      },
+      {
+        "decision": "Strip linkId centrally in planPaste and add links only via a PasteOptions.linkIds map from planPageElementsCopy, with source updateVisual commands placed before creates.",
+        "rationale": "All paste/duplicate/component paths go through planPaste, so one strip covers them; updateVisual undo restores the exact visual in one step (design 3.1-3.3)."
+      },
+      {
+        "decision": "Planner is pure over Store + registry and emits a JSON-serialisable SlideTransitionPlan; ui-solid only executes it.",
+        "rationale": "Unit-testable without DOM, mirrors prototype smartPlan duplicate-key exclusion (design 4.1-4.2)."
+      },
+      {
+        "decision": "Runner wraps animated nodes in transform-box view-box wrappers and scopes SVG ids per inlined SVG with scopeSvgIds.",
+        "rationale": "Two slides coexist in one DOM without def-id collisions and node transforms are never overwritten (design 5.1-5.5)."
+      },
+      {
+        "decision": "Add a strict-index gate script (slk-00) instead of enabling noUncheckedIndexedAccess repo-wide.",
+        "rationale": "The repo already has baseline diagnostics at ccac2d3; the gate fails only on new diagnostics in listed feature files, captured from a per-invocation extracted tree removed in finally (design 9.1, Step 5 SLK-PLAN-001)."
+      },
+      {
+        "decision": "Checkpoint: slk-00 biome verification uses --no-errors-on-unmatched.",
+        "rationale": "biome.json files.include does not cover .agents/scripts, so biome 1.9.4 would otherwise exit nonzero with no processed files; the plan requires the step to exit 0. slk-07 strict union command is expanded to the concrete file list from the plan, including slk-03 pre-authorised tests (existing files pass when unchanged)."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Linked shapes of different types fall back to fade-out plus entrance instead of morphing.",
+      "Edits to linked shapes stay independent per page; propagation is explicit via 'Apply to linked shapes'.",
+      "Strict gate keys diagnostics by (path, code, message) without line numbers.",
+      "slk-00 (163 lines) and slk-05 (179 lines) exceed the ~150-line guideline for pitfall detail.",
+      "Animation visual quality can only be judged in a real WebView."
+    ],
+    "supportedEdgeCases": [
+      "Duplicate linkId on one page is ambiguous and never matched; outgoing copy fades out, incoming copies enter.",
+      "Source already carrying linkId keeps it and gets no updateVisual.",
+      "Rapid next/next cancels the first layer and plans from the first target to the second.",
+      "Toggle black, exit, digits, revision change during a transition.",
+      "Reverse navigation pairs the same elements with from/to swapped.",
+      "Slide size mismatch or both pages empty -> cut; one empty page -> only fade-outs or only entrances.",
+      "Groups are never step targets; their children are planned; hidden/mask-source/prototype-edge elements are skipped.",
+      "Grow steps remove markers and restore them via onFinish on finish or cancel."
+    ],
+    "outOfScopeEdgeCases": [
+      "Cross-type morphing",
+      "Text glyph writing animations",
+      "Animated goto/first/last jumps",
+      "Per-document transition timing"
+    ],
+    "sourcePaths": [
+      "packages/core/src/presentation",
+      "packages/ui-solid/src/presentation",
+      "packages/ui-solid/src/canvas/SlideAreaOverlay.tsx",
+      "packages/core/src/svg-export/document.ts",
+      "packages/core/src/prototype.ts",
+      "packages/ui-solid/src/prototype-transition.ts",
+      "packages/core/src/editor/pages.ts",
+      "packages/core/src/clipboard.ts",
+      "packages/ir/src/types.ts",
+      "packages/ir/src/validate.ts",
+      "packages/ir/src/keyOrder.ts",
+      "packages/io/src/jsonl",
+      "packages/collab/src/ydoc.ts",
+      "packages/ui-solid/src/Inspector.tsx",
+      "packages/core/src/commands.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "slk-00-strict-index-gate",
+      "planPath": "impl-plans/active/slk-00-strict-index-gate.md",
+      "progressPath": "impl-plans/progress/slk-00-strict-index-gate.md",
+      "dependsOn": [],
+      "writePaths": [
+        ".agents/scripts/strict-index-gate.ts",
+        ".agents/scripts/strict-index-gate.test.ts",
+        "impl-plans/progress/slk-00-strict-index-gate.md",
+        "tmp/slk-s855/slk-00-strict-index-gate",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "capture-baseline and check behave as specified; tests cover every fail rule.",
+        "target/strict-index/baseline.log, .exit and .ref exist and .ref is the full SHA of ccac2d3.",
+        "After capture no *.test.ts file and no base-tree-* directory exists under target/strict-index, and the real node_modules is intact.",
+        "No file outside writePaths changed."
+      ],
+      "verification": [
+        "bun test ./.agents/scripts/strict-index-gate.test.ts",
+        "bunx biome check --diagnostic-level=warn --no-errors-on-unmatched .agents/scripts/strict-index-gate.ts .agents/scripts/strict-index-gate.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref ccac2d3 --out target/strict-index/baseline.log",
+        "test -z \"$(find target/strict-index -name '*.test.ts' -print -quit)\"",
+        "test -z \"$(find target/strict-index -maxdepth 1 -name 'base-tree-*' -print -quit)\"",
+        "test -d node_modules/.bin && test -d packages/core/node_modules"
+      ]
+    },
+    {
+      "planId": "slk-01-link-field",
+      "planPath": "impl-plans/active/slk-01-link-field.md",
+      "progressPath": "impl-plans/progress/slk-01-link-field.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/types.ts",
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/keyOrder.ts",
+        "packages/ir/src/link-id.test.ts",
+        "packages/io/src/jsonl/link-id.test.ts",
+        "packages/collab/src/link-id.test.ts",
+        "impl-plans/progress/slk-01-link-field.md",
+        "tmp/slk-s855/slk-01-link-field",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Visual.linkId?: string is declared right after componentKey, validated as an optional non-empty string, and ordered right after componentKey in keyOrder.",
+        "git diff --stat ccac2d3 -- packages/io/src packages/collab/src shows only the two new test files.",
+        "linkId round-trips through JSONL and the Yjs binding; documents without linkId round-trip byte-identical.",
+        "All listed tests pass; golden suites unchanged."
+      ],
+      "verification": [
+        "bun test packages/ir packages/io packages/collab",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ir/src/types.ts packages/ir/src/validate.ts packages/ir/src/keyOrder.ts packages/ir/src/link-id.test.ts packages/io/src/jsonl/link-id.test.ts packages/collab/src/link-id.test.ts"
+      ]
+    },
+    {
+      "planId": "slk-02-transition-contract",
+      "planPath": "impl-plans/active/slk-02-transition-contract.md",
+      "progressPath": "impl-plans/progress/slk-02-transition-contract.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/presentation/slide-transition-types.ts",
+        "packages/core/src/presentation/slide-transition-types.test.ts",
+        "packages/core/src/presentation/index.ts",
+        "impl-plans/progress/slk-02-transition-contract.md",
+        "tmp/slk-s855/slk-02-transition-contract",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All pinned names (SlideViewBox, SlideBox, SlideAppearance, SlideStepKind, SlideTransitionStep, SlideTransitionPlan, timing constants, staggerStart, scopeSvgIds, svgViewBox) are exported from @nodetto/core.",
+        "staggerStart, scopeSvgIds and svgViewBox tests pass, including disjoint scoped id sets and resolvable references on a real renderPageSvg export.",
+        "git diff ccac2d3 -- packages/core/src/svg-export is empty."
+      ],
+      "verification": [
+        "bun test packages/core/src/presentation",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/presentation/slide-transition-types.ts packages/core/src/presentation/slide-transition-types.test.ts packages/core/src/presentation/index.ts"
+      ]
+    },
+    {
+      "planId": "slk-03-copy-links",
+      "planPath": "impl-plans/active/slk-03-copy-links.md",
+      "progressPath": "impl-plans/progress/slk-03-copy-links.md",
+      "dependsOn": ["slk-00-strict-index-gate", "slk-01-link-field"],
+      "writePaths": [
+        "packages/core/src/clipboard.ts",
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/copy-page-elements.test.ts",
+        "packages/core/src/link-id-copy.test.ts",
+        "packages/core/src/pages.test.ts",
+        "packages/core/src/duplicate-slide-origin.test.ts",
+        "apps/cli/src/pages-command.test.ts",
+        "packages/collab/src/binding.test.ts",
+        "packages/collab/src/binding-pages-artboards.test.ts",
+        "impl-plans/progress/slk-03-copy-links.md",
+        "tmp/slk-s855/slk-03-copy-links",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Copy shapes from page and Duplicate page link copies to sources (source linkId or source id set on the source) and one undo restores both pages.",
+        "Same-page duplicate, clipboard paste to another page and component instances carry no linkId.",
+        "git diff ccac2d3 -- packages/core/src/commands.ts packages/core/src/editor/paste.ts packages/core/src/editor/components.ts is empty.",
+        "The strict-index gate exits 0 for the owned files."
+      ],
+      "verification": [
+        "bun test packages/core/src/copy-page-elements.test.ts packages/core/src/link-id-copy.test.ts packages/core/src/pages.test.ts packages/core/src/duplicate-slide-origin.test.ts packages/core/src/page-presentation-flag.test.ts packages/collab apps/cli/src/pages-command.test.ts",
+        "bun test packages/core",
+        "bun run typecheck",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref ccac2d3 --out target/strict-index/baseline.log",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slk-03-copy-links.log -- packages/core/src/clipboard.ts packages/core/src/editor/pages.ts packages/core/src/link-id-copy.test.ts packages/core/src/copy-page-elements.test.ts",
+        "bunx biome check --diagnostic-level=warn packages/core/src/clipboard.ts packages/core/src/editor/pages.ts packages/core/src/copy-page-elements.test.ts packages/core/src/link-id-copy.test.ts packages/core/src/pages.test.ts packages/core/src/duplicate-slide-origin.test.ts apps/cli/src/pages-command.test.ts packages/collab/src/binding.test.ts packages/collab/src/binding-pages-artboards.test.ts"
+      ]
+    },
+    {
+      "planId": "slk-04-transition-planner",
+      "planPath": "impl-plans/active/slk-04-transition-planner.md",
+      "progressPath": "impl-plans/progress/slk-04-transition-planner.md",
+      "dependsOn": ["slk-00-strict-index-gate", "slk-01-link-field", "slk-02-transition-contract"],
+      "writePaths": [
+        "packages/core/src/presentation/slide-transition.ts",
+        "packages/core/src/presentation/slide-transition.test.ts",
+        "packages/core/src/presentation/index.ts",
+        "impl-plans/progress/slk-04-transition-planner.md",
+        "tmp/slk-s855/slk-04-transition-planner",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Every planner rule (plannable filter, cut reasons, link keys and ambiguity, pairing kinds, entrance kinds, timing, step order) is covered by a passing test.",
+        "Plans are JSON-stable and reverse navigation swaps from/to.",
+        "planSlideTransition is exported from @nodetto/core.",
+        "The strict-index gate exits 0 for the owned files."
+      ],
+      "verification": [
+        "bun test packages/core/src/presentation",
+        "bun run typecheck",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref ccac2d3 --out target/strict-index/baseline.log",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slk-04-transition-planner.log -- packages/core/src/presentation/slide-transition.ts packages/core/src/presentation/slide-transition.test.ts packages/core/src/presentation/index.ts",
+        "bunx biome check --diagnostic-level=warn packages/core/src/presentation/slide-transition.ts packages/core/src/presentation/slide-transition.test.ts packages/core/src/presentation/index.ts"
+      ]
+    },
+    {
+      "planId": "slk-05-transition-runner",
+      "planPath": "impl-plans/active/slk-05-transition-runner.md",
+      "progressPath": "impl-plans/progress/slk-05-transition-runner.md",
+      "dependsOn": ["slk-00-strict-index-gate", "slk-02-transition-contract"],
+      "writePaths": [
+        "packages/ui-solid/src/presentation/transition-keyframes.ts",
+        "packages/ui-solid/src/presentation/transition-keyframes.test.ts",
+        "packages/ui-solid/src/presentation/transition-dom.ts",
+        "packages/ui-solid/src/presentation/transition-dom.test.ts",
+        "packages/ui-solid/src/presentation/transition-runner.ts",
+        "packages/ui-solid/src/presentation/transition-runner.test.ts",
+        "packages/ui-solid/src/presentation/TransitionLayer.tsx",
+        "packages/ui-solid/src/presentation/slide-render.ts",
+        "packages/ui-solid/src/presentation/slide-render.test.ts",
+        "impl-plans/progress/slk-05-transition-runner.md",
+        "tmp/slk-s855/slk-05-transition-runner",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Keyframe, DOM preparation, runner and slide-render tests pass; controller.test.ts and slide-clip.test.ts pass unchanged.",
+        "Runner cancels cleanly, stale plays never report finished, and every job onFinish runs exactly once on finish or cancel.",
+        "git diff ccac2d3 -- packages/ui-solid/src/presentation/controller.ts packages/ui-solid/src/presentation/PresentationView.tsx is empty.",
+        "The strict-index gate exits 0 for the owned files."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/presentation",
+        "bun run typecheck",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref ccac2d3 --out target/strict-index/baseline.log",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slk-05-transition-runner.log -- packages/ui-solid/src/presentation/transition-keyframes.ts packages/ui-solid/src/presentation/transition-keyframes.test.ts packages/ui-solid/src/presentation/transition-dom.ts packages/ui-solid/src/presentation/transition-dom.test.ts packages/ui-solid/src/presentation/transition-runner.ts packages/ui-solid/src/presentation/transition-runner.test.ts packages/ui-solid/src/presentation/TransitionLayer.tsx packages/ui-solid/src/presentation/slide-render.ts packages/ui-solid/src/presentation/slide-render.test.ts",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/presentation/transition-keyframes.ts packages/ui-solid/src/presentation/transition-keyframes.test.ts packages/ui-solid/src/presentation/transition-dom.ts packages/ui-solid/src/presentation/transition-dom.test.ts packages/ui-solid/src/presentation/transition-runner.ts packages/ui-solid/src/presentation/transition-runner.test.ts packages/ui-solid/src/presentation/TransitionLayer.tsx packages/ui-solid/src/presentation/slide-render.ts packages/ui-solid/src/presentation/slide-render.test.ts"
+      ]
+    },
+    {
+      "planId": "slk-06-link-inspector",
+      "planPath": "impl-plans/active/slk-06-link-inspector.md",
+      "progressPath": "impl-plans/progress/slk-06-link-inspector.md",
+      "dependsOn": ["slk-00-strict-index-gate", "slk-01-link-field"],
+      "writePaths": [
+        "packages/ui-solid/src/inspector/slide-link-edits.ts",
+        "packages/ui-solid/src/inspector/slide-link-edits.test.ts",
+        "packages/ui-solid/src/inspector/SlideLinkSection.tsx",
+        "impl-plans/progress/slk-06-link-inspector.md",
+        "tmp/slk-s855/slk-06-link-inspector",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "linkedPages, planUnlink and planApplyToLinked tests pass, including one-undo restore across two pages.",
+        "Only replaceVisual commands are emitted.",
+        "The strict-index gate exits 0 for the owned files."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/inspector/slide-link-edits.test.ts",
+        "bun run typecheck",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref ccac2d3 --out target/strict-index/baseline.log",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slk-06-link-inspector.log -- packages/ui-solid/src/inspector/slide-link-edits.ts packages/ui-solid/src/inspector/slide-link-edits.test.ts packages/ui-solid/src/inspector/SlideLinkSection.tsx",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/inspector/slide-link-edits.ts packages/ui-solid/src/inspector/slide-link-edits.test.ts packages/ui-solid/src/inspector/SlideLinkSection.tsx"
+      ]
+    },
+    {
+      "planId": "slk-07-wiring",
+      "planPath": "impl-plans/active/slk-07-wiring.md",
+      "progressPath": "impl-plans/progress/slk-07-wiring.md",
+      "dependsOn": [
+        "slk-00-strict-index-gate",
+        "slk-03-copy-links",
+        "slk-04-transition-planner",
+        "slk-05-transition-runner",
+        "slk-06-link-inspector"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/presentation/controller.ts",
+        "packages/ui-solid/src/presentation/PresentationView.tsx",
+        "packages/ui-solid/src/presentation/Presentation.css",
+        "packages/ui-solid/src/presentation/controller-transition.test.ts",
+        "packages/ui-solid/src/Inspector.tsx",
+        "packages/ui-solid/src/index.ts",
+        "packages/core/src/index.ts",
+        "docs/editing.md",
+        "README.md",
+        "impl-plans/progress/slk-07-wiring.md",
+        "tmp/slk-s855/slk-07-wiring",
+        "target"
+      ],
+      "sharedPaths": [
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/link-id.test.ts",
+        "packages/io/src/jsonl/link-id.test.ts",
+        "packages/collab/src/link-id.test.ts",
+        "packages/core/src/presentation/slide-transition-types.ts",
+        "packages/core/src/presentation/slide-transition-types.test.ts"
+      ],
+      "sharedPathNotes": [
+        {"path": "packages/ir/src/validate.ts", "intendedEdit": "Only to fix a diagnostic the strict-index union gate attributes to this file; no behaviour change."},
+        {"path": "packages/ir/src/link-id.test.ts", "intendedEdit": "Only to fix a strict-index union gate diagnostic; keep test intent."},
+        {"path": "packages/io/src/jsonl/link-id.test.ts", "intendedEdit": "Only to fix a strict-index union gate diagnostic; keep test intent."},
+        {"path": "packages/collab/src/link-id.test.ts", "intendedEdit": "Only to fix a strict-index union gate diagnostic; keep test intent."},
+        {"path": "packages/core/src/presentation/slide-transition-types.ts", "intendedEdit": "Only to fix a strict-index union gate diagnostic; no contract or behaviour change."},
+        {"path": "packages/core/src/presentation/slide-transition-types.test.ts", "intendedEdit": "Only to fix a strict-index union gate diagnostic; keep test intent."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Every verification command exits 0 (mise run verify may take up to 3 attempts for deadline tests; deadlines never relaxed).",
+        "Next/prev animate per design 6.1; reduced motion and goto/first/last jumps switch instantly; cancellation leaves no layer and no transitioning class.",
+        "The Slide link inspector section is mounted; docs/editing.md and README.md describe slide links and animated transitions.",
+        "packages/core/src/commands.ts and packages/core/src/svg-export are unchanged from ccac2d3."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/presentation packages/core/src/presentation",
+        "bun test packages/ir packages/io packages/collab packages/core/src/presentation packages/core/src/copy-page-elements.test.ts packages/ui-solid/src/presentation",
+        "bun run typecheck",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref ccac2d3 --out target/strict-index/baseline.log",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/slk-07-union.log -- packages/ir/src/types.ts packages/ir/src/validate.ts packages/ir/src/keyOrder.ts packages/ir/src/link-id.test.ts packages/io/src/jsonl/link-id.test.ts packages/collab/src/link-id.test.ts packages/core/src/presentation/slide-transition-types.ts packages/core/src/presentation/slide-transition-types.test.ts packages/core/src/presentation/index.ts packages/core/src/clipboard.ts packages/core/src/editor/pages.ts packages/core/src/link-id-copy.test.ts packages/core/src/copy-page-elements.test.ts packages/core/src/pages.test.ts packages/core/src/duplicate-slide-origin.test.ts apps/cli/src/pages-command.test.ts packages/collab/src/binding.test.ts packages/collab/src/binding-pages-artboards.test.ts packages/core/src/presentation/slide-transition.ts packages/core/src/presentation/slide-transition.test.ts packages/ui-solid/src/presentation/transition-keyframes.ts packages/ui-solid/src/presentation/transition-keyframes.test.ts packages/ui-solid/src/presentation/transition-dom.ts packages/ui-solid/src/presentation/transition-dom.test.ts packages/ui-solid/src/presentation/transition-runner.ts packages/ui-solid/src/presentation/transition-runner.test.ts packages/ui-solid/src/presentation/TransitionLayer.tsx packages/ui-solid/src/presentation/slide-render.ts packages/ui-solid/src/presentation/slide-render.test.ts packages/ui-solid/src/inspector/slide-link-edits.ts packages/ui-solid/src/inspector/slide-link-edits.test.ts packages/ui-solid/src/inspector/SlideLinkSection.tsx packages/ui-solid/src/presentation/controller.ts packages/ui-solid/src/presentation/PresentationView.tsx packages/ui-solid/src/presentation/controller-transition.test.ts packages/ui-solid/src/Inspector.tsx packages/ui-solid/src/index.ts packages/core/src/index.ts",
+        "git diff --exit-code ccac2d3 -- packages/core/src/commands.ts packages/core/src/svg-export",
+        "mise run lint",
+        "mise run verify"
+      ]
+    }
+  ]
+}
