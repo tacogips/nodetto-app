@@ -1,0 +1,15 @@
+{
+  "name": "@nodetto/ui-solid",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@nodetto/core": "workspace:*",
+    "@nodetto/io": "workspace:*",
+    "@nodetto/ir": "workspace:*",
+    "solid-js": "^1.9.0"
+  }
+}
