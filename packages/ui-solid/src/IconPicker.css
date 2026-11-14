@@ -1,0 +1,22 @@
+.nodetto-icon-picker {
+  background: var(--nodetto-surface);
+  color: var(--nodetto-ink);
+  padding: 8px;
+}
+.nodetto-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  max-height: 320px;
+  overflow: auto;
+}
+.nodetto-icon-grid button {
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px;
+  cursor: pointer;
+}
+.nodetto-icon-grid button.selected,
+.nodetto-icon-grid button:focus-visible {
+  border-color: var(--nodetto-accent);
+}

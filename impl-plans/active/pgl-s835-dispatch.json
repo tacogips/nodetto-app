@@ -1,0 +1,176 @@
+{
+  "taskId": "pgl-s835",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-835",
+  "implementationBranch": "fix/open-page-active",
+  "baseBranch": "fix/open-page-active",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "4d11670e6f1075c29c074014516dadbbfdb118f3",
+  "evidenceRoot": "tmp/pgl-s835",
+  "designReferences": ["design-docs/specs/design-page-list.md"],
+  "designDocPaths": ["design-docs/specs/design-page-list.md"],
+  "acceptedDependencies": [
+    {
+      "planId": "pgl-01-page-actions",
+      "planPath": "impl-plans/active/pgl-01-page-actions.md",
+      "commit": "e59978764255657373f2059417fea339ffb67645",
+      "provides": [
+        "page-actions.ts: deletePagePrompt, canDeletePage, deletePageWithConfirm, duplicatePageAction, togglePagePresentation, pageMenuItems, PageMenuItem, PageMenuItemKey",
+        "PageTabs.tsx uses the helpers with a key-string-keyed menu. Accepted at integration review wave 001; the working-tree blobs are PageTabs.tsx c8888f6, page-actions.ts eb932f6 and page-actions.test.ts 93259c4."
+      ]
+    }
+  ],
+  "waves": [["pgl-02-page-list"], ["pgl-03-wiring"]],
+  "reconcile": {
+    "note": "Each wave has one plan, so no same-wave write clash is possible. The lockfile (bun.lock) is owned by pgl-02 alone. Workspace-wide lint, verify and build gates run in pgl-03 and in integration review."
+  },
+  "reviewContext": {
+    "issueReference": "none (no issue URL/number supplied; the runtime workflowInput of opus-terra-design-and-implement-review-loop-session-835 is authoritative; design accepted at step3 comm-019171; plans accepted at step5-impl-plan-review comm-019175; prior plan review finding PGL-PLAN-001 verified-fixed)",
+    "userProblem": "The desktop left pane has no page overview. Users need a collapsible Pages list with numbers, hidden markers, current-page highlight and the tab menu actions.",
+    "requiredOutcomes": [
+      "A collapsible 'Pages (N)' section in the left SidePane between ShapePalette and Layers. Its fold state persists as the pagesListOpen preference and is never stored in the document.",
+      "Rows show the 1-based number, the name and a hidden-in-presentation marker. The current row is highlighted and revealed on any page change.",
+      "Click, Enter and Space activate a row. Up/Down/Home/End move focus. F2 and double-click rename through pageRenameDraft.",
+      "A '...' button and context menu reuse page-actions.ts, extracted from PageTabs.tsx with identical behavior. A '+' button adds a page. Read-only hides editing actions.",
+      "DOM interaction tests cover all 8 design scenarios. docs/editing.md documents the Pages list."
+    ],
+    "constraints": [
+      "Add no core Command kind and no IR/JSONL field.",
+      "PageTabs behavior and the active-tab reveal stay unchanged.",
+      "Code must be noUncheckedIndexedAccess-safe.",
+      "gitPush is false and the output uses no emojis."
+    ],
+    "nonGoals": ["Drag-to-reorder in the list", "Changes to the global test preload or mise.toml"],
+    "designDecisionsAndRationale": [
+      {"decision": "Extract page-actions.ts from PageTabs.tsx with identical behavior; an axis option changes only the move labels.", "rationale": "Tabs and list cannot drift, and the intake forbids duplicating tab-menu logic (design section 2)."},
+      {"decision": "Use details/summary with the .nodetto-navigation-group style, as the Layers Comments section does.", "rationale": "It matches the existing collapsible style and gives native expanded state to assistive tech (design section 4)."},
+      {"decision": "Skip drag-to-reorder and offer Move up/Move down through editor.reorderPage.", "rationale": "pageTabDropAt hit-tests a horizontal strip only, and the intake allowed drag only if PageTabDrag could be reused as-is (design section 1)."},
+      {"decision": "The reveal sets only the row box's scrollTop through pageListRevealTop, which wraps pageTabRevealTarget.", "rationale": "page-tab-scroll.ts stays unchanged and the reveal never moves focus or scrolls outer panes (design sections 3-4)."},
+      {"decision": "Add an isolated DOM test lane (test-dom with happy-dom, run in a child process).", "rationale": "The existing preload compiles TSX with solid-js/h on the server build, so it cannot test reactive interactions (design sections 1 and 8.2)."},
+      {"decision": "Rows use For over a PageId string memo, and menus use For over key strings.", "rationale": "Focused nodes survive revision bumps (PGL-PLAN-001, verified-fixed)."},
+      {"decision": "Amendment 2026-11-11 round 1: authorize the pgl-02-page-list dependency install output (root node_modules plus seven workspace node_modules directories as writePaths and artifactRoots) for one audited `bun add --dev --exact` of happy-dom, @babel/core@7.29.7, babel-preset-solid@1.9.15 and @types/babel__core@7.20.5, and record pgl-01-page-actions as an acceptedDependency so pgl-02 has dependsOn [].", "rationale": "Blocked plan ids: pgl-02-page-list (reason blocked-wave-scope-or-contract, previousCheckpointCommit e599787, summary tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-835/wave-002/wave-summary.json). Resolved gap: no approved install location for the DOM test dependencies (node_modules/happy-dom was absent and bun install writes outside target and apps/desktop/dist). The install is audited in tmp/pgl-s835/pgl-02-page-list/toolchain.json. Wave 001 integration review accepted pgl-01-page-actions (21 pass, 0 fail; typecheck, biome and strict-index clean; logs under tmp/pgl-s835/reconcile-wave-001). The amendment review was accepted at step5-impl-plan-review comm-019194. Design, contracts, scenarios and plan IDs are unchanged."},
+      {"decision": "Amendment 2026-11-11 round 2: permit the observed bun.lock re-hoist of entities (7.0.1 at the top level for happy-dom@21.0.4, with parse5/entities nested at the unchanged 6.0.1 and identical sha512). The pgl-02 lockfile rule now allows only added entries, new root devDependencies, and integrity-preserving re-hoists. Any other change still causes a revert and a block. The install exit code must be captured as rc=$?, not via the zsh read-only status variable, and happy-dom is pinned to 21.0.4.", "rationale": "Blocked plan id: pgl-02-page-list (reason blocked-wave-scope-or-contract, amendmentRound 1 of max 2, previousCheckpointCommit 7fc4d85, summary tmp/opus-terra-waves/opus-terra-design-and-implement-review-loop-session-835/wave-003/wave-summary.json). Evidence: tmp/pgl-s835/pgl-02-page-list/install-diff.patch shows the only removed lockfile line is the top-level entities@6.0.1, re-added as parse5/entities@6.0.1 with the same integrity. In bun.lock, parse5@7.3.0 is the sole existing dependent of entities. No existing consumer's resolved version changes. The design, contracts, the 8 scenarios, plan IDs, writePaths and verification commands are unchanged. This is the final amendment round."}
+    ],
+    "supportedEdgeCases": [
+      "A single page: Delete and Copy shapes are disabled.",
+      "First or last page: Move up or Move down is disabled.",
+      "Deleting a page with elements asks for confirmation; a cancel refocuses the row.",
+      "Read-only, including a switch while a menu or rename is open: editing affordances are hidden, and an open menu or rename closes.",
+      "Folded list: no rows render and the reveal does nothing.",
+      "A legacy stored preference without pagesListOpen, or a non-boolean value, loads as true.",
+      "Undo/redo and collaborator changes update rows through signals.rev().",
+      "Modifier keys and IME composition are ignored by the row keyboard handler."
+    ],
+    "outOfScopeEdgeCases": [
+      "Drag-to-reorder rows vertically.",
+      "Real layout geometry of the reveal in DOM tests (happy-dom has no layout; it is helper-tested only).",
+      "Changes to the private sync Worker (no new Command kind is added)."
+    ],
+    "intentionalTradeoffs": [
+      "Reveal geometry is helper-tested only, because happy-dom does not compute layout.",
+      "Design plan pl-02 (preference) is merged into the wiring plan pgl-03, because the required field breaks App.tsx typecheck until App.tsx writes it."
+    ],
+    "residualRisks": ["The DOM harness feasibility under Bun 1.4.4 is proven only when pgl-02 runs."],
+    "sourcePaths": ["packages/ui-solid/src", "apps/desktop/src", "docs/editing.md", "README.md", "package.json", "bun.lock", "impl-plans"]
+  },
+  "plans": [
+    {
+      "planId": "pgl-02-page-list",
+      "planPath": "impl-plans/active/pgl-02-page-list.md",
+      "progressPath": "impl-plans/progress/pgl-02-page-list.md",
+      "wave": 1,
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "page-list.ts exports pageListRows, pageListVisibleRows, pageListKeyAction and pageListRevealTop, and page-list.test.ts covers them against a real Editor.",
+        "PageList.tsx (exporting PageListProps) renders the details section, the listbox rows, the menu built from pageMenuItems with the vertical axis, a '+' button, read-only gating, and a scrollTop-only reveal.",
+        "PageList.test.tsx runs test-dom/page-list.dom.tsx in a child process. It requires exit 0 and 'ok <name>' for rows, highlight, click, keyboard, fold, read-only, rename and menu.",
+        "The root bunfig.toml, mise.toml, PageTabs.tsx and page-tab-scroll.ts are unchanged, and package.json changes only devDependencies.",
+        "Rows render with For over a pageIds string memo (the PageTabs.tsx:325 pattern) and menu items with For over key strings or Index. The keyboard, click and rename DOM scenarios assert that the same focused node survives a revision change: Enter on row 2 keeps the row-2 node focused and ArrowDown then focuses row 3, and the rename input survives an unrelated editor change and keeps focus.",
+        "The dependency install (a single `bun add --dev --exact` from the repo root) changes only package.json devDependencies, bun.lock and the declared node_modules artifact roots. tmp/pgl-s835/pgl-02-page-list/toolchain.json records the bun version, the install command, exit code 0, the resolved happy-dom version, and the before and after hashes of bun.lock and package.json.",
+        "Round 2 lockfile rule: bun.lock changes are limited to added entries, new root devDependencies, and re-hoists in which every pre-existing dependent keeps its old version and integrity through a nested key. The pre-authorized case is entities: 7.0.1 at the top level for happy-dom, with parse5/entities kept at 6.0.1 and the same sha512. toolchain.json records installExitCode 0 (captured as rc=$?, never via the zsh status variable) and lockfileRehoists."
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/page-list.ts",
+        "packages/ui-solid/src/page-list.test.ts",
+        "packages/ui-solid/src/PageList.tsx",
+        "packages/ui-solid/src/PageList.css",
+        "packages/ui-solid/src/PageList.test.tsx",
+        "packages/ui-solid/src/test-dom/setup.ts",
+        "packages/ui-solid/src/test-dom/page-list.dom.tsx",
+        "packages/ui-solid/src/test-dom/bunfig.toml",
+        "package.json",
+        "bun.lock",
+        "impl-plans/progress/pgl-02-page-list.md",
+        "tmp/pgl-s835/pgl-02-page-list",
+        "target",
+        "apps/desktop/dist",
+        "node_modules",
+        "packages/ui-solid/node_modules",
+        "packages/core/node_modules",
+        "packages/io/node_modules",
+        "packages/ir/node_modules",
+        "packages/collab/node_modules",
+        "apps/desktop/node_modules",
+        "apps/cli/node_modules"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [
+        "target",
+        "apps/desktop/dist",
+        "node_modules",
+        "packages/ui-solid/node_modules",
+        "packages/core/node_modules",
+        "packages/io/node_modules",
+        "packages/ir/node_modules",
+        "packages/collab/node_modules",
+        "apps/desktop/node_modules",
+        "apps/cli/node_modules"
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/page-list.test.ts packages/ui-solid/src/PageList.test.tsx",
+        "bun run typecheck",
+        "bunx biome check packages/ui-solid/src/page-list.ts packages/ui-solid/src/page-list.test.ts packages/ui-solid/src/PageList.tsx packages/ui-solid/src/PageList.css packages/ui-solid/src/PageList.test.tsx packages/ui-solid/src/test-dom",
+        "bun test packages/ui-solid/src/page-actions.test.ts packages/ui-solid/src/page-rename.test.ts",
+        "mkdir -p tmp/pgl-s835/pgl-02-page-list && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/pgl-s835/pgl-02-page-list/strict-index.log 2>&1; ! grep 'error TS' tmp/pgl-s835/pgl-02-page-list/strict-index.log | grep -e 'page-list.ts' -e 'PageList.tsx' -e 'test-dom/'"
+      ]
+    },
+    {
+      "planId": "pgl-03-wiring",
+      "planPath": "impl-plans/active/pgl-03-wiring.md",
+      "progressPath": "impl-plans/progress/pgl-03-wiring.md",
+      "wave": 2,
+      "dependsOn": ["pgl-02-page-list"],
+      "acceptanceCriteria": [
+        "EditorPreferences.pagesListOpen defaults to true, round-trips false, and ignores non-boolean or legacy values (preferences.test.ts).",
+        "App.tsx mounts exactly one PageList between ShapePalette and Layers with open, onOpenChange and onCopyShapesFrom={openCopyShapes}, and persists pagesListOpen.",
+        "packages/ui-solid/src/index.ts exports PageList and PageListProps.",
+        "docs/editing.md has a Pages list paragraph under Page navigation, README.md mentions the Pages list, and impl-plans/README.md lists pgl-01..03.",
+        "bun run typecheck, mise run lint, mise run verify and bun run build all exit 0."
+      ],
+      "writePaths": [
+        "apps/desktop/src/settings/preferences.ts",
+        "apps/desktop/src/settings/preferences.test.ts",
+        "apps/desktop/src/App.tsx",
+        "packages/ui-solid/src/index.ts",
+        "docs/editing.md",
+        "README.md",
+        "impl-plans/README.md",
+        "impl-plans/progress/pgl-03-wiring.md",
+        "tmp/pgl-s835/pgl-03-wiring",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test apps/desktop/src/settings/preferences.test.ts packages/ui-solid/src/page-list.test.ts packages/ui-solid/src/PageList.test.tsx packages/ui-solid/src/page-actions.test.ts",
+        "bun run typecheck",
+        "mise run lint",
+        "mise run verify",
+        "bun run build",
+        "mkdir -p tmp/pgl-s835/pgl-03-wiring/final && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/pgl-s835/pgl-03-wiring/final/strict-index.log 2>&1; ! grep 'error TS' tmp/pgl-s835/pgl-03-wiring/final/strict-index.log | grep -v -e '\\.test\\.ts' -e '^apps/desktop/scripts/'"
+      ]
+    }
+  ]
+}

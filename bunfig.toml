@@ -1,0 +1,2 @@
+[test]
+preload = ["./packages/ui-solid/src/bun-test-jsx-preload.ts"]

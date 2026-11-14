@@ -1,0 +1,906 @@
+# Splitting the oversized editor, edit and parity sources
+
+Status: DESIGNED, 2026-10-31 (session 575). Base b52e4db "Derive the App
+Store build number from the app version". No GitHub issue; the request came
+as inline workflow input. This is a pure refactor. Behavior, CLI output, exit
+codes, JSONL bytes, export bytes and MCP responses do not change.
+
+Re-validated, 2026-10-31 (session 579) at 1b6b669 "Plan the split of the
+oversized editor, edit and parity sources". `git diff --stat b52e4db
+1b6b669` lists only this design, the three sms plans and the session-575
+manifest, so the source tree is the same as at b52e4db. Every b52e4db
+reference below (line counts, line numbers, commands 7 and 8) still holds.
+The session-575 run stopped before any code change because its dispatch
+manifest was wrong. The design was not the cause. The manifest rules
+under "Rollout constraints" fix that.
+
+Re-validated, 2026-10-31 (session 583) at 9ef8639 "Split the Editor facade
+into responsibility layers". That commit implemented sms-01 (section 1),
+but nobody reviewed it: the session-579 review branch failed with a
+provider error. `git diff --stat b52e4db 9ef8639 -- apps/cli/src/edit-command.ts
+apps/cli/src/native-parity.test.ts apps/cli/native/README.md
+packages/core/src/index.ts packages/core/src/editor/types.ts
+packages/core/src/editor/components.ts` prints nothing, so sections 2 and 3
+and the sms-02 and sms-03 line references still hold. Sections 1-4 and
+D1-D6 are reused unchanged. Session 583 changes only the following:
+
+- sms-01 gets a review and repair pass (section 1.4).
+- Command 3 is redefined so that native parity is verified only through
+  `mise run test-cli` (D9).
+- The evidence root moves to `tmp/source-module-split-s583/`.
+- Both earlier manifests are archived (D10).
+
+Re-validated, 2026-10-31 (session 589) at 9e6ccc7 "Record the session 583
+load-bound test-cli attempt for sms-01". `git diff --stat 9ef8639 9e6ccc7`
+lists only this design, `impl-plans/README.md`, the three sms plans, the
+session-583 manifest and the sms-01 progress log, so the source tree is
+the same as at 9ef8639. At 9e6ccc7, `editor.ts` has 267 lines, the facade
+files have the counts in section 1.4, `edit-command.ts` has 1372 lines,
+`native-parity.test.ts` has 1012 lines, and `grep -c '^nativeTest('` on it
+prints 17. Session 583 stopped at the sms-01 test-cli gate: 166 pass and
+6 fail, all deadline timeouts, at a load average of 87.94. Sections 1-4,
+D1-D10 and the plans are reused. Session 589 changes only the following:
+
+- Commands 1 and 2 run inside a three-attempt retry loop, and a CPU-time
+  regression check (command 10) is added (D11). No test deadline or
+  timeout changes.
+- The evidence root moves to `tmp/source-module-split-s589/`, and the
+  session-589 manifest replaces the session-583 manifest as the final
+  dispatch (D12).
+
+Re-validated, 2026-11-01 (session 598) at 99df8d4 "Split nodetto-cli edit
+into batch, apply and per-operation modules". sms-01 passed both
+independent reviews in session 589 and is done. 99df8d4 implemented
+sms-02 (section 2): `edit-command.ts` has 156 lines, and the largest
+module, `edit/batch.ts`, has 293. Its progress log records verify 2956
+pass, 25 skip, 0 fail and test-cli 183 pass, 0 fail, no skip, under
+`tmp/source-module-split-s589/sms-02-cli-edit/final/`. Nobody reviewed it.
+The run stopped on the binary-less collection check of command 3, which
+runs zero tests. `git diff --stat b52e4db 99df8d4 --
+apps/cli/src/native-parity.test.ts apps/cli/native/README.md mise.toml`
+prints nothing, so section 3 and every sms-03 line reference still hold.
+At 99df8d4, `grep -c '^nativeTest('` on the old file prints 17, and the
+17 test names are distinct single-line strings on the line after each
+`nativeTest(`. Between b52e4db and 99df8d4, the only changed test files
+are the two new section 2.4 files. Sections 1-4, D1-D12 and the plans are
+reused. Session 598 changes only the following:
+
+- The binary-less collection check is removed from command 3. A static
+  block count (command 4) and a test-name check (command 11) replace it
+  (D13).
+- sms-02 is reviewed and repaired, not implemented again (section 2.5,
+  D14).
+- sms-01 is not dispatched again. The session-598 manifest lists it as an
+  accepted dependency.
+- The evidence root moves to `tmp/source-module-split-s598/`. After the
+  final gates and reviews pass, all sms plans and all five
+  source-module-split manifests move to `impl-plans/completed/`
+  (command 12, D15).
+
+## Overview
+
+Three hand-written files are over 1000 lines:
+
+| File | Lines at b52e4db | Content |
+|---|---|---|
+| `packages/core/src/editor.ts` | 1926 | The `Editor` facade class (about 165 members) |
+| `apps/cli/src/edit-command.ts` | 1372 | `nodetto-cli edit`: operation parsing, the `Batch` class (about 870 lines), `applyBatch`, `editCommand`, `runOperations` |
+| `apps/cli/src/native-parity.test.ts` | 1012 | 17 `nativeTest` blocks plus the shared `compare` harness |
+
+Each one is split into modules named for their responsibility. After the
+split, no file in these areas is over 700 lines and no file name has a
+numeric suffix or part number. No other hand-written file outside
+`examples/` is over 1000 lines. `packages/core/src/bpmn/notation.ts` (970
+lines) and `packages/io/src/bpmn` are out of scope.
+
+## Invariants
+
+- `@nodetto/core` has one entry point, `packages/core/src/index.ts`. That
+  file does not change. `Editor` and the types it re-exports
+  (`ApplyOptions`, `BpmnEditResult`, `CreateElementOptions`,
+  `CreatePageOptions`, `EditableField`, `EditorListener`, `EditorOptions`,
+  `StylePatch`) are still exported from `packages/core/src/editor.ts`, so
+  existing deep imports of that path keep working. The private
+  nodetto-cloud submodule consumer is one such case.
+- Every public method, accessor and property of `Editor` keeps its name,
+  parameters, defaults and return type. `new Editor(options?: EditorOptions)`
+  is unchanged. The instance's own enumerable properties (`Object.keys(new
+  Editor())`) keep the same names in the same order.
+- `apps/cli/src/edit-command.ts` stays the entry point. It still exports
+  the values `parseOperations`, `deepMerge`, `applyBatch`, `editCommand`,
+  `runOperations` and `EXIT_CONTENDED`, and the types `EditWarning` and
+  `RunOptions`. Re-exports are allowed. `commands.ts`, `draw-command.ts`
+  and `ai-commands.test.ts` do not change.
+- Inside each operation, operations, refs, warnings and errors keep their
+  order. The error message for every failure path stays the same,
+  including which check fails first.
+- Every existing test name and assertion is kept. The 17 native parity
+  blocks only move into new files.
+- New modules have no module-level side effects other than constant
+  definitions. Code moves as written: no regex splitting of long strings,
+  no new recursion, and no per-operation closures or handler tables that
+  the old code did not have. The native CLI runs this code in Boa.
+- Moved and new code under `packages/core` type-checks with
+  `noUncheckedIndexedAccess`, because the private cloud Worker compiles it
+  that way.
+
+## 1. Editor facade (`packages/core`)
+
+### 1.1 Why a class chain
+
+The `Editor` class is already a facade: most method bodies call a planner in
+`packages/core/src/editor/*.ts` (or another core module) and then
+`this.apply(...)`. What makes the file long is the number of public members,
+each with a multi-line signature and a doc comment. Turning the bodies into
+free-function calls would still leave about 165 signatures, more than 700
+lines. Patching methods onto `Editor.prototype` is not allowed either: it is
+a module-level side effect and it hides the methods from the type system.
+
+So the members are split across a single-inheritance chain of classes, one
+per responsibility. `Editor` is the last class in the chain. Inherited
+methods are public members of `Editor` with the same signatures, so every
+call site keeps working without a change.
+
+```text
+EditorCore            editor/facade/core.ts
+  <- ElementEditing   editor/facade/element-editing.ts
+  <- SelectionEditing editor/facade/selection-editing.ts
+  <- PageEditing      editor/facade/page-editing.ts
+  <- NotationEditing  editor/facade/notation-editing.ts
+  <- Editor           editor.ts
+```
+
+`packages/core/src/editor/facade/` holds only these chain classes. The
+planner modules in `packages/core/src/editor/*.ts` keep their names and
+their role: they compute command plans and do not apply them.
+
+### 1.2 Member placement
+
+Each class may use members of the classes above it in the chain, and never
+members of the classes below it. Line counts are estimates from the
+current bodies, including imports.
+
+| Class | Members | Est. lines |
+|---|---|---|
+| `EditorCore` | Every instance field, in today's declaration order (`assets`, `readonlyMode`, `openRevision`, `store`, `camera`, `selection`, `registry`, `history`, `clipboard`, `idSource`, `rng`, `rasterMaskSampler`, `shapeContextCache`, listener sets, `probe`, `pendingTop`, `pageId`, `pageViews`, `selectionAfterLoad`, `knownPageOrder`, `revisionCount`, `silenceHistory`, `requireAsset`). The constructor. `readOnly`/`setReadOnly`, `documentOpenRevision`, `revision`, `subscribe`, `onBpmnRejection`, `breadboardProbe`/`setBreadboardProbe`/`onBreadboardProbeChange`, `currentPageId`, `setCurrentPage`, `loadDocument`, `getSnapshot`. Transactions: `apply`, `reconcileDerivedState`, `undo`, `redo`, `canUndo`, `canRedo`, `beginBatch`, `endBatch`, `abortBatch`. Shape queries: `getShapeUtil`, `setRasterMaskSampler`, `createShapeContext`, `getBounds`, `getSelectionBounds`, `hitTest`, `nextIndex`, `buildElement`, `createElement`. Selection queries: `resolveSelectionTarget`, `selectAll`, `movableSelection`, `expandedSelection`. Protected helpers: `notify`, `applyPlan`, `rejectBpmn` | ~540 |
+| `ElementEditing` | Per-element commands by id: `reparentElement`, `connect`, `moveElements`, `resizeElement`, `deleteElements`, `editableField`, `getText`, `setText`, `setRichText`, `toggleTextMark` | ~230 |
+| `SelectionEditing` | Commands on the current selection: `deleteSelection`, `copySelection`, `cutSelection`, `canPaste`, `paste`, `duplicateSelection`, `reorderSelection`, `bringToFront`, `bringForward`, `sendBackward`, `sendToBack`, `nudgeSelection`, `groupSelection`, `booleanSelection`, `flattenBooleanSelection`, `frameSelection`, `canFrameSelection`, `ungroupSelection`, `alignSelection`, `distributeSelection`, `arrangeLayout`, `arrangePage`, `matchSelectionSize`, `setSelectionStyle`, `setSelectionTextResize`; private `insertCopies` | ~400 |
+| `PageEditing` | Pages: `createPage`, `reorderPage`, `reorderPageTo`, `renamePage`, `setPageKind`, `setPageMode`, `setPageSqlDialect`, `setPageTokenMode`, `deletePage`, `duplicatePage`. Viewport: `pageBounds`, `zoomToFit`, `zoomToSelection`, `zoomIn`, `zoomOut`, `resetZoom`. SVG export: `exportPageSvg`, `exportArtboardSvg`, `exportSelectionSvg` | ~250 |
+| `NotationEditing` | Sequence: `moveSequenceElement`, `createSequenceParticipant`, `createSequenceActivation`. Typed connectors: `connectSmart`, `connectErdRelation`, `connectComponent`, `connectUseCase`, `createUmlPort`. BPMN: `connectBpmn`, `reconnectBpmnFlow`, `updateBpmnSemantic`, `addBpmnLane`. Breadboard: `createBreadboardPart`, `rotateBreadboardParts`, `updateBreadboardSemantic`, `annotateBreadboard`. PCB: `rotatePcbFootprints`, `addPcbTrack`, `addPcbVia` | ~270 |
+| `Editor` (`editor.ts`) | Components and responsive variants: `makeComponent`, `createComponentInstance`, `detachComponentInstance`, `resetComponentInstance`, `switchComponentVariant`, `updateComponentStructure`, `planComponentStructureUpdate`, `updateResponsiveStructure`, `reorderFrameMember`, `refreshComponentInstance`, `refreshResponsiveVariant`, `detachResponsiveVariant`, `resetComponentOverride`, `createResponsiveVariant`; private `rebuildComponentInstance`, `rebuildResponsiveVariant`. The `export type { ... } from "./editor/types.ts"` block | ~320 |
+
+The component members stay in `Editor` for two reasons:
+`rebuildResponsiveVariant` constructs `new Editor(...)`, and the component
+planners (`editor/components.ts`, `component-variants.ts`,
+`component-refresh.ts`, `component-overrides.ts`) take the full `Editor`
+type.
+
+### 1.3 Rules for the chain
+
+- Only `EditorCore` declares instance fields or a constructor. The project
+  compiles with `useDefineForClassFields: true`. Any field declared in a
+  subclass would be defined after the base constructor runs, would change
+  the own-property order, and would reset an inherited field to
+  `undefined`. `requireAsset`, an arrow-function field, therefore stays in
+  `EditorCore`.
+- A member that used to be `private` and is now used by a later class in the
+  chain becomes `protected`. A member used only inside its own class stays
+  `private`. Public members stay public. Private and protected members are
+  both hidden from callers, so the public surface does not change.
+- A member name is declared once in the chain. No class overrides a member,
+  and no class calls `super.`.
+- Import direction: only `editor.ts` and `editor/facade/*.ts` import a chain
+  class as a value, and each chain class imports only the class it extends.
+  Planner modules refer to chain classes only with `import type`. This keeps
+  `class X extends Y` from running before `Y` has been evaluated, in Bun
+  and in the bundled Boa engine.
+- Planner parameter types. A planner that a chain class calls with `this`
+  takes the lowest chain class that has every member it uses. Every
+  `Editor` is still accepted.
+  - `EditorCore`: `editor/paste.ts` (`planInsertCopies`),
+    `editor/pages.ts` (`planDuplicatePage`), `editor/sequence.ts` (all
+    planners), `editor/bpmn.ts` (`planBpmnLane`) and `editor/breadboard.ts`
+    (`buildBreadboardPart`). These use only `store`, `nextIndex`,
+    `buildElement`, `createShapeContext` and `currentPageId`.
+  - `NotationEditing`: `editor/connections.ts`. It calls `connect`,
+    `connectBpmn`, `connectComponent`, `connectErdRelation`,
+    `createElement`, `apply` and `readOnly`.
+  - `Editor`, unchanged: `editor/components.ts` and every planner outside
+    `editor/`.
+- Duplicate logic removed, with no change in behavior. In `Editor`, the
+  repeated "unlocked frame" guard (`store.get(id)`, then `type === "frame"`,
+  then `createShapeContext().isLocked?.(id)`) in `makeComponent`,
+  `detachComponentInstance` and `detachResponsiveVariant` becomes one
+  private helper. It runs the checks in the same order and short-circuits
+  the same way. The repeated `type === "frame" ? semantic as FrameSemantic`
+  lookup becomes one private helper as well. Nothing else is merged.
+  For example, `applyPlan` returns early when the editor is read-only and
+  plain `apply` does not, so the two are not interchangeable.
+- The pieces are moved without rewriting them. Comments and section
+  dividers move with their members.
+
+### 1.4 Review of the existing implementation (session 583)
+
+At 9ef8639, `editor.ts` has 267 lines and declares `class Editor extends
+NotationEditing`. It holds the private helpers `unlockedFrame` and
+`frameSemantic`. The facade files have these line counts: `core.ts` 531,
+`element-editing.ts` 226, `notation-editing.ts` 285, `page-editing.ts` 238
+and `selection-editing.ts` 397. The progress log
+`impl-plans/progress/sms-01-editor-facade.md` records that the gates
+passed in session 579: verify 2945 pass, 25 skip, 0 fail; test-cli 172
+pass, 0 fail; and the commands 5-9 checks. It also records a standalone
+parity rerun that timed out (D9).
+
+sms-01 is reviewed, not implemented again. The review looks at the diff
+`b52e4db..9ef8639` restricted to `packages/core/src` and
+`docs/development.md`, and checks each item in sections 1.2 and 1.3:
+
+- Member placement. Each member is in the class that the table in 1.2
+  names, and it is declared exactly once in the chain. No class overrides
+  a member and no class calls `super.`.
+- Fields. Only `EditorCore` declares fields and a constructor. The fields
+  keep the old declaration order, and `requireAsset` is the last field.
+- Visibility. A member is `protected` only when a later class in the chain
+  uses it.
+- Moved code. Each body is byte-identical to its b52e4db version, apart
+  from indentation and import changes. In the six retyped planners, only
+  the editor parameter's type annotation and its `import type` line differ
+  from b52e4db.
+- Deduplication. `unlockedFrame` runs the same checks in the same order as
+  the code it replaced and returns early in the same cases. So does
+  `frameSemantic`.
+- Imports and comments. Import direction follows command 9. The
+  `editor.ts` header comment and the `docs/development.md` paragraph say
+  what section 4 asks for.
+
+The review also checks test integrity. No test file under
+`packages/core`, `apps/` or `packages/ui-solid` changed between b52e4db
+and 9ef8639. The pass and skip counts equal the baseline recorded before
+the edit.
+
+A finding is fixed in place inside the sms-01 write paths. The fix must
+also follow sections 1.2 and 1.3. After a fix, the sms-01 gates are run
+again. If the review finds nothing, sms-01 makes no source edit, and its
+gates pass on the unchanged tree.
+
+Session 589. Session 583 ran the checks above as R1-R10 and recorded them
+in `impl-plans/progress/sms-01-editor-facade.md`, with evidence under
+`tmp/source-module-split-s583/sms-01-editor-facade/`. R1-R8 and R10
+passed. R9, the test-cli gate, failed with deadline timeouts under load.
+That was a self-check by the implementer, so it does not replace the
+independent review. sms-01 may reuse the session-583 evidence only after
+it shows that the 13 source hashes in `final-hashes.txt` still match. It
+then runs every sms-01 gate fresh under the session-589 evidence root.
+R9 is settled by commands 2, 3 and 10 as defined in section 5. If all
+three test-cli attempts fail, that is a failed gate and not load to be
+waived. The plan then stops and reports a blocker. The workflow's
+independent test-integrity and adversarial review then covers the same
+section 1.4 items.
+
+## 2. `nodetto-cli edit` (`apps/cli/src/edit-command.ts`)
+
+### 2.1 Modules
+
+| Module | Responsibility | Est. lines |
+|---|---|---|
+| `edit-command.ts` | Entry point. Header comment, `EDIT_OPTIONS`, `EDIT_FLAGS`, `EXIT_CONTENDED`, `MAX_ATTEMPTS`, `editCommand`, `RunOptions`, `runOperations` (read, apply, re-read and write, with retry while the file is contended). Re-exports `parseOperations`, `deepMerge`, `applyBatch` and `type EditWarning` | ~170 |
+| `edit/operation-input.ts` | `Json`, `JsonObject`, `OperationError`, `parseOperations`, `deepMerge`, `fillIds`, and the field readers `requireText` and `requireNumber` (today's `text` and `number`, renamed; same messages) | ~95 |
+| `edit/types.ts` | `Created`, `EditWarning`, `BatchResult`, `PageChangeCounts` | ~40 |
+| `edit/batch.ts` | `Batch`: the batch state (`refs`, `created`, `touchedPages`, `replaced`, `lastPlaced`), resolvers (`element`, `page`, `targets`, `shape`, `resolveReferences`), geometry (`boundsOf`, `moveBoxTo`), `record`, and `apply`. `apply` is the `op` switch: it calls one handler per case and keeps today's unknown-op error text | ~320 |
+| `edit/operations/pages.ts` | `add-page`, `move-page`, `rename-page`, `set-page-mode`, `delete-page`; `placePage`, `unknownMode` | ~140 |
+| `edit/operations/add.ts` | `add` by type, `addShape`, `addParticipant`, auto placement, `placeRelative`, `PLACE_GAP` | ~260 |
+| `edit/operations/connect.ts` | `connect`, including the ERD column patch and the label field choice | ~130 |
+| `edit/operations/elements.ts` | `append`/`remove-item`, `update`, `move`, `delete`, `scale`, `replace-text` | ~200 |
+| `edit/operations/groups.ts` | `group`, `ungroup` | ~50 |
+| `edit/apply-batch.ts` | `applyBatch`: parse, run the operations, attribute unknown fields, arrange, validate, warnings, page counts. Pure helpers: `unknownFieldKey` (today's `warningKey` closure), `countPageChanges` (today's inline `bump` loop), `issueLine` | ~190 |
+| `edit/report.ts` | `formatEditReport(result, path, dryRun, format)`: the JSON and text reports that `runOperations` returns through `ok(...)`, byte for byte | ~55 |
+
+### 2.2 Boundaries
+
+- A handler is a module-level function,
+  `(batch: Batch, operation: JsonObject, index: number) => void`, or `=> string`
+  when it returns the created id (`add` and `connect`). Handlers import
+  `Batch` with `import type` only. `batch.ts` imports the handlers as
+  values, so there is no runtime cycle. `connect.ts` and `add.ts` call
+  `addElement` directly, the way `this.add(...)` was called before.
+- Handlers can use the Batch members they call: `record`,
+  `resolveReferences`, `boundsOf`, `targets`, `shape`, `moveBoxTo` and
+  `lastPlaced` are no longer `private` (`lastPlaced` stays `readonly`).
+  Members that only `Batch` uses, such as `elementIds`, stay `private`.
+  `Batch` and the handlers are not exported from `edit-command.ts`.
+- `OperationError` is defined once, in `edit/operation-input.ts`. Every
+  `instanceof OperationError` check (`applyBatch`, `editCommand`,
+  `runOperations`) uses that class.
+- The stray first line, `import { connectScreenTransition } from
+  "@nodetto/core"`, moves to `edit/operations/connect.ts`.
+
+### 2.3 Duplicate logic removed
+
+All of these changes are behavior-neutral:
+
+- `add` and `connect` each repeat the body of `record` (ref uniqueness
+  check, `refs.set`, `created.push`, `touchedPages.add`), in the same order.
+  Both now call `batch.record(...)`. `add-page` keeps its own
+  `refs.set` without the uniqueness check, because routing it through
+  `record` would add an error case that does not exist today.
+- `isKnownElementType(t) ? getElementTypeDefinition(t) : undefined` is
+  repeated in `append`/`remove-item` and `update`. It becomes one local
+  `definitionOf` in `edit/operations/elements.ts`.
+- `applyBatch` formats issues as `${path ? `${path}: ` : ""}${message}` in
+  two places. Both now use `issueLine`; each site keeps its own indent and
+  join.
+
+### 2.4 Focused tests for extracted pure helpers
+
+These helpers used to be closures or inline code, tested only through
+`edit` runs. Each gets a focused test next to it:
+
+- `edit/apply-batch.test.ts`: `unknownFieldKey` (a matching path, a
+  non-matching path, an out-of-range element index) and
+  `countPageChanges` (added, updated, removed, unchanged, multiple pages).
+- `edit/report.test.ts`: `formatEditReport` text output (applied and dry
+  run, created with and without ref, replaced, warnings) and JSON output
+  (the `replaced` key is present only when the list is non-empty).
+
+Functions that were already standalone before the split (`fillIds`,
+`requireText`, `requireNumber`, `parseOperations`, `deepMerge`) only move.
+No test is added for them.
+
+### 2.5 Review of the existing implementation (session 598)
+
+sms-02 is reviewed, not implemented again. The two independent reviews
+(test integrity, adversarial) look at the diff `b52e4db..99df8d4`
+restricted to `apps/cli/src` and `docs/development.md`, and check:
+
+- Placement. Each symbol is in the module that the table in 2.1 names.
+  `edit-command.ts` keeps the order and exports listed in "Invariants".
+- Boundaries (2.2). Handlers import `Batch` only with `import type`.
+  `connect.ts` imports `addElement`, and `add.ts` does not import
+  `connect.ts`. `OperationError` is declared once, and every `instanceof`
+  check uses it. Only the members listed in 2.2 lost `private`.
+- Moved code. Each handler body matches its b52e4db `Batch` code, apart
+  from `this.` becoming `batch.`, the `text`/`number` renames and
+  indentation. Error messages, the order of checks, the `op` switch order
+  and the unknown-op text are unchanged.
+- Deduplication (2.3). `record` runs the same checks in the same order as
+  the inline code it replaced, at the same point in `add` and `connect`.
+  `add-page` still calls `refs.set` without the uniqueness check.
+  `definitionOf` and `issueLine` keep each site's wrappers, indents and
+  joins.
+- Reports. `formatEditReport` returns the same bytes as the old end of
+  `runOperations`, including JSON key order and the trailing newline.
+  `countPageChanges` iterates `after` first, then `before`.
+- Boa. No new recursion, regex splitting of long strings, handler table
+  or per-operation closure, and no module-level side effect.
+- Tests. The 11 tests of 2.4 exist, one `test(...)` per case. No other
+  test file changed between b52e4db and 99df8d4. The verify count rose by
+  exactly 11 (2945 to 2956), and the test-cli count rose by exactly 11
+  (172 to 183).
+- Documentation. The two `nodetto-cli edit` sentences at
+  `docs/development.md:32-33` say what section 4 asks for.
+
+A finding is fixed in place inside the sms-02 write paths, following
+sections 2.1-2.4. A repair that adds a test changes the expected counts by
+the number of tests added, and the plan records why. Whether or not a
+repair happened, sms-02 then runs its gates fresh under the session-598
+evidence root, on the tree as it stands at that moment. Its baselines are
+the session-589 final counts (verify 2956 pass, 25 skip; test-cli 183
+pass). If both reviews find nothing, sms-02 makes no source edit and its
+gates pass on the unchanged tree.
+
+## 3. Native parity tests (`apps/cli/src/native-parity.test.ts`)
+
+`apps/cli/src/native-parity.test.ts` is removed. Its content moves to
+`apps/cli/src/native-parity/`:
+
+| File | Content |
+|---|---|
+| `harness.ts` | Not a test file. Exports `binary`, `nativeTest` (`binary ? test : test.skip`), `compare`, `cliSrcDir` (the old `import.meta.dir`), `cliEntry` (the old module-level `source`, `main.ts`) and `fixtureRoot`. Constant definitions only: no file system access at import time |
+| `documents.test.ts` | Golden fixtures for validate, format and inspect; help, catalogue, DDL, layout, diff, errors and BPMN; `--cwd`; page aliases; the 20,000-point path. `goldenFixtures` (a `readdirSync` call) is defined here, because the first block's timeout reads it when the test is registered |
+| `drawing.test.ts` | `edit` with refs, arrangement, snapshots and rollback; state flow; flowchart; manual bends |
+| `export.test.ts` | SVG, PNG, PDF and HTML ZIP; Mermaid, D2 and Code panel outputs; the PNG last row and column, with its local `decodeRgbaPng` |
+| `pcb.test.ts` | Breadboard PCB archive, `pcb import` and `gerber`, `gerber import` |
+| `text-layout.test.ts` | The two text-layout lint blocks |
+
+That is 5 + 4 + 3 + 3 + 2 = 17 blocks. Names, bodies, timeouts and the
+order of blocks within each file stay the same. Paths that used
+`import.meta.dir` are rebuilt from `cliSrcDir` with the same relative
+suffix. `./__fixtures__/text-layout.ts` becomes
+`../__fixtures__/text-layout.ts`. Local variables named `source` stay as
+they are. `bun test apps/cli/src`, used by `mise run test-cli`, still finds
+every block. Each test name stays a single-line string on the line right
+after `nativeTest(`, so commands 4 and 11 can count and compare the blocks
+without running them.
+
+## 4. Documentation
+
+- `apps/cli/native/README.md`: the parity sentence points to
+  `apps/cli/src/native-parity/` (`harness.ts` and the topic files).
+- `docs/development.md` gets a short paragraph after "Layout". It describes
+  the `Editor` chain (`editor/facade/*`, with planners in `editor/*.ts`)
+  and the `edit` modules (`edit-command.ts`, `edit/`, `edit/operations/`).
+- Completed design records that mention `native-parity.test.ts` stay as
+  they are, because they describe work done before the split.
+- `impl-plans/README.md`: while the plans run, its "Active" section lists
+  the three sms plans and the session-598 manifest. When the plans are
+  archived (D15), the source-module-split paragraph leaves "Active" and a
+  "Completed" entry replaces it. The entry links the three plans under
+  `completed/` and names the five manifests with their roles: s575 never
+  dispatched, s579 stopped on a provider error, s583 stopped on load-bound
+  test-cli timeouts, s589 stopped on the zero-test collection check after
+  sms-01 passed review and sms-02 was implemented, and s598 is the final
+  dispatch. The progress logs stay in `progress/`. The links in the README
+  must resolve (command 12).
+- Session 598 does not edit `docs/development.md`. Its editor and edit
+  paragraphs (lines 26-33) already describe sections 1 and 2, and it does
+  not mention the parity test file. sms-03 edits only
+  `apps/cli/native/README.md`.
+
+## 5. Verification
+
+Every command below must exit 0 on a correct tree. Run them from the
+repository root. `$d` is the evidence directory of one gate run (section
+"Rollout constraints"). A plan that runs a gate set more than once (for
+example after the move, after deduplication, and at the end) gives each
+run its own `$d`, so no log is overwritten.
+
+1. `mise run verify`, load-tolerant (D11). This is one command that exits
+   0 on the first fully green attempt out of three:
+
+   ```sh
+   sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/verify-[123].log "$d/verify.log"; for i in 1 2 3; do BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > "$d/verify-$i.log" 2>&1 && cp "$d/verify-$i.log" "$d/verify.log" && exit 0; done; exit 1' sh "$d"
+   ```
+
+   `$d/verify.log` is a copy of the green attempt. Its bun summary has
+   ` 0 fail`, and its pass count is at least the baseline pass count plus
+   the focused tests added in section 2.4.
+2. `mise run test-cli`, load-tolerant (D11), in the same form:
+
+   ```sh
+   sh -c 'd="$1"; mkdir -p "$d" && rm -f "$d"/test-cli-[123].log "$d/test-cli.log"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > "$d/test-cli-$i.log" 2>&1 && cp "$d/test-cli-$i.log" "$d/test-cli.log" && exit 0; done; exit 1' sh "$d"
+   ```
+
+   `$d/test-cli.log` is a copy of the green attempt, with ` 0 fail` in its
+   bun summary. This builds `target/release/nodetto-cli`. The failed
+   attempts stay in `test-cli-1.log` and `test-cli-2.log` as evidence.
+   They are not waived. They are expected only when the machine is loaded,
+   and command 10 checks that separately.
+3. Native parity, redefined in session 583 (D9). Parity is verified only
+   through command 2; there is no separate parity run against the binary.
+   With `test-cli.log` as the green copy written by command 2:
+   - `grep -E '^ *0 fail$' test-cli.log` exits 0;
+   - `test -z "$(grep -E '^ *[1-9][0-9]* skip$' test-cli.log)"` exits 0;
+   - the ` N pass` value in `test-cli.log` equals the plan's test-cli
+     baseline plus the new test cases the plan added under `apps/cli/src`.
+     That is 172 at 9ef8639, plus the section 2.4 cases after sms-02.
+
+   Command 2 sets `NODETTO_CLI_TEST_BINARY`, so `nativeTest` is `test`, and
+   every collected parity block runs against `target/release/nodetto-cli`.
+   With no failures and no skips, every one of those blocks passed. That
+   the 17 blocks exist is checked statically by commands 4 and 11 (D13).
+   No command runs the parity tests without the binary: such a run only
+   skips, so it tests nothing.
+4. Block count, which does not run any test. Before sms-03 deletes the old
+   file:
+   `test "$(grep -c '^nativeTest(' apps/cli/src/native-parity.test.ts)" -eq 17`.
+   After sms-03 creates the topic files (before and after the deletion):
+   `test "$(cat apps/cli/src/native-parity/*.test.ts | grep -c '^nativeTest(')" -eq 17`.
+   sms-02 uses the combined form
+   `sh -c 'test "$(cat apps/cli/src/native-parity.test.ts apps/cli/src/native-parity/*.test.ts 2>/dev/null | grep -c "^nativeTest(")" -eq 17'`.
+   It is the old-file form during wave 1 and still exits 0 if the gate is
+   rerun on the final tree. The `sh -c` wrapper is required: zsh aborts on
+   the unmatched topic-file glob in wave 1 ("no matches found") before
+   `2>/dev/null` applies.
+5. File sizes:
+   `find packages/core/src/editor.ts packages/core/src/editor apps/cli/src/edit-command.ts apps/cli/src/edit apps/cli/src/native-parity -name '*.ts' -exec awk 'FNR == 701 { print FILENAME " exceeds 700 lines"; bad = 1 } END { exit bad }' {} +`,
+   and the facade files are much smaller:
+   `test "$(wc -l < packages/core/src/editor.ts)" -le 450 && test "$(wc -l < apps/cli/src/edit-command.ts)" -le 300`.
+6. No numbered file names:
+   `test -z "$(find packages/core/src/editor apps/cli/src/edit apps/cli/src/native-parity -name '*[0-9]*')"`,
+   and the old file is gone: `test ! -e apps/cli/src/native-parity.test.ts`.
+7. Export surface:
+   `git diff --exit-code b52e4dbe5509f739a3c1e996377ee2ac0e70059b -- packages/core/src/index.ts`
+   exits 0. A runtime comparison against the base commit also exits 0. It
+   extracts the base tree to a temporary directory outside the repository,
+   so `bun test` never collects it. Bun installs dependencies per workspace
+   package (for example `packages/core/node_modules/polygon-clipping`), so
+   each package's `node_modules` is symlinked into the extracted tree:
+
+   ```sh
+   base="$(mktemp -d)" && git archive b52e4dbe5509f739a3c1e996377ee2ac0e70059b packages apps/cli/src | tar -x -C "$base" && for d in packages/* apps/cli; do if [ -e "$d/node_modules" ]; then ln -s "$PWD/$d/node_modules" "$base/$d/node_modules"; fi; done && BASE="$base" bun -e '
+   const chain = (C) => { const s = new Set(); for (let p = C.prototype; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) for (const n of Object.getOwnPropertyNames(p)) if (n !== "constructor") s.add(n); return s; };
+   const keys = (m) => Object.keys(m).sort().join(",");
+   const coreBefore = await import(`${process.env.BASE}/packages/core/src/index.ts`);
+   const coreAfter = await import(`${process.cwd()}/packages/core/src/index.ts`);
+   const cliBefore = await import(`${process.env.BASE}/apps/cli/src/edit-command.ts`);
+   const cliAfter = await import(`${process.cwd()}/apps/cli/src/edit-command.ts`);
+   const missing = [...chain(coreBefore.Editor)].filter((n) => !chain(coreAfter.Editor).has(n));
+   const fields = (E) => Object.keys(new E()).join(",");
+   const problems = [
+     keys(coreBefore) !== keys(coreAfter) && "core value exports differ",
+     keys(cliBefore) !== keys(cliAfter) && "edit-command value exports differ",
+     missing.length > 0 && `Editor members missing: ${missing.join(",")}`,
+     fields(coreBefore.Editor) !== fields(coreAfter.Editor) && "Editor instance fields differ",
+   ].filter(Boolean);
+   if (problems.length) { console.error(problems.join("\n")); process.exit(1); }
+   console.log("export surface unchanged");
+   '
+   ```
+
+   The new private helpers can add prototype names. Only missing names fail
+   the check; TypeScript keeps the added names out of the public type. Type
+   exports are covered by `index.ts` being unchanged, by the unchanged
+   `export type` block in `editor.ts`, and by step 1's typecheck of every
+   dependent: the desktop app, `ui-solid`, the CLI and the tests.
+8. Strict index access for core code:
+   `test -z "$(bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess 2>&1 | grep -E '^packages/core/src/(editor\.ts|editor/)')"`.
+9. Runtime imports of chain modules follow section 1.3. The check
+   transpiles each file, which drops type-only imports, then scans the
+   runtime imports that remain. Biome wraps long imports over several
+   lines, so a line-based grep is not enough:
+
+   ```sh
+   bun -e '
+   const fs = require("node:fs");
+   const ts = new Bun.Transpiler({ loader: "ts" });
+   const js = new Bun.Transpiler({ loader: "js" });
+   const names = "(core|element-editing|selection-editing|page-editing|notation-editing)";
+   const viaDir = new RegExp(`facade/${names}\\.ts$`);
+   const local = new RegExp(`^\\./${names}\\.ts$`);
+   const allowed = {
+     "packages/core/src/editor/facade/core.ts": [],
+     "packages/core/src/editor/facade/element-editing.ts": ["./core.ts"],
+     "packages/core/src/editor/facade/selection-editing.ts": ["./element-editing.ts"],
+     "packages/core/src/editor/facade/page-editing.ts": ["./selection-editing.ts"],
+     "packages/core/src/editor/facade/notation-editing.ts": ["./page-editing.ts"],
+     "packages/core/src/editor.ts": ["./editor/facade/notation-editing.ts"],
+   };
+   const bad = [];
+   for (const file of new Bun.Glob("packages/core/src/**/*.ts").scanSync(".")) {
+     const inFacade = file.startsWith("packages/core/src/editor/facade/");
+     const runtime = js.scanImports(ts.transformSync(fs.readFileSync(file, "utf8"))).map((i) => i.path);
+     for (const path of runtime)
+       if ((viaDir.test(path) || (inFacade && local.test(path))) && !(allowed[file] ?? []).includes(path))
+         bad.push(`${file} -> ${path}`);
+   }
+   if (bad.length) { console.error(bad.join("\n")); process.exit(1); }
+   console.log("facade imports ok");
+   '
+   ```
+10. CPU-time regression check (D11). Run it right after command 2, with no
+    source edit in between, so `target/release/nodetto-cli` is built from
+    the plan's final tree. The reference binary is
+    `/opt/homebrew/bin/nodetto-cli`, version 0.8.5. Tag `v0.8.5` is
+    f033691, an ancestor of b52e4db, and `git diff --stat v0.8.5 b52e4db --
+    apps/cli/src apps/cli/native packages/core/src packages/io/src` prints
+    nothing, so it runs the same CLI source as b52e4db. One attempt
+    measures the `/usr/bin/time -p` user time of `validate`, `format` and
+    `inspect` on every `packages/io/src/__fixtures__/*.jsonl`, first with
+    the reference binary and then with the new one. `format` without
+    `--write` prints to stdout and does not touch the fixtures. An attempt
+    passes when the new user time is at most 1.15 times the reference user
+    time. The command exits 0 on the first passing attempt out of three:
+
+    ```sh
+    bash -c '
+    d="$1"; base="$2"; want="${3-}"; new=target/release/nodetto-cli
+    [ -z "$want" ] || "$base" --version | grep -qF "$want" || { echo "reference binary is not $want"; exit 1; }
+    user() { /usr/bin/time -p bash -c "for f in packages/io/src/__fixtures__/*.jsonl; do for a in validate format inspect; do \"$1\" \"\$a\" \"\$f\" > /dev/null 2>&1; done; done" 2>&1 > /dev/null | awk "\$1 == \"user\" { print \$2 }"; }
+    mkdir -p "$d" && rm -f "$d"/cpu-time-[123].log "$d/cpu-time.log"
+    for i in 1 2 3; do
+      b="$(user "$base")"; n="$(user "$new")"
+      echo "attempt $i: reference $base user $b s; new $new user $n s" > "$d/cpu-time-$i.log"
+      awk -v b="$b" -v n="$n" "BEGIN { exit !(b > 0 && n > 0 && n <= b * 1.15) }" && cp "$d/cpu-time-$i.log" "$d/cpu-time.log" && exit 0
+    done
+    exit 1' bash "$d" /opt/homebrew/bin/nodetto-cli 0.8.5
+    ```
+
+    If `/opt/homebrew/bin/nodetto-cli` is missing or is not 0.8.5, the plan
+    builds the reference from b52e4db instead. It uses a `git worktree`
+    outside the repository, runs `mise run install` there and then
+    `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`, and
+    passes that worktree's `target/release/nodetto-cli` as the second
+    argument and no third argument, which skips the version check. The plan records which
+    reference it used. Session 583 measured about 42 s user time for both
+    binaries at 9ef8639, so a passing result is expected on a correct
+    tree. In session 589, sms-02 recorded `nodetto-cli 0.8.5` for the
+    reference and a ratio of 1.0655 (reference 20.62 s, new 21.97 s).
+11. Parity test names (session 598, D13), for sms-03 only. It does not run
+    any test. It compares the sorted name lines of the old file at 99df8d4
+    with those of the topic files, and requires 17 distinct names:
+
+    ```sh
+    sh -c 'd="$1"; mkdir -p "$d" && git show 99df8d4c050d0e37620477ab1a043ec2ef830524:apps/cli/src/native-parity.test.ts | grep -A1 "^nativeTest(" | grep "^  \"" | sort > "$d/parity-names-before.txt" && cat apps/cli/src/native-parity/*.test.ts | grep -A1 "^nativeTest(" | grep "^  \"" | sort > "$d/parity-names-after.txt" && test "$(sort -u "$d/parity-names-before.txt" | wc -l)" -eq 17 && cmp "$d/parity-names-before.txt" "$d/parity-names-after.txt"' sh "$d"
+    ```
+
+    A lost, duplicated or renamed block makes `cmp` fail. At 99df8d4,
+    `git show 99df8d4:apps/cli/src/native-parity.test.ts | grep -A1
+    '^nativeTest(' | grep '^  "' | sort -u | wc -l` prints 17.
+12. Archive (session 598, D15). The orchestrator runs it after it has
+    moved the files and edited `impl-plans/README.md`. It is not a plan
+    gate. Each of these exits 0:
+    - `test -z "$(find impl-plans/active -name 'sms-*' -o -name 'source-module-split-*')"`;
+    - `sh -c 'for f in sms-01-editor-facade.md sms-02-cli-edit.md sms-03-native-parity.md source-module-split-s575-dispatch.json source-module-split-s579-dispatch.json source-module-split-s583-dispatch.json source-module-split-s589-dispatch.json source-module-split-s598-dispatch.json; do test -e "impl-plans/completed/$f" || exit 1; done'`;
+    - `test -e impl-plans/progress/sms-03-native-parity.md` (progress logs
+      stay in `progress/`);
+    - every relative Markdown link in `impl-plans/README.md` resolves
+      against `impl-plans/`:
+
+      ```sh
+      bun -e 'const fs = require("node:fs"); const t = fs.readFileSync("impl-plans/README.md", "utf8"); const bad = [...t.matchAll(/\]\(([^)#\s]+)\)/g)].map((m) => m[1]).filter((p) => !/^[a-z]+:/.test(p) && !fs.existsSync(`impl-plans/${p}`)); if (bad.length) { console.error(bad.join("\n")); process.exit(1); } console.log("links ok");'
+      ```
+
+Baselines are recorded before any edit, on the untouched tree. Each plan's
+first step runs `BUN_OPTIONS=--jsx-runtime=classic bun test > baseline.log
+2>&1` and keeps its ` N pass` / ` N skip` / ` 0 fail` lines. It also runs
+command 8. That command is expected to exit 0 at b52e4db, after f033691
+"Type the wide-range lookup for strict index access". If it does not, the
+plan stops and reports a blocker; it must not list a failing gate. The
+intake reports 17 native parity blocks at baseline. At 1b6b669, `grep -c
+'^nativeTest(' apps/cli/src/native-parity.test.ts` prints 17. The
+repo-wide `--noUncheckedIndexedAccess` error total (91 at 28c9ded) may be
+recorded in a progress log for reference. It is not a gate, because that
+command exits non-zero on the untouched tree. Command 8 is the gate.
+
+## Rollout constraints
+
+- Three plans in three serial waves (revised at plan creation, session
+  575). The plans own disjoint files, but their gates are coupled at run
+  time: plans share one working directory, every CLI test and the release
+  binary load `packages/core`, and the binary bundles `edit-command.ts`.
+  If two plans ran at once, one plan's half-finished edit could fail the
+  other plan's gate. Each plan therefore runs alone in its wave, so
+  repository-wide gates are valid for it:
+  1. `sms-01-editor-facade`: `packages/core/src/editor.ts`,
+     `packages/core/src/editor/facade/*` (new), the planner parameter types
+     in `editor/{paste,pages,sequence,bpmn,breadboard,connections}.ts`, and
+     the editor paragraph in `docs/development.md`. Gates: commands 1, 2
+     (test-cli, for the Boa cost of the chain; review finding DR-L2), 3, 7,
+     8, 9 and 10; command 5 limited to the editor paths, plus the
+     `editor.ts` size check; command 6 limited to `packages/core/src/editor`.
+     Since session 583 this plan is the review and repair pass of section
+     1.4. Its gates pass at 9ef8639 once a test-cli attempt is green, so
+     they show both that the existing implementation holds and that any
+     repair keeps it working. The baseline is recorded fresh at 9e6ccc7
+     (the same source as 9ef8639). It must match the session-579 pre-edit
+     counts (2945 pass, 25 skip, 0 fail), because sms-01 added no tests.
+  2. `sms-02-cli-edit` (depends on 1): `apps/cli/src/edit-command.ts`,
+     `apps/cli/src/edit/**` (new, with the focused tests), and the edit
+     sentence in `docs/development.md`. Gates: commands 1, 2, 3, 7 and 10;
+     command 5 limited to the edit paths, plus the `edit-command.ts` size
+     check; command 6 limited to `apps/cli/src/edit`. Its test-cli
+     baseline is the ` N pass` line of sms-01's final green
+     `test-cli.log` under the session-589 evidence root.
+  3. `sms-03-native-parity` (depends on 2): `apps/cli/src/native-parity.test.ts`
+     (removed), `apps/cli/src/native-parity/**` (new) and
+     `apps/cli/native/README.md`. This is the last plan, so its gates are
+     commands 1-10 on the combined tree.
+- Session 598 dispatch (D13-D15). sms-01 is done and is listed in the
+  manifest as an accepted dependency with no gates. Its plan text is not
+  edited. It still names the session-589 collection check, but it is
+  never run again. Two plans run in two serial waves:
+  1. `sms-02-cli-edit`, the section 2.5 review and repair. Write paths:
+     `apps/cli/src/edit-command.ts`, `apps/cli/src/edit/**`, its progress
+     log, its evidence directory and `target/`. `docs/development.md` is
+     a write path only if a review finding is about its edit sentences.
+     Gates: commands 1, 2, 3, 4 (old-file form), 7 and 10, the focused
+     `bun test apps/cli/src/edit/` run with ` 11 pass`, command 5 limited
+     to the edit paths plus the `edit-command.ts` size check, and command
+     6 limited to `apps/cli/src/edit`. Expected counts: verify 2956 pass,
+     25 skip; test-cli 183 pass, plus any test a repair adds.
+  2. `sms-03-native-parity` (depends on 1), section 3 as planned. Its
+     gates are commands 1-11 on the combined tree, with command 4 in the
+     topic-file form. Commands 4 and 11 also run after the topic files
+     are created and before the old file is deleted. The test-cli count
+     is sms-02's final ` N pass` (183 unless a repair added tests).
+  Only the following parts of the sms-02 and sms-03 plan bodies change:
+  the evidence paths and session labels; the removal of every `env -u
+  NODETTO_CLI_TEST_BINARY` collection command and its ` 17 skip`
+  expectation (`sms-02-cli-edit.md` lines 274-276 and 312,
+  `sms-03-native-parity.md` lines 123-129, 159, 202-206 and 248), which
+  commands 4 and 11 replace; and the sms-02 steps, which become "check the
+  session-589 final hashes, apply review repairs, run the gates into
+  `final/`".
+- Within plans 1 and 2, the move comes first: code is moved and only
+  re-pointed (`this` becomes a `batch` parameter, imports change). Behavior-
+  neutral deduplication (sections 1.3 and 2.3) is a separate step in the
+  same plan, run after the gates pass on the moved code.
+- The native bundle needs no manifest or registration change.
+  `apps/cli/scripts/build-engine.ts` bundles from `src/native-engine.ts`
+  through the import graph. `apps/cli/native/build.rs` already reruns when
+  anything under `apps/cli/src` or `packages/core/src` changes, so the new
+  directories are picked up.
+- Dispatch manifest rules. Session 579 wrote them to fix the session-575
+  manifest. Session 583 revised them: the evidence root, the
+  `originalHead` and the archive rule changed. Session 589 revised them
+  again: the evidence root, the `originalHead`, the final manifest and
+  the load-tolerant gate forms (D11, D12) changed.
+  - Every plan declares `artifactRoots: ["target"]`. Commands 1 and 2
+    build into the git-ignored `target/`. Command 2 builds
+    `target/release/nodetto-cli` and runs the parity blocks against it.
+    Command 10 reads that binary.
+  - Every verification command in the plans and in the manifest is the
+    exact form of section 5. Commands 1 and 2 appear only as the retry
+    loops, and command 10 always follows command 2. No command is
+    informational or expected to fail. No test deadline or timeout is
+    changed by any plan.
+  - Every file a plan's steps edit is in that plan's `writePaths`, not
+    only in `sharedPaths`. `docs/development.md` is a write path of both
+    sms-01 and sms-02. That is safe only because the two plans run in
+    separate serial waves, 1 then 2. `apps/cli/native/README.md` is a
+    write path of sms-03. Each plan's progress log and evidence directory
+    are also write paths.
+  - Evidence goes under `tmp/source-module-split-s598/<planId>/` since
+    session 598 (`tmp/source-module-split-s589/` before), with
+    one subdirectory per gate run (the `$d` of section 5).
+    `tmp/` is git-ignored (`.gitignore` line 41). Only `.log` and `.txt`
+    files go there. The plan bodies and the manifest name the same
+    evidence root. The session-579 and session-583 evidence under
+    `tmp/source-module-split-s579/` and `tmp/source-module-split-s583/` is
+    kept, and sms-01 may read it. Only these parts of the plan bodies
+    change in session 589:
+    - the evidence paths and the session labels;
+    - commands 1 and 2, which become the retry loops of section 5, and
+      the new command 10 after command 2;
+    - the "rerun test-cli once on an idle machine" instructions, which
+      are replaced by the retry loop (D11).
+    The session-583 changes (command 3 as redefined, sms-01 as the
+    section 1.4 review and repair) stay. Everything else in the plans is
+    reused as is.
+  - The session-589 manifest is
+    `impl-plans/completed/source-module-split-s589-dispatch.json` (archived
+    by D15). It records
+    `originalHead` 9e6ccc7 and the upstream `origin/main`. Command 7 and the
+    sms-01/sms-02 `git diff` gates keep comparing against b52e4db. Since
+    b52e4db, the only source changes are the sms-01 edits under review.
+  - The session-598 manifest is
+    `impl-plans/completed/source-module-split-s598-dispatch.json` (archived
+    by D15). It records
+    `originalHead` 99df8d4 and the upstream `origin/main`, and it lists
+    sms-01 as an accepted dependency. Command 7 still compares against
+    b52e4db. Since b52e4db, the only source changes are the sms-01 and
+    sms-02 edits. Every plan in it has `artifactRoots: ["target"]`.
+  - Archive (D10, D12; superseded by D15 in session 598). After the final gates pass, the three sms plans
+    move to `impl-plans/completed/`, together with both superseded
+    manifests: `source-module-split-s575-dispatch.json` and
+    `source-module-split-s579-dispatch.json`. The session-589 manifest is
+    the final dispatch and stays in `impl-plans/active/`. The session-583
+    manifest was dispatched and also stays in `active/`, following the
+    README convention for dispatched manifests. The workflow input names
+    only the s575 and s579 manifests for archiving. The `planPath` values
+    of both manifests keep naming the pre-archive `active/` locations, as
+    the other historical manifests there do. The orchestrator owns
+    `impl-plans/README.md`, the plans, this design and all four
+    manifests. Workers do not edit them.
+- No version bump, tag or release. `gitPush` is false: commit locally only,
+  with no push or merge.
+
+## Risks
+
+- The class chain adds prototype lookups to every `Editor` call. The chain
+  is at most six levels deep, so a method lookup in Boa walks at most six
+  shapes. That is small next to command planning. The `test-cli` parity
+  deadlines (command 2) and the CPU-time check (command 10) would catch a
+  regression.
+- Field order and `useDefineForClassFields`. Section 1.3 rules this out
+  (fields only in `EditorCore`), and command 7 compares
+  `Object.keys(new Editor())`.
+- Import cycles. Planners may import chain classes only with `import type`
+  (command 9). A violation shows up as "Class extends value undefined"
+  when the module is evaluated, which commands 1 and 2 would hit.
+- Parity runs that pass with nothing run. Command 3 requires no skips and
+  no failures in the test-cli run, where the binary is set, and the exact
+  pass count. Commands 4 and 11 require exactly 17 blocks with the
+  unchanged names, without running them.
+- Stale links after the archive. Plan bodies name `impl-plans/active/...`
+  paths only as text, like the other archived plans. Command 12 checks the
+  README links.
+- Parity deadlines under machine load. In session 579, the standalone
+  parity rerun timed out twice on the golden-fixture block (95 s budget).
+  The logs are in `tmp/source-module-split-s579/sms-01-editor-facade/`.
+  `retry2-native-parity.log` shows 16 pass and 1 fail, and the whole file
+  took 278.80 s, against 80.29 s in the passing `native-parity.log`. The
+  source hashes were unchanged (`retry-final-hashes.log`), and test-cli
+  passed with 172 pass and 0 fail on the same tree. Every block was about
+  3.5 times slower, which points to machine load, not to the chain. In
+  session 583, test-cli on the unchanged tree had 166 pass and 6 fail,
+  all deadline timeouts, at a load average of 87.94. The idle-machine
+  rerun rule is replaced in session 589 (D11). Commands 1 and 2 each get
+  up to three attempts, and a gate passes only on a fully green attempt
+  with every test run. If all three attempts fail, the gate fails and the
+  plan stops; it is never waived as load. Command 10 measures CPU time,
+  which load affects much less than wall-clock deadlines, so a real slowdown
+  of the native CLI still fails a gate even when a test-cli attempt passes
+  on a quiet moment. CPU time on macOS still varies with the core the
+  scheduler picks, so command 10 also gets three attempts with the
+  reference binary measured right before the new one.
+- Ordering inside `edit`. Handlers are moved, not rewritten. Golden parity
+  tests, `ai-commands.test.ts` and `edit-scale-text-group.test.ts` cover the
+  output and error text.
+
+## Decisions
+
+- D1. A single-inheritance class chain is used, not delegation stubs. Stubs
+  cannot fit about 165 public signatures in 700 lines, and prototype
+  patching is a module-level side effect.
+- D2. Component and responsive-variant members stay in `Editor`, the last
+  class in the chain, because they need `new Editor` and planners typed as
+  the full `Editor`.
+- D3. Planner parameters are typed as the lowest chain class that has the
+  members they use (section 1.3). This is the typed interface between the
+  facade and the planners; no new interface types are introduced.
+- D4. `Batch` stays a class that holds batch state and resolvers. Operation
+  handlers are module-level functions grouped by domain under
+  `edit/operations/`. The `op` switch stays in `Batch.apply`, so dispatch
+  order and the unknown-op error are unchanged.
+- D5. The parity tests move into `apps/cli/src/native-parity/` and the old
+  file is removed. A topic file named `native-parity.test.ts` would be
+  misleading, and `bun test apps/cli/src/native-parity` still selects all
+  17 blocks.
+- D6. Only helpers newly extracted from closures or inline code get focused
+  tests. Functions that only move do not.
+- D7 (session 579). The design and the three plans are reused. Only the
+  dispatch manifest is rebuilt, following the rules under "Rollout
+  constraints". The superseded session-575 manifest is archived to
+  `completed/`, as the workflow input asks. This differs on purpose from
+  the README convention that historical manifests stay in `active/`. That
+  convention covers manifests that were dispatched, and the session-575
+  manifest never was. D10 supersedes the rule that the session-579
+  manifest stays in `active/`.
+- D8 (session 583). sms-01 is reviewed, not implemented again. The sms-01
+  plan becomes the section 1.4 review and repair pass. It keeps its write
+  paths and gates, and those gates pass at 9ef8639. sms-02 and sms-03 run
+  after it, in waves 2 and 3, unchanged except for D9 and the evidence
+  root.
+- D9 (session 583). Native parity is verified only through `mise run
+  test-cli` (command 3 as redefined), as the workflow input requires.
+  The standalone rerun against the binary was dropped. It ran the same 17
+  blocks a second time, and under load its timing made it fail although
+  the code had not changed. The block count is still fixed by command 4
+  and by the collection check in command 3, which does not run the
+  comparison. D13 removes that collection check in session 598.
+- D10 (session 583). The workflow input asks to archive the session-579
+  manifest together with the session-575 one, so both move to
+  `completed/`. The session-579 manifest was dispatched, and archiving it
+  goes against the README convention for dispatched manifests. That is
+  intentional. The convention is still met, because the session-583
+  manifest, which drives the run to completion, stays in `active/`.
+  D12 names the session-589 manifest as the final dispatch instead.
+- D11 (session 589). Gates are load-tolerant, as the workflow input
+  requires. `mise run verify` and `mise run test-cli` each run inside a
+  three-attempt retry loop that passes on the first fully green attempt.
+  The green attempt's log is copied to `verify.log` or `test-cli.log`, so
+  the count checks in commands 1 and 3 read exactly one log. Command 10
+  adds a CPU-time check with a 15% limit against the 0.8.5 binary. Test
+  deadlines and timeouts are not changed. A retry does not weaken a test:
+  every test still has to pass within its unchanged deadline in one full
+  run.
+- D12 (session 589). The session-589 manifest
+  (`source-module-split-s589-dispatch.json`) is the final dispatch and
+  stays in `active/`. The session-583 manifest was dispatched and did not
+  finish. It is neither superseded-and-archived nor rewritten. It stays in
+  `active/` under the README convention, because the workflow input names
+  only the s575 and s579 manifests for archiving.
+- D13 (session 598). The binary-less collection check is removed from
+  command 3 and from the plans. It ran zero tests, so the progress gate
+  rejected it, and it only showed that blocks were registered. The block
+  count (command 4) and the name comparison against 99df8d4 (command 11)
+  show the same thing statically. Whether the blocks run and pass is shown
+  only by the test-cli run (commands 2 and 3). This replaces the
+  collection part of D9.
+- D14 (session 598). sms-02 is reviewed and repaired, not implemented
+  again (section 2.5), the same way sms-01 was in sessions 583 and 589. Its
+  gates run fresh under the session-598 evidence root even if nothing is
+  repaired, because the session-589 run did not finish its gate set.
+- D15 (session 598). The workflow input asks to archive the s575, s579,
+  s583 and s589 manifests. They move to `completed/` with the three sms
+  plans. The session-598 manifest moves too, as the orchestrator's last
+  step after the final gates and both sms-03 reviews pass, so no
+  source-module-split file is left in `active/`. This supersedes the
+  "stays in `active/`" parts of D10 and D12. The README convention keeps
+  dispatched manifests in `active/` while their work is open. This work
+  is finished, and the Completed entry records each manifest's role. The
+  `planPath` values keep naming the pre-archive `active/` locations. The
+  progress logs stay in `impl-plans/progress/`. The README says they are
+  kept there after archival, and every other archived plan's log is
+  there.
