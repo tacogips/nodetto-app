@@ -1,0 +1,49 @@
+[
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "decision",
+    "semantic": { "geo": "diamond", "label": "Decision" },
+    "visual": { "x": 400, "y": 200, "width": 160, "height": 120 }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "ref": "process",
+    "semantic": { "geo": "rect", "label": "Process" },
+    "visual": { "x": 700, "y": 220, "width": 160, "height": 80 }
+  },
+  {
+    "op": "connect",
+    "from": "@decision",
+    "to": "@process",
+    "label": "Attached",
+    "semantic": { "fromPort": "right", "toPort": "left" }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "edge.generic",
+    "semantic": {
+      "label": "Free polyline",
+      "fromPoint": { "x": 100, "y": 100 },
+      "toPoint": { "x": 400, "y": 100 },
+      "routing": "manual",
+      "routingWaypoints": [{ "u": 0.5, "v": 100 }]
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "edge.generic",
+    "semantic": {
+      "label": "Free end",
+      "from": "@decision",
+      "fromPort": "bottom",
+      "toPoint": { "x": 650, "y": 450 },
+      "routing": "orthogonal"
+    }
+  }
+]
