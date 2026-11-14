@@ -1,0 +1,253 @@
+import { Switch } from "./Switch.tsx";
+import {
+  colorTokens,
+  bindSelectionColor,
+  createColorToken,
+  designTokenModes,
+  type Editor,
+  pageTokenMode,
+  removeDesignTokenMode,
+  renameDesignTokenMode,
+  setColorTokenAlias,
+  updateColorToken,
+} from "@nodetto/core";
+import { createMemo, createSignal, For, type JSX, Show } from "solid-js";
+import { createEditorSignals } from "./adapter.ts";
+import { HelpHint } from "./HelpHint.tsx";
+
+/** Shared palette with optional live color bindings. */
+export function ColorTokens(props: { readonly editor: Editor }): JSX.Element {
+  const signals = createEditorSignals(props.editor);
+  const [name, setName] = createSignal("");
+  const [value, setValue] = createSignal("#2563eb");
+  const [newMode, setNewMode] = createSignal("");
+  const [linked, setLinked] = createSignal(true);
+  const tokens = createMemo(() => {
+    signals.rev();
+    return colorTokens(props.editor);
+  });
+  const mode = createMemo(() => {
+    signals.rev();
+    return pageTokenMode(props.editor.store, props.editor.currentPageId) ?? "";
+  });
+  const modes = createMemo(() => {
+    signals.rev();
+    return designTokenModes(props.editor.store);
+  });
+  return (
+    <section
+      class="nodetto-color-tokens"
+      aria-label="Document color palette"
+      onKeyDown={(event) => event.stopPropagation()}
+      onKeyUp={(event) => event.stopPropagation()}
+    >
+      <h2>
+        Color palette{" "}
+        <HelpHint text="Choose a color, then apply it to the selected items. Keep colors updated to apply future palette changes too." />
+      </h2>
+      <details class="nodetto-navigation-group">
+        <summary>Page themes</summary>
+        <label>
+          Page theme
+          <select
+            aria-label="Page theme"
+            value={mode()}
+            onChange={(event) =>
+              props.editor.setPageTokenMode(
+                props.editor.currentPageId,
+                event.currentTarget.value || null,
+              )
+            }
+          >
+            <option value="">Default</option>
+            <For each={modes()}>
+              {(entry) => <option value={entry}>{entry}</option>}
+            </For>
+          </select>
+        </label>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const name = newMode().trim();
+            if (!name || name.toLowerCase() === "default") return;
+            const changed = mode()
+              ? renameDesignTokenMode(props.editor, mode(), name)
+              : props.editor.setPageTokenMode(props.editor.currentPageId, name);
+            if (changed) setNewMode("");
+          }}
+        >
+          <input
+            aria-label="Theme name"
+            placeholder={mode() ? `Rename ${mode()}` : "e.g. Dark"}
+            value={newMode()}
+            onInput={(event) => setNewMode(event.currentTarget.value)}
+          />
+          <button type="submit" disabled={!newMode().trim()}>
+            {mode() ? "Rename theme" : "Add theme"}
+          </button>
+          <Show when={mode()}>
+            {(active) => (
+              <button
+                type="button"
+                onClick={() => removeDesignTokenMode(props.editor, active())}
+              >
+                Remove theme
+              </button>
+            )}
+          </Show>
+        </form>
+      </details>
+      <label>
+        <Switch
+          checked={linked()}
+          onChange={(event) => setLinked(event.currentTarget.checked)}
+        />
+        Keep applied colors updated
+      </label>
+      <Show when={signals.selection().size > 0}>
+        <div class="nodetto-color-entry">
+          <For each={["fill", "stroke", "color"] as const}>
+            {(field) => (
+              <button
+                type="button"
+                disabled={signals.selection().size === 0}
+                onClick={() => bindSelectionColor(props.editor, field, null)}
+              >
+                Stop updating {field === "color" ? "text" : field}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (createColorToken(props.editor, name(), value())) setName("");
+        }}
+      >
+        <input
+          aria-label="New color name"
+          placeholder="Primary"
+          required
+          value={name()}
+          onInput={(event) => setName(event.currentTarget.value)}
+        />
+        <input
+          type="color"
+          aria-label="New color value"
+          value={value()}
+          onInput={(event) => setValue(event.currentTarget.value)}
+        />
+        <button type="submit" disabled={!name().trim()}>
+          Add color
+        </button>
+      </form>
+      <For each={tokens()}>
+        {(token) => {
+          const locked = () => {
+            signals.rev();
+            return (
+              props.editor.createShapeContext().isLocked?.(token.id) === true
+            );
+          };
+          return (
+            <div class="nodetto-color-entry">
+              <input
+                aria-label={`Rename ${token.name}`}
+                value={token.name}
+                disabled={locked()}
+                onChange={(event) => {
+                  if (
+                    !updateColorToken(
+                      props.editor,
+                      token.id,
+                      event.currentTarget.value,
+                      token.value,
+                    )
+                  )
+                    event.currentTarget.value = token.name;
+                }}
+              />
+              <input
+                type="color"
+                aria-label={`${token.name} color`}
+                value={token.value}
+                disabled={locked() || token.aliasId !== null}
+                onChange={(event) =>
+                  updateColorToken(
+                    props.editor,
+                    token.id,
+                    token.name,
+                    event.currentTarget.value,
+                  )
+                }
+              />
+              <details>
+                <summary>Use another color</summary>
+                <select
+                  aria-label={`Color used by ${token.name}`}
+                  value={token.aliasId ?? ""}
+                  disabled={locked()}
+                  onChange={(event) => {
+                    if (
+                      !setColorTokenAlias(
+                        props.editor,
+                        token.id,
+                        event.currentTarget.value || null,
+                      )
+                    )
+                      event.currentTarget.value = token.aliasId ?? "";
+                  }}
+                >
+                  <option value="">Custom color</option>
+                  <For each={tokens().filter((entry) => entry.id !== token.id)}>
+                    {(entry) => (
+                      <option value={entry.id}>Use {entry.name}</option>
+                    )}
+                  </For>
+                </select>
+              </details>
+              <Show when={token.broken}>
+                <span role="status">
+                  Referenced color is missing; showing the saved color
+                </span>
+              </Show>
+              <div>
+                <For each={["fill", "stroke", "color"] as const}>
+                  {(field) => (
+                    <button
+                      type="button"
+                      disabled={signals.selection().size === 0}
+                      title={`Apply ${token.name} as ${field === "color" ? "text color" : field} to selection (${linked() ? "linked" : "copy value"})`}
+                      onClick={() =>
+                        linked()
+                          ? bindSelectionColor(props.editor, field, token.id)
+                          : props.editor.setSelectionStyle({
+                              [field]: token.value,
+                            })
+                      }
+                    >
+                      {field === "color"
+                        ? "Text"
+                        : field === "fill"
+                          ? "Fill"
+                          : "Stroke"}
+                    </button>
+                  )}
+                </For>
+                <button
+                  type="button"
+                  disabled={locked()}
+                  title={`Remove ${token.name} from palette; applied colors stay unchanged`}
+                  onClick={() => props.editor.deleteElements([token.id])}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          );
+        }}
+      </For>
+    </section>
+  );
+}
