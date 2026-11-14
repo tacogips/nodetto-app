@@ -1,0 +1,290 @@
+export { stateTransitionLabel } from "./state.ts";
+// Diagram IR: canonical semantic + visual data model.
+// See the product design (nodetto-cloud repo), section 5.
+//
+// Runtime-agnostic by contract: this package must run in a browser, the
+// Tauri webview, Node/Bun, and Cloudflare Workers. No DOM, no framework.
+export {
+  STATE_NODE_KINDS,
+  type StateNodeKind,
+  type StateNodeSemantic,
+  type StateTransitionSemantic,
+} from "./semantics.ts";
+export { comparePageOrder } from "./page-order.ts";
+
+export {
+  ACCESSIBILITY_KEY_ORDER,
+  ACCESSIBILITY_ROLES,
+  type AccessibilityMetadata,
+  type AccessibilityRole,
+  validateAccessibilityMetadata,
+} from "./accessibility.ts";
+export {
+  checkArray,
+  checkBoolean,
+  checkEnum,
+  checkFractionalIndex,
+  checkNumber,
+  checkObject,
+  checkString,
+} from "./checks.ts";
+export {
+  DocumentValidationError,
+  error,
+  formatIssue,
+  hasErrors,
+  type IssueSeverity,
+  type ValidationIssue,
+  warning,
+} from "./issues.ts";
+export {
+  COORDINATE_PRECISION,
+  type KeyOrder,
+  VISUAL_KEY_ORDER,
+  VISUAL_STYLE_KEY_ORDER,
+} from "./keyOrder.ts";
+export {
+  type DocumentSnapshot,
+  type MigrateOptions,
+  type Migration,
+  MIGRATIONS,
+  migrateSnapshot,
+  needsMigration,
+  SCHEMA_VERSION,
+  SchemaMigrationError,
+} from "./migrations.ts";
+export {
+  ELEMENT_TYPES,
+  type ElementCategory,
+  type ElementReference,
+  type ElementTypeDefinition,
+  getElementTypeDefinition,
+  isKnownElementType,
+  listElementTypeDefinitions,
+  type ReferencePolicy,
+} from "./registry.ts";
+export {
+  ARROWHEADS,
+  type Arrowhead,
+  type Arrowheads,
+  CARDINALITIES,
+  type Cardinality,
+  REFERENTIAL_ACTIONS,
+  type ReferentialAction,
+  FOREIGN_KEY_DEFERRABILITIES,
+  type ForeignKeyDeferrability,
+  CONNECTOR_ROUTINGS,
+  CONNECTOR_ROUTING_AXES,
+  type ConnectorRouting,
+  type ConnectorRoutingAxis,
+  type ConnectorRoutingSemantic,
+  type ConnectorWaypoint,
+  MAX_CONNECTOR_WAYPOINTS,
+  GUIDE_AXES,
+  type GuideAxis,
+  type ElementType,
+  type ErdColumn,
+  type ErdCheckConstraint,
+  type ErdEndpoint,
+  erdEndpointColumnIds,
+  type ErdIndex,
+  type ErdRelationSemantic,
+  type ErdTableSemantic,
+  type PageGuideSemantic,
+  type FrameSemantic,
+  type FrameLayout,
+  SCREEN_KINDS,
+  type ScreenKind,
+  FRAME_PLATFORMS,
+  type FramePlatform,
+  type SafeAreaInsets,
+  type ComponentVariantProperty,
+  type LayoutGrid,
+  type AxisLayoutGrid,
+  type SquareLayoutGrid,
+  type FreehandPoint,
+  type FreehandSemantic,
+  type PathContour,
+  type PathFillRule,
+  type PathSemantic,
+  PATH_FILL_RULES,
+  GEO_KINDS,
+  type GenericEdgeSemantic,
+  PROTOTYPE_ACTIONS,
+  type PrototypeAction,
+  PROTOTYPE_OVERLAY_POSITIONS,
+  type PrototypeOverlayPosition,
+  PROTOTYPE_OVERFLOWS,
+  type PrototypeOverflow,
+  PROTOTYPE_TRANSITIONS,
+  type PrototypeTransition,
+  PROTOTYPE_TRIGGERS,
+  type PrototypeTrigger,
+  type GenericNodeSemantic,
+  type GeoKind,
+  type GeoShapeSemantic,
+  type GroupSemantic,
+  MESSAGE_KINDS,
+  type MessageKind,
+  PARTICIPANT_KINDS,
+  type ParticipantKind,
+  type SemanticByType,
+  type SequenceActivationSemantic,
+  type SequenceMessageSemantic,
+  type SequenceParticipantSemantic,
+  TEXT_MARK_KINDS,
+  type TextMark,
+  type TextMarkKind,
+  type TextNoteSemantic,
+  type ReviewCommentMessage,
+  type ReviewCommentSemantic,
+  type TextStyleSemantic,
+  type TypographyStyleValue,
+  UML_ASSOCIATION_KINDS,
+  UML_VISIBILITIES,
+  type UmlAssociationKind,
+  type UmlAssociationSemantic,
+  type UmlAttribute,
+  type UmlCardinalities,
+  type UmlClassSemantic,
+  type UmlMethod,
+  type UmlParameter,
+  type UmlVisibility,
+} from "./semantics.ts";
+export {
+  type DocId,
+  type Document,
+  type BlendMode,
+  BLEND_MODES,
+  type BackgroundBlurEffect,
+  type CornerRadii,
+  type DropShadowEffect,
+  type Element,
+  type ElementId,
+  elementsByPage,
+  type Extensions,
+  type FractionalIndex,
+  type FillGradient,
+  type FontFeatureSetting,
+  type FontVariationAxis,
+  type GradientStop,
+  type LayerBlurEffect,
+  type LayerEffect,
+  type TextResizeMode,
+  isPageKind,
+  isPlainObject,
+  PAGE_KINDS,
+  type Page,
+  type PageId,
+  type PageKind,
+  type UnknownRecord,
+  type Visual,
+  type VisualStyle,
+} from "./types.ts";
+export {
+  assertValidDocument,
+  isValidDocument,
+  type ValidateOptions,
+  validateDocument,
+} from "./validate.ts";
+export { isRasterDataUrl, MAX_IMAGE_BYTES } from "./image.ts";
+export type { ImageCrop, ImageSemantic } from "./semantics.ts";
+export type {
+  BooleanOperation,
+  ColorTokenSemantic,
+  ColorTokenMode,
+  DesignTokenSemantic,
+  NumberTokenMode,
+  NumberTokenSemantic,
+} from "./semantics.ts";
+export { BOOLEAN_OPERATIONS } from "./semantics.ts";
+
+export {
+  UmlComponentType,
+  UmlComponentRelationship,
+  UML_INTERFACE_KINDS,
+  UML_PORT_SIDES,
+  type UmlComponentRelationshipKind,
+  type UmlComponentSemantic,
+  type UmlInterfaceSemantic,
+  type UmlInterfaceKind,
+  type UmlPortSemantic,
+  type UmlPortSide,
+  type UmlComponentRelationshipSemantic,
+} from "./semantics.ts";
+export {
+  BPMN_ASSOCIATION_DIRECTIONS,
+  BPMN_DATA_OBJECT_ROLES,
+  BPMN_ELEMENT_TYPES,
+  BPMN_EVENT_DEFINITION_KINDS,
+  BPMN_EVENT_POSITIONS,
+  BPMN_GATEWAY_TYPES,
+  BPMN_LOOP_TYPES,
+  BPMN_TASK_TYPES,
+  BPMN_TIMER_TYPES,
+  isBpmnElementType,
+} from "./semantics.ts";
+export type {
+  BpmnAssociationDirection,
+  BpmnAssociationSemantic,
+  BpmnBoundaryEventSemantic,
+  BpmnCallActivitySemantic,
+  BpmnDataAssociationSemantic,
+  BpmnDataObjectRole,
+  BpmnDataObjectSemantic,
+  BpmnDataStoreSemantic,
+  BpmnEventDefinition,
+  BpmnEventDefinitionKind,
+  BpmnEventPosition,
+  BpmnEventSemantic,
+  BpmnGatewaySemantic,
+  BpmnGatewayType,
+  BpmnGroupSemantic,
+  BpmnLaneSemantic,
+  BpmnLoopType,
+  BpmnMessageFlowSemantic,
+  BpmnParticipantSemantic,
+  BpmnSequenceFlowSemantic,
+  BpmnSubProcessSemantic,
+  BpmnTaskSemantic,
+  BpmnTaskType,
+  BpmnTextAnnotationSemantic,
+  BpmnTimerType,
+} from "./semantics.ts";
+export {
+  connectorWaypointFromPage,
+  connectorWaypointToPage,
+} from "./connector-waypoints.ts";
+export type { LabelBounds } from "./types.ts";
+
+export {
+  CONNECTOR_ENDPOINT_TYPES,
+  connectorEndpointIssues,
+  type ConnectorEndpointIssue,
+} from "./connector-policy.ts";
+
+export {
+  DATABASE_OBJECT_LABELS,
+  isDatabaseObjectType,
+  type DatabaseObjectType,
+  type DatabaseObjectSemantic,
+  type DatabaseParameter,
+} from "./database-objects.ts";
+
+export {
+  isRelativeAttachmentPath,
+  isRasterAttachmentPath,
+} from "./attachments.ts";
+export { decodeRasterDataUrl, encodeRasterDataUrl } from "./image.ts";
+
+export {
+  UI_CONTROL_KINDS,
+  type UiControlKind,
+  type UiControlSemantic,
+} from "./ui-controls.ts";
+
+export {
+  shortPageId,
+  resolvePageQuery,
+  type PageResolution,
+} from "./page-id.ts";
