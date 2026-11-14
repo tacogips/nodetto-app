@@ -1,0 +1,44 @@
+/* Keep structural chrome and text fields square. Action buttons and color
+ * wells use the shared control styles; swatches retain their circular shape. */
+.app-shell.app-shell
+  :is(input:not([type="color"]):not([role="switch"]), select, textarea):not(
+    :where(.app-settings-dialog *)
+  ),
+.app-shell
+  :is(
+    .app-recent-select,
+    .app-cloud-status,
+    .app-cloud-badge,
+    .app-presence-dot,
+    .app-presence-name,
+    .app-presence-brush,
+    .app-presence-selection,
+    .app-presence-selection-name,
+    .nodetto-page-tab,
+    .nodetto-context-menu,
+    .nodetto-context-submenu,
+    .nodetto-selection-toolbar,
+    .nodetto-zoom-group,
+    .nodetto-segmented,
+    .nodetto-image-drop-overlay,
+    .nodetto-image-drop-error,
+    .nodetto-comment-thread,
+    .nodetto-comment-placement,
+    .nodetto-comment-popover,
+    .nodetto-inspector-stack,
+    .nodetto-component-entry,
+    .nodetto-component-entry img
+  ) {
+  border-radius: 0;
+}
+
+.nodetto-navigation-group > summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  border-bottom: 1px solid var(--nodetto-line);
+}
+
+.nodetto-navigation-group[open] {
+  border-bottom: 1px solid var(--nodetto-line);
+}

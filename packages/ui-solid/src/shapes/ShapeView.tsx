@@ -1,0 +1,274 @@
+import { StateNodeView } from "./StateNodeView.tsx";
+import { UseCaseNodeView } from "./UseCaseNodeView.tsx";
+import { IconView } from "./IconView.tsx";
+import { UiControlView } from "./UiControlView.tsx";
+import { isDatabaseObjectType } from "@nodetto/ir";
+import { DatabaseObjectView } from "./DatabaseObjectView.tsx";
+import "../ShapeWarnings.css";
+import { UmlComponentType } from "@nodetto/ir";
+import { UmlComponentView } from "./UmlComponentView.tsx";
+// Dispatch from element type to view, plus the positioned wrapper every
+// box-shaped element shares.
+//
+// The wrapper is `pointer-events: none`: picking is the core's job, so a
+// click on the transparent corner of an ellipse must miss it. Letting the
+// DOM decide would silently disagree with `hitTestPoint`.
+//
+// A group gets no DOM at all (design editor-ux.md section 7): it exists for
+// selection and transformation only, and its members draw themselves.
+
+import { isBpmnShapeType, type Box } from "@nodetto/core";
+import { isBreadboardElementType } from "@nodetto/ir";
+import { isPcbElementType } from "@nodetto/ir";
+import type { AccessibilityRole, Element } from "@nodetto/ir";
+import { type JSX, Match, Show, Switch } from "solid-js";
+import { ErdTableView } from "./ErdTableView.tsx";
+import { TableSheetView } from "./TableSheetView.tsx";
+import { FrameView } from "./FrameView.tsx";
+import { FreehandView } from "./FreehandView.tsx";
+import { CompoundPathView } from "./CompoundPathView.tsx";
+import { ImageView } from "./ImageView.tsx";
+import { GeoShapeView } from "./GeoShapeView.tsx";
+import { NodeView } from "./NodeView.tsx";
+import { SequenceParticipantView } from "./SequenceParticipantView.tsx";
+import { TextNoteView } from "./TextNoteView.tsx";
+import { UmlClassView } from "./UmlClassView.tsx";
+import { BpmnShapeView } from "./BpmnShapeView.tsx";
+import { BreadboardShapeView } from "./BreadboardShapeView.tsx";
+import { PcbShapeView } from "./PcbShapeView.tsx";
+import type { Accessor } from "solid-js";
+import { layerAppearanceStyle } from "./visual.ts";
+
+export interface ShapeViewProps {
+  readonly element: Element;
+  readonly box: Box;
+  readonly selected: boolean;
+  /** True when a target netlist card is not the active page target. */
+  readonly breadboardInert?: boolean;
+  readonly warnings?: readonly string[];
+  readonly resolveAsset?: (source: string) => string | undefined;
+  /** Construction guides are canvas-only and excluded from preview/export. */
+  readonly showLayoutGrids?: boolean;
+  /** Expose authored semantics in interactive prototype DOM, not editor chrome. */
+  readonly exposeAccessibility?: boolean;
+  readonly pcbHidden?: Accessor<ReadonlySet<string>>;
+}
+
+const HTML_ROLES: Partial<
+  Record<AccessibilityRole, JSX.AriaAttributes["role"]>
+> = {
+  button: "button",
+  link: "link",
+  image: "img",
+  heading: "heading",
+  textbox: "textbox",
+  checkbox: "checkbox",
+  switch: "switch",
+  navigation: "navigation",
+  main: "main",
+  region: "region",
+  group: "group",
+  list: "list",
+  "list-item": "listitem",
+};
+
+function htmlRole(element: Element): JSX.AriaAttributes["role"] {
+  const role = element.accessibility?.role;
+  if (!role) return undefined;
+  return HTML_ROLES[role];
+}
+
+function descriptionId(element: Element): string {
+  return `nodetto-a11y-${Array.from(element.id, (character) =>
+    character.codePointAt(0)?.toString(16),
+  ).join("-")}`;
+}
+
+function accessibilityDescription(element: Element): string | undefined {
+  const description = [
+    element.accessibility?.hint,
+    element.accessibility?.value
+      ? `Current value: ${element.accessibility.value}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return description || undefined;
+}
+
+export function ShapeView(props: ShapeViewProps): JSX.Element {
+  return (
+    <Show when={props.element.type !== "group"}>
+      <div
+        class="nodetto-shape"
+        classList={{ "nodetto-selected": props.selected }}
+        data-element-id={props.element.id}
+        data-element-type={props.element.type}
+        role={props.exposeAccessibility ? htmlRole(props.element) : undefined}
+        aria-hidden={
+          props.exposeAccessibility && props.element.accessibility?.decorative
+            ? "true"
+            : undefined
+        }
+        aria-label={
+          props.exposeAccessibility && !props.element.accessibility?.decorative
+            ? props.element.accessibility?.label
+            : undefined
+        }
+        aria-describedby={
+          props.exposeAccessibility &&
+          !props.element.accessibility?.decorative &&
+          accessibilityDescription(props.element)
+            ? descriptionId(props.element)
+            : undefined
+        }
+        aria-disabled={
+          props.exposeAccessibility && props.element.accessibility?.disabled
+            ? "true"
+            : undefined
+        }
+        aria-level={
+          props.exposeAccessibility
+            ? props.element.accessibility?.headingLevel
+            : undefined
+        }
+        style={{
+          left: `${props.box.x}px`,
+          top: `${props.box.y}px`,
+          width: `${props.box.width}px`,
+          height: `${props.box.height}px`,
+          ...layerAppearanceStyle(props.element.visual),
+        }}
+      >
+        <Show when={props.warnings?.length}>
+          <span
+            class="nodetto-shape-warning"
+            aria-label={props.warnings?.join("\n")}
+            title={props.warnings?.join("\n")}
+          >
+            !
+          </span>
+        </Show>
+        <Show
+          when={
+            props.exposeAccessibility &&
+            !props.element.accessibility?.decorative
+              ? accessibilityDescription(props.element)
+              : undefined
+          }
+        >
+          {(hint) => (
+            <span
+              id={descriptionId(props.element)}
+              style={{
+                position: "absolute",
+                width: "1px",
+                height: "1px",
+                padding: 0,
+                margin: "-1px",
+                overflow: "hidden",
+                clip: "rect(0, 0, 0, 0)",
+                "white-space": "nowrap",
+                border: 0,
+              }}
+            >
+              {hint()}
+            </span>
+          )}
+        </Show>
+        <Switch
+          fallback={
+            <div class="nodetto-unknown">{`unsupported: ${props.element.type}`}</div>
+          }
+        >
+          <Match when={isBpmnShapeType(props.element.type)}>
+            <BpmnShapeView element={props.element} box={props.box} />
+          </Match>
+          <Match when={isBreadboardElementType(props.element.type)}>
+            <BreadboardShapeView
+              element={props.element}
+              box={props.box}
+              inert={props.breadboardInert}
+            />
+          </Match>
+          <Match when={isPcbElementType(props.element.type)}>
+            <PcbShapeView
+              element={props.element}
+              box={props.box}
+              hidden={props.pcbHidden ?? (() => new Set<string>())}
+            />
+          </Match>
+          <Match when={props.element.type === "state.node"}>
+            <StateNodeView element={props.element} box={props.box} />
+          </Match>
+          <Match when={props.element.type === "usecase.node"}>
+            <UseCaseNodeView element={props.element} box={props.box} />
+          </Match>
+          <Match when={props.element.type === "shape.geo"}>
+            <GeoShapeView element={props.element} box={props.box} />
+          </Match>
+          <Match when={props.element.type === "frame"}>
+            <FrameView
+              element={props.element}
+              showLayoutGrids={props.showLayoutGrids}
+            />
+          </Match>
+          <Match when={props.element.type === "draw.freehand"}>
+            <FreehandView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "draw.path"}>
+            <CompoundPathView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "ui.icon"}>
+            <IconView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "ui.control"}>
+            <UiControlView
+              element={props.element}
+              interactive={props.exposeAccessibility}
+            />
+          </Match>
+          <Match when={props.element.type === "image.raster"}>
+            <ImageView
+              element={props.element}
+              resolveAsset={props.resolveAsset}
+            />
+          </Match>
+          <Match when={props.element.type === "node.generic"}>
+            <NodeView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "sequence.participant"}>
+            <SequenceParticipantView element={props.element} box={props.box} />
+          </Match>
+          <Match when={props.element.type === "sequence.activation"}>
+            <div class="nodetto-sequence-activation" />
+          </Match>
+          <Match when={props.element.type === "text.note"}>
+            <TextNoteView element={props.element} />
+          </Match>
+          <Match when={isDatabaseObjectType(props.element.type)}>
+            <DatabaseObjectView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "table.sheet"}>
+            <TableSheetView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "erd.table"}>
+            <ErdTableView element={props.element} />
+          </Match>
+          <Match
+            when={[
+              UmlComponentType.Component,
+              UmlComponentType.Interface,
+              UmlComponentType.Port,
+            ].some((type) => props.element.type === type)}
+          >
+            <UmlComponentView element={props.element} box={props.box} />
+          </Match>
+          <Match when={props.element.type === "uml.class"}>
+            <UmlClassView element={props.element} />
+          </Match>
+        </Switch>
+      </div>
+    </Show>
+  );
+}

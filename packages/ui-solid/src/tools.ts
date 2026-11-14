@@ -1,0 +1,21 @@
+// The tool catalogue lives in @nodetto/core so the CLI can draw by shape ID.
+export {
+  Tool,
+  TOOLS,
+  GEO_TOOLS,
+  BPMN_TOOLS,
+  BREADBOARD_TOOLS,
+  PCB_TOOLS,
+  PCB_CREATIONS,
+  canUseTool,
+  creationFor,
+  componentRelationshipFor,
+  useCaseRelationshipFor,
+  isConnectorTool,
+  typedConnectorFor,
+  type ToolKind,
+  type BpmnToolKind,
+  type BreadboardToolKind,
+  type PcbToolKind,
+  type CreationTool,
+} from "@nodetto/core";

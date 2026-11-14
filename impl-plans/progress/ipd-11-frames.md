@@ -1,0 +1,23 @@
+# ipd-11-frames progress
+
+- 2026-11-10: Added `Tool.PrototypeBack` to the gesture classification expectation, addressing integration-s781-w1-ui-solid-prototype-back-gesture. The focused test passed 172/172; evidence: `tmp/ipd-s772/ipd-11-frames/prototype-back-s783.log`.
+- The requested aggregate exited 0 with 304 tests across nine files, but Bun silently omitted the four nonexistent new test files. This is not evidence that the frame implementation is complete.
+- The insertion-parent helper, CLI parent implementation, frame title and desktop drop work and their new tests are absent. Before/after drop behavior has not been measured. Visual evidence is outstanding. Continue implementation before review.
+- Typecheck and selected-file Biome passed; logs are under `tmp/ipd-s772/ipd-11-frames/`.
+
+- Continuation: added the core insertion-parent helper and initial tests, and made partial CLI parent and title rendering changes. These changes require completion and review.
+- Before desktop changes, `bun test packages/ui-solid/src/frame-parent-interaction.test.ts` recorded 0 pass, 2 fail: creation and dropping into an explicit frame left `memberIds` empty. Evidence: `tmp/ipd-s772/ipd-11-frames/desktop-before-2.log`. No after behavior has been established.
+- Drop completion closes the history batch in `packages/ui-solid/src/interaction/lifecycle.ts`; that file and `packages/ui-solid/src/interaction/pointer.ts` are outside this plan's authorized paths. A scope amendment for the lifecycle integration is required before implementing and testing a correct drop in the same undo step.
+
+- Round 6 resolved the prior scope gap. Before: creation and drop left explicit frame membership empty (0 pass, 2 fail, `desktop-before-2.log`). After: creation and translation attach within the same history batch; one undo restores both position and membership (2 pass, 0 fail, `desktop-after-s784.log`). Cancellation does not attach.
+- Added CLI parent and title export regression coverage. The full assigned aggregate passed 413 tests, 0 failed (`final/aggregate.log`); selected-file Biome passed (`final/biome-final.log`). Typecheck passed (`final/typecheck.log`). `gridSize?: 4 | 8 | 24` remained unchanged (`final/grid-check.log`).
+- Exported and inspected `final/frames.png` at scale 2: both device titles appear above their frames without overlapping content; the diagram title remains inside. Formal review and workflow finalization remain downstream.
+
+- Adversarial finding S7-ipd11-R1: dragging a nested frame detached its child into the enclosing frame. The new regression failed before the repair (0 pass, 1 fail, `review-r1/before.log`); drop-time reparenting now skips descendants of moving containers. The nested frame and existing creation/drop tests pass with full-snapshot undo (3 pass, `review-r1/after.log`). The renewed aggregate passed 414 tests with 0 failures (`review-r1/aggregate.log`); typecheck and selected-file Biome passed, and `gridSize` stayed unchanged (`review-r1/typecheck.log`, `review-r1/biome.log`, `review-r1/grid-diff.log`). Independent review remains pending.
+
+- Round 7 addresses `integration-s784-ipd11-export-command-stale-raster-height`: before, the raster test failed 1/8 expecting 475x250; the outside title adds 22 units and the actual result is 475x267 (`round7/before.log`, `round7/capture.log`). The captured SVG dimensions are 633.33x356 and its background is x=-16, y=-38, width=634.67, height=357.34. The updated test preserves whole-pixel and background coverage assertions; focused verification passed 8/8 (`round7/focused.log`).
+- The 19-file aggregate passed 422/422, typecheck and selected Biome passed (`round7/aggregate.log`, `round7/typecheck.log`, `round7/biome.log`). The prior drop behavior remains recorded above; lifecycle and frame-parent interaction hashes remain 1690e2b3 and 3b416da5 (`round7/before-hashes.txt`, `round7/after-hashes.txt`). Formal review remains downstream.
+
+- The broad gate passed: 3342 pass, 64 skip, 0 fail (`round7/broad.log`), with no new failures versus the ipd-00 baseline.
+
+- Test-integrity finding `s6ti-ipd11-r7-raster-height-bound-weakened`: corrected the height bound from >266.24 to >266.99, rejecting the unsnapped 266.25 px height while accepting the snapped 267 px height. The raster test alone changed; focused verification passed 8/8, the aggregate 422/422, and the broad suite 3342 pass, 64 skip, 0 fail. Typecheck and selected Biome passed. Logs and the scoped diff are in `tmp/ipd-s772/ipd-11-frames/round7b/`. The prior creation/drop before-and-after evidence remains above; independent review is pending.

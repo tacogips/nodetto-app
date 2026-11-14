@@ -1,0 +1,86 @@
+/* Pages list in the left pane. Sized and coloured like the Layers panel
+   (side-panels.css) so it reads as one more navigation group. */
+.nodetto-page-list {
+  font-size: 12px;
+}
+.nodetto-page-list-rows {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.nodetto-page-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  padding: 0 4px 0 8px;
+  min-height: 26px;
+  color: inherit;
+  cursor: pointer;
+}
+.nodetto-page-list-row:hover {
+  background: var(--app-chrome-hover, rgba(127, 127, 127, 0.12));
+}
+.nodetto-page-list-row:focus-visible {
+  outline: 2px solid var(--app-focus-ring, #4c8bf5);
+  outline-offset: -2px;
+}
+.nodetto-page-list-number {
+  min-width: 2em;
+  text-align: right;
+  color: var(--app-chrome-muted, var(--nodetto-muted, #777));
+  font-variant-numeric: tabular-nums;
+}
+.nodetto-page-list-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodetto-page-list-active,
+.nodetto-page-list-active:hover {
+  background: var(--nodetto-accent-soft, #dceaff);
+  color: var(--nodetto-ink, inherit);
+}
+.nodetto-page-list-active .nodetto-page-list-number {
+  color: inherit;
+}
+.nodetto-page-list-hidden .nodetto-page-list-name {
+  opacity: 0.55;
+}
+.nodetto-page-list-hidden .nodetto-page-list-name::after {
+  content: " (hidden)";
+  font-style: italic;
+}
+.nodetto-page-list-menu-button,
+.nodetto-page-list-add {
+  border: 0;
+  background: transparent;
+  color: var(--app-chrome-muted, inherit);
+  cursor: pointer;
+  font: inherit;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.nodetto-page-list-menu-button {
+  visibility: hidden;
+}
+.nodetto-page-list-row:hover .nodetto-page-list-menu-button,
+.nodetto-page-list-row:focus-within .nodetto-page-list-menu-button,
+.nodetto-page-list-active .nodetto-page-list-menu-button,
+.nodetto-page-list-menu-button[aria-expanded="true"] {
+  visibility: visible;
+}
+.nodetto-page-list-menu-button:hover,
+.nodetto-page-list-add:hover {
+  color: var(--nodetto-ink, inherit);
+  background: var(--app-chrome-active, rgba(127, 127, 127, 0.2));
+}
+.nodetto-page-list-menu-button:focus-visible,
+.nodetto-page-list-add:focus-visible {
+  outline: 2px solid var(--app-focus-ring, #4c8bf5);
+  outline-offset: -2px;
+}
+.nodetto-page-list-add {
+  margin: 4px 8px 8px;
+}
