@@ -1,0 +1,125 @@
+{
+ "schemaVersion": 1,
+ "id": "doc-1",
+ "title": "Test",
+ "pages": [
+  {
+   "id": "page-1",
+   "name": "BPMN",
+   "kind": "bpmn"
+  }
+ ],
+ "elements": [
+  {
+   "id": "a",
+   "page": "page-1",
+   "type": "bpmn.task",
+   "index": "a1",
+   "semantic": {
+    "name": "a",
+    "taskType": "user",
+    "loop": "none",
+    "parent": "l"
+   },
+   "visual": {
+    "x": 70,
+    "y": 40,
+    "width": 100,
+    "height": 60
+   }
+  },
+  {
+   "id": "b",
+   "page": "page-1",
+   "type": "bpmn.task",
+   "index": "a1",
+   "semantic": {
+    "name": "b",
+    "taskType": "user",
+    "loop": "none",
+    "parent": "m"
+   },
+   "visual": {
+    "x": 290,
+    "y": 300,
+    "width": 100,
+    "height": 60
+   }
+  },
+  {
+   "id": "f",
+   "page": "page-1",
+   "type": "bpmn.messageFlow",
+   "index": "a1",
+   "semantic": {
+    "from": "a",
+    "to": "b"
+   },
+   "visual": {}
+  },
+  {
+   "id": "l",
+   "page": "page-1",
+   "type": "bpmn.lane",
+   "index": "a1",
+   "semantic": {
+    "name": "l",
+    "parent": "p"
+   },
+   "visual": {
+    "x": 30,
+    "y": 0,
+    "width": 400,
+    "height": 140
+   }
+  },
+  {
+   "id": "m",
+   "page": "page-1",
+   "type": "bpmn.lane",
+   "index": "a1",
+   "semantic": {
+    "name": "m",
+    "parent": "q"
+   },
+   "visual": {
+    "x": 30,
+    "y": 260,
+    "width": 400,
+    "height": 140
+   }
+  },
+  {
+   "id": "p",
+   "page": "page-1",
+   "type": "bpmn.participant",
+   "index": "a1",
+   "semantic": {
+    "name": "p",
+    "collapsed": false
+   },
+   "visual": {
+    "x": 0,
+    "y": 0,
+    "width": 430,
+    "height": 140
+   }
+  },
+  {
+   "id": "q",
+   "page": "page-1",
+   "type": "bpmn.participant",
+   "index": "a1",
+   "semantic": {
+    "name": "q",
+    "collapsed": false
+   },
+   "visual": {
+    "x": 0,
+    "y": 260,
+    "width": 430,
+    "height": 140
+   }
+  }
+ ]
+}

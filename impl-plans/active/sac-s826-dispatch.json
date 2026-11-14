@@ -1,0 +1,381 @@
+{
+  "taskId": "sac-s826",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-826",
+  "implementationBranch": "feat/slide-area-copy-shapes",
+  "baseBranch": "feat/slide-area-copy-shapes",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "a5ef4fa91fe510efd33be36458a3ef86d2e6953a",
+  "evidenceRoot": "tmp/sac-s826",
+  "overviewPath": "impl-plans/active/sac-00-overview.md",
+  "designReferences": [
+    "design-docs/specs/design-slide-area-copy-shapes.md",
+    "design-docs/specs/design-presentation.md",
+    "design-docs/user-qa/slide-area-copy-shapes.md"
+  ],
+  "designDocPaths": [
+    "design-docs/specs/design-slide-area-copy-shapes.md",
+    "design-docs/specs/design-presentation.md",
+    "design-docs/user-qa/slide-area-copy-shapes.md"
+  ],
+  "acceptedDependencies": [],
+  "checkpointAmendments": [],
+  "waves": [
+    ["sac-01-slide-data", "sac-02-copy-shapes-core", "sac-03-slide-rect-core"],
+    ["sac-04-slide-collab-duplicate", "sac-05-cli-copy-shapes", "sac-06-slide-area-overlay", "sac-07-settings-and-picker-ui"],
+    ["sac-08-wiring"]
+  ],
+  "reconcile": {
+    "afterWave1": ["bun run typecheck", "mkdir -p tmp/sac-s826/reconcile && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/sac-s826/reconcile/strict-index-wave1.log 2>&1; ! grep 'error TS' tmp/sac-s826/reconcile/strict-index-wave1.log | grep -v -e '\\.test\\.ts' -e '^apps/desktop/scripts/'", "bun test ./packages/core/src/presentation ./packages/core/src/copy-page-elements.test.ts ./packages/core/src/slide-area-commands.test.ts ./packages/core/src/pages.test.ts"],
+    "afterWave2": ["bun run typecheck", "mkdir -p tmp/sac-s826/reconcile && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/sac-s826/reconcile/strict-index-wave2.log 2>&1; ! grep 'error TS' tmp/sac-s826/reconcile/strict-index-wave2.log | grep -v -e '\\.test\\.ts' -e '^apps/desktop/scripts/'", "bun test ./packages/collab/src/slide-area.test.ts ./apps/cli/src/pages-command.test.ts ./packages/ui-solid/src/canvas/slide-area.test.ts ./packages/ui-solid/src/presentation ./packages/ui-solid/src/copy-shapes-options.test.ts"],
+    "strictIndexGateNote": "Production-only noUncheckedIndexedAccess gate (SAC-PLAN-001). tsconfig is unchanged; the 104 baseline errors in *.test.ts and apps/desktop/scripts at a5ef4fa are filtered out. The command exits 0 only when no production source has a strict-index error."
+  },
+  "reviewContext": {
+    "issueReference": "none; runtime workflowInput of opus-terra-design-and-implement-review-loop-session-826 is authoritative",
+    "userProblem": "Authors cannot see what a slide will show, because a slide is the page's single frame or else its content bounds. Building the next slide from the previous one needs a way to copy every shape of one page onto another.",
+    "requiredOutcomes": [
+      "Optional Document.slideSize and Page.slideOrigin validate, round-trip in canonical JSONL and Yjs, and are byte-identical when absent.",
+      "Pure core resolveSlideRect, presets and slideLabel, with tests.",
+      "The presentation controller clips and fits exactly the explicit rect when a size is set; nothing changes when no size is set.",
+      "A DOM-only slide-area overlay with a label, and dimming only for an explicit size. It is never exported or hit-tested, and has an optional Canvas prop with automatic visibility.",
+      "Inspector settings for the slide size and the page origin.",
+      "copyPageElements through a helper extracted from planDuplicatePage, with one undo step and the pasted elements selected; a picker that defaults to Previous page; the page tab menu item and a header action.",
+      "The CLI command nodetto-cli pages copy-shapes with --from page|prev|next and --to page.",
+      "Docs (editing.md, cli.md) and the README updated."
+    ],
+    "constraints": [
+      "Exactly one new core Command kind, updateDocument (design 3.1). It must be stated in the final summary, together with the private sync Worker follow-up.",
+      "noUncheckedIndexedAccess-safe code.",
+      "The overlay never reaches the core renderers, exports, thumbnails or presentation.",
+      "The Show slide area toggle is a UI preference only.",
+      "Duplicate page output stays byte-identical.",
+      "Public repository only, gitPush false, no emojis."
+    ],
+    "designDecisionsAndRationale": [
+      "updateDocument is needed because Store.meta was load-only and no command could edit document fields (design 3.1, user-qa Q1).",
+      "The UI uses editor.apply with the commands, with no facade setters, so the work fits in 2 feature waves (design 3.3).",
+      "Core resolvers take structural inputs, so sac-03 runs in parallel with sac-01.",
+      "The controller owns explicit-size rendering through SvgExportOptions.viewport (SAC-DES-001).",
+      "NodettoCanvasProps.showSlideArea is optional, with automatic visibility, so wave 2 typechecks before wiring (SAC-DES-002).",
+      "sac-01 owns the IR barrel type names, because wave 2 imports them.",
+      "The desktop app has no Edit/Page menu bar. The design's Edit/Page entry is a FileActions header button next to Present, plus the page tab menu item."
+    ],
+    "nonGoals": ["Fit to slide", "copy-shapes shortcut", "per-page slide size", "slide-size-aware export", "copying page-level fields"],
+    "residualRisks": [
+      "The private sync Worker needs an updateDocument case.",
+      "An older collab client can drop slideOrigin when it edits a page.",
+      "SlideAreaOverlay and the dialog DOM have no automated DOM test; the logic is covered through the pure modules."
+    ],
+    "intentionalTradeoffs": [
+      "Exactly one new core Command kind, updateDocument, because Store.meta had no editing command (design 3.1, user-qa Q1); the private sync Worker needs a matching case, stated in the final summary.",
+      "The Edit/Page menu entry is a FileActions header button plus the page tab menu item, because the desktop app has no menu bar.",
+      "SlideAreaOverlay and CopyShapesDialog DOM have no automated DOM tests; their logic is covered by the pure modules.",
+      "An older collab client can drop Page.slideOrigin when it edits that page (design 10), as accepted for hiddenInPresentation.",
+      "sac-01 and sac-08 exceed the ~150-line plan guidance; splitting them would add contract coupling (step5 review residuals).",
+      "Strict-index violations are caught at reconcile or in sac-08 through the production-only noUncheckedIndexedAccess gate (SAC-PLAN-001)."
+    ],
+    "supportedEdgeCases": [
+      "Explicit slide size with and without a page slideOrigin override, including an empty page (the explicit rect still resolves; frames are ignored).",
+      "No slide size: unchanged fallback to the single visible frame, else content bounds; an empty page resolves to null.",
+      "Hidden pages: the label reads Hidden from presentation; hidden pages count as tab neighbors for prev/next.",
+      "Copy shapes: prev at the first page and next at the last page are disabled in the UI and a clear CLI error; source equal to target is rejected; an empty source copies 0 elements with no undo entry and no write.",
+      "Copied elements get fresh IDs with connector endpoints, group/frame membership and parent links remapped, the same coordinates, placement above existing target content, and one undo step.",
+      "The CLI prev/next keywords win over a page literally named prev or next; --dry-run writes nothing.",
+      "Documents without slideSize/slideOrigin round-trip byte-identically; duplicate page output stays byte-identical."
+    ],
+    "outOfScopeEdgeCases": [
+      "Fit to slide / zoom-to-slide action (deferred, user-qa Q6).",
+      "A keyboard shortcut for copy shapes.",
+      "A per-page slide size.",
+      "Slide-size-aware SVG/PNG/PDF export.",
+      "Copying page-level fields (name, mode, tokens, routing) or duplicating binary assets.",
+      "Changes to slideshow keys or navigation.",
+      "Changes to the private nodetto-cloud sync Worker."
+    ],
+    "sourcePaths": ["packages/ir/src", "packages/io/src/jsonl", "packages/collab/src", "packages/core/src", "packages/ui-solid/src", "apps/desktop/src", "apps/cli/src", "docs/editing.md", "docs/cli.md", "README.md"]
+  },
+  "plans": [
+    {
+      "planId": "sac-01-slide-data",
+      "planPath": "impl-plans/active/sac-01-slide-data.md",
+      "progressPath": "impl-plans/progress/sac-01-slide-data.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/types.ts",
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/index.ts",
+        "packages/ir/src/slide-area.test.ts",
+        "packages/io/src/jsonl/records.ts",
+        "packages/io/src/jsonl/parse.ts",
+        "packages/io/src/jsonl/slide-area.test.ts",
+        "packages/core/src/store.ts",
+        "packages/core/src/commands.ts",
+        "packages/core/src/editor/dirty-pages.ts",
+        "packages/core/src/editor/transaction.ts",
+        "packages/core/src/slide-area-commands.test.ts",
+        "impl-plans/progress/sac-01-slide-data.md",
+        "tmp/sac-s826/sac-01-slide-data",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./packages/ir/src/slide-area.test.ts ./packages/ir/src/page-presentation-flag.test.ts",
+        "bun test ./packages/io/src/jsonl",
+        "bun test ./packages/core/src/slide-area-commands.test.ts ./packages/core/src/page-presentation-flag.test.ts ./packages/core/src/pages.test.ts",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "slideSize and slideOrigin validate with the codes type.object, range.slideSize, range.slideOrigin and type.unknown.",
+        "JSONL round trips with the fields are canonical; files without them are byte-identical and the golden suites pass.",
+        "updateDocument and updatePage slideOrigin set, clear and undo exactly; Editor load followed by snapshot keeps slideSize.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-02-copy-shapes-core",
+      "planPath": "impl-plans/active/sac-02-copy-shapes-core.md",
+      "progressPath": "impl-plans/progress/sac-02-copy-shapes-core.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/editor/facade/page-editing.ts",
+        "packages/core/src/copy-page-elements.test.ts",
+        "impl-plans/progress/sac-02-copy-shapes-core.md",
+        "tmp/sac-s826/sac-02-copy-shapes-core",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./packages/core/src/copy-page-elements.test.ts",
+        "bun test ./packages/core/src/pages.test.ts ./packages/core/src/page-presentation-flag.test.ts ./packages/core/src/page-order.test.ts",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "planPageElementsCopy is the only copyElements caller in pages.ts, and planDuplicatePage uses it with unchanged output.",
+        "copyPageElements copies with fresh ids, remapped connectors and groups, the same coordinates and on top, in one undo step that restores the target exactly; it selects the pasted elements on the target page.",
+        "from==to and unknown ids return null; an empty source returns [] without an undo entry; adjacentPageId returns null at the edges.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-03-slide-rect-core",
+      "planPath": "impl-plans/active/sac-03-slide-rect-core.md",
+      "progressPath": "impl-plans/progress/sac-03-slide-rect-core.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/presentation/slide-rect.ts",
+        "packages/core/src/presentation/slide-rect.test.ts",
+        "packages/core/src/presentation/slide-size.ts",
+        "packages/core/src/presentation/slide-size.test.ts",
+        "packages/core/src/presentation/labels.ts",
+        "packages/core/src/presentation/labels.test.ts",
+        "packages/core/src/presentation/index.ts",
+        "impl-plans/progress/sac-03-slide-rect-core.md",
+        "tmp/sac-s826/sac-03-slide-rect-core",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./packages/core/src/presentation",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "resolveSlideRect covers explicit with and without an origin, the artboard fallback, the content fallback, and an empty page with and without a size.",
+        "The presets are in order with A4 landscape 1123x794; slideSizePreset returns custom for a non-preset size; slideLabel handles hidden pages.",
+        "source.ts, slides.ts, fit.ts, navigation.ts and packages/core/src/index.ts are unchanged.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-04-slide-collab-duplicate",
+      "planPath": "impl-plans/active/sac-04-slide-collab-duplicate.md",
+      "progressPath": "impl-plans/progress/sac-04-slide-collab-duplicate.md",
+      "wave": 2,
+      "dependsOn": ["sac-01-slide-data", "sac-02-copy-shapes-core"],
+      "writePaths": [
+        "packages/collab/src/ydoc.ts",
+        "packages/collab/src/binding.ts",
+        "packages/collab/src/slide-area.test.ts",
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/duplicate-slide-origin.test.ts",
+        "impl-plans/progress/sac-04-slide-collab-duplicate.md",
+        "tmp/sac-s826/sac-04-slide-collab-duplicate",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/editor/pages.ts", "intendedEdit": "Only the planDuplicatePage page literal gains the slideOrigin spread. sac-02 edited this file in wave 1; read it fresh."}
+      ],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./packages/collab/src/slide-area.test.ts ./packages/collab/src/page-presentation-flag.test.ts ./packages/collab/src/binding-pages-artboards.test.ts",
+        "bun test ./packages/core/src/duplicate-slide-origin.test.ts ./packages/core/src/pages.test.ts ./packages/core/src/copy-page-elements.test.ts",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "Yjs round trips slideSize (meta) and slideOrigin (page); absent fields leave no keys; malformed Y values are dropped.",
+        "A local updateDocument reaches a second peer through the binding, and so does a null removal.",
+        "Duplicate page copies slideOrigin only when present.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-05-cli-copy-shapes",
+      "planPath": "impl-plans/active/sac-05-cli-copy-shapes.md",
+      "progressPath": "impl-plans/progress/sac-05-cli-copy-shapes.md",
+      "wave": 2,
+      "dependsOn": ["sac-02-copy-shapes-core"],
+      "writePaths": [
+        "apps/cli/src/pages-command.ts",
+        "apps/cli/src/pages-copy-shapes.ts",
+        "apps/cli/src/pages-command.test.ts",
+        "impl-plans/progress/sac-05-cli-copy-shapes.md",
+        "tmp/sac-s826/sac-05-cli-copy-shapes",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./apps/cli/src/pages-command.test.ts",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "pages copy-shapes --from prev writes once and copies with remapped ids; the first page with prev, the last page with next, and from==to fail with 'Nothing was written.' and no write.",
+        "--dry-run --format json reports written:false without writing; an empty source writes nothing.",
+        "apps/cli/src/commands.ts and help.ts are unchanged.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-06-slide-area-overlay",
+      "planPath": "impl-plans/active/sac-06-slide-area-overlay.md",
+      "progressPath": "impl-plans/progress/sac-06-slide-area-overlay.md",
+      "wave": 2,
+      "dependsOn": ["sac-01-slide-data", "sac-03-slide-rect-core"],
+      "writePaths": [
+        "packages/ui-solid/src/canvas/slide-area.ts",
+        "packages/ui-solid/src/canvas/slide-area.test.ts",
+        "packages/ui-solid/src/canvas/SlideAreaOverlay.tsx",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/presentation/controller.ts",
+        "packages/ui-solid/src/presentation/controller.test.ts",
+        "packages/ui-solid/src/presentation/slide-clip.test.ts",
+        "impl-plans/progress/sac-06-slide-area-overlay.md",
+        "tmp/sac-s826/sac-06-slide-area-overlay",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./packages/ui-solid/src/canvas/slide-area.test.ts ./packages/ui-solid/src/presentation/controller.test.ts ./packages/ui-solid/src/presentation/slide-clip.test.ts",
+        "bun test ./packages/ui-solid/src/canvas-paint-order.test.ts ./packages/ui-solid/src/presentation/keys.test.ts",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "effectiveShowSlideArea: omitted means shown iff slideSize is set; explicit true and false override it.",
+        "The model gives the rect and label with dim only when explicit; renderPageSvg has no nodetto-slide-area.",
+        "The controller with slideSize and origin (100,-50) yields viewBox '100 -50 1920 1080', size from the rect and layout from fitSlide of the rect; an empty explicit slide has src null and the rect size; the unset path is unchanged.",
+        "PresentationView.tsx and App.tsx are unchanged.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-07-settings-and-picker-ui",
+      "planPath": "impl-plans/active/sac-07-settings-and-picker-ui.md",
+      "progressPath": "impl-plans/progress/sac-07-settings-and-picker-ui.md",
+      "wave": 2,
+      "dependsOn": ["sac-01-slide-data", "sac-02-copy-shapes-core", "sac-03-slide-rect-core"],
+      "writePaths": [
+        "packages/ui-solid/src/inspector/PresentationSection.tsx",
+        "packages/ui-solid/src/inspector/presentation-settings.ts",
+        "packages/ui-solid/src/inspector/presentation-settings.test.ts",
+        "packages/ui-solid/src/copy-shapes-options.ts",
+        "packages/ui-solid/src/copy-shapes-options.test.ts",
+        "packages/ui-solid/src/CopyShapesDialog.tsx",
+        "packages/ui-solid/src/CopyShapesDialog.css",
+        "packages/ui-solid/src/PageTabs.tsx",
+        "impl-plans/progress/sac-07-settings-and-picker-ui.md",
+        "tmp/sac-s826/sac-07-settings-and-picker-ui",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./packages/ui-solid/src/copy-shapes-options.test.ts ./packages/ui-solid/src/inspector/presentation-settings.test.ts",
+        "bun test ./packages/ui-solid/src/page-presentation-toggle.test.ts ./packages/ui-solid/src/page-rename.test.ts",
+        "bun run typecheck"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures.",
+        "The copy-shapes options list prev, next, then the others without the target; the default is prev, or the first enabled option; prev is disabled on the first page.",
+        "The slide size and origin command builders return the expected updateDocument/updatePage commands, or null when nothing changes; undo restores the previous state.",
+        "PageTabs onCopyShapesFrom is optional; App.tsx, Inspector.tsx and the ui-solid index.ts are unchanged.",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    },
+    {
+      "planId": "sac-08-wiring",
+      "planPath": "impl-plans/active/sac-08-wiring.md",
+      "progressPath": "impl-plans/progress/sac-08-wiring.md",
+      "wave": 3,
+      "dependsOn": ["sac-04-slide-collab-duplicate", "sac-05-cli-copy-shapes", "sac-06-slide-area-overlay", "sac-07-settings-and-picker-ui"],
+      "writePaths": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/settings/preferences.ts",
+        "apps/desktop/src/settings/preferences.test.ts",
+        "apps/desktop/src/shell/FileActions.tsx",
+        "packages/ui-solid/src/ZoomControls.tsx",
+        "packages/ui-solid/src/Inspector.tsx",
+        "packages/ui-solid/src/index.ts",
+        "apps/cli/src/help.ts",
+        "docs/editing.md",
+        "docs/cli.md",
+        "README.md",
+        "impl-plans/progress/sac-08-wiring.md",
+        "tmp/sac-s826/sac-08-wiring",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./apps/desktop/src/settings/preferences.test.ts ./apps/desktop/src/shell/window-input.test.ts",
+        "bun test ./apps/cli/src/cli-wiring.test.ts ./apps/cli/src/pages-command.test.ts",
+        "bun run typecheck",
+        "mkdir -p tmp/sac-s826/sac-08-wiring/final && bunx tsc --noEmit --noUncheckedIndexedAccess -p tsconfig.json > tmp/sac-s826/sac-08-wiring/final/strict-index.log 2>&1; ! grep 'error TS' tmp/sac-s826/sac-08-wiring/final/strict-index.log | grep -v -e '\\.test\\.ts' -e '^apps/desktop/scripts/'",
+        "CARGO_TERM_QUIET=true mise run lint",
+        "CARGO_TERM_QUIET=true mise run verify",
+        "bun run build"
+      ],
+      "acceptanceCriteria": [
+        "Verifications exited 0 with tests run and zero failures; build output stays in the gitignored apps/desktop/dist.",
+        "The showSlideArea preference is optional and boolean-only; the View menu toggle stores the negation of the effective value; it is never stored in the document.",
+        "The copy-shapes dialog opens from the page tab menu and the header button for the current page; PresentationSection is mounted after PageSection.",
+        "CLI help, docs/cli.md, docs/editing.md (Slide size, Slide area, Copy shapes from page) and README are updated.",
+        "The final summary states the single new Command kind, updateDocument.",
+        "The production-only noUncheckedIndexedAccess gate exited 0 (log tmp/sac-s826/sac-08-wiring/final/strict-index.log): no 'error TS' line outside *.test.ts and apps/desktop/scripts (SAC-PLAN-001).",
+        "The progress log has the intent hash, per-edit hashes and exit statuses."
+      ]
+    }
+  ]
+}

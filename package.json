@@ -1,0 +1,34 @@
+{
+  "name": "nodetto-app",
+  "version": "0.1.0",
+  "description": "nodetto standalone diagram editor and shared editor packages",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "bun --cwd=apps/desktop run dev",
+    "build": "bun run typecheck && bun --cwd=apps/desktop run build",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "lint": "bun run lint:ts",
+    "lint:biome": "biome check . --diagnostic-level=warn",
+    "lint:ts": "bun run lint:biome && bun run typecheck",
+    "format": "biome format --write packages apps",
+    "format:check": "biome format --check packages apps",
+    "tauri": "bun --cwd=apps/desktop run tauri"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@biomejs/biome": "^1.9.4",
+    "@types/babel__core": "7.20.5",
+    "@types/bun": "^1.1.14",
+    "babel-preset-solid": "1.9.15",
+    "gerber-parser": "4.2.7",
+    "happy-dom": "21.0.4",
+    "typescript": "~5.6.2"
+  },
+  "overrides": {
+    "@types/node": "^26.2.0"
+  }
+}

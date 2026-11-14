@@ -1,0 +1,176 @@
+{
+  "taskId": "stb-s857",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/selection-toolbar-icons",
+  "baseBranch": "feat/selection-toolbar-icons",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "b07fd34c8b9c5c621274551497b3461f36a69a27",
+  "designDocPaths": ["design-docs/specs/design-selection-toolbar-icons.md"],
+  "evidenceRoot": "tmp/stb-s857",
+  "reviewContext": {
+    "issueReference": "none; workflowInput.requestedOutcome (opus-terra-design-and-implement-review-loop-session-857; design accepted at Step 3, comm-020237)",
+    "userProblem": "The floating selection toolbar uses text buttons. It needs icon-only controls with hover tooltips and aria-labels, plus a Text disclosure for formatting the text of the selection.",
+    "requiredOutcomes": [
+      "Icon-only buttons and summaries from the vendored Lucide set. The title equals the aria-label (actionTitle for actions). Toggles expose aria-pressed.",
+      "A unit test fails if any toolbar icon name is missing from the registry.",
+      "The Text disclosure covers font size steps with the current size, bold, italic, underline, strikethrough, horizontal alignment, and vertical alignment for text.note only. Each click is one setSelectionStyle undo step.",
+      "A DOM-free text-format module with unit tests.",
+      "Existing behaviour is kept. SelectionToolbar.css is self-contained and uses existing tokens only."
+    ],
+    "nonGoals": [
+      "Changes to actions, the shortcut table, ContextMenu.tsx or the main toolbar",
+      "A new Command kind, a new dependency, or a new CSS custom property",
+      "A styled tooltip",
+      "Edits to /Users/taco/gits/tacogips/nodetto-cloud/apps/web"
+    ],
+    "constraints": [
+      "Workers edit only their writePaths, their progress file and their evidence directory. No git state changes, no any, no emojis.",
+      "mise run verify gets up to 3 attempts for deadline tests under load. Deadlines are never relaxed.",
+      "No push. Local commits only, with no tool attribution."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Icons come only from the vendored Lucide set through findIcon and renderIconMarkup, named in one TOOLBAR_ICONS record.", "rationale": "No hand-drawn paths and no new dependency. One key type makes the registry test cover every icon the toolbar uses (design 3.2)."},
+      {"decision": "Text formatting logic lives in a DOM-free text-format.ts and writes only through editor.setSelectionStyle.", "rationale": "Unit-testable without the DOM. Each click is one undo step across every leaf reached through groups, with no new Command kind (design 3.1, 3.3)."},
+      {"decision": "All toolbar CSS moves into SelectionToolbar.css, scoped under .nodetto-selection-toolbar, and the .nodetto-float-* rules are removed from panels.css.", "rationale": "ui-solid imports SelectionToolbar.css, so the hosted app gets the rules without edits to nodetto-cloud. Existing tokens with design-appearance 4.3 fallbacks keep both themes correct (design 3.4)."},
+      {"decision": "Native title tooltips equal to aria-label; actions use actionTitle.", "rationale": "Meets the mouse-over requirement with the shortcut included and no extra tooltip component (design 3.3, 3.4)."},
+      {"decision": "Two independent wave-1 plans (text-format, toolbar-icon) and one wave-2 wiring plan.", "rationale": "Dependencies follow real import contracts only; source write paths do not overlap."}
+    ],
+    "intentionalTradeoffs": [
+      "Clicking the implicit default vertical alignment 'top' while unset writes 'top' explicitly; it looks the same.",
+      "ToolbarIcon uses a 24 box inside a viewBox 0 0 24 24 svg sized 16px instead of a 0..16 box with paint viewBox 24; the rendered glyph is identical.",
+      "No styled tooltip and no DOM render test; visible-label removal is checked by review plus unit tests.",
+      "Wave-1 plans run workspace-wide typecheck while a sibling edits; a sibling-only diagnostic is recorded and re-run after the wave."
+    ],
+    "supportedEdgeCases": [
+      "Font size at or beyond 8 or 72 disables the smaller or larger button; non-step sizes move to the neighbouring step.",
+      "Decoration combines to 'underline line-through' and clears to null, never 'none'.",
+      "Clicking the active horizontal or vertical alignment clears it to the default.",
+      "Vertical alignment row appears only when every selected leaf is text.note; groups are expanded through leafElements.",
+      "Simple mode hides Frame selection and boolean operations; Straighten and align actions appear only when enabled; disabled actions look disabled.",
+      "Escape closes the Text disclosure and refocuses its summary; pressing the canvas closes it; the toolbar hides while dragging."
+    ],
+    "outOfScopeEdgeCases": [
+      "Mixed formatting across leaves: pressed state reflects the first leaf only, as in the inspector.",
+      "Per-character rich text formatting.",
+      "Read-only handling beyond what the existing colour swatches do.",
+      "Hosted web app styling beyond the rules carried by SelectionToolbar.css."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-selection-toolbar-icons.md",
+      "design-docs/specs/design-appearance.md",
+      "impl-plans/active/stb-01-text-format.md",
+      "impl-plans/active/stb-02-toolbar-icon.md",
+      "impl-plans/active/stb-03-toolbar-wiring.md",
+      "packages/ui-solid/src/SelectionToolbar.tsx",
+      "packages/ui-solid/src/SelectionToolbar.css",
+      "packages/ui-solid/src/IconPicker.tsx",
+      "packages/ui-solid/src/inspector/StyleSection.tsx",
+      "packages/ui-solid/src/shortcuts.ts",
+      "packages/core/src/icons/icon-registry.ts",
+      "packages/core/src/icons/icon-markup.ts",
+      "apps/desktop/src/styles/panels.css",
+      "apps/desktop/src/styles/theme-tokens.test.ts",
+      "docs/editing.md"
+    ]
+  },
+  "waves": [
+    ["stb-01-text-format", "stb-02-toolbar-icon"],
+    ["stb-03-toolbar-wiring"]
+  ],
+  "plans": [
+    {
+      "planId": "stb-01-text-format",
+      "planPath": "impl-plans/active/stb-01-text-format.md",
+      "progressPath": "impl-plans/progress/stb-01-text-format.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/text-format.ts",
+        "packages/ui-solid/src/text-format.test.ts",
+        "impl-plans/progress/stb-01-text-format.md",
+        "tmp/stb-s857/stb-01-text-format",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "text-format.ts exports DEFAULT_FONT_SIZE (13, from TEXT_NOTE_FONT_SIZE), FONT_SIZE_STEPS 8..72, MIN_FONT_SIZE, MAX_FONT_SIZE, TextFormatState, textFormatState, stepFontSize, fontSizePatch, boldPatch, italicPatch, decorationPatch, textAlignPatch, verticalAlignPatch and supportsVerticalAlign, with the signatures in the plan.",
+        "Bold writes 700 or null. Italic writes 'italic' or null. Decoration combines to 'underline line-through' and clears to null, never 'none'. Clicking the active textAlign or verticalAlign writes null. stepFontSize returns null beyond the bounds.",
+        "The module imports no Solid or DOM APIs, and text-format.test.ts covers every case listed in the plan."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/text-format.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/text-format.ts packages/ui-solid/src/text-format.test.ts",
+        "sh -c 'mkdir -p tmp/stb-s857/stb-01-text-format && bunx tsc --noEmit --pretty false -p tsconfig.json --noUncheckedIndexedAccess > tmp/stb-s857/stb-01-text-format/strict-index.log 2>&1; ! grep -E \"^packages/ui-solid/src/text-format(\\.test)?\\.ts\\(\" tmp/stb-s857/stb-01-text-format/strict-index.log'"
+      ]
+    },
+    {
+      "planId": "stb-02-toolbar-icon",
+      "planPath": "impl-plans/active/stb-02-toolbar-icon.md",
+      "progressPath": "impl-plans/progress/stb-02-toolbar-icon.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/ToolbarIcon.tsx",
+        "packages/ui-solid/src/ToolbarIcon.test.ts",
+        "impl-plans/progress/stb-02-toolbar-icon.md",
+        "tmp/stb-s857/stb-02-toolbar-icon",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "ToolbarIcon.tsx exports TOOLBAR_ICONS as const, with exactly the 36 key-to-Lucide pairs in the plan, along with ToolbarIconKey and ToolbarIcon({ name }).",
+        "ToolbarIcon renders an aria-hidden 16px svg with viewBox 0 0 24 24 using findIcon and renderIconMarkup with currentColor stroke and no hand-drawn paths.",
+        "ToolbarIcon.test.ts fails when any TOOLBAR_ICONS value is missing from findIcon, and checks the exact key set and that values are unique."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/ToolbarIcon.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/ToolbarIcon.tsx packages/ui-solid/src/ToolbarIcon.test.ts",
+        "sh -c 'mkdir -p tmp/stb-s857/stb-02-toolbar-icon && bunx tsc --noEmit --pretty false -p tsconfig.json --noUncheckedIndexedAccess > tmp/stb-s857/stb-02-toolbar-icon/strict-index.log 2>&1; ! grep -E \"^packages/ui-solid/src/ToolbarIcon(\\.test)?\\.tsx?\\(\" tmp/stb-s857/stb-02-toolbar-icon/strict-index.log'"
+      ]
+    },
+    {
+      "planId": "stb-03-toolbar-wiring",
+      "planPath": "impl-plans/active/stb-03-toolbar-wiring.md",
+      "progressPath": "impl-plans/progress/stb-03-toolbar-wiring.md",
+      "wave": 2,
+      "dependsOn": ["stb-01-text-format", "stb-02-toolbar-icon"],
+      "writePaths": [
+        "packages/ui-solid/src/SelectionToolbar.tsx",
+        "packages/ui-solid/src/SelectionToolbar.css",
+        "packages/ui-solid/src/SelectionToolbar.test.ts",
+        "apps/desktop/src/styles/panels.css",
+        "docs/editing.md",
+        "impl-plans/progress/stb-03-toolbar-wiring.md",
+        "tmp/stb-s857/stb-03-toolbar-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/desktop/src/styles/panels.css", "intendedEdit": "Delete only the floating selection toolbar container rule and the .nodetto-float-group, .nodetto-float-colours and .nodetto-float-button rules (about lines 261-319). Keep every .nodetto-swatch rule."},
+        {"path": "docs/editing.md", "intendedEdit": "Near line 399, describe the toolbar as icons with hover names and add one paragraph about the Text disclosure."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Every toolbar button and summary has only a ToolbarIcon child (the font-size <output> is the only text), with title equal to aria-label. Action buttons use actionTitle, and toggles expose aria-pressed.",
+        "The Text disclosure sits between Colors and Arrange. It uses leafElements and the first leaf's style for its state and writes only through editor.setSelectionStyle with the text-format patches. The vertical row shows only when supportsVerticalAlign is true.",
+        "Existing behaviour is unchanged: placeAbove and its test, hiding while pressed, Escape refocusing the summary, simple-mode guards, conditional Straighten and align buttons, and disabled states.",
+        "SelectionToolbar.css holds every toolbar rule, scoped under .nodetto-selection-toolbar, with 26px buttons and existing tokens with light fallbacks. theme-tokens.test.ts passes. panels.css no longer contains nodetto-float- rules.",
+        "docs/editing.md describes the icon toolbar and the Text disclosure."
+      ],
+      "verification": [
+        "bun run typecheck",
+        "bun test packages/ui-solid/src/SelectionToolbar.test.ts packages/ui-solid/src/text-format.test.ts packages/ui-solid/src/ToolbarIcon.test.ts apps/desktop/src/styles/theme-tokens.test.ts",
+        "bun .agents/scripts/strict-index-gate.ts capture-baseline --ref b07fd34c8b9c5c621274551497b3461f36a69a27 --out target/strict-index/baseline.log",
+        "bun .agents/scripts/strict-index-gate.ts check --baseline target/strict-index/baseline.log --log target/strict-index/stb-03-toolbar-wiring.log -- packages/ui-solid/src/SelectionToolbar.tsx packages/ui-solid/src/SelectionToolbar.test.ts packages/ui-solid/src/text-format.ts packages/ui-solid/src/text-format.test.ts packages/ui-solid/src/ToolbarIcon.tsx packages/ui-solid/src/ToolbarIcon.test.ts",
+        "mise run lint",
+        "mise run verify"
+      ],
+      "retry": {"command": "mise run verify", "maxAttempts": 3, "reason": "Timing-sensitive deadline tests under machine load. Deadlines are never relaxed."}
+    }
+  ]
+}

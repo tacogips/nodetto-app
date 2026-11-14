@@ -1,0 +1,155 @@
+{
+  "taskId": "prs-s793",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-793",
+  "implementationBranch": "feat/presentation",
+  "baseBranch": "feat/presentation",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "d6f9ebd19a508fe272d7f65ea524ad60aaa06d81",
+  "acceptedDependencies": [
+    {
+      "planId": "prs-01-page-flag",
+      "planPath": "impl-plans/active/prs-01-page-flag.md",
+      "acceptedBy": "integration-review wave-001, session 793",
+      "provides": "Page.hiddenInPresentation (IR type, validation, JSONL key, Yjs pageFields/pageFromY), the updatePage patch field hiddenInPresentation boolean|null with conditional exact undo, the duplicate copy, Editor.setPageHiddenInPresentation and Editor.exportPageSvgOf."
+    },
+    {
+      "planId": "prs-02-core-presentation",
+      "planPath": "impl-plans/active/prs-02-core-presentation.md",
+      "acceptedBy": "integration-review wave-001, session 793",
+      "provides": "@nodetto/core presentation exports: slideList, startIndex, PresentationState, PresentationAction, createPresentationState, reducePresentation, currentSlide, slideCounter, PRESENTATION_MARGIN, fitSlide, SlideSize, SlideSource, slideSource, svgSize."
+    },
+    {
+      "planId": "prs-03-fullscreen",
+      "planPath": "impl-plans/active/prs-03-fullscreen.md",
+      "acceptedBy": "integration-review wave-002, session 793",
+      "provides": "enterPresentationFullscreen (tauri, dom and none modes; idempotent restore) and watchFullscreenExit in apps/desktop/src/shell/presentation-fullscreen.ts; the core:window:allow-set-fullscreen capability and the regenerated gen/schemas/capabilities.json."
+    },
+    {
+      "planId": "prs-04-presentation-view",
+      "planPath": "impl-plans/active/prs-04-presentation-view.md",
+      "acceptedBy": "integration-review wave-002, session 793",
+      "provides": "PresentationView, createPresentationController and presentationKeyAction from packages/ui-solid/src/presentation/index.ts."
+    },
+    {
+      "planId": "prs-05-page-flag-ui",
+      "planPath": "impl-plans/active/prs-05-page-flag-ui.md",
+      "acceptedBy": "integration-review wave-002, session 793",
+      "provides": "The PageTabs Hide/Show in presentation menu item, the PRESENTATION_HIDDEN_TAB_CLASS class and title suffix, and the PageSection Show in presentation switch."
+    }
+  ],
+  "checkpointAmendments": [
+    {
+      "round": 1,
+      "date": "2026-11-10",
+      "reason": "integration-paths-outside-writePaths",
+      "previousCheckpointCommit": "530900e826210e8737ceed8c161c4184b99ef22a",
+      "findingId": "PRS-INT-001",
+      "unmatchedPaths": ["apps/desktop/src-tauri/gen/schemas/capabilities.json"],
+      "assignedTo": "prs-03-fullscreen",
+      "gateChange": "git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json' replaces the full gen/schemas gate in prs-03 and prs-06."
+    },
+    {
+      "round": 2,
+      "date": "2026-11-10",
+      "reason": "blocked-wave-scope-or-contract",
+      "previousCheckpointCommit": "d5eeb9710280eafa0970b34d0714dfcffd9bae75",
+      "blockedPlanIds": ["prs-06-wiring"],
+      "paths": ["apps/desktop/dist"],
+      "decision": "apps/desktop/dist is the gitignored vite output of bun run build (root .gitignore 'dist/'; apps/desktop/vite.config.ts sets no outDir). It is authorized as a prs-06-wiring writePath and artifactRoot. No output relocation and no source or design change.",
+      "resumeCriterion": "prs-06 runs bun run build and records exit 0 in tmp/prs-s793/prs-06-wiring/final/build.log."
+    }
+  ],
+  "designDocPaths": ["design-docs/specs/design-presentation.md", "design-docs/user-qa/presentation.md"],
+  "overviewPath": "impl-plans/active/prs-00-overview.md",
+  "evidenceRoot": "tmp/prs-s793",
+  "evidenceLayout": "Per-plan logs under tmp/prs-s793/<planId>/final/. Move final/ to attempt-<n>/ before repeating a run. Untracked data only.",
+  "waveGates": {
+    "afterWave1": ["bun run typecheck", "bun test ./packages/core/src/presentation/ ./packages/core/src/page-presentation-flag.test.ts"],
+    "afterWave2": ["bun run typecheck", "bun test ./packages/ui-solid/src/presentation/ ./packages/ui-solid/src/page-presentation-toggle.test.ts"]
+  },
+  "reviewContext": {
+    "issueReference": "none; runtime workflowInput of opus-terra-design-and-implement-review-loop-session-793 is authoritative",
+    "userProblem": "Nodetto cannot present a document as a slideshow. Users need a PowerPoint-style full-screen presentation of pages in tab order, rendered read-only and fitted to the screen, with keyboard, mouse and control-bar navigation, and a per-page flag to skip pages.",
+    "requiredOutcomes": [
+      "Optional Page.hiddenInPresentation is validated as a boolean, round-trips in JSONL and Yjs, and is edited only through the updatePage patch with exact undo. Flagless documents are byte-identical.",
+      "Pure core presentation module: slideList, startIndex, navigation reducer, fitSlide, slideSource (with effective inherited visibility) and svgSize, all with tests.",
+      "ui-solid PresentationView plus a DOM-free controller and key map, with tests: slide rendered as a data-URL img from the existing SVG exporter, counter, keys including number+Enter and B, exit callback, and key isolation.",
+      "Desktop: F5 and Shift+F5 (not in editable targets), the File menu items, the header Present button, Tauri or DOM fullscreen with overlay fallback, and a return to the last shown page.",
+      "Page tab menu item and inspector switch for the flag. Docs and the README describe the feature."
+    ],
+    "constraints": [
+      "No new core Command kind; use the updatePage patch.",
+      "Documents without the flag round-trip byte-identically; the setter removes the key instead of writing false.",
+      "Presentation captures every key (stopImmediatePropagation), and window-input returns early while presenting.",
+      "apps/desktop/src-tauri/gen/schemas stays byte-identical except gen/schemas/capabilities.json, which tauri-build regenerates from capabilities/default.json and which prs-03 owns (amendment round 1, PRS-INT-001). The exporter, layer-state and the CLI are untouched.",
+      "Public repository: no server or auth code. No emojis. gitPush false."
+    ],
+    "designDecisionsAndRationale": [
+      "Rendering reuses renderArtboardSvg/renderPageSvg through Editor.exportArtboardSvg/exportPageSvgOf, shown as a data-URL img, to avoid defs id collisions with the mounted canvas.",
+      "Artboard: exactly one frame that is visible by inherited visibility (createShapeContext.isHidden), otherwise the content bbox; a null artboard export falls back to the page render (PRS-DESIGN-001).",
+      "prs-02 owns the single core barrel line, because @nodetto/core has no subpath exports and wave-2 ui-solid must import it.",
+      "ui-solid behavior lives in a DOM-free controller, because ui-solid tests run without a DOM.",
+      "Core function names are prefixed (reducePresentation, currentSlide, slideCounter) for barrel uniqueness; behavior is unchanged.",
+      "Amendment 2026-11-10 (round 1, PRS-INT-001): tauri-build regenerates gen/schemas/capabilities.json from capabilities/default.json, so adding the fullscreen permission necessarily changes it. prs-03 owns that file and keeps it as generated. The gen/schemas gates exclude only capabilities.json; acl-manifests.json, desktop-schema.json and macOS-schema.json stay byte-identical.",
+      {
+        "decision": "Amendment 2026-11-10 round 2: authorize the gitignored vite build output apps/desktop/dist as a prs-06-wiring writePath and artifactRoot so the required bun run build gate can run; no output relocation, source or design change.",
+        "rationale": "Blocked plan prs-06-wiring (reason blocked-wave-scope-or-contract, trigger comm-018333): bun run build writes apps/desktop/dist (vite.config.ts sets no outDir; .gitignore:8 dist/; 0 tracked files), which lay outside the declared artifact root target. prs-03, prs-04 and prs-05 are recorded as acceptedDependencies. Completion requires build.log exit 0 and an empty git status --porcelain -- apps/desktop/dist. Amendment budget 2 of 2 used."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Mixed-version cloud clients may drop the flag when an older client edits the page.",
+      "Next on the last slide clamps; there is no end screen (user-qa Q4 default)."
+    ],
+    "nonGoals": ["Transitions", "speaker notes", "presenter view", "CLI", "PPTX/PDF slide export", "new Command kind"],
+    "supportedEdgeCases": ["Start on a hidden page goes to the next visible page, or the last slide", "All pages hidden disables Present", "Live slide-list changes reconcile", "Empty page gives a blank slide", "Browser Esc fullscreen exit ends the presentation", "Frame inside a hidden group is not an artboard"],
+    "outOfScopeEdgeCases": ["Multi-monitor presenter", "Touch swipe gestures"],
+    "residualRisks": [
+      "WKWebView fullscreen behavior is verified only through the Tauri API path and manual use",
+      "Long data URLs for large embedded images",
+      "Plan review (step5): prs-04 has no direct test that a single Esc with no pending digits calls onExit at once; the prs-04 worker should add one.",
+      "Plan review (step5): in prs-06, an Esc pressed before enterPresentationFullscreen resolves leaves no session; the worker must guard a null session and restore after a late resolve (restore is idempotent).",
+      "PresentationView.tsx DOM binding has no automated DOM test (repository limitation)."
+    ],
+    "sourcePaths": ["packages/ir/src", "packages/io/src/jsonl", "packages/collab/src/ydoc.ts", "packages/core/src", "packages/ui-solid/src", "apps/desktop/src", "apps/desktop/src-tauri/capabilities/default.json", "docs/editing.md", "README.md"]
+  },
+  "plans": [
+    {
+      "planId": "prs-06-wiring",
+      "planPath": "impl-plans/active/prs-06-wiring.md",
+      "progressPath": "impl-plans/progress/prs-06-wiring.md",
+      "wave": 3,
+      "dependsOn": ["prs-03-fullscreen", "prs-04-presentation-view", "prs-05-page-flag-ui"],
+      "writePaths": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/shell/window-input.ts",
+        "apps/desktop/src/shell/window-input.test.ts",
+        "apps/desktop/src/shell/FileActions.tsx",
+        "apps/desktop/src/pane.css",
+        "packages/ui-solid/src/index.ts",
+        "docs/editing.md",
+        "README.md",
+        "impl-plans/progress/prs-06-wiring.md",
+        "tmp/prs-s793/prs-06-wiring",
+        "target",
+        "apps/desktop/dist"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "apps/desktop/dist"],
+      "verification": [
+        "bun test ./apps/desktop/src/shell/window-input.test.ts ./packages/ui-solid/src/presentation/controller.test.ts",
+        "CARGO_TERM_QUIET=true mise run test",
+        "CARGO_TERM_QUIET=true mise run verify"
+      ],
+      "acceptanceCriteria": [
+        "Verifications 1-3 exited 0 with tests run and zero failures.",
+        "The final gates bun run typecheck, CARGO_TERM_QUIET=true mise run lint, bun run build and git diff --exit-code -- apps/desktop/src-tauri/gen/schemas ':(exclude)apps/desktop/src-tauri/gen/schemas/capabilities.json' exited 0, and gen/schemas/capabilities.json still lists core:window:allow-set-fullscreen (amendment round 1, PRS-INT-001).",
+        "F5 and Shift+F5 start a presentation (not in editable targets, preventDefault); the File menu and header Present actions exist; window-input returns early while presenting; fullscreen enter/restore and the DOM exit watcher are wired; exit returns to the last shown page.",
+        "docs/editing.md has a ## Presentation section covering every key, and README.md links docs/editing.md#presentation.",
+        "The progress log has the intent hash, per-edit hashes and every command's exit status and counts.",
+        "Amendment round 2 (blocked-wave-scope-or-contract): bun run build exited 0 with its vite output written to the gitignored artifact root apps/desktop/dist; the log is tmp/prs-s793/prs-06-wiring/final/build.log; git status shows no tracked change under apps/desktop/dist."
+      ]
+    }
+  ]
+}
