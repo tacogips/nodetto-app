@@ -1,0 +1,15 @@
+(export
+  (components
+    (comp (ref L1) (value Coil) (libsource (lib Device) (part L)))
+    (comp (ref U1) (value Chip) (libsource (lib User) (part MyChip)))
+    (comp (ref X1) (value Missing) (libsource (lib User) (part Unknown)))
+    (comp (ref R1) (value 10k) (libsource (lib Device) (part R)))
+    (comp (ref R1) (value 20k) (libsource (lib Device) (part R))))
+  (libparts
+    (libpart (lib Device) (part L) (pins (pin (num 1) (name 1)) (pin (num 2) (name 2))))
+    (libpart (lib User) (part MyChip) (pins (pin (num 1)) (pin (num 2)) (pin (num 3)) (pin (num 4)) (pin (num 5)) (pin (num 6)) (pin (num 7)) (pin (num 8))))
+    (libpart (lib Device) (part R) (pins (pin (num 1)) (pin (num 2)))))
+  (nets
+    (net (name SINGLE) (node (ref L1) (pin 2)))
+    (net (name BROKEN) (node (ref U1) (pin A1))))
+)

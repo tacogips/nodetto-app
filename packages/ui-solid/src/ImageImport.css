@@ -1,0 +1,36 @@
+.nodetto-image-import-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.nodetto-image-import-error > span {
+  min-width: 0;
+}
+
+.nodetto-image-error-dismiss {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--app-control-radius, 6px);
+  color: var(--nodetto-ink, #1d2a2e);
+  background: transparent;
+  cursor: pointer;
+}
+
+.nodetto-image-error-dismiss svg {
+  width: 16px;
+  height: 16px;
+}
+
+.nodetto-image-error-dismiss:hover {
+  background: var(--app-image-dismiss-hover, #eef0f2);
+}
+
+.nodetto-image-error-dismiss:focus-visible {
+  outline: 2px solid var(--app-ui-focus, #5d7480);
+}

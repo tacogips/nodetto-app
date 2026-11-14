@@ -1,0 +1,421 @@
+{
+  "taskId": "shape-lateral-s544",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-544",
+  "implementationBranch": "fix/shape-lateral-consistency",
+  "baseBranch": "fix/shape-lateral-consistency",
+  "baseBranchUpstream": "none configured",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "878f2cb82eb3b0b3e5f1f108a75e2aa77c00cb48",
+  "amendment": {
+    "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-547",
+    "previousCheckpointCommit": "51993943c8678b35c08aea23bf52a4129ae1bde8",
+    "reason": "Wave 2 blocked. slc-02 needs packages/ir/src/registry/uml.ts, because the shared UML keyOrder declares kind for component, interface and port. slc-03 needs the shape-search 'actor' expectations in packages/core/src/shape-catalogue.test.ts and packages/ui-solid/src/shape-search.test.ts.",
+    "amendedPlans": [
+      "slc-02-ir-unknown-field",
+      "slc-03-geo-actor"
+    ],
+    "resumeState": "No plan is committed yet. The wave-1 and wave-2 source edits stay uncommitted in the working tree, and workers resume from them. Progress logs: slc-01 done, slc-02/03/04/05 blocked, slc-06/07 not started."
+  },
+  "designDocPaths": [
+    "design-docs/specs/design-shape-lateral-consistency.md",
+    "design-docs/user-qa/shape-lateral-consistency.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/slc-00-overview.md",
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/shape-lateral-s544",
+  "evidenceLayout": "Per-plan logs go under tmp/shape-lateral-s544/<planId>/ (one attempt-<n>/ subdirectory per retry) and reconciliation output under tmp/shape-lateral-s544/reconcile/. tmp/ is git-ignored (.gitignore line 41). No *.test.ts file may be written under tmp/.",
+  "reviewContext": {
+    "issueReference": "none (no issueUrl/issueNumber/issueRepository supplied; request taken from workflowInput.requestedOutcome)",
+    "userProblem": "Drawing a person as a UML actor on an architecture page exposed four gaps that apply to every element type or shape. Unknown semantic fields are silently accepted. There is no stick-figure geo shape. draw.io umlActor is only approximated, and UML component, interface and port export as rectangles. draw.path cannot represent an open line.",
+    "requiredOutcomes": [
+      "semantic.unknownField warning for every registered type, recursing through keyOrder.children; zero warnings for fixtures (except forward-compat.jsonl n-known), examples, defaultSemantic, design templates and BPMN imports (slc-02).",
+      "nodetto-cli edit and draw print per-operation warnings in text and JSON and still exit 0; nodetto-cli validate --strict exits 3 when there are warnings (slc-07).",
+      "shape.geo actor stick figure on canvas and in SVG/PNG/PDF export, with the Stick figure palette tile, the geo:actor catalogue entry, box picking, ports and connectors, and D2 person (slc-01, slc-03).",
+      "draw.io umlActor maps to actor exactly in both directions; uml.component, uml.interface and uml.port export natively (slc-05).",
+      "draw.path open contours (closed:false, 2+ points): unfilled stroke, bounds, stroke-only hit test, export, and editing that preserves the flag (slc-01, slc-04, slc-06).",
+      "TYPICAL.architecture lists usecase.node and usecase.relationship; help, docs/cli.md, docs/editing.md and docs/import-export.md are updated (slc-05, slc-07).",
+      "bunx tsc, biome, bun test packages/ir packages/core packages/io apps/cli/src, and mise run verify all pass."
+    ],
+    "nonGoals": [
+      "Arrowheads on open paths, an open/closed toggle UI, a stick-figure label band, native-type reconstruction on draw.io import, sequence lifeline export, and new geo kinds for ext or the 4/6/8-point stars (user-qa Q1-Q7 defaults).",
+      "Schema version bump, fixture or example edits, changes to the person outline or to closed-contour rendering.",
+      "Server, auth, secret or deployment code."
+    ],
+    "constraints": [
+      "Existing JSONL stays byte-identical: keyOrder additions are appended in lexicographic order, and closed:true is never written.",
+      "semantic.unknownField is a warning only, and unknown fields are preserved.",
+      "Workers follow impl-plans/active/slc-00-overview.md 'Per-worker protocol' rules 1-10.",
+      "Run bun tests with BUN_OPTIONS=--jsx-runtime=classic and cargo with CARGO_TERM_QUIET=true; self-authored neutral test data; no emojis; no tool attribution in commits."
+    ],
+    "designDecisionsAndRationale": [
+      "Unknown semantic keys are a warning (code semantic.unknownField, path elements[i].semantic.<key>) rather than an error, so documents from newer builds still load and round-trip (design section 1).",
+      "keyOrder omissions are fixed in the registry (BPMN, database objects) rather than suppressed, so the warning stays meaningful for every type (design section 1, keyOrder audit).",
+      "The stick figure is a new GeoKind 'actor' instead of a change to 'person', so existing person shapes render unchanged; its box is the picking, port and connector region (geoOutlinePolygon returns null) (design section 2).",
+      "Open contours use an optional contour key closed:false; absent means closed, so existing JSONL is byte-identical and no schema bump is needed (design section 4).",
+      "CompoundPathGeometry gains parallel closed[] and openPath; path holds closed contours only, so fill and region consumers skip open contours without per-consumer branching (design section 4, DR-1).",
+      "PathWorldContour carries the closed flag through the edit pipeline so anchor drags and inspector edits never drop closed:false (design section 4, slc-06).",
+      "draw.io umlActor imports exactly as geo actor; geo actor exports as umlActor; uml.component, uml.interface and uml.port export natively because nodetto now has exact equivalents (design section 3)."
+    ],
+    "intentionalTradeoffs": [
+      "Stick figure label uses the existing centred geo label rule; no label band (user-qa Q1).",
+      "draw.io import keeps the freeform model; shape=component, requiredInterface and umlLifeline stay approximated on import (user-qa Q2).",
+      "Open contours are left out of the handoff CSS mask and Swift/Compose generated code (user-qa Q6).",
+      "No open/closed toggle in the path inspector; Add contour adds a closed contour (user-qa Q7).",
+      "draw.io style names shape=component and shape=requiredInterface are unverified; slc-05 records evidence and stops rather than inventing a mapping."
+    ],
+    "supportedEdgeCases": [
+      "Nested unknown keys in keyOrder.children objects and array items (e.g. elements[0].semantic.columns[2].x, contours[0].x).",
+      "Own keys __proto__ and constructor are reported as unknown fields; unregistered types such as future.widget get no semantic.unknownField.",
+      "Open contour with exactly 2 points is valid; 1-point open contour is an error; 2-point closed contour keeps the existing closed-contour error.",
+      "Mixed [closed, open] contour paths: removing a contour preserves the remaining contour's closed flag; editing a closed contour writes no closed key.",
+      "Hit test on an open contour: a point on the stroke hits, a point between the open ends misses.",
+      "Flipped geo actor honours flip within the box."
+    ],
+    "outOfScopeEdgeCases": [
+      "Arrowheads or markers on open path ends (user-qa Q5).",
+      "Sequence participant and lifeline export to draw.io (user-qa Q3).",
+      "Native element reconstruction from draw.io import (user-qa Q2).",
+      "Geo kinds for ext and 4/6/8-point stars (user-qa Q4)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-shape-lateral-consistency.md",
+      "design-docs/user-qa/shape-lateral-consistency.md",
+      "impl-plans/active/slc-00-overview.md",
+      "impl-plans/active/slc-01-ir-drawing-contract.md",
+      "impl-plans/active/slc-02-ir-unknown-field.md",
+      "impl-plans/active/slc-03-geo-actor.md",
+      "impl-plans/active/slc-04-open-path-render.md",
+      "impl-plans/active/slc-05-drawio.md",
+      "impl-plans/active/slc-06-open-path-edit.md",
+      "impl-plans/active/slc-07-cli-docs.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "slc-01-ir-drawing-contract",
+      "planPath": "impl-plans/active/slc-01-ir-drawing-contract.md",
+      "progressPath": "impl-plans/progress/slc-01-ir-drawing-contract.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/semantics/drawing.ts",
+        "packages/ir/src/registry/drawing.ts",
+        "packages/ir/src/registry/drawing.test.ts",
+        "packages/io/src/jsonl/open-path.test.ts",
+        "packages/core/src/shapes/outline.ts",
+        "packages/core/src/shapes/outline-rules.test.ts",
+        "impl-plans/progress/slc-01-ir-drawing-contract.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "GEO_KINDS ends with \"person\", \"package\", \"actor\"; PathContour gains optional closed?: boolean (absent or true means closed).",
+        "DRAW_PATH.keyOrder.children.contours.keys is [\"points\", \"closed\"]; an open contour with 2 points validates, a 1-point open contour errors with 'an open contour requires at least two points', and a 2-point closed contour keeps the existing closed-contour error.",
+        "outline.ts returns no outline polygon for geo actor (box is the region) and for a single open draw.path contour (bounds are the region).",
+        "An open-contour path round-trips through JSONL with closed:false; existing fixtures stay byte-identical.",
+        "Progress log ends with STATUS: done and git diff touches only this plan's writePaths."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-01-ir-drawing-contract",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir > tmp/shape-lateral-s544/slc-01-ir-drawing-contract/ir.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io/src/jsonl > tmp/shape-lateral-s544/slc-01-ir-drawing-contract/io-jsonl.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/shapes/outline-rules.test.ts packages/core/src/shapes/connection-points.test.ts > tmp/shape-lateral-s544/slc-01-ir-drawing-contract/outline.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-01-ir-drawing-contract/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/ir/src/semantics/drawing.ts packages/ir/src/registry/drawing.ts packages/ir/src/registry/drawing.test.ts packages/io/src/jsonl/open-path.test.ts packages/core/src/shapes/outline.ts packages/core/src/shapes/outline-rules.test.ts",
+        "grep -c '\"actor\"' packages/ir/src/semantics/drawing.ts",
+        "grep -c 'an open contour requires at least two points' packages/ir/src/registry/drawing.ts"
+      ]
+    },
+    {
+      "planId": "slc-02-ir-unknown-field",
+      "planPath": "impl-plans/active/slc-02-ir-unknown-field.md",
+      "progressPath": "impl-plans/progress/slc-02-ir-unknown-field.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/validate.ts",
+        "packages/ir/src/validate.test.ts",
+        "packages/ir/src/registry/bpmn.ts",
+        "packages/ir/src/semantics/bpmn.ts",
+        "packages/ir/src/database-objects.ts",
+        "packages/core/src/semantic-field-audit.test.ts",
+        "packages/ir/src/registry/uml.ts",
+        "impl-plans/progress/slc-02-ir-unknown-field.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "validateDocument emits warning-level semantic.unknownField at elements[i].semantic.<key> (recursing into keyOrder.children objects and array items) with message 'unknown semantic field for <type>; preserved but ignored by this build'; never an error; unknown keys are preserved.",
+        "validate.test.ts covers uml.component {kind:'actor'}, node.generic, erd.table nested columns[0].x, shape.geo, usecase.node, state.node, draw.path nested contours[0].x, __proto__/constructor own keys, and no warning for future.widget.",
+        "keyOrder omissions in BPMN and database-object registries are fixed (appended lexicographically); each change is logged as 'type: added keys'.",
+        "Amendment: uml.component and uml.port get keyOrders without kind in packages/ir/src/registry/uml.ts, uml.interface keeps kind, and every other key and its order is unchanged.",
+        "semantic-field-audit.test.ts asserts zero semantic.unknownField for every fixture (except forward-compat n-known keys), example, defaultSemantic of every registered type, design template and BPMN import.",
+        "git diff --quiet -- packages/io/src/__fixtures__ examples exits 0; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-02-ir-unknown-field",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir > tmp/shape-lateral-s544/slc-02-ir-unknown-field/ir.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/semantic-field-audit.test.ts > tmp/shape-lateral-s544/slc-02-ir-unknown-field/audit.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io > tmp/shape-lateral-s544/slc-02-ir-unknown-field/io.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-02-ir-unknown-field/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/ir/src/validate.ts packages/ir/src/validate.test.ts packages/ir/src/registry/bpmn.ts packages/ir/src/semantics/bpmn.ts packages/ir/src/database-objects.ts packages/core/src/semantic-field-audit.test.ts packages/ir/src/registry/uml.ts",
+        "grep -c 'semantic.unknownField' packages/ir/src/validate.ts",
+        "git diff --quiet -- packages/io/src/__fixtures__ examples; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core apps/cli/src > tmp/shape-lateral-s544/slc-02-ir-unknown-field/core-cli-sweep.log 2>&1; echo \"exit=$?\""
+      ]
+    },
+    {
+      "planId": "slc-03-geo-actor",
+      "planPath": "impl-plans/active/slc-03-geo-actor.md",
+      "progressPath": "impl-plans/progress/slc-03-geo-actor.md",
+      "wave": 2,
+      "dependsOn": [
+        "slc-01-ir-drawing-contract"
+      ],
+      "writePaths": [
+        "packages/core/src/shapes/geo-outline.ts",
+        "packages/core/src/interface-code.ts",
+        "packages/core/src/tools.ts",
+        "packages/core/src/shape-catalogue.ts",
+        "packages/core/src/geo-actor.test.ts",
+        "packages/ui-solid/src/shape-palette.ts",
+        "packages/ui-solid/src/inspector/ShapeSections.tsx",
+        "packages/ui-solid/src/workspaces.test.ts",
+        "packages/io/src/d2/export.ts",
+        "packages/io/src/d2/export.test.ts",
+        "packages/core/src/shape-catalogue.test.ts",
+        "packages/ui-solid/src/shape-search.test.ts",
+        "impl-plans/progress/slc-03-geo-actor.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "geo-outline.ts draws geo actor as a stick figure (head circle, body, arms, legs) inside the box, honouring flip, on canvas and in SVG/PNG/PDF export; geo person is unchanged.",
+        "Tool.StickFigure = \"geo:actor\" with default visual 60x110; shape catalogue entry geo:actor labelled 'Stick figure'; General palette tile 'Stick figure'; inspector kind label 'Stick figure'.",
+        "interface-code.ts clip handling covers actor; D2 export maps geo actor to shape: person.",
+        "Amendment: the 'actor' shape-search expectations in shape-catalogue.test.ts and shape-search.test.ts include geo:actor in catalogue order, and every other assertion is unchanged.",
+        "The wave-1 rule-9 transient failures (svg-export.test.ts and geo-outline.test.ts for actor) pass; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-03-geo-actor",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/geo-actor.test.ts packages/core/src/shapes/geo-outline.test.ts packages/core/src/svg-export.test.ts packages/core/src/shapes/connection-points.test.ts packages/core/src/shape-catalogue.test.ts packages/core/src/interface-code.test.ts > tmp/shape-lateral-s544/slc-03-geo-actor/core.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid/src/workspaces.test.ts packages/ui-solid/src/shape-search.test.ts > tmp/shape-lateral-s544/slc-03-geo-actor/ui.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io/src/d2 > tmp/shape-lateral-s544/slc-03-geo-actor/d2.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-03-geo-actor/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/core/src/shapes/geo-outline.ts packages/core/src/interface-code.ts packages/core/src/tools.ts packages/core/src/shape-catalogue.ts packages/core/src/geo-actor.test.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/inspector/ShapeSections.tsx packages/ui-solid/src/workspaces.test.ts packages/io/src/d2/export.ts packages/io/src/d2/export.test.ts packages/core/src/shape-catalogue.test.ts packages/ui-solid/src/shape-search.test.ts",
+        "grep -c 'StickFigure: \"geo:actor\"' packages/core/src/tools.ts"
+      ]
+    },
+    {
+      "planId": "slc-04-open-path-render",
+      "planPath": "impl-plans/active/slc-04-open-path-render.md",
+      "progressPath": "impl-plans/progress/slc-04-open-path-render.md",
+      "wave": 2,
+      "dependsOn": [
+        "slc-01-ir-drawing-contract"
+      ],
+      "writePaths": [
+        "packages/core/src/shapes/compound-path.ts",
+        "packages/core/src/svg-export/shapes.ts",
+        "packages/core/src/boolean-operations.ts",
+        "packages/core/src/pcb-export.ts",
+        "packages/core/src/mobile-code/swift-modifiers.ts",
+        "packages/core/src/mobile-code/compose-modifiers.ts",
+        "packages/ui-solid/src/shapes/CompoundPathView.tsx",
+        "packages/core/src/open-path.test.ts",
+        "impl-plans/progress/slc-04-open-path-render.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "CompoundPathGeometry gains readonly closed: readonly boolean[] (parallel to contours) and readonly openPath: string; path holds closed contours only; contours keeps its type.",
+        "An open contour (closed:false, 2+ points) renders as an unfilled stroke (fill=\"none\") on canvas (CompoundPathView.tsx) and in SVG export, with correct bounds; closed contours render byte-identically to today.",
+        "Hit testing on an open contour hits along the stroke only and misses between the open ends.",
+        "Boolean, PCB, Swift and Compose consumers skip open contours (all-open path yields the empty placeholder).",
+        "compound-path.test.ts passes unchanged; compound-path-edit.ts is not touched; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-04-open-path-render",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/open-path.test.ts packages/core/src/compound-path.test.ts packages/core/src/svg-export.test.ts > tmp/shape-lateral-s544/slc-04-open-path-render/core.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core > tmp/shape-lateral-s544/slc-04-open-path-render/core-all.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid > tmp/shape-lateral-s544/slc-04-open-path-render/ui.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-04-open-path-render/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/core/src/shapes/compound-path.ts packages/core/src/svg-export/shapes.ts packages/core/src/boolean-operations.ts packages/core/src/pcb-export.ts packages/core/src/mobile-code/swift-modifiers.ts packages/core/src/mobile-code/compose-modifiers.ts packages/ui-solid/src/shapes/CompoundPathView.tsx packages/core/src/open-path.test.ts"
+      ]
+    },
+    {
+      "planId": "slc-05-drawio",
+      "planPath": "impl-plans/active/slc-05-drawio.md",
+      "progressPath": "impl-plans/progress/slc-05-drawio.md",
+      "wave": 2,
+      "dependsOn": [
+        "slc-01-ir-drawing-contract"
+      ],
+      "writePaths": [
+        "packages/io/src/drawio/style.ts",
+        "packages/io/src/drawio/export-shape-style.ts",
+        "packages/io/src/drawio/export-page.ts",
+        "packages/io/src/drawio/drawio.test.ts",
+        "docs/import-export.md",
+        "impl-plans/progress/slc-05-drawio.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "draw.io umlActor imports as geo actor exactly with no approximation warning (style.ts entry umlActor: { geo: \"actor\" }).",
+        "draw.io export maps geo actor and usecase.node actor to umlActor; uml.component, uml.interface and uml.port export as native draw.io shapes; round-trip tests cover these.",
+        "Unchanged mappings: actor -> person, folder -> package, ext and 4/6/8-point stars stay approximate, usecase.node/state.node/uml.class/erd.table exports unchanged, sequence participants still skipped.",
+        "docs/import-export.md no longer lists 'umlActor (approximated)'; progress log records draw.io shape-name evidence and ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-05-drawio",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io/src/drawio > tmp/shape-lateral-s544/slc-05-drawio/drawio.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/io > tmp/shape-lateral-s544/slc-05-drawio/io.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-05-drawio/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/io/src/drawio/style.ts packages/io/src/drawio/export-shape-style.ts packages/io/src/drawio/export-page.ts packages/io/src/drawio/drawio.test.ts",
+        "grep -c 'umlActor: { geo: \"actor\" }' packages/io/src/drawio/style.ts",
+        "grep -c 'umlActor (approximated)' docs/import-export.md"
+      ]
+    },
+    {
+      "planId": "slc-06-open-path-edit",
+      "planPath": "impl-plans/active/slc-06-open-path-edit.md",
+      "progressPath": "impl-plans/progress/slc-06-open-path-edit.md",
+      "wave": 3,
+      "dependsOn": [
+        "slc-04-open-path-render"
+      ],
+      "writePaths": [
+        "packages/core/src/compound-path-edit.ts",
+        "packages/core/src/index.ts",
+        "packages/core/src/compound-path.test.ts",
+        "packages/ui-solid/src/CompoundPathHandles.tsx",
+        "packages/ui-solid/src/inspector/PathSection.tsx",
+        "impl-plans/progress/slc-06-open-path-edit.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "compound-path-edit.ts exports interface PathWorldContour { readonly points: readonly FreehandPoint[]; readonly closed: boolean }, re-exported from packages/core/src/index.ts; pathWorldContours, planPathWorldContours and PathAnchorDrag carry it.",
+        "A PathAnchorDrag on a 2-point open contour applies a command and the stored contour keeps closed:false with 2 points; removing contour 0 from [closed, open] leaves one contour with closed:false.",
+        "Editing a closed contour writes no closed key; a 1-point open contour or 2-point closed contour yields no command.",
+        "CompoundPathHandles.tsx and PathSection.tsx preserve each contour's closed flag; Add contour adds a closed contour; existing rotated-drag test passes after the .points migration; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-06-open-path-edit",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/compound-path.test.ts packages/core/src/open-path.test.ts packages/core/src/pcb-import.test.ts > tmp/shape-lateral-s544/slc-06-open-path-edit/core.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid > tmp/shape-lateral-s544/slc-06-open-path-edit/ui.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-06-open-path-edit/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check packages/core/src/compound-path-edit.ts packages/core/src/index.ts packages/core/src/compound-path.test.ts packages/ui-solid/src/CompoundPathHandles.tsx packages/ui-solid/src/inspector/PathSection.tsx",
+        "grep -c 'export interface PathWorldContour' packages/core/src/compound-path-edit.ts",
+        "grep -c 'splitStrokeSegment(points(), pointIndex(), true)' packages/ui-solid/src/inspector/PathSection.tsx"
+      ]
+    },
+    {
+      "planId": "slc-07-cli-docs",
+      "planPath": "impl-plans/active/slc-07-cli-docs.md",
+      "progressPath": "impl-plans/progress/slc-07-cli-docs.md",
+      "wave": 3,
+      "dependsOn": [
+        "slc-02-ir-unknown-field",
+        "slc-03-geo-actor"
+      ],
+      "writePaths": [
+        "apps/cli/src/edit-command.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/types-command.ts",
+        "apps/cli/src/shape-lateral.test.ts",
+        "docs/cli.md",
+        "docs/editing.md",
+        "impl-plans/progress/slc-07-cli-docs.md"
+      ],
+      "sharedPaths": [
+        "apps/cli/src/commands.test.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "apps/cli/src/commands.test.ts",
+          "intendedEdit": "Only update existing expectations broken by the new edit JSON 'warnings' key or the validate --strict flag; no new tests, no other edits; log pre/post sha256."
+        }
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "nodetto-cli edit (and draw, via runOperations) reports each newly introduced semantic.unknownField warning with its operation index in text and --format json output, and the batch still exits 0.",
+        "nodetto-cli validate prints semantic.unknownField warnings and exits 3 with --strict.",
+        "nodetto-cli shapes actor lists geo:actor; draw <doc> geo:actor --label Visitor plus an edge.generic connect succeeds.",
+        "types-command.ts TYPICAL.architecture lists usecase.node and usecase.relationship; help.ts documents the changes.",
+        "docs/cli.md and docs/editing.md each mention geo:actor; docs/editing.md mentions closed: false and semantic.unknownField; progress log ends with STATUS: done."
+      ],
+      "verification": [
+        "mkdir -p tmp/shape-lateral-s544/slc-07-cli-docs",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/shape-lateral.test.ts apps/cli/src/commands.test.ts apps/cli/src/shapes-command.test.ts > tmp/shape-lateral-s544/slc-07-cli-docs/cli.log 2>&1; echo \"exit=$?\"",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src > tmp/shape-lateral-s544/slc-07-cli-docs/cli-all.log 2>&1; echo \"exit=$?\"",
+        "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/slc-07-cli-docs/tsc.log 2>&1; echo \"exit=$?\"",
+        "bunx biome check apps/cli/src/edit-command.ts apps/cli/src/commands.ts apps/cli/src/help.ts apps/cli/src/types-command.ts apps/cli/src/shape-lateral.test.ts apps/cli/src/commands.test.ts",
+        "grep -c 'with --strict' apps/cli/src/commands.ts",
+        "grep -c 'geo:actor' docs/cli.md docs/editing.md"
+      ]
+    }
+  ],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "waves": [
+      [
+        "slc-01-ir-drawing-contract",
+        "slc-02-ir-unknown-field"
+      ],
+      [
+        "slc-03-geo-actor",
+        "slc-04-open-path-render",
+        "slc-05-drawio"
+      ],
+      [
+        "slc-06-open-path-edit",
+        "slc-07-cli-docs"
+      ]
+    ],
+    "afterWave": [
+      "bunx tsc -p tsconfig.json --noEmit",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir packages/io",
+      "after wave 2 and 3: BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir packages/core packages/io apps/cli/src packages/ui-solid",
+      "rerun every gate recorded as pending-join in the joined wave's progress logs (overview rule 8)"
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Add a 'Shape lateral consistency' entry indexing slc-00..07 during finalization; not a worker task."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths. The wave-1 transient failures of core svg-export.test.ts and shapes/geo-outline.test.ts for kind 'actor' belong to slc-03.",
+    "commitPolicy": "Commit each wave on fix/shape-lateral-consistency, staging explicit paths only. Never git add -A, never stage tmp/, never push (gitPush=false). No tool attribution in commit messages.",
+    "orchestratorOwnedPaths": {
+      "paths": [
+        "design-docs/specs/design-shape-lateral-consistency.md",
+        "design-docs/user-qa/shape-lateral-consistency.md",
+        "impl-plans/active/slc-00-overview.md",
+        "impl-plans/active/shape-lateral-s544-dispatch.json",
+        "impl-plans/README.md"
+      ]
+    },
+    "finalVerification": [
+      "mkdir -p tmp/shape-lateral-s544/reconcile",
+      "bunx tsc -p tsconfig.json --noEmit > tmp/shape-lateral-s544/reconcile/tsc.log 2>&1",
+      "bunx biome check <every file in the union of plan writePaths and sharedPaths, excluding impl-plans/progress and docs>",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ir packages/core packages/io apps/cli/src > tmp/shape-lateral-s544/reconcile/tests.log 2>&1",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/ui-solid > tmp/shape-lateral-s544/reconcile/ui.log 2>&1",
+      "BUN_OPTIONS=--jsx-runtime=classic CARGO_TERM_QUIET=true mise run verify > tmp/shape-lateral-s544/reconcile/verify.log 2>&1",
+      "git diff --quiet -- packages/io/src/__fixtures__ examples",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "git status --short"
+    ]
+  }
+}
