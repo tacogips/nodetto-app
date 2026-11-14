@@ -1,0 +1,561 @@
+/*
+ * Inspector panel, inline text editor and text notes.
+ *
+ * Everything here belongs to the components in @nodetto/ui-solid's
+ * Inspector.tsx, TextEditor.tsx and shapes/TextNoteView.tsx. Colours come
+ * from the --nodetto-* custom properties defined in style.css.
+ */
+
+/* Inspector */
+
+.nodetto-inspector {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border-left: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+  color: var(--nodetto-ink);
+  font-size: 0.78rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.nodetto-inspector-section {
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--nodetto-line);
+}
+
+.app-inspector {
+  container: inspector / inline-size;
+}
+
+.nodetto-inspector :is(p, output) {
+  overflow-wrap: anywhere;
+}
+
+.nodetto-inspector-details > summary {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--nodetto-line);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+@container inspector (max-width: 260px) {
+  .nodetto-inspector .nodetto-field-grid,
+  .nodetto-inspector .nodetto-inspector-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.nodetto-inspector-title {
+  margin: 0;
+  color: var(--nodetto-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nodetto-inspector-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.nodetto-inspector-subtitle {
+  margin: 12px 0 6px;
+  color: var(--nodetto-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nodetto-inspector-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nodetto-inspector-subsection {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--nodetto-line);
+}
+
+.nodetto-inspector-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.nodetto-inspector-summary,
+.nodetto-inspector-note {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--nodetto-muted);
+}
+
+.nodetto-inspector-section .nodetto-inspector-note {
+  padding: 0;
+}
+
+.nodetto-inspector-button {
+  align-self: flex-start;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--app-control-radius, 6px);
+  color: var(--nodetto-ink);
+  background: var(--app-button-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.nodetto-inspector-button:hover:not(:disabled) {
+  background: var(--nodetto-accent-soft);
+}
+
+/* Fields */
+
+.nodetto-field {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.nodetto-field-label {
+  color: var(--nodetto-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodetto-field-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.nodetto-field-control > * {
+  min-width: 0;
+  flex: 1;
+}
+
+.nodetto-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.nodetto-field-grid .nodetto-field {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
+.nodetto-input,
+.nodetto-select {
+  min-width: 0;
+  min-height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 0;
+  color: var(--nodetto-ink);
+  background: var(--nodetto-surface);
+  font: inherit;
+}
+
+.nodetto-input:focus,
+.nodetto-select:focus,
+.nodetto-textarea:focus {
+  outline: 2px solid var(--nodetto-accent);
+  outline-offset: -1px;
+  border-color: var(--nodetto-accent);
+  box-shadow: none;
+}
+
+.nodetto-input:disabled,
+.nodetto-select:disabled {
+  color: var(--app-disabled-soft-ink);
+  background: var(--nodetto-canvas);
+}
+
+.nodetto-textarea {
+  width: 100%;
+  padding: 4px 6px;
+  resize: vertical;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.nodetto-number {
+  width: 100%;
+}
+
+.nodetto-check {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--nodetto-muted);
+  cursor: pointer;
+}
+
+.nodetto-check input {
+  margin: 0;
+  accent-color: var(--nodetto-accent);
+}
+
+/* Style controls */
+
+.nodetto-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.nodetto-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.nodetto-swatch[aria-pressed="true"] {
+  border-color: var(--nodetto-accent);
+  box-shadow: 0 0 0 2px var(--nodetto-accent-soft);
+}
+
+.nodetto-swatch-none {
+  position: relative;
+  background: var(--nodetto-surface);
+  overflow: hidden;
+}
+
+.nodetto-swatch-none::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -3px;
+  right: -3px;
+  border-top: 1.5px solid var(--app-document-swatch-red);
+  transform: rotate(-45deg);
+}
+
+.nodetto-color {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nodetto-opacity {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.nodetto-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--nodetto-accent);
+}
+
+.nodetto-opacity-value {
+  min-width: 36px;
+  color: var(--nodetto-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nodetto-segmented {
+  display: inline-flex;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.nodetto-segment {
+  flex: 1;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--nodetto-line);
+  color: var(--nodetto-ink);
+  background: var(--nodetto-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.nodetto-segment:last-child {
+  border-right: 0;
+}
+
+.nodetto-segment[aria-pressed="true"] {
+  color: var(--nodetto-surface);
+  background: var(--nodetto-accent);
+}
+
+/* Row editors */
+
+.nodetto-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nodetto-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 22px 22px auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.nodetto-row-erd {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr) 22px 22px minmax(
+      0,
+      1fr
+    ) minmax(0, 1fr) auto;
+}
+
+.nodetto-erd-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nodetto-erd-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+}
+
+.nodetto-erd-column-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: end;
+}
+
+.nodetto-erd-column-field {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: var(--nodetto-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nodetto-erd-column-main .nodetto-row-tools {
+  align-self: end;
+}
+
+.nodetto-erd-column-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nodetto-erd-column-flags .nodetto-check {
+  font-size: 0.76rem;
+}
+
+.nodetto-erd-column-sql > summary {
+  color: var(--nodetto-muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.nodetto-erd-column-sql-fields {
+  display: grid;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+@container inspector (max-width: 260px) {
+  .nodetto-erd-column-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .nodetto-erd-column-field:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.nodetto-row-erd-relation {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.nodetto-row-uml {
+  grid-template-columns: 44px minmax(0, 1.3fr) minmax(0, 1fr) 22px auto;
+}
+
+.nodetto-row-head {
+  color: var(--nodetto-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nodetto-row-head span {
+  padding: 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodetto-row .nodetto-input,
+.nodetto-row .nodetto-select {
+  width: 100%;
+  min-height: 24px;
+  padding: 0 4px;
+}
+
+.nodetto-row .nodetto-check {
+  justify-content: center;
+}
+
+.nodetto-row-tools {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.nodetto-row-button {
+  width: 20px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 4px;
+  color: var(--nodetto-ink);
+  background: var(--nodetto-surface);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.nodetto-row-button:hover:not(:disabled) {
+  background: var(--nodetto-accent-soft);
+}
+
+.nodetto-row-button:disabled {
+  color: var(--app-disabled-strong-ink);
+  cursor: default;
+}
+
+.nodetto-row-remove:hover:not(:disabled) {
+  color: var(--nodetto-danger);
+  background: var(--nodetto-danger-surface);
+}
+
+.nodetto-method {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--nodetto-line);
+}
+
+.nodetto-method:last-child {
+  border-bottom: 0;
+}
+
+.nodetto-method-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  padding-left: 48px;
+}
+
+.nodetto-endpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nodetto-endpoint-table {
+  color: var(--nodetto-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inline text editor (page space, inside the canvas viewport) */
+
+.nodetto-text-editor {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  margin: 0;
+  border: 1px solid var(--nodetto-accent);
+  border-radius: 3px;
+  color: var(--nodetto-ink);
+  background: color-mix(in srgb, var(--nodetto-surface) 92%, transparent);
+  font-family: inherit;
+  outline: none;
+  overflow: hidden;
+  resize: none;
+  white-space: pre;
+  box-shadow: 0 0 0 2px var(--nodetto-accent-soft);
+  pointer-events: auto;
+}
+
+.nodetto-text-editor-multiline {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* Text note */
+
+.nodetto-text-note {
+  height: 100%;
+  padding: 6px 8px;
+  color: var(--nodetto-ink);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow: hidden;
+}
+
+.nodetto-text-note-empty {
+  border: 1px dashed var(--nodetto-line);
+  border-radius: 3px;
+}
+
+.nodetto-rich-text-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.nodetto-rich-text-controls button[aria-pressed="true"] {
+  border-color: var(--nodetto-accent);
+  color: var(--nodetto-accent);
+  background: var(--nodetto-accent-soft);
+}
+.nodetto-note-replacement-preview summary {
+  overflow-wrap: anywhere;
+}
+
+.nodetto-note-replacement-preview pre {
+  max-height: 10rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
