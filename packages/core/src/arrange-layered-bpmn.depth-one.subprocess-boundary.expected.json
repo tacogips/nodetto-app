@@ -1,0 +1,115 @@
+{
+ "schemaVersion": 1,
+ "id": "doc-1",
+ "title": "Test",
+ "pages": [
+  {
+   "id": "page-1",
+   "name": "BPMN",
+   "kind": "bpmn"
+  }
+ ],
+ "elements": [
+  {
+   "id": "after",
+   "page": "page-1",
+   "type": "bpmn.task",
+   "index": "a1",
+   "semantic": {
+    "name": "after",
+    "taskType": "user",
+    "loop": "none",
+    "parent": "p"
+   },
+   "visual": {
+    "x": 390,
+    "y": 60,
+    "width": 100,
+    "height": 60
+   }
+  },
+  {
+   "id": "boundary",
+   "page": "page-1",
+   "type": "bpmn.boundaryEvent",
+   "index": "a1",
+   "semantic": {
+    "name": "Boundary",
+    "attachedTo": "sub",
+    "definitions": [],
+    "cancelActivity": true
+   },
+   "visual": {
+    "x": 100,
+    "y": 125,
+    "width": 30,
+    "height": 30
+   }
+  },
+  {
+   "id": "f",
+   "page": "page-1",
+   "type": "bpmn.sequenceFlow",
+   "index": "a1",
+   "semantic": {
+    "from": "boundary",
+    "to": "after"
+   },
+   "visual": {}
+  },
+  {
+   "id": "inner",
+   "page": "page-1",
+   "type": "bpmn.task",
+   "index": "a1",
+   "semantic": {
+    "name": "inner",
+    "taskType": "user",
+    "loop": "none",
+    "parent": "sub"
+   },
+   "visual": {
+    "x": 90,
+    "y": 60,
+    "width": 100,
+    "height": 60
+   }
+  },
+  {
+   "id": "p",
+   "page": "page-1",
+   "type": "bpmn.participant",
+   "index": "a1",
+   "semantic": {
+    "name": "p",
+    "collapsed": false
+   },
+   "visual": {
+    "x": 0,
+    "y": 0,
+    "width": 530,
+    "height": 180
+   }
+  },
+  {
+   "id": "sub",
+   "page": "page-1",
+   "type": "bpmn.subProcess",
+   "index": "a1",
+   "semantic": {
+    "name": "Sub",
+    "parent": "p",
+    "expanded": true,
+    "triggeredByEvent": false,
+    "adHoc": false,
+    "loop": "none"
+   },
+   "visual": {
+    "x": 70,
+    "y": 40,
+    "width": 200,
+    "height": 100
+   }
+  }
+ ]
+}

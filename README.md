@@ -1,0 +1,114 @@
+# Nodetto
+
+A desktop diagram editor for ER diagrams, UML, sequence diagrams, flowcharts,
+state machines, BPMN, breadboard circuits and app or web design artboards.
+Documents are plain, diff-friendly JSONL files, and `nodetto-cli` lets scripts
+and AI agents read, draw, check and convert them.
+
+![Nodetto editing an ER diagram](docs/images/nodetto-erd.png)
+
+## Install
+
+```bash
+brew install --cask tacogips/tap/nodetto
+```
+
+Or download the [macOS DMG](https://github.com/tacogips/nodetto-app/releases/latest/download/Nodetto_aarch64.dmg),
+or the Linux `.deb`, AppImage or CLI archive from the
+[latest release](https://github.com/tacogips/nodetto-app/releases/latest).
+See [Installing Nodetto](docs/install.md) for the command-line link and file
+associations.
+
+## Features
+
+- **Diagrams**: ER diagrams with PostgreSQL, MySQL and SQLite DDL export, UML
+  class, component and use-case diagrams, sequence diagrams, state machines,
+  flowcharts and BPMN operation flows. See [Editing diagrams](docs/editing.md).
+- **Import and export**: Mermaid, draw.io, D2, BPMN XML, SVG, PNG, PDF and
+  static websites. See [Import and export](docs/import-export.md).
+- **Breadboard circuits**: BOM, netlist, electrical rule checks, KiCad import,
+  PCB Gerber export and Gerber import. See
+  [Breadboard circuit pages](docs/breadboard/README.md).
+- **PCB boards**: open KiCad boards, edit parts and tracks, export Gerber
+  and drill files, and export the board as SVG, PNG or PDF. See [KiCad PCB
+  boards](docs/pcb/kicad-pcb.md).
+- **Design artboards**: web and iPhone screens, transitions, and code export.
+  See [Design artboards](docs/design.md).
+- **Appearance**: choose a System, Light or Dark app theme, a Light, Dark or
+  Match theme diagram canvas, and a Dark-by-default PCB canvas. See
+  [Appearance](docs/editing.md#appearance).
+- **Command line and MCP**: an AI agent edits a document while the desktop app
+  shows its changes live. See [Command line](docs/cli.md).
+
+| Edit an imported board | Export it back to Gerber |
+| --- | --- |
+| ![The ErgoDash keyboard PCB opened from its Gerber ZIP, with its top silkscreen layer selected for editing](docs/images/nodetto-gerber-edit.png) | ![The Export dialog writing the edited board as Gerber and drill files](docs/images/nodetto-gerber-export.png) |
+
+The [ErgoDash](https://github.com/omkbd/ErgoDash) Rev. 1.2 Gerber ZIP opened
+from the Open dialog: copper, silkscreen, drill and outline become editable
+vector layers, and **Export > Gerber** writes the edited board back as Gerber
+and drill files. ErgoDash is copyright (c) 2018 omkbd and released under the
+MIT License.
+
+## Command line
+
+```bash
+nodetto-cli inspect schema.jsonl
+nodetto-cli shapes --category uml
+nodetto-cli draw schema.jsonl usecase:actor --label Customer
+nodetto-cli export schema.jsonl --format png --output schema.png
+nodetto-cli ddl schema.jsonl --dialect postgresql --check schema.sql
+nodetto-cli gerber import board-gerbers.zip --output board.jsonl
+nodetto-cli pcb import board.kicad_pcb --output board.jsonl
+```
+
+## KiCad PCB boards
+
+| Open a KiCad board | Move a part; its tracks follow |
+| --- | --- |
+| ![The ErgoDash keyboard PCB opened from its KiCad board file as a PCB page](docs/images/nodetto-kicad-board.png) | ![An LED footprint dragged on the ErgoDash board, with its connected tracks following and its net highlighted](docs/images/nodetto-kicad-edit.png) |
+
+The [ErgoDash](https://github.com/omkbd/ErgoDash) Rev. 1.2 `.kicad_pcb` opened
+from the Open dialog: footprints, pads, nets, tracks, vias, zones and the board
+outline become a PCB page. Parts and tracks can be moved and edited, the page
+saves as Nodetto JSONL, and **Export > PCB** writes Gerber and drill files.
+ErgoDash is copyright (c) 2018 omkbd and released under the MIT License.
+
+## Development
+
+```bash
+mise install
+bun install
+mise run dev
+```
+
+This repository is the public half of Nodetto: the editor packages and the
+Tauri desktop app. The hosted cloud edition lives in a private repository. See
+[Development](docs/development.md) for the layout, tasks and release process.
+
+### Layout, selection, and merging
+
+`arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text and moves labels; `lint --metrics` reports crossings, label overlaps and overlapping segment pairs. `--quiet` suppresses warnings.
+
+`convert` changes a compatible element type while preserving its identity, geometry and connectors, reporting dropped fields. `delete` with `reconnectTo` moves direct connectors before deletion. For frame-scoped DDL, `memberIds` governs explicit content; open frames also include fully contained unclaimed tables by position, and `frame-straddle` lint warns on crossed edges. Sequence participants draw by kind in export and on the canvas: `actor` as a stick figure, `db` as a cylinder and `service` as a rounded box.
+
+Edit references use `name:<text>`, ids and `@ref`. `update`, `convert` and `delete` accept `where` with `page`, `type`, `from`, `to`, `parent`, `name`, and `expect`; `select` binds a `ref`. `label` updates display text. `carryMembers` controls frame, `bpmn.participant`, `bpmn.lane`, `bpmn.subProcess` and `breadboard.board` box updates. See the [CLI guide](docs/cli.md#layout-selection-and-merging) for per-kind tables and limitations.
+
+Set `*.jsonl merge=nodetto` in `.gitattributes`, then configure each clone:
+
+```sh
+git config merge.nodetto.name "nodetto three-way merge"
+git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
+```
+
+Treat SVG exports as build output and regenerate after merging, for example in an executable `.git/hooks/post-merge`:
+
+```sh
+#!/bin/sh
+nodetto-cli export flow.jsonl --page Flow --format svg --output flow.svg
+```
+
+## License
+
+Nodetto is released under the [MIT License](LICENSE). The editor packages,
+desktop application and command-line tool use the same license.
