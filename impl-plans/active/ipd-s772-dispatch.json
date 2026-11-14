@@ -1,0 +1,1205 @@
+{
+  "taskId": "ipd-s772",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-772",
+  "implementationBranch": "feat/iphone-app-design",
+  "baseBranch": "feat/iphone-app-design",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "f59bef4a6774948d731bc404a7fac88fd41e1883",
+  "designDocPaths": [
+    "design-docs/specs/design-iphone-app-design.md",
+    "design-docs/user-qa/iphone-app-design.md",
+    "design-docs/specs/design-cli-ai-drawing.md",
+    "design-docs/specs/design-web-app-roundtrip.md"
+  ],
+  "evidenceRoot": "tmp/ipd-s772",
+  "evidenceLayout": "Per-plan evidence under tmp/ipd-s772/<planId>/ with final/ and attempt-<n>/ subdirectories. tmp/ is git-ignored and holds only data (logs, JSON, digests, PNG exports and comparison images); never authored source. Cargo output goes to target/ and the sidecar to apps/desktop/src-tauri/binaries/, declared as artifactRoots only by the plans that build them, which are ordered by dependsOn.",
+  "reviewContext": {
+    "issueReference": "operator-request-2026-11-10 (no GitHub issue)",
+    "userProblem": "An iPhone app design drawn with nodetto-cli 0.8.9 came out misaligned and sloppy. Defects D1-D10: ui.control ignores textAlign (D1); tabs ignore fill/stroke/accent and options are not styleable (D2); newline labels render monospace on one line (D3); geo rects under 3 units vanish (D4); no precise text layer, text.note ignores fontSize/fontWeight on update (D5); no icon element (D6); elements added inside a frame are not its children and nothing clips or snaps (D7); auto layout cannot be driven from the CLI (D8); prototype links are drawn across artboards with verbose labels and there is no prototype view, flow start, storyboard or presentation (D9); frame titles overlap content and there is no easy per-frame side-by-side comparison (D10).",
+    "requiredOutcomes": [
+      "Decision 1: precise text layer on text.note (text:layer shape, no implicit padding, auto-width/auto-height/fixed, alignment, font size/weight, line height, letter spacing, color, single-line ellipsis, honored on add and update).",
+      "Decision 2: ui.icon element backed by vendored Lucide (ISC) with LICENSE and THIRD_PARTY_NOTICES.md, name lookup from palette and `nodetto-cli shapes icon <query>`, size/color/stroke width, custom SVG path icons.",
+      "Decision 3: dividers and borders of any thickness >= 0.5 render; per-side borders and stroke alignment.",
+      "Decision 4: ui.control honors alignment, padding, font, color, radius, leading/trailing icons; tabs/segmented with underline and pill indicators, selected/unselected colors, per-option overrides; badges.",
+      "Decision 5: iOS component kit on the component/instance system with overridable properties, insertable by ios:<name> shape ID from palette and CLI.",
+      "Decision 6: frame auto-parenting (CLI add with parent or by containment), children move with frame, clip content, safe-area and layout-grid guides, iPhone presets including 390x844 and 402x874, titles above the artboard.",
+      "Decision 7: CLI layout/sizing (direction, gap, padding, alignment, hug/fill/fixed, absolute children), align, distribute, snap, and an 8/4 point desktop snap grid.",
+      "Decision 8: Figma-style prototyping concepts: hotspot or frame links with trigger/action (incl. back, swap-overlay)/animation, prototype view toggle with curved compact links, named flow starts, storyboard overview, desktop and HTML click-through presentation with persistent elements.",
+      "Decision 9: app-design lint (off-frame, text overflow/truncation, overlapping controls, off-grid, misaligned siblings, touch targets under 44 points).",
+      "Decision 10: export of all frames of a page as individual PNGs and a side-by-side comparison helper in CLI (`compare`) and desktop app.",
+      "Item 11: reproduction of the ten private reference screens built only through nodetto-cli operations into the operator-named git-ignored output directory, validate and app lint with zero findings, prototype links and one flow start, per-frame PNGs compared side by side with every reference screenshot (drift <= 4 points, correct icons, colors and type).",
+      "Generic iPhone sample under examples/ exercising the kit and prototype flows; CLI help and docs for AI agents.",
+      "TypeScript and native Rust CLI parity covered by mise run test-cli; final gates mise run verify, test-cli, build-cli and typecheck with no new failures versus the ipd-00 baseline."
+    ],
+    "nonGoals": [
+      "No server, auth or deployment code (public repo).",
+      "No proprietary Figma assets or internal names; concepts only.",
+      "No schemaVersion bump or migration; all additions are optional fields plus the ui.icon type and two prototype action values.",
+      "No new native Rust host primitive is planned; parity comes from running shared TypeScript in the Boa-hosted CLI.",
+      "No push, merge, rebase, release, signing or upload; no changes to other repos or worktrees.",
+      "No tracked copy of any private reference material (names, texts, colors, screenshots)."
+    ],
+    "constraints": [
+      "Work only in /Users/taco/gits/tacogips/nodetto-app-iphone-design on feat/iphone-app-design from f59bef4; gitPush false.",
+      "Privacy: reference and reproduction directories stay under git-ignored tmp/; ipd-28 scans tracked and untracked files against tmp/ipd-s772/ipd-27-reproduction/private-terms.txt.",
+      "AGENTS.md: CARGO_TERM_QUIET=true, no emojis, stage by explicit path, no tool attribution in commits.",
+      "Existing documents stay valid and render byte-identically except the rows in the design's Accepted output changes table.",
+      "Problems outside a unit's writePaths are findings, never blockers; finding statuses use the fixed vocabulary.",
+      "Broad suites gate on no new failures versus the ipd-00 Baseline failures table with explicit excludes.",
+      "Visual evidence is mandatory for rendering/UI work: export PNGs with the built CLI and inspect them.",
+      "packages/core/src/index.ts and packages/ui-solid/src/index.ts are append-only shared files: re-read before writing, never reorder or remove lines."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Extend existing element types (text.note, ui.control, frame, edge.generic prototype links, component frames); the only new type is ui.icon.",
+        "rationale": "Operator constraint to prefer extension; no existing type can hold a named vector reference (design Global rules, Decision 2)."
+      },
+      {
+        "decision": "One implementation in TypeScript (packages/core, apps/cli/src) runs in both Bun and the native Boa-hosted CLI; parity proven by apps/cli/src/native-parity topic tests (ipd-23, ipd-24).",
+        "rationale": "Command parity requirement without duplicating logic in Rust."
+      },
+      {
+        "decision": "Vendored Lucide (ISC) as a lazily parsed generated JSON string; Liberation Sans advance metrics (OFL) for proportional text measurement.",
+        "rationale": "Permissive licenses with committed license files; bundle size recorded against the ipd-00 baseline with a curated-subset fallback (user-QA Q3)."
+      },
+      {
+        "decision": "Prototype links hidden from page SVG/PNG/PDF export unless --prototype; compact curved links in prototype view; separate single-file --format prototype HTML export.",
+        "rationale": "D9: links crossing artboards made design exports unreadable."
+      },
+      {
+        "decision": "Device frame titles render above the artboard.",
+        "rationale": "D10: titles overlapped content; listed as an accepted output change with regenerated examples/design previews."
+      },
+      {
+        "decision": "Reproduction uses the user-QA Q1 default: 390x844 device layout with status bar 0-47, top content shifted +47, bottom content above the home indicator, compared in two bands per screen.",
+        "rationale": "The reference screenshots lack the status bar; the default satisfies both the 390x844 frame and the 4-point drift requirement. Q1, Q3, Q4 remain open with defaults implemented."
+      },
+      {
+        "decision": "Desktop app gets Compare with reference using the same composeComparisonSvg as the CLI (user-QA Q2 resolved).",
+        "rationale": "Acceptance criteria require comparison from both desktop and CLI."
+      },
+      {
+        "decision": "ipd-00 records the f59bef4 baseline alone before any source edit; ipd-28 gates on no new failures versus it.",
+        "rationale": "Operator constraint for broad suites that may already fail."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 1: blocked-wave-scope-or-contract operator amendment for session-772 wave 2 blockers: (a) ipd-01-ir-schema owns packages/ir/src/registry.test.ts and updates its complete ELEMENT_TYPES expectation to include ui.icon; (b) ipd-03-icon-data pins lucide-static 1.70.0 (the release already downloaded and recorded) and the generator accepts a `fill` attribute on child geometry elements only with the values `currentColor` or `none`; it stores a per-node `fill` flag, the markup renders `fill=\"currentColor\"` nodes filled with the icon color (and `none` as unfilled, the default), and any other fill value still fails the script with the icon name; (c) ipd-00-baseline, ipd-02-text-measure, ipd-04-cli-edit-contracts and ipd-29-desktop-snap-grid are accepted dependencies whose code is already in the working tree; do not redo them.",
+        "rationale": "Blocked plans: ipd-01-ir-schema and ipd-03-icon-data (gaps resolved: registry.test.ts ownership; lucide-static version pin and fill allowlist). ipd-01 could not pass `bun test packages/ir` because registry.test.ts asserts the full element-type list and was outside its writePaths. Lucide 1.70.0 (latest stable) has fill=\"currentColor\" on a child of brain-circuit.svg (a filled dot); rejecting it would block the whole icon set, while a two-value fill flag keeps the strict allowlist and renders the icon as upstream intends. The run died at wave-2 reconcile from a network outage (ENOTFOUND), not a code failure."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 2 (integration-paths-outside-writePaths, session-775 checkpoint amendment): ipd-01-ir-schema owns packages/io/src/jsonl/golden.test.ts (append exactly one GOLDEN entry \"ui-icon\" at the end; nothing else) and the new fixture packages/io/src/__fixtures__/ui-icon.jsonl (one page with two ui.icon elements: semantic {icon:\"bell\"} and {path:\"M0 0L24 24\",viewBox:24}, canonical bytes produced by serializeDocument(parseDocument(...))). No existing fixture is modified, the coverage assertion is not loosened, and ui.icon semantics and registry order are unchanged. apps/cli/src/edit/label-field.test.ts stays with ipd-07-icon-core-cli: it reads defaultSemantic() from the core shape registry, which ipd-07 supplies through packages/core/src/shapes/ui-icon.ts, so no test edit is authorized.",
+        "rationale": "Integration review finding integration-s775-w1-golden-ui-icon (mid): ipd-01 registered ui.icon in ELEMENT_TYPES, so golden.test.ts 'covers every registered element type at least once' fails with missing [\"ui.icon\"], and no plan owned packages/io. The failure blocks mise run verify and ipd-28. The fix is the smallest one that restores the gate and pins ui.icon serialization round-trip."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 2 (ordering, Step 5 finding S5-R2-IPD08-GATE): ipd-08-cli-layout-ops dependsOn gains ipd-07-icon-core-cli (wave 3 -> 5) and reruns its unchanged verification aggregate (including apps/cli/src/edit) after ipd-07 is accepted; its layout source edits are already in the working tree and are not reimplemented. ipd-07-icon-core-cli verification step 1 adds apps/cli/src/edit/label-field.test.ts (expect exit 0, 0 fail) and an acceptance line that the ui.icon defaultSemantic {icon:\"square\"} validates. label-field.test.ts is run only, never edited, skipped or loosened; writePaths of both plans are unchanged and disjoint.",
+        "rationale": "label-field.test.ts creates every ELEMENT_TYPES entry from the core registry defaultSemantic(); ui.icon is registered by ipd-01 but its core shape comes only from ipd-07 (packages/core/src/shapes/ui-icon.ts), so ipd-08's aggregate could not exit 0 in wave 3 and the owner had no gate on the failing test. Only ipd-23, ipd-24 and ipd-25 depend on ipd-08 and they already follow ipd-07, so no downstream plan is delayed."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 3: operator ipd-07a split (session-775 wave 2 blocker, blocked-wave-scope-or-contract):ipd-01-ir-schema is accepted (IR 156/156, golden 57/57, typecheck clean). New root unit ipd-07a-icon-shape takes the minimal ui.icon core shape util (defaultSemantic {icon: \"square\"}) and its createDefaultRegistry registration out of ipd-07; ipd-05, ipd-06, ipd-07, ipd-09 and ipd-12 depend on it; ipd-07 keeps SVG export, warnings, catalogue and CLI work and treats ui-icon.ts as a shared path.",
+        "rationale": "apps/cli/src/edit/label-field.test.ts creates every registered element type from its core default; with the IR type registered but no core util, ui.icon's fallback default lacks icon/path and createElement throws, so every unit running bun test packages apps/cli/src before ipd-07 failed the progress gate. ipd-01 could not fix it inside its IR scope."
+      },
+      {
+        "decision": "Step 4 rerun 2026-11-10 (session-777): the operator round-3 split is normalized without scope change. ipd-07a-icon-shape gets the standard ownership block and plan contract; ipd-07's markdown drops the prose writePaths entry and lists packages/core/src/shapes/ui-icon.ts as a sharedPath with a note; ipd-05, ipd-06, ipd-07, ipd-08, ipd-09 and ipd-12 headers name ipd-07a (directly or via ipd-07) and accepted dependencies separately, with dated round-3 amendment sections; waves recomputed (ipd-07a 1; ipd-05, ipd-06 2; ipd-07, ipd-09, ipd-12 3; ipd-08 4). ipd-08 keeps dependsOn ipd-07 (the Step 5 S5-R2-IPD08-GATE repair) and ipd-07 keeps label-field.test.ts in its verification. The tmp plan-check inputs are resynced and check-md.ts matches ipd-NNx plan files.",
+        "rationale": "Step 5 S5-R2-IPD08-GATE and S5-R2-L1 required the ordering repair to be explicit and the checkers to exit 0; the operator round-3 working-tree amendment left a prose path entry in ipd-07 and a non-standard ipd-07a header that the markdown checker could not parse."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Text wrapping can differ between canvas and resvg; PNG export is the reference.",
+      "ipd-27 copies deliverables into the operator-named git-ignored output directory, a documented exception to its writePaths so the private name never appears in tracked files.",
+      "target and apps/desktop/src-tauri/binaries are artifactRoots shared only by dependency-ordered plans; ipd-24 depends on ipd-23 to serialize cargo builds.",
+      "Downloads (ipd-02 metrics, ipd-03 icons) need the network; without it the plan records a blocker finding rather than hand-written data."
+    ],
+    "supportedEdgeCases": [
+      "Documents without the new fields render and export byte-identically to f59bef4 (except accepted output changes).",
+      "Rects thinner than 3 units down to 0.5 render at their exact box.",
+      "Back links whose to is the hotspot's own frame; several flow starts per document with unique names (duplicate is a validation warning).",
+      "CLI connect accepts tap as an alias of click.",
+      "Custom SVG path icons up to 8 KiB."
+    ],
+    "outOfScopeEdgeCases": [
+      "Headless browser inspection of the HTML prototype may be unavailable (ipd-21, ipd-26); recorded as residual risk.",
+      "Owner questions Q1, Q3, Q4 alternatives; only the defaults are implemented."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-iphone-app-design.md",
+      "design-docs/user-qa/iphone-app-design.md",
+      "design-docs/specs/design-cli-ai-drawing.md",
+      "design-docs/specs/design-web-app-roundtrip.md",
+      "design-docs/specs/design-text-layout-lint.md",
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/specs/design-appearance.md",
+      "design-docs/specs/design-z-order.md",
+      "AGENTS.md"
+    ],
+    "planReview": "step5-impl-plan-review accepted (comm-017687): IPD-R1, IPD-R2, IPD-R3, IPD-L1, IPD-L2 resolved/addressed; no new high or mid findings."
+  },
+  "plans": [
+    {
+      "planId": "ipd-07a-icon-shape",
+      "planPath": "impl-plans/active/ipd-07a-icon-shape.md",
+      "progressPath": "impl-plans/progress/ipd-07a-icon-shape.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/shapes/ui-icon.ts",
+        "packages/core/src/shapes/index.ts",
+        "impl-plans/progress/ipd-07a-icon-shape.md",
+        "tmp/ipd-s772/ipd-07a-icon-shape"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-07a-icon-shape"
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit/label-field.test.ts",
+        "bun test packages/core",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/shapes/ui-icon.ts packages/core/src/shapes/index.ts"
+      ],
+      "acceptanceCriteria": [
+        "The verification above passes (packages/core: no new failures versus the ipd-00-baseline record).",
+        "label-field.test.ts 'all registered types accept their mapped label or report no label' passes.",
+        "`rg -n 'uiIconShapeUtil' packages/core/src/shapes/index.ts` -> 2 matches (import and register); `rg -n 'icon: \"square\"' packages/core/src/shapes/ui-icon.ts` -> 1 match."
+      ]
+    },
+    {
+      "planId": "ipd-05-core-catalogue",
+      "planPath": "impl-plans/active/ipd-05-core-catalogue.md",
+      "progressPath": "impl-plans/progress/ipd-05-core-catalogue.md",
+      "wave": 2,
+      "dependsOn": [
+        "ipd-07a-icon-shape"
+      ],
+      "writePaths": [
+        "packages/core/src/tools.ts",
+        "packages/core/src/shape-catalogue.ts",
+        "packages/core/src/shape-catalogue.test.ts",
+        "packages/core/src/shapes/frame.ts",
+        "packages/core/src/screen-transition.ts",
+        "packages/core/src/ipd-catalogue.test.ts",
+        "impl-plans/progress/ipd-05-core-catalogue.md",
+        "tmp/ipd-s772/ipd-05-core-catalogue"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-05-core-catalogue"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -n '\"text:layer\"|\"prototype:back\"|\"frame:iphone-402x874\"' packages/core/src/tools.ts` -> 3 matches."
+      ],
+      "verification": [
+        "bun test packages/core/src/shape-catalogue.test.ts packages/core/src/ipd-catalogue.test.ts packages/core/src/frame.test.ts packages/core/src/screen-transition.test.ts packages/core/src/arrange-layered.test.ts",
+        "bun test apps/cli/src/shapes-command.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/tools.ts packages/core/src/shape-catalogue.ts packages/core/src/shapes/frame.ts packages/core/src/screen-transition.ts packages/core/src/ipd-catalogue.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-06-geo-strokes",
+      "planPath": "impl-plans/active/ipd-06-geo-strokes.md",
+      "progressPath": "impl-plans/progress/ipd-06-geo-strokes.md",
+      "wave": 2,
+      "dependsOn": [
+        "ipd-07a-icon-shape"
+      ],
+      "writePaths": [
+        "packages/core/src/shapes/geo-outline.ts",
+        "packages/core/src/svg-export/rect-strokes.ts",
+        "packages/core/src/svg-export/basic-shapes.ts",
+        "packages/core/src/svg-export/paint.ts",
+        "packages/core/src/label-layout.ts",
+        "packages/core/src/geo-strokes.test.ts",
+        "apps/cli/src/thin-rect-export.test.ts",
+        "packages/ui-solid/src/shapes/GeoShapeView.tsx",
+        "packages/ui-solid/src/shapes/RectStrokes.tsx",
+        "packages/ui-solid/src/shapes/label-align-style.ts",
+        "packages/ui-solid/src/shapes/rect-strokes-view.test.ts",
+        "impl-plans/progress/ipd-06-geo-strokes.md",
+        "tmp/ipd-s772/ipd-06-geo-strokes"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-06-geo-strokes"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes, and the progress log records the visual inspection notes."
+      ],
+      "verification": [
+        "bun test packages/core/src/geo-strokes.test.ts packages/core/src/svg-export.test.ts packages/core/src/label-layout.test.ts packages/core/src/geo-actor.test.ts apps/cli/src/thin-rect-export.test.ts apps/cli/src/export-determinism.test.ts apps/cli/src/export-paint-order.test.ts packages/ui-solid/src/shapes/rect-strokes-view.test.ts",
+        "bun test packages/core/src/text-layout-lint apps/cli/src/text-layout-lint.test.ts apps/cli/src/box-label-compat.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-07-icon-core-cli",
+      "planPath": "impl-plans/active/ipd-07-icon-core-cli.md",
+      "progressPath": "impl-plans/progress/ipd-07-icon-core-cli.md",
+      "wave": 3,
+      "dependsOn": [
+        "ipd-05-core-catalogue",
+        "ipd-07a-icon-shape"
+      ],
+      "writePaths": [
+        "packages/core/src/svg-export/shapes.ts",
+        "packages/core/src/shape-warnings.ts",
+        "packages/core/src/ui-icon.test.ts",
+        "apps/cli/src/edit/icon-shapes.ts",
+        "apps/cli/src/shapes-command.ts",
+        "apps/cli/src/shapes-command.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/edit/apply-batch.ts",
+        "apps/cli/src/icon-commands.test.ts",
+        "impl-plans/progress/ipd-07-icon-core-cli.md",
+        "tmp/ipd-s772/ipd-07-icon-core-cli"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts",
+        "packages/core/src/shapes/ui-icon.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        },
+        {
+          "path": "packages/core/src/shapes/ui-icon.ts",
+          "intendedEdit": "created and registered by ipd-07a-icon-shape; edit only if the export/warning work needs a helper there; keep its type, bounds, defaults and registration unchanged"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-07-icon-core-cli"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -n '\"ui.icon\"' packages/core/src/shapes/ui-icon.ts packages/core/src/svg-export/shapes.ts` -> 2 or more matches (one per file).",
+        "`bun test apps/cli/src/edit/label-field.test.ts` -> exit 0, 0 fail: a ui.icon created from the core registry defaultSemantic() ({icon: \"square\"}) validates."
+      ],
+      "verification": [
+        "bun test packages/core/src/ui-icon.test.ts apps/cli/src/icon-commands.test.ts apps/cli/src/shapes-command.test.ts apps/cli/src/commands.test.ts apps/cli/src/warnings.test.ts packages/core/src/shape-warnings.test.ts apps/cli/src/edit/label-field.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-08-cli-layout-ops",
+      "planPath": "impl-plans/active/ipd-08-cli-layout-ops.md",
+      "progressPath": "impl-plans/progress/ipd-08-cli-layout-ops.md",
+      "wave": 4,
+      "dependsOn": [
+        "ipd-07-icon-core-cli"
+      ],
+      "writePaths": [
+        "apps/cli/src/edit/operations/layout.ts",
+        "apps/cli/src/edit/sizing-fields.ts",
+        "apps/cli/src/layout-ops.test.ts",
+        "impl-plans/progress/ipd-08-cli-layout-ops.md",
+        "tmp/ipd-s772/ipd-08-cli-layout-ops"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-08-cli-layout-ops"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes, and the progress log records the test counts and visual notes."
+      ],
+      "verification": [
+        "bun test apps/cli/src/layout-ops.test.ts apps/cli/src/edit apps/cli/src/edit-frame-carry.test.ts packages/core/src/auto-layout.test.ts packages/core/src/align.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/edit/operations/layout.ts apps/cli/src/edit/sizing-fields.ts apps/cli/src/layout-ops.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-09-text-layer",
+      "planPath": "impl-plans/active/ipd-09-text-layer.md",
+      "progressPath": "impl-plans/progress/ipd-09-text-layer.md",
+      "dependsOn": [
+        "ipd-05-core-catalogue",
+        "ipd-07a-icon-shape"
+      ],
+      "writePaths": [
+        "packages/core/src/text-layout.ts",
+        "packages/core/src/svg-export/text-note.ts",
+        "packages/core/src/text-layer.test.ts",
+        "packages/ui-solid/src/shapes/TextNoteView.tsx",
+        "apps/cli/src/edit/typography-link.ts",
+        "apps/cli/src/edit/visual-patch.ts",
+        "apps/cli/src/text-layer-cli.test.ts",
+        "impl-plans/progress/ipd-09-text-layer.md",
+        "tmp/ipd-s772/ipd-09-text-layer"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-09-text-layer"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -n 'export function textNoteLines' packages/core/src/text-layout.ts` -> 1 match."
+      ],
+      "verification": [
+        "bun test packages/core/src/text-layer.test.ts apps/cli/src/text-layer-cli.test.ts packages/core/src/text-layout.test.ts packages/core/src/text-styles.test.ts packages/core/src/svg-export.test.ts packages/core/src/text-layout-lint apps/cli/src/text-layout-export.test.ts packages/ui-solid/src/text-note-view.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-10-icon-desktop",
+      "planPath": "impl-plans/active/ipd-10-icon-desktop.md",
+      "progressPath": "impl-plans/progress/ipd-10-icon-desktop.md",
+      "dependsOn": [
+        "ipd-07-icon-core-cli"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/shapes/IconView.tsx",
+        "packages/ui-solid/src/shapes/ShapeView.tsx",
+        "packages/ui-solid/src/inspector/IconSection.tsx",
+        "packages/ui-solid/src/Inspector.tsx",
+        "packages/ui-solid/src/IconPicker.tsx",
+        "packages/ui-solid/src/IconPicker.css",
+        "packages/ui-solid/src/icon-view.test.ts",
+        "packages/ui-solid/src/icon-picker.test.ts",
+        "impl-plans/progress/ipd-10-icon-desktop.md",
+        "tmp/ipd-s772/ipd-10-icon-desktop"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-10-icon-desktop"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/icon-view.test.ts packages/ui-solid/src/icon-picker.test.ts packages/ui-solid/src/design-shapes.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-11-frames",
+      "planPath": "impl-plans/active/ipd-11-frames.md",
+      "progressPath": "impl-plans/progress/ipd-11-frames.md",
+      "dependsOn": [
+        "ipd-05-core-catalogue",
+        "ipd-06-geo-strokes",
+        "ipd-07-icon-core-cli"
+      ],
+      "writePaths": [
+        "packages/core/src/insertion-parent.ts",
+        "packages/core/src/insertion-parent.test.ts",
+        "packages/core/src/frame-title.test.ts",
+        "packages/core/src/svg-export/shapes.ts",
+        "packages/core/src/svg-export/document.ts",
+        "packages/ui-solid/src/shapes/FrameView.tsx",
+        "packages/ui-solid/src/interaction/creation.ts",
+        "packages/ui-solid/src/interaction/transform.ts",
+        "packages/ui-solid/src/frame-parent-interaction.test.ts",
+        "apps/cli/src/edit/parent-fields.ts",
+        "apps/cli/src/inspect-command.ts",
+        "apps/cli/src/frame-parent.test.ts",
+        "impl-plans/progress/ipd-11-frames.md",
+        "tmp/ipd-s772/ipd-11-frames"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts",
+        "apps/cli/src/commands.test.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        },
+        {
+          "path": "apps/cli/src/commands.test.ts",
+          "intendedEdit": "update inspect expectations only where frame children now show rel coordinates"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-11-frames"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes, and the progress log records the before/after drop behavior."
+      ],
+      "verification": [
+        "bun test packages/core/src/insertion-parent.test.ts packages/core/src/frame-title.test.ts apps/cli/src/frame-parent.test.ts packages/ui-solid/src/frame-parent-interaction.test.ts packages/core/src/frame-tree.test.ts packages/core/src/frame-membership.test.ts packages/core/src/frame.test.ts packages/core/src/arrange-layered.test.ts packages/core/src/svg-export.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/interaction-dragging-camera.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/commands.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-12-controls",
+      "planPath": "impl-plans/active/ipd-12-controls.md",
+      "progressPath": "impl-plans/progress/ipd-12-controls.md",
+      "dependsOn": [
+        "ipd-06-geo-strokes",
+        "ipd-07a-icon-shape"
+      ],
+      "writePaths": [
+        "packages/core/src/svg-export/ui-control.ts",
+        "packages/core/src/ui-control-paint.ts",
+        "packages/core/src/ui-control-style.test.ts",
+        "packages/core/src/interface-code.ts",
+        "packages/core/src/interface-code-controls.test.ts",
+        "packages/ui-solid/src/shapes/UiControlView.tsx",
+        "packages/ui-solid/src/shapes/UiControlView.css",
+        "packages/ui-solid/src/inspector/UiControlSection.tsx",
+        "packages/ui-solid/src/ui-control-view.test.ts",
+        "impl-plans/progress/ipd-12-controls.md",
+        "tmp/ipd-s772/ipd-12-controls"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-12-controls"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -n '#137e7e' packages/ui-solid/src/shapes/UiControlView.css` -> only in `var(...)` fallbacks."
+      ],
+      "verification": [
+        "bun test packages/core/src/ui-control-style.test.ts packages/ui-solid/src/ui-control-view.test.ts packages/core/src/interface-code-controls.test.ts packages/core/src/svg-export.test.ts packages/core/src/interface-code.test.ts packages/core/src/html-bundle.test.ts packages/core/src/templates/design-templates.test.ts apps/cli/src/html-export.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-13-prototype-core-cli",
+      "planPath": "impl-plans/active/ipd-13-prototype-core-cli.md",
+      "progressPath": "impl-plans/progress/ipd-13-prototype-core-cli.md",
+      "dependsOn": [
+        "ipd-05-core-catalogue",
+        "ipd-11-frames"
+      ],
+      "writePaths": [
+        "packages/core/src/prototype-links.ts",
+        "packages/core/src/prototype-links.test.ts",
+        "packages/core/src/shapes/connector/decoration.ts",
+        "packages/core/src/svg-export/theme.ts",
+        "packages/core/src/svg-export/document.ts",
+        "packages/core/src/editor/facade/page-editing.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/inspect-command.ts",
+        "apps/cli/src/edit/operations/connect.ts",
+        "apps/cli/src/prototype-cli.test.ts",
+        "impl-plans/progress/ipd-13-prototype-core-cli.md",
+        "tmp/ipd-s772/ipd-13-prototype-core-cli"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts",
+        "packages/core/src/svg-export.test.ts",
+        "packages/core/src/templates/design-templates.test.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        },
+        {
+          "path": "packages/core/src/svg-export.test.ts",
+          "intendedEdit": "update only expectations that pinned prototype links in default page export (accepted output change, design 8.4)"
+        },
+        {
+          "path": "packages/core/src/templates/design-templates.test.ts",
+          "intendedEdit": "update only expectations that pinned prototype links in default page export (accepted output change, design 8.4)"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-13-prototype-core-cli"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/core/src/prototype-links.test.ts apps/cli/src/prototype-cli.test.ts packages/core/src/prototype.test.ts packages/core/src/screen-transition.test.ts packages/core/src/svg-export.test.ts packages/core/src/connector-outlines.test.ts apps/cli/src/export-command.test.ts apps/cli/src/commands.test.ts packages/core/src/templates/design-templates.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-14-kit-core",
+      "planPath": "impl-plans/active/ipd-14-kit-core.md",
+      "progressPath": "impl-plans/progress/ipd-14-kit-core.md",
+      "dependsOn": [
+        "ipd-05-core-catalogue",
+        "ipd-07-icon-core-cli",
+        "ipd-09-text-layer",
+        "ipd-11-frames",
+        "ipd-12-controls"
+      ],
+      "writePaths": [
+        "packages/core/src/kits/ios/types.ts",
+        "packages/core/src/kits/ios/style.ts",
+        "packages/core/src/kits/ios/insert.ts",
+        "packages/core/src/kits/ios/props.ts",
+        "packages/core/src/kits/ios/bars.ts",
+        "packages/core/src/kits/ios/content.ts",
+        "packages/core/src/kits/ios/index.ts",
+        "packages/core/src/kits/ios/kit-core.test.ts",
+        "apps/cli/src/edit/kit-shapes.ts",
+        "apps/cli/src/shapes-command.ts",
+        "apps/cli/src/shapes-command.test.ts",
+        "apps/cli/src/kit-cli.test.ts",
+        "impl-plans/progress/ipd-14-kit-core.md",
+        "tmp/ipd-s772/ipd-14-kit-core"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-14-kit-core"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -n 'IOS_CONTENT_COMPONENTS' packages/core/src/kits/ios/content.ts` -> 1 match."
+      ],
+      "verification": [
+        "bun test packages/core/src/kits apps/cli/src/kit-cli.test.ts apps/cli/src/shapes-command.test.ts packages/core/src/components.test.ts packages/core/src/component-refresh.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/kits apps/cli/src/edit/kit-shapes.ts apps/cli/src/shapes-command.ts apps/cli/src/kit-cli.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-15-kit-content",
+      "planPath": "impl-plans/active/ipd-15-kit-content.md",
+      "progressPath": "impl-plans/progress/ipd-15-kit-content.md",
+      "dependsOn": [
+        "ipd-14-kit-core"
+      ],
+      "writePaths": [
+        "packages/core/src/kits/ios/content.ts",
+        "packages/core/src/kits/ios/kit-content.test.ts",
+        "impl-plans/progress/ipd-15-kit-content.md",
+        "tmp/ipd-s772/ipd-15-kit-content"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-15-kit-content"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -c 'id: \"ios:' packages/core/src/kits/ios/content.ts` -> 10."
+      ],
+      "verification": [
+        "bun test packages/core/src/kits",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/kits/ios/content.ts packages/core/src/kits/ios/kit-content.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-16-frames-export-compare",
+      "planPath": "impl-plans/active/ipd-16-frames-export-compare.md",
+      "progressPath": "impl-plans/progress/ipd-16-frames-export-compare.md",
+      "dependsOn": [
+        "ipd-11-frames",
+        "ipd-13-prototype-core-cli"
+      ],
+      "writePaths": [
+        "packages/core/src/frame-order.ts",
+        "packages/core/src/frame-order.test.ts",
+        "packages/core/src/compare-images.ts",
+        "packages/core/src/compare-images.test.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/compare-command.ts",
+        "apps/cli/src/cli.ts",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/local-io.ts",
+        "apps/cli/src/frames-compare.test.ts",
+        "apps/cli/native/src/engine.rs",
+        "apps/cli/native/src/files.rs",
+        "apps/cli/native/src/engine_tests.rs",
+        "impl-plans/progress/ipd-16-frames-export-compare.md",
+        "tmp/ipd-s772/ipd-16-frames-export-compare",
+        "target"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-16-frames-export-compare",
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/core/src/compare-images.test.ts packages/core/src/frame-order.test.ts apps/cli/src/frames-compare.test.ts apps/cli/src/export-command.test.ts apps/cli/src/cli-wiring.test.ts",
+        "bun run typecheck",
+        "bunx biome check",
+        "CARGO_TERM_QUIET=true cargo fmt --manifest-path apps/cli/native/Cargo.toml -- --check && CARGO_TERM_QUIET=true cargo test -p nodetto-cli"
+      ]
+    },
+    {
+      "planId": "ipd-17-desktop-palette",
+      "planPath": "impl-plans/active/ipd-17-desktop-palette.md",
+      "progressPath": "impl-plans/progress/ipd-17-desktop-palette.md",
+      "dependsOn": [
+        "ipd-05-core-catalogue",
+        "ipd-10-icon-desktop",
+        "ipd-14-kit-core"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/shape-palette.ts",
+        "packages/ui-solid/src/ShapePalette.tsx",
+        "packages/ui-solid/src/shape-search.ts",
+        "packages/ui-solid/src/palette-drag.ts",
+        "packages/ui-solid/src/app-palette.test.ts",
+        "impl-plans/progress/ipd-17-desktop-palette.md",
+        "tmp/ipd-s772/ipd-17-desktop-palette"
+      ],
+      "sharedPaths": [
+        "packages/ui-solid/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/ui-solid/src/index.ts",
+          "intendedEdit": "append export lines only, and only if needed; re-read before writing; verify sibling lines survive"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-17-desktop-palette"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/app-palette.test.ts packages/ui-solid/src/shape-search.test.ts packages/ui-solid/src/bpmn-palette.test.ts packages/ui-solid/src/breadboard-palette.test.ts packages/ui-solid/src/palette-drag.test.ts packages/ui-solid/src/panel-keyboard.test.ts packages/ui-solid/src/workspaces.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-18-desktop-prototype-view",
+      "planPath": "impl-plans/active/ipd-18-desktop-prototype-view.md",
+      "progressPath": "impl-plans/progress/ipd-18-desktop-prototype-view.md",
+      "dependsOn": [
+        "ipd-13-prototype-core-cli",
+        "ipd-19-desktop-presentation"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/Toolbar.tsx",
+        "packages/ui-solid/src/shortcuts.ts",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/PrototypeViewLayer.tsx",
+        "packages/ui-solid/src/shapes/ConnectorView.tsx",
+        "packages/ui-solid/src/interaction/hit-testing.ts",
+        "packages/ui-solid/src/FlowsPanel.tsx",
+        "packages/ui-solid/src/prototype-view.test.ts",
+        "packages/ui-solid/src/flows-panel.test.ts",
+        "impl-plans/progress/ipd-18-desktop-prototype-view.md",
+        "tmp/ipd-s772/ipd-18-desktop-prototype-view"
+      ],
+      "sharedPaths": [
+        "packages/ui-solid/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/ui-solid/src/index.ts",
+          "intendedEdit": "append export lines only, and only if needed; re-read before writing; verify sibling lines survive"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-18-desktop-prototype-view"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/prototype-view.test.ts packages/ui-solid/src/flows-panel.test.ts packages/ui-solid/src/Toolbar.test.ts packages/ui-solid/src/shortcuts.test.ts packages/ui-solid/src/interaction-selection-snapping.test.ts packages/ui-solid/src/canvas-paint-order.test.ts apps/desktop/src/design-workflow.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-19-desktop-presentation",
+      "planPath": "impl-plans/active/ipd-19-desktop-presentation.md",
+      "progressPath": "impl-plans/progress/ipd-19-desktop-presentation.md",
+      "dependsOn": [
+        "ipd-13-prototype-core-cli"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/prototype-presentation.ts",
+        "packages/ui-solid/src/PrototypePreview.tsx",
+        "packages/ui-solid/src/PrototypeHotspots.tsx",
+        "packages/ui-solid/src/PrototypeLayer.tsx",
+        "packages/ui-solid/src/prototype-transition.ts",
+        "apps/desktop/src/styles/prototype-preview.css",
+        "packages/ui-solid/src/prototype-presentation.test.ts",
+        "packages/ui-solid/src/prototype-preview-flows.test.ts",
+        "impl-plans/progress/ipd-19-desktop-presentation.md",
+        "tmp/ipd-s772/ipd-19-desktop-presentation"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-19-desktop-presentation"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/prototype-presentation.test.ts packages/ui-solid/src/prototype-preview-flows.test.ts packages/ui-solid/src/prototype-overlays.test.ts packages/ui-solid/src/prototype-transition.test.ts packages/ui-solid/src/prototype-trigger.test.ts packages/ui-solid/src/prototype-scroll.test.ts packages/ui-solid/src/prototype-surface-focus.test.ts packages/ui-solid/src/prototype-variant-state.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-20-app-lint",
+      "planPath": "impl-plans/active/ipd-20-app-lint.md",
+      "progressPath": "impl-plans/progress/ipd-20-app-lint.md",
+      "dependsOn": [
+        "ipd-07-icon-core-cli",
+        "ipd-09-text-layer",
+        "ipd-12-controls",
+        "ipd-13-prototype-core-cli",
+        "ipd-14-kit-core",
+        "ipd-15-kit-content",
+        "ipd-16-frames-export-compare"
+      ],
+      "writePaths": [
+        "packages/core/src/app-design-lint",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/app-lint-cli.test.ts",
+        "impl-plans/progress/ipd-20-app-lint.md",
+        "tmp/ipd-s772/ipd-20-app-lint"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-20-app-lint"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "`rg -c '\"app-' packages/core/src/app-design-lint/index.ts` -> 7 or more."
+      ],
+      "verification": [
+        "bun test packages/core/src/app-design-lint apps/cli/src/app-lint-cli.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/lint-metrics.test.ts packages/core/src/text-layout-lint",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/app-design-lint apps/cli/src/app-lint-cli.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-21-html-prototype",
+      "planPath": "impl-plans/active/ipd-21-html-prototype.md",
+      "progressPath": "impl-plans/progress/ipd-21-html-prototype.md",
+      "dependsOn": [
+        "ipd-13-prototype-core-cli",
+        "ipd-16-frames-export-compare"
+      ],
+      "writePaths": [
+        "packages/core/src/prototype-html.ts",
+        "packages/core/src/prototype-html.test.ts",
+        "packages/core/src/svg-export/theme.ts",
+        "packages/core/src/svg-export/document.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/prototype-html-cli.test.ts",
+        "impl-plans/progress/ipd-21-html-prototype.md",
+        "tmp/ipd-s772/ipd-21-html-prototype"
+      ],
+      "sharedPaths": [
+        "packages/core/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "append export lines only; re-read immediately before writing; never reorder or remove lines; verify sibling plans' new lines survive after writing"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-21-html-prototype"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test packages/core/src/prototype-html.test.ts apps/cli/src/prototype-html-cli.test.ts packages/core/src/html-bundle.test.ts apps/cli/src/html-export.test.ts apps/cli/src/export-command.test.ts packages/core/src/svg-export.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-22-desktop-export-compare-check",
+      "planPath": "impl-plans/active/ipd-22-desktop-export-compare-check.md",
+      "progressPath": "impl-plans/progress/ipd-22-desktop-export-compare-check.md",
+      "dependsOn": [
+        "ipd-16-frames-export-compare",
+        "ipd-18-desktop-prototype-view",
+        "ipd-19-desktop-presentation",
+        "ipd-20-app-lint",
+        "ipd-21-html-prototype"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/ExportDialog.tsx",
+        "packages/ui-solid/src/ExportDialog.css",
+        "packages/ui-solid/src/compare-dialog.ts",
+        "packages/ui-solid/src/CompareDialog.tsx",
+        "packages/ui-solid/src/AppDesignProblemsPanel.tsx",
+        "packages/ui-solid/src/AppDesignProblemsPanel.css",
+        "packages/ui-solid/src/interaction/context-menu.ts",
+        "packages/ui-solid/src/ContextMenu.tsx",
+        "apps/desktop/src/App.tsx",
+        "packages/ui-solid/src/compare-dialog.test.ts",
+        "packages/ui-solid/src/app-design-panel.test.ts",
+        "packages/ui-solid/src/export-dialog-artboards.test.ts",
+        "impl-plans/progress/ipd-22-desktop-export-compare-check.md",
+        "tmp/ipd-s772/ipd-22-desktop-export-compare-check"
+      ],
+      "sharedPaths": [
+        "packages/ui-solid/src/index.ts"
+      ],
+      "sharedPathNotes": [
+        {
+          "path": "packages/ui-solid/src/index.ts",
+          "intendedEdit": "append export lines only, and only if needed; re-read before writing; verify sibling lines survive"
+        }
+      ],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-22-desktop-export-compare-check"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes, and the progress log records the visual comparison notes."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/compare-dialog.test.ts packages/ui-solid/src/app-design-panel.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts packages/ui-solid/src/raster-export.test.ts packages/ui-solid/src/pdf-export.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts apps/desktop/src/design-workflow.test.ts",
+        "bun run typecheck",
+        "bunx biome check"
+      ]
+    },
+    {
+      "planId": "ipd-23-parity-shapes",
+      "planPath": "impl-plans/active/ipd-23-parity-shapes.md",
+      "progressPath": "impl-plans/progress/ipd-23-parity-shapes.md",
+      "dependsOn": [
+        "ipd-06-geo-strokes",
+        "ipd-07-icon-core-cli",
+        "ipd-08-cli-layout-ops",
+        "ipd-09-text-layer",
+        "ipd-11-frames",
+        "ipd-12-controls",
+        "ipd-13-prototype-core-cli",
+        "ipd-14-kit-core",
+        "ipd-15-kit-content",
+        "ipd-16-frames-export-compare",
+        "ipd-20-app-lint",
+        "ipd-21-html-prototype"
+      ],
+      "writePaths": [
+        "apps/cli/src/native-parity/app-design-shapes.test.ts",
+        "impl-plans/progress/ipd-23-parity-shapes.md",
+        "tmp/ipd-s772/ipd-23-parity-shapes",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-23-parity-shapes",
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes.",
+        "The progress log has the bundle size delta, plus a table of each case with its result."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/app-design-shapes.test.ts",
+        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/edit-performance.test.ts apps/cli/src/native-parity/export.test.ts apps/cli/src/mcp-stdio.test.ts",
+        "bunx biome check apps/cli/src/native-parity/app-design-shapes.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-24-parity-flows",
+      "planPath": "impl-plans/active/ipd-24-parity-flows.md",
+      "progressPath": "impl-plans/progress/ipd-24-parity-flows.md",
+      "dependsOn": [
+        "ipd-06-geo-strokes",
+        "ipd-07-icon-core-cli",
+        "ipd-08-cli-layout-ops",
+        "ipd-09-text-layer",
+        "ipd-11-frames",
+        "ipd-12-controls",
+        "ipd-13-prototype-core-cli",
+        "ipd-14-kit-core",
+        "ipd-15-kit-content",
+        "ipd-16-frames-export-compare",
+        "ipd-20-app-lint",
+        "ipd-21-html-prototype",
+        "ipd-23-parity-shapes"
+      ],
+      "writePaths": [
+        "apps/cli/src/native-parity/app-design-flows.test.ts",
+        "impl-plans/progress/ipd-24-parity-flows.md",
+        "tmp/ipd-s772/ipd-24-parity-flows",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-24-parity-flows",
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes, and the progress log has a per-case result table."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/app-design-flows.test.ts",
+        "bunx biome check apps/cli/src/native-parity/app-design-flows.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-25-docs-help",
+      "planPath": "impl-plans/active/ipd-25-docs-help.md",
+      "progressPath": "impl-plans/progress/ipd-25-docs-help.md",
+      "dependsOn": [
+        "ipd-07-icon-core-cli",
+        "ipd-08-cli-layout-ops",
+        "ipd-09-text-layer",
+        "ipd-11-frames",
+        "ipd-13-prototype-core-cli",
+        "ipd-14-kit-core",
+        "ipd-15-kit-content",
+        "ipd-16-frames-export-compare",
+        "ipd-17-desktop-palette",
+        "ipd-18-desktop-prototype-view",
+        "ipd-19-desktop-presentation",
+        "ipd-20-app-lint",
+        "ipd-21-html-prototype",
+        "ipd-22-desktop-export-compare-check"
+      ],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "docs/cli.md",
+        "docs/design.md",
+        "README.md",
+        "apps/cli/src/help-app-design.test.ts",
+        "impl-plans/progress/ipd-25-docs-help.md",
+        "tmp/ipd-s772/ipd-25-docs-help"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-25-docs-help"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes."
+      ],
+      "verification": [
+        "bun test apps/cli/src/help-app-design.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/help-style-export.test.ts apps/cli/src/help-convert-frame.test.ts apps/cli/src/sequence-self-help.test.ts apps/cli/src/mcp.test.ts",
+        "bunx biome check apps/cli/src/help.ts apps/cli/src/help-app-design.test.ts",
+        "grep -c 'Designing phone apps with the CLI' docs/cli.md"
+      ]
+    },
+    {
+      "planId": "ipd-26-example-sample",
+      "planPath": "impl-plans/active/ipd-26-example-sample.md",
+      "progressPath": "impl-plans/progress/ipd-26-example-sample.md",
+      "dependsOn": [
+        "ipd-11-frames",
+        "ipd-13-prototype-core-cli",
+        "ipd-15-kit-content",
+        "ipd-16-frames-export-compare",
+        "ipd-20-app-lint",
+        "ipd-21-html-prototype",
+        "ipd-23-parity-shapes",
+        "ipd-24-parity-flows"
+      ],
+      "writePaths": [
+        "examples/design",
+        "apps/cli/scripts/generate-iphone-kit-example.ts",
+        "apps/cli/src/iphone-kit-example.test.ts",
+        "apps/cli/src/native-parity/iphone-kit-example.test.ts",
+        "impl-plans/progress/ipd-26-example-sample.md",
+        "tmp/ipd-s772/ipd-26-example-sample",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-26-example-sample",
+        "target"
+      ],
+      "acceptanceCriteria": [
+        "Verification passes, and `du -sk examples/design/iphone-kit` < 5120."
+      ],
+      "verification": [
+        "bun apps/cli/scripts/generate-iphone-kit-example.ts",
+        "bun test apps/cli/src/iphone-kit-example.test.ts packages/core/src/templates/design-templates.test.ts",
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/iphone-kit-example.test.ts",
+        "bun apps/cli/scripts/generate-design-examples.ts",
+        "bunx biome check apps/cli/scripts/generate-iphone-kit-example.ts apps/cli/src/iphone-kit-example.test.ts apps/cli/src/native-parity/iphone-kit-example.test.ts"
+      ]
+    },
+    {
+      "planId": "ipd-27-reproduction",
+      "planPath": "impl-plans/active/ipd-27-reproduction.md",
+      "progressPath": "impl-plans/progress/ipd-27-reproduction.md",
+      "dependsOn": [
+        "ipd-25-docs-help",
+        "ipd-26-example-sample"
+      ],
+      "writePaths": [
+        "impl-plans/progress/ipd-27-reproduction.md",
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-27-reproduction",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "acceptanceCriteria": [
+        "All verification passes: validate exit 0, app lint 0 problems, one flow, ten 390x844 frames, ten comparison images, tmp/ ignored.",
+        "The per-screen table in the progress log shows drift <= 4 for all ten screens, with yes for icons, colors and weight, and 0 missing elements.",
+        "No private content appears in the progress log: `grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27-reproduction.md` exits 1.",
+        "Deliverables are copied into the git-ignored operator-named output directory from workflow input acceptance criterion 4 (documented exception to writePaths; the name stays out of tracked files)."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true mise run build-cli",
+        "target/release/nodetto-cli validate tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
+        "target/release/nodetto-cli lint tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --format json",
+        "target/release/nodetto-cli inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --flows",
+        "target/release/nodetto-cli inspect tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl --type frame",
+        "sh -c 'test \"$(ls tmp/ipd-s772/ipd-27-reproduction/work/compare | wc -l | tr -d \" \")\" -eq 10'",
+        "git check-ignore -q tmp/ipd-s772/ipd-27-reproduction/work/doc.jsonl",
+        "sh -c '! grep -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt impl-plans/progress/ipd-27-reproduction.md'"
+      ]
+    },
+    {
+      "planId": "ipd-28-finish",
+      "planPath": "impl-plans/active/ipd-28-finish.md",
+      "progressPath": "impl-plans/progress/ipd-28-finish.md",
+      "dependsOn": [
+        "ipd-22-desktop-export-compare-check",
+        "ipd-27-reproduction"
+      ],
+      "writePaths": [
+        "impl-plans/README.md",
+        "design-docs/specs/design-iphone-app-design.md",
+        "impl-plans/progress/ipd-28-finish.md",
+        "tmp/ipd-s772/ipd-28-finish",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [
+        "tmp/ipd-s772/ipd-28-finish",
+        "target",
+        "apps/desktop/src-tauri/binaries"
+      ],
+      "acceptanceCriteria": [
+        "All of steps 1-8 of the plan are satisfied (verify, test-cli and build-cli with no new failures versus the ipd-00 baseline table, typecheck exit 0, privacy scans clean, license files present, no emojis, lockfile unchanged), the README entry exists, and the design status is updated."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true mise run verify",
+        "CARGO_TERM_QUIET=true mise run test-cli",
+        "CARGO_TERM_QUIET=true mise run build-cli",
+        "bun run typecheck",
+        "sh -c 'test \"$(git ls-files tmp | wc -l | tr -d \" \")\" -eq 0'",
+        "sh -c 'test \"$(git ls-files -o --exclude-standard | grep -c ^tmp/)\" -eq 0'",
+        "sh -c '! git grep --untracked -l -i -F -f tmp/ipd-s772/ipd-27-reproduction/private-terms.txt -- . \":!tmp\"'",
+        "test -f THIRD_PARTY_NOTICES.md && test -f packages/core/src/icons/LICENSE-lucide.txt && test -f packages/core/src/text-metrics/LICENSE-liberation-sans.txt",
+        "sh -c '{ git diff --name-only f59bef4; git ls-files -o --exclude-standard; } | sort -u | grep -E \"\\.(md|ts|tsx|json|html)$\" | while read -r f; do test -f \"$f\" && echo \"$f\"; done | xargs grep -nP \"[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]\"; test $? -eq 1'",
+        "git diff --exit-code f59bef4 -- bun.lock package.json"
+      ]
+    }
+  ],
+  "acceptedDependencies": [
+    {
+      "planId": "ipd-00-baseline",
+      "planPath": "impl-plans/active/ipd-00-baseline.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-02-text-measure",
+      "planPath": "impl-plans/active/ipd-02-text-measure.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-04-cli-edit-contracts",
+      "planPath": "impl-plans/active/ipd-04-cli-edit-contracts.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-29-desktop-snap-grid",
+      "planPath": "impl-plans/active/ipd-29-desktop-snap-grid.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-772 wave 1-2 (passed test-integrity and adversarial reviews); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-03-icon-data",
+      "planPath": "impl-plans/active/ipd-03-icon-data.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted in session-775 (successfulPlanIds; adversarial and test-integrity reviews accepted); repair ipd-03-branch-1 resolved: bunx biome check packages/core/src/index.ts exits 0 (tmp/ipd-s772/plan-check/amend-s775/index-biome-r2.log); its changes are in the working tree"
+    },
+    {
+      "planId": "ipd-01-ir-schema",
+      "planPath": "impl-plans/active/ipd-01-ir-schema.md",
+      "commit": "uncommitted-working-tree",
+      "note": "accepted by the operator after amendment round 2 (session-775): bun test packages/ir 156/156, golden 57/57, typecheck clean; its only aggregate failure (label-field.test.ts ui.icon default) is owned by ipd-07a-icon-shape"
+    }
+  ]
+}

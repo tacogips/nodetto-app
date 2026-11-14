@@ -1,0 +1,23 @@
+# crl-06 layered order progress
+
+Plan intent blob: c71dcfbc9b3876acf098247be5bf59246563aea6. Dependency crl-02 admitted by dispatch. Baseline: `bun test packages/core/src/arrange-layered.test.ts` exited 0, 14 passed, 0 failed; `tmp/crl-s749/crl-06-layered-order/baseline.log`.
+
+Implemented rank, input and four-sweep barycenter member order and measured candidate selection, retaining no-command ties. Existing default and frame geometry are preserved. Wiring evaluation is assigned to crl-07.
+
+Edit intentions are in `tmp/crl-s749/crl-06-layered-order/intent-1.txt` through `intent-10.txt`. Git blob transitions: new order module 077225802c16f8cf9c764044a2c1dd5d6a40430a; layered source 10a4ddab5fca37101ec0b4a60cdedce406d14384 -> bfb3ef1a80d210f4c6603598a0ff1f78e32225db; new ordering test fd964481751b3fba17466bcdecb3af518195533c; layered test e4c42ba32a8b4a2543fdc1d7aa6140853a1121cd -> 5c05c66fab3a8ce2e8394623ad0dd635dbf1532a. Formatting hashes are in `format-before.txt` and `format-after.txt`. Later test edits: 1cefaf3b58fee3d8df2a953a0c77f66662435c79 -> f06ab6a1dbe071f99054f56cfe7574b1c359dd04 -> 8a29d56bd87b7d1633f242bd9873634e48cd1c70 -> 880fbc552331fabb6828e0e05d41bc14e31a7e98 -> 798cb2a85c1e36c1c828cad33750bdbc88ce344a. Intent 10 creates this log; its post-edit hash is recorded separately in evidence.
+
+Final moving-tree gates, all exit 0: targeted tests 19 passed, 0 failed (`final/test.log`); `bun run typecheck` (`final/typecheck.log`); exact four-file `bunx biome check` (`final/biome.log`). Logs are under `tmp/crl-s749/crl-06-layered-order/`. Selector export and untouched shared files are recorded in `final/export.log` and `final/shared-diff.log`. Formal reviews and integration remain downstream.
+
+## Test-integrity revision
+
+CRL06-TI-01: the swapped fixture now asserts distinct nonempty candidates, two evaluations, and rank on equal metrics. CRL06-TI-02: a connected four-node fixture asserts the barycenter order differs, frame visuals match, and all four parents remain correct for both orders. No existing assertions were removed. Test blob transitions: 798cb2a85c1e36c1c828cad33750bdbc88ce344a -> 58615d297f14d6639dc16a447402423167caa557 -> d455b0b2d3519ee92191c280bafc67cb99ec1fc6 -> 1b1458a90aca5d3bb019d5c6a85ab66c422784ab (format). Intent-11 and intent-12 corrected the previous log's hash transcription; intent-13 through intent-16 cover this revision.
+
+Negative controls used isolated copies under `target/crl-06-mutation` without changing production source. `bun test target/crl-06-mutation/tie/arrange-layered.test.ts --test-name-pattern 'selection prefers fewer crossings'` exited 1 with one failure when later ties win (`revision-final/mutation-tie.log`). `bun test target/crl-06-mutation/neighbors/arrange-layered.test.ts --test-name-pattern 'connected barycenter changes member order'` exited 1 with one failure using empty neighbors (`revision-final/mutation-neighbors.log`). Both failures were the intended assertions. Production source blob remained e2387d513136d3a8f2571f8f939fae0c96c9d2f3.
+
+Final moving-tree verification: `bun test packages/core/src/arrange-layered-order.test.ts packages/core/src/arrange-layered.test.ts` exit 0, 20 passed, 0 failed; `bun run typecheck` exit 0; `bunx biome check packages/core/src/arrange-layered.ts packages/core/src/arrange-layered.test.ts packages/core/src/arrange-layered-order.ts packages/core/src/arrange-layered-order.test.ts` exit 0. Complete logs are under `tmp/crl-s749/crl-06-layered-order/revision-final/`. Independent re-review and integration remain downstream.
+
+## Mutation artifact cleanup
+
+CRL06-TI-03: saved the two mutations as `tmp/crl-s749/crl-06-layered-order/revision-final/mutation-tie.diff` and `mutation-neighbors.diff`; both original logs remain. Removed only `target/crl-06-mutation`; the negative-control commands above are historical and cannot be rerun without recreating their copies. Other target contents, including `target/crl-baseline` if present, were untouched. Four source/test blobs remain e2387d513136d3a8f2571f8f939fae0c96c9d2f3, 1b1458a90aca5d3bb019d5c6a85ab66c422784ab, 3fe7f2f001ab2b218a4e644110fba2ec290d400e, 5ab8dd1c8e04915d2bbca02639be07d0e58488c2.
+
+Moving-tree recheck: `bun test arrange-layered.test.ts` exit 0, 18 passed across one file, 0 failed; the exact two-file test exit 0, 20 passed, 0 failed; `bun run typecheck` exit 0; the exact four-file Biome check exit 0. Complete logs are `revision-final/discovery.log`, `recheck-test.log`, `recheck-typecheck.log`, and `recheck-biome.log` under `tmp/crl-s749/crl-06-layered-order/`. Independent re-review remains downstream.
