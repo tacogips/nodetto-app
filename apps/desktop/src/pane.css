@@ -1,0 +1,273 @@
+.app-shell .app-editor-body {
+  position: relative;
+  min-width: 0;
+}
+
+.app-viewer-column > .app-canvas-host {
+  isolation: isolate;
+}
+
+.app-pane {
+  --pane-width: 280px;
+  display: flex;
+  flex: 0 0 var(--pane-width);
+  min-width: 0;
+  overflow: hidden;
+  background: var(--app-chrome-surface);
+}
+
+.app-pane-left {
+  border-right: 1px solid var(--app-chrome-line);
+}
+
+.app-pane-right {
+  border-left: 1px solid var(--app-chrome-line);
+}
+
+.app-pane-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-pane-collapse {
+  position: absolute;
+  z-index: 4;
+  top: 4px;
+  right: 24px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 4px;
+  border: 0;
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-surface);
+  cursor: pointer;
+}
+
+.app-pane-collapse svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-pane-collapse:hover,
+.app-pane-collapse:focus-visible {
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-hover);
+}
+
+.app-pane-left,
+.app-pane-right {
+  position: relative;
+}
+
+.app-pane-left .app-pane-content {
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-pane-content > .nodetto-layers,
+.app-pane-content > .app-inspector {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+}
+
+.app-pane-left .app-pane-content > .nodetto-layers {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.app-pane-navigation:not(:empty) {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--app-chrome-line);
+}
+
+.app-pane.is-collapsed {
+  flex-basis: 34px;
+}
+
+.app-pane.is-overlay {
+  position: absolute;
+  width: var(--pane-width);
+  max-width: calc(100% - 34px);
+  z-index: 8;
+  top: 0;
+  bottom: 0;
+  box-shadow: 3px 0 12px rgb(0 0 0 / 14%);
+}
+
+.app-pane-left.is-overlay {
+  left: 0;
+}
+
+.app-pane-right.is-overlay {
+  right: 0;
+  box-shadow: -3px 0 12px rgb(0 0 0 / 14%);
+}
+
+.app-pane.is-collapsed .app-pane-content {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.app-pane-restore {
+  display: none;
+  width: 33px;
+  min-width: 33px;
+  padding: 7px 3px;
+  border: 0;
+  color: var(--app-chrome-muted);
+  background: var(--app-chrome-surface);
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  font-weight: 600;
+  text-align: start;
+}
+
+.app-pane.is-collapsed .app-pane-restore {
+  display: block;
+}
+
+.app-pane-restore:hover,
+.app-pane-restore:focus-visible {
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-hover);
+}
+
+.app-pane-restore:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.app-pane-divider {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 8px;
+  width: 8px;
+  margin: 0 -4px;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.app-pane-divider::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  content: "";
+}
+
+.app-pane-divider:hover::after,
+.app-pane-divider:focus-visible::after,
+.app-pane-divider.is-dragging::after {
+  background: var(--nodetto-accent);
+}
+
+.app-pane-divider.is-overlay-divider {
+  position: absolute;
+  z-index: 9;
+  top: 0;
+  bottom: 0;
+}
+
+.app-file-menu {
+  position: relative;
+}
+
+.app-file-menu > summary {
+  list-style: none;
+}
+
+.app-file-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-file-menu[open] > .app-file-controls {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 220px;
+  max-width: calc(100vw - 96px);
+  padding: 6px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  background: var(--app-chrome-surface);
+  box-shadow: 0 8px 18px rgb(20 28 32 / 10%);
+}
+
+.app-file-controls > .app-file-button,
+.app-settings-controls > .app-file-button {
+  min-height: 32px;
+  text-align: left;
+}
+
+.app-header-slot {
+  display: contents;
+}
+
+.app-hint-details {
+  margin-left: auto;
+  color: var(--nodetto-muted);
+  font-size: 0.8rem;
+}
+
+.app-hint-details summary {
+  cursor: pointer;
+}
+
+.app-hint-details p {
+  max-width: 520px;
+  margin: 5px 0 0;
+}
+
+@media (max-width: 640px) {
+  .app-pane {
+    --pane-width: 220px;
+  }
+}
+
+.app-pane-collapse:focus-visible,
+.app-pane-restore:focus-visible {
+  outline: 2px solid var(--nodetto-ink);
+  outline-offset: -3px;
+}
+
+.app-viewer-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.app-viewer-heading {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.app-pane input.nodetto-switch {
+  --nodetto-switch-width: 34px;
+  --nodetto-switch-height: 20px;
+  --nodetto-switch-thumb: 16px;
+  --nodetto-switch-inset: 2px;
+  --nodetto-switch-travel: 14px;
+}
