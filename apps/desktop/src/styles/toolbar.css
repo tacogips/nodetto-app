@@ -1,0 +1,152 @@
+/* Header file controls, notices and the creation toolbar.
+   Imported in cascade order from style.css. */
+
+/* File controls */
+
+.app-file-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.app-file-menu,
+.app-settings-menu {
+  position: relative;
+}
+
+.app-settings-controls {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  width: 160px;
+  max-width: calc(100vw - 144px);
+  padding: 4px;
+  border: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+  box-shadow: 0 8px 18px rgb(20 28 32 / 10%);
+}
+
+.app-file-button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--app-control-radius, 6px);
+  color: var(--nodetto-ink);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.app-file-button:hover:not(:disabled) {
+  background: var(--app-chrome-hover);
+}
+
+.app-file-button:disabled {
+  color: #9aa2a8;
+  cursor: default;
+}
+
+.app-recent-select {
+  max-width: 220px;
+  min-height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-surface);
+  font-size: 13px;
+}
+
+.app-file-name {
+  color: var(--nodetto-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-dirty-marker {
+  color: var(--nodetto-accent);
+}
+
+.app-file-status,
+.app-notice {
+  color: var(--nodetto-muted);
+  font-size: 0.8rem;
+}
+
+.app-notice {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+}
+
+.app-error {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--nodetto-line);
+  color: #8c2f26;
+  background: #fdf1ef;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+}
+
+.app-conflict {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--nodetto-line);
+  background: var(--nodetto-accent-soft);
+  font-size: 0.8rem;
+}
+
+.app-hint {
+  color: var(--nodetto-muted);
+  font-size: 0.8rem;
+}
+
+/* Toolbar */
+
+.nodetto-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--nodetto-line);
+  background: var(--nodetto-surface);
+}
+
+.nodetto-tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nodetto-tool-button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--nodetto-line);
+  border-radius: 6px;
+  color: var(--nodetto-ink);
+  background: var(--nodetto-surface);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.nodetto-tool-button:hover:not(:disabled) {
+  background: var(--nodetto-accent-soft);
+}
+
+.nodetto-tool-button:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.nodetto-tool-button.nodetto-active {
+  border-color: var(--nodetto-accent);
+  color: var(--nodetto-surface);
+  background: var(--nodetto-accent);
+}

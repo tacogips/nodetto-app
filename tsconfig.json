@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@nodetto/ir": ["./packages/ir/src/index.ts"],
+      "@nodetto/core": ["./packages/core/src/index.ts"],
+      "@nodetto/io": ["./packages/io/src/index.ts"],
+      "@nodetto/collab": ["./packages/collab/src/index.ts"],
+      "@nodetto/ui-solid": ["./packages/ui-solid/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src",
+    "apps/desktop/src",
+    "apps/cli/src",
+    "apps/cli/scripts",
+    "apps/desktop/vite.config.ts",
+    "apps/desktop/scripts/fixtures"
+  ]
+}

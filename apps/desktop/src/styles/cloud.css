@@ -1,0 +1,333 @@
+/* Cloud mode panels, sharing and live presence.
+   Imported in cascade order from style.css. */
+
+/* Cloud mode */
+
+.app-history-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.app-cloud-dismiss {
+  order: 1;
+  margin-left: auto;
+  padding: 0 5px;
+}
+
+.app-cloud-dismiss svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.app-cloud-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+  font-size: 13px;
+}
+
+.app-cloud-panel.is-embedded.is-expanded {
+  position: fixed;
+  z-index: 40;
+  top: var(--app-cloud-top, 44px);
+  right: 8px;
+  width: min(620px, calc(100vw - 16px));
+  max-height: min(620px, calc(100dvh - var(--app-cloud-top, 44px) - 8px));
+  overflow: auto;
+  box-shadow: 0 12px 30px rgb(20 28 32 / 16%);
+}
+
+.app-cloud-panel.is-dormant {
+  display: none;
+}
+
+.app-cloud-summary,
+.app-cloud-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.app-cloud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-cloud-field {
+  display: flex;
+  flex: 1 1 150px;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+  color: var(--app-chrome-muted);
+}
+
+.app-cloud-field > span {
+  align-self: stretch;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.app-cloud-field input {
+  width: 100%;
+  min-height: 26px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-surface);
+  font-size: 13px;
+}
+
+.app-cloud-field-narrow input {
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.app-cloud-field-narrow {
+  flex: 0 0 52px;
+}
+
+.app-cloud-status,
+.app-cloud-badge {
+  padding: 1px 8px;
+  border-radius: 0;
+  background: var(--nodetto-accent-soft);
+  color: var(--nodetto-accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-cloud-status[data-status="error"],
+.app-cloud-badge[data-status="error"] {
+  color: #8c2f26;
+  background: #fdf1ef;
+}
+
+.app-cloud-status[data-status="reconnecting"],
+.app-cloud-badge[data-status="reconnecting"],
+.app-cloud-status[data-status="syncing"],
+.app-cloud-badge[data-status="syncing"] {
+  color: #7a5a12;
+  background: #fdf3dc;
+}
+
+.app-cloud-notice {
+  margin: 0;
+  color: var(--nodetto-muted);
+}
+
+.app-cloud-share {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--app-chrome-line);
+}
+
+.app-cloud-share-toolbar,
+.app-cloud-share-row,
+.app-cloud-share label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-cloud-share-toolbar,
+.app-cloud-share-row {
+  flex-wrap: wrap;
+}
+
+.app-cloud-share :is(button, select, input) {
+  min-height: 26px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: var(--app-control-radius, 6px);
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-surface);
+  font: inherit;
+}
+
+.app-cloud-share button {
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.app-cloud-share button:hover:not(:disabled) {
+  background: var(--app-chrome-hover);
+}
+
+.app-cloud-share button:disabled {
+  color: #9aa2a8;
+  cursor: default;
+}
+
+.app-cloud-share select,
+.app-cloud-share input {
+  padding: 0 6px;
+}
+
+.app-cloud-share-row > label,
+.app-cloud-share-row input {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-cloud-share-row > label {
+  flex-basis: 180px;
+}
+
+.app-cloud-share-list {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.app-cloud-share-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--app-chrome-line);
+}
+
+.app-cloud-share-list li > span {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--app-chrome-muted);
+}
+
+.app-cloud-share-list button {
+  min-width: 0;
+  white-space: normal;
+}
+
+.app-cloud-empty {
+  margin: 0;
+  color: var(--app-chrome-muted);
+}
+
+.app-cloud-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.app-cloud-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.app-cloud-doc-title {
+  font-weight: 600;
+}
+
+.app-cloud-doc-id {
+  color: var(--nodetto-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+/*
+ * The toolbar's own undo/redo pair drives the core History, which is not the
+ * undo stack a cloud document uses (design 5). In cloud mode the header
+ * carries the buttons that route to the Y.UndoManager, and this pair is
+ * removed rather than left showing a stack nobody is reading.
+ */
+.app-cloud-mode .nodetto-local-history {
+  display: none;
+}
+
+/* Presence */
+
+.app-presence-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--nodetto-muted);
+  font-size: 0.75rem;
+}
+
+.app-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.app-presence-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-presence-brush {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px dashed currentColor;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  will-change: transform;
+}
+
+.app-presence-selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  will-change: transform;
+}
+
+.app-presence-selection-name {
+  position: absolute;
+  top: -1.4rem;
+  left: -1.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fffdf8;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.app-presence-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 2px;
+  align-items: flex-start;
+  will-change: transform;
+}
+
+.app-presence-name {
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fffdf8;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
