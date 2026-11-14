@@ -1,0 +1,10 @@
+{"kind":"document","schemaVersion":1,"id":"01JSEQ00000000000000000001","title":"Widget flow"}
+{"kind":"page","id":"p1","name":"Flow","pageKind":"sequence"}
+{"kind":"element","id":"p-widgets","page":"p1","type":"sequence.participant","index":"a0","semantic":{"name":"Widgets","kind":"service","order":"a0"}}
+{"kind":"element","id":"p-orders","page":"p1","type":"sequence.participant","index":"a1","semantic":{"name":"Orders","kind":"service","order":"a1"}}
+{"kind":"element","id":"p-stock","page":"p1","type":"sequence.participant","index":"a2","semantic":{"name":"Stock","kind":"service","order":"a2"}}
+{"kind":"element","id":"m1","page":"p1","type":"sequence.message","index":"a3","semantic":{"from":"p-widgets","to":"p-orders","order":"a1","label":"Check","kind":"sync"}}
+{"kind":"element","id":"m2","page":"p1","type":"sequence.message","index":"a4","semantic":{"from":"p-orders","to":"p-stock","order":"a2","label":"Reserve","kind":"async"}}
+{"kind":"element","id":"m3","page":"p1","type":"sequence.message","index":"a5","semantic":{"from":"p-stock","to":"p-orders","order":"a3","label":"Ready","kind":"return"},"visual":{"y":300}}
+{"kind":"element","id":"m4","page":"p1","type":"sequence.message","index":"a6","semantic":{"from":"p-orders","to":"p-widgets","order":"a4","label":"Done","kind":"sync"}}
+{"kind":"element","id":"act-orders","page":"p1","type":"sequence.activation","index":"a7","semantic":{"participant":"p-orders","fromOrder":"a1","toOrder":"a3"}}

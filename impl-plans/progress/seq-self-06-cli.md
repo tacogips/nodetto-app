@@ -1,0 +1,15 @@
+# seq-self-06-cli progress
+
+Workflow: issue-resolution. Implementation is incomplete; formal review and final integration are downstream. Dependencies 02, 03 and 04 were accepted in the dispatch. Design sections 7–10 and the plan align.
+
+Implemented the conditional types note, shared PNG decoder, Bun CLI tests, native tests and timing fixture. Per-edit intentions and before/after hashes are under `tmp/seq-self-s750/seq-self-06-cli/`, including the `commands`, `native` and `timing` subdirectories. The first Bun aggregate failed due to order-dependent test assertions; this was corrected and the final aggregate passed.
+
+Baseline binary SHA-256: `c8f5c9049d8877d9e277e55c97ec4f76012b6adf6f7201a3440368f1aad2afa0`, matching plan 01, recorded in `baseline-sha.log`. Timing fixture generation succeeded. Baseline user/sys seconds: 0.87/0.03, 1.09/0.04, 1.12/0.04. Release user/sys: 1.06/0.03, 0.99/0.02, 0.88/0.02. Median user ratio: 0.99/1.09 = 0.9083. Full individual logs: `time-baseline-{1,2,3}.log` and `time-release-{1,2,3}.log` in the evidence directory.
+
+Final verification: Bun tests exit 0, 9 passed (`bun-tests-final.log`); release build exit 0 (`build.log`); typecheck exit 0 (`typecheck-final.log`); Biome exit 0 (`biome-stable.log`); scope diff exit 0 (`scope.log`). Native aggregate exit 1, 7 passed and 2 failed (`native-tests-final.log`). Independent CLI edits generate random IDs, causing literal `compareFile` parity to fail; the plan forbids edits to connect and the native runtime. The wide Arial PNG reproduction also fails its required glyph-existence assertion on this host; the letter-spacing reproduction passes. Root cause and authorized repair for the raster failure remain unresolved. Neither failing assertion has been weakened. Resolve deterministic literal parity within an amended scope or revise the accepted contract; investigate and repair the raster failure within an authorized scope, then rerun all required gates.
+
+## Review repair
+
+The prior blockers above are resolved for this plan. Independent edit runs generate IDs and fractional keys, so the test now normalizes IDs and input paths in stdout, compares ordered message semantics and visual geometry and participant visual geometry, and checks SVG byte parity on each document and loop points across documents. The wide-glyph fixture uses the platform-resolved font with the glyph and edge assertions unchanged. Named-font text loss in the native renderer is a separate pre-existing defect outside this plan; see `tmp/seq-self-s750/reconcile-wave-004/raster-analysis.log` and `raster-analysis-2.log` for the baseline and default-font evidence. Owner decision remains separate.
+
+Review verification: release build exit 0 (`review-build.log`); native parity and export tests exit 0 (`review-native-final.log`); Bun tests exit 0 (`review-bun-final.log`); typecheck exit 0 (`review-typecheck-final.log`); scoped Biome checks exit 0 (`review-biome-exact.log`, `review-biome-final.log`). The first repair run exposed different input paths in stdout; path normalization corrected it (`review-native.log`). Formal review and final integration remain downstream.

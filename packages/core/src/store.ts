@@ -1,0 +1,317 @@
+// Canonical editor state.
+//
+// The store owns the document: pages, elements, and the document-level
+// metadata that has to survive a save. It is the single source of truth —
+// renderers derive from it and never keep a second copy.
+//
+// Writes go through {@link Store.commit}, which is driven by `commands.ts`;
+// nothing outside the command layer should call it, so every mutation is
+// validated, undoable, and announced as exactly one {@link StoreDiff}.
+
+import {
+  comparePageOrder,
+  type DocId,
+  type Document,
+  type Element,
+  type ElementId,
+  type Extensions,
+  type Page,
+  type PageId,
+  SCHEMA_VERSION,
+  type UnknownRecord,
+} from "@nodetto/ir";
+import { compareFractional } from "./fractional.ts";
+
+/** What changed in one commit. Empty arrays mean "nothing of that kind". */
+export interface StoreDiff {
+  readonly added: readonly ElementId[];
+  readonly updated: readonly ElementId[];
+  readonly removed: readonly ElementId[];
+  /** True when the page list or document metadata was replaced. */
+  readonly pagesChanged: boolean;
+}
+
+/** Document-level fields that are not pages or elements. */
+export interface DocumentMeta {
+  readonly schemaVersion: number;
+  readonly id: DocId;
+  readonly title: string;
+  readonly extensions?: Extensions;
+  readonly unknownRecords?: readonly UnknownRecord[];
+}
+
+/** One commit's worth of element and page changes, already validated. */
+export interface StoreCommit {
+  readonly insert?: readonly Element[];
+  readonly update?: readonly Element[];
+  readonly remove?: readonly ElementId[];
+  readonly insertPages?: readonly Page[];
+  readonly updatePages?: readonly Page[];
+  readonly removePages?: readonly PageId[];
+}
+
+export type StoreListener = (diff: StoreDiff) => void;
+
+/**
+ * Elements sort by fractional index (z-order) and fall back to id so the
+ * order is total even if two elements ever share an index.
+ */
+function compareElementOrder(left: Element, right: Element): number {
+  const byIndex = compareFractional(left.index, right.index);
+  return byIndex !== 0 ? byIndex : compareFractional(left.id, right.id);
+}
+
+function compareSnapshotOrder(left: Element, right: Element): number {
+  const byPage = compareFractional(left.page, right.page);
+  return byPage !== 0 ? byPage : compareFractional(left.id, right.id);
+}
+
+function emptyMeta(id: DocId): DocumentMeta {
+  return { schemaVersion: SCHEMA_VERSION, id, title: "Untitled" };
+}
+
+export class Store {
+  private meta: DocumentMeta;
+  private revisionCount = 0;
+
+  /** Changes before subscribers run, including document replacement. */
+  get revision(): number {
+    return this.revisionCount;
+  }
+  private readonly pageMap = new Map<PageId, Page>();
+  private readonly elementMap = new Map<ElementId, Element>();
+  private readonly pageElementIds = new Map<PageId, Set<ElementId>>();
+  private readonly layerFlagIds = new Set<ElementId>();
+  private readonly listeners = new Set<StoreListener>();
+  private readonly pageElements = new Map<PageId, readonly Element[]>();
+
+  constructor(document?: Document, fallbackId = "document") {
+    this.meta = emptyMeta(fallbackId);
+    if (document) {
+      this.loadDocument(document);
+    }
+  }
+
+  getMeta(): DocumentMeta {
+    return this.meta;
+  }
+
+  get(id: ElementId): Element | undefined {
+    return this.elementMap.get(id);
+  }
+
+  has(id: ElementId): boolean {
+    return this.elementMap.has(id);
+  }
+
+  get size(): number {
+    return this.elementMap.size;
+  }
+
+  get hasLayerFlags(): boolean {
+    return this.layerFlagIds.size > 0;
+  }
+
+  getPage(id: PageId): Page | undefined {
+    return this.pageMap.get(id);
+  }
+
+  /**
+   * Pages by id, the same order the snapshot writes them in, so tabs and
+   * the file agree and an undone page delete comes back where it was.
+   */
+  listPages(): readonly Page[] {
+    return [...this.pageMap.values()].sort(comparePageOrder);
+  }
+
+  /** Every element, unordered. Callers that care must sort. */
+  listElements(): readonly Element[] {
+    return [...this.elementMap.values()];
+  }
+
+  /** Elements of one page, bottom to top. */
+  getPageElements(pageId: PageId): readonly Element[] {
+    const cached = this.pageElements.get(pageId);
+    if (cached) return cached;
+    const out: Element[] = [];
+    for (const id of this.pageElementIds.get(pageId) ?? []) {
+      const element = this.elementMap.get(id);
+      if (element) out.push(element);
+    }
+    out.sort(compareElementOrder);
+    this.pageElements.set(pageId, out);
+    return out;
+  }
+
+  subscribe(listener: StoreListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /** Replace the whole document. Announced as one diff. */
+  loadDocument(document: Document): void {
+    const removed = [...this.elementMap.keys()];
+    this.pageElements.clear();
+    this.pageMap.clear();
+    this.elementMap.clear();
+    this.pageElementIds.clear();
+    this.layerFlagIds.clear();
+    this.meta = {
+      schemaVersion: document.schemaVersion,
+      id: document.id,
+      title: document.title,
+      extensions: document.extensions,
+      unknownRecords: document.unknownRecords,
+    };
+    for (const page of document.pages) {
+      this.pageMap.set(page.id, page);
+    }
+    for (const element of document.elements) {
+      this.elementMap.set(element.id, element);
+      this.indexElement(element);
+    }
+    this.emit({
+      added: [...this.elementMap.keys()],
+      updated: [],
+      removed,
+      pagesChanged: true,
+    });
+  }
+
+  /**
+   * Apply one validated batch of changes and announce a single diff.
+   *
+   * @internal Called by the command layer. Bypassing it skips validation,
+   * history, and change notification.
+   */
+  commit(commit: StoreCommit): StoreDiff {
+    const added: ElementId[] = [];
+    const updated: ElementId[] = [];
+    const removed: ElementId[] = [];
+    let pagesChanged = false;
+    // Invalidate before mutation/notification, including moves between pages.
+    for (const element of [
+      ...(commit.insert ?? []),
+      ...(commit.update ?? []),
+    ]) {
+      const previous = this.elementMap.get(element.id);
+      if (previous) this.pageElements.delete(previous.page);
+      this.pageElements.delete(element.page);
+    }
+    for (const id of commit.remove ?? []) {
+      const previous = this.elementMap.get(id);
+      if (previous) this.pageElements.delete(previous.page);
+    }
+    for (const page of commit.insertPages ?? []) {
+      this.pageMap.set(page.id, page);
+      pagesChanged = true;
+    }
+    for (const page of commit.updatePages ?? []) {
+      this.pageMap.set(page.id, page);
+      pagesChanged = true;
+    }
+    for (const element of commit.insert ?? []) {
+      const previous = this.elementMap.get(element.id);
+      if (previous) this.pageElementIds.get(previous.page)?.delete(previous.id);
+      this.elementMap.set(element.id, element);
+      this.indexElement(element);
+      added.push(element.id);
+    }
+    for (const element of commit.update ?? []) {
+      const previous = this.elementMap.get(element.id);
+      if (previous) this.pageElementIds.get(previous.page)?.delete(previous.id);
+      this.elementMap.set(element.id, element);
+      this.indexElement(element);
+      updated.push(element.id);
+    }
+    for (const id of commit.remove ?? []) {
+      const previous = this.elementMap.get(id);
+      if (previous) this.pageElementIds.get(previous.page)?.delete(id);
+      this.layerFlagIds.delete(id);
+      if (this.elementMap.delete(id)) {
+        removed.push(id);
+      }
+    }
+    for (const id of commit.removePages ?? []) {
+      if (this.pageMap.delete(id)) {
+        pagesChanged = true;
+      }
+    }
+    const diff: StoreDiff = { added, updated, removed, pagesChanged };
+    if (
+      pagesChanged ||
+      added.length > 0 ||
+      updated.length > 0 ||
+      removed.length > 0
+    ) {
+      this.emit(diff);
+    }
+    return diff;
+  }
+
+  /**
+   * A deterministic document snapshot: pages by id, elements by page then
+   * id, unknown records and extension bags passed through untouched. Feeding
+   * this to `@nodetto/io` twice yields byte-identical JSONL.
+   */
+  getSnapshot(): Document {
+    const pages = [...this.pageMap.values()].sort(comparePageOrder);
+    const elements = [...this.elementMap.values()].sort(compareSnapshotOrder);
+    const snapshot: Document = {
+      schemaVersion: this.meta.schemaVersion,
+      id: this.meta.id,
+      title: this.meta.title,
+      pages,
+      elements,
+      ...(this.meta.unknownRecords
+        ? { unknownRecords: this.meta.unknownRecords }
+        : {}),
+      ...(this.meta.extensions ? { extensions: this.meta.extensions } : {}),
+    };
+    return snapshot;
+  }
+
+  /** A snapshot with all pages and only elements on the selected pages. */
+  getScopedSnapshot(pages: ReadonlySet<PageId>): Document {
+    const elements: Element[] = [];
+    for (const page of pages) {
+      for (const id of this.pageElementIds.get(page) ?? []) {
+        const element = this.elementMap.get(id);
+        if (element) elements.push(element);
+      }
+    }
+    elements.sort(compareSnapshotOrder);
+    return {
+      schemaVersion: this.meta.schemaVersion,
+      id: this.meta.id,
+      title: this.meta.title,
+      pages: this.listPages(),
+      elements,
+      ...(this.meta.unknownRecords
+        ? { unknownRecords: this.meta.unknownRecords }
+        : {}),
+      ...(this.meta.extensions ? { extensions: this.meta.extensions } : {}),
+    };
+  }
+
+  private indexElement(element: Element): void {
+    if (element.visual.hidden || element.visual.locked)
+      this.layerFlagIds.add(element.id);
+    else this.layerFlagIds.delete(element.id);
+    let ids = this.pageElementIds.get(element.page);
+    if (!ids) {
+      ids = new Set();
+      this.pageElementIds.set(element.page, ids);
+    }
+    ids.add(element.id);
+  }
+
+  private emit(diff: StoreDiff): void {
+    this.revisionCount += 1;
+    for (const listener of [...this.listeners]) {
+      listener(diff);
+    }
+  }
+}
