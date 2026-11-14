@@ -1,0 +1,31 @@
+# Breadboard JSONL format
+
+Breadboard documents use schema version 1. A page has `pageKind: "breadboard"` and its parts, board, wires, and optional target card are ordinary typed element records. Coordinates use page units; one hole pitch is 10 units (2.54 mm). The pitch is independent of the editor's screen grid.
+
+Board holes use row letters `a` through `e` above the centre channel and `f` through `j` below it, paired with numbered columns. Rail holes use `T+1`, `T-1`, `B+1`, and `B-1` forms. A half board has 30 numbered columns, 400 terminal holes, and continuous top and bottom rails.
+
+The following complete element records are copied from nodetto's canonical
+breadboard JSONL fixture. Together they show all 13 registered element types.
+The identifiers are `breadboard.battery`, `breadboard.board`,
+`breadboard.button`, `breadboard.capacitor`, `breadboard.diode`,
+`breadboard.header`, `breadboard.ic`, `breadboard.led`,
+`breadboard.netlist`, `breadboard.potentiometer`, `breadboard.resistor`,
+`breadboard.transistor`, and `breadboard.wire`.
+
+```jsonl
+{"kind":"element","id":"a-battery","page":"p-breadboard","type":"breadboard.battery","index":"a0","semantic":{"reference":"BT1","value":"5V"}}
+{"kind":"element","id":"b-board","page":"p-breadboard","type":"breadboard.board","index":"a1","semantic":{"size":"half"}}
+{"kind":"element","id":"c-button","page":"p-breadboard","type":"breadboard.button","index":"a2","semantic":{"reference":"SW1","value":"PUSH"}}
+{"kind":"element","id":"d-capacitor","page":"p-breadboard","type":"breadboard.capacitor","index":"a3","semantic":{"reference":"C1","value":"100n","style":"ceramic","span":1}}
+{"kind":"element","id":"e-diode","page":"p-breadboard","type":"breadboard.diode","index":"a4","semantic":{"reference":"D2","value":"1N4148","span":4}}
+{"kind":"element","id":"f-header","page":"p-breadboard","type":"breadboard.header","index":"a5","semantic":{"reference":"J1","value":"HEADER","pinCount":4}}
+{"kind":"element","id":"g-ic","page":"p-breadboard","type":"breadboard.ic","index":"a6","semantic":{"reference":"U1","value":"IC","pinCount":8}}
+{"kind":"element","id":"h-led","page":"p-breadboard","type":"breadboard.led","index":"a7","semantic":{"reference":"D1","value":"red","color":"red"}}
+{"kind":"element","id":"i-netlist","page":"p-breadboard","type":"breadboard.netlist","index":"a8","semantic":{"source":"led-button.net","format":"kicad_net","parts":[{"reference":"D1","value":"red","type":"breadboard.led"},{"reference":"R1","value":"220","type":"breadboard.resistor"}],"nets":[{"name":"SIGNAL","nodes":[{"reference":"D1","pin":1},{"reference":"R1","pin":1}]}]}}
+{"kind":"element","id":"j-potentiometer","page":"p-breadboard","type":"breadboard.potentiometer","index":"a9","semantic":{"reference":"RV1","value":"10k"}}
+{"kind":"element","id":"k-resistor","page":"p-breadboard","type":"breadboard.resistor","index":"aa","semantic":{"reference":"R1","value":"220","span":4,"bands":5,"tolerance":1}}
+{"kind":"element","id":"l-transistor","page":"p-breadboard","type":"breadboard.transistor","index":"ab","semantic":{"reference":"Q1","value":"NPN","polarity":"npn","pinout":"EBC"}}
+{"kind":"element","id":"m-wire","page":"p-breadboard","type":"breadboard.wire","index":"ac","semantic":{"color":"blue","points":[{"x":0,"y":0},{"x":10,"y":10},{"x":20,"y":10}]}}
+```
+
+The target netlist card stores imported parts and named pin groups. It can be removed to turn off parity checks and the ratsnest. See [KiCad import](kicad-import.md) for the import flow and supported source data.
