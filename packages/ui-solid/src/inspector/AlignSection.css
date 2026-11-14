@@ -1,0 +1,33 @@
+.nodetto-align-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: center;
+}
+.nodetto-align-row > div {
+  display: flex;
+  gap: 2px;
+}
+.nodetto-align-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--app-control-radius, 6px);
+  color: var(--nodetto-ink, #1d2a2e);
+  background: transparent;
+  cursor: pointer;
+}
+.nodetto-align-button:hover:not(:disabled) {
+  background: var(--nodetto-accent-soft, #dbe6e8);
+}
+.nodetto-align-button:disabled {
+  color: var(--app-disabled-soft-ink, #a8a8a8);
+  cursor: default;
+}
+.nodetto-align-button:focus-visible {
+  outline: 2px solid var(--nodetto-accent, #335c67);
+}

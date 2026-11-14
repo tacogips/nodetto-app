@@ -1,0 +1,208 @@
+.nodetto-compact-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  padding: 6px 10px;
+  overflow: visible;
+  border-bottom: 1px solid var(--app-chrome-line, #dfe3e6);
+  background: var(--app-chrome-surface, #fff);
+}
+
+.nodetto-toolbar-primary,
+.nodetto-toolbar-utilities,
+.nodetto-local-history {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nodetto-toolbar-primary {
+  flex: 1 1 250px;
+}
+.nodetto-toolbar-utilities,
+.nodetto-local-history {
+  flex: 0 0 auto;
+}
+
+.nodetto-toolbar-icon,
+.nodetto-toolbar-chevron,
+.nodetto-toolbar-menu button,
+.nodetto-toolbar-menu select,
+.nodetto-image-import-compact .nodetto-tool-button {
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--app-control-radius, 6px);
+  color: var(--nodetto-ink, #1d2a2e);
+  background: transparent;
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+
+.nodetto-toolbar-icon,
+.nodetto-image-import-compact .nodetto-tool-button {
+  display: grid;
+  width: 30px;
+  place-items: center;
+  padding: 4px;
+}
+
+.nodetto-toolbar-icon svg,
+.nodetto-toolbar-chevron svg,
+.nodetto-image-import-compact svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.nodetto-toolbar-split {
+  display: flex;
+  align-items: stretch;
+  padding-right: 4px;
+  border-right: 1px solid var(--app-chrome-line, #dfe3e6);
+}
+.nodetto-toolbar-split .nodetto-toolbar-icon {
+  border-right: 0;
+}
+.nodetto-toolbar-chevron {
+  display: grid;
+  width: 16px;
+  place-items: center;
+  padding: 2px;
+}
+.nodetto-toolbar-menu-wrap {
+  flex: none;
+}
+
+.nodetto-toolbar-menu {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  width: min(260px, calc(100vw - 16px));
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--app-chrome-line, #dfe3e6);
+  border-radius: 0;
+  background: var(--app-chrome-surface, #fff);
+  box-shadow: 0 8px 24px var(--app-toolbar-menu-shadow, rgb(0 0 0 / 0.14));
+}
+
+.nodetto-toolbar-menu button,
+.nodetto-toolbar-menu select {
+  padding: 6px 8px;
+  border-color: transparent;
+  text-align: left;
+}
+
+.nodetto-toolbar-menu button:hover:not(:disabled),
+.nodetto-toolbar-icon:hover:not(:disabled),
+.nodetto-toolbar-chevron:hover:not(:disabled),
+.nodetto-image-import-compact .nodetto-tool-button:hover:not(:disabled) {
+  background: var(--app-chrome-hover, #f1f3f4);
+}
+
+.nodetto-toolbar-menu button:disabled,
+.nodetto-toolbar-icon:disabled,
+.nodetto-toolbar-chevron:disabled,
+.nodetto-image-import-compact .nodetto-tool-button:disabled {
+  color: var(--app-disabled-ink, #9aa2a8);
+  cursor: default;
+}
+
+.nodetto-toolbar-menu .nodetto-active,
+.nodetto-toolbar-icon[aria-pressed="true"] {
+  color: var(--app-toolbar-selected-ink, #fff);
+  background: var(--app-toolbar-selected-surface, #303a40);
+}
+
+.nodetto-toolbar-more-menu section {
+  display: grid;
+  gap: 1px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--app-chrome-line, #dfe3e6);
+}
+.nodetto-toolbar-more-menu section:last-child {
+  border-bottom: 0;
+}
+.nodetto-toolbar-more-menu h2 {
+  margin: 0;
+  padding: 2px 8px;
+  color: var(--app-chrome-muted, #667078);
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nodetto-image-import-compact {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.nodetto-image-import-compact .nodetto-tool-group {
+  display: contents;
+}
+.nodetto-image-import-compact .nodetto-image-import-status,
+.nodetto-image-import-compact [role="alert"] {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 21;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 16px));
+  padding: 4px 6px;
+  border: 1px solid var(--app-chrome-line, #dfe3e6);
+  background: var(--app-chrome-surface, #fff);
+  font-size: .72rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  .nodetto-toolbar-primary {
+    flex-basis: 100%;
+  }
+  .nodetto-toolbar-utilities {
+    width: 100%;
+  }
+
+  .nodetto-image-import-compact .nodetto-image-import-status,
+  .nodetto-image-import-compact [role="alert"] {
+    right: auto;
+    left: 0;
+  }
+}
+
+.nodetto-workspace-select,
+.nodetto-workspace-tool {
+  min-height: 30px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--app-chrome-line, #dfe3e6);
+  border-radius: 0;
+  background: var(--app-chrome-surface, #fff);
+  color: var(--nodetto-ink, #1d2a2e);
+  font: inherit;
+  font-size: .8rem;
+}
+.nodetto-workspace-tool[aria-pressed="true"] {
+  background: var(--app-toolbar-selection-surface, #e7edf6);
+  border-color: var(--app-toolbar-selection-border, #526d96);
+}
+.nodetto-active-tool {
+  font-size: .75rem;
+  color: var(--app-toolbar-selection-ink, #526071);
+}
+
+.nodetto-workspace-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: .75rem;
+  color: var(--nodetto-ink, #1d2a2e);
+}

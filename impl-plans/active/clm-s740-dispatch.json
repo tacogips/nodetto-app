@@ -1,0 +1,368 @@
+{
+  "taskId": "clm-s740",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-740",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "235b8c84f3d47734077901aeb9313eed895f6e8f",
+  "designDocPaths": [
+    "design-docs/specs/design-cli-layout-merge-lint.md",
+    "design-docs/user-qa/cli-layout-merge-lint.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/clm-00-overview.md",
+  "supersededManifests": [
+    "impl-plans/active/clm-s725-dispatch.json",
+    "impl-plans/active/clm-s731-dispatch.json",
+    "impl-plans/active/clm-s732-dispatch.json",
+    "impl-plans/active/clm-s736-dispatch.json",
+    "impl-plans/active/clm-s737-dispatch.json"
+  ],
+  "evidenceRoot": "tmp/clm-s740",
+  "evidenceLayout": "Per-plan evidence under tmp/clm-s740/<planId>/ with gate runs under tmp/clm-s740/<planId>/final/. Before repeating a gate run, move final/ to attempt-<n>/. Retry loops write <name>-1.log..<name>-3.log and copy the green attempt to <name>.log. tmp/ holds only .log, .txt, .json and .jsonl data, never binaries or .ts files, and at most 300 files per plan. Cargo output goes to target/ (artifactRoots [\"target\"] in every plan). target/clm-s737-before/nodetto-cli is the timing reference. target/clm-baseline/nodetto-cli must never be deleted (no cargo clean).",
+  "openDecisions": [
+    {
+      "id": "Q11",
+      "path": "design-docs/user-qa/cli-layout-merge-lint.md",
+      "blocking": false,
+      "blocks": "Nothing in this manifest. Depth-one output stays unchanged, and depth-one containment is not reported as met for conflict inputs.",
+      "effectOnPlans": "clm-09a documents the limitation without naming Q11. No plan pins a conflict input. clm-09-wiring keeps the exact Q11 line in its progress log and final report."
+    }
+  ],
+  "reviewContext": {
+    "workflowMode": "issue-resolution",
+    "issueReference": "clm-09-wiring, continuation 5. No GitHub issue; source is workflowInput.requestedOutcome of opus-terra-design-and-implement-review-loop-session-740.",
+    "userProblem": "clm-09-wiring is partial: full help and docs, CLI-level and git merge-driver end-to-end tests, native parity tests, manifest gates, native timing and final stable-tree verification are outstanding.",
+    "requiredOutcomes": [
+      "Full help and docs for every new command, mode, flag, op and field.",
+      "CLI-level tests through runCli.",
+      "Git merge-driver end-to-end test with a temporary repository and .gitattributes merge=nodetto; a missing git fails.",
+      "Native parity tests for new commands and flags, with more than 0 tests run.",
+      "CARGO_TERM_QUIET=true mise run verify and mise run test-cli pass, with up to 3 attempts on native deadlines.",
+      "Native timing against target/clm-s737-before/nodetto-cli, plus arrange timings, recorded.",
+      "Q11 depth-one behavior kept and documented."
+    ],
+    "nonGoals": [
+      "Redesign, or changes to decisions D1, D2 or D3'.",
+      "Feature logic; a defect in a feature module is a finding for its owning plan.",
+      "Implementing Q11 Option A, or pinning the Q11 reproduction in a test.",
+      "Rust changes and MCP schema changes.",
+      "Changing defaults of tidy, overlaps, edit --arrange, move or frame carry.",
+      "Relaxing any deadline; binary-less native parity; pushes, tags, releases; server, auth or deployment code.",
+      "Strict noUncheckedIndexedAccess diagnostics that exist only in test files outside clm-09's scope."
+    ],
+    "constraints": [
+      "Strict TS, noUncheckedIndexedAccess-safe production core, Boa rules (no regex split on whole documents, no per-point destructuring in hot loops).",
+      "Neutral self-authored fixtures only; no external issue numbers, organizations, reporters or downstream names.",
+      "Every plan: fresh read before each edit, pre and post git hash-object in its own progress log, edits only its paths, no state-changing git commands, no worktrees, no broad formatters, no lockfile changes.",
+      "AGENTS.md: English, no emojis, CARGO_TERM_QUIET=true for cargo.",
+      "apps/desktop/src-tauri/gen/schemas/*.json may be rewritten by mise run verify and is never staged."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Split clm-09 into three wave 1 tracks and one wave 2 final-gates plan.", "rationale": "Registration is in the tree, so the tracks need no handover. Only final gates and timing need the complete tree."},
+      {"decision": "Only clm-09c builds and runs native tests in wave 1.", "rationale": "One cargo build at a time, and no competing deadline tests."},
+      {"decision": "Q11 is documented and reported, not resolved.", "rationale": "workflowInput says to keep current behavior, document it and not block, without choosing a final option."},
+      {"decision": "harness.ts gains one additive compareFile export.", "rationale": "Three new topic files need the same fresh-copy comparison for commands that write; compare stays unchanged."},
+      {"decision": "README carries every name and both recipes and links docs/cli.md for the per-kind tables.", "rationale": "Keeps the README readable while docs/cli.md holds the complete tables."}
+    ],
+    "intentionalTradeoffs": [
+      "A help assertion that clm-09a breaks outside its own tests is fixed in wave 2, so plans need no hand-off.",
+      "Repo-wide typecheck in wave 1 reads siblings' in-progress files and may fail transiently."
+    ],
+    "supportedEdgeCases": [
+      "E2.1 refusals exit 2 and write nothing.",
+      "A conflicting git merge keeps canonical ours with no conflict markers.",
+      "--quiet never hides match lines, conflict lines or errors, and --strict --quiet exits 3."
+    ],
+    "outOfScopeEdgeCases": [
+      "Depth-one conflict inputs until Q11 is answered.",
+      "Layered and route arrange for sequence, breadboard and pcb pages (excluded, with reasons in help)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/user-qa/cli-layout-merge-lint.md",
+      "impl-plans/active/clm-00-overview.md",
+      "impl-plans/active/clm-09-wiring.md",
+      "impl-plans/active/clm-09a-help-docs.md",
+      "impl-plans/active/clm-09b-cli-tests.md",
+      "impl-plans/active/clm-09c-native-parity.md"
+    ],
+    "residualRisks": [
+      "Q11 open: depth-one containment not accepted for conflict inputs",
+      "The new tests may expose a feature defect, which becomes a finding for its owning plan and keeps the gate red.",
+      "A Rust host defect has no pre-authorized path, because Rust changes are a non-goal, and would need a blocker report.",
+      "Native deadline tests may fail under load after 3 attempts; deadlines are never relaxed.",
+      "mise run verify may rewrite tracked apps/desktop/src-tauri/gen/schemas/*.json; commits stage explicit paths only."
+    ]
+  },
+  "amendments": [],
+  "acceptedDependencies": [
+    {"planId": "clm-01-merge", "planPath": "impl-plans/active/clm-01-merge.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "mergeDocumentVersions, VersionConflict, mergeCommand, MERGE_USAGE, export determinism test"},
+    {"planId": "clm-02-connector-edit-perf", "planPath": "impl-plans/active/clm-02-connector-edit-perf.md", "commit": "235b8c84f3d47734077901aeb9313eed895f6e8f", "provides": "D3' page-scoped edit performance, timing inputs and target/clm-s737-before/nodetto-cli"},
+    {"planId": "clm-03-lint-core", "planPath": "impl-plans/active/clm-03-lint-core.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "lintNodeOverlaps, wrapTextToWidth, planTextWrapFixes"},
+    {"planId": "clm-04-edit-usability", "planPath": "impl-plans/active/clm-04-edit-usability.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "labelField, applyLabel, OPERATION_FIELDS, checkOperationFields, collapseWarnings, extractQuiet, applyQuiet"},
+    {"planId": "clm-06-route-arrange", "planPath": "impl-plans/active/clm-06-route-arrange.md", "commit": "d5b9bac98e29bba2159f7e6791dc39938e392953", "provides": "planRoute, pageMetrics, isLabelObstacle, bpmnFlowLabelBox, arrangeLayeredOrRoute, lintMetrics"},
+    {"planId": "clm-07-layered-core", "planPath": "impl-plans/active/clm-07-layered-core.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "planLayered, columnFrames, LAYERED_PAGE_KINDS, FRAME_TITLE_BAND"},
+    {"planId": "clm-08-lint-cli", "planPath": "impl-plans/active/clm-08-lint-cli.md", "commit": "4d82d91c5ad2d7a303d5e41b1cd3e96645b58cff", "provides": "lintDiagramPages, diagramLintApplies, LINT_NO_PAGES_MESSAGE, formatFixLines"},
+    {"planId": "clm-10-layered-fixes", "planPath": "impl-plans/active/clm-10-layered-fixes.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "TB title band at the top, precomputed frame ranks, erd in LAYERED_PAGE_KINDS"},
+    {"planId": "clm-11-container-carry", "planPath": "impl-plans/active/clm-11-container-carry.md", "commit": "235b8c84f3d47734077901aeb9313eed895f6e8f", "provides": "CARRY_CONTAINER_TYPES, heldMembers and E1 messages"},
+    {"planId": "clm-12-bpmn-layered", "planPath": "impl-plans/active/clm-12-bpmn-layered.md", "commit": "c5484577164daf4c4f5b57d888e1b291f84d7867", "provides": "planLayeredBpmn with containerCommands, settleCommands, unitCommands and error; depth-one expected files"},
+    {"planId": "clm-13-edit-selectors", "planPath": "impl-plans/active/clm-13-edit-selectors.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "resolveElementReference, matchWhere, formatMatchLines, MatchReport, batch.matches, select op"},
+    {"planId": "clm-14-lint-image-path", "planPath": "impl-plans/active/clm-14-lint-image-path.md", "commit": "29f8691135fb6098a9496495f4a417e93ce0625e", "provides": "documentRelativePath and traversal tests"},
+    {"planId": "clm-15-bun-test-jsx", "planPath": "impl-plans/active/clm-15-bun-test-jsx.md", "commit": "d5b9bac98e29bba2159f7e6791dc39938e392953", "provides": "bun test JSX preload through bunfig.toml"}
+  ],
+  "plans": [
+    {
+      "planId": "clm-09a-help-docs",
+      "planPath": "impl-plans/active/clm-09a-help-docs.md",
+      "progressPath": "impl-plans/progress/clm-09a-help-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "apps/cli/src/ai-commands.test.ts",
+        "apps/cli/src/mcp.test.ts",
+        "docs/cli.md",
+        "README.md",
+        "design-docs/specs/export.md",
+        "design-docs/specs/design-cli-ai-drawing.md",
+        "impl-plans/active/clm-09a-help-docs.md",
+        "impl-plans/progress/clm-09a-help-docs.md",
+        "tmp/clm-s740/clm-09a-help-docs",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "design-docs/specs/design-cli-ai-drawing.md", "intendedEdit": "Update the pointer at line 129 only if the help wording differs; record whether touched."},
+        {"path": "apps/cli/src/mcp.test.ts", "intendedEdit": "Keep existing assertions; add one only if a new help fact needs it."},
+        {"path": "impl-plans/active/clm-09a-help-docs.md", "intendedEdit": "None. Listed for ownership tracking only; record any needed plan change as an amendment request."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "help.ts documents every command, mode, flag, op and field listed in the plan, including the E1 and E2 tables, E2.1 refusals, the depth-one limitation and E1 geometry errors.",
+        "OVERVIEW stays under 40 lines, and the merge page has its own exit-code line.",
+        "docs/cli.md has the same content and both recipes; README names every item, has both recipes, sits above License and links docs/cli.md.",
+        "export.md has the Goals and Rollout bullets. No user-facing text names Q11. mcp.ts is unchanged."
+      ],
+      "verification": [
+        "bun test apps/cli/src/ai-commands.test.ts apps/cli/src/mcp.test.ts apps/cli/src/mcp-stdio.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/help.ts apps/cli/src/ai-commands.test.ts apps/cli/src/mcp.test.ts",
+        "sh -c 'for f in apps/cli/src/help.ts docs/cli.md README.md; do for t in --frames --ids --reset-manual --metrics --fix --quiet name: where expect select carryMembers bpmn.lane breadboard.board merge=nodetto merge.nodetto.driver; do grep -qF -- \"$t\" \"$f\" || { echo \"$f missing $t\"; exit 1; }; done; done'",
+        "sh -c 'for f in apps/cli/src/help.ts docs/cli.md; do for t in node-overlap image-missing tableName \"more like this\" \"time zone\" \"outside its pool\"; do grep -qF -- \"$t\" \"$f\" || { echo \"$f missing $t\"; exit 1; }; done; done'",
+        "sh -c 'for f in docs/cli.md README.md; do grep -qF post-merge \"$f\" || { echo \"$f missing post-merge\"; exit 1; }; done'",
+        "sh -c '! grep -nE \"Q11|clm-[0-9]\" apps/cli/src/help.ts docs/cli.md README.md'",
+        "sh -c 'test \"$(grep -n \"^## License\" README.md | cut -d: -f1)\" -gt \"$(grep -n \"Layout, selection, and merging\" README.md | cut -d: -f1)\"'",
+        "grep -n 'time zone' design-docs/specs/export.md",
+        "git diff --quiet 235b8c84f3d47734077901aeb9313eed895f6e8f -- apps/cli/src/mcp.ts"
+      ]
+    },
+    {
+      "planId": "clm-09b-cli-tests",
+      "planPath": "impl-plans/active/clm-09b-cli-tests.md",
+      "progressPath": "impl-plans/progress/clm-09b-cli-tests.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/cli-wiring.test.ts",
+        "apps/cli/src/merge-git.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/cli.ts",
+        "apps/cli/src/main.ts",
+        "apps/cli/src/warnings.ts",
+        "apps/cli/src/merge-command.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/lint-metrics.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/edit-command.ts",
+        "apps/cli/src/draw-command.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/edit/report.ts",
+        "apps/cli/src/edit/apply-batch.ts",
+        "packages/core/src/index.ts",
+        "apps/cli/src/arrange-modes.test.ts",
+        "apps/cli/src/lint-metrics.test.ts",
+        "apps/cli/src/lint-diagram.test.ts",
+        "apps/cli/src/merge-command.test.ts",
+        "apps/cli/src/warnings.test.ts",
+        "apps/cli/src/edit/report.test.ts",
+        "apps/cli/src/edit/apply-batch.test.ts",
+        "apps/cli/src/commands.test.ts",
+        "apps/cli/src/mcp-stdio.test.ts",
+        "apps/cli/src/text-layout-lint.test.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "impl-plans/active/clm-09b-cli-tests.md",
+        "impl-plans/progress/clm-09b-cli-tests.md",
+        "tmp/clm-s740/clm-09b-cli-tests",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/commands.ts", "intendedEdit": "Only the smallest wiring fix a new test proves necessary; record it. The same limit applies to cli.ts, main.ts, warnings.ts, merge-command.ts, arrange-modes.ts, lint-metrics.ts, lint-diagram.ts, edit-command.ts, draw-command.ts, export-command.ts, edit/report.ts and edit/apply-batch.ts."},
+        {"path": "packages/core/src/index.ts", "intendedEdit": "Add a missing export only; no logic."},
+        {"path": "apps/cli/src/commands.test.ts", "intendedEdit": "Intentional assertion updates only; record each one. The same limit applies to every other existing test file here."},
+        {"path": "impl-plans/active/clm-09b-cli-tests.md", "intendedEdit": "None. Listed for ownership tracking only; record any needed plan change as an amendment request."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "cli-wiring.test.ts covers every case listed in the plan through runCli, including an E2.1 refusal that exits 2 with the file unchanged.",
+        "merge-git.test.ts runs a real git repository with .gitattributes merge=nodetto, covers clean and conflicting merges, and fails rather than skips when git is missing.",
+        "Without new flags, command output is unchanged; no feature logic was added."
+      ],
+      "verification": [
+        "bun test apps/cli/src/cli-wiring.test.ts apps/cli/src/merge-git.test.ts",
+        "bun test apps/cli/src/commands.test.ts apps/cli/src/merge-command.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/lint-metrics.test.ts apps/cli/src/lint-diagram.test.ts apps/cli/src/warnings.test.ts apps/cli/src/edit/report.test.ts apps/cli/src/edit/apply-batch.test.ts apps/cli/src/text-layout-lint.test.ts apps/cli/src/breadboard-commands.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/cli-wiring.test.ts apps/cli/src/merge-git.test.ts",
+        "grep -n 'merge=nodetto' apps/cli/src/merge-git.test.ts",
+        "sh -c '! grep -nE \"test\\.skip|nativeTest\" apps/cli/src/merge-git.test.ts'"
+      ]
+    },
+    {
+      "planId": "clm-09c-native-parity",
+      "planPath": "impl-plans/active/clm-09c-native-parity.md",
+      "progressPath": "impl-plans/progress/clm-09c-native-parity.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/__fixtures__/bpmn-layered.ts",
+        "apps/cli/src/native-parity/layout.test.ts",
+        "apps/cli/src/native-parity/merge.test.ts",
+        "apps/cli/src/native-parity/edit-usability.test.ts",
+        "apps/cli/src/native-parity/lint-rules.test.ts",
+        "apps/cli/src/native-parity/harness.ts",
+        "apps/cli/src/native-parity/documents.test.ts",
+        "apps/cli/src/native-parity/drawing.test.ts",
+        "apps/cli/src/native-parity/text-layout.test.ts",
+        "apps/cli/src/native-parity/edit-performance.test.ts",
+        "apps/cli/src/native-engine.ts",
+        "impl-plans/active/clm-09c-native-parity.md",
+        "impl-plans/progress/clm-09c-native-parity.md",
+        "tmp/clm-s740/clm-09c-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/native-parity/harness.ts", "intendedEdit": "Add the additive compareFile export; compare stays unchanged."},
+        {"path": "apps/cli/src/native-engine.ts", "intendedEdit": "Only for a native-only wiring gap a test proves; record it."},
+        {"path": "apps/cli/src/native-parity/documents.test.ts", "intendedEdit": "Only if wiring changed an asserted output; never relax a deadline. The same limit applies to drawing.test.ts, text-layout.test.ts and edit-performance.test.ts."},
+        {"path": "impl-plans/active/clm-09c-native-parity.md", "intendedEdit": "None. Listed for ownership tracking only; record any needed plan change as an amendment request."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "layout, merge, edit-usability and lint-rules native parity files exist and cover every case listed in the plan, comparing Bun and the release binary.",
+        "bpmnLayeredDocument(units = 60) exists with the stated contract and validates cleanly.",
+        "More than 0 native tests pass, 0 fail, and no deadline was relaxed."
+      ],
+      "verification": [
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/native-[123].log \"$d/native.log\"; for i in 1 2 3; do CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > \"$d/native-build-$i.log\" 2>&1 || exit 1; NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/merge.test.ts apps/cli/src/native-parity/edit-usability.test.ts apps/cli/src/native-parity/lint-rules.test.ts > \"$d/native-$i.log\" 2>&1 && cp \"$d/native-$i.log\" \"$d/native.log\" && exit 0; done; exit 1' sh tmp/clm-s740/clm-09c-native-parity/final",
+        "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s740/clm-09c-native-parity/final/native.log",
+        "grep -E '^ *0 fail$' tmp/clm-s740/clm-09c-native-parity/final/native.log",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/__fixtures__/bpmn-layered.ts apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/merge.test.ts apps/cli/src/native-parity/edit-usability.test.ts apps/cli/src/native-parity/lint-rules.test.ts apps/cli/src/native-parity/harness.ts",
+        "grep -n 'export function bpmnLayeredDocument' apps/cli/src/__fixtures__/bpmn-layered.ts",
+        "test -x target/clm-baseline/nodetto-cli"
+      ]
+    },
+    {
+      "planId": "clm-09-wiring",
+      "planPath": "impl-plans/active/clm-09-wiring.md",
+      "progressPath": "impl-plans/progress/clm-09-wiring.md",
+      "wave": 2,
+      "dependsOn": ["clm-09a-help-docs", "clm-09b-cli-tests", "clm-09c-native-parity"],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "apps/cli/src/ai-commands.test.ts",
+        "apps/cli/src/mcp.test.ts",
+        "docs/cli.md",
+        "README.md",
+        "design-docs/specs/export.md",
+        "design-docs/specs/design-cli-ai-drawing.md",
+        "apps/cli/src/cli-wiring.test.ts",
+        "apps/cli/src/merge-git.test.ts",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/cli.ts",
+        "apps/cli/src/main.ts",
+        "apps/cli/src/warnings.ts",
+        "apps/cli/src/merge-command.ts",
+        "apps/cli/src/arrange-modes.ts",
+        "apps/cli/src/lint-metrics.ts",
+        "apps/cli/src/lint-diagram.ts",
+        "apps/cli/src/edit-command.ts",
+        "apps/cli/src/draw-command.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/edit/report.ts",
+        "apps/cli/src/edit/apply-batch.ts",
+        "packages/core/src/index.ts",
+        "packages/core/src/bpmn/index.ts",
+        "packages/core/src/diagram-lint/node-overlap.ts",
+        "apps/cli/src/arrange-modes.test.ts",
+        "apps/cli/src/lint-metrics.test.ts",
+        "apps/cli/src/lint-diagram.test.ts",
+        "apps/cli/src/merge-command.test.ts",
+        "apps/cli/src/warnings.test.ts",
+        "apps/cli/src/edit/report.test.ts",
+        "apps/cli/src/edit/apply-batch.test.ts",
+        "apps/cli/src/commands.test.ts",
+        "apps/cli/src/mcp-stdio.test.ts",
+        "apps/cli/src/text-layout-lint.test.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "apps/cli/src/pcb-commands.test.ts",
+        "apps/cli/src/gerber-commands.test.ts",
+        "apps/cli/src/open-command.test.ts",
+        "apps/cli/src/__fixtures__/bpmn-layered.ts",
+        "apps/cli/src/native-parity/layout.test.ts",
+        "apps/cli/src/native-parity/merge.test.ts",
+        "apps/cli/src/native-parity/edit-usability.test.ts",
+        "apps/cli/src/native-parity/lint-rules.test.ts",
+        "apps/cli/src/native-parity/harness.ts",
+        "apps/cli/src/native-parity/documents.test.ts",
+        "apps/cli/src/native-parity/drawing.test.ts",
+        "apps/cli/src/native-parity/text-layout.test.ts",
+        "apps/cli/src/native-parity/edit-performance.test.ts",
+        "apps/cli/src/native-engine.ts",
+        "impl-plans/active/clm-09-wiring.md",
+        "impl-plans/progress/clm-09-wiring.md",
+        "tmp/clm-s740/clm-09-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/commands.ts", "intendedEdit": "Only to fix a gate failure within wiring scope, as for every source and test file in this list; record the file and the reason. No feature logic."},
+        {"path": "packages/core/src/diagram-lint/node-overlap.ts", "intendedEdit": "Annotation only, and only if the production-core strict gate reports it."},
+        {"path": "impl-plans/active/clm-09-wiring.md", "intendedEdit": "None. Listed for ownership tracking only; record any needed plan change as an amendment request."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All gates below exit 0 on the stable tree with logs and every attempt kept.",
+        "Timing against target/clm-s737-before/nodetto-cli and the arrange timings are recorded; both marginal ratios are at most 1.5; the 120-unit layered median is at most 3 times the 60-unit median.",
+        "Production core has no diagnostic under noUncheckedIndexedAccess.",
+        "Depth-one expected files, the planner and the three obstacle-routing expected files are unchanged from originalHead.",
+        "The progress log contains the exact Q11 line and the final state, and the E2 criterion is not reported as fully met for Q11 conflict inputs."
+      ],
+      "verification": [
+        "sh -c 'd=\"$1\"; mkdir -p \"$d\" && rm -f \"$d\"/native-[123].log \"$d/native.log\"; CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > \"$d/native-build.log\" 2>&1 || exit 1; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/layout.test.ts apps/cli/src/native-parity/merge.test.ts apps/cli/src/native-parity/edit-usability.test.ts apps/cli/src/native-parity/lint-rules.test.ts apps/cli/src/native-parity/edit-performance.test.ts apps/cli/src/merge-git.test.ts > \"$d/native-$i.log\" 2>&1 && cp \"$d/native-$i.log\" \"$d/native.log\" && exit 0; done; exit 1' sh tmp/clm-s740/clm-09-wiring/final",
+        "grep -E '^ *[1-9][0-9]* pass$' tmp/clm-s740/clm-09-wiring/final/native.log",
+        "grep -E '^ *0 fail$' tmp/clm-s740/clm-09-wiring/final/native.log",
+        "bun run typecheck",
+        "sh -c 'mkdir -p tmp/clm-s740/clm-09-wiring/final; bun run typecheck --noUncheckedIndexedAccess > tmp/clm-s740/clm-09-wiring/final/strict.log 2>&1; ! grep -E \"^packages/core/src/\" tmp/clm-s740/clm-09-wiring/final/strict.log | grep -v \"\\.test\\.ts(\" | grep -q .'",
+        "bun --cwd=apps/desktop run build --outDir ../../target/clm-s740-jsx/final --emptyOutDir",
+        "CARGO_TERM_QUIET=true mise run verify",
+        "sh -c 'd=tmp/clm-s740/clm-09-wiring/final; mkdir -p \"$d\"; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > \"$d/test-cli-$i.log\" 2>&1 && cp \"$d/test-cli-$i.log\" \"$d/test-cli.log\" && exit 0; done; exit 1'",
+        "test -x target/clm-baseline/nodetto-cli",
+        "test -x target/clm-s737-before/nodetto-cli",
+        "test -s tmp/clm-s740/clm-09-wiring/timing.log",
+        "grep -E '^final A7 medians release: single1=' impl-plans/progress/clm-09-wiring.md",
+        "grep -E '^final A7 medians before: single1=' impl-plans/progress/clm-09-wiring.md",
+        "grep -E '^final arrange route user: [0-9.]+$' impl-plans/progress/clm-09-wiring.md",
+        "sh -c 'f=impl-plans/progress/clm-09-wiring.md; a=$(sed -n \"s/^final A7 marginal ratio batch: //p\" \"$f\" | tail -1); b=$(sed -n \"s/^final A7 marginal ratio mixed: //p\" \"$f\" | tail -1); test -n \"$a\" && test -n \"$b\" && awk -v a=\"$a\" -v b=\"$b\" \"BEGIN{exit !(a+0<=1.5 && b+0<=1.5)}\"'",
+        "sh -c 'f=impl-plans/progress/clm-09-wiring.md; l=$(sed -n \"s/^final arrange layered user: 60=//p\" \"$f\" | tail -1); x=${l%% 120=*}; y=${l##* 120=}; test -n \"$x\" && test -n \"$y\" && awk -v x=\"$x\" -v y=\"$y\" \"BEGIN{exit !(y+0<=3*(x+0))}\"'",
+        "grep -qx 'Q11 open: depth-one containment not accepted for conflict inputs' impl-plans/progress/clm-09-wiring.md",
+        "sh -c '! grep -nE \"^Outstanding:\" impl-plans/progress/clm-09-wiring.md'",
+        "git diff --quiet 235b8c84f3d47734077901aeb9313eed895f6e8f -- apps/cli/src/mcp.ts packages/core/src/arrange-layered-bpmn.ts packages/core/src/arrange-layered-bpmn.depth-one.collapsed-pool.expected.json packages/core/src/arrange-layered-bpmn.depth-one.pool-no-lanes-free-row.expected.json packages/core/src/arrange-layered-bpmn.depth-one.subprocess-boundary.expected.json packages/core/src/arrange-layered-bpmn.depth-one.two-pools-message-flow.expected.json apps/cli/src/__fixtures__/obstacle-routing-batch.expected.jsonl apps/cli/src/__fixtures__/obstacle-routing-batch.multi-page.expected.jsonl apps/cli/src/__fixtures__/obstacle-routing-batch.mixed-multi-page.expected.jsonl"
+      ]
+    }
+  ]
+}

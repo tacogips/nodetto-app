@@ -1,0 +1,303 @@
+// Zoom widget in the canvas corner (design editor-ux 3.5).
+//
+// Zoom out, an editable percentage, reset, zoom in and fit come
+// from the action table; the grid and snap toggles are shell state passed
+// in and handed back, because the canvas reads them too. When `compact`,
+// only a menu button stays in the bar and the zoom group and ruler toggle
+// move into the menu, so a narrow footer keeps the page tabs on its row.
+
+import { type JSX, onCleanup, onMount, Show } from "solid-js";
+import { MIN_ZOOM, MAX_ZOOM } from "@nodetto/core";
+import { Icon } from "./Icon.tsx";
+import "./ZoomControls.css";
+import { NumberInput } from "./NumberInput.tsx";
+import { createEditorSignals } from "./adapter.ts";
+import { stepMenuIndex } from "./menu-navigation.ts";
+import { stopPanelKeyDown } from "./panel-keyboard.ts";
+import type { SnapSettings } from "./interaction.ts";
+import {
+  type ActionContext,
+  type ActionId,
+  actionTitle,
+  getAction,
+  runAction,
+  viewportCenter,
+} from "./shortcuts.ts";
+
+export interface ZoomControlsProps {
+  /** Carries the editor and the viewport size the zoom commands anchor on. */
+  readonly context: ActionContext;
+  readonly snap: SnapSettings;
+  readonly showGrid: boolean;
+  readonly showSlideArea?: boolean;
+  readonly onShowSlideAreaChange?: (show: boolean) => void;
+  readonly showRulers?: boolean;
+  readonly onShowRulersChange?: (show: boolean) => void;
+  readonly onSnapChange: (snap: SnapSettings) => void;
+  readonly onShowGridChange: (show: boolean) => void;
+  /** Fold every control into the menu (for a narrow footer). */
+  readonly compact?: boolean;
+}
+
+export function formatZoom(z: number): string {
+  return `${Math.round(z * 100)} %`;
+}
+
+export function ZoomControls(props: ZoomControlsProps): JSX.Element {
+  const signals = createEditorSignals(props.context.editor);
+  let viewMenu: HTMLDetailsElement | undefined;
+  onMount(() => {
+    const outside = (event: PointerEvent): void => {
+      if (
+        event.target instanceof Node &&
+        !viewMenu?.contains(event.target) &&
+        viewMenu
+      ) {
+        viewMenu.open = false;
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    onCleanup(() => document.removeEventListener("pointerdown", outside));
+  });
+
+  const isEnabled = (id: ActionId): boolean => {
+    signals.rev();
+    signals.selection();
+    signals.camera();
+    return getAction(id).enabled(props.context);
+  };
+
+  const button = (
+    id: ActionId,
+    label: JSX.Element,
+    icon = false,
+  ): JSX.Element => (
+    <button
+      type="button"
+      class="nodetto-zoom-button"
+      classList={{ "nodetto-zoom-icon-button": icon }}
+      title={actionTitle(getAction(id))}
+      aria-label={actionTitle(getAction(id))}
+      disabled={!isEnabled(id)}
+      onClick={(event) => {
+        event.currentTarget.focus({ preventScroll: true });
+        runAction(getAction(id), props.context);
+        if ((id === "zoomReset" || id === "zoomSelection") && viewMenu) {
+          viewMenu.open = false;
+          viewMenu.querySelector("summary")?.focus({ preventScroll: true });
+        }
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  const toggle = (
+    label: string,
+    title: string,
+    on: () => boolean,
+    flip: () => void,
+  ): JSX.Element => (
+    <button
+      type="button"
+      class="nodetto-zoom-button nodetto-zoom-toggle"
+      classList={{ "nodetto-active": on() }}
+      aria-pressed={on()}
+      title={title}
+      onClick={(event) => {
+        event.currentTarget.focus({ preventScroll: true });
+        flip();
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  const zoomGroup = (): JSX.Element => (
+    <div class="nodetto-zoom-group">
+      {button("zoomOut", <Icon name="zoomOut" />, true)}
+      <div class="nodetto-zoom-level">
+        <NumberInput
+          label="Zoom percent"
+          value={Math.round(signals.camera().z * 10000) / 100}
+          min={MIN_ZOOM * 100}
+          max={MAX_ZOOM * 100}
+          step={10}
+          onCommit={(percent) =>
+            props.context.editor.camera.zoomTo(
+              percent / 100,
+              viewportCenter(props.context.viewport),
+            )
+          }
+        />
+        <span aria-hidden="true">%</span>
+      </div>
+      {button("zoomIn", <Icon name="zoomIn" />, true)}
+      {button("zoomFit", <Icon name="fit" />, true)}
+    </div>
+  );
+
+  const rulerButton = (): JSX.Element => (
+    <Show when={props.onShowRulersChange}>
+      <button
+        type="button"
+        class="nodetto-zoom-button nodetto-zoom-toggle nodetto-ruler-toggle"
+        classList={{ "nodetto-active": props.showRulers !== false }}
+        aria-label="Rulers"
+        aria-pressed={props.showRulers !== false}
+        title={props.showRulers !== false ? "Hide rulers" : "Show rulers"}
+        onClick={() => props.onShowRulersChange?.(props.showRulers === false)}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          aria-hidden="true"
+        >
+          <rect x="3" y="6" width="18" height="12" rx="1" />
+          <path d="M6 6v5m3-5v3m3-3v5m3-5v3m3-3v5" />
+        </svg>
+      </button>
+    </Show>
+  );
+
+  return (
+    <div
+      class="nodetto-zoom-controls"
+      classList={{ "nodetto-zoom-compact": props.compact === true }}
+      role="toolbar"
+      aria-label="Zoom"
+    >
+      <Show when={!props.compact}>
+        {zoomGroup()}
+        {rulerButton()}
+      </Show>
+      <details
+        class="nodetto-view-menu"
+        ref={viewMenu}
+        onKeyDown={(event) => {
+          // Menu navigation must not also nudge or pan the canvas.
+          stopPanelKeyDown(event);
+          if (event.key === "Escape" && event.currentTarget.open) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.open = false;
+            event.currentTarget.querySelector("summary")?.focus();
+            return;
+          }
+          if (event.target instanceof HTMLSelectElement) return;
+          if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key))
+            return;
+          event.preventDefault();
+          const menu = event.currentTarget;
+          menu.open = true;
+          const items = [
+            ...menu.querySelectorAll<HTMLButtonElement>(
+              "button:not(:disabled)",
+            ),
+          ];
+          const active = items.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          const next =
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? items.length - 1
+                : stepMenuIndex(
+                    items.map((_, index) => index),
+                    active === -1 ? null : active,
+                    event.key === "ArrowDown" ? 1 : -1,
+                  );
+          if (next !== null) items[next]?.focus({ preventScroll: true });
+        }}
+      >
+        <summary
+          class="nodetto-zoom-icon-button"
+          aria-label={props.compact ? "Zoom and view options" : "View options"}
+          title={props.compact ? "Zoom and view options" : "View options"}
+          onClick={(event) =>
+            event.currentTarget.focus({ preventScroll: true })
+          }
+        >
+          <Icon name={props.compact ? "menu" : "viewOptions"} />
+        </summary>
+        <div class="nodetto-view-menu-body">
+          <Show when={props.compact}>
+            {zoomGroup()}
+            <Show when={props.onShowRulersChange}>
+              {toggle(
+                "Rulers",
+                "Show rulers",
+                () => props.showRulers !== false,
+                () => props.onShowRulersChange?.(props.showRulers === false),
+              )}
+            </Show>
+          </Show>
+          {button("zoomReset", "Reset to 100%")}
+          {button("zoomSelection", "Fit selection")}
+          {toggle(
+            "Grid",
+            "Show grid",
+            () => props.showGrid,
+            () => props.onShowGridChange(!props.showGrid),
+          )}
+          <Show when={props.onShowSlideAreaChange}>
+            {toggle(
+              "Slide area",
+              "Show slide area",
+              () => props.showSlideArea === true,
+              () => props.onShowSlideAreaChange?.(!props.showSlideArea),
+            )}
+          </Show>
+          <label>
+            Grid size
+            <select
+              aria-label="Grid size"
+              value={props.snap.gridSize ?? 24}
+              onChange={(event) =>
+                props.onSnapChange({
+                  ...props.snap,
+                  gridSize: Number(event.currentTarget.value) as 4 | 8 | 24,
+                })
+              }
+            >
+              <option value="4">4</option>
+              <option value="8">8</option>
+              <option value="24">24</option>
+            </select>
+          </label>
+          {toggle(
+            "Snap",
+            "Snap to other objects (hold Cmd/Ctrl to bypass)",
+            () => props.snap.objects,
+            () =>
+              props.onSnapChange({
+                ...props.snap,
+                objects: !props.snap.objects,
+              }),
+          )}
+          {toggle(
+            "Grid snap",
+            "Snap to the grid (hold Cmd/Ctrl to bypass)",
+            () => props.snap.grid,
+            () => props.onSnapChange({ ...props.snap, grid: !props.snap.grid }),
+          )}
+          {toggle(
+            "Guides",
+            "Snap to persistent page guides (hold Cmd/Ctrl to bypass)",
+            () => props.snap.guides !== false,
+            () =>
+              props.onSnapChange({
+                ...props.snap,
+                guides: props.snap.guides === false,
+              }),
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}

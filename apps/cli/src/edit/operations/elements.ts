@@ -1,0 +1,304 @@
+import { planScale, replaceText, textMatcher } from "@nodetto/core";
+import {
+  getElementTypeDefinition,
+  isKnownElementType,
+  isPlainObject,
+  type Element,
+} from "@nodetto/ir";
+import type { Batch } from "../batch.ts";
+import { reparentFromUpdate } from "../parent-fields.ts";
+import { applySizingFields } from "../sizing-fields.ts";
+import { applyKitProps } from "../kit-shapes.ts";
+import { normalizeTypography } from "../typography-link.ts";
+import { nullPaths, visualPatchCommand } from "../visual-patch.ts";
+import { heldMembers } from "../carry-members.ts";
+import { selectedWhere } from "../selectors.ts";
+import { applyLabel } from "../label-field.ts";
+import { reconnectConnectors, verifyReconnected } from "./convert.ts";
+import {
+  deepMerge,
+  fillIds,
+  type Json,
+  type JsonObject,
+  OperationError,
+  requireNumber,
+  requireText,
+} from "../operation-input.ts";
+
+function definitionOf(type: string) {
+  return isKnownElementType(type) ? getElementTypeDefinition(type) : undefined;
+}
+
+export function editListField(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+  op: "append" | "remove-item",
+): void {
+  const element = batch.element(operation["id"], index);
+  const field = requireText(operation["field"], "field", index);
+  const semantic = isPlainObject(element.semantic) ? element.semantic : {};
+  const current = semantic[field];
+  if (!Array.isArray(current))
+    throw new OperationError(
+      index,
+      `${element.type} has no list field "${field}".`,
+    );
+  let next: Json[];
+  if (op === "append") {
+    const items = operation["items"];
+    if (!Array.isArray(items) || !items.length)
+      throw new OperationError(index, `"items" must be a non-empty array`);
+    next = [...current, ...items];
+  } else {
+    const item = requireText(operation["item"], "item", index);
+    const position = current.findIndex(
+      (entry) =>
+        isPlainObject(entry) &&
+        (entry["id"] === item || entry["name"] === item),
+    );
+    if (position < 0)
+      throw new OperationError(
+        index,
+        `No item with id or name "${item}" in ${field}.`,
+      );
+    next = current.filter((_, at) => at !== position);
+  }
+  const definition = definitionOf(element.type);
+  batch.editor.apply([
+    {
+      type: "updateSemantic",
+      id: element.id,
+      semantic: fillIds({ ...semantic, [field]: next }, definition?.keyOrder),
+    },
+  ]);
+  batch.touchedPages.add(element.page);
+  return;
+}
+
+export function updateElement(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  if (
+    operation["semantic"] === undefined &&
+    operation["visual"] === undefined &&
+    operation["label"] === undefined &&
+    operation["parent"] === undefined &&
+    operation["memberIndex"] === undefined &&
+    operation["props"] === undefined &&
+    operation["sizing"] === undefined &&
+    operation["absolute"] === undefined
+  )
+    throw new OperationError(
+      index,
+      "update needs semantic, visual, label, parent, memberIndex, props, sizing or absolute",
+    );
+  for (const element of selectedWhere(batch, operation, index, "update"))
+    updateOne(batch, element, operation, index);
+}
+
+function updateOne(
+  batch: Batch,
+  element: Element,
+  operation: JsonObject,
+  index: number,
+): void {
+  const definition = definitionOf(element.type);
+  const commands = [];
+  if (operation["semantic"] !== undefined) {
+    const semantic = fillIds(
+      deepMerge(element.semantic, operation["semantic"]),
+      definition?.keyOrder,
+    );
+    const paths = nullPaths(operation["semantic"]);
+    if (definition && paths.length) {
+      const issues = definition.validateSemantic(semantic, "semantic");
+      for (const path of paths) {
+        const prefix = `semantic.${path}`;
+        if (
+          issues.some(
+            (issue) =>
+              issue.severity === "error" &&
+              (issue.path === prefix ||
+                issue.path.startsWith(`${prefix}.`) ||
+                issue.path.startsWith(`${prefix}[`)),
+          )
+        )
+          throw new OperationError(
+            index,
+            `update cannot remove required field "${path}" of ${element.type}`,
+          );
+      }
+    }
+    const merged = batch.resolveReferences(
+      element.type,
+      semantic,
+      index,
+      element.page,
+    );
+    commands.push({
+      type: "updateSemantic" as const,
+      id: element.id,
+      semantic: merged,
+    });
+  }
+  const normalized = normalizeTypography(
+    element.type,
+    operation["visual"],
+    element.visual,
+    index,
+  );
+  const placement = reparentFromUpdate(batch, element, operation, index);
+  let visual = normalized.visual;
+  if (placement && isPlainObject(visual))
+    visual = {
+      ...visual,
+      ...(typeof visual["x"] === "number"
+        ? { x: visual["x"] + placement.origin.x }
+        : {}),
+      ...(typeof visual["y"] === "number"
+        ? { y: visual["y"] + placement.origin.y }
+        : {}),
+    };
+  if (visual !== undefined) {
+    if (!isPlainObject(visual))
+      throw new OperationError(index, `"visual" must be an object`);
+    commands.push(visualPatchCommand(element, visual, index));
+  }
+  const carry = operation["carryMembers"];
+  if (carry !== undefined && typeof carry !== "boolean")
+    throw new OperationError(index, `"carryMembers" must be true or false`);
+  const keepMembers =
+    carry === false
+      ? heldMembers(batch.editor, element, visual, index)
+      : undefined;
+  batch.editor.apply(commands, keepMembers ? { keepMembers } : undefined);
+  applySizingFields(batch, element.id, operation, index);
+  if (operation["props"] !== undefined)
+    applyKitProps(batch, element.id, operation["props"], index);
+  if (normalized.detachedStyle)
+    batch.convertWarnings.push({
+      operation: index,
+      op: "update",
+      element: element.id,
+      type: element.type,
+      path: "visual.textStyle",
+      code: "typography.detachedStyle",
+      message: `detached text style ${normalized.detachedStyle} from ${element.id}`,
+    });
+  if (operation["label"] !== undefined)
+    applyLabel(batch, element.id, operation["label"], index);
+  batch.touchedPages.add(element.page);
+  return;
+}
+
+export function moveElement(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  const element = batch.element(operation["id"], index);
+  batch.editor.moveElements([
+    {
+      id: element.id,
+      x: requireNumber(operation["x"], "x", index),
+      y: requireNumber(operation["y"], "y", index),
+    },
+  ]);
+  batch.touchedPages.add(element.page);
+  return;
+}
+
+export function scaleElements(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  const factor = requireNumber(operation["factor"], "factor", index);
+  if (factor <= 0)
+    throw new OperationError(index, `"factor" must be above zero`);
+  const origin = operation["origin"];
+  if (
+    origin !== undefined &&
+    !(
+      isPlainObject(origin) &&
+      typeof origin["x"] === "number" &&
+      typeof origin["y"] === "number"
+    )
+  )
+    throw new OperationError(
+      index,
+      `"origin" must be {"x":<number>,"y":<number>}`,
+    );
+  const targets = batch.targets(operation, index, false);
+  const page = targets[0]?.page;
+  if (page === undefined)
+    throw new OperationError(index, "There is nothing to scale.");
+  batch.editor.setCurrentPage(page);
+  const plan = planScale(
+    batch.editor,
+    targets.map((element) => element.id),
+    factor,
+    isPlainObject(origin)
+      ? { x: Number(origin["x"]), y: Number(origin["y"]) }
+      : undefined,
+  );
+  if (!plan) throw new OperationError(index, "There is nothing to scale.");
+  batch.editor.apply(plan.commands, { placed: plan.placed });
+  batch.touchedPages.add(page);
+  return;
+}
+
+export function replaceTextIn(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  const find = requireText(operation["find"], "find", index);
+  const replacement = operation["replace"];
+  if (typeof replacement !== "string")
+    throw new OperationError(index, `"replace" must be a string`);
+  for (const field of ["regex", "ignoreCase"] as const) {
+    if (operation[field] !== undefined && typeof operation[field] !== "boolean")
+      throw new OperationError(
+        index,
+        `"${field}" must be true or false (true reads "find" as a regular expression)`,
+      );
+  }
+  const matcher = textMatcher(find, {
+    regex: operation["regex"] === true,
+    ignoreCase: operation["ignoreCase"] === true,
+  });
+  if (typeof matcher === "string") throw new OperationError(index, matcher);
+  const targets = batch.targets(operation, index, true);
+  const changes = replaceText(
+    batch.editor,
+    targets.map((element) => element.id),
+    matcher,
+    replacement,
+  );
+  for (const change of changes) {
+    const element = batch.editor.store.get(change.id);
+    if (element) batch.touchedPages.add(element.page);
+  }
+  batch.replaced.push(...changes);
+  return;
+}
+
+export function deleteElement(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  const elements = selectedWhere(batch, operation, index, "delete");
+  if (operation["reconnectTo"] !== undefined)
+    reconnectConnectors(batch, operation, index, elements);
+  if (elements.length)
+    batch.editor.deleteElements(elements.map((element) => element.id));
+  if (operation["reconnectTo"] !== undefined)
+    verifyReconnected(batch, index, elements);
+  for (const element of elements) batch.touchedPages.add(element.page);
+  return;
+}

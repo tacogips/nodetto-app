@@ -1,0 +1,431 @@
+// Inline text editor (design editor-ux.md section 3.3).
+//
+// A textarea positioned in page space over the element's text, so it zooms
+// with the canvas. It is mounted inside the viewport by the shell and lives
+// for exactly one edit: Enter or blur commits through `editor.setText`
+// (which costs no undo step when nothing changed), Escape restores, and
+// `onDone` fires once either way. Pointer and key events stop here so the
+// canvas underneath never mistakes typing for a shortcut or a click in the
+// text for a drag; wheel events keep bubbling so the canvas can still zoom.
+
+import {
+  boxLabelVerticalAlign,
+  type EditableField,
+  type Editor,
+  ERD_TABLE_HEADER_HEIGHT,
+  UML_CLASS_NAME_HEIGHT,
+  umlNameHeight,
+  connectorDecoration,
+  connectorLabelBox,
+  connectorLabelLayout,
+} from "@nodetto/core";
+import {
+  type Element,
+  type ElementId,
+  getElementTypeDefinition,
+} from "@nodetto/ir";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  type JSX,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
+import { createEditorSignals } from "./adapter.ts";
+import { textEditorRotation } from "./text-editor-rotation.ts";
+import { alignTextEditor } from "./text-editor-alignment.ts";
+import { textEditDraft } from "./text-edit-draft.ts";
+import "./TextEditor.css";
+
+export interface TextEditorTarget {
+  readonly id: ElementId;
+  readonly field: EditableField;
+}
+
+export interface TextEditorProps {
+  readonly editor: Editor;
+  readonly target: TextEditorTarget;
+  readonly onDone: () => void;
+}
+
+/** The stylesheet's shape font size; label styles override it. */
+const BASE_FONT_SIZE = 13;
+/** The connector label's font size in the stylesheet. */
+const CONNECTOR_FONT_SIZE = 11;
+const LINE_HEIGHT = 1.2;
+const CONNECTOR_EDITOR_WIDTH = 160;
+/** Leaf shapes whose whole text the editor replaces while it is open. */
+const HIDES_OWN_TEXT: ReadonlySet<string> = new Set([
+  "shape.geo",
+  "node.generic",
+  "text.note",
+]);
+
+interface Placement {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly fontSize: number;
+  readonly align: "left" | "center" | "right";
+  readonly bold: boolean;
+  readonly color: string | undefined;
+  readonly padding: string;
+}
+
+function cssAlign(
+  align: string | undefined,
+  fallback: "left" | "center" | "right",
+): "left" | "center" | "right" {
+  switch (align) {
+    case "start":
+      return "left";
+    case "middle":
+      return "center";
+    case "end":
+      return "right";
+    default:
+      return fallback;
+  }
+}
+
+function isComposing(event: KeyboardEvent): boolean {
+  return event.isComposing || event.keyCode === 229;
+}
+
+/** Where the editor goes for this element, in page units. */
+function placeEditor(
+  editor: Editor,
+  element: Element,
+  field: EditableField,
+): Placement | null {
+  const box = editor.getBounds(element.id);
+  if (!box) {
+    return null;
+  }
+  const style = element.visual.style ?? {};
+  const isEdge = getElementTypeDefinition(element.type)?.category === "edge";
+
+  if (isEdge) {
+    const fontSize = style.fontSize ?? CONNECTOR_FONT_SIZE;
+    const lines = connectorLabelLayout(
+      connectorDecoration(element).label,
+      element.visual,
+    ).lines.length;
+    const height = fontSize * LINE_HEIGHT * Math.max(1, lines) + 8;
+    // Over the label as drawn; BPMN flows place theirs by notation, so they
+    // keep the bounds centre.
+    const label = connectorLabelBox(element, editor.createShapeContext());
+    const centreX = label ? label.x + label.width / 2 : box.x + box.width / 2;
+    const centreY = label
+      ? label.y + label.height / 2
+      : box.y + box.height / 2 - 6;
+    return {
+      x: centreX - CONNECTOR_EDITOR_WIDTH / 2,
+      y: centreY - height / 2,
+      width: CONNECTOR_EDITOR_WIDTH,
+      height,
+      fontSize,
+      align: "center",
+      bold: false,
+      color: style.color,
+      padding: "4px 6px",
+    };
+  }
+
+  if (element.type === "erd.table") {
+    const height = ERD_TABLE_HEADER_HEIGHT;
+    return {
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height,
+      fontSize: BASE_FONT_SIZE,
+      align: "left",
+      bold: true,
+      color: undefined,
+      padding: `${(height - BASE_FONT_SIZE * LINE_HEIGHT) / 2}px 10px`,
+    };
+  }
+
+  if (element.type === "uml.class") {
+    const height = UML_CLASS_NAME_HEIGHT;
+    return {
+      x: box.x,
+      y: box.y + umlNameHeight(element.semantic) - height,
+      width: box.width,
+      height,
+      fontSize: BASE_FONT_SIZE,
+      align: "center",
+      bold: true,
+      color: undefined,
+      padding: `${(height - BASE_FONT_SIZE * LINE_HEIGHT) / 2}px 8px`,
+    };
+  }
+
+  const fontSize = style.fontSize ?? BASE_FONT_SIZE;
+  if (field === "text" || element.type === "node.generic") {
+    return {
+      ...box,
+      fontSize,
+      align: cssAlign(
+        style.textAlign,
+        element.type === "node.generic" ? "center" : "left",
+      ),
+      bold: false,
+      color: style.color,
+      padding: "6px 8px",
+    };
+  }
+
+  // A label: a single line band centred in the box, so most of the shape
+  // stays visible around it.
+  const height = Math.min(box.height, fontSize * LINE_HEIGHT + 8);
+  // The band sits where the label is drawn: centred unless the box label
+  // opted in to top or bottom alignment.
+  const vertical = boxLabelVerticalAlign(element.visual);
+  const inset = Math.min(4, Math.max(0, (box.height - height) / 2));
+  return {
+    x: box.x + 4,
+    y:
+      vertical === "top"
+        ? box.y + inset
+        : vertical === "bottom"
+          ? box.y + box.height - height - inset
+          : box.y + (box.height - height) / 2,
+    width: Math.max(24, box.width - 8),
+    height,
+    fontSize,
+    align: cssAlign(style.textAlign, "center"),
+    bold: false,
+    color: style.color,
+    padding: `${Math.max(0, (height - fontSize * LINE_HEIGHT) / 2)}px 4px`,
+  };
+}
+
+export function TextEditor(props: TextEditorProps): JSX.Element {
+  const signals = createEditorSignals(props.editor);
+  let textarea: HTMLTextAreaElement | undefined;
+  let done = false;
+  // Edge labels render line breaks, so editing one keeps them; Enter still
+  // commits and Shift+Enter adds a line.
+  const edgeLabel = (): boolean => {
+    const type = props.editor.store.get(props.target.id)?.type;
+    return (
+      props.target.field === "label" &&
+      type !== undefined &&
+      getElementTypeDefinition(type)?.category === "edge"
+    );
+  };
+  const multiline = (): boolean =>
+    props.target.field === "text" ||
+    props.editor.store.get(props.target.id)?.type === "node.generic" ||
+    edgeLabel();
+  const draft = textEditDraft(props.editor, props.target.id);
+  const initial = draft?.value ?? "";
+  const [conflict, setConflict] = createSignal(false);
+  const conflictId = createUniqueId();
+  const previouslyFocused =
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+
+  const placement = createMemo<Placement | null>(() => {
+    signals.rev();
+    const element = props.editor.store.get(props.target.id);
+    return element
+      ? placeEditor(props.editor, element, props.target.field)
+      : null;
+  });
+
+  const alignEditor = (): void => {
+    if (done || !textarea || !multiline() || edgeLabel()) return;
+    const element = props.editor.store.get(props.target.id);
+    // A node label is a box label (centred unless it opted in); a text note
+    // follows its own vertical alignment.
+    alignTextEditor(
+      textarea,
+      element?.type === "node.generic"
+        ? boxLabelVerticalAlign(element.visual)
+        : element?.visual.style?.verticalAlign,
+    );
+  };
+
+  // While editing, the element's own text is hidden so only the editor's
+  // copy shows: otherwise a label drawn outside the editor band (wrapped
+  // lines, another alignment) stays visible next to the text being typed.
+  const markEditing = (on: boolean): void => {
+    const element = props.editor.store.get(props.target.id);
+    const id = props.target.id;
+    for (const node of document.querySelectorAll(".nodetto-text-editing")) {
+      if (!on || node.getAttribute("data-element-id") !== id)
+        node.classList.remove("nodetto-text-editing");
+    }
+    if (!on || !element || !HIDES_OWN_TEXT.has(element.type)) return;
+    for (const node of document.querySelectorAll("[data-element-id]")) {
+      if (node.getAttribute("data-element-id") === id)
+        node.classList.add("nodetto-text-editing");
+    }
+  };
+  createEffect(() => {
+    signals.rev();
+    if (!done) queueMicrotask(() => markEditing(!done));
+  });
+  createEffect(() => {
+    placement();
+    queueMicrotask(alignEditor);
+  });
+
+  const finish = (commit: boolean, restoreFocus: boolean): void => {
+    if (done) {
+      return;
+    }
+    if (commit && textarea) {
+      const raw = textarea.value;
+      const value = multiline() ? raw : raw.replace(/\r?\n/g, " ");
+      if (!draft || draft.commit(value) === "unavailable") {
+        setConflict(true);
+        return;
+      }
+    }
+    done = true;
+    markEditing(false);
+    props.onDone();
+    if (restoreFocus && previouslyFocused?.isConnected) {
+      previouslyFocused.focus();
+    }
+  };
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    event.stopPropagation();
+    if (isComposing(event)) {
+      return;
+    }
+    if (event.key === "Enter") {
+      if (multiline() && event.shiftKey) {
+        return;
+      }
+      event.preventDefault();
+      finish(true, true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false, true);
+    }
+  };
+
+  // A pointer going down anywhere else ends the edit, whether or not the
+  // browser gets to move focus: the canvas prevents the default on its own
+  // pointerdown, so a blur cannot be relied on to arrive.
+  const onOutsidePointerDown = (event: PointerEvent): void => {
+    if (
+      textarea &&
+      event.target instanceof Node &&
+      textarea.contains(event.target)
+    ) {
+      return;
+    }
+    finish(true, false);
+  };
+
+  // The element can vanish mid-edit (a remote delete, an undo): there is
+  // nothing left to write to, so the edit ends without a commit.
+  createEffect(() => {
+    if (placement() === null) {
+      finish(false, false);
+    }
+  });
+
+  onMount(() => {
+    document.addEventListener("pointerdown", onOutsidePointerDown, true);
+    if (textarea) {
+      textarea.value = initial;
+      alignEditor();
+      textarea.focus();
+      textarea.select();
+    }
+  });
+  onCleanup(() => {
+    markEditing(false);
+    document.removeEventListener("pointerdown", onOutsidePointerDown, true);
+  });
+
+  return (
+    <Show when={placement()}>
+      {(placed) => (
+        <>
+          <textarea
+            ref={textarea}
+            class="nodetto-text-editor"
+            classList={{
+              "nodetto-text-editor-multiline": multiline(),
+              "nodetto-text-editor-edge": edgeLabel(),
+            }}
+            aria-label="Edit text"
+            aria-invalid={conflict() || undefined}
+            aria-describedby={conflict() ? conflictId : undefined}
+            rows={1}
+            spellcheck={false}
+            wrap={multiline() ? "soft" : "off"}
+            style={{
+              ...textEditorRotation(
+                props.editor.store.get(props.target.id),
+                props.editor.getBounds(props.target.id),
+                placed(),
+              ),
+              left: `${placed().x}px`,
+              top: `${placed().y}px`,
+              width: `${placed().width}px`,
+              height: `${placed().height}px`,
+              "font-size": `${placed().fontSize}px`,
+              "line-height": String(LINE_HEIGHT),
+              "text-align": placed().align,
+              "font-weight": placed().bold ? 700 : 400,
+              ...typographyStyle(
+                props.editor.store.get(props.target.id)?.visual ?? {},
+              ),
+              padding: placed().padding,
+              ...(placed().color === undefined
+                ? {}
+                : { color: placed().color }),
+            }}
+            on:keydown={onKeyDown}
+            on:input={alignEditor}
+            on:keyup={(event) => event.stopPropagation()}
+            on:pointerdown={(event) => event.stopPropagation()}
+            on:pointermove={(event) => event.stopPropagation()}
+            on:pointerup={(event) => event.stopPropagation()}
+            on:dblclick={(event) => event.stopPropagation()}
+            on:contextmenu={(event) => event.stopPropagation()}
+            on:blur={() => finish(true, false)}
+          />
+          <Show when={conflict()}>
+            <div
+              id={conflictId}
+              role="alert"
+              style={{
+                position: "absolute",
+                left: `${placed().x}px`,
+                top: `${placed().y + placed().height + 4}px`,
+                width: `${Math.max(240, placed().width)}px`,
+                padding: "8px",
+                background: "#fff3cd",
+                color: "#553c00",
+                "font-size": "13px",
+                "z-index": 100,
+              }}
+              on:pointerdown={(event) => event.stopPropagation()}
+            >
+              Text changed elsewhere or is no longer editable. Your draft was
+              not saved. Copy it if needed, then press Escape and reopen the
+              text.
+            </div>
+          </Show>
+        </>
+      )}
+    </Show>
+  );
+}
+import { typographyStyle } from "./shapes/visual.ts";

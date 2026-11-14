@@ -1,0 +1,697 @@
+[
+  {
+    "op": "set-page-mode",
+    "id": "app",
+    "mode": "app"
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "frame:iphone",
+    "id": "plants",
+    "visual": {
+      "x": 0,
+      "y": 0
+    },
+    "semantic": {
+      "name": "Plants",
+      "prototypeStart": true,
+      "prototypeFlowName": "Main"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "frame:iphone",
+    "id": "detail",
+    "visual": {
+      "x": 470,
+      "y": 0
+    },
+    "semantic": {
+      "name": "Plant detail"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "frame:iphone",
+    "id": "settings",
+    "visual": {
+      "x": 940,
+      "y": 0
+    },
+    "semantic": {
+      "name": "Settings"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "frame:iphone",
+    "id": "entry",
+    "visual": {
+      "x": 1410,
+      "y": 0
+    },
+    "semantic": {
+      "name": "Add entry",
+      "screenKind": "bottom-sheet"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:status-bar",
+    "parent": "plants",
+    "visual": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:home-indicator",
+    "parent": "plants",
+    "visual": {
+      "x": 0,
+      "y": 800
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:tab-bar",
+    "parent": "plants",
+    "ref": "plantstabs",
+    "visual": {
+      "x": 0,
+      "y": 727
+    },
+    "props": {
+      "items": [
+        {
+          "label": "Plants",
+          "icon": "leaf"
+        },
+        {
+          "label": "Calendar",
+          "icon": "calendar"
+        },
+        {
+          "label": "Settings",
+          "icon": "settings"
+        }
+      ],
+      "active": 0
+    }
+  },
+  {
+    "op": "update",
+    "id": "@plantstabs",
+    "visual": {
+      "prototypeFixed": true,
+      "layerName": "Tab bar"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:status-bar",
+    "parent": "detail",
+    "visual": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:home-indicator",
+    "parent": "detail",
+    "visual": {
+      "x": 0,
+      "y": 800
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:tab-bar",
+    "parent": "detail",
+    "ref": "detailtabs",
+    "visual": {
+      "x": 0,
+      "y": 727
+    },
+    "props": {
+      "items": [
+        {
+          "label": "Plants",
+          "icon": "leaf"
+        },
+        {
+          "label": "Calendar",
+          "icon": "calendar"
+        },
+        {
+          "label": "Settings",
+          "icon": "settings"
+        }
+      ],
+      "active": 0
+    }
+  },
+  {
+    "op": "update",
+    "id": "@detailtabs",
+    "visual": {
+      "prototypeFixed": true,
+      "layerName": "Tab bar"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:status-bar",
+    "parent": "settings",
+    "visual": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:home-indicator",
+    "parent": "settings",
+    "visual": {
+      "x": 0,
+      "y": 800
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:tab-bar",
+    "parent": "settings",
+    "ref": "settingstabs",
+    "visual": {
+      "x": 0,
+      "y": 727
+    },
+    "props": {
+      "items": [
+        {
+          "label": "Plants",
+          "icon": "leaf"
+        },
+        {
+          "label": "Calendar",
+          "icon": "calendar"
+        },
+        {
+          "label": "Settings",
+          "icon": "settings"
+        }
+      ],
+      "active": 2
+    }
+  },
+  {
+    "op": "update",
+    "id": "@settingstabs",
+    "visual": {
+      "prototypeFixed": true,
+      "layerName": "Tab bar"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:status-bar",
+    "parent": "entry",
+    "visual": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:home-indicator",
+    "parent": "entry",
+    "visual": {
+      "x": 0,
+      "y": 800
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:nav-bar",
+    "parent": "plants",
+    "visual": {
+      "x": 0,
+      "y": 48
+    },
+    "props": {
+      "title": "Plants",
+      "back": false,
+      "large": true
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:search-field",
+    "parent": "plants",
+    "visual": {
+      "x": 16,
+      "y": 152
+    },
+    "props": {
+      "placeholder": "Find a plant"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "type": "frame",
+    "id": "plant-list",
+    "parent": "plants",
+    "visual": {
+      "x": 0,
+      "y": 208,
+      "width": 390,
+      "height": 300,
+      "style": {
+        "fill": "none",
+        "stroke": "none"
+      }
+    },
+    "semantic": {
+      "name": "Plant list",
+      "showTitle": false,
+      "memberIds": [],
+      "layout": {
+        "direction": "vertical",
+        "gap": 0,
+        "padding": 0,
+        "sizing": "fixed",
+        "align": "start"
+      }
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "plant-list",
+    "ref": "row0",
+    "visual": {
+      "x": 0,
+      "y": 0
+    },
+    "props": {
+      "title": "Fern",
+      "subtitle": "Garden notes",
+      "leadingIcon": "leaf",
+      "accessory": "chevron"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "plant-list",
+    "ref": "row1",
+    "visual": {
+      "x": 0,
+      "y": 60
+    },
+    "props": {
+      "title": "Rosemary",
+      "subtitle": "Garden notes",
+      "leadingIcon": "leaf",
+      "accessory": "chevron"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "plant-list",
+    "ref": "row2",
+    "visual": {
+      "x": 0,
+      "y": 120
+    },
+    "props": {
+      "title": "Aloe",
+      "subtitle": "Garden notes",
+      "leadingIcon": "leaf",
+      "accessory": "chevron"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "plant-list",
+    "ref": "row3",
+    "visual": {
+      "x": 0,
+      "y": 180
+    },
+    "props": {
+      "title": "Mint",
+      "subtitle": "Garden notes",
+      "leadingIcon": "leaf",
+      "accessory": "chevron"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "plant-list",
+    "ref": "row4",
+    "visual": {
+      "x": 0,
+      "y": 240
+    },
+    "props": {
+      "title": "Basil",
+      "subtitle": "Garden notes",
+      "leadingIcon": "leaf",
+      "accessory": "chevron"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:fab",
+    "parent": "plants",
+    "ref": "fab",
+    "visual": {
+      "x": 318,
+      "y": 640
+    },
+    "props": {
+      "icon": "plus"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:nav-bar",
+    "parent": "detail",
+    "ref": "back",
+    "visual": {
+      "x": 0,
+      "y": 48
+    },
+    "props": {
+      "title": "Fern",
+      "back": true
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:segmented",
+    "parent": "detail",
+    "visual": {
+      "x": 16,
+      "y": 112
+    },
+    "props": {
+      "items": [
+        {
+          "label": "Care"
+        },
+        {
+          "label": "Notes"
+        },
+        {
+          "label": "Photos"
+        }
+      ],
+      "active": 0
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:chip",
+    "parent": "detail",
+    "visual": {
+      "x": 16,
+      "y": 176
+    },
+    "props": {
+      "label": "Indoor",
+      "selected": true
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:chip",
+    "parent": "detail",
+    "visual": {
+      "x": 120,
+      "y": 176
+    },
+    "props": {
+      "label": "Shade"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:card",
+    "parent": "detail",
+    "visual": {
+      "x": 16,
+      "y": 240
+    },
+    "props": {
+      "title": "Care notes",
+      "body": "Water when the soil is dry.",
+      "accentSide": "left"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:nav-bar",
+    "parent": "settings",
+    "visual": {
+      "x": 0,
+      "y": 48
+    },
+    "props": {
+      "title": "Settings",
+      "back": false
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:section-header",
+    "parent": "settings",
+    "visual": {
+      "x": 0,
+      "y": 112
+    },
+    "props": {
+      "title": "Preferences"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "settings",
+    "visual": {
+      "x": 0,
+      "y": 160
+    },
+    "props": {
+      "title": "Reminders",
+      "leadingIcon": "bell",
+      "accessory": "switch"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:list-row",
+    "parent": "settings",
+    "visual": {
+      "x": 0,
+      "y": 216
+    },
+    "props": {
+      "title": "Daily tips",
+      "leadingIcon": "sun",
+      "accessory": "switch"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:nav-bar",
+    "parent": "entry",
+    "visual": {
+      "x": 0,
+      "y": 48
+    },
+    "props": {
+      "title": "Add entry",
+      "back": false
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:text-field",
+    "parent": "entry",
+    "visual": {
+      "x": 16,
+      "y": 112
+    },
+    "props": {
+      "placeholder": "Entry title"
+    }
+  },
+  {
+    "op": "add",
+    "page": "app",
+    "shape": "ios:composer",
+    "parent": "entry",
+    "ref": "composer",
+    "visual": {
+      "x": 0,
+      "y": 176
+    },
+    "props": {
+      "placeholder": "Write a note"
+    }
+  },
+  {
+    "op": "select",
+    "ref": "backButton",
+    "where": {
+      "parent": "@back",
+      "name": "Back button",
+      "type": "frame"
+    }
+  },
+  {
+    "op": "select",
+    "ref": "sendButton",
+    "where": {
+      "parent": "@composer",
+      "name": "sendButton",
+      "type": "frame"
+    }
+  },
+  {
+    "op": "select",
+    "ref": "plantsSettings",
+    "where": {
+      "parent": "@plantstabs",
+      "name": "Item 3",
+      "type": "frame"
+    }
+  },
+  {
+    "op": "select",
+    "ref": "settingsPlants",
+    "where": {
+      "parent": "@settingstabs",
+      "name": "Item 1",
+      "type": "frame"
+    }
+  },
+  {
+    "op": "select",
+    "ref": "detailPlants",
+    "where": {
+      "parent": "@detailtabs",
+      "name": "Item 1",
+      "type": "frame"
+    }
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:transition",
+    "from": "@row0",
+    "to": "detail",
+    "semantic": {
+      "prototypeTrigger": "tap"
+    }
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:back",
+    "from": "@backButton"
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:transition",
+    "from": "@fab",
+    "to": "entry",
+    "semantic": {
+      "prototypeTrigger": "tap",
+      "prototypeAction": "open-overlay",
+      "prototypeOverlayPosition": "bottom-center",
+      "prototypeTransition": "slide-up"
+    }
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:transition",
+    "from": "@sendButton",
+    "to": "entry",
+    "semantic": {
+      "prototypeTrigger": "tap",
+      "prototypeAction": "close-overlay",
+      "label": ""
+    }
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:transition",
+    "from": "@plantsSettings",
+    "to": "settings",
+    "semantic": {
+      "prototypeTrigger": "tap",
+      "prototypeTransition": "instant"
+    }
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:transition",
+    "from": "@settingsPlants",
+    "to": "plants",
+    "semantic": {
+      "prototypeTrigger": "tap",
+      "prototypeTransition": "instant"
+    }
+  },
+  {
+    "op": "connect",
+    "shape": "prototype:transition",
+    "from": "@detailPlants",
+    "to": "plants",
+    "semantic": {
+      "prototypeTrigger": "tap",
+      "prototypeTransition": "instant"
+    }
+  }
+]
