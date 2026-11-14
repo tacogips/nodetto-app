@@ -1,0 +1,328 @@
+{
+  "taskId": "zorder-s734",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-734",
+  "implementationBranch": "z-order",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "29f8691135fb6098a9496495f4a417e93ce0625e",
+  "designDocPaths": [
+    "design-docs/specs/design-z-order.md",
+    "design-docs/specs/design-bpmn.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/zorder-00-overview.md",
+  "evidenceRoot": "tmp/zorder-s734",
+  "evidenceLayout": "Per-plan evidence under tmp/zorder-s734/<planId>/, with per-attempt subdirectories for repeated gate runs. tmp/ holds only .log, .txt, .json and .jsonl data, never binaries or .ts files. Cargo output goes to target/ (artifactRoots [\"target\"] in every plan); target/zorder-baseline is the pre-change baseline and must never be deleted (no cargo clean).",
+  "reviewContext": {
+    "issueReference": "none; authoritative workflowInput H1-H2 of opus-terra-design-and-implement-review-loop-session-734",
+    "userProblem": "nodetto-cli edit has no way to change stacking order (send-to-back and reorder are rejected as unknown ops), and a filled frame added after the nodes it encloses is painted over them in SVG, PNG and PDF export and on the app canvas.",
+    "requiredOutcomes": [
+      "H1: edit supports {\"op\":\"order\"} with to back/front/backward/forward and before/after, targeted by id prefix, @ref, name: and where/expect, with Bun and native parity tests, unknown-op suggestions for send-to-back, bring-to-front and reorder, help and docs.",
+      "H2: frames and BPMN surfaces paint beneath what they own in SVG, PNG and PDF export and on the canvas, regardless of stored index; documents with no inversion render byte-identically; regression tests cover a filled frame added after an enclosed node.",
+      "Final, serial, on the combined tree: CARGO_TERM_QUIET=true mise run verify and CARGO_TERM_QUIET=true mise run test-cli exit 0 (3 attempts for native deadline timeouts only; native parity tests must run, not skip); the zorder-08 CPU timing comparison is recorded; apps/desktop/src-tauri/gen/schemas/*.json rewritten by verify are not staged."
+    ],
+    "nonGoals": [
+      "No change to add index behavior or frameParents ownership.",
+      "No schema change, migration, flag or document rewrite.",
+      "No HTML or prototype export change, Layers panel change, PCB canvasHitTest change or new app UI.",
+      "No change to README.md, apps/cli/src/commands.ts, MCP schemas or Rust.",
+      "No pushes, rebases, merges, or server, auth or deployment code."
+    ],
+    "constraints": [
+      "Plans edit only their writePaths; writePaths are disjoint apart from the target artifact root. Only zorder-01 edits packages/core/src/index.ts and only zorder-06 edits apps/cli/src/edit/batch.ts.",
+      "Sibling branches share the base commit, so logic lives in new modules with small localized hunks in shared files.",
+      "Workers read fresh before each edit, record git hash-object before and after in their own progress log, make no git state changes, create no worktrees, run no broad formatters and change no lockfiles.",
+      "Strict TypeScript, no unchecked index lookups in packages/core, no String.prototype.split with a regex on whole documents, no per-point destructuring in hot loops, no emojis.",
+      "Fixtures and all text use self-authored neutral names; no external references and no image files.",
+      "Cargo commands use CARGO_TERM_QUIET=true. Native deadline tests get up to 3 attempts for timeouts only, CPU time is compared against the pre-change binary, and deadlines are never relaxed.",
+      "An existing test that fails must not be weakened. Update it only if it encodes the old inversion and is in the plan's writePaths, with the reason logged; otherwise report it."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Paint order is derived at paint time by containerPaintOrder in packages/core/src/paint-order.ts; no document data changes.", "rationale": "One code path fixes existing documents and new edits. Inserting below at add time leaves existing documents broken, misses other creation routes and changes ownership. Rewriting indexes on load writes on open and needs a migration."},
+      {"decision": "The rule moves a surface only when it is above something it owns in the same paint layer, and returns the same array instance when nothing moves.", "rationale": "Painting all containers first by depth would change bytes for correctly ordered documents; returning the input instance makes byte-identical output structural."},
+      {"decision": "The rule uses its own owner computation (explicit memberIds pass, then smallest enclosing surface), not frameParents.", "rationale": "frameParents ignores frames above their content, which is the case being fixed, and its index test must stay to prevent overlapping copies capturing each other's content."},
+      {"decision": "SVG export and the canvas each pass their own backdrop partition; hitTestPoint and targetUnder scan pagePaintOrder.", "rationale": "The correction always matches the layers the caller really paints. PNG and PDF derive from the SVG, so one fix covers all three formats."},
+      {"decision": "order uses page scope through reorderCommands and expandContainers for ungrouped targets, and group scope through a memberIds update for grouped targets; mixed scope is an error.", "rationale": "Group paint follows memberIds rather than index, and page scope matches the app's z-order commands and keeps frames with their contents."},
+      {"decision": "Wave 1 runs every independent plan; waves 2 and 3 depend only on real contracts.", "rationale": "Owner requirement for maximum concurrency; shared hunks are each owned by a single plan."}
+    ],
+    "intentionalTradeoffs": [
+      "A frame deliberately placed over an element it encloses now paints beneath it. A covering panel uses a rectangle shape, or a group with the frame so memberIds decides. No flag is added.",
+      "For [E, X, S] with S owning E in one layer, S also moves below X, so X paints over any part of S it overlaps.",
+      "Paint-time lowering does not grant ownership; a node above a later frame does not move with that frame until the frame is ordered below it.",
+      "On connector pages a BPMN surface stored above an enclosed shape still receives the click first, and grouped members are hit-tested at their stored positions. Both divergences exist today and stay."
+    ],
+    "supportedEdgeCases": [
+      "Geometric nesting in all six stored orders of node, outer and inner.",
+      "Explicit nesting where area disagrees with ownership, and cyclic explicit membership, which keeps the first link in z-order.",
+      "Pool added after its lane on a connector page; already-correct backdrop, group and nested-group pages stay byte-identical.",
+      "Group inversions: a group is one candidate at its own position; memberIds and stored indexes are unchanged.",
+      "Equal-box copies, partial overlap, the larger-overlapping-frame case, unlisted enclosed elements of an explicit frame, hidden elements and mask sources cause no move.",
+      "order with multi-element where moving as one block, no-op moves, where with expect 0, and anchors treated as whole container blocks at page scope."
+    ],
+    "outOfScopeEdgeCases": [
+      "HTML and prototype export, which do not use the SVG page path.",
+      "The PCB branch of canvasHitTest, edgeLabelAt, elementsIn and the Layers panel, which stay on stored order.",
+      "Connector-page surface-over-shape hit order and hit positions of grouped members.",
+      "UML packages: no such element type exists in the IR."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-z-order.md",
+      "design-docs/specs/design-bpmn.md",
+      "impl-plans/active/zorder-00-overview.md",
+      "impl-plans/active/zorder-01-paint-order.md",
+      "impl-plans/active/zorder-02-core-placement.md",
+      "impl-plans/active/zorder-03-help-docs.md",
+      "impl-plans/active/zorder-04-paint-consumers.md",
+      "impl-plans/active/zorder-05-canvas.md",
+      "impl-plans/active/zorder-06-cli-order-op.md",
+      "impl-plans/active/zorder-07-export-tests.md",
+      "impl-plans/active/zorder-08-native-parity.md"
+    ],
+    "residualRisks": [
+      "zorder-08: the baseline recipe rests on a static trace and has not been executed; another third-party link could be needed. The plan has a one-package link rule and a pre-change proof, and a build failure is reported rather than masked.",
+      "zorder-07: fixtures do not pin clipContent as unset. packages/core/src/clipping.ts clips owned content only when it is set, which would make [frame, node] and [node, frame] SVG bytes differ. Literal frames omit it by default.",
+      "zorder-06: where with expect 0 as a no-op is specified but has no listed test.",
+      "zorder-06: the design says anchors resolve through batch.element; the plan uses resolveElementReference scoped to the page, with the same intent.",
+      "zorder-04: connector routing independence from stored order is unproven for the [node, panel, frame, connector] byte comparison, and existing tests encoding the old inversion are unproven. Both first execute at implementation; failures are reported, and tests are not weakened.",
+      "Native deadline tests may fail under load after 3 attempts; deadlines are never relaxed."
+    ]
+  },
+  "acceptedDependencies": [],
+  "plans": [
+    {
+      "planId": "zorder-01-paint-order",
+      "planPath": "impl-plans/active/zorder-01-paint-order.md",
+      "progressPath": "impl-plans/progress/zorder-01-paint-order.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/paint-order.ts",
+        "packages/core/src/paint-order.test.ts",
+        "packages/core/src/index.ts",
+        "impl-plans/progress/zorder-01-paint-order.md",
+        "tmp/zorder-s734/zorder-01-paint-order",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "containerPaintOrder and pagePaintOrder are exported from @nodetto/core with the pinned signatures.",
+        "All listed tests exist and pass.",
+        "paint-order.ts has no store or document writes and no regex split."
+      ],
+      "verification": [
+        "bun test packages/core/src/paint-order.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/paint-order.ts packages/core/src/paint-order.test.ts packages/core/src/index.ts",
+        "sh -c 'mkdir -p tmp/zorder-s734/zorder-01-paint-order; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/zorder-s734/zorder-01-paint-order/strict.log 2>&1; ! grep -E \"^packages/core/src/paint-order\\.ts\" tmp/zorder-s734/zorder-01-paint-order/strict.log'"
+      ]
+    },
+    {
+      "planId": "zorder-02-core-placement",
+      "planPath": "impl-plans/active/zorder-02-core-placement.md",
+      "progressPath": "impl-plans/progress/zorder-02-core-placement.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/z-order.ts",
+        "packages/core/src/z-order.test.ts",
+        "packages/core/src/editor/facade/selection-editing.ts",
+        "impl-plans/progress/zorder-02-core-placement.md",
+        "tmp/zorder-s734/zorder-02-core-placement",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "ZOrderPlacement, relativeOrder, planElementOrder and Editor.orderElements exist with the pinned signatures, and the new tests pass.",
+        "Existing z-order.test.ts tests pass unmodified."
+      ],
+      "verification": [
+        "bun test packages/core/src/z-order.test.ts packages/core/src/frame-selection.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/z-order.ts packages/core/src/z-order.test.ts packages/core/src/editor/facade/selection-editing.ts",
+        "sh -c 'mkdir -p tmp/zorder-s734/zorder-02-core-placement; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/zorder-s734/zorder-02-core-placement/strict.log 2>&1; ! grep -E \"^packages/core/src/(z-order\\.ts|editor/facade/selection-editing\\.ts)\" tmp/zorder-s734/zorder-02-core-placement/strict.log'"
+      ]
+    },
+    {
+      "planId": "zorder-03-help-docs",
+      "planPath": "impl-plans/active/zorder-03-help-docs.md",
+      "progressPath": "impl-plans/progress/zorder-03-help-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/help.ts",
+        "docs/cli.md",
+        "docs/design.md",
+        "impl-plans/progress/zorder-03-help-docs.md",
+        "tmp/zorder-s734/zorder-03-help-docs",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "help.ts and docs/cli.md contain \"op\":\"order\", and both describe before, after and the paint-rule interaction.",
+        "docs/design.md describes the paint rule next to the ownership sentence."
+      ],
+      "verification": [
+        "bun test apps/cli/src/commands.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/help.ts",
+        "grep -q '\"op\":\"order\"' apps/cli/src/help.ts",
+        "grep -q '\"op\":\"order\"' docs/cli.md",
+        "grep -q 'paints beneath' docs/design.md"
+      ]
+    },
+    {
+      "planId": "zorder-04-paint-consumers",
+      "planPath": "impl-plans/active/zorder-04-paint-consumers.md",
+      "progressPath": "impl-plans/progress/zorder-04-paint-consumers.md",
+      "wave": 2,
+      "dependsOn": ["zorder-01-paint-order"],
+      "writePaths": [
+        "packages/core/src/svg-export/document.ts",
+        "packages/core/src/hit-test.ts",
+        "packages/core/src/hit-test.test.ts",
+        "packages/core/src/svg-paint-order.test.ts",
+        "impl-plans/progress/zorder-04-paint-consumers.md",
+        "tmp/zorder-s734/zorder-04-paint-consumers",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "document.ts calls containerPaintOrder with the existing backdropIds.",
+        "hitTestPoint scans pagePaintOrder.",
+        "Existing golden and layer tests pass unmodified."
+      ],
+      "verification": [
+        "bun test packages/core/src/svg-paint-order.test.ts packages/core/src/hit-test.test.ts",
+        "bun test packages/core/src/svg-export.test.ts packages/core/src/backdrops.test.ts packages/core/src/bpmn/svg-export-layers.test.ts packages/core/src/bpmn/svg-export-bpmn.test.ts packages/core/src/breadboard/export-golden.test.ts packages/core/src/breadboard/svg-export-breadboard.test.ts packages/core/src/editor.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/core/src/svg-export/document.ts packages/core/src/hit-test.ts packages/core/src/hit-test.test.ts packages/core/src/svg-paint-order.test.ts",
+        "sh -c 'mkdir -p tmp/zorder-s734/zorder-04-paint-consumers; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/zorder-s734/zorder-04-paint-consumers/strict.log 2>&1; ! grep -E \"^packages/core/src/(svg-export/document\\.ts|hit-test\\.ts)\" tmp/zorder-s734/zorder-04-paint-consumers/strict.log'"
+      ]
+    },
+    {
+      "planId": "zorder-05-canvas",
+      "planPath": "impl-plans/active/zorder-05-canvas.md",
+      "progressPath": "impl-plans/progress/zorder-05-canvas.md",
+      "wave": 2,
+      "dependsOn": ["zorder-01-paint-order"],
+      "writePaths": [
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/interaction/hit-testing.ts",
+        "packages/ui-solid/src/canvas-paint-order.test.ts",
+        "impl-plans/progress/zorder-05-canvas.md",
+        "tmp/zorder-s734/zorder-05-canvas",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The three canvas memos read paintElements().",
+        "targetUnder scans pagePaintOrder.",
+        "bpmn-backdrop.test.ts passes unmodified."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/canvas-paint-order.test.ts packages/ui-solid/src/bpmn-backdrop.test.ts packages/ui-solid/src/bpmn-palette.test.ts",
+        "bun run typecheck",
+        "bunx biome check packages/ui-solid/src/Canvas.tsx packages/ui-solid/src/interaction/hit-testing.ts packages/ui-solid/src/canvas-paint-order.test.ts",
+        "grep -q 'containerPaintOrder(elements(), context(), backdropIds())' packages/ui-solid/src/Canvas.tsx"
+      ]
+    },
+    {
+      "planId": "zorder-06-cli-order-op",
+      "planPath": "impl-plans/active/zorder-06-cli-order-op.md",
+      "progressPath": "impl-plans/progress/zorder-06-cli-order-op.md",
+      "wave": 2,
+      "dependsOn": ["zorder-02-core-placement"],
+      "writePaths": [
+        "apps/cli/src/edit/operations/order.ts",
+        "apps/cli/src/edit-order.test.ts",
+        "apps/cli/src/edit/batch.ts",
+        "apps/cli/src/edit/operation-fields.ts",
+        "apps/cli/src/edit/operation-fields.test.ts",
+        "impl-plans/progress/zorder-06-cli-order-op.md",
+        "tmp/zorder-s734/zorder-06-cli-order-op",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "order works through Batch.apply.",
+        "Hints appear only for send-to-back, bring-to-front and reorder.",
+        "Existing edit tests pass; the only change to the existing test file is the new handler row."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit-order.test.ts apps/cli/src/edit/operation-fields.test.ts apps/cli/src/edit/selectors.test.ts apps/cli/src/edit/apply-batch.test.ts",
+        "bun test apps/cli/src/commands.test.ts apps/cli/src/edit-frame-carry.test.ts apps/cli/src/ai-features.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/edit/operations/order.ts apps/cli/src/edit-order.test.ts apps/cli/src/edit/batch.ts apps/cli/src/edit/operation-fields.ts apps/cli/src/edit/operation-fields.test.ts"
+      ]
+    },
+    {
+      "planId": "zorder-07-export-tests",
+      "planPath": "impl-plans/active/zorder-07-export-tests.md",
+      "progressPath": "impl-plans/progress/zorder-07-export-tests.md",
+      "wave": 3,
+      "dependsOn": ["zorder-04-paint-consumers", "zorder-05-canvas"],
+      "writePaths": [
+        "apps/cli/src/export-determinism.test.ts",
+        "apps/cli/src/export-paint-order.test.ts",
+        "packages/ui-solid/src/paint-order-parity.test.ts",
+        "impl-plans/progress/zorder-07-export-tests.md",
+        "tmp/zorder-s734/zorder-07-export-tests",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All listed SVG, PNG, PDF and canvas parity cases exist and pass, with no test skipped.",
+        "The existing determinism test is unchanged."
+      ],
+      "verification": [
+        "bun test apps/cli/src/export-paint-order.test.ts apps/cli/src/export-determinism.test.ts packages/ui-solid/src/paint-order-parity.test.ts",
+        "bun test apps/cli/src/export-command.test.ts",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/export-paint-order.test.ts apps/cli/src/export-determinism.test.ts packages/ui-solid/src/paint-order-parity.test.ts"
+      ]
+    },
+    {
+      "planId": "zorder-08-native-parity",
+      "planPath": "impl-plans/active/zorder-08-native-parity.md",
+      "progressPath": "impl-plans/progress/zorder-08-native-parity.md",
+      "wave": 3,
+      "dependsOn": ["zorder-04-paint-consumers", "zorder-06-cli-order-op"],
+      "writePaths": [
+        "apps/cli/src/native-parity/order.test.ts",
+        "impl-plans/progress/zorder-08-native-parity.md",
+        "tmp/zorder-s734/zorder-08-native-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The parity file runs against the release binary with 0 skipped tests.",
+        "timing.txt records both binaries' medians and the pass condition holds: connected.jsonl at most 1.25 times the baseline, flat.jsonl at most 1.5 times."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli",
+        "sh -c 'NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/order.test.ts'",
+        "test -x target/zorder-baseline/cargo/release/nodetto-cli",
+        "test -s tmp/zorder-s734/zorder-08-native-parity/timing.txt",
+        "bun run typecheck",
+        "bunx biome check apps/cli/src/native-parity/order.test.ts"
+      ]
+    }
+  ]
+}

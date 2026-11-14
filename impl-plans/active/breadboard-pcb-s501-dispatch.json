@@ -1,0 +1,414 @@
+{
+  "taskId": "breadboard-pcb-s501",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-501",
+  "implementationBranch": "feat/breadboard-gerber",
+  "baseBranch": "feat/breadboard-gerber",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "431bfdbb70bd12e5c74130bb7885d20435fe18d9",
+  "designDocPaths": [
+    "design-docs/specs/design-breadboard-pcb.md",
+    "design-docs/user-qa/breadboard-pcb.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/breadboard-pcb-s501",
+  "evidenceLayout": "tmp/breadboard-pcb-s501/<planId>/ per plan (logs, tsconfig.nuia.json, baseline and after exports, plan 03 fixture-export.ts scratch script), per-attempt dispatcher output under tmp/breadboard-pcb-s501/<planId>/attempt-<n>/, reconciliation output under tmp/breadboard-pcb-s501/reconcile/. Untracked: tmp/ is git-ignored (.gitignore line 41). No *.test.ts file may be written under tmp/.",
+  "historicalManifests": {
+    "paths": [
+      "impl-plans/active/bpmn-operation-flow-s356-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s357-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s359-dispatch.json",
+      "impl-plans/active/bpmn-render-fix-s360-dispatch.json",
+      "impl-plans/active/breadboard-mode-s485-dispatch.json",
+      "impl-plans/active/ddl-frame-dispatch.json"
+    ],
+    "note": "Historical manifests. Not dispatched and not changed by this checkpoint. This manifest is the only new dispatch manifest."
+  },
+  "reviewContext": {
+    "issueReference": "local-input:feat/breadboard-gerber@431bfdb (no GitHub issue URL/number supplied). Workflow input 'Breadboard PCB export: design record, adversarial review and hardening for JLCPCB-class board houses'; execution opus-luna-design-and-implement-review-loop-session-501; plan review accepted comm-009372 (prior findings F-PLAN-1, F-PLAN-2, L-1 verified fixed; L-2 accepted residual).",
+    "userProblem": "Commit 431bfdb exports breadboard boards as Gerber/Excellon ZIPs, but it has no design record and it was not reviewed against board-house upload rules. Silkscreen can print on pads or fall outside the outline, Excellon whole-millimetre coordinates lack a decimal point, the drill header copies another tool's wording, polarity marks can collide with pads, TS/native parity is untested, the test parser is lenient, small circuits cannot be trimmed to a cheaper size tier, and there are no PCB goldens or drift check.",
+    "requiredOutcomes": [
+      "design-docs/specs/design-breadboard-pcb.md records the model, design rules, file set and naming, warnings, and review findings R1-R7 with their resolutions.",
+      "No GTO stroke comes within legendPadClearance (0.15 mm) of any solder mask opening or within legendEdgeClearance (0.2 mm) of the board edge; verified by legendClearanceErrors over the pcb.test.ts fixtures and the example in both outline modes (design 7.1, plans 02, 03, 05).",
+      "BreadboardPcbOptions.outline 'board'|'used' and CLI --outline board|used: default and 'board' keep GTL/GBL/GTS/GBS/GKO byte-identical to 431bfdb; 'used' trims to the used area plus usedMargin 1.0 mm, drops board labels outside the trimmed legend rectangle and keeps origin at bottom-left (design 7.2, plans 03, 04).",
+      "Example PCB goldens examples/breadboard/led-button.{GTL,GBL,GTS,GBS,GTO,GKO,DRL} and a byte-exact golden test in export-golden.test.ts as the drift check; examples/breadboard/README.md updated (design 7.3, plan 05).",
+      "Strict Gerber and Excellon validator (fabrication-validate.ts) with negative tests for every rule, applied to every generated file in pcb.test.ts and export-golden.test.ts (design 7.4, plans 01, 03, 05).",
+      "Regression tests for R1-R5 and F1 recorded as failing on 431bfdb before the fix (plan 03).",
+      "Native (Boa) and TypeScript CLI produce byte-identical archives for the example with and without --outline used (design 7.5, plan 04).",
+      "Docs: docs/breadboard/pcb.md and README.md describe --outline used, the silkscreen clearance, the 3-decimal drill format and the new mark warning (plan 06).",
+      "CARGO_TERM_QUIET=true BUN_OPTIONS=--jsx-runtime=classic mise run verify and CARGO_TERM_QUIET=true mise run test-cli pass."
+    ],
+    "nonGoals": [
+      "PCB editing or preview, autorouting beyond the straight-wire rule, extra layers (paste, bottom silkscreen, inner), pick-and-place, board-house APIs (design 2).",
+      "A CLI 'breadboard gerber --check' (design D6 in 7.3; the golden test is the drift check).",
+      "A desktop outline setting or any desktop/ui-solid change (user QA Q1 default).",
+      "Changes to SCHEMA_VERSION, the breadboard JSONL format, examples/breadboard/led-button.jsonl (user QA Q2 default) or the BOM/netlist/SVG goldens.",
+      "Edits to geometry.ts, pcb-font.ts, zip.ts, html-bundle.ts, packages/core/src/breadboard/index.ts, apps/cli/native/**, commands.ts, mcp*.ts or mise.toml.",
+      "Exporting fabrication-validate.ts or pcb-legend.ts from @nodetto/core beyond pcb.ts's internal import of pcb-legend.ts."
+    ],
+    "constraints": [
+      "Follow AGENTS.md; no emojis; cargo commands use CARGO_TERM_QUIET=true.",
+      "Public repository: no server code, secrets or nodetto-cloud content.",
+      "Build incrementally on 431bfdb; keep exportBreadboardPcb, encodeBreadboardPcbZip, BREADBOARD_PCB_RULES keys, the gerber subcommand options and existing messages compatible; only add options and keys.",
+      "No code, comments or data copied from KiCad, gerbv, tracespace or other projects; .reference/kicad is read-only reference and never committed.",
+      "Fixtures and goldens are self-authored or generated from examples/breadboard/led-button.jsonl.",
+      "Core code type-clean under noUncheckedIndexedAccess; no numeric magic indexes on tuples or regex matches; named regex groups, destructuring or named objects.",
+      "New code producing emitted coordinates uses only + - * /, Math.sqrt, Math.SQRT1_2, Math.SQRT2, Math.floor, Math.ceil and Math.round (design 7.1 item 5).",
+      "Workers edit only their writePaths and their own impl-plans/progress/<planId>.md; fresh read plus sha256 before and after each edit; intent snapshot first; stop on drift; no state-changing git commands and no worktrees; scratch only under tmp/breadboard-pcb-s501/<planId>/; never *.test.ts under tmp/; foreground commands only.",
+      "bun run typecheck failures confined to sibling-owned files in the same wave are recorded as drift, never edited; serial reconciliation runs the blocking whole-repo gates."
+    ],
+    "designDecisionsAndRationale": [
+      "Silkscreen safety is guaranteed by clipping every legend stroke to the legend rectangle and outside per-pad keepout circles (cut, rejoin, filter), with placement that avoids keepouts first; clipping never moves a point, so uncut glyphs such as the 1/6 mm segments of '2' and '5' survive (design 7.1, finding F1).",
+      "Square pads use the circumscribed circle for the keepout radius (about 1.5835 mm) for a simple conservative test; round pads use 1.19 mm (design 4).",
+      "Polarity marks try five directions (0, +45, -45, +90, -90) and are omitted with a warning rather than clipped, because a clipped '+' could read as '-' (design 7.1 item 4, R5).",
+      "Outline mode affects emission only; routing, strips, placement and clipping are computed once in the full-board frame, so 'board' output and copper geometry stay unchanged (design 7.2, 7.6).",
+      "Excellon always writes three decimals so METRIC readers never apply zero suppression (R3); the drill header comment is self-authored, keeping the '; #@! TF.FileFunction' convention (R4).",
+      "Determinism uses only basic arithmetic and Math.sqrt so Bun (JSC) and Boa produce identical bytes; parity is proven with a native-parity case run by mise run test-cli (design 7.5, R6).",
+      "The drift check is a golden test in export-golden.test.ts rather than a CLI --check, which meets the acceptance criterion with less surface (design 7.3).",
+      "The validator is an allow-list of exactly what the writer emits and is test-only; the CLI test asserts the written ZIP equals encodeBreadboardPcbZip(exportBreadboardPcb(...)) so core validation covers CLI output (design 7.4).",
+      "The 431bfdb byte-diff evidence uses a scratch fixture-export.ts script under tmp/ instead of a git worktree (plan 03 Step 0, review F-PLAN-1)."
+    ],
+    "intentionalTradeoffs": [
+      "GTO and DRL bytes change versus 431bfdb; GTL, GBL, GTS, GBS and GKO do not (design 7.6).",
+      "A reference with no free spot falls back to the first candidate and is partly clipped without a warning (design 7.1 item 3).",
+      "The example keeps its e7 two-leads warning and the goldens are generated with it (user QA Q2).",
+      "The desktop always exports the full board (user QA Q1).",
+      "geometry.ts rotatePoint trigonometry for rotated boards and part outlines is an accepted parity exception; the parity example uses rotation 0.",
+      "Accepted residuals: F3 (polarity marks are not checked against label text); L-2 (existing distanceToSegment Math.hypot is used only in routing comparisons)."
+    ],
+    "supportedEdgeCases": [
+      "Square pin-1 pads (breadboard.ic, breadboard.header) with an R aperture and the circumscribed keepout.",
+      "Jumper fallback lines clipped around every pad they cross (c1-c5 fixture).",
+      "Parts on the top rail whose four reference candidates are all blocked (R2 fixture).",
+      "Full-board holes at x = 127 mm written as X127.000 (R3 fixture).",
+      "LED anode with used neighbours in all five mark directions (R5 warning, no mark).",
+      "Zero-length segments and tangent keepouts in clipping and in the validator's distance checks.",
+      "Rotated boards give identical files in both outline modes.",
+      "Board labels partly outside the trimmed outline are dropped whole in used mode."
+    ],
+    "outOfScopeEdgeCases": [
+      "Checking polarity marks against label text (F3).",
+      "Keepout shapes other than circles and general polygon clipping.",
+      "Arcs, AM/SR/LPC Gerber commands and inch units in the validator.",
+      "Bit-exact parity for rotated boards with non-zero rotation (rotatePoint trigonometry).",
+      "Used-mode goldens and a ZIP golden."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-breadboard-pcb.md",
+      "design-docs/user-qa/breadboard-pcb.md",
+      "design-docs/specs/design-breadboard.md",
+      "impl-plans/active/breadboard-pcb-01-validator.md",
+      "impl-plans/active/breadboard-pcb-02-legend-clip.md",
+      "impl-plans/active/breadboard-pcb-03-core-export.md",
+      "impl-plans/active/breadboard-pcb-04-cli-parity.md",
+      "impl-plans/active/breadboard-pcb-05-goldens.md",
+      "impl-plans/active/breadboard-pcb-06-docs.md",
+      "packages/core/src/breadboard/pcb.ts",
+      "packages/core/src/breadboard/gerber.ts",
+      "packages/core/src/breadboard/pcb-font.ts",
+      "packages/core/src/breadboard/pcb.test.ts",
+      "packages/core/src/breadboard/export-golden.test.ts",
+      "apps/cli/src/breadboard-command.ts",
+      "apps/cli/src/help.ts",
+      "apps/cli/src/breadboard-commands.test.ts",
+      "apps/cli/src/native-parity.test.ts",
+      "docs/breadboard/pcb.md",
+      "examples/breadboard/README.md",
+      "README.md"
+    ],
+    "reviewFindingsCarried": [
+      {
+        "path": "impl-plans/active/breadboard-pcb-03-core-export.md",
+        "note": "F-PLAN-1 (mid, verified fixed): fixture byte contract via tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/fixture-export.ts, baseline before edits and unchanged rerun after; all 10 cmp checks must exit 0."
+      },
+      {
+        "path": "impl-plans/active/breadboard-pcb-05-goldens.md",
+        "note": "F-PLAN-2 (mid, verified fixed): typecheck failures in plan 04's apps/cli/src files are sibling drift, never edited by plan 05."
+      },
+      {
+        "path": "impl-plans/active/breadboard-pcb-03-core-export.md",
+        "note": "L-2 (low, accepted residual): existing distanceToSegment Math.hypot is the only allowed hypot/trig match in pcb.ts."
+      },
+      {
+        "path": "impl-plans/active/breadboard-pcb-05-goldens.md",
+        "note": "The exact example warnings, including any R5 mark warning, are known only after plan 03; plans 04 and 05 pin them as observed."
+      }
+    ]
+  },
+  "acceptedDependencies": [],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "afterWave": [
+      "bun run typecheck",
+      "bunx biome check .",
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard apps/cli/src/breadboard-commands.test.ts"
+    ],
+    "deferredSharedEdits": [
+      {
+        "path": "impl-plans/README.md",
+        "intendedEdit": "Index the breadboard-pcb-01..06 plans; done by the orchestrator in serial reconciliation, not by any worker."
+      }
+    ],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths; sibling drift recorded by a worker is resolved here.",
+    "commitPolicy": "Commit each wave on feat/breadboard-gerber staging explicit paths only; never git add -A; never stage .reference/ or tmp/; never push.",
+    "finalVerification": [
+      "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard apps/cli/src/breadboard-commands.test.ts",
+      "CARGO_TERM_QUIET=true mise run test-cli",
+      "test -z \"$(find tmp -name '*.test.ts')\"",
+      "CARGO_TERM_QUIET=true BUN_OPTIONS=--jsx-runtime=classic mise run verify",
+      "mkdir -p tmp/breadboard-pcb-s501/reconcile",
+      "printf '%s\\n' '{\"extends\": \"../../../tsconfig.json\", \"compilerOptions\": {\"noUncheckedIndexedAccess\": true}, \"include\": [\"../../../packages/core/src\"]}' > tmp/breadboard-pcb-s501/reconcile/tsconfig.nuia.json",
+      "bunx tsc -p tmp/breadboard-pcb-s501/reconcile/tsconfig.nuia.json > tmp/breadboard-pcb-s501/reconcile/nuia.log 2>&1; echo \"nuia exit=$?\"",
+      "! grep -E 'breadboard/(pcb|gerber|pcb-legend|fabrication-validate)\\.ts' tmp/breadboard-pcb-s501/reconcile/nuia.log",
+      "git diff --exit-code 431bfdb -- examples/breadboard/led-button.jsonl examples/breadboard/led-button.bom.csv examples/breadboard/led-button.net examples/breadboard/led-button.cir packages/ir",
+      "test \"$(git status --short | grep -c '.reference')\" -eq 0"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "breadboard-pcb-01-validator",
+      "planPath": "impl-plans/active/breadboard-pcb-01-validator.md",
+      "progressPath": "impl-plans/progress/breadboard-pcb-01-validator.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/breadboard/fabrication-validate.ts",
+        "packages/core/src/breadboard/fabrication-validate.test.ts",
+        "impl-plans/progress/breadboard-pcb-01-validator.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/fabrication-validate(\\.test)?\\.ts",
+      "acceptanceCriteria": [
+        "fabrication-validate.ts exports exactly FabricationOutline, validateGerber, validateExcellon and legendClearanceErrors with the pinned signatures; errors start with 'line <n>: ' or 'file: '.",
+        "Every Gerber, Excellon and clearance case listed in the plan is a passing test; each negative test asserts the error count and reported line.",
+        "The module does not import BREADBOARD_PCB_RULES, has no node: imports, and is not exported from packages/core/src/breadboard/index.ts.",
+        "Clean under noUncheckedIndexedAccess; named regex groups only; gerber.ts, pcb.ts and pcb.test.ts untouched.",
+        "Progress log records intent snapshot, hashes, commands, exit codes and pass counts."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-pcb-s501/breadboard-pcb-01-validator",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard/fabrication-validate.test.ts",
+        "bunx biome check packages/core/src/breadboard/fabrication-validate.ts packages/core/src/breadboard/fabrication-validate.test.ts --diagnostic-level=warn",
+        "bun run typecheck > tmp/breadboard-pcb-s501/breadboard-pcb-01-validator/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/fabrication-validate' tmp/breadboard-pcb-s501/breadboard-pcb-01-validator/typecheck.log",
+        "printf '%s\\n' '{\"extends\": \"../../../tsconfig.json\", \"compilerOptions\": {\"noUncheckedIndexedAccess\": true}, \"include\": [\"../../../packages/core/src\"]}' > tmp/breadboard-pcb-s501/breadboard-pcb-01-validator/tsconfig.nuia.json",
+        "bunx tsc -p tmp/breadboard-pcb-s501/breadboard-pcb-01-validator/tsconfig.nuia.json > tmp/breadboard-pcb-s501/breadboard-pcb-01-validator/nuia.log 2>&1; echo \"nuia exit=$?\"",
+        "! grep -n 'fabrication-validate' tmp/breadboard-pcb-s501/breadboard-pcb-01-validator/nuia.log",
+        "test \"$(grep -c 'fabrication-validate' packages/core/src/breadboard/index.ts)\" -eq 0",
+        "git diff --quiet 431bfdb -- packages/core/src/breadboard/gerber.ts packages/core/src/breadboard/pcb.ts packages/core/src/breadboard/pcb.test.ts",
+        "test -s impl-plans/progress/breadboard-pcb-01-validator.md"
+      ]
+    },
+    {
+      "planId": "breadboard-pcb-02-legend-clip",
+      "planPath": "impl-plans/active/breadboard-pcb-02-legend-clip.md",
+      "progressPath": "impl-plans/progress/breadboard-pcb-02-legend-clip.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/breadboard/pcb-legend.ts",
+        "packages/core/src/breadboard/pcb-legend.test.ts",
+        "impl-plans/progress/breadboard-pcb-02-legend-clip.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/pcb-legend(\\.test)?\\.ts",
+      "acceptanceCriteria": [
+        "pcb-legend.ts exports exactly LegendRect, LegendKeepout, clipLegendStroke and boxClearOfKeepouts with the pinned signatures.",
+        "clipLegendStroke implements cut (Liang-Barsky plus merged open circle intervals), rejoin at original vertices, and filter of cut strokes under minLength; uncut polylines are returned deep-equal to the input, including 1/6 mm glyph segments (F1).",
+        "All listed tests pass, including tangent, overlapping-keepout, zero-length and boxClearOfKeepouts boundary cases.",
+        "No Math.hypot/sin/cos/atan2/tan; only type imports from ./gerber.ts; no node: or DOM imports; clean under noUncheckedIndexedAccess.",
+        "Progress log records intent snapshot, hashes, commands and exit codes."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard/pcb-legend.test.ts",
+        "bunx biome check packages/core/src/breadboard/pcb-legend.ts packages/core/src/breadboard/pcb-legend.test.ts --diagnostic-level=warn",
+        "bun run typecheck > tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/pcb-legend' tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip/typecheck.log",
+        "printf '%s\\n' '{\"extends\": \"../../../tsconfig.json\", \"compilerOptions\": {\"noUncheckedIndexedAccess\": true}, \"include\": [\"../../../packages/core/src\"]}' > tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip/tsconfig.nuia.json",
+        "bunx tsc -p tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip/tsconfig.nuia.json > tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip/nuia.log 2>&1; echo \"nuia exit=$?\"",
+        "! grep -n 'pcb-legend' tmp/breadboard-pcb-s501/breadboard-pcb-02-legend-clip/nuia.log",
+        "! grep -nE 'Math\\.(hypot|sin|cos|atan2|tan)' packages/core/src/breadboard/pcb-legend.ts",
+        "git diff --quiet 431bfdb -- packages/core/src/breadboard/pcb.ts packages/core/src/breadboard/gerber.ts packages/core/src/breadboard/pcb-font.ts packages/core/src/breadboard/index.ts packages/core/src/geometry.ts",
+        "test -s impl-plans/progress/breadboard-pcb-02-legend-clip.md"
+      ]
+    },
+    {
+      "planId": "breadboard-pcb-06-docs",
+      "planPath": "impl-plans/active/breadboard-pcb-06-docs.md",
+      "progressPath": "impl-plans/progress/breadboard-pcb-06-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "docs/breadboard/pcb.md",
+        "README.md",
+        "impl-plans/progress/breadboard-pcb-06-docs.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "docs/breadboard/pcb.md describes --outline used (used area plus 1 mm, never beyond the breadboard, labels outside dropped, origin bottom-left, 100 x 100 mm tier, desktop always full board), the 0.15 mm pad and 0.2 mm edge silkscreen clearance, mark placement or omission, the 3-decimal DRL coordinates, the --outline used CLI example, and the new warning with the exact plan 03 wording.",
+        "README.md gains the --outline used CLI line and one sentence in the breadboard paragraph; no other section changes.",
+        "Every number matches design section 4; no emojis; examples/breadboard/README.md and help.ts untouched.",
+        "Progress log records intent snapshot, hashes, commands and results."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-pcb-s501/breadboard-pcb-06-docs",
+        "grep -n 'outline used' docs/breadboard/pcb.md",
+        "grep -n 'outline used' README.md",
+        "grep -n '0.15 mm' docs/breadboard/pcb.md",
+        "test \"$(grep -c 'has no room clear of the pads' docs/breadboard/pcb.md)\" -eq 1",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard/docs.test.ts",
+        "git diff --stat -- docs/breadboard/pcb.md README.md",
+        "test -s impl-plans/progress/breadboard-pcb-06-docs.md"
+      ]
+    },
+    {
+      "planId": "breadboard-pcb-03-core-export",
+      "planPath": "impl-plans/active/breadboard-pcb-03-core-export.md",
+      "progressPath": "impl-plans/progress/breadboard-pcb-03-core-export.md",
+      "wave": 2,
+      "dependsOn": [
+        "breadboard-pcb-01-validator",
+        "breadboard-pcb-02-legend-clip"
+      ],
+      "writePaths": [
+        "packages/core/src/breadboard/pcb.ts",
+        "packages/core/src/breadboard/gerber.ts",
+        "packages/core/src/breadboard/pcb.test.ts",
+        "impl-plans/progress/breadboard-pcb-03-core-export.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/(pcb|gerber|pcb\\.test)\\.ts",
+      "acceptanceCriteria": [
+        "Step 0 baseline evidence is recorded before any edit: git diff --quiet 431bfdb on pcb.ts and gerber.ts, the example baseline export, and the fixture baseline via the scratch tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/fixture-export.ts with its sha256.",
+        "BREADBOARD_PCB_RULES gains legendPadClearance 0.15, legendEdgeClearance 0.2 and usedMargin 1.0 after edgeKeepout; BreadboardPcbOptions gains outline?: 'board' | 'used'; existing keys, warnings and notes unchanged.",
+        "Legend strokes are clipped with clipLegendStroke against per-pad keepouts and the legend rectangle; references use boxClearOfKeepouts; polarity marks use the five-direction rule or emit the exact pinned warning; markBeside removed.",
+        "DRL uses the pinned self-authored header and X<x.toFixed(3)>Y<y.toFixed(3)> hits.",
+        "Outline 'used' trims, translates and drops board labels per design 7.2; board mode emission path unchanged.",
+        "All 10 cmp checks (GTL, GBL, GTS, GBS, GKO for the example and the fixture) exit 0 against the Step 0 baselines.",
+        "R1-R5, F1, validator-on-every-file, outline default/used and rotated-board used tests exist; each regression test has a recorded pre-fix failure (R4 and F1 may pass pre-fix where old output already met them, recorded).",
+        "No new Math.hypot/sin/cos/atan2 in pcb.ts beyond the existing distanceToSegment hypot; pcb.ts does not import fabrication-validate.ts; clean under noUncheckedIndexedAccess."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after-fixture",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard",
+        "bun apps/cli/src/main.ts breadboard gerber examples/breadboard/led-button.jsonl --output tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after/led-button.zip",
+        "unzip -o tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after/led-button.zip -d tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after",
+        "for ext in GTL GBL GTS GBS GKO; do cmp tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/baseline/led-button.$ext tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after/led-button.$ext || exit 1; done",
+        "bun tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/fixture-export.ts tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after-fixture",
+        "for ext in GTL GBL GTS GBS GKO; do cmp tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/baseline-fixture/fixture.$ext tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/after-fixture/fixture.$ext || exit 1; done",
+        "bunx biome check packages/core/src/breadboard/pcb.ts packages/core/src/breadboard/gerber.ts packages/core/src/breadboard/pcb.test.ts --diagnostic-level=warn",
+        "bun run typecheck",
+        "printf '%s\\n' '{\"extends\": \"../../../tsconfig.json\", \"compilerOptions\": {\"noUncheckedIndexedAccess\": true}, \"include\": [\"../../../packages/core/src\"]}' > tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/tsconfig.nuia.json",
+        "bunx tsc -p tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/tsconfig.nuia.json > tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/nuia.log 2>&1; echo \"nuia exit=$?\"",
+        "! grep -E 'breadboard/(pcb|gerber|pcb-legend)\\.ts' tmp/breadboard-pcb-s501/breadboard-pcb-03-core-export/nuia.log",
+        "test \"$(grep -cE 'Math\\.(hypot|sin|cos|atan2)' packages/core/src/breadboard/pcb.ts)\" -le 1",
+        "test \"$(grep -c 'legendPadClearance\\|legendEdgeClearance\\|usedMargin' packages/core/src/breadboard/pcb.ts)\" -ge 3",
+        "test \"$(grep -c 'markBeside' packages/core/src/breadboard/pcb.ts)\" -eq 0",
+        "! grep -n 'fabrication-validate' packages/core/src/breadboard/pcb.ts",
+        "test -s impl-plans/progress/breadboard-pcb-03-core-export.md"
+      ]
+    },
+    {
+      "planId": "breadboard-pcb-04-cli-parity",
+      "planPath": "impl-plans/active/breadboard-pcb-04-cli-parity.md",
+      "progressPath": "impl-plans/progress/breadboard-pcb-04-cli-parity.md",
+      "wave": 3,
+      "dependsOn": [
+        "breadboard-pcb-03-core-export"
+      ],
+      "writePaths": [
+        "apps/cli/src/breadboard-command.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/breadboard-commands.test.ts",
+        "apps/cli/src/native-parity.test.ts",
+        "impl-plans/progress/breadboard-pcb-04-cli-parity.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^apps/cli/src/(breadboard-command|help|breadboard-commands\\.test|native-parity\\.test)\\.ts",
+      "acceptanceCriteria": [
+        "gerberCommand accepts --outline board|used, validated after the positional check and before --output, failing with '--outline must be board or used.' plus breadboard help (exit 2); passed to exportBreadboardPcb via a type guard, no cast; other messages unchanged.",
+        "help.ts breadboard entry shows [--outline board|used], the --outline option line after --board, and the --outline used example.",
+        "CLI tests: default ZIP equals encodeBreadboardPcbZip(exportBreadboardPcb(...)); --outline board equals default; --outline used equals core used output, differs from default, and notes a width below 83.82; --outline square exits 2 and writes nothing; missing value exits 2; existing assertions kept and any R5 example warning asserted explicitly.",
+        "native-parity.test.ts gains 'native CLI writes the same breadboard PCB archive' for [] and ['--outline','used'] in separate temp dirs, comparing exit code, stdout, stderr and ZIP bytes; it passes (not skipped) with NODETTO_CLI_TEST_BINARY set.",
+        "No changes to apps/cli/native/**, commands.ts, mcp*.ts or mise.toml."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-pcb-s501/breadboard-pcb-04-cli-parity",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src",
+        "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli > tmp/breadboard-pcb-s501/breadboard-pcb-04-cli-parity/build-release.log 2>&1",
+        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" BUN_OPTIONS=--jsx-runtime=classic bun test apps/cli/src/native-parity.test.ts > tmp/breadboard-pcb-s501/breadboard-pcb-04-cli-parity/native-parity.log 2>&1",
+        "grep -n 'native CLI writes the same breadboard PCB archive' tmp/breadboard-pcb-s501/breadboard-pcb-04-cli-parity/native-parity.log",
+        "bunx biome check apps/cli/src/breadboard-command.ts apps/cli/src/help.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/native-parity.test.ts --diagnostic-level=warn",
+        "bun run typecheck > tmp/breadboard-pcb-s501/breadboard-pcb-04-cli-parity/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^apps/cli/src/(breadboard-command|help|breadboard-commands\\.test|native-parity\\.test)\\.ts' tmp/breadboard-pcb-s501/breadboard-pcb-04-cli-parity/typecheck.log",
+        "bun apps/cli/src/main.ts help breadboard | grep -n -- '--outline board|used'",
+        "test \"$(grep -c '\"--outline\"' apps/cli/src/breadboard-command.ts)\" -ge 1",
+        "test \"$(grep -c 'outline board|used' apps/cli/src/help.ts)\" -ge 1",
+        "git diff --quiet -- apps/cli/native apps/cli/src/commands.ts mise.toml",
+        "test -s impl-plans/progress/breadboard-pcb-04-cli-parity.md"
+      ]
+    },
+    {
+      "planId": "breadboard-pcb-05-goldens",
+      "planPath": "impl-plans/active/breadboard-pcb-05-goldens.md",
+      "progressPath": "impl-plans/progress/breadboard-pcb-05-goldens.md",
+      "wave": 3,
+      "dependsOn": [
+        "breadboard-pcb-01-validator",
+        "breadboard-pcb-03-core-export"
+      ],
+      "writePaths": [
+        "examples/breadboard/led-button.GTL",
+        "examples/breadboard/led-button.GBL",
+        "examples/breadboard/led-button.GTS",
+        "examples/breadboard/led-button.GBS",
+        "examples/breadboard/led-button.GTO",
+        "examples/breadboard/led-button.GKO",
+        "examples/breadboard/led-button.DRL",
+        "packages/core/src/breadboard/export-golden.test.ts",
+        "examples/breadboard/README.md",
+        "impl-plans/progress/breadboard-pcb-05-goldens.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "ownTypecheckRegex": "^packages/core/src/breadboard/export-golden\\.test\\.ts",
+      "acceptanceCriteria": [
+        "The 7 goldens examples/breadboard/led-button.{GTL,GBL,GTS,GBS,GTO,GKO,DRL} are generated by the CLI with the default outline from led-button.jsonl, unedited, ASCII with LF endings and a single trailing newline.",
+        "export-golden.test.ts adds: byte-exact toBe comparison of all 7 files (drift check), validateGerber/validateExcellon all [], legendClearanceErrors [] with BREADBOARD_PCB_RULES values, and the exact warning list observed at generation (e7 two-leads warning plus any R5 warning).",
+        "Drift proof recorded: appending one character to the GTO golden makes the test fail; restoring it (cmp-confirmed) makes it pass.",
+        "examples/breadboard/README.md lists the goldens, the drift-check command, the mkdir/gerber/unzip regeneration commands, the e7 warning rationale (user QA Q2), keeps the BOM/netlist commands, and links docs/breadboard/pcb.md.",
+        "led-button.jsonl, .bom.csv, .net, .cir and the existing export-golden tests are unchanged."
+      ],
+      "verification": [
+        "mkdir -p tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard/export-golden.test.ts",
+        "cp examples/breadboard/led-button.GTO tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens/GTO.bak",
+        "printf 'x' >> examples/breadboard/led-button.GTO",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard/export-golden.test.ts > tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens/drift-proof.log 2>&1; test $? -ne 0",
+        "cp tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens/GTO.bak examples/breadboard/led-button.GTO",
+        "cmp tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens/GTO.bak examples/breadboard/led-button.GTO",
+        "BUN_OPTIONS=--jsx-runtime=classic bun test packages/core/src/breadboard/export-golden.test.ts",
+        "git diff --exit-code 431bfdb -- examples/breadboard/led-button.jsonl examples/breadboard/led-button.bom.csv examples/breadboard/led-button.net examples/breadboard/led-button.cir",
+        "bunx biome check packages/core/src/breadboard/export-golden.test.ts --diagnostic-level=warn",
+        "bun run typecheck > tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/breadboard/export-golden\\.test\\.ts' tmp/breadboard-pcb-s501/breadboard-pcb-05-goldens/typecheck.log",
+        "file examples/breadboard/led-button.GTL examples/breadboard/led-button.GBL examples/breadboard/led-button.GTS examples/breadboard/led-button.GBS examples/breadboard/led-button.GTO examples/breadboard/led-button.GKO examples/breadboard/led-button.DRL",
+        "test \"$(cat examples/breadboard/led-button.GTL examples/breadboard/led-button.GBL examples/breadboard/led-button.GTS examples/breadboard/led-button.GBS examples/breadboard/led-button.GTO examples/breadboard/led-button.GKO examples/breadboard/led-button.DRL | grep -c $'\\r')\" -eq 0",
+        "test -s impl-plans/progress/breadboard-pcb-05-goldens.md"
+      ]
+    }
+  ]
+}
