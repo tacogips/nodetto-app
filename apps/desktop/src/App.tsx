@@ -975,11 +975,11 @@ export function App(props: AppProps): JSX.Element {
                 editor={props.editor}
                 author={settings().userName}
               />
-              <Show when={editing()}>
+              <Show when={editing()} keyed>
                 {(target) => (
                   <TextEditor
                     editor={props.editor}
-                    target={target()}
+                    target={target}
                     onDone={() => setEditing(null)}
                   />
                 )}

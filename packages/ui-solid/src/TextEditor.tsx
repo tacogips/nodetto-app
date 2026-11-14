@@ -208,6 +208,8 @@ function placeEditor(
 
 export function TextEditor(props: TextEditorProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
+  const openRevision = props.editor.documentOpenRevision;
+  const pageId = props.editor.currentPageId;
   let textarea: HTMLTextAreaElement | undefined;
   let done = false;
   // Edge labels render line breaks, so editing one keeps them; Enter still
@@ -235,6 +237,11 @@ export function TextEditor(props: TextEditorProps): JSX.Element {
 
   const placement = createMemo<Placement | null>(() => {
     signals.rev();
+    if (
+      props.editor.documentOpenRevision !== openRevision ||
+      props.editor.currentPageId !== pageId
+    )
+      return null;
     const element = props.editor.store.get(props.target.id);
     return element
       ? placeEditor(props.editor, element, props.target.field)
