@@ -1,0 +1,309 @@
+{
+  "taskId": "tsh-s780",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-780",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "baseBranchUpstream": "origin/main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "fc2ef3b7d7c09f721192cfb2dc8a3ea8f0733901",
+  "acceptedDependencies": [
+    {
+      "planId": "tsh-01-model-partial",
+      "planPath": "impl-plans/progress/tsh-01-model.md",
+      "commit": "87365fbe1635faab3ffd9bbc8581cda903c45116",
+      "provides": "packages/ir/src/semantics/table.ts (table.sheet semantic types, TABLE_SHEET_* constants, isTableSheetDate, tableSheetValueMatches) and packages/ir/src/registry/table.test.ts primitive tests; tsh-01a-ir continues these files."
+    },
+    {
+      "planId": "tsh-contract-seed",
+      "planPath": "impl-plans/active/tsh-00-overview.md",
+      "commit": "fc2ef3b7d7c09f721192cfb2dc8a3ea8f0733901",
+      "provides": "packages/ir/src/semantics.ts re-exports ./semantics/table.ts and packages/ir/src/index.ts re-exports the section 2 table.sheet symbols, so wave-1 core plans import them from @nodetto/ir."
+    }
+  ],
+  "designDocPaths": ["design-docs/specs/design-table-sheet.md", "design-docs/user-qa/table-sheet.md"],
+  "overviewPath": "impl-plans/active/tsh-00-overview.md",
+  "supersededPlans": ["impl-plans/active/tsh-01-model.md", "impl-plans/active/tsh-04-cell-editing.md", "impl-plans/active/tsh-s776-dispatch.json"],
+  "deletedManifests": ["impl-plans/active/tsh-s778-dispatch.json"],
+  "evidenceRoot": "tmp/tsh-s780",
+  "evidenceLayout": "Per-plan logs under tmp/tsh-s780/<planId>/final/ (evidence root equals tmp/<taskId>; the plans' former session-778 log path was renamed at the checkpoint; design section 15). Move final/ to attempt-<n>/ before repeating a run. Untracked data only.",
+  "waveGates": {
+    "afterWave1": ["bun run typecheck", "bun test ./packages/core/src/table-sheet/"],
+    "afterWave2": ["bun run typecheck"]
+  },
+  "reviewContext": {
+    "issueReference": "none; runtime workflowInput of opus-terra-design-and-implement-review-loop-session-780 (continuation of blocked session 776 and of session 778, which failed at dispatch-plans because tsh-s778-dispatch.json had no acceptanceCriteria) is authoritative",
+    "userProblem": "nodetto has no spreadsheet-style element. Users need a first-class table.sheet element (typed columns, rows, header row, per-column widths, per-row heights, cell text) that displays and edits like an Excel sheet or a Notion table, distinct from the ERD erd.table element.",
+    "requiredOutcomes": [
+      "table.sheet is created from the toolbox (default 3x3), renders header plus grid with typed cells in light and dark themes, and its bounds equal the sum of column widths and row heights.",
+      "In-place cell editing with Enter, Tab, Shift+Tab, Escape and arrow keys; rows and columns can be added, deleted, renamed, retyped and resized; each edit is one undo step.",
+      "Pasting TSV fills a range and grows the table; copying a range yields TSV.",
+      "The inspector edits header row, striping and column properties.",
+      "Validation rejects duplicate ids, unknown column keys, type mismatches and limit violations with table.* issue codes; valid tables round-trip through JSONL unchanged.",
+      "SVG and PNG export render the table like the canvas, verified by SVG output tests.",
+      "The CLI creates tables from inline data and CSV/TSV, edits cells, lints and exports them; docs/cli.md and help text describe it.",
+      "docs/editing.md documents the shape and design-docs/specs/design-table-sheet.md exists.",
+      "mise run lint, bun run typecheck, the TS test suites, and the CLI and desktop builds pass; erd.table behavior is unchanged."
+    ],
+    "nonGoals": [
+      "Formulas, sorting, filtering, merged cells, frozen panes, multi-line cell layout.",
+      "New Command kinds (the private Worker authoring-discovery.ts is exhaustive over Command kinds).",
+      "Any change to erd.table schema, behavior, rendering or tests, or to packages/core/src/commands.ts.",
+      "Server code, auth, secrets or deployment config in this public repository.",
+      "Version bumps, releases or pushes.",
+      "Redesigning or re-splitting the plans committed at fc2ef3b."
+    ],
+    "constraints": [
+      "Follow AGENTS.md; no emojis; cargo commands use CARGO_TERM_QUIET=true.",
+      "Do not redesign: reuse design-docs/specs/design-table-sheet.md, design-docs/user-qa/table-sheet.md and the pinned contracts in impl-plans/active/tsh-00-overview.md.",
+      "Wave-1 plans do not import each other at runtime; the only cross-plan reference is the type-only import of ./types.ts from tsh-01d-values.",
+      "Every verification command exits 0 and runs at least one test; plans reference only test files they create or that already exist; per-plan verification uses no directory filters.",
+      "Terra workers implement every owned file before reporting and run their plan's verification at the end.",
+      "All plans share one branch and working directory: workers run no state-changing git commands, freshly read each file before editing, record pre/post git hash-object per edit in their own progress log, edit only their writePaths and own progress file, and keep evidence under tmp/tsh-s780/<planId>/ untracked. Drift in a file the worker does not own is reported, not repaired; repair is serial after the wave joins.",
+      "mise run test-cli (tsh-08) gets up to 3 attempts under load, each logged in attempt-<n>/; deadlines are never relaxed; skipped native tests count as failures.",
+      "Tests use only self-authored neutral data."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Reuse the tsh-01a..01d (wave 1), tsh-02..07 (wave 2) and tsh-08-wiring (wave 3) plans from fc2ef3b unchanged; only this manifest is new.",
+        "rationale": "Session 778 failed at dispatch only, because every plan entry lacked acceptanceCriteria (design section 15)."
+      },
+      {
+        "decision": "acceptanceCriteria for each plan are taken from that plan's '## Done criteria' section.",
+        "rationale": "No plan has a section literally titled acceptance criteria; Done criteria is the mechanically checkable completion contract in every plan."
+      },
+      {
+        "decision": "insertColumn(at, type?) creates a column named Column N (the smallest positive N not used by a Column N header), width 120, type text unless given; pasteGrid uses the same rule.",
+        "rationale": "Pinned in design section 6, tsh-00-overview.md and the owning plan tsh-01d-values.md; resolves the session 776 plan-review finding."
+      },
+      {
+        "decision": "Each edit is one updateSemantic through the existing createElement/updateSemantic/updateVisual paths.",
+        "rationale": "One undo step per edit, and collaboration keeps working without new Command kinds."
+      },
+      {
+        "decision": "tsh-08-wiring alone owns the shared registration files (shape dispatch, core shapes index, ShapeView, toolbox, CLI commands.ts/help.ts, README.md).",
+        "rationale": "Keeps wave-1 and wave-2 file ownership disjoint, with at most 2 waves before wiring."
+      },
+      {
+        "decision": "tsh-06 verification lists explicit test files and excludes label-field.test.ts, which runs in tsh-08 verification 3.",
+        "rationale": "Tests that loop over registered element types fail by design until tsh-08 registers table.sheet."
+      },
+      {
+        "decision": "Amendment 2026-11-10 round 1: authorize the gitignored build outputs apps/desktop/dist and apps/desktop/src-tauri/binaries as tsh-08-wiring writePaths and artifactRoots, and add the tracked apps/desktop/src-tauri/gen/schemas as a source writePath that must stay byte-identical.",
+        "rationale": "Blocked plan tsh-08-wiring (blocked-wave-scope-or-contract): mise run build (desktop Vite build) and mise run build-cli (build-sidecar.ts) write outside the declared target artifact root. The amendment resolves that gap; mise.toml, .gitignore, build-sidecar.ts and the Tauri config stay unchanged, and 12 completed plans are recorded as accepted dependencies of the wave."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "tsh-01a-ir owns IR-internal registration, the core table-sheet barrel and one barrel line in core index.ts (design section 11).",
+      "tsh-01c, tsh-01d and tsh-04a exceed the ~150-line target; accepted because each owns at most 4 source files.",
+      "Export text truncation uses estimated text widths, so ellipsis points may differ slightly from the browser.",
+      "The cell editor is single-line; newlines reach text cells only through paste or the CLI.",
+      "Concurrent edits to the same cell are last writer wins."
+    ],
+    "supportedEdgeCases": [
+      "Paste larger than the table grows rows and columns up to limits (100 columns, 1000 rows) and reports table.limit beyond them.",
+      "Paste coerces values to column types; select columns gain new options.",
+      "Deleting the last remaining column is refused (table.lastColumn).",
+      "Dates are validated as real YYYY-MM-DD calendar dates including leap years.",
+      "CSV parsing follows RFC 4180 with an optional UTF-8 BOM.",
+      "Escape while editing cancels with no history entry."
+    ],
+    "outOfScopeEdgeCases": [
+      "Formulas, sorting, filtering, merged cells and frozen panes.",
+      "Locale-specific number or date formats.",
+      "Multi-line in-cell layout.",
+      "Tauri WKWebView clipboard permission behavior beyond what tsh-08 observes."
+    ],
+    "residualRisks": [
+      "Superseded tsh-01-model.md, tsh-04-cell-editing.md and tsh-s776-dispatch.json stay in impl-plans/active until plan-archive and must not be dispatched.",
+      "From wave 1 until tsh-08 lands, tests that loop over registered element types (for example label-field.test.ts) fail by design; no wave-1 or wave-2 verification lists them.",
+      "CLI deadline flakiness under load: test-cli gets up to 3 attempts."
+    ],
+    "sourcePaths": [
+      "AGENTS.md",
+      "design-docs/specs/design-table-sheet.md",
+      "design-docs/user-qa/table-sheet.md",
+      "impl-plans/active/tsh-00-overview.md",
+      "impl-plans/progress/tsh-01-model.md",
+      "packages/ir/src/semantics/table.ts",
+      "packages/ir/src/registry/table.test.ts",
+      "packages/ir/src/semantics.ts",
+      "packages/ir/src/index.ts",
+      "packages/ir/src/registry/erd.ts",
+      "packages/core/src/shapes/erdTable.ts",
+      "packages/ui-solid/src/shapes/ErdTableView.tsx",
+      "packages/core/src/commands.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "tsh-01a-ir", "planPath": "impl-plans/active/tsh-01a-ir.md", "progressPath": "impl-plans/progress/tsh-01a-ir.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/ir/src/registry/table.ts", "packages/ir/src/registry/table.test.ts", "packages/ir/src/semantics/table.ts", "packages/ir/src/semantics.ts", "packages/ir/src/registry.ts", "packages/ir/src/index.ts", "packages/ir/src/registry.test.ts", "packages/io/src/__fixtures__/table-sheet.jsonl", "packages/io/src/jsonl/golden.test.ts", "packages/io/src/jsonl/table-sheet.test.ts", "packages/core/src/table-sheet/index.ts", "packages/core/src/index.ts", "impl-plans/progress/tsh-01a-ir.md", "tmp/tsh-s780/tsh-01a-ir", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": [
+        "bun test ./packages/ir/src/registry/table.test.ts ./packages/ir/src/registry.test.ts ./packages/ir/src/registry/erd.test.ts",
+        "bun test ./packages/io/src/jsonl/table-sheet.test.ts ./packages/io/src/jsonl/golden.test.ts",
+        "bun test ./packages/core/src/semantic-field-audit.test.ts"
+      ],
+      "acceptanceCriteria": [
+        "TABLE_SHEET is in DEFINITIONS, the table-sheet fixture is in GOLDEN, and verifications 1-3 exited 0.",
+        "git diff -- packages/core/src/index.ts adds exactly one line, and the core table-sheet barrel has the ten pinned lines.",
+        "git diff --stat -- packages/ir/src/registry/erd.ts packages/core/src/commands.ts is empty.",
+        "The progress log has the intent hash, per-edit hashes and command results."
+      ]
+    },
+    {
+      "planId": "tsh-01b-layout", "planPath": "impl-plans/active/tsh-01b-layout.md", "progressPath": "impl-plans/progress/tsh-01b-layout.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/core/src/table-sheet/layout.ts", "packages/core/src/table-sheet/layout.test.ts", "packages/core/src/table-sheet/paint.ts", "packages/core/src/table-sheet/shape.ts", "packages/core/src/table-sheet/shape.test.ts", "impl-plans/progress/tsh-01b-layout.md", "tmp/tsh-s780/tsh-01b-layout", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts"],
+      "acceptanceCriteria": [
+        "All five owned files exist and export the names pinned in tsh-00.",
+        "Verification 1 exited 0 with at least 10 tests.",
+        "No file outside writePaths was changed, and the progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-01c-edits", "planPath": "impl-plans/active/tsh-01c-edits.md", "progressPath": "impl-plans/progress/tsh-01c-edits.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/core/src/table-sheet/types.ts", "packages/core/src/table-sheet/edits.ts", "packages/core/src/table-sheet/edits.test.ts", "packages/core/src/table-sheet/apply.ts", "packages/core/src/table-sheet/apply.test.ts", "packages/core/src/table-sheet/delimited.ts", "packages/core/src/table-sheet/delimited.test.ts", "impl-plans/progress/tsh-01c-edits.md", "tmp/tsh-s780/tsh-01c-edits", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts"],
+      "acceptanceCriteria": [
+        "types.ts matches the content pinned in tsh-00 verbatim.",
+        "Every pinned edits.ts, apply.ts and delimited.ts function is exported.",
+        "Verification 1 exited 0 with at least 15 tests.",
+        "git diff --stat -- packages/core/src/commands.ts is empty, and the progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-01d-values", "planPath": "impl-plans/active/tsh-01d-values.md", "progressPath": "impl-plans/progress/tsh-01d-values.md", "wave": 1, "dependsOn": [],
+      "writePaths": ["packages/core/src/table-sheet/coerce.ts", "packages/core/src/table-sheet/coerce.test.ts", "packages/core/src/table-sheet/columns.ts", "packages/core/src/table-sheet/columns.test.ts", "packages/core/src/table-sheet/grid.ts", "packages/core/src/table-sheet/grid.test.ts", "impl-plans/progress/tsh-01d-values.md", "tmp/tsh-s780/tsh-01d-values", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts"],
+      "acceptanceCriteria": [
+        "All pinned names are exported, and the Column N examples pass (insertColumn names a new column Column N with the smallest unused positive N, width 120, type text unless given; pasteGrid uses the same rule).",
+        "Verification 1 exited 0 with at least 20 tests.",
+        "The only import from a sibling-owned file is the import type of ./types.ts, checked with grep -n \"from \\\"./\" over coerce.ts, columns.ts and grid.ts and recorded.",
+        "The progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-02-export", "planPath": "impl-plans/active/tsh-02-export.md", "progressPath": "impl-plans/progress/tsh-02-export.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout"],
+      "writePaths": ["packages/core/src/svg-export/table-sheet.ts", "packages/core/src/svg-export/table-sheet.test.ts", "impl-plans/progress/tsh-02-export.md", "tmp/tsh-s780/tsh-02-export", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/core/src/svg-export/table-sheet.test.ts", "bun test ./packages/core/src/svg-export.test.ts"],
+      "acceptanceCriteria": [
+        "renderTableSheet is exported with the signature pinned in tsh-00.",
+        "Test verifications 1-2 and both static checks (typecheck, biome) exited 0, with logs under tmp/tsh-s780/tsh-02-export/final/.",
+        "packages/core/src/svg-export/shapes.ts is untouched by this plan, and the progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-03-view", "planPath": "impl-plans/active/tsh-03-view.md", "progressPath": "impl-plans/progress/tsh-03-view.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout"],
+      "writePaths": ["packages/ui-solid/src/shapes/TableSheetView.tsx", "packages/ui-solid/src/shapes/TableSheetView.css", "packages/ui-solid/src/shapes/table-sheet-view-model.ts", "packages/ui-solid/src/table-sheet-view.test.ts", "impl-plans/progress/tsh-03-view.md", "tmp/tsh-s780/tsh-03-view", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet-view.test.ts", "bun test ./packages/ui-solid/src/erd-table-view.test.ts"],
+      "acceptanceCriteria": [
+        "TableSheetView is exported with the signature pinned in tsh-00, and the view model is tested.",
+        "Test verifications 1-2 and both static checks (typecheck, biome) exited 0, with logs under tmp/tsh-s780/tsh-03-view/final/.",
+        "grep -n -- \"--app-\\|prefers-color-scheme\\|nodetto-canvas-dark\" packages/ui-solid/src/shapes/TableSheetView.css prints nothing, and its exit status 1 is recorded in the progress log."
+      ]
+    },
+    {
+      "planId": "tsh-04a-navigation", "planPath": "impl-plans/active/tsh-04a-navigation.md", "progressPath": "impl-plans/progress/tsh-04a-navigation.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["packages/ui-solid/src/table-sheet/selection.ts", "packages/ui-solid/src/table-sheet/selection.test.ts", "packages/ui-solid/src/table-sheet/keyboard.ts", "packages/ui-solid/src/table-sheet/keyboard.test.ts", "packages/ui-solid/src/table-sheet/cell-commit.ts", "packages/ui-solid/src/table-sheet/cell-commit.test.ts", "packages/ui-solid/src/table-sheet/CellEditor.tsx", "packages/ui-solid/src/table-sheet/SelectionOverlay.tsx", "packages/ui-solid/src/table-sheet/TableSheet.css", "impl-plans/progress/tsh-04a-navigation.md", "tmp/tsh-s780/tsh-04a-navigation", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts"],
+      "acceptanceCriteria": [
+        "Every contract in the plan is exported with the pinned names.",
+        "Verification 1 exited 0 with at least 15 tests.",
+        "No edits outside writePaths, and the progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-04b-clipboard", "planPath": "impl-plans/active/tsh-04b-clipboard.md", "progressPath": "impl-plans/progress/tsh-04b-clipboard.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["packages/ui-solid/src/table-sheet/clipboard.ts", "packages/ui-solid/src/table-sheet/clipboard.test.ts", "impl-plans/progress/tsh-04b-clipboard.md", "tmp/tsh-s780/tsh-04b-clipboard", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet/clipboard.test.ts"],
+      "acceptanceCriteria": [
+        "The clipboard contracts are exported, and verification 1 exited 0 with at least 7 tests.",
+        "The progress log names the clipboard preservation test and the single-undo cut test."
+      ]
+    },
+    {
+      "planId": "tsh-04c-resize", "planPath": "impl-plans/active/tsh-04c-resize.md", "progressPath": "impl-plans/progress/tsh-04c-resize.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout", "tsh-01c-edits"],
+      "writePaths": ["packages/ui-solid/src/table-sheet/resize.ts", "packages/ui-solid/src/table-sheet/resize.test.ts", "impl-plans/progress/tsh-04c-resize.md", "tmp/tsh-s780/tsh-04c-resize", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/table-sheet/resize.test.ts"],
+      "acceptanceCriteria": [
+        "The resize contracts are exported, and verification 1 exited 0 with at least 6 tests.",
+        "The progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-05-inspector", "planPath": "impl-plans/active/tsh-05-inspector.md", "progressPath": "impl-plans/progress/tsh-05-inspector.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01b-layout", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["packages/ui-solid/src/inspector/TableSheetSection.tsx", "packages/ui-solid/src/inspector/table-sheet-section.ts", "packages/ui-solid/src/inspector/table-sheet-section.test.ts", "impl-plans/progress/tsh-05-inspector.md", "tmp/tsh-s780/tsh-05-inspector", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./packages/ui-solid/src/inspector/table-sheet-section.test.ts", "bun test ./packages/ui-solid/src/inspector/edits.test.ts"],
+      "acceptanceCriteria": [
+        "TableSheetSection is exported with the props pinned in tsh-00.",
+        "Test verifications 1-2 and both static checks (typecheck, biome) exited 0, with logs under tmp/tsh-s780/tsh-05-inspector/final/.",
+        "packages/ui-solid/src/Inspector.tsx is unchanged by this plan, and the progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-06-cli", "planPath": "impl-plans/active/tsh-06-cli.md", "progressPath": "impl-plans/progress/tsh-06-cli.md", "wave": 2, "dependsOn": ["tsh-01a-ir", "tsh-01c-edits", "tsh-01d-values"],
+      "writePaths": ["apps/cli/src/table-command.ts", "apps/cli/src/table-command.test.ts", "apps/cli/src/edit/operations/table.ts", "apps/cli/src/edit/operations/table.test.ts", "apps/cli/src/edit/batch.ts", "apps/cli/src/edit/operation-fields.ts", "apps/cli/src/edit/operation-fields.test.ts", "impl-plans/progress/tsh-06-cli.md", "tmp/tsh-s780/tsh-06-cli", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./apps/cli/src/table-command.test.ts ./apps/cli/src/edit/operations/table.test.ts ./apps/cli/src/edit/operation-fields.test.ts", "bun test ./apps/cli/src/edit/apply-batch.test.ts ./apps/cli/src/edit/report.test.ts ./apps/cli/src/edit/selectors.test.ts"],
+      "acceptanceCriteria": [
+        "tableCommand, TABLE_HELP and setCells are exported, and set-cells is dispatched in apps/cli/src/edit/batch.ts.",
+        "Verifications 1-2 and both static checks (typecheck, biome) exited 0, with logs under tmp/tsh-s780/tsh-06-cli/final/.",
+        "apps/cli/src/commands.ts, help.ts and types-command.ts are untouched by this plan, and the progress log is complete."
+      ]
+    },
+    {
+      "planId": "tsh-07-docs", "planPath": "impl-plans/active/tsh-07-docs.md", "progressPath": "impl-plans/progress/tsh-07-docs.md", "wave": 2, "dependsOn": ["tsh-01a-ir"],
+      "writePaths": ["docs/editing.md", "docs/cli.md", "docs/import-export.md", "apps/cli/src/table-docs.test.ts", "impl-plans/progress/tsh-07-docs.md", "tmp/tsh-s780/tsh-07-docs", "target"],
+      "sharedPaths": [], "artifactRoots": ["target"],
+      "verification": ["bun test ./apps/cli/src/table-docs.test.ts"],
+      "acceptanceCriteria": [
+        "docs/editing.md, docs/cli.md and docs/import-export.md are updated, and the drift test apps/cli/src/table-docs.test.ts passes.",
+        "Logs are under tmp/tsh-s780/tsh-07-docs/final/, and the progress log is complete.",
+        "git diff --stat -- docs/ lists only the three files."
+      ]
+    },
+    {
+      "planId": "tsh-08-wiring", "planPath": "impl-plans/active/tsh-08-wiring.md", "progressPath": "impl-plans/progress/tsh-08-wiring.md", "wave": 3,
+      "dependsOn": ["tsh-02-export", "tsh-03-view", "tsh-04a-navigation", "tsh-04b-clipboard", "tsh-04c-resize", "tsh-05-inspector", "tsh-06-cli", "tsh-07-docs"],
+      "writePaths": ["packages/core/src/shapes/index.ts", "packages/core/src/svg-export/shapes.ts", "packages/core/src/tools.ts", "packages/core/src/shape-catalogue.ts", "packages/core/src/shape-catalogue.test.ts", "packages/core/src/table-sheet-export.test.ts", "packages/ui-solid/src/shapes/ShapeView.tsx", "packages/ui-solid/src/Canvas.tsx", "packages/ui-solid/src/interaction/pointer.ts", "packages/ui-solid/src/interaction/keyboard.ts", "packages/ui-solid/src/interaction/types.ts", "packages/ui-solid/src/interaction.ts", "packages/ui-solid/src/Inspector.tsx", "packages/ui-solid/src/shape-palette.ts", "packages/ui-solid/src/Toolbar.test.ts", "packages/ui-solid/src/shape-search.test.ts", "packages/ui-solid/src/table-sheet-wiring.test.ts", "apps/cli/src/commands.ts", "apps/cli/src/help.ts", "apps/cli/src/types-command.ts", "apps/cli/src/cli-wiring.test.ts", "apps/cli/src/table-e2e.test.ts", "README.md", "design-docs/specs/design-table-sheet.md", "docs/cli.md", "docs/editing.md", "impl-plans/progress/tsh-08-wiring.md", "tmp/tsh-s780/tsh-08-wiring", "target", "apps/desktop/dist", "apps/desktop/src-tauri/binaries", "apps/desktop/src-tauri/gen/schemas"],
+      "sharedPaths": [], "artifactRoots": ["target", "apps/desktop/dist", "apps/desktop/src-tauri/binaries"],
+      "amendments": [
+        {
+          "round": 1,
+          "reason": "blocked-wave-scope-or-contract",
+          "previousCheckpointCommit": "205767f59e4724c7a38761875f739dadd78dcdfe",
+          "decision": "mise run build writes the Vite bundle to apps/desktop/dist (gitignored dist/). mise run build-cli copies the sidecar into apps/desktop/src-tauri/binaries (gitignored). Both are now tsh-08 writePaths and artifactRoots. The Tauri build.rs may regenerate the tracked apps/desktop/src-tauri/gen/schemas; that directory is authorized as a source writePath only so the build can run, and its content must stay byte-identical (see the plan amendment)."
+        }
+      ],
+      "verification": [
+        "bun test ./packages/core/src/table-sheet-export.test.ts ./packages/core/src/shape-catalogue.test.ts ./packages/core/src/svg-export/table-sheet.test.ts ./packages/core/src/table-sheet/layout.test.ts ./packages/core/src/table-sheet/shape.test.ts ./packages/core/src/table-sheet/edits.test.ts ./packages/core/src/table-sheet/apply.test.ts ./packages/core/src/table-sheet/delimited.test.ts ./packages/core/src/table-sheet/coerce.test.ts ./packages/core/src/table-sheet/columns.test.ts ./packages/core/src/table-sheet/grid.test.ts",
+        "bun test ./packages/ui-solid/src/table-sheet-wiring.test.ts ./packages/ui-solid/src/table-sheet/selection.test.ts ./packages/ui-solid/src/table-sheet/keyboard.test.ts ./packages/ui-solid/src/table-sheet/cell-commit.test.ts ./packages/ui-solid/src/table-sheet/clipboard.test.ts ./packages/ui-solid/src/table-sheet/resize.test.ts ./packages/ui-solid/src/table-sheet-view.test.ts ./packages/ui-solid/src/inspector/table-sheet-section.test.ts ./packages/ui-solid/src/Toolbar.test.ts ./packages/ui-solid/src/shape-search.test.ts ./packages/ui-solid/src/interaction-keyboard-menus.test.ts",
+        "bun test ./apps/cli/src/table-e2e.test.ts ./apps/cli/src/cli-wiring.test.ts ./apps/cli/src/table-command.test.ts ./apps/cli/src/edit/operations/table.test.ts ./apps/cli/src/table-docs.test.ts ./apps/cli/src/edit/label-field.test.ts",
+        "bun run typecheck",
+        "mise run lint",
+        "mise run test",
+        "mise run test-cli",
+        "mise run build-cli",
+        "mise run build"
+      ],
+      "acceptanceCriteria": [
+        "Every wiring point listed in the plan is done.",
+        "Verifications 1-9 exited 0, with up to 3 recorded attempts for mise run test-cli, and the erd integrity check (git diff --stat f59bef4 over commands.ts, erd.ts, erdTable.ts and ErdTableView.tsx) prints nothing.",
+        "The README bullet is present, and the design-table-sheet.md status reads implemented.",
+        "The progress log records the per-edit hashes and any serial repair or amendment request."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+# sac-08-wiring progress
+
+Intent: wire slide area preference and copy-shapes UI, inspector, exports, help and docs per accepted plan.
+Plan intent SHA-256: a0ef5b20bbf41e88fd0711a82679af9fbc60c23a87e3dff55d43deee146f8562
+
+Implementation complete; formal reviews and plan archive remain downstream. Detailed intended diffs and per-edit verification: `tmp/sac-s830/sac-08-wiring/edits.log`.
+
+## Per-edit hashes and exit statuses
+
+```text
+Intent apps/desktop/src/settings/preferences.ts pre=8e6e40f4b70d08f66fc035a28c34d38a34c9ac575014d1f52796e2e5cc544869 post=c094b46dca39db1305ac08248df5cb022bb7ad05ace6f79ef3abb43b7905a5c2
+edit exit=0 verified post hash c094b46dca39db1305ac08248df5cb022bb7ad05ace6f79ef3abb43b7905a5c2
+Intent packages/ui-solid/src/ZoomControls.tsx pre=38b603b636a0e31effdbe6d4f5f390908bc795ea876e168493dd72210bdab315 post=6c95ba0f15e90105503e75ca9dfe777e24c4fb360cf50d36008cfc6c081c4766
+edit exit=0 verified post hash 6c95ba0f15e90105503e75ca9dfe777e24c4fb360cf50d36008cfc6c081c4766
+Intent apps/desktop/src/shell/FileActions.tsx pre=8aaeb2a27e818ad9fb39bbcccb17b6dc20aa8342a213d3a519827040631097d3 post=f033ff8babb00dbf40d8b103122e19fb25e4cbc7ada4ba120b2a080418490f7e
+edit exit=0 verified post hash f033ff8babb00dbf40d8b103122e19fb25e4cbc7ada4ba120b2a080418490f7e
+Intent packages/ui-solid/src/Inspector.tsx pre=b582e29ceeb2c4cce912f73a73f0b000d7da687dd822cadd9f77e0c990b14d7e post=45576b3285bc72d2cec38a414f004eba08ba781d7068122f03d991f808e3ad66
+edit exit=0 verified post hash 45576b3285bc72d2cec38a414f004eba08ba781d7068122f03d991f808e3ad66
+Intent packages/ui-solid/src/index.ts pre=7d92128fa2ce5cf9be76bb8c923e8adc28b7abb0b6ea688a5b2809fa7e55c7d9 post=cc3e69982d69dfaa40b6c0e47a5f5fb438a102cb07dcec6b1d32e778d46a7d17
+edit exit=0 verified post hash cc3e69982d69dfaa40b6c0e47a5f5fb438a102cb07dcec6b1d32e778d46a7d17
+Intent apps/desktop/src/App.tsx pre=24855eca18296ea533f3dbf200fa6c1b513f735e0d7e314c342acd5cb405bfda post=c9e8dce2e459f8dd76226925a14f7d962be21e58558489940434ad8618587c2a
+edit exit=0 verified post hash c9e8dce2e459f8dd76226925a14f7d962be21e58558489940434ad8618587c2a
+Intent apps/desktop/src/settings/preferences.test.ts pre=542bb11632defd2a3a3fdec0f0e2467ea6bdc15aa035022da114f546ffb252a4 post=d444c10d4ddb55966fc283b3f899a11dcb0b17e1583a6d5b9c83afa8ed34821a
+edit exit=0 verified post hash d444c10d4ddb55966fc283b3f899a11dcb0b17e1583a6d5b9c83afa8ed34821a
+Intent packages/ui-solid/src/presentation/slide-clip.test.ts pre=c86fb3b5393452a56811868c35aa1dcde883c2eb4e55fb867278e503f0659e04 post=a68152ea01c61177c75cc141f544e397767bd755f2c96d7dfddcbc717f400ac6
+edit exit=0 verified post hash a68152ea01c61177c75cc141f544e397767bd755f2c96d7dfddcbc717f400ac6
+Intent apps/cli/src/help.ts pre=d6b62ce02e876477cad6f583110123eed7bf830870986956e2e867c429b49aa9 post=6e698ecf2f0d13010386b67c67d1221d6a0090a70fea72f7acda07741af4b4ee
+edit exit=0 verified post hash 6e698ecf2f0d13010386b67c67d1221d6a0090a70fea72f7acda07741af4b4ee
+Intent README.md pre=b55b46c0381709c20e93ec04ce0a546740ec30b4395ece5245a79ad1b3c809eb post=5e0140a66053c5b0283ce9208c0c9be959d1bc69c21120767be1304f09d9dca5
+edit exit=0 verified post hash 5e0140a66053c5b0283ce9208c0c9be959d1bc69c21120767be1304f09d9dca5
+Intent docs/editing.md pre=8dff5cf30e1779ca23cdd7eb910b36eb2372f98a0d634dcd20b0692c7671a94f post=868a4af07fa7e38e58382d3aac78df3670b2a562ac7f9561af66a3f600e15f5f
+edit exit=0 verified post hash 868a4af07fa7e38e58382d3aac78df3670b2a562ac7f9561af66a3f600e15f5f
+Intent docs/cli.md pre=4f856c3c51b1c7d86570a53c23144a039308e21fbe3c7e5a1f4fb82a44f46418 post=00696f9d8a07f4de70ad1ed6eed92334bf9e68878d56253e2ad7caeeb938896f
+edit exit=0 verified post hash 00696f9d8a07f4de70ad1ed6eed92334bf9e68878d56253e2ad7caeeb938896f
+Intent impl-plans/README.md pre=4d822ef71f80bd927257c554a00a8b1a611799592a05d71658aaf0370cb2cc69 post=0fd3305db4a55a42a44474cccac698fc4695e6eaab96978ea7477460b9351b23
+edit exit=0 verified post hash 0fd3305db4a55a42a44474cccac698fc4695e6eaab96978ea7477460b9351b23
+Intent packages/ui-solid/src/Inspector.tsx pre=45576b3285bc72d2cec38a414f004eba08ba781d7068122f03d991f808e3ad66 post=c953af748ac8d9c12eff5382857e3e1005904bc4ccaa9e2aaee4537fb09dacd7
+edit exit=0 verified
+Intent apps/desktop/src/App.tsx pre=c9e8dce2e459f8dd76226925a14f7d962be21e58558489940434ad8618587c2a post=975e63cf0eb01e16f7e290024f147ce9c94bf2861d79575e91eb3306713bc839
+edit exit=0 verified
+Intent apps/desktop/src/settings/preferences.test.ts pre=d444c10d4ddb55966fc283b3f899a11dcb0b17e1583a6d5b9c83afa8ed34821a post=8047299e3e28baaa9100e87c0b96a8545fdcd3bb8466430266a06e1e0c59e49c
+edit exit=0 verified
+Intent packages/ui-solid/src/presentation/slide-clip.test.ts pre=a68152ea01c61177c75cc141f544e397767bd755f2c96d7dfddcbc717f400ac6 post=2504d389c6142e7e6ad9b3d6521d0ecede12b3b2a357744792b00fbada1b1b5d
+edit exit=0 verified
+Intent: retain copy-shapes overview while satisfying 39-line limit. pre=6e698ecf2f0d13010386b67c67d1221d6a0090a70fea72f7acda07741af4b4ee post=5b0cf2c1f63ef0cfdc84b2471bae70c9f14dc9abb12b32b56255f7f9391f1338
+edit exit=0 verified
+Intent: remove extra trailing blank line; pre=0fd3305db4a55a42a44474cccac698fc4695e6eaab96978ea7477460b9351b23 post=a54f351ea65db43387dac1180d9ce74593acd361351e364615e9879cfef18368
+edit exit=0 verified
+```
+
+## Final verification
+
+```text
+desktop 0
+cli 0
+typecheck 0
+strict-index 0
+lint 0
+verify 0
+build 0
+```
+
+Focused desktop: 9 passed, 0 failed; focused CLI and UI: 28 passed, 0 failed. Aggregate counts are in `tmp/sac-s830/sac-08-wiring/final/verify.log`. All complete logs are under `tmp/sac-s830/sac-08-wiring/final/`. Earlier aggregate failure and corrected source logs are retained under `prior/` and `prior-doc/`.
+
+The only new core Command kind is `updateDocument`; the private sync Worker needs a matching case.
