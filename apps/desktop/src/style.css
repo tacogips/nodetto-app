@@ -1,0 +1,2052 @@
+:root {
+  --diagra-ink: #1d2a2e;
+  --diagra-muted: #596366;
+  --diagra-line: #d8d2c3;
+  --diagra-surface: #fffdf8;
+  --diagra-canvas: #f6f4ee;
+  --diagra-accent: #335c67;
+  --diagra-accent-soft: #dbe6e8;
+  --diagra-grid: #e3ded1;
+  --app-chrome-surface: #ffffff;
+  --app-chrome-line: #dfe3e6;
+  --app-chrome-muted: #667078;
+  --app-chrome-hover: #f1f3f4;
+  --app-chrome-active: #e5e9eb;
+
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--diagra-ink);
+  background: var(--diagra-canvas);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+/* Normalize native field bevels in application chrome only. Do not
+ * restyle controls drawn inside documents or interactive prototype content. */
+:is(.app-header, .app-pane, .app-cloud-panel, .diagra-zoom-controls)
+  :is(
+    input:where(
+        :not(
+            [type="checkbox"],
+            [type="radio"],
+            [type="range"],
+            [type="color"],
+            [type="file"],
+            [type="button"],
+            [type="submit"],
+            [type="reset"],
+            [type="image"],
+            [type="hidden"]
+          )
+      ),
+    textarea,
+    select
+  ) {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  min-height: 26px;
+  padding: 4px 6px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--app-chrome-surface);
+  color: var(--diagra-ink);
+  font: inherit;
+}
+
+:is(.app-header, .app-pane, .app-cloud-panel, .diagra-zoom-controls)
+  :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--diagra-accent);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+/* Keep the native select semantics, but draw a flat, square closed control.
+ * The arrow is decorative; the select remains the keyboard/click target. */
+:is(.app-header, .app-pane, .app-cloud-panel, .diagra-zoom-controls)
+  select:not([multiple], [size]) {
+  padding-inline-end: 24px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 11px center, right 7px center;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
+
+@media (forced-colors: active) {
+  :is(.app-header, .app-pane, .app-cloud-panel, .diagra-zoom-controls) select {
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
+  :is(.app-header, .app-pane, .app-cloud-panel, .diagra-zoom-controls)
+    select:not([multiple], [size]) {
+    background-image: none;
+  }
+}
+
+#app {
+  height: 100vh;
+}
+
+/*
+ * A column rather than fixed grid rows: the notice, the error and the
+ * conflict banner each appear only when they have something to say, and the
+ * canvas takes whatever is left.
+ */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/*
+ * The canvas sits in a positioned host so the presence overlay can be laid
+ * over it without becoming part of the transformed viewport.
+ */
+.app-canvas-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+}
+
+/* File controls */
+
+.app-file-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.app-file-menu,
+.app-settings-menu {
+  position: relative;
+}
+
+.app-header
+  :is(.app-file-menu, .app-settings-menu, .app-hint-details)
+  > summary {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  color: var(--diagra-ink);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  list-style: none;
+}
+
+.app-header
+  :is(.app-file-menu, .app-settings-menu, .app-hint-details)
+  > summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-header
+  :is(.app-file-menu, .app-settings-menu, .app-hint-details)
+  > summary::after {
+  width: 5px;
+  height: 5px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.app-header
+  :is(.app-file-menu, .app-settings-menu, .app-hint-details)
+  > summary:hover,
+.app-header
+  :is(.app-file-menu, .app-settings-menu, .app-hint-details)[open]
+  > summary {
+  background: var(--app-chrome-hover);
+}
+
+.app-header
+  :is(.app-file-menu, .app-settings-menu, .app-hint-details)
+  > summary:focus-visible {
+  outline: 2px solid #5d7480;
+  outline-offset: 1px;
+}
+
+.app-settings-controls {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  width: 160px;
+  max-width: calc(100vw - 144px);
+  padding: 4px;
+  border: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+  box-shadow: 0 8px 18px rgb(20 28 32 / 10%);
+}
+
+.app-file-button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: var(--diagra-ink);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.app-file-button:hover:not(:disabled) {
+  background: var(--app-chrome-hover);
+}
+
+.app-file-button:disabled {
+  color: #9aa2a8;
+  cursor: default;
+}
+
+.app-recent-select {
+  max-width: 220px;
+  min-height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  color: var(--diagra-ink);
+  background: var(--app-chrome-surface);
+  font-size: 13px;
+}
+
+.app-file-name {
+  color: var(--diagra-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-dirty-marker {
+  color: var(--diagra-accent);
+}
+
+.app-file-status,
+.app-notice {
+  color: var(--diagra-muted);
+  font-size: 0.8rem;
+}
+
+.app-notice {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--diagra-line);
+  background: var(--diagra-surface);
+}
+
+.app-error {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--diagra-line);
+  color: #8c2f26;
+  background: #fdf1ef;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+}
+
+.app-conflict {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--diagra-line);
+  background: var(--diagra-accent-soft);
+  font-size: 0.8rem;
+}
+
+.app-title {
+  color: #2e363b;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-hint {
+  color: var(--diagra-muted);
+  font-size: 0.8rem;
+}
+
+/* Toolbar */
+
+.diagra-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--diagra-line);
+  background: var(--diagra-surface);
+}
+
+.diagra-tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diagra-tool-button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--diagra-line);
+  border-radius: 6px;
+  color: var(--diagra-ink);
+  background: var(--diagra-surface);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.diagra-tool-button:hover:not(:disabled) {
+  background: var(--diagra-accent-soft);
+}
+
+.diagra-tool-button:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.diagra-tool-button.diagra-active {
+  border-color: var(--diagra-accent);
+  color: var(--diagra-surface);
+  background: var(--diagra-accent);
+}
+
+/* Canvas */
+
+.diagra-canvas {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--diagra-canvas);
+  background-image: radial-gradient(var(--diagra-grid) 1px, transparent 1px);
+  outline: none;
+  touch-action: none;
+  cursor: default;
+}
+
+.diagra-canvas.diagra-image-drop-active {
+  box-shadow: inset 0 0 0 2px var(--diagra-accent);
+}
+
+.diagra-image-drop-overlay,
+.diagra-image-drop-error {
+  position: absolute;
+  z-index: 30;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid var(--diagra-accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--diagra-surface) 94%, transparent);
+  color: var(--diagra-ink);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.diagra-image-drop-overlay {
+  top: 24px;
+  padding: 12px 18px;
+  pointer-events: none;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.diagra-image-drop-error {
+  bottom: 24px;
+  display: flex;
+  max-width: min(560px, calc(100% - 48px));
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.diagra-image-drop-error button {
+  border: 0;
+  background: transparent;
+  color: var(--diagra-accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
+.diagra-canvas.diagra-tool-hand {
+  cursor: grab;
+}
+
+.diagra-canvas.diagra-tool-edge {
+  cursor: crosshair;
+}
+.diagra-canvas.diagra-tool-comment {
+  cursor: crosshair;
+}
+
+.diagra-canvas[class*="diagra-tool-geo-"],
+.diagra-canvas.diagra-tool-node\.generic,
+.diagra-canvas.diagra-tool-erd\.table,
+.diagra-canvas.diagra-tool-uml\.class {
+  cursor: copy;
+}
+
+.diagra-viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.diagra-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Connectors */
+
+.diagra-connector line,
+.diagra-connector polyline {
+  fill: none;
+  stroke: var(--diagra-ink);
+  stroke-width: 1.5;
+}
+
+.diagra-connector.diagra-selected line,
+.diagra-connector.diagra-selected polyline {
+  stroke: var(--diagra-accent);
+  stroke-width: 2.5;
+}
+
+.diagra-connector-label {
+  fill: var(--diagra-muted);
+  font-size: 11px;
+}
+
+.diagra-marker-filled {
+  fill: var(--diagra-ink);
+  stroke: none;
+}
+
+.diagra-marker-hollow {
+  fill: var(--diagra-surface);
+  stroke: var(--diagra-ink);
+  stroke-width: 1.2;
+}
+
+.diagra-pending-connection {
+  stroke: var(--diagra-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+/* Shapes */
+
+.diagra-shape {
+  position: absolute;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.diagra-geo {
+  display: block;
+  overflow: visible;
+}
+
+.diagra-geo rect,
+.diagra-geo ellipse,
+.diagra-geo polygon,
+.diagra-geo path {
+  fill: var(--diagra-surface);
+  stroke: var(--diagra-ink);
+  stroke-width: 1.5;
+}
+
+.diagra-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  inset: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagra-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 10px;
+  border: 1.5px solid var(--diagra-ink);
+  border-radius: 8px;
+  background: var(--diagra-surface);
+  overflow: hidden;
+}
+
+.diagra-node-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagra-sequence-participant {
+  position: relative;
+  height: 100%;
+}
+
+.diagra-sequence-participant-head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 54px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--diagra-ink);
+  border-radius: 8px;
+  background: var(--diagra-surface);
+  text-align: center;
+}
+
+.diagra-sequence-participant-head span {
+  color: var(--diagra-muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.diagra-sequence-participant-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagra-sequence-lifeline {
+  position: absolute;
+  top: 54px;
+  bottom: 0;
+  left: 50%;
+  border-left: 1px dashed var(--diagra-muted);
+}
+
+.diagra-sequence-activation {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--diagra-ink);
+  background: var(--diagra-surface);
+}
+
+.diagra-unknown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border: 1.5px dashed var(--diagra-muted);
+  border-radius: 6px;
+  color: var(--diagra-muted);
+  background: var(--diagra-surface);
+  font-size: 11px;
+}
+
+/* ERD table */
+
+.diagra-erd-table {
+  height: 100%;
+  border: 1.5px solid var(--diagra-ink);
+  border-radius: 6px;
+  background: var(--diagra-surface);
+  overflow: hidden;
+}
+
+.diagra-erd-header {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1.5px solid var(--diagra-ink);
+  background: var(--diagra-accent-soft);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagra-erd-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.diagra-erd-key {
+  color: var(--diagra-accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.diagra-erd-name,
+.diagra-erd-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagra-erd-type {
+  color: var(--diagra-muted);
+}
+
+/* UML class */
+
+.diagra-uml-class {
+  height: 100%;
+  border: 1.5px solid var(--diagra-ink);
+  background: var(--diagra-surface);
+  overflow: hidden;
+}
+
+.diagra-uml-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1.5px solid var(--diagra-ink);
+  overflow: hidden;
+}
+
+.diagra-uml-stereotype {
+  color: var(--diagra-muted);
+  font-size: 10px;
+}
+
+.diagra-uml-title {
+  font-weight: 700;
+}
+
+.diagra-uml-compartment {
+  border-bottom: 1px solid var(--diagra-line);
+  overflow: hidden;
+}
+
+.diagra-uml-compartment:last-child {
+  border-bottom: 0;
+}
+
+.diagra-uml-row {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagra-uml-static {
+  text-decoration: underline;
+}
+
+.diagra-uml-abstract {
+  font-style: italic;
+}
+
+/* Selection overlay */
+
+.diagra-marquee {
+  fill: color-mix(in srgb, var(--diagra-accent) 10%, transparent);
+  stroke: var(--diagra-accent);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.diagra-selection-outline {
+  fill: none;
+  stroke: var(--diagra-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.diagra-handle {
+  fill: var(--diagra-surface);
+  stroke: var(--diagra-accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+.diagra-crop-outline {
+  fill: none;
+  stroke: #f8fafc;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+  pointer-events: none;
+}
+
+.diagra-crop-mask {
+  fill: rgb(15 23 42 / 45%);
+  pointer-events: none;
+}
+
+.diagra-crop-handle {
+  fill: var(--diagra-surface);
+  stroke: #f97316;
+  stroke-width: 2;
+  pointer-events: all;
+}
+
+.diagra-gradient-axis {
+  stroke: #f8fafc;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.diagra-gradient-stop-handle,
+.diagra-gradient-geometry-handle {
+  stroke: #0f172a;
+  stroke-width: 1.5;
+  pointer-events: all;
+  cursor: move;
+}
+
+.diagra-gradient-geometry-handle {
+  fill: var(--diagra-surface);
+  stroke: #f97316;
+  stroke-width: 2;
+}
+
+/* Cloud mode */
+
+.app-history-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.app-cloud-dismiss {
+  order: 1;
+  margin-left: auto;
+  padding: 0 5px;
+}
+
+.app-cloud-dismiss svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.app-cloud-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+  font-size: 13px;
+}
+
+.app-cloud-panel.is-embedded.is-expanded {
+  position: fixed;
+  z-index: 40;
+  top: var(--app-cloud-top, 44px);
+  right: 8px;
+  width: min(620px, calc(100vw - 16px));
+  max-height: min(620px, calc(100dvh - var(--app-cloud-top, 44px) - 8px));
+  overflow: auto;
+  box-shadow: 0 12px 30px rgb(20 28 32 / 16%);
+}
+
+.app-cloud-panel.is-dormant {
+  display: none;
+}
+
+.app-cloud-summary,
+.app-cloud-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.app-cloud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-cloud-field {
+  display: flex;
+  flex: 1 1 150px;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+  color: var(--app-chrome-muted);
+}
+
+.app-cloud-field > span {
+  align-self: stretch;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.app-cloud-field input {
+  width: 100%;
+  min-height: 26px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  color: var(--diagra-ink);
+  background: var(--app-chrome-surface);
+  font-size: 13px;
+}
+
+.app-cloud-field-narrow input {
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.app-cloud-field-narrow {
+  flex: 0 0 52px;
+}
+
+.app-cloud-status,
+.app-cloud-badge {
+  padding: 1px 8px;
+  border-radius: 0;
+  background: var(--diagra-accent-soft);
+  color: var(--diagra-accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-cloud-status[data-status="error"],
+.app-cloud-badge[data-status="error"] {
+  color: #8c2f26;
+  background: #fdf1ef;
+}
+
+.app-cloud-status[data-status="reconnecting"],
+.app-cloud-badge[data-status="reconnecting"],
+.app-cloud-status[data-status="syncing"],
+.app-cloud-badge[data-status="syncing"] {
+  color: #7a5a12;
+  background: #fdf3dc;
+}
+
+.app-cloud-notice {
+  margin: 0;
+  color: var(--diagra-muted);
+}
+
+.app-cloud-share {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--app-chrome-line);
+}
+
+.app-cloud-share-toolbar,
+.app-cloud-share-row,
+.app-cloud-share label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-cloud-share-toolbar,
+.app-cloud-share-row {
+  flex-wrap: wrap;
+}
+
+.app-cloud-share :is(button, select, input) {
+  min-height: 26px;
+  border: 1px solid var(--app-chrome-line);
+  border-radius: 0;
+  color: var(--diagra-ink);
+  background: var(--app-chrome-surface);
+  font: inherit;
+}
+
+.app-cloud-share button {
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.app-cloud-share button:hover:not(:disabled) {
+  background: var(--app-chrome-hover);
+}
+
+.app-cloud-share button:disabled {
+  color: #9aa2a8;
+  cursor: default;
+}
+
+.app-cloud-share select,
+.app-cloud-share input {
+  padding: 0 6px;
+}
+
+.app-cloud-share-row > label,
+.app-cloud-share-row input {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-cloud-share-row > label {
+  flex-basis: 180px;
+}
+
+.app-cloud-share-list {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.app-cloud-share-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--app-chrome-line);
+}
+
+.app-cloud-share-list li > span {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--app-chrome-muted);
+}
+
+.app-cloud-share-list button {
+  min-width: 0;
+  white-space: normal;
+}
+
+.app-cloud-empty {
+  margin: 0;
+  color: var(--app-chrome-muted);
+}
+
+.app-cloud-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.app-cloud-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.app-cloud-doc-title {
+  font-weight: 600;
+}
+
+.app-cloud-doc-id {
+  color: var(--diagra-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+/*
+ * The toolbar's own undo/redo pair drives the core History, which is not the
+ * undo stack a cloud document uses (design 5). In cloud mode the header
+ * carries the buttons that route to the Y.UndoManager, and this pair is
+ * removed rather than left showing a stack nobody is reading.
+ */
+.app-cloud-mode .diagra-local-history {
+  display: none;
+}
+
+/* Presence */
+
+.app-presence-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--diagra-muted);
+  font-size: 0.75rem;
+}
+
+.app-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.app-presence-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-presence-brush {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px dashed currentColor;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  will-change: transform;
+}
+
+.app-presence-selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  will-change: transform;
+}
+
+.app-presence-selection-name {
+  position: absolute;
+  top: -1.4rem;
+  left: -1.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fffdf8;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.app-presence-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 2px;
+  align-items: flex-start;
+  will-change: transform;
+}
+
+.app-presence-name {
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fffdf8;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+/* ---- A2: panels and menus ---- */
+
+/* Editor body: canvas host and the Inspector column side by side. */
+
+.app-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-editor-body > .app-canvas-host {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-inspector {
+  width: 280px;
+  flex: 0 0 280px;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--diagra-line);
+  background: var(--diagra-surface);
+  outline: none;
+}
+
+.app-inspector:focus-visible {
+  box-shadow: inset 2px 0 0 var(--diagra-accent);
+}
+
+/* Page tabs */
+
+.diagra-page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: stretch;
+  padding: 4px 12px 0;
+  border-bottom: 1px solid var(--diagra-line);
+  background: var(--diagra-surface);
+}
+
+.diagra-page-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--diagra-line);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--diagra-canvas);
+  font-size: 0.78rem;
+}
+
+.diagra-page-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.diagra-page-tab-name:focus-visible,
+.diagra-page-menu-button:focus-visible,
+.diagra-page-add:focus-visible {
+  outline: 2px solid var(--diagra-accent);
+  outline-offset: -2px;
+}
+
+.diagra-page-tab.diagra-active {
+  background: var(--diagra-surface);
+  box-shadow: 0 1px 0 var(--diagra-surface);
+  font-weight: 600;
+}
+
+.diagra-page-tab-name,
+.diagra-page-menu-button,
+.diagra-page-add {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  color: var(--diagra-ink);
+  background: transparent;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.diagra-page-menu-button {
+  padding: 0 6px;
+  color: var(--diagra-muted);
+}
+
+.diagra-page-menu-button:hover,
+.diagra-page-add:hover {
+  color: var(--diagra-accent);
+}
+
+.diagra-page-add {
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+
+.diagra-page-rename {
+  min-width: 80px;
+  max-width: 160px;
+  height: 22px;
+  margin: 0 4px;
+  padding: 0 6px;
+  border: 1px solid var(--diagra-accent);
+  border-radius: 4px;
+  color: var(--diagra-ink);
+  background: var(--diagra-surface);
+  font-size: inherit;
+  outline: none;
+}
+
+.diagra-page-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--diagra-line);
+  border-radius: 6px;
+  background: var(--diagra-surface);
+  box-shadow: 0 6px 18px rgba(29, 42, 46, 0.14);
+  font-weight: 400;
+}
+
+/* Menus (context menu, page menu) */
+
+.diagra-context-menu {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--diagra-line);
+  border-radius: 6px;
+  background: var(--diagra-surface);
+  box-shadow: 0 6px 18px rgba(29, 42, 46, 0.14);
+  font-size: 0.8rem;
+  outline: none;
+  user-select: none;
+}
+
+.diagra-menu-item {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--diagra-ink);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diagra-context-menu > .diagra-menu-item,
+.diagra-context-menu > .diagra-menu-submenu-host,
+.diagra-context-menu > .diagra-menu-separator {
+  flex-shrink: 0;
+}
+
+.diagra-context-menu .diagra-menu-label,
+.diagra-context-menu .diagra-menu-shortcut {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.diagra-menu-item:hover:not(:disabled),
+.diagra-menu-item.diagra-menu-active:not(:disabled) {
+  background: var(--diagra-accent-soft);
+}
+
+.diagra-menu-item:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.diagra-menu-shortcut {
+  color: var(--diagra-muted);
+  font-size: 0.72rem;
+}
+
+.diagra-menu-item:disabled .diagra-menu-shortcut {
+  color: inherit;
+}
+
+.diagra-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--diagra-line);
+}
+
+.diagra-menu-submenu-host {
+  position: relative;
+}
+
+.diagra-submenu {
+  top: -5px;
+  left: 100%;
+  min-width: 220px;
+}
+
+.diagra-submenu.diagra-submenu-left {
+  left: auto;
+  right: 100%;
+}
+
+/* Floating selection toolbar */
+
+.diagra-selection-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  max-width: calc(100% - 8px);
+  padding: 4px 6px;
+  border: 1px solid var(--diagra-line);
+  border-radius: 8px;
+  background: var(--diagra-surface);
+  box-shadow: 0 4px 14px rgba(29, 42, 46, 0.12);
+  will-change: transform;
+  user-select: none;
+}
+
+.diagra-float-group {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding-right: 6px;
+  border-right: 1px solid var(--diagra-line);
+}
+
+.diagra-float-group:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.diagra-float-colours {
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
+.diagra-float-button {
+  min-height: 24px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--diagra-ink);
+  background: transparent;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.diagra-float-button:hover:not(:disabled) {
+  background: var(--diagra-accent-soft);
+}
+
+.diagra-float-button:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.diagra-swatch-row {
+  display: flex;
+  gap: 3px;
+}
+
+.diagra-swatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--diagra-line);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.diagra-swatch-stroke {
+  border-width: 3px;
+  background: var(--diagra-surface);
+}
+
+.diagra-swatch-none {
+  background: linear-gradient(
+    135deg,
+    transparent 45%,
+    #b91c1c 45%,
+    #b91c1c 55%,
+    transparent 55%
+  );
+}
+
+.diagra-swatch:hover {
+  transform: scale(1.15);
+}
+
+/* Zoom widget */
+
+.diagra-zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+  justify-content: flex-end;
+  gap: 6px;
+  align-items: center;
+  user-select: none;
+}
+
+.diagra-zoom-group {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--diagra-line);
+  border-radius: 6px;
+  background: var(--diagra-surface);
+  box-shadow: 0 2px 8px rgba(29, 42, 46, 0.08);
+  overflow: hidden;
+}
+
+.diagra-zoom-button {
+  min-width: 28px;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--diagra-line);
+  color: var(--diagra-ink);
+  background: transparent;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.diagra-zoom-button:last-child {
+  border-right: 0;
+}
+
+.diagra-zoom-button:hover:not(:disabled) {
+  background: var(--diagra-accent-soft);
+}
+
+.diagra-zoom-button:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.diagra-zoom-level {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-right: 1px solid var(--diagra-line);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagra-zoom-level .diagra-input {
+  width: 58px;
+  min-height: 26px;
+  padding: 2px 4px;
+  text-align: right;
+  border: 0;
+  border-radius: 0;
+}
+
+.diagra-zoom-toggle.diagra-active {
+  color: var(--diagra-surface);
+  background: var(--diagra-accent);
+}
+
+.diagra-view-menu > summary {
+  padding: 5px 8px;
+  border: 1px solid var(--diagra-line);
+  background: var(--diagra-surface);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.diagra-view-menu-body {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: grid;
+  width: 190px;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid var(--diagra-line);
+  background: var(--diagra-surface);
+  box-shadow: 0 2px 8px rgba(29, 42, 46, 0.08);
+}
+
+.diagra-view-menu-body .diagra-zoom-button {
+  text-align: left;
+  border: 0;
+  min-height: 32px;
+}
+
+/* Text tool cursor, matching the other creation tools. */
+
+.diagra-canvas.diagra-tool-text\.note {
+  cursor: text;
+}
+
+/* ---- A1: canvas gestures ---- */
+
+.diagra-canvas.diagra-grid-hidden {
+  background-image: none;
+}
+
+.diagra-canvas.diagra-space-pan {
+  cursor: grab;
+}
+
+.diagra-canvas.diagra-connecting {
+  cursor: crosshair;
+}
+
+.diagra-snap-guide {
+  stroke: var(--diagra-accent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.diagra-persistent-guide > line:first-of-type {
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.diagra-persistent-guide-hit {
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
+  cursor: grab;
+}
+
+.diagra-persistent-guide-active .diagra-persistent-guide-hit {
+  cursor: grabbing;
+}
+
+.diagra-persistent-guide-locked .diagra-persistent-guide-hit {
+  pointer-events: none;
+}
+
+.diagra-persistent-guide-label {
+  fill: var(--diagra-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+.diagra-rulers {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.diagra-ruler rect,
+.diagra-ruler-corner {
+  fill: color-mix(in srgb, var(--diagra-surface) 92%, transparent);
+  stroke: var(--diagra-line);
+  stroke-width: 1;
+}
+
+.diagra-ruler rect {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.diagra-ruler line {
+  stroke: var(--diagra-muted);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.diagra-ruler text {
+  fill: var(--diagra-muted);
+  font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+.diagra-ruler-draft {
+  stroke: var(--diagra-accent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.diagra-hover-target {
+  fill: color-mix(in srgb, var(--diagra-accent) 12%, transparent);
+  stroke: var(--diagra-accent);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.diagra-endpoint-handle {
+  fill: var(--diagra-surface);
+  stroke: var(--diagra-accent);
+  stroke-width: 2;
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.diagra-connect-handle {
+  fill: var(--diagra-accent);
+  stroke: var(--diagra-surface);
+  stroke-width: 1.5;
+  opacity: 0.85;
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.diagra-connect-handle:hover {
+  opacity: 1;
+}
+
+/* The slot layer itself stays transparent; what the shell mounts in it
+   (the inline text editor) takes the pointer. */
+.diagra-slot-layer > * {
+  pointer-events: auto;
+}
+.diagra-layers {
+  flex: 0 0 210px;
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--line, #d8d2c3);
+  background: var(--surface, #fffdf8);
+  font-size: 12px;
+}
+.diagra-layers h2 {
+  font-size: 13px;
+  margin: 14px 12px 8px;
+}
+.diagra-layers p {
+  margin: 8px 12px;
+  color: #596366;
+}
+.diagra-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.diagra-layer-row button,
+.diagra-layer-actions button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 7px 4px;
+  font: inherit;
+}
+.diagra-layer-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+.diagra-layer-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagra-layer-name[aria-pressed="true"] {
+  background: #dbe6e8;
+}
+.diagra-layer-row button:focus-visible,
+.diagra-layer-row input:focus-visible {
+  outline: 2px solid #227c91;
+  outline-offset: -2px;
+}
+.diagra-layer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 8px;
+  gap: 6px;
+}
+
+.diagra-layer-row button.diagra-layer-icon {
+  display: inline-grid;
+  flex: 0 0 24px;
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  place-items: center;
+  color: var(--app-chrome-muted);
+}
+
+.diagra-layer-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.diagra-layer-row .diagra-layer-icon[aria-pressed="true"] {
+  color: var(--diagra-ink);
+  background: var(--app-chrome-active);
+}
+.diagra-component-library {
+  border-bottom: 1px solid #d8d2c3;
+  padding: 8px;
+}
+
+.diagra-color-tokens,
+.diagra-number-tokens,
+.diagra-typography-styles,
+.diagra-review-comments {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--diagra-border, #ddd);
+}
+.diagra-color-tokens form,
+.diagra-number-tokens form,
+.diagra-typography-styles form,
+.diagra-color-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px;
+}
+.diagra-color-tokens input:not([type="color"]):not([type="checkbox"]),
+.diagra-number-tokens input {
+  min-width: 0;
+  width: 120px;
+  flex: 1;
+}
+.diagra-typography-styles form input,
+.diagra-typography-entry input {
+  min-width: 0;
+  width: 112px;
+  flex: 1;
+}
+.diagra-typography-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin: 8px;
+}
+.diagra-typography-entry > span {
+  color: #596366;
+  font-variant-numeric: tabular-nums;
+}
+.diagra-typography-entry button[aria-pressed="true"] {
+  border-color: var(--diagra-accent, #335c67);
+  color: #fff;
+  background: var(--diagra-accent, #335c67);
+}
+.diagra-color-tokens input[type="color"] {
+  width: 32px;
+  height: 28px;
+  padding: 1px;
+}
+.diagra-review-comments > textarea,
+.diagra-comment-thread textarea {
+  box-sizing: border-box;
+  width: calc(100% - 16px);
+  min-height: 54px;
+  margin: 0 8px;
+  resize: vertical;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 6px;
+  padding: 6px;
+  color: inherit;
+  background: var(--surface, #fffdf8);
+  font: inherit;
+}
+.diagra-comment-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 8px;
+}
+.diagra-comment-actions button,
+.diagra-comment-placement button,
+.diagra-comment-thread header button,
+.diagra-comment-popover button {
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 5px;
+  padding: 4px 7px;
+  background: var(--surface, #fffdf8);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.diagra-comment-thread {
+  margin: 8px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 7px;
+  background: #fff;
+  overflow: hidden;
+}
+.diagra-comment-thread.is-resolved {
+  opacity: 0.65;
+}
+.diagra-comment-thread header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: #f5f2e9;
+}
+.diagra-comment-thread header span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagra-comment-message {
+  padding: 6px 8px 0;
+}
+.diagra-comment-message time {
+  display: block;
+  color: #727b7e;
+  font-size: 10px;
+}
+.diagra-comment-message p {
+  margin: 3px 0 6px;
+  color: inherit;
+  white-space: pre-wrap;
+}
+.diagra-comment-placement {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 8px;
+  padding: 7px;
+  border: 1px solid var(--diagra-accent, #335c67);
+  border-radius: 7px;
+  color: var(--diagra-ink);
+  background: var(--diagra-accent-soft);
+  font-size: 11px;
+}
+.diagra-comment-pins {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.diagra-comment-pin-wrap {
+  position: absolute;
+  pointer-events: auto;
+}
+.diagra-comment-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 8px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 28%);
+  color: #fff;
+  background: var(--diagra-accent, #335c67);
+  font: 700 11px / 1 sans-serif;
+  cursor: grab;
+  touch-action: none;
+}
+.diagra-comment-pin.is-dragging {
+  cursor: grabbing;
+}
+.diagra-comment-popover {
+  position: absolute;
+  z-index: 4;
+  left: 18px;
+  top: 18px;
+  width: 220px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 9px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 22%);
+  color: var(--ink, #172124);
+  background: var(--surface, #fffdf8);
+  font: 12px / 1.35 sans-serif;
+}
+.diagra-comment-popover > span {
+  display: block;
+  color: #596366;
+}
+.diagra-comment-popover p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+.diagra-color-entry > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+}
+.diagra-gradient-stop {
+  display: grid;
+  grid-template-columns: 32px minmax(48px, 1fr) minmax(48px, 1fr);
+  gap: 4px;
+  margin: 6px 0;
+  align-items: center;
+}
+.diagra-gradient-stop button {
+  grid-column: 1 / -1;
+}
+.diagra-effect-actions,
+.diagra-inspector-actions,
+.diagra-effect-entry > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.diagra-inspector-stack {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 6px;
+}
+.diagra-effect-entry {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--line, #d8d2c3);
+  border-radius: 6px;
+}
+.diagra-effect-entry > label,
+.diagra-effect-entry > select,
+.diagra-effect-entry > div {
+  grid-column: 1 / -1;
+}
+.diagra-component-library input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+}
+.diagra-component-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 4px;
+  border-bottom: 1px solid #eee9dd;
+}
+.diagra-component-entry strong,
+.diagra-component-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagra-component-preview {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+  box-sizing: border-box;
+  border: 1px solid #d8d2c3;
+  border-radius: 4px;
+  background: #f2f0e9;
+}
+.diagra-component-entry span {
+  color: #596366;
+}
+.diagra-component-entry button {
+  border: 1px solid #d8d2c3;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-right: 4px;
+  cursor: pointer;
+  background: #fffdf8;
+  color: #1d2a2e;
+}
+.diagra-prototype-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: #f3f4f5;
+  color: #1d2a2e;
+}
+.diagra-prototype-overlay > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+}
+.diagra-prototype-overlay > header :is(button, select) {
+  min-height: 32px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--diagra-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.diagra-prototype-overlay > header select {
+  max-width: 180px;
+  border-color: var(--app-chrome-line);
+  background: var(--app-chrome-surface);
+}
+.diagra-prototype-overlay > header :is(button, select):hover:not(:disabled) {
+  background: var(--app-chrome-hover);
+}
+.diagra-prototype-overlay > header :is(button, select):disabled {
+  color: #9aa2a8;
+  cursor: default;
+}
+.diagra-prototype-overlay > header :is(button, select):focus-visible {
+  outline: 2px solid #5d7480;
+  outline-offset: 1px;
+}
+.diagra-prototype-overlay > p {
+  margin: 32px 24px;
+  color: var(--diagra-muted);
+  font-size: 14px;
+}
+.diagra-prototype-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.diagra-prototype-hotspot {
+  position: absolute;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.diagra-prototype-hotspot:hover,
+.diagra-prototype-hotspot:focus-visible {
+  outline: 2px solid #335c67;
+  background: #335c6710;
+}
+.diagra-prototype-overlay {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+}
