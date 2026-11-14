@@ -1,0 +1,133 @@
+/* Canvas cursors and gesture feedback: panning, guides, rulers and
+   connection handles.
+   Imported in cascade order from style.css. */
+
+/* Text tool cursor, matching the other creation tools. */
+
+.nodetto-canvas.nodetto-tool-text\.note {
+  cursor: text;
+}
+
+/* ---- A1: canvas gestures ---- */
+
+.nodetto-canvas.nodetto-grid-hidden {
+  background-image: none;
+}
+
+.nodetto-canvas.nodetto-space-pan {
+  cursor: grab;
+}
+
+/* Active panning takes precedence over creation and resize-handle cursors. */
+.nodetto-canvas.nodetto-panning,
+.nodetto-canvas.nodetto-panning * {
+  cursor: grabbing !important;
+}
+
+.nodetto-canvas.nodetto-connecting {
+  cursor: crosshair;
+}
+
+.nodetto-snap-guide {
+  stroke: var(--nodetto-accent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.nodetto-persistent-guide > line:first-of-type {
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.nodetto-persistent-guide-hit {
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
+  cursor: grab;
+}
+
+.nodetto-persistent-guide-active .nodetto-persistent-guide-hit {
+  cursor: grabbing;
+}
+
+.nodetto-persistent-guide-locked .nodetto-persistent-guide-hit {
+  pointer-events: none;
+}
+
+.nodetto-persistent-guide-label {
+  fill: var(--nodetto-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+.nodetto-rulers {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.nodetto-ruler rect,
+.nodetto-ruler-corner {
+  fill: color-mix(in srgb, var(--nodetto-surface) 92%, transparent);
+  stroke: var(--nodetto-line);
+  stroke-width: 1;
+}
+
+.nodetto-ruler rect {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.nodetto-ruler line {
+  stroke: var(--nodetto-muted);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.nodetto-ruler text {
+  fill: var(--nodetto-muted);
+  font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+.nodetto-ruler-draft {
+  stroke: var(--nodetto-accent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.nodetto-hover-target {
+  fill: color-mix(in srgb, var(--nodetto-accent) 12%, transparent);
+  stroke: var(--nodetto-accent);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.nodetto-endpoint-handle {
+  fill: var(--nodetto-surface);
+  stroke: var(--nodetto-accent);
+  stroke-width: 2;
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.nodetto-connect-handle {
+  fill: var(--nodetto-accent);
+  stroke: var(--nodetto-surface);
+  stroke-width: 1.5;
+  opacity: 0.85;
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.nodetto-connect-handle:hover {
+  opacity: 1;
+}
+
+/* The slot layer itself stays transparent; what the shell mounts in it
+   (the inline text editor) takes the pointer. */
+.nodetto-slot-layer > * {
+  pointer-events: auto;
+}
