@@ -1,0 +1,5 @@
+{"kind":"document","schemaVersion":1,"id":"free-line-fixture","title":"Free line endpoints"}
+{"kind":"page","id":"p1","name":"Free lines","pageKind":"flowchart"}
+{"kind":"element","id":"decision","page":"p1","type":"shape.geo","index":"Z","semantic":{"geo":"diamond","label":"Decision"},"visual":{"x":400,"y":200,"width":100,"height":100}}
+{"kind":"element","id":"free-line","page":"p1","type":"edge.generic","index":"q","semantic":{"fromPoint":{"x":100,"y":100},"toPoint":{"x":400,"y":100},"arrowheads":{"end":"arrow"},"routing":"manual","routingWaypoints":[{"u":0.5,"v":100}]}}
+{"kind":"element","id":"partial-line","page":"p1","type":"edge.generic","index":"r","semantic":{"from":"decision","toPoint":{"x":650,"y":400},"arrowheads":{"end":"arrow"},"routing":"orthogonal","fromPort":"bottom"}}

@@ -1,0 +1,253 @@
+{
+  "taskId": "erd-highlight-s528",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-528",
+  "implementationBranch": "feature/erd-relation-field-highlight",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "645b2217c78d21afbb3967d933d43182abc37619",
+  "designDocPaths": [
+    "design-docs/specs/design-erd-relation-field-highlight.md"
+  ],
+  "evidenceRoot": "tmp/erd-highlight-s528",
+  "evidenceLayout": "tmp/erd-highlight-s528/<planId>/ per plan (command logs), per-attempt dispatcher output under tmp/erd-highlight-s528/<planId>/attempt-<n>/, reconciliation output under tmp/erd-highlight-s528/reconcile/. Untracked: tmp/ is git-ignored (.gitignore line 41). The plans' example log location /tmp/nodetto-erd-highlight/<planId>/ is superseded by this evidenceRoot. No *.test.ts file may be written under tmp/.",
+  "historicalManifests": {
+    "paths": [
+      "impl-plans/active/bpmn-operation-flow-s356-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s357-dispatch.json",
+      "impl-plans/active/bpmn-operation-flow-s359-dispatch.json",
+      "impl-plans/active/bpmn-render-fix-s360-dispatch.json",
+      "impl-plans/active/breadboard-mode-s485-dispatch.json",
+      "impl-plans/active/breadboard-pcb-s501-dispatch.json",
+      "impl-plans/active/ddl-frame-dispatch.json"
+    ],
+    "note": "Historical manifests. Not dispatched and not changed by this checkpoint. This manifest is the only new dispatch manifest."
+  },
+  "reviewContext": {
+    "issueReference": "local-input:feature/erd-relation-field-highlight@645b221 (no GitHub issue URL/number supplied). Workflow input 'ERD relation field highlight'; execution opus-luna-design-and-implement-review-loop-session-528; design accepted comm-009772; plan review accepted comm-009774.",
+    "userProblem": "In the ERD editor a selected erd.relation (foreign-key) edge does not show which columns it connects, so users cannot see which source and target field rows the relation links.",
+    "requiredOutcomes": [
+      "Selecting an ERD relation edge highlights the background of exactly the source and target field rows it connects; other rows are unaffected (design 2, plans 01-03).",
+      "Deselecting the edge or selecting something else removes the highlight (Canvas memo reads signals.selection and signals.rev, plan 03).",
+      "Multiple selected relations highlight the union of their connected fields, keyed per table (plan 01).",
+      "Relations whose endpoints do not reference specific fields, or whose data is malformed or stale, do not crash and highlight nothing at field level (plan 01).",
+      "Unit tests cover erdRelationHighlightedColumns in packages/core/src/erd-foreign-key.test.ts and erdRowHighlighted in packages/ui-solid/src/erd-table-view.test.ts.",
+      "bun run typecheck, bun test packages/core packages/ui-solid and mise run lint-ts pass on the combined tree."
+    ],
+    "nonGoals": [
+      "Reverse highlight (hover or select a field to highlight its relation lines): erd.table has no field-level hover or selection hook today, so it would need a new interaction model (design 7).",
+      "Highlighting through group selection, in ShapePalette, in PrototypePreview, or in SVG/PNG/PDF exports (design 7).",
+      "Any change to packages/ir, packages/io, packages/collab, Rust, server code, connector rendering or selection logic.",
+      "New CSS variables, a dark-theme block, or renaming the nodetto-erd-row class; apps/desktop/scripts must not change."
+    ],
+    "constraints": [
+      "Follow AGENTS.md; no emojis; cargo commands, if any, use CARGO_TERM_QUIET=true.",
+      "Highlight is transient view/selection state: never persisted to the document, IR, JSONL, collab doc or exports, and issues no editor command, so it creates no undo history entry.",
+      "Resolve columns from existing relation endpoint data via erdEndpointColumnIds (packages/ir/src/semantics.ts:300); do not re-implement the precedence.",
+      "Highlight colour derives only from --nodetto-accent (color-mix 18% background plus inset 3px left bar), distinct from .nodetto-selected, the header accent-soft and .nodetto-hover-target.",
+      "Strict TypeScript: no any, no non-null assertions on lookups, no prop destructuring in Solid components; self-authored test data only.",
+      "Workers edit only their writePaths and their own impl-plans/progress/<planId>.md; fresh read plus sha256 before and after each edit; stop on drift; no state-changing git commands and no worktrees; foreground commands only; scratch only under tmp/erd-highlight-s528/<planId>/.",
+      "Wave-1 bun run typecheck failures confined to the sibling plan's files are recorded as drift, never edited; the serial integration gate runs the blocking whole-repo checks."
+    ],
+    "designDecisionsAndRationale": [
+      "A pure core helper erdRelationHighlightedColumns(selection, resolve): ReadonlyMap<ElementId, ReadonlySet<string>> in packages/core/src/erd-foreign-key.ts keeps resolution framework-agnostic and unit-testable (design 4.1).",
+      "Column ids are filtered against the table's current semantic.columns so stale ids after a rename or delete never highlight (design 2).",
+      "Canvas computes one createMemo over signals.rev() and signals.selection() and passes map.get(element.id) through the single renderShape ShapeView call site; cost is O(selected elements + endpoint columns) (design 4.2).",
+      "Optional props ShapeViewProps.erdHighlightedColumnIds and ErdTableViewProps.highlightedColumnIds keep ShapePalette and PrototypePreview compiling unchanged (design 4.3).",
+      "Row class nodetto-erd-row-related is toggled via classList using the exported pure helper erdRowHighlighted, so rows stay mounted and the decision is testable without mounting components (design 4.3, text-note-view.test.ts pattern).",
+      "Logical relations highlight like enforced ones; only resolvability matters (design 2)."
+    ],
+    "intentionalTradeoffs": [
+      "A relation selected only through a group selection is not highlighted (no group expansion).",
+      "Dark-theme readability relies on deriving from --nodetto-accent; no dark block exists today, so none is added. The 18% contrast is not visually verified (residual risk, low).",
+      "No Canvas DOM test; Canvas wiring is covered by helper tests, typecheck and grep checks (residual risk, low).",
+      "Wave-1 plans run repo-wide typecheck concurrently; sibling errors are recorded, and the serial integration gate re-runs on the combined tree (residual risk, low)."
+    ],
+    "supportedEdgeCases": [
+      "Single relation with column ends highlights exactly the two column ids.",
+      "Composite columns ends, and columns taking precedence over column.",
+      "Two selected relations touching one table on different columns give the union.",
+      "Self-relation on one table highlights both column sets in that table.",
+      "Mixed selection (relation plus table) still highlights the relation's columns.",
+      "Empty selection, non-relation selection or unknown ids give an empty map.",
+      "Table-level ends, missing table, non-erd.table target, stale column id and malformed semantic (missing from/to or non-object ends): no entry for that end, no throw.",
+      "logical: true relations highlight."
+    ],
+    "outOfScopeEdgeCases": [
+      "Relations inside a selected group (no group expansion).",
+      "Field hover or field selection highlighting relation lines.",
+      "Highlight in palette, prototype preview or exports."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-erd-relation-field-highlight.md",
+      "impl-plans/active/erd-highlight-01-core-helper.md",
+      "impl-plans/active/erd-highlight-02-table-view.md",
+      "impl-plans/active/erd-highlight-03-canvas-wiring.md",
+      "packages/ir/src/semantics.ts",
+      "packages/core/src/erd-foreign-key.ts",
+      "packages/core/src/erd-foreign-key.test.ts",
+      "packages/core/src/index.ts",
+      "packages/core/src/shapes/connector.ts",
+      "packages/ui-solid/src/shapes/ErdTableView.tsx",
+      "packages/ui-solid/src/shapes/ShapeView.tsx",
+      "packages/ui-solid/src/erd-table-view.test.ts",
+      "packages/ui-solid/src/text-note-view.test.ts",
+      "packages/ui-solid/src/Canvas.tsx",
+      "packages/ui-solid/src/adapter.ts",
+      "apps/desktop/src/style.css"
+    ],
+    "reviewFindingsCarried": [
+      {
+        "path": "impl-plans/active/erd-highlight-01-core-helper.md",
+        "note": "Low, accepted residual: plans 01 and 02 both run repo-wide bun run typecheck in wave 1; errors outside own writePaths are recorded, not fixed."
+      },
+      {
+        "path": "impl-plans/active/erd-highlight-03-canvas-wiring.md",
+        "note": "Low, accepted residual: no Canvas DOM test, by design and ui-solid convention."
+      },
+      {
+        "path": "design-docs/specs/design-erd-relation-field-highlight.md",
+        "note": "Low, accepted residual: 18% accent-mix contrast not visually checked; group-selected relations not highlighted by design."
+      }
+    ]
+  },
+  "acceptedDependencies": [],
+  "reconciliation": {
+    "owner": "orchestrator",
+    "afterWave": [
+      "bun run typecheck",
+      "bun test packages/core packages/ui-solid"
+    ],
+    "deferredSharedEdits": [],
+    "routing": "Strictly blocking. Route each diagnostic or failing test to the owning plan by writePaths; sibling drift recorded by a worker is resolved here.",
+    "commitPolicy": "Single local commit on feature/erd-relation-field-highlight staging explicit paths only; never git add -A; never stage tmp/; never push.",
+    "finalVerification": [
+      "mkdir -p tmp/erd-highlight-s528/reconcile",
+      "bun run typecheck",
+      "bun test packages/core packages/ui-solid",
+      "mise run lint-ts",
+      "git diff --exit-code 645b2217c78d21afbb3967d933d43182abc37619 -- packages/ir packages/io packages/collab apps/desktop/scripts apps/desktop/src-tauri",
+      "test \"$(grep -c '<ShapeView' packages/ui-solid/src/Canvas.tsx)\" -eq 1",
+      "test -z \"$(find tmp -name '*.test.ts')\""
+    ]
+  },
+  "plans": [
+    {
+      "planId": "erd-highlight-01-core-helper",
+      "planPath": "impl-plans/active/erd-highlight-01-core-helper.md",
+      "progressPath": "impl-plans/progress/erd-highlight-01-core-helper.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/erd-foreign-key.ts",
+        "packages/core/src/erd-foreign-key.test.ts",
+        "packages/core/src/index.ts",
+        "impl-plans/progress/erd-highlight-01-core-helper.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {
+          "path": "packages/core/src/index.ts",
+          "intendedEdit": "Owned only by this plan; change line 665 to export { erdForeignKeyWarning, erdRelationHighlightedColumns } from \"./erd-foreign-key.ts\"; and touch nothing else."
+        }
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "packages/core/src/erd-foreign-key.ts exports erdRelationHighlightedColumns(selection: Iterable<ElementId>, resolve: (id: ElementId) => Element | undefined): ReadonlyMap<ElementId, ReadonlySet<string>>, reusing erdEndpointColumnIds, filtering stale column ids against the table's current columns, never creating empty entries, never throwing on malformed data, and never mutating input or issuing commands.",
+        "packages/core/src/index.ts re-exports erdRelationHighlightedColumns on the existing erd-foreign-key export line only.",
+        "All plan test cases exist and pass with self-authored data: single, composite, columns-over-column precedence, union, self-relation, empty, non-relation, table-level, missing/non-table target, stale id, logical, malformed semantic.",
+        "Existing erdForeignKeyWarning tests and behaviour are unchanged.",
+        "Only writePaths are modified; progress log records start time, edits with pre/post sha256, command results with exit codes and log paths, and final status."
+      ],
+      "verification": [
+        "mkdir -p tmp/erd-highlight-s528/erd-highlight-01-core-helper",
+        "bun test packages/core/src/erd-foreign-key.test.ts",
+        "bun run typecheck > tmp/erd-highlight-s528/erd-highlight-01-core-helper/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/core/src/(erd-foreign-key(\\.test)?|index)\\.ts' tmp/erd-highlight-s528/erd-highlight-01-core-helper/typecheck.log",
+        "bunx biome check packages/core/src/erd-foreign-key.ts packages/core/src/erd-foreign-key.test.ts packages/core/src/index.ts --diagnostic-level=warn",
+        "test \"$(grep -c 'export function erdRelationHighlightedColumns' packages/core/src/erd-foreign-key.ts)\" -eq 1",
+        "test \"$(grep -c 'erdRelationHighlightedColumns' packages/core/src/index.ts)\" -eq 1",
+        "test -s impl-plans/progress/erd-highlight-01-core-helper.md"
+      ]
+    },
+    {
+      "planId": "erd-highlight-02-table-view",
+      "planPath": "impl-plans/active/erd-highlight-02-table-view.md",
+      "progressPath": "impl-plans/progress/erd-highlight-02-table-view.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/shapes/ErdTableView.tsx",
+        "packages/ui-solid/src/shapes/ShapeView.tsx",
+        "packages/ui-solid/src/erd-table-view.test.ts",
+        "apps/desktop/src/style.css",
+        "impl-plans/progress/erd-highlight-02-table-view.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {
+          "path": "apps/desktop/src/style.css",
+          "intendedEdit": "Owned only by this plan; append one .nodetto-erd-row-related rule (background: color-mix(in srgb, var(--nodetto-accent) 18%, transparent); box-shadow: inset 3px 0 0 var(--nodetto-accent);) right after the .nodetto-erd-row block and change nothing else."
+        }
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "ErdTableView.tsx exports erdRowHighlighted(highlightedColumnIds: ReadonlySet<string> | undefined, column: ErdColumn): boolean returning highlightedColumnIds?.has(column.id) === true.",
+        "ErdTableViewProps gains optional readonly highlightedColumnIds?: ReadonlySet<string>; each row keeps class nodetto-erd-row and adds nodetto-erd-row-related via classList through erdRowHighlighted; the For and row structure are unchanged; props are not destructured.",
+        "ShapeViewProps gains optional readonly erdHighlightedColumnIds?: ReadonlySet<string>, forwarded only to ErdTableView as highlightedColumnIds.",
+        "style.css gains exactly the .nodetto-erd-row-related rule from the design with no hard-coded colours; nothing else in the file changes.",
+        "erd-table-view.test.ts keeps the existing test and adds the four erdRowHighlighted cases with self-authored ErdColumn objects.",
+        "ShapePalette.tsx, PrototypePreview.tsx and apps/desktop/scripts are unchanged; only writePaths are modified; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/erd-highlight-s528/erd-highlight-02-table-view",
+        "bun test packages/ui-solid/src/erd-table-view.test.ts",
+        "bun run typecheck > tmp/erd-highlight-s528/erd-highlight-02-table-view/typecheck.log 2>&1; echo \"typecheck exit=$?\"",
+        "! grep -E '^packages/ui-solid/src/(shapes/ErdTableView\\.tsx|shapes/ShapeView\\.tsx|erd-table-view\\.test\\.ts)' tmp/erd-highlight-s528/erd-highlight-02-table-view/typecheck.log",
+        "bunx biome check packages/ui-solid/src/shapes/ErdTableView.tsx packages/ui-solid/src/shapes/ShapeView.tsx packages/ui-solid/src/erd-table-view.test.ts apps/desktop/src/style.css --diagnostic-level=warn",
+        "test -z \"$(git diff --stat -- apps/desktop/scripts)\"",
+        "test \"$(grep -c 'export function erdRowHighlighted' packages/ui-solid/src/shapes/ErdTableView.tsx)\" -eq 1",
+        "grep -n 'nodetto-erd-row-related' packages/ui-solid/src/shapes/ErdTableView.tsx",
+        "grep -n 'nodetto-erd-row-related' apps/desktop/src/style.css",
+        "test \"$(grep -c 'erdHighlightedColumnIds' packages/ui-solid/src/shapes/ShapeView.tsx)\" -ge 2",
+        "test -s impl-plans/progress/erd-highlight-02-table-view.md"
+      ]
+    },
+    {
+      "planId": "erd-highlight-03-canvas-wiring",
+      "planPath": "impl-plans/active/erd-highlight-03-canvas-wiring.md",
+      "progressPath": "impl-plans/progress/erd-highlight-03-canvas-wiring.md",
+      "wave": 2,
+      "dependsOn": [
+        "erd-highlight-01-core-helper",
+        "erd-highlight-02-table-view"
+      ],
+      "writePaths": [
+        "packages/ui-solid/src/Canvas.tsx",
+        "impl-plans/progress/erd-highlight-03-canvas-wiring.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Before editing, the plan 01 export erdRelationHighlightedColumns and the plan 02 prop ShapeViewProps.erdHighlightedColumnIds are confirmed present; if missing, stop and record it.",
+        "Canvas.tsx adds erdRelationHighlightedColumns to an existing @nodetto/core value import (no duplicate import statement).",
+        "One createMemo next to isSelected reads signals.rev() and signals.selection() inside the memo and calls erdRelationHighlightedColumns(signals.selection(), (id) => props.editor.store.get(id)).",
+        "renderShape's single <ShapeView> passes erdHighlightedColumnIds={<memo>().get(element().id)}; the ReadonlySet is passed as is.",
+        "No change to InlineConnector/ConnectorView call sites, connector styling or selection logic; no command, editor.apply or store write; Canvas still has exactly one <ShapeView occurrence.",
+        "Only writePaths are modified; progress log complete."
+      ],
+      "verification": [
+        "mkdir -p tmp/erd-highlight-s528/erd-highlight-03-canvas-wiring",
+        "bun run typecheck",
+        "bun test packages/core packages/ui-solid",
+        "bunx biome check packages/ui-solid/src/Canvas.tsx --diagnostic-level=warn",
+        "test \"$(grep -c '<ShapeView' packages/ui-solid/src/Canvas.tsx)\" -eq 1",
+        "test \"$(grep -c 'erdRelationHighlightedColumns' packages/ui-solid/src/Canvas.tsx)\" -ge 2",
+        "test \"$(grep -c 'erdHighlightedColumnIds=' packages/ui-solid/src/Canvas.tsx)\" -eq 1",
+        "test -s impl-plans/progress/erd-highlight-03-canvas-wiring.md"
+      ]
+    }
+  ]
+}

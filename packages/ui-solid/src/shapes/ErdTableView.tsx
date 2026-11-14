@@ -1,0 +1,84 @@
+// erd.table: a header row plus one fixed-height row per column, rendered
+// straight from the semantic payload. Row height matches the core's bounds
+// arithmetic (ERD_TABLE_ROW_HEIGHT), so what is drawn is what is picked.
+
+import {
+  erdColumnKey,
+  ERD_TABLE_HEADER_HEIGHT,
+  ERD_TABLE_ROW_HEIGHT,
+} from "@nodetto/core";
+import type { Element, ErdColumn, ErdTableSemantic } from "@nodetto/ir";
+import { For, type JSX, Show } from "solid-js";
+import { erdRowHighlighted } from "./erd-row-highlight.ts";
+import { fillPaintStyle, strokeBorderStyle } from "./visual.ts";
+
+export interface ErdTableViewProps {
+  readonly element: Element;
+  /** Transient selection state; never persisted with the document. */
+  readonly highlightedColumnIds?: ReadonlySet<string>;
+}
+
+function semanticOf(element: Element): ErdTableSemantic {
+  const semantic = element.semantic as Partial<ErdTableSemantic> | null;
+  return {
+    tableName: semantic?.tableName ?? "",
+    columns: Array.isArray(semantic?.columns) ? semantic.columns : [],
+    indexes: Array.isArray(semantic?.indexes) ? semantic.indexes : [],
+  };
+}
+
+export function ErdTableView(props: ErdTableViewProps): JSX.Element {
+  const semantic = () => semanticOf(props.element);
+  return (
+    <div
+      class="nodetto-erd-table"
+      data-smart-paint="box"
+      style={{
+        ...fillPaintStyle(props.element.visual),
+        ...strokeBorderStyle(props.element.visual),
+      }}
+    >
+      <div
+        class="nodetto-erd-header"
+        style={{ height: `${ERD_TABLE_HEADER_HEIGHT}px` }}
+      >
+        {semantic().tableName}
+      </div>
+      <div class="nodetto-erd-body">
+        <For each={semantic().columns}>
+          {(column: ErdColumn) => (
+            <div
+              class="nodetto-erd-row"
+              classList={{
+                "nodetto-erd-row-related": erdRowHighlighted(
+                  props.highlightedColumnIds,
+                  column,
+                ),
+              }}
+              style={{ height: `${ERD_TABLE_ROW_HEIGHT}px` }}
+            >
+              <span class="nodetto-erd-key">
+                {erdColumnKey(semantic(), column)}
+              </span>
+              <span class="nodetto-erd-name">{column.name}</span>
+              <span
+                class="nodetto-erd-type"
+                title={
+                  column.generatedExpression
+                    ? `Generated: ${column.generatedExpression}`
+                    : column.defaultExpression
+                      ? `Default: ${column.defaultExpression}`
+                      : undefined
+                }
+              >
+                {column.dataType}
+                <Show when={column.nullable}>?</Show>
+                <Show when={column.generatedExpression}> ƒ</Show>
+              </span>
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
