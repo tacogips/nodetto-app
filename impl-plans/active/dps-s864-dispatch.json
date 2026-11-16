@@ -1,0 +1,337 @@
+{
+  "taskId": "dps-s864",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/document-snippets-page-frames",
+  "baseBranch": "feat/document-snippets-page-frames",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "e5578450079196d323bbe6b1c54de3568e3966d0",
+  "designDocPaths": [
+    "design-docs/specs/design-document-pages-snippets.md",
+    "design-docs/user-qa/document-pages-snippets.md",
+    "design-docs/specs/export.md"
+  ],
+  "evidenceRoot": "tmp/dps-s864",
+  "reviewContext": {
+    "issueReference": "impl-plans/active/dps-17-wiring.md; opus-terra-design-and-implement-review-loop-session-864 (continues 861/863); no GitHub issue",
+    "userProblem": "Finish dps-17-wiring: owner-decided test updates, golden fixture, store identity test, page palette/action/navigation tests, PDF text for individual exports, desktop/ExportDialog document export tests, CLI Markdown and native parity tests, docs, examples and final gates.",
+    "requiredOutcomes": [
+      "All dps-17-wiring acceptance criteria met; impl-plans/progress/dps-17-wiring.md records the final verification.",
+      "Page tile, page-frame actions, snippet palette entries, inline snippet editing and the document PDF/Markdown export menu are covered by tests.",
+      "docs/cli.md, docs/editing.md, docs/import-export.md and README.md describe snippets, page frames and flow, slideshow and document export; examples/document paper and deck exist and load.",
+      "bun test packages/ir packages/io packages/core packages/ui-solid apps/cli/src, mise run verify and mise run test-cli pass on the final tree."
+    ],
+    "nonGoals": [
+      "Redesigning or re-implementing accepted dps-01..16 or the committed dps-17 wiring.",
+      "A new Command kind, dependency, version bump or CSS token.",
+      "Server, auth or deployment code."
+    ],
+    "constraints": [
+      "Workers edit only their writePaths, their progress file and their evidence directory. No git state changes, no any, no emojis.",
+      "Owner decisions for bpmn-palette.test.ts, interaction-creation.test.ts, text-runs.test.ts and shape-search.test.ts are final (design 10.2). Pre-authorized tests may only be extended; never delete, skip or loosen assertions.",
+      "Rust builds use a per-plan CARGO_TARGET_DIR (target/dps-17f) except mise run verify and mise run test-cli in dps-17-final, which use the default target dir.",
+      "Native parity and test-cli: up to 3 attempts only on deadline timeouts; deadlines never relaxed; never run parity without NODETTO_CLI_TEST_BINARY.",
+      "JSONL round trips stay byte-identical; TypeScript snippets use canonical language javascript (IR-W1-DPS15-CANONICAL-LANG)."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "collectTextRuns gains optional include predicate; rasterExportSnapshot returns textRuns from the SVG viewBox rect filtered by expandContainers for artboard/selection; AssetExportSection passes them to pngToPdf.", "rationale": "Design 10.2; individual PDF exports must carry extractable snippet text without changing documentPdfPlan."},
+      {"decision": "createExportHandlers gets optional deps.rasterizeSvg; ExportDialog exports EXPORT_FORMAT_GROUPS and documentExportFormats.", "rationale": "Design 10.2; DOM-free behavioural tests with no UI change."},
+      {"decision": "dps-17f depends on dps-17b only, for the golden fixture document-pages.jsonl.", "rationale": "Real data contract; everything else is disjoint and parallel."}
+    ],
+    "residualRisks": [
+      "Whole-repo bun run typecheck in a parallel wave can see a sibling mid-edit; rerun after joining before declaring failure.",
+      "Canvas PageUp/PageDown editable-target guard (Canvas.tsx:343-365) is covered by citation, not a DOM test."
+    ],
+    "intentionalTradeoffs": [
+      "Examples test lives in a new apps/cli/src/document-examples.test.ts (dps-17g) instead of document-wiring.test.ts so docs/examples and CLI parity run in parallel.",
+      "dps-17-final edits no source; failures are repaired serially by the owning plan."
+    ],
+    "supportedEdgeCases": [
+      "Read-only documents disable addPageFrame; next/previous page-frame actions are enabled only when page frames exist and move the camera without a history entry.",
+      "Individual PDF exports (page, artboard, selection) carry snippet text; unselected overlapping snippets contribute no text.",
+      "Document Markdown export via explicit --format markdown --document --output <file.md> and the shorthand produce byte-identical output in Bun and native CLI.",
+      "Store identity of markdown layout cache holds after updateSemantic and updateVisual."
+    ],
+    "outOfScopeEdgeCases": [
+      "DOM-level test of the Canvas PageUp/PageDown editable-target/presentation guard (covered by code citation only).",
+      "New export formats, UI redesign of ExportDialog, or changes to documentPdfPlan / pdf-document.ts.",
+      "Cloud/server document export paths."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-document-pages-snippets.md",
+      "impl-plans/active/dps-17-wiring.md",
+      "impl-plans/progress/dps-17-wiring.md",
+      "impl-plans/active/dps-s863-dispatch.json",
+      "impl-plans/active/dps-17a-owner-tests.md",
+      "impl-plans/active/dps-17b-golden-identity.md",
+      "impl-plans/active/dps-17c-page-ui-tests.md",
+      "impl-plans/active/dps-17d-pdf-text-individual.md",
+      "impl-plans/active/dps-17e-desktop-export-tests.md",
+      "impl-plans/active/dps-17f-cli-parity.md",
+      "impl-plans/active/dps-17g-docs-examples.md",
+      "impl-plans/active/dps-17-final.md"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "dps-14-document-export", "planPath": "impl-plans/active/dps-14-document-export.md", "commit": "e5578450079196d323bbe6b1c54de3568e3966d0", "provides": "exportMarkdownDocument, documentPdfPlan, CLI --document pdf/markdown, CommandIo.ensureDir."},
+    {"planId": "dps-15-cli-authoring", "planPath": "impl-plans/active/dps-15-cli-authoring.md", "commit": "e5578450079196d323bbe6b1c54de3568e3966d0", "provides": "normalizeCodeSnippetSemantic and set-page-flow."},
+    {"planId": "dps-17-wiring (partial)", "planPath": "impl-plans/active/dps-17-wiring.md", "commit": "e5578450079196d323bbe6b1c54de3568e3966d0", "provides": "Registration, tools, catalogue, palette tiles, page-frame actions, PageUp/PageDown, snippet editor dispatch, ExportDialog Document group, desktop document handlers, CLI types/help."}
+  ],
+  "waves": [
+    ["dps-17a-owner-tests", "dps-17b-golden-identity", "dps-17c-page-ui-tests", "dps-17d-pdf-text-individual", "dps-17e-desktop-export-tests", "dps-17g-docs-examples"],
+    ["dps-17f-cli-parity"],
+    ["dps-17-final"]
+  ],
+  "plans": [
+    {
+      "planId": "dps-17a-owner-tests",
+      "planPath": "impl-plans/active/dps-17a-owner-tests.md",
+      "progressPath": "impl-plans/progress/dps-17a-owner-tests.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/bpmn-palette.test.ts",
+        "packages/ui-solid/src/interaction-creation.test.ts",
+        "packages/ui-solid/src/shape-search.test.ts",
+        "impl-plans/progress/dps-17a-owner-tests.md",
+        "tmp/dps-s864/dps-17a-owner-tests",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "bpmn-palette.test.ts expected action list includes addPageFrame, nextPageFrame, previousPageFrame in Toolbar order.",
+        "interaction-creation.test.ts skips palette entries with an action and separately asserts exactly one Page entry with action add-page-frame.",
+        "shape-search.test.ts requires a catalogue shape only for non-action entries and asserts the exact action-id list.",
+        "No assertion deleted, skipped or loosened; the three files pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/bpmn-palette.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/shape-search.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/bpmn-palette.test.ts packages/ui-solid/src/interaction-creation.test.ts packages/ui-solid/src/shape-search.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17b-golden-identity",
+      "planPath": "impl-plans/active/dps-17b-golden-identity.md",
+      "progressPath": "impl-plans/progress/dps-17b-golden-identity.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/io/src/__fixtures__/document-pages.jsonl",
+        "packages/io/src/jsonl/golden.test.ts",
+        "packages/core/src/document-snippets-wiring.test.ts",
+        "packages/core/src/markdown-snippet/layout.ts",
+        "impl-plans/progress/dps-17b-golden-identity.md",
+        "tmp/dps-s864/dps-17b-golden-identity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/markdown-snippet/layout.ts", "intendedEdit": "Edit only if the store identity test fails on the unchanged file; then key the cache by (semantic.markdown, width, fill)."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "document-pages.jsonl (canonical serializer output) holds a vertical page with two A4 frames, a text.markdown, a text.code (rust, line numbers) and a shape.geo, and a horizontal page with one slide-16-9 frame; document PDF has 3 pages.",
+        "GOLDEN includes document-pages; golden round trip and coverage pass.",
+        "document-snippets-wiring.test.ts covers validation, SVG classes, getText/setText, clipboard/duplicate, extractor keys and store identity after updateSemantic and updateVisual.",
+        "Progress log records whether layout.ts changed."
+      ],
+      "verification": [
+        "bun test packages/io/src/jsonl/golden.test.ts packages/core/src/document-snippets-wiring.test.ts",
+        "bun test packages/core/src/markdown-snippet",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/io/src/jsonl/golden.test.ts packages/core/src/document-snippets-wiring.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17c-page-ui-tests",
+      "planPath": "impl-plans/active/dps-17c-page-ui-tests.md",
+      "progressPath": "impl-plans/progress/dps-17c-page-ui-tests.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/document-wiring.test.ts",
+        "packages/ui-solid/src/app-palette.test.ts",
+        "packages/ui-solid/src/shortcuts.test.ts",
+        "packages/ui-solid/src/page-actions.test.ts",
+        "packages/ui-solid/src/viewer-actions.test.ts",
+        "packages/ui-solid/src/interaction-keyboard-menus.test.ts",
+        "impl-plans/progress/dps-17c-page-ui-tests.md",
+        "tmp/dps-s864/dps-17c-page-ui-tests",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/ui-solid/src/shortcuts.test.ts", "intendedEdit": "Extension only, and only if it fails because of the new actions; same rule for app-palette, page-actions, viewer-actions and interaction-keyboard-menus tests."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "document-wiring.test.ts asserts the 3 palette tiles in order, addPageFrame enablement (read-only disabled), one-step undo, next/previous shortcuts PageDown/PageUp, enablement only with page frames, viewer availability, camera navigation without history change, and labels.",
+        "Any edit to the listed existing tests only extends exact lists and is recorded in the progress log."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/document-wiring.test.ts packages/ui-solid/src/app-palette.test.ts packages/ui-solid/src/shortcuts.test.ts packages/ui-solid/src/page-actions.test.ts packages/ui-solid/src/viewer-actions.test.ts packages/ui-solid/src/interaction-keyboard-menus.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/document-wiring.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17d-pdf-text-individual",
+      "planPath": "impl-plans/active/dps-17d-pdf-text-individual.md",
+      "progressPath": "impl-plans/progress/dps-17d-pdf-text-individual.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/document-export/text-runs.ts",
+        "packages/core/src/document-export/text-runs.test.ts",
+        "packages/ui-solid/src/raster-export.ts",
+        "packages/ui-solid/src/inspector/AssetExportSection.tsx",
+        "packages/ui-solid/src/raster-export-text.test.ts",
+        "impl-plans/progress/dps-17d-pdf-text-individual.md",
+        "tmp/dps-s864/dps-17d-pdf-text-individual",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/document-export/text-runs.ts", "intendedEdit": "Add only the optional trailing include?: (element: Element) => boolean parameter to collectTextRuns; default behaviour unchanged."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "text-runs.test.ts expects exactly the text.code and text.markdown extractors and tests the include filter.",
+        "rasterExportSnapshot returns textRuns for page, artboard and selection scope using the SVG viewBox rect and expandContainers membership.",
+        "AssetExportSection passes textRuns to pngToPdf; extracted PDF text equals the snippet run texts for each scope; unselected overlapping snippets contribute nothing.",
+        "pdf-document.ts is unchanged."
+      ],
+      "verification": [
+        "bun test packages/core/src/document-export packages/ui-solid/src/raster-export-text.test.ts packages/ui-solid/src/pdf-export.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/document-export/text-runs.ts packages/core/src/document-export/text-runs.test.ts packages/ui-solid/src/raster-export.ts packages/ui-solid/src/inspector/AssetExportSection.tsx packages/ui-solid/src/raster-export-text.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17e-desktop-export-tests",
+      "planPath": "impl-plans/active/dps-17e-desktop-export-tests.md",
+      "progressPath": "impl-plans/progress/dps-17e-desktop-export-tests.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/shell/export-handlers.ts",
+        "apps/desktop/src/shell/export-handlers.test.ts",
+        "packages/ui-solid/src/ExportDialog.tsx",
+        "packages/ui-solid/src/export-dialog-document.test.ts",
+        "packages/ui-solid/src/export-dialog-artboards.test.ts",
+        "impl-plans/progress/dps-17e-desktop-export-tests.md",
+        "tmp/dps-s864/dps-17e-desktop-export-tests",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/ui-solid/src/export-dialog-artboards.test.ts", "intendedEdit": "Extension only, and only if it fails because of the new exports."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "createExportHandlers accepts optional deps.rasterizeSvg; App.tsx unchanged.",
+        "export-handlers.test.ts proves document PDF (name, 2 pages, extractable snippet text), document Markdown ZIP (base.md and base.assets/*.svg) and error reporting.",
+        "ExportDialog exports EXPORT_FORMAT_GROUPS and documentExportFormats with unchanged ids, labels, order and enabled rule; export-dialog-document.test.ts pins them."
+      ],
+      "verification": [
+        "bun test apps/desktop/src/shell/export-handlers.test.ts packages/ui-solid/src/export-dialog-document.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts packages/ui-solid/src/ExportDialog.tsx packages/ui-solid/src/export-dialog-document.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17g-docs-examples",
+      "planPath": "impl-plans/active/dps-17g-docs-examples.md",
+      "progressPath": "impl-plans/progress/dps-17g-docs-examples.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "docs/cli.md",
+        "docs/editing.md",
+        "docs/import-export.md",
+        "README.md",
+        "examples/document/README.md",
+        "examples/document/paper.ops.json",
+        "examples/document/deck.ops.json",
+        "apps/cli/src/document-examples.test.ts",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/cli-wiring.test.ts",
+        "apps/cli/src/help-style-export.test.ts",
+        "impl-plans/progress/dps-17g-docs-examples.md",
+        "tmp/dps-s864/dps-17g-docs-examples",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/help.ts", "intendedEdit": "Help text only: ensure --format pdf --document, --format markdown --document --output <file.md> and the shorthand appear."},
+        {"path": "apps/cli/src/cli-wiring.test.ts", "intendedEdit": "Extension only, if the help change breaks an exact expectation; same for help-style-export.test.ts."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "docs/cli.md, docs/import-export.md and help.ts show the three document export forms; docs/cli.md documents set-page-flow, text.code (javascript canonical), text.markdown and page frame adds.",
+        "docs/editing.md labels match the final UI; README.md has a paragraph per feature.",
+        "examples/document paper (2 A4 frames, markdown, code, diagram) and deck (horizontal, 3 slide-16-9 frames) apply via edit ops with 0 validation errors and export (paper PDF has 2 pages), proven by document-examples.test.ts."
+      ],
+      "verification": [
+        "bun test apps/cli/src/document-examples.test.ts apps/cli/src/cli-wiring.test.ts apps/cli/src/help-style-export.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/help.ts apps/cli/src/document-examples.test.ts examples/document/paper.ops.json examples/document/deck.ops.json"
+      ]
+    },
+    {
+      "planId": "dps-17f-cli-parity",
+      "planPath": "impl-plans/active/dps-17f-cli-parity.md",
+      "progressPath": "impl-plans/progress/dps-17f-cli-parity.md",
+      "wave": 2,
+      "dependsOn": ["dps-17b-golden-identity"],
+      "writePaths": [
+        "apps/cli/src/document-wiring.test.ts",
+        "apps/cli/src/native-parity/export.test.ts",
+        "impl-plans/progress/dps-17f-cli-parity.md",
+        "tmp/dps-s864/dps-17f-cli-parity",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "document-wiring.test.ts keeps the text.code add test and adds SVG byte identity with exportPageSvgOf, --format pdf --document (3 pages, exact text equal to documentPdfPlan runs) and the Markdown export assertion (verbatim, one rust fence, one asset).",
+        "native-parity/export.test.ts adds snippet SVG byte parity, native PDF page count and text equal to Bun, and native Markdown explicit/shorthand byte identity equal to Bun; run with the release binary and not skipped."
+      ],
+      "verification": [
+        "bun test apps/cli/src/document-wiring.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/dps-17f cargo build --release -p nodetto-cli",
+        "sh -c 'mkdir -p tmp/dps-s864/dps-17f-cli-parity; for i in 1 2 3; do NODETTO_CLI_TEST_BINARY=\"$PWD/target/dps-17f/release/nodetto-cli\" bun test apps/cli/src/native-parity/export.test.ts > tmp/dps-s864/dps-17f-cli-parity/native-$i.log 2>&1 && exit 0; grep -qiE \"timed out|deadline\" tmp/dps-s864/dps-17f-cli-parity/native-$i.log || exit 1; done; exit 1'",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/document-wiring.test.ts apps/cli/src/native-parity/export.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17-final",
+      "planPath": "impl-plans/active/dps-17-final.md",
+      "progressPath": "impl-plans/progress/dps-17-final.md",
+      "wave": 3,
+      "dependsOn": ["dps-17a-owner-tests", "dps-17b-golden-identity", "dps-17c-page-ui-tests", "dps-17d-pdf-text-individual", "dps-17e-desktop-export-tests", "dps-17f-cli-parity", "dps-17g-docs-examples"],
+      "writePaths": [
+        "impl-plans/progress/dps-17-wiring.md",
+        "impl-plans/progress/dps-17-final.md",
+        "tmp/dps-s864/dps-17-final",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All five final gates exit 0 on the joined tree.",
+        "impl-plans/progress/dps-17-wiring.md records each gate command, exit code, log path and attempt count, maps every dps-17-wiring acceptance item to its passing test or rg check, and states whether markdown-snippet/layout.ts changed."
+      ],
+      "verification": [
+        "bun test packages/ir packages/io packages/core packages/ui-solid apps/cli/src",
+        "bun run typecheck",
+        "mise run lint",
+        "CARGO_TERM_QUIET=true mise run verify",
+        "sh -c 'mkdir -p tmp/dps-s864/dps-17-final; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > tmp/dps-s864/dps-17-final/test-cli-$i.log 2>&1 && exit 0; grep -qiE \"timed out|deadline\" tmp/dps-s864/dps-17-final/test-cli-$i.log || exit 1; done; exit 1'"
+      ]
+    }
+  ]
+}

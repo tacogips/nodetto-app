@@ -996,6 +996,117 @@ dps-15 and dps-17 remain. They run from a fresh dispatch manifest
   `apps/desktop/src/shell/export-handlers.ts`) is not wired yet and stays in
   dps-17, as in section 10.
 
+### 10.2 Continuation (session 864): splitting the rest of dps-17
+
+State at e557845 (from `impl-plans/progress/dps-17-wiring.md` and the
+tree): registration, snippet tools, catalogue, Page tile, page-frame
+actions, PageUp/PageDown, Toolbar entries, snippet editor dispatch, the
+ExportDialog Document group, the desktop `exportDocumentPdf` and
+`exportDocumentMarkdown` handlers, and the CLI type and help entries are
+in place. The last aggregate run
+(`tmp/dps-s863/dps-17-wiring/round2-aggregate.log`) had 5 failures: four
+owner-decided tests and the golden coverage test. Missing pieces:
+`packages/io/src/__fixtures__/document-pages.jsonl`,
+`packages/core/src/document-snippets-wiring.test.ts`,
+`packages/ui-solid/src/document-wiring.test.ts`, text runs for single PDF
+exports, behavioural tests for the export handlers and dialog, CLI and
+native parity tests, docs, examples and the final gates. This section adds
+no new behaviour. It fixes the ownership and the few test seams that the
+remaining work needs. Sections 3 to 9 and 11 still apply.
+
+Owner decisions (final, do not reopen):
+
+- `packages/ui-solid/src/bpmn-palette.test.ts`: add `addPageFrame`,
+  `nextPageFrame` and `previousPageFrame` to its exact toolbar action list.
+- `packages/ui-solid/src/interaction-creation.test.ts`: palette entries
+  with an `action` id are not creation tools. The creation loop skips them,
+  and a separate assertion checks that the Page entry
+  (`action: "add-page-frame"`) exists and runs `addPageFrame`. The Page
+  entry stays in the palette.
+- `packages/core/src/document-export/text-runs.test.ts`: the default
+  registry is expected to hold exactly `text.code` and `text.markdown`.
+- `packages/ui-solid/src/shape-search.test.ts`: action entries are checked
+  as actions, not shapes. Every non-action entry must still have a
+  catalogue shape ID.
+- Any other exact list, snapshot or catalogue test under `packages/*/src`,
+  `apps/cli/src` or `apps/desktop/src` may be extended for the new shapes,
+  the Page action, the toolbar actions, the CLI types and help, and the
+  export menu entries. No assertion may be deleted, skipped or loosened.
+
+Test seams (additive; existing call sites keep their behaviour):
+
+- Text runs for single PDFs (dps-17 Changes 4 and 5, "Page PDF").
+  - The app's single PDF path is `AssetExportSection.tsx` (scopes page,
+    artboard and selection). It must pass text runs to `pngToPdf`.
+  - `collectTextRuns(store, registry, pageId, rect, extractors?, include?)`
+    gets an optional sixth parameter
+    `include?: (element: Element) => boolean`, defaulting to all elements.
+    `documentPdfPlan` does not pass it, so its output is unchanged.
+  - `rasterExportSnapshot` also returns `textRuns`:
+    - `rect` is the root `viewBox` of the exported SVG (the same parse as
+      `svgRasterDimensions`), and the page is `editor.currentPageId`;
+    - page scope collects every element;
+    - artboard and selection scope keep only the elements in
+      `expandContainers(store, ids, createShapeContext(store, registry, 1))`,
+      where `ids` is `[artboardId]` or the selection. Both are exported
+      from `@nodetto/core`, and this is the same set that
+      `renderArtboardSvg` and `renderSelectionSvg` draw.
+  - Snippets outside the exported artwork never add invisible text.
+- Desktop handlers. `createExportHandlers(source, setExportError, deps?)`
+  gets an optional `deps: { rasterizeSvg? }` that defaults to the real
+  `rasterizeSvg`. Bun tests inject a synthetic PNG rasterizer and a fake
+  `ExportBackend` with `available: true` that captures `writeBytes`. No
+  Tauri command is added.
+- ExportDialog. Move the format group table to module scope as an exported
+  `EXPORT_FORMAT_GROUPS`. Export a pure
+  `documentExportFormats(props: Pick<ExportDialogProps, "exportDocumentPdf" | "exportDocumentMarkdown">)`
+  that returns the two Document entries `formats()` already builds (same
+  ids, labels and enabled rule). The rendered dialog is unchanged.
+
+Plans and ownership (manifest `impl-plans/active/dps-s864-dispatch.json`,
+shaped like `dps-s863-dispatch.json`; evidence under `tmp/dps-s864/<planId>`;
+each plan has its own progress file
+`impl-plans/progress/<planId>.md`; `artifactRoots: ["target"]`):
+
+| Plan | Depends on | writePaths (beyond its progress file and evidence dir) | Required tests |
+| --- | --- | --- | --- |
+| `dps-17a-owner-tests` | - | `packages/ui-solid/src/{bpmn-palette,interaction-creation,shape-search}.test.ts` | The three owner decisions above, applied as written |
+| `dps-17b-golden-identity` | - | `packages/io/src/__fixtures__/document-pages.jsonl` (new), `packages/io/src/jsonl/golden.test.ts`, `packages/core/src/document-snippets-wiring.test.ts` (new), `packages/core/src/markdown-snippet/layout.ts` (only if the identity test fails) | Golden fixture per dps-17 Changes 2, added to `GOLDEN`; golden coverage passes. The fixture text is the canonical serializer's output, so the byte round trip holds. The code snippet holds the section 11 code string and the Markdown snippet holds the section 11 Markdown string. Core wiring tests from dps-17 "Tests" plus the section 11 identity test. |
+| `dps-17c-page-ui-tests` | - | `packages/ui-solid/src/document-wiring.test.ts` (new); extension only: `app-palette.test.ts`, `shortcuts.test.ts`, `page-actions.test.ts`, `viewer-actions.test.ts`, `interaction-keyboard-menus.test.ts` | Without a DOM: the palette has 3 tiles (Code snippet, Markdown snippet, Page as an action); `addPageFrame` is disabled when read-only; next/previous are enabled only when the page has frames and disabled while text editing; PageUp/PageDown map to previous/next; running `addPageFrame` adds a frame with one undo step |
+| `dps-17d-pdf-text-individual` | - | `packages/core/src/document-export/{text-runs.ts,text-runs.test.ts}`, `packages/ui-solid/src/raster-export.ts`, `packages/ui-solid/src/inspector/AssetExportSection.tsx`, `packages/ui-solid/src/raster-export-text.test.ts` (new) | Owner decision for `text-runs.test.ts`; the `include` filter. For each scope, the snapshot's runs passed to `pngToPdf` (synthetic PNG) give a PDF whose `extractPdfText` equals the snippet text exactly. In selection scope, an unselected overlapping snippet adds nothing. |
+| `dps-17e-desktop-export-tests` | - | `apps/desktop/src/shell/export-handlers.ts`, `apps/desktop/src/shell/export-handlers.test.ts` (new), `packages/ui-solid/src/ExportDialog.tsx`, `packages/ui-solid/src/export-dialog-document.test.ts` (new); extension only: `export-dialog-artboards.test.ts` | Document PDF: one page per page frame, saved as `<base>.pdf` with extractable snippet text. Document Markdown: a ZIP holding `<base>.md` and `<base>.assets/*.svg`. A failure reaches `setExportError`. The Document group ids and labels, and enabled exactly when its callback exists. |
+| `dps-17f-cli-parity` | `dps-17b-golden-identity` (fixture) | `apps/cli/src/document-wiring.test.ts`, `apps/cli/src/native-parity/export.test.ts` | dps-17 Changes 6 and the session 863 additions 2 and 3: SVG byte identity with `exportPageSvgOf`; `--format pdf --document` on the golden fixture gives 3 pages and the exact extracted text; the Markdown export assertion; native Markdown explicit and shorthand byte identity with Bun; native PDF page count and text |
+| `dps-17g-docs-examples` | - | `docs/cli.md`, `docs/editing.md`, `docs/import-export.md`, `README.md`, `examples/document/{README.md,paper.ops.json,deck.ops.json}` (new), `apps/cli/src/document-examples.test.ts` (new), `apps/cli/src/help.ts`; extension only: `apps/cli/src/{cli-wiring,help-style-export}.test.ts` | Examples per dps-17 Changes 8, applied through `edit --ops` with 0 validation errors. The paper exports to PDF with `--document` (2 pages); the deck has `pageFlow: "horizontal"` and 3 frames. The section 7.4 forms and `set-page-flow` appear in `help.ts` and `docs/cli.md`. |
+| `dps-17-final` | all above | `impl-plans/progress/dps-17-wiring.md` only | Final gates below |
+
+- All the `writePaths` above are disjoint. Only `dps-17f` waits for
+  another plan, because it consumes the golden fixture.
+- Snippet code in the examples uses canonical language ids, and TypeScript
+  is `javascript` (IR-W1-DPS15-CANONICAL-LANG).
+- The verification for each plan is:
+  - its new and edited test files with `bun test`;
+  - `bun run typecheck`;
+  - `bunx biome check --diagnostic-level=warn <touched paths>`;
+  - for `dps-17f`, also:
+    `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/dps-17f cargo build --release -p nodetto-cli`,
+    then
+    `NODETTO_CLI_TEST_BINARY=$PWD/target/dps-17f/release/nodetto-cli bun test apps/cli/src/native-parity/export.test.ts`.
+    It has up to 3 attempts, only on deadline timeouts.
+- Final gates (`dps-17-final`, default target dir, logs under
+  `tmp/dps-s864/dps-17-final/`), each of which must exit 0:
+  - `bun test packages/ir packages/io packages/core packages/ui-solid apps/cli/src`;
+  - `bun run typecheck`;
+  - `mise run lint`;
+  - `CARGO_TERM_QUIET=true mise run verify`, which runs `bun test` on the
+    whole tree, desktop tests included;
+  - `mise run test-cli`, with the 3-attempt timeout-only loop of the
+    dps-17 amendment.
+
+  The final plan then records every dps-17 acceptance criterion with its
+  test, exit code and log path in `impl-plans/progress/dps-17-wiring.md`.
+- If the final gates fail, the failing test's owning plan above is
+  repaired. The final plan never edits source.
+
 ## 11. Verification
 
 Unit tests (Bun, co-located):

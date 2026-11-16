@@ -350,3 +350,20 @@ Decisions:
   change.
 - No other scope change. If any other file outside writePaths is needed,
   stop and report it as a blocker; the amendment budget is exhausted.
+
+## Continuation 2026-11-16 (session 864): split
+
+The remaining work is split into the plans of design section 10.2 and the
+manifest `impl-plans/active/dps-s864-dispatch.json`:
+
+- `dps-17a-owner-tests`
+- `dps-17b-golden-identity`
+- `dps-17c-page-ui-tests`
+- `dps-17d-pdf-text-individual`
+- `dps-17e-desktop-export-tests`
+- `dps-17f-cli-parity`
+- `dps-17g-docs-examples`
+- `dps-17-final`
+
+This plan's acceptance criteria are unchanged. `dps-17-final` records
+their completion in `impl-plans/progress/dps-17-wiring.md`.
