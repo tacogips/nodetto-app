@@ -1,3 +1,4 @@
+import { PAGE_FLOWS } from "./semantics/document.ts";
 import { connectorEndpointIssues } from "./connector-policy.ts";
 // Document-level validation.
 //
@@ -1033,6 +1034,16 @@ export function validateDocument(
         1000000,
         "range.slideOrigin",
       );
+      const flowIssueIndex = out.length;
+      checkEnum(out, page["pageFlow"], `${path}.pageFlow`, PAGE_FLOWS, {
+        optional: true,
+      });
+      if (out[flowIssueIndex]?.code === "value.enum")
+        out[flowIssueIndex] = error(
+          "type.enum",
+          `${path}.pageFlow`,
+          "invalid page flow",
+        );
       if (page["sqlDialect"] !== undefined) {
         checkEnum(out, page["sqlDialect"], `${path}.sqlDialect`, [
           "postgresql",

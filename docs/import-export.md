@@ -1,5 +1,36 @@
 # Import and export
 
+## Document export
+
+Choose **Document as PDF...** to export one PDF page per page frame, in
+Nodetto page tab order and then frame flow order. A page without frames exports
+as one page based on its content; empty pages are skipped. Pages hidden from
+presentation are included. PDF pages are raster images with an invisible,
+selectable Unicode text layer for code and Markdown snippets. Documents with
+more than 500 resulting pages are rejected.
+
+**Document as Markdown (ZIP)...** saves a ZIP in the desktop and web apps,
+containing `<base>.md` and SVG images in `<base>.assets/`. Markdown snippets
+are emitted verbatim, code snippets as fenced blocks with their language, and
+other element groups as `page-N-M.svg` images. Page frames themselves are not
+included in the images. The CLI writes the Markdown file and sibling assets:
+
+```sh
+nodetto-cli export document.jsonl --format pdf --document --output document.pdf
+nodetto-cli export document.jsonl --format markdown --output document.md
+```
+
+See [CLI](cli.md) for options. Other exporters use these fallbacks:
+
+| Exporter | Code snippet | Markdown snippet |
+| --- | --- | --- |
+| draw.io | Monospace text vertex containing code | Text vertex containing Markdown source |
+| D2 | Text shape labelled with code | Text shape labelled with source |
+| Mermaid | Omitted | Omitted |
+| HTML | Escaped code in `<pre><code class="language-<id>">` | Escaped source in a `white-space:pre-wrap` div |
+
+Page frames export like ordinary frames in these formats; page flow is ignored.
+
 ## Database schema export
 
 Layer search includes database columns and types, default/generated expressions,

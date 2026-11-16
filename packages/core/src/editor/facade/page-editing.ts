@@ -12,6 +12,16 @@ import {
 } from "../../editor/pages.ts";
 import type { ApplyOptions, CreatePageOptions } from "../../editor/types.ts";
 import type { Box, Vec } from "../../geometry.ts";
+import { frameParents } from "../../frame-tree.ts";
+import {
+  planAddPageFrame,
+  planSetPageFlow,
+} from "../../page-frames/editing.ts";
+import {
+  neighbourPageFrame,
+  referencePageFrame,
+} from "../../page-frames/navigation.ts";
+import { pageFramesInFlowOrder } from "../../page-frames/order.ts";
 import {
   renderArtboardSvg,
   renderPageSvg,
@@ -22,6 +32,96 @@ import { viewBounds } from "../../view-bounds.ts";
 import { SelectionEditing } from "./selection-editing.ts";
 
 export class PageEditing extends SelectionEditing {
+  pageFrameAnchor(): ElementId | null {
+    const selected = [...this.selection.ids()];
+    if (selected.length !== 1) return null;
+    const frames = pageFramesInFlowOrder(
+      this.store,
+      this.registry,
+      this.pageId,
+    );
+    const frameIds = new Set(frames.map((frame) => frame.id));
+    const parents = frameParents(
+      this.store,
+      this.pageId,
+      this.createShapeContext(),
+    );
+    let id: ElementId | undefined = selected[0];
+    const visited = new Set<ElementId>();
+    while (id && !visited.has(id)) {
+      if (frameIds.has(id)) return id;
+      visited.add(id);
+      id = parents.get(id);
+    }
+    return null;
+  }
+
+  addPageFrame(
+    options: {
+      after?: ElementId;
+      size?: string;
+      orientation?: "portrait" | "landscape";
+    } = {},
+  ): ElementId | null {
+    if (this.readOnly) return null;
+    const plan = planAddPageFrame(this.store, this.registry, this.pageId, {
+      id: this.idSource(),
+      anchorId: options.after ?? this.pageFrameAnchor(),
+      size: options.size,
+      orientation: options.orientation,
+    });
+    if (!plan) return null;
+    this.beginBatch();
+    try {
+      this.apply(plan.commands);
+    } finally {
+      this.endBatch();
+    }
+    this.selection.set([plan.id]);
+    return plan.id;
+  }
+
+  setPageFlow(pageId: PageId, flow: "vertical" | "horizontal"): boolean {
+    if (this.readOnly) return false;
+    const commands = planSetPageFlow(this.store, this.registry, pageId, flow);
+    if (!commands.length) return false;
+    this.beginBatch();
+    try {
+      this.apply(commands);
+    } finally {
+      this.endBatch();
+    }
+    return true;
+  }
+
+  goToPageFrame(direction: "next" | "previous", size: ViewportSize): boolean {
+    const frames = pageFramesInFlowOrder(
+      this.store,
+      this.registry,
+      this.pageId,
+    );
+    const context = this.createShapeContext();
+    const boxes = new Map<ElementId, Box>();
+    for (const frame of frames) {
+      const box = viewBounds(this.store, [frame.id], context);
+      if (box) boxes.set(frame.id, box);
+    }
+    const center = this.camera.screenToPage({
+      x: size.width / 2,
+      y: size.height / 2,
+    });
+    const reference = referencePageFrame(
+      frames,
+      boxes,
+      center,
+      this.pageFrameAnchor(),
+    );
+    const next = reference && neighbourPageFrame(frames, reference, direction);
+    const box = next && boxes.get(next);
+    if (!box) return false;
+    this.camera.fitBox(box, size, { maxZoom: 4 });
+    return true;
+  }
   /** The current page as a standalone SVG, or `null` when it is empty. */
   exportPageSvg(options: SvgExportOptions = {}): string | null {
     return renderPageSvg(this.store, this.registry, this.pageId, {

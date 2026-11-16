@@ -35,6 +35,7 @@ import {
   movePage,
   renamePage,
   setPageMode,
+  setPageFlow,
   setPageRouting,
   deletePage,
 } from "./operations/pages.ts";
@@ -335,6 +336,9 @@ export class Batch {
         return;
       case "set-page-mode":
         setPageMode(this, operation, index);
+        return;
+      case "set-page-flow":
+        setPageFlow(this, operation, index);
         return;
       case "set-page-routing":
         setPageRouting(this, operation, index);

@@ -119,3 +119,10 @@ the embedded JS as the host function `pdfPages`. The JS binding in
 
 No other plan writes these files. Re-read each file before editing and
 record its hashes. No git state changes.
+
+## Implementation status
+
+- Implemented the native multi-page writer and host function; plan-local
+  behavioral, format and Clippy gates pass. See
+  `impl-plans/progress/dps-06-pdf-native.md` for evidence.
+- Independent review and downstream JS binding remain subsequent workflow work.

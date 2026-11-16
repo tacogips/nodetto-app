@@ -1,17 +1,19 @@
 import {
   createPresentationState,
+  expandSlides,
   currentSlide,
   fitSlide,
   reducePresentation,
   planSlideTransition,
   slideCounter,
   slideList,
-  startIndex,
+  startSlideIndex,
   svgSize,
   type Editor,
   type PresentationAction,
   type PresentationState,
   type SlideSize,
+  type SlideRef,
 } from "@nodetto/core";
 import type { PageId } from "@nodetto/ir";
 import { renderSlide } from "./slide-render.ts";
@@ -32,8 +34,8 @@ export function createPresentationController({
   onExit,
 }: PresentationControllerOptions) {
   const pages = editor.store.listPages();
-  const slides = slideList(pages);
-  const index = startIndex(
+  const slides = expandSlides(editor.store, editor.registry, slideList(pages));
+  const index = startSlideIndex(
     pages.map((p) => p.id),
     slides,
     from,
@@ -52,7 +54,7 @@ export function createPresentationController({
   } | null = null;
   let cache:
     | {
-        page: PageId;
+        ref: SlideRef;
         revision: number;
         result: { src: string | null; size: SlideSize | null };
       }
@@ -70,14 +72,14 @@ export function createPresentationController({
       transition = null;
       if (state.digits)
         state = reducePresentation(state, { type: "clearDigits" });
-      else exit(currentSlide(state));
+      else exit(currentSlide(state).page);
     } else {
       const before = state;
       const previous = currentSlide(before);
       state = reducePresentation(before, action);
       if (!state) {
         transition = null;
-        exit(previous);
+        exit(previous.page);
         return;
       }
       if (action.type === "digit" || action.type === "clearDigits") return;
@@ -88,6 +90,7 @@ export function createPresentationController({
         (action.type === "enter" && !before.digits);
       if (
         adjacent &&
+        previous.page !== currentSlide(state).page &&
         !before.black &&
         !state.black &&
         Math.abs(state.index - before.index) === 1
@@ -97,16 +100,16 @@ export function createPresentationController({
         const to = renderSlide(editor, toPage);
         if (from.rect && to.rect) {
           const plan = planSlideTransition(editor.store, editor.registry, {
-            from: { page: previous, rect: from.rect },
-            to: { page: toPage, rect: to.rect },
+            from: { page: previous.page, rect: from.rect },
+            to: { page: toPage.page, rect: to.rect },
             navigation: state.index > before.index ? "forward" : "backward",
           });
           if (plan.kind === "animate") {
             const emptySvg = (rect: typeof from.rect & {}) =>
               `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${rect.x} ${rect.y} ${rect.width} ${rect.height}"></svg>`;
             transition = {
-              fromPage: previous,
-              toPage,
+              fromPage: previous.page,
+              toPage: toPage.page,
               fromSvg: from.svg ?? emptySvg(from.rect),
               toSvg: to.svg ?? emptySvg(to.rect),
               fromRect: from.rect,
@@ -121,7 +124,11 @@ export function createPresentationController({
   function slide() {
     if (!state) return { src: null, size: null };
     const page = currentSlide(state);
-    if (cache?.page === page && cache.revision === editor.revision)
+    if (
+      cache?.ref.page === page.page &&
+      cache.ref.frame === page.frame &&
+      cache.revision === editor.revision
+    )
       return cache.result;
     const { svg, rect } = renderSlide(editor, page);
     const result = {
@@ -129,13 +136,13 @@ export function createPresentationController({
         ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
         : null,
       size:
-        editor.store.getMeta().slideSize && rect
+        (page.frame || editor.store.getMeta().slideSize) && rect
           ? { width: rect.width, height: rect.height }
           : svg
             ? svgSize(svg)
             : null,
     };
-    cache = { page, revision: editor.revision, result };
+    cache = { ref: page, revision: editor.revision, result };
     return result;
   }
   return {
@@ -148,7 +155,11 @@ export function createPresentationController({
     refresh: () =>
       dispatch({
         type: "reconcile",
-        slides: slideList(editor.store.listPages()),
+        slides: expandSlides(
+          editor.store,
+          editor.registry,
+          slideList(editor.store.listPages()),
+        ),
       }),
     slide,
     layout: (viewport: SlideSize) =>

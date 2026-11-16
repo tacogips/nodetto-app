@@ -3,6 +3,7 @@
 //
 // This module is runtime-agnostic: no DOM, no framework imports.
 
+import type { PageFlow } from "./semantics/document.ts";
 import type { AccessibilityMetadata } from "./accessibility.ts";
 
 /** Identifier of a {@link Document}. ULIDs in practice; any non-empty string parses. */
@@ -470,6 +471,7 @@ export interface Page {
   /** Absent means shown in presentations. */
   readonly hiddenInPresentation?: boolean;
   readonly slideOrigin?: SlideOrigin;
+  readonly pageFlow?: PageFlow;
   readonly extensions?: Extensions;
 }
 

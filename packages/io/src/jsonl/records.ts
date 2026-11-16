@@ -42,6 +42,7 @@ export const PAGE_RECORD_KEYS: readonly string[] = [
   "connectorRouting",
   "hiddenInPresentation",
   "slideOrigin",
+  "pageFlow",
 ];
 
 export const ELEMENT_RECORD_KEYS: readonly string[] = [

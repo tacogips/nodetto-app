@@ -2,6 +2,7 @@
 // tokens.
 
 import type { ElementId } from "../types.ts";
+import type { PageFrameSpec } from "./document.ts";
 import type { PrototypeOverflow } from "./connectors.ts";
 
 export const GUIDE_AXES = ["x", "y"] as const;
@@ -92,6 +93,7 @@ export type ScreenKind = (typeof SCREEN_KINDS)[number];
 export const FRAME_TITLE_PLACEMENTS = ["inside", "outside"] as const;
 
 export interface FrameSemantic {
+  readonly page?: PageFrameSpec;
   readonly screenKind?: ScreenKind;
   readonly name: string;
   /** Target platform informs presets and generated implementation handoff. */

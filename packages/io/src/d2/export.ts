@@ -85,6 +85,10 @@ function labelOf(element: Element): string {
     return stringField(element.semantic, "label");
   if (element.type === "text.note")
     return stringField(element.semantic, "text");
+  if (element.type === "text.code")
+    return stringField(element.semantic, "code");
+  if (element.type === "text.markdown")
+    return stringField(element.semantic, "markdown");
   if (element.type === "image.raster")
     return stringField(element.semantic, "alt") || "Image";
   if (element.type === "frame")
@@ -222,7 +226,12 @@ function shapeKind(element: Element): string | null {
       )[kind] ?? "rectangle"
     );
   }
-  if (element.type === "text.note") return "text";
+  if (
+    element.type === "text.note" ||
+    element.type === "text.code" ||
+    element.type === "text.markdown"
+  )
+    return "text";
   return element.type === "image.raster" ? "rectangle" : null;
 }
 

@@ -1,4 +1,10 @@
-import { resolveSlideRect, slideLabel, type Editor } from "@nodetto/core";
+import {
+  expandSlides,
+  slideList,
+  resolveSlideRect,
+  slideLabel,
+  type Editor,
+} from "@nodetto/core";
 import { createMemo, Show, type Accessor, type JSX } from "solid-js";
 import { effectiveShowSlideArea, slideAreaModel } from "./slide-area.ts";
 
@@ -13,6 +19,14 @@ export function SlideAreaOverlay(props: {
     const pageId = props.editor.currentPageId;
     const meta = props.editor.store.getMeta();
     const page = props.editor.store.getPage(pageId);
+    const pages = props.editor.store.listPages();
+    const counts = new Map<string, number>();
+    for (const ref of expandSlides(
+      props.editor.store,
+      props.editor.registry,
+      slideList(pages),
+    ))
+      counts.set(ref.page, (counts.get(ref.page) ?? 0) + 1);
     return slideAreaModel({
       rect: resolveSlideRect(
         props.editor.store,
@@ -20,7 +34,7 @@ export function SlideAreaOverlay(props: {
         pageId,
         { slideSize: meta.slideSize, slideOrigin: page?.slideOrigin },
       ),
-      label: slideLabel(props.editor.store.listPages(), pageId),
+      label: slideLabel(pages, pageId, counts),
       show: effectiveShowSlideArea(props.show(), meta.slideSize),
     });
   });

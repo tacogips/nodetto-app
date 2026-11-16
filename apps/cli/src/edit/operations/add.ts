@@ -1,4 +1,4 @@
-import { shapeCreation } from "@nodetto/core";
+import { resolveSyntaxKind, shapeCreation, SYNTAX_KINDS } from "@nodetto/core";
 import {
   getElementTypeDefinition,
   isKnownElementType,
@@ -108,10 +108,31 @@ export function addElement(
   const content = autoPlace ? batch.editor.pageBounds(page.id) : null;
   // Given fields are merged over the type's defaults, so an agent states
   // only what it cares about (lists such as columns replace the default).
-  const semanticInput =
+  let semanticInput =
     split && Object.keys(split.routing).length
       ? deepMerge(split.routing, operation["semantic"] ?? {})
       : operation["semantic"];
+  if (
+    type === "text.code" &&
+    (semanticInput === undefined || isPlainObject(semanticInput))
+  ) {
+    const input = semanticInput ?? {};
+    const language =
+      input["language"] === undefined
+        ? "plain"
+        : requireText(input["language"], "language", index);
+    const canonical = resolveSyntaxKind(language);
+    if (canonical === null)
+      throw new OperationError(
+        index,
+        `Unknown language "${language}". Choose one of: ${SYNTAX_KINDS.join(", ")}`,
+      );
+    semanticInput = {
+      ...input,
+      code: input["code"] === undefined ? "" : input["code"],
+      language: canonical,
+    };
+  }
   const semantic =
     semanticInput === undefined
       ? undefined

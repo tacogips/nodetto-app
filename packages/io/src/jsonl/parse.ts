@@ -234,6 +234,9 @@ function collect(text: string, keepSourceLines = false): Collected {
         ...(known["slideOrigin"] === undefined
           ? {}
           : { slideOrigin: known["slideOrigin"] }),
+        ...(known["pageFlow"] === undefined
+          ? {}
+          : { pageFlow: known["pageFlow"] }),
         ...(known["sqlDialect"] === undefined
           ? {}
           : { sqlDialect: known["sqlDialect"] }),

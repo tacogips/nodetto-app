@@ -1,4 +1,17 @@
 export {
+  PAGE_FLOWS,
+  PAGE_FRAME_SIZES,
+  PAGE_FRAME_ORIENTATIONS,
+  TEXT_SNIPPET_MAX_LENGTH,
+  TEXT_CODE_LANGUAGE_PATTERN,
+  type PageFlow,
+  type PageFrameSize,
+  type PageFrameOrientation,
+  type PageFrameSpec,
+  type TextCodeSemantic,
+  type TextMarkdownSemantic,
+} from "./semantics.ts";
+export {
   CONNECTOR_PORTS,
   type ConnectorPort,
   type ConnectorPorts,

@@ -162,6 +162,7 @@ export function planDuplicatePage(
       ? { hiddenInPresentation: true }
       : {}),
     ...(source.slideOrigin ? { slideOrigin: { ...source.slideOrigin } } : {}),
+    ...(source.pageFlow === undefined ? {} : { pageFlow: source.pageFlow }),
     ...(source.connectorRouting
       ? { connectorRouting: source.connectorRouting }
       : {}),

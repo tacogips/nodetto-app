@@ -1,16 +1,31 @@
 import {
+  documentPageSequence,
   resolveSlideRect,
   slideSource,
   svgViewBox,
   type Editor,
   type SlideViewBox,
+  type SlideRef,
 } from "@nodetto/core";
-import type { PageId } from "@nodetto/ir";
 
 export function renderSlide(
   editor: Editor,
-  page: PageId,
+  ref: SlideRef,
 ): { svg: string | null; rect: SlideViewBox | null } {
+  const page = ref.page;
+  if (ref.frame) {
+    const rect =
+      documentPageSequence(editor.store, editor.registry).find(
+        (item) => item.pageId === page && item.frameId === ref.frame,
+      )?.rect ?? null;
+    return {
+      rect,
+      svg:
+        rect && editor.store.getPageElements(page).length
+          ? editor.exportPageSvgOf(page, { viewport: rect })
+          : null,
+    };
+  }
   const slideSize = editor.store.getMeta().slideSize;
   if (slideSize) {
     const rect = resolveSlideRect(editor.store, editor.registry, page, {

@@ -315,6 +315,30 @@ export class PageWriter {
           ),
         );
         return;
+      case "text.code":
+      case "text.markdown":
+        this.vertex(
+          element,
+          box,
+          textToHtmlLabel(
+            text(semantic[element.type === "text.code" ? "code" : "markdown"]),
+          ),
+          formatStyle(
+            ["text"],
+            [
+              ...common,
+              ["align", "left"],
+              ["verticalAlign", "top"],
+              ["strokeColor", "none"],
+              ["fillColor", "none"],
+              ...paint,
+              ...(element.type === "text.code"
+                ? [["fontFamily", "Courier New"] as [string, string]]
+                : []),
+            ],
+          ),
+        );
+        return;
       case "frame":
         this.vertex(
           element,

@@ -97,7 +97,7 @@ test("reconciles hidden pages and renders inherited hidden frame fallback", () =
   );
   editor.setPageHiddenInPresentation("p1", true);
   controller.refresh();
-  expect(controller.state()?.slides).toEqual(["p3"]);
+  expect(controller.state()?.slides).toEqual([{ page: "p3" }]);
   expect(controller.counterText()).toBe("1 / 1");
 });
 

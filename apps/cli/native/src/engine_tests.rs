@@ -213,3 +213,18 @@ fn list_dir_returns_sorted_file_names_only() {
         json!(["a.png", "z.png"])
     );
 }
+
+#[test]
+fn pdf_pages_host_returns_pdf_bytes() {
+    let result = evaluate(
+        r#"(() => {
+        const png = native.png('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>', 1, undefined, false);
+        const spec = {pages:[{pngLength:png.length,layout:{pageWidth:1,pageHeight:1,x:0,y:0,width:1,height:1},fontNames:[],content:''}],fonts:[]};
+        const output = native.pdfPages(png, JSON.stringify(spec));
+        return [output instanceof Uint8Array, Array.from(output.slice(0,5))];
+    })()"#,
+        Input::Mcp(None),
+        None,
+    );
+    assert_eq!(result, json!([true, [37, 80, 68, 70, 45]]));
+}

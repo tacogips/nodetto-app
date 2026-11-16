@@ -110,3 +110,10 @@ export function renderCodeSnippet(element: Element, box: Box): string;
 
 Edit only your writePaths. Re-read before each edit and record hashes. No
 git state changes.
+
+## Implementation status
+
+The shape, renderer, PDF runs, and focused tests are implemented. Focused
+Bun tests, Biome, and the required workspace typecheck pass on the moving
+shared tree; see `impl-plans/progress/dps-08-code-shape.md` for evidence.
+Formal review and registration remain downstream.

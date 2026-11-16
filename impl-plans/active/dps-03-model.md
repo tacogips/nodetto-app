@@ -176,3 +176,8 @@ dps-17.
 - If an unexpected change appears, stop editing that file and record the
   drift.
 - No git state changes.
+
+## Implementation status
+
+- Model, persistence, command and duplication changes implemented; behavioral suite, typecheck and Biome passed on the shared tree. See `impl-plans/progress/dps-03-model.md` for hashes and logs.
+- Registry wiring and formal review remain downstream.

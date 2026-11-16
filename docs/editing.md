@@ -211,8 +211,9 @@ table/class heights remain derived. Unsupported resize selections show a reason.
 
 Use Present (header button or File menu) or F5 to start from the first slide;
 use Present from current page or Shift+F5 to start at the current page. The
-shortcuts do not fire while typing in a text field. Each slide is one page in
-tab order, shown read-only and fitted to the screen. With no explicit slide
+shortcuts do not fire while typing in a text field. Slides are shown read-only
+and fitted to the screen, in page tab order. A page with page frames has one
+slide per frame in flow order; otherwise it has one slide. With no explicit slide
 size, a page with exactly one visible frame shows that frame, otherwise its
 content bounds. Use the page tab menu's
 Hide/Show in presentation action or the inspector's Show in presentation switch
@@ -361,6 +362,40 @@ break around (Gap) connectors painted beneath it. Both are paint-only, so they
 are copied by Copy style and exported to SVG, PNG, PDF and draw.io.
 
 The General palette includes Stick figure (`geo:actor`), with a centred label; its box is used for picking and connections. A `draw.path` contour with `closed: false` and at least two points is an unfilled stroke without arrowheads; handoff and mobile code omit open contours. Unknown semantic fields produce a `semantic.unknownField` warning and are preserved, never treated as errors.
+
+## Code and Markdown snippets
+
+Choose **Code snippet** or **Markdown snippet** from the palette. Double-click
+to edit: Tab inserts a tab, Escape cancels, and Cmd/Ctrl+Enter or clicking
+outside commits. Resize the width; snippet height can grow automatically.
+The code inspector offers the languages listed in the inspector, **Line
+numbers** and **Wrap lines**. Both snippets offer **Snippet theme: Light / Dark**;
+the palette follows the snippet panel fill, independently of the canvas theme.
+
+Markdown supports headings, paragraphs, emphasis, strong and strikethrough,
+inline code and links, nested ordered, unordered and task lists, blockquotes,
+fenced code with syntax highlighting, GFM tables and thematic breaks. Only
+http, https and mailto links become SVG anchors. Math, raw HTML, images,
+footnotes, indented code blocks, lazy blockquote continuation, reference-style
+links and bare-URL autolinks render as literal text.
+
+## Page frames and document flow
+
+Use the **Page** palette tile or enable **Page** on a top-level frame. Choose
+A4, A5, Letter, Legal, 16:9 or 4:3, or a custom size, and portrait or landscape.
+**Add page** inserts after the selected page frame, the frame containing the
+single selection, or the last frame in flow order. It copies the anchor's size
+and orientation, leaves a 48 px gap, and shifts later frames and their contents.
+Without a frame it starts at (0, 0) on an empty page, or after the content bounds
+with the same gap. Defaults are A4 portrait for vertical flow and 16:9 landscape
+for horizontal flow.
+
+Set **Page flow** to Vertical or Horizontal to re-layout the frames and their
+contents in one undo step. **Next page frame** and **Previous page frame** move
+the camera; PageDown and PageUp perform these actions on the canvas outside text
+editing. The slideshow presents one slide per frame in flow order. Frames take
+precedence over slide size, slide origin and the artboard rule; transitions
+between frames on the same Nodetto page are cuts.
 
 ## File saving
 

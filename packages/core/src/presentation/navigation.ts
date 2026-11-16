@@ -1,7 +1,7 @@
-import type { PageId } from "@nodetto/ir";
+import { sameSlide, type SlideRef } from "./slides.ts";
 
 export interface PresentationState {
-  readonly slides: readonly PageId[];
+  readonly slides: readonly SlideRef[];
   readonly index: number;
   readonly black: boolean;
   readonly digits: string;
@@ -19,11 +19,11 @@ export type PresentationAction =
     }
   | { type: "goto"; n: number }
   | { type: "digit"; digit: string }
-  | { type: "reconcile"; slides: readonly PageId[] };
+  | { type: "reconcile"; slides: readonly SlideRef[] };
 const clamp = (n: number, total: number) =>
   Math.max(0, Math.min(total - 1, Math.trunc(n)));
 export function createPresentationState(
-  slides: readonly PageId[],
+  slides: readonly SlideRef[],
   index: number,
 ): PresentationState {
   if (!slides.length)
@@ -35,8 +35,8 @@ export function createPresentationState(
     digits: "",
   };
 }
-export function currentSlide(state: PresentationState): PageId {
-  return state.slides[state.index] as PageId;
+export function currentSlide(state: PresentationState): SlideRef {
+  return state.slides[state.index] as SlideRef;
 }
 export function slideCounter(state: PresentationState): {
   n: number;
@@ -79,7 +79,9 @@ export function reducePresentation(
         : navigate(state.index + 1);
     case "reconcile": {
       if (!action.slides.length) return null;
-      const index = action.slides.indexOf(currentSlide(state));
+      const index = action.slides.findIndex((slide) =>
+        sameSlide(slide, currentSlide(state)),
+      );
       return {
         ...state,
         slides: action.slides,

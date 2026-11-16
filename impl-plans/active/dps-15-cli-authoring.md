@@ -83,3 +83,10 @@ inline semantic. This plan adds language normalisation and the
 
 Edit only your writePaths. Re-read before each edit and record hashes. No
 git state changes.
+
+## Implementation status
+
+Source and tests are authored. Verification remains incomplete: the required
+edit pipeline test needs dps-17 text.code registry wiring, and workspace
+ typecheck currently reports sibling-owned errors. See
+`impl-plans/progress/dps-15-cli-authoring.md` for exact results.

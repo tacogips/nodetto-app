@@ -25,6 +25,8 @@ import {
   isPlainObject,
   type Page,
   type PageId,
+  type PageFlow,
+  PAGE_FLOWS,
   type PageKind,
   type PageMode,
   type SlideSize,
@@ -127,6 +129,7 @@ export type Command =
         readonly connectorRouting?: Page["connectorRouting"] | null;
         readonly hiddenInPresentation?: boolean | null;
         readonly slideOrigin?: SlideOrigin | null;
+        readonly pageFlow?: PageFlow | null;
         readonly order?: FractionalIndex | null;
       };
     }
@@ -886,7 +889,13 @@ export function applyCommands(
             ],
             "updatePage: invalid slide origin",
           );
+        if (patch.pageFlow != null && !PAGE_FLOWS.includes(patch.pageFlow))
+          throw new CommandError(
+            [error("type.enum", "page.pageFlow", "invalid page flow")],
+            "updatePage: invalid page flow",
+          );
         const {
+          pageFlow: _oldPageFlow,
           slideOrigin: _oldSlideOrigin,
           hiddenInPresentation: _oldHiddenInPresentation,
           connectorRouting: _oldConnectorRouting,
@@ -926,6 +935,13 @@ export function applyCommands(
               : previous.slideOrigin === undefined
                 ? {}
                 : { slideOrigin: previous.slideOrigin }),
+          ...(patch.pageFlow === null
+            ? {}
+            : patch.pageFlow !== undefined
+              ? { pageFlow: patch.pageFlow }
+              : previous.pageFlow === undefined
+                ? {}
+                : { pageFlow: previous.pageFlow }),
           ...(patch.sqlDialect === null
             ? {}
             : patch.sqlDialect !== undefined
@@ -968,6 +984,9 @@ export function applyCommands(
             ...(patch.slideOrigin === undefined
               ? {}
               : { slideOrigin: previous.slideOrigin ?? null }),
+            ...(patch.pageFlow === undefined
+              ? {}
+              : { pageFlow: previous.pageFlow ?? null }),
             tokenMode: previous.tokenMode ?? null,
             sqlDialect: previous.sqlDialect ?? null,
             connectorRouting: previous.connectorRouting ?? null,

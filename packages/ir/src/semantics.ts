@@ -1,3 +1,7 @@
+import type {
+  TextCodeSemantic,
+  TextMarkdownSemantic,
+} from "./semantics/document.ts";
 import type { TableSheetSemantic } from "./semantics/table.ts";
 import type { UiIconSemantic } from "./registry/icons.ts";
 import type { UiControlSemantic } from "./ui-controls.ts";
@@ -93,6 +97,7 @@ export * from "./semantics/design.ts";
 export * from "./semantics/bpmn.ts";
 export * from "./semantics/breadboard.ts";
 export * from "./semantics/table.ts";
+export * from "./semantics/document.ts";
 
 export interface PresentationSlideSemantic {
   readonly note?: string;
@@ -132,6 +137,8 @@ export interface SemanticByType {
   "draw.path": PathSemantic;
   "shape.geo": GeoShapeSemantic;
   "text.note": TextNoteSemantic;
+  "text.code": TextCodeSemantic;
+  "text.markdown": TextMarkdownSemantic;
   "review.comment": ReviewCommentSemantic;
   "design.text-style": TextStyleSemantic;
   frame: FrameSemantic;

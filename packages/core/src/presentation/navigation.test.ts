@@ -6,7 +6,8 @@ import {
   slideCounter,
 } from "./navigation.ts";
 import type { PresentationAction, PresentationState } from "./navigation.ts";
-const initial = () => createPresentationState(["a", "b", "c"], 0);
+const initial = () =>
+  createPresentationState([{ page: "a" }, { page: "b" }, { page: "c" }], 0);
 const apply = (state: PresentationState, action: PresentationAction) =>
   reducePresentation(state, action) as PresentationState;
 test("navigation clamps and clears black and digits", () => {
@@ -26,7 +27,7 @@ test("navigation clamps and clears black and digits", () => {
     digits: "",
   });
   expect(slideCounter(last)).toEqual({ n: 3, total: 3 });
-  expect(currentSlide(last)).toBe("c");
+  expect(currentSlide(last)).toEqual({ page: "c" });
   expect(state.index).toBe(0);
 });
 test("digits and enter select slides", () => {
@@ -45,9 +46,14 @@ test("reconcile preserves page and black or clamps removed page", () => {
   let state = apply(initial(), { type: "goto", n: 2 });
   state = apply(state, { type: "toggleBlack" });
   state = apply(state, { type: "digit", digit: "3" });
-  const moved = apply(state, { type: "reconcile", slides: ["b", "a"] });
+  const moved = apply(state, {
+    type: "reconcile",
+    slides: [{ page: "b" }, { page: "a" }],
+  });
   expect(moved).toMatchObject({ index: 0, black: true, digits: "" });
-  expect(apply(state, { type: "reconcile", slides: ["a"] }).index).toBe(0);
+  expect(
+    apply(state, { type: "reconcile", slides: [{ page: "a" }] }).index,
+  ).toBe(0);
   expect(
     reducePresentation(state, { type: "reconcile", slides: [] }),
   ).toBeNull();

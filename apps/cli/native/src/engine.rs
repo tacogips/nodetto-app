@@ -141,6 +141,11 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             let layout = string(args, 1, ctx)?;
             byte_value(render::pdf(png, layout).map_err(host_error)?, ctx)
         }
+        "pdfPages" => {
+            let pngs = bytes(args.get_or_undefined(0), ctx)?;
+            let spec = string(args, 1, ctx)?;
+            byte_value(render::pdf_pages(pngs, spec).map_err(host_error)?, ctx)
+        }
         "readStdin" => {
             let text = match &ctx
                 .get_data::<HostState>()
@@ -227,7 +232,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
     .map_err(|e| e.to_string())?;
     ctx.eval(Source::from_bytes(r#"
         globalThis.native = Object.fromEntries([
-          'path','readText','readBytes','listDir','exists','writeBytes','attachment','open','png','pdf','fontCoverage',
+          'path','readText','readBytes','listDir','exists','writeBytes','attachment','open','png','pdf','pdfPages','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };

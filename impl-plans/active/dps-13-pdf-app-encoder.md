@@ -94,3 +94,9 @@ export async function pngToPdf(png: Blob, width: number, height: number, options
 
 Edit only your writePaths. Re-read before each edit and record hashes. No
 git state changes.
+
+## Implementation status
+
+The encoder and host-level tests are implemented. All three required checks pass
+on the current shared tree; see `impl-plans/progress/dps-13-pdf-app-encoder.md`.
+Formal review and stable-tree integration verification remain downstream.

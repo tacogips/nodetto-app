@@ -2,7 +2,7 @@
 //
 // Shape:
 //   meta     Y.Map   { schemaVersion, id, title, extensions?, unknownRecords? }
-//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, connectorRouting?, hiddenInPresentation?, extensions? }>
+//   pages    Y.Map<PageId, Y.Map{ name, kind, mode?, order?, tokenMode?, sqlDialect?, connectorRouting?, hiddenInPresentation?, slideOrigin?, pageFlow?, extensions? }>
 //   elements Y.Map<ElementId, Y.Map{ type, page, index, semantic,
 //                                    accessibility?, visual, extensions? }>
 //
@@ -100,6 +100,7 @@ export function pageFields(page: Page): Record<string, unknown> {
     ...(page.slideOrigin === undefined
       ? {}
       : { slideOrigin: page.slideOrigin }),
+    ...(page.pageFlow === undefined ? {} : { pageFlow: page.pageFlow }),
     ...(page.tokenMode === undefined ? {} : { tokenMode: page.tokenMode }),
     ...(page.order === undefined ? {} : { order: page.order }),
     ...(page.extensions === undefined ? {} : { extensions: page.extensions }),
@@ -248,6 +249,9 @@ export function pageFromY(id: PageId, value: unknown): Page {
     typeof record.slideOrigin.y === "number" &&
     Number.isFinite(record.slideOrigin.y)
       ? { slideOrigin: { x: record.slideOrigin.x, y: record.slideOrigin.y } }
+      : {}),
+    ...(record.pageFlow === "vertical" || record.pageFlow === "horizontal"
+      ? { pageFlow: record.pageFlow }
       : {}),
     ...(typeof record.tokenMode === "string"
       ? { tokenMode: record.tokenMode }

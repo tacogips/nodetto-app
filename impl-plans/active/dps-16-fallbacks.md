@@ -81,3 +81,9 @@ frames export like any frame, and `pageFlow` is ignored.
 
 Edit only your writePaths. Re-read before each edit and record hashes. No
 git state changes.
+
+## Implementation status
+
+- Fallbacks and focused regression tests implemented; focused tests and Biome pass.
+- Workspace typecheck passes on the current shared tree; continuation evidence is recorded in `impl-plans/progress/dps-16-fallbacks.md`.
+- Formal reviews and final combined-tree verification remain downstream.

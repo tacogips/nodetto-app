@@ -437,8 +437,15 @@ export function generateInterfaceCode(
       : "";
     const open = `<${tag} class="${classes}" data-nodetto-id="${escapeAttribute(element.id)}" data-nodetto-type="${escapeAttribute(element.type)}"${platform}${screenKind}${accessibilityHtmlAttributes(element, frameSemantic?.name)}>`;
     const text = elementText(editor, element);
+    const semantic = element.semantic as Record<string, unknown>;
     const renderedText =
-      element.type === "text.note" ? richTextHtml(element) : escapeText(text);
+      element.type === "text.code"
+        ? `<pre><code class="language-${escapeAttribute(typeof semantic["language"] === "string" ? semantic["language"] : "plain")}">${escapeText(typeof semantic["code"] === "string" ? semantic["code"] : "")}</code></pre>`
+        : element.type === "text.markdown"
+          ? `<div style="white-space:pre-wrap">${escapeText(typeof semantic["markdown"] === "string" ? semantic["markdown"] : "")}</div>`
+          : element.type === "text.note"
+            ? richTextHtml(element)
+            : escapeText(text);
     if (!childrenForElement.length) {
       htmlLines.push(`${indent}${open}${renderedText}</${tag}>`);
       return;

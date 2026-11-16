@@ -7,6 +7,7 @@ import {
   type PageConnectorRouting,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
+import { checkFields } from "../operation-fields.ts";
 import {
   type Json,
   type JsonObject,
@@ -163,6 +164,28 @@ export function setPageMode(
     throw new OperationError(index, unknownMode(mode));
   batch.editor.setPageMode(page.id, mode);
   return;
+}
+
+export function setPageFlow(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  checkFields(operation, ["op", "page", "flow"], index);
+  const page = batch.page(operation["page"], index);
+  const flow = operation["flow"];
+  if (flow !== "vertical" && flow !== "horizontal" && flow !== null)
+    throw new OperationError(
+      index,
+      '"flow" must be vertical, horizontal or null',
+    );
+  batch.editor.apply([
+    {
+      type: "updatePage",
+      id: page.id,
+      page: { pageFlow: flow === "vertical" ? null : flow },
+    },
+  ]);
 }
 
 export function setPageRouting(

@@ -151,3 +151,10 @@ export function snippetThemeOf(element: Element): "light" | "dark";
 
 Edit only your writePaths. Re-read before each edit and record hashes. No
 git state changes.
+
+## Implementation status
+
+Implemented the view, editor, inspector sections and pure helpers; focused tests,
+workspace typecheck and scoped Biome check pass on the current shared tree.
+See `impl-plans/progress/dps-10-snippet-ui.md` for evidence. Formal review and
+integration wiring remain downstream.

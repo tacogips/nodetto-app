@@ -170,23 +170,71 @@ pub struct Layout {
     width: f32,
     height: f32,
 }
-pub fn pdf(png: Vec<u8>, layout: String) -> Result<Vec<u8>, String> {
-    let layout: Layout = serde_json::from_str(&layout).map_err(|e| e.to_string())?;
+struct PdfImage {
+    width: u32,
+    height: u32,
+    rgb: Vec<u8>,
+    alpha: Vec<u8>,
+}
+
+fn decode_pdf_image(png: &[u8]) -> Result<PdfImage, String> {
     let decoder = png::Decoder::new(Cursor::new(png));
     let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
+    let profile: RenderProfile = serde_json::from_str(include_str!(concat!(
+        env!("OUT_DIR"),
+        "/render-profile.json"
+    )))
+    .map_err(|e| e.to_string())?;
+    let (width, height) = (reader.info().width, reader.info().height);
+    if width == 0
+        || height == 0
+        || width > profile.limits.max_side
+        || height > profile.limits.max_side
+        || u64::from(width) * u64::from(height) > profile.limits.max_pixels
+    {
+        return Err("Raster dimensions exceed the pixel limit".into());
+    }
     let mut buffer = vec![0; reader.output_buffer_size().ok_or("Invalid PNG size")?];
     let image = reader.next_frame(&mut buffer).map_err(|e| e.to_string())?;
     if image.color_type != png::ColorType::Rgba {
         return Err("Expected RGBA PNG from native renderer".into());
     }
-    let mut rgb = Vec::with_capacity(image.width as usize * image.height as usize * 3);
-    let mut alpha = Vec::with_capacity(image.width as usize * image.height as usize);
+    let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
+    let mut alpha = Vec::with_capacity(width as usize * height as usize);
     for pixel in buffer[..image.buffer_size()].as_chunks::<4>().0 {
         rgb.extend_from_slice(&pixel[..3]);
         alpha.push(pixel[3]);
     }
-    let rgb = miniz_oxide::deflate::compress_to_vec_zlib(&rgb, 6);
-    let alpha = miniz_oxide::deflate::compress_to_vec_zlib(&alpha, 6);
+    Ok(PdfImage {
+        width,
+        height,
+        rgb: miniz_oxide::deflate::compress_to_vec_zlib(&rgb, 6),
+        alpha: miniz_oxide::deflate::compress_to_vec_zlib(&alpha, 6),
+    })
+}
+
+fn write_pdf_image(pdf: &mut Pdf, image: &PdfImage, image_ref: Ref, mask_ref: Ref) {
+    let mut image_obj = pdf.image_xobject(image_ref, &image.rgb);
+    image_obj.filter(Filter::FlateDecode);
+    image_obj
+        .width(image.width as i32)
+        .height(image.height as i32)
+        .bits_per_component(8)
+        .s_mask(mask_ref);
+    image_obj.color_space().device_rgb();
+    image_obj.finish();
+    let mut mask = pdf.image_xobject(mask_ref, &image.alpha);
+    mask.filter(Filter::FlateDecode);
+    mask.width(image.width as i32)
+        .height(image.height as i32)
+        .bits_per_component(8);
+    mask.color_space().device_gray();
+    mask.finish();
+}
+
+pub fn pdf(png: Vec<u8>, layout: String) -> Result<Vec<u8>, String> {
+    let layout: Layout = serde_json::from_str(&layout).map_err(|e| e.to_string())?;
+    let image = decode_pdf_image(&png)?;
     let mut pdf = Pdf::new();
     pdf.catalog(Ref::new(1)).pages(Ref::new(2));
     pdf.pages(Ref::new(2)).kids([Ref::new(3)]).count(1);
@@ -198,22 +246,7 @@ pub fn pdf(png: Vec<u8>, layout: String) -> Result<Vec<u8>, String> {
         .x_objects()
         .pair(Name(b"Image"), Ref::new(4));
     page.finish();
-    let mut image_obj = pdf.image_xobject(Ref::new(4), &rgb);
-    image_obj.filter(Filter::FlateDecode);
-    image_obj
-        .width(image.width as i32)
-        .height(image.height as i32)
-        .bits_per_component(8)
-        .s_mask(Ref::new(5));
-    image_obj.color_space().device_rgb();
-    image_obj.finish();
-    let mut mask = pdf.image_xobject(Ref::new(5), &alpha);
-    mask.filter(Filter::FlateDecode);
-    mask.width(image.width as i32)
-        .height(image.height as i32)
-        .bits_per_component(8);
-    mask.color_space().device_gray();
-    mask.finish();
+    write_pdf_image(&mut pdf, &image, Ref::new(4), Ref::new(5));
     let mut content = Content::new();
     content
         .save_state()
@@ -226,9 +259,273 @@ pub fn pdf(png: Vec<u8>, layout: String) -> Result<Vec<u8>, String> {
     Ok(pdf.finish())
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PdfSpec {
+    pages: Vec<PdfPage>,
+    fonts: Vec<PdfFont>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PdfPage {
+    png_length: usize,
+    layout: Layout,
+    font_names: Vec<String>,
+    content: String,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PdfFont {
+    name: String,
+    first_char: i32,
+    last_char: i32,
+    widths: Vec<f32>,
+    glyph_procs: Vec<PdfGlyph>,
+    differences: Vec<String>,
+    to_unicode: String,
+}
+#[derive(Deserialize)]
+struct PdfGlyph {
+    glyph: String,
+    content: String,
+}
+
+pub fn pdf_pages(pngs: Vec<u8>, spec_json: String) -> Result<Vec<u8>, String> {
+    let spec: PdfSpec = serde_json::from_str(&spec_json).map_err(|e| e.to_string())?;
+    if spec.pages.is_empty() || spec.pages.len() > 500 {
+        return Err("Invalid PDF page count".into());
+    }
+    let total = spec
+        .pages
+        .iter()
+        .try_fold(0usize, |n, p| n.checked_add(p.png_length))
+        .ok_or("Invalid PNG lengths")?;
+    if total != pngs.len() {
+        return Err("PNG lengths do not match input".into());
+    }
+    let mut fonts = std::collections::BTreeMap::new();
+    let mut next = 3i32 + 4 * spec.pages.len() as i32;
+    for font in &spec.fonts {
+        if font.name.is_empty()
+            || font.first_char != 1
+            || !(1..=255).contains(&font.last_char)
+            || font.widths.len() != font.last_char as usize
+            || font.differences.len() != font.widths.len()
+            || font.glyph_procs.len() != font.widths.len()
+            || fonts.contains_key(&font.name)
+        {
+            return Err("Invalid PDF font".into());
+        }
+        fonts.insert(font.name.clone(), Ref::new(next));
+        next += 2 + font.glyph_procs.len() as i32;
+    }
+    for page in &spec.pages {
+        if page.font_names.iter().any(|name| !fonts.contains_key(name)) {
+            return Err("Unknown PDF font".into());
+        }
+        let l = &page.layout;
+        if ![l.page_width, l.page_height, l.x, l.y, l.width, l.height]
+            .iter()
+            .all(|v| v.is_finite())
+            || l.page_width <= 0.
+            || l.page_height <= 0.
+            || l.width <= 0.
+            || l.height <= 0.
+        {
+            return Err("Invalid PDF layout".into());
+        }
+    }
+    let mut pdf = Pdf::new();
+    pdf.catalog(Ref::new(1)).pages(Ref::new(2));
+    pdf.pages(Ref::new(2))
+        .kids((0..spec.pages.len()).map(|i| Ref::new(3 + 4 * i as i32)))
+        .count(spec.pages.len() as i32);
+    let mut offset = 0;
+    for (i, page) in spec.pages.iter().enumerate() {
+        let base = 3 + 4 * i as i32;
+        let image = decode_pdf_image(&pngs[offset..offset + page.png_length])?;
+        offset += page.png_length;
+        let mut obj = pdf.page(Ref::new(base));
+        obj.parent(Ref::new(2))
+            .media_box(Rect::new(
+                0.,
+                0.,
+                page.layout.page_width,
+                page.layout.page_height,
+            ))
+            .contents(Ref::new(base + 3));
+        let mut resources = obj.resources();
+        resources
+            .x_objects()
+            .pair(Name(b"Image"), Ref::new(base + 1));
+        {
+            let mut font_dict = resources.fonts();
+            for name in &page.font_names {
+                font_dict.pair(Name(name.as_bytes()), fonts[name]);
+            }
+        }
+        resources.finish();
+        obj.finish();
+        write_pdf_image(&mut pdf, &image, Ref::new(base + 1), Ref::new(base + 2));
+        let mut content = Content::new();
+        content
+            .save_state()
+            .transform([
+                page.layout.width,
+                0.,
+                0.,
+                page.layout.height,
+                page.layout.x,
+                page.layout.y,
+            ])
+            .x_object(Name(b"Image"))
+            .restore_state();
+        let mut stream = content.finish().to_vec();
+        stream.push(b'\n');
+        stream.extend_from_slice(page.content.as_bytes());
+        pdf.stream(Ref::new(base + 3), &stream);
+    }
+    for font in &spec.fonts {
+        let base = fonts[&font.name].get();
+        let mut dict = pdf.indirect(Ref::new(base)).dict();
+        dict.pair(Name(b"Type"), Name(b"Font"))
+            .pair(Name(b"Subtype"), Name(b"Type3"));
+        dict.insert(Name(b"FontMatrix"))
+            .array()
+            .items([0.001f32, 0., 0., 0.001, 0., 0.]);
+        dict.insert(Name(b"FontBBox")).array().items([0, 0, 0, 0]);
+        dict.pair(Name(b"FirstChar"), font.first_char)
+            .pair(Name(b"LastChar"), font.last_char);
+        dict.insert(Name(b"Widths"))
+            .array()
+            .items(font.widths.iter().copied());
+        {
+            let mut encoding = dict.insert(Name(b"Encoding")).dict();
+            encoding.pair(Name(b"Type"), Name(b"Encoding"));
+            let mut differences = encoding.insert(Name(b"Differences")).array();
+            differences.item(1);
+            for glyph in &font.differences {
+                differences.item(Name(glyph.as_bytes()));
+            }
+        }
+        {
+            let mut procs = dict.insert(Name(b"CharProcs")).dict();
+            for (i, glyph) in font.glyph_procs.iter().enumerate() {
+                procs.pair(Name(glyph.glyph.as_bytes()), Ref::new(base + 2 + i as i32));
+            }
+        }
+        dict.pair(Name(b"ToUnicode"), Ref::new(base + 1));
+        dict.finish();
+        pdf.stream(Ref::new(base + 1), font.to_unicode.as_bytes());
+        for (i, glyph) in font.glyph_procs.iter().enumerate() {
+            pdf.stream(Ref::new(base + 2 + i as i32), glyph.content.as_bytes());
+        }
+    }
+    Ok(pdf.finish())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_png() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(&[12, 34, 56, 128]).unwrap();
+        }
+        bytes
+    }
+    fn test_spec(length: usize) -> String {
+        serde_json::json!({"pages": (0..2).map(|_| serde_json::json!({"pngLength":length,"layout":{"pageWidth":100,"pageHeight":200,"x":0,"y":0,"width":100,"height":200},"fontNames":["NTm1"],"content":"BT /NTm1 12 Tf <01> Tj ET"})).collect::<Vec<_>>(), "fonts":[{"name":"NTm1","firstChar":1,"lastChar":1,"widths":[600],"glyphProcs":[{"glyph":"g1","content":"600 0 d0"}],"differences":["g1"],"toUnicode":"<01> <65E5>"}]}).to_string()
+    }
+    #[test]
+    fn pdf_pages_produces_unicode_text_and_rejects_invalid_input() {
+        let png = test_png();
+        let mut both = png.clone();
+        both.extend_from_slice(&png);
+        let output = pdf_pages(both.clone(), test_spec(png.len())).unwrap();
+        assert!(output.starts_with(b"%PDF-"));
+        let text = String::from_utf8_lossy(&output);
+        for expected in ["/Count 2", "/Type3", "/ToUnicode", "<01> <65E5>", "Tj"] {
+            assert!(text.contains(expected), "missing {expected}");
+        }
+        assert_eq!(text.matches("/MediaBox").count(), 2);
+        assert!(pdf_pages(both.clone(), test_spec(png.len() + 1)).is_err());
+        assert!(pdf_pages(both.clone(), "{}".into()).is_err());
+        assert!(pdf_pages(vec![], r#"{"pages":[],"fonts":[]}"#.into()).is_err());
+        assert!(pdf_pages(
+            both,
+            test_spec(png.len()).replace("NTm1\"],", "missing\"],")
+        )
+        .is_err());
+    }
+    #[test]
+    fn pdf_single_page_remains_byte_identical() {
+        let layout = r#"{"pageWidth":100,"pageHeight":200,"x":0,"y":0,"width":100,"height":200}"#;
+        assert_eq!(
+            pdf(test_png(), layout.into()).unwrap(),
+            legacy_pdf(test_png(), layout.into()).unwrap()
+        );
+    }
+    fn legacy_pdf(png: Vec<u8>, layout: String) -> Result<Vec<u8>, String> {
+        let layout: Layout = serde_json::from_str(&layout).map_err(|e| e.to_string())?;
+        let decoder = png::Decoder::new(Cursor::new(png));
+        let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
+        let mut buffer = vec![0; reader.output_buffer_size().ok_or("Invalid PNG size")?];
+        let image = reader.next_frame(&mut buffer).map_err(|e| e.to_string())?;
+        if image.color_type != png::ColorType::Rgba {
+            return Err("Expected RGBA PNG from native renderer".into());
+        }
+        let mut rgb = Vec::with_capacity(image.width as usize * image.height as usize * 3);
+        let mut alpha = Vec::with_capacity(image.width as usize * image.height as usize);
+        for pixel in buffer[..image.buffer_size()].as_chunks::<4>().0 {
+            rgb.extend_from_slice(&pixel[..3]);
+            alpha.push(pixel[3]);
+        }
+        let rgb = miniz_oxide::deflate::compress_to_vec_zlib(&rgb, 6);
+        let alpha = miniz_oxide::deflate::compress_to_vec_zlib(&alpha, 6);
+        let mut pdf = Pdf::new();
+        pdf.catalog(Ref::new(1)).pages(Ref::new(2));
+        pdf.pages(Ref::new(2)).kids([Ref::new(3)]).count(1);
+        let mut page = pdf.page(Ref::new(3));
+        page.parent(Ref::new(2))
+            .media_box(Rect::new(0., 0., layout.page_width, layout.page_height))
+            .contents(Ref::new(6));
+        page.resources()
+            .x_objects()
+            .pair(Name(b"Image"), Ref::new(4));
+        page.finish();
+        let mut image_obj = pdf.image_xobject(Ref::new(4), &rgb);
+        image_obj.filter(Filter::FlateDecode);
+        image_obj
+            .width(image.width as i32)
+            .height(image.height as i32)
+            .bits_per_component(8)
+            .s_mask(Ref::new(5));
+        image_obj.color_space().device_rgb();
+        image_obj.finish();
+        let mut mask = pdf.image_xobject(Ref::new(5), &alpha);
+        mask.filter(Filter::FlateDecode);
+        mask.width(image.width as i32)
+            .height(image.height as i32)
+            .bits_per_component(8);
+        mask.color_space().device_gray();
+        mask.finish();
+        let mut content = Content::new();
+        content
+            .save_state()
+            .transform([layout.width, 0., 0., layout.height, layout.x, layout.y])
+            .x_object(Name(b"Image"))
+            .restore_state();
+        pdf.stream(Ref::new(6), &content.finish());
+        pdf.document_info(Ref::new(7))
+            .creator(pdf_writer::TextStr("Nodetto"));
+        Ok(pdf.finish())
+    }
 
     #[cfg(target_os = "macos")]
     #[test]

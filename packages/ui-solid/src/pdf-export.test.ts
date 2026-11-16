@@ -58,3 +58,66 @@ test("invalid PDF geometry and cancelled operations fail without producing a doc
     "cancelled",
   );
 });
+
+test("multi-page PDF preserves page sizes and exact Unicode text", async () => {
+  const { extractPdfText } = await import("@nodetto/core");
+  const { pagesToPdf } = await import("./pdf-export.ts");
+  const first = 'const label = "日本語"; // 𠮷 é\tend';
+  const second = "# Ünïcode 太字 😀";
+  const spec = (
+    width: number,
+    height: number,
+    textRuns: import("@nodetto/core").PdfTextRun[],
+  ) => ({
+    width,
+    height,
+    layout: pdfLayout(width, height, options),
+    textRuns,
+  });
+  const blob = await pagesToPdf([
+    {
+      png,
+      spec: spec(800, 400, [
+        { x: 10, y: 20, size: 12, text: first, font: "mono" },
+      ]),
+    },
+    {
+      png,
+      spec: spec(400, 800, [
+        { x: 10, y: 20, size: 12, text: second, font: "sans" },
+        { x: 10, y: 40, size: 12, text: second, font: "sans-bold" },
+      ]),
+    },
+  ]);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  expect((await extractPdfText(bytes)).pages).toEqual([
+    first,
+    `${second}\n${second}`,
+  ]);
+  const doc = await PDFDocument.load(bytes);
+  expect(doc.getPages().map((page) => page.getSize())).toEqual([
+    { width: 600, height: 300 },
+    { width: 300, height: 600 },
+  ]);
+  await expect(pagesToPdf([])).rejects.toThrow("at least one page");
+});
+
+test("single-page PDF optionally includes selectable text", async () => {
+  const { extractPdfText } = await import("@nodetto/core");
+  const run = {
+    x: 1,
+    y: 2,
+    size: 12,
+    text: "日本語\t𠮷",
+    font: "mono",
+  } as const;
+  const withText = await pngToPdf(png, 100, 100, options, undefined, [run]);
+  const withoutText = await pngToPdf(png, 100, 100, options);
+  expect(
+    (await extractPdfText(new Uint8Array(await withText.arrayBuffer()))).pages,
+  ).toEqual([run.text]);
+  expect(
+    (await extractPdfText(new Uint8Array(await withoutText.arrayBuffer())))
+      .pages,
+  ).toEqual([""]);
+});

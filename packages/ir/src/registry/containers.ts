@@ -13,6 +13,8 @@ import { error, type ValidationIssue } from "../issues.ts";
 import {
   FABRICATION_LAYER_KINDS,
   FABRICATION_LAYER_SIDES,
+  PAGE_FRAME_SIZES,
+  PAGE_FRAME_ORIENTATIONS,
   FRAME_PLATFORMS,
   FRAME_TITLE_PLACEMENTS,
   SCREEN_KINDS,
@@ -51,8 +53,10 @@ export const FRAME: ElementTypeDefinition = {
       "prototypeOverflow",
       "clipContent",
       "instanceBindings",
+      "page",
     ],
     children: {
+      page: { keys: ["size", "orientation"] },
       layout: {
         keys: [
           "direction",
@@ -141,6 +145,22 @@ export const FRAME: ElementTypeDefinition = {
         SCREEN_KINDS,
         { optional: true },
       );
+      const page = semantic["page"];
+      if (page !== undefined && checkObject(out, page, `${path}.page`)) {
+        for (const [key, allowed] of [
+          ["size", PAGE_FRAME_SIZES],
+          ["orientation", PAGE_FRAME_ORIENTATIONS],
+        ] as const) {
+          const start = out.length;
+          checkEnum(out, page[key], `${path}.page.${key}`, allowed);
+          if (out[start]?.code === "value.enum")
+            out[start] = error(
+              "type.enum",
+              `${path}.page.${key}`,
+              "invalid page frame value",
+            );
+        }
+      }
       const safeArea = semantic["safeArea"];
       if (
         safeArea !== undefined &&
