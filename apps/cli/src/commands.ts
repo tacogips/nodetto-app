@@ -108,6 +108,8 @@ export interface CommandIo {
   readStdin?(): string;
   /** Binary output (PNG, PDF); required only by commands that write bytes. */
   writeBytes?(path: string, bytes: Uint8Array): void;
+  /** Create a directory and its parents, if needed. */
+  ensureDir?(path: string): Promise<void>;
   exists?(path: string): boolean;
   listDir?(path: string): readonly string[];
 }

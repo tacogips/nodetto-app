@@ -86,7 +86,7 @@ export const PALETTE_ICONS = {
 
 export interface ShapePaletteItem {
   readonly tool: ToolKind;
-  readonly action?: "icon-picker" | "ios-kit";
+  readonly action?: "icon-picker" | "ios-kit" | "add-page-frame";
   readonly kitId?: string;
   readonly label: string;
   readonly icon: keyof typeof PALETTE_ICONS;
@@ -133,6 +133,14 @@ export const COMMON_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.StickFigure, label: "Stick figure", icon: "actor" },
   { tool: Tool.Package, label: "Package", icon: "package" },
   { tool: Tool.Sheet, label: "Sheet", icon: "table" },
+  { tool: Tool.CodeSnippet, label: "Code snippet", icon: "text" },
+  { tool: Tool.MarkdownSnippet, label: "Markdown snippet", icon: "text" },
+  {
+    tool: "action:add-page-frame" as ToolKind,
+    label: "Page",
+    icon: "frame",
+    action: "add-page-frame",
+  },
   { tool: Tool.Text, label: "Text", icon: "text" },
   { tool: Tool.TextLayer, label: "Text layer", icon: "text" },
   { tool: Tool.Note, label: "Note", icon: "note" },

@@ -45,6 +45,9 @@ test("toolbar action menus retain arrangement and export commands", () => {
     menu.actions.map((action) => action.id),
   );
   expect(items).toEqual([
+    "addPageFrame",
+    "nextPageFrame",
+    "previousPageFrame",
     "frameSelection",
     "group",
     "booleanUnion",

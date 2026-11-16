@@ -59,6 +59,7 @@ import {
   ShapePalette,
   type SnapSettings,
   TextEditor,
+  SnippetTextEditor,
   Toolbar,
   workspaceById,
   readWorkspacePreference,
@@ -710,6 +711,8 @@ export function App(props: AppProps): JSX.Element {
             setExportRequest(0);
             setCompareArtboards(ids);
           }}
+          exportDocumentPdf={exportHandlers.exportDocumentPdf}
+          exportDocumentMarkdown={exportHandlers.exportDocumentMarkdown}
           exportBpmn={exportHandlers.exportBpmn}
           exportBreadboard={exportHandlers.exportBreadboard}
           exportGerber={exportHandlers.exportGerber}
@@ -977,11 +980,43 @@ export function App(props: AppProps): JSX.Element {
               />
               <Show when={editing()} keyed>
                 {(target) => (
-                  <TextEditor
-                    editor={props.editor}
-                    target={target}
-                    onDone={() => setEditing(null)}
-                  />
+                  <Show
+                    when={
+                      (target.field === "code" ||
+                        target.field === "markdown") &&
+                      props.editor.store.get(target.id)
+                    }
+                    fallback={
+                      <TextEditor
+                        editor={props.editor}
+                        target={target}
+                        onDone={() => setEditing(null)}
+                      />
+                    }
+                  >
+                    {(element) => {
+                      const box = props.editor.registry
+                        .getOrFallback(element().type)
+                        .getBounds(
+                          element(),
+                          props.editor.createShapeContext(),
+                        );
+                      return box ? (
+                        <SnippetTextEditor
+                          editor={props.editor}
+                          id={target.id}
+                          box={box}
+                          mono={target.field === "code"}
+                          wrap={
+                            target.field === "markdown" ||
+                            (element().semantic as { wrap?: boolean }).wrap ===
+                              true
+                          }
+                          onClose={() => setEditing(null)}
+                        />
+                      ) : null;
+                    }}
+                  </Show>
                 )}
               </Show>
             </NodettoCanvas>

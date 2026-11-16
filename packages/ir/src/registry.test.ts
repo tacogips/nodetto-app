@@ -23,6 +23,8 @@ const DESIGN_TABLE_TYPES: readonly string[] = [
   "draw.path",
   "shape.geo",
   "text.note",
+  "text.code",
+  "text.markdown",
   "frame",
   "group",
 ];

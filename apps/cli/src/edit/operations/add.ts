@@ -25,6 +25,30 @@ import {
 
 const PLACE_GAP = 80;
 
+/** Normalize CLI code snippet defaults and language aliases without registry access. */
+export function normalizeCodeSnippetSemantic(
+  semantic: Json | undefined,
+  index: number,
+): Json | undefined {
+  if (semantic !== undefined && !isPlainObject(semantic)) return semantic;
+  const input = semantic ?? {};
+  const language =
+    input["language"] === undefined
+      ? "plain"
+      : requireText(input["language"], "language", index);
+  const canonical = resolveSyntaxKind(language);
+  if (canonical === null)
+    throw new OperationError(
+      index,
+      `Unknown language "${language}". Choose one of: ${SYNTAX_KINDS.join(", ")}`,
+    );
+  return {
+    ...input,
+    code: input["code"] === undefined ? "" : input["code"],
+    language: canonical,
+  };
+}
+
 /** Create one element; place it relative to another or beside the page content. */
 export function addElement(
   batch: Batch,
@@ -112,27 +136,8 @@ export function addElement(
     split && Object.keys(split.routing).length
       ? deepMerge(split.routing, operation["semantic"] ?? {})
       : operation["semantic"];
-  if (
-    type === "text.code" &&
-    (semanticInput === undefined || isPlainObject(semanticInput))
-  ) {
-    const input = semanticInput ?? {};
-    const language =
-      input["language"] === undefined
-        ? "plain"
-        : requireText(input["language"], "language", index);
-    const canonical = resolveSyntaxKind(language);
-    if (canonical === null)
-      throw new OperationError(
-        index,
-        `Unknown language "${language}". Choose one of: ${SYNTAX_KINDS.join(", ")}`,
-      );
-    semanticInput = {
-      ...input,
-      code: input["code"] === undefined ? "" : input["code"],
-      language: canonical,
-    };
-  }
+  if (type === "text.code")
+    semanticInput = normalizeCodeSnippetSemantic(semanticInput, index);
   const semantic =
     semanticInput === undefined
       ? undefined

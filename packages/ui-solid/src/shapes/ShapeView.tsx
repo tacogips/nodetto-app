@@ -17,12 +17,18 @@ import { UmlComponentView } from "./UmlComponentView.tsx";
 // A group gets no DOM at all (design editor-ux.md section 7): it exists for
 // selection and transformation only, and its members draw themselves.
 
-import { isBpmnShapeType, type Box } from "@nodetto/core";
+import {
+  isBpmnShapeType,
+  renderCodeSnippet,
+  renderMarkdownSnippet,
+  type Box,
+} from "@nodetto/core";
 import { isBreadboardElementType } from "@nodetto/ir";
 import { isPcbElementType } from "@nodetto/ir";
 import type { AccessibilityRole, Element } from "@nodetto/ir";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { ErdTableView } from "./ErdTableView.tsx";
+import { SnippetView } from "./SnippetView.tsx";
 import { TableSheetView } from "./TableSheetView.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { FreehandView } from "./FreehandView.tsx";
@@ -248,6 +254,20 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
           </Match>
           <Match when={isDatabaseObjectType(props.element.type)}>
             <DatabaseObjectView element={props.element} />
+          </Match>
+          <Match when={props.element.type === "text.code"}>
+            <SnippetView
+              element={props.element}
+              box={props.box}
+              render={renderCodeSnippet}
+            />
+          </Match>
+          <Match when={props.element.type === "text.markdown"}>
+            <SnippetView
+              element={props.element}
+              box={props.box}
+              render={renderMarkdownSnippet}
+            />
           </Match>
           <Match when={props.element.type === "table.sheet"}>
             <TableSheetView element={props.element} />

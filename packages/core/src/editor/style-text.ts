@@ -25,6 +25,8 @@ const EDITABLE_FIELDS: Readonly<Record<string, EditableField>> = {
   "shape.geo": "label",
   "node.generic": "label",
   "text.note": "text",
+  "text.code": "code",
+  "text.markdown": "markdown",
   frame: "name",
   "erd.table": "tableName",
   "ui.control": "label",

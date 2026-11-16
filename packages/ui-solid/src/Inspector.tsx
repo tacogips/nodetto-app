@@ -74,6 +74,10 @@ import { BasicAppearance } from "./inspector/BasicAppearance.tsx";
 import { StyleSection } from "./inspector/StyleSection.tsx";
 import { ImageSection } from "./inspector/ImageSection.tsx";
 import { UmlClassSection } from "./inspector/UmlClassSection.tsx";
+import { CodeSnippetSection } from "./inspector/CodeSnippetSection.tsx";
+import { MarkdownSnippetSection } from "./inspector/MarkdownSnippetSection.tsx";
+import { PageFrameSection } from "./inspector/PageFrameSection.tsx";
+import { PageFlowControl } from "./inspector/PageFlowControl.tsx";
 import { TableSheetSection } from "./inspector/TableSheetSection.tsx";
 import { ColorBindingsSection } from "./inspector/ColorBindingsSection.tsx";
 import { NumberBindingsSection } from "./inspector/NumberBindingsSection.tsx";
@@ -211,6 +215,8 @@ export function Inspector(props: InspectorProps): JSX.Element {
       "ui.icon": "Icon",
       "erd.table": "Table",
       "table.sheet": "Table (sheet)",
+      "text.code": "Code snippet",
+      "text.markdown": "Markdown snippet",
       "uml.class": "Class",
       "state.node": "State",
       "state.transition": "State transition",
@@ -283,6 +289,7 @@ export function Inspector(props: InspectorProps): JSX.Element {
           </Match>
           <Match when={element().type === "frame"}>
             <FrameSection editor={props.editor} element={element()} />
+            <PageFrameSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type === "text.note"}>
             <TextNoteSection editor={props.editor} element={element()} />
@@ -292,6 +299,12 @@ export function Inspector(props: InspectorProps): JSX.Element {
           </Match>
           <Match when={isDatabaseObjectType(element().type)}>
             <DatabaseObjectSection editor={props.editor} element={element()} />
+          </Match>
+          <Match when={element().type === "text.code"}>
+            <CodeSnippetSection editor={props.editor} element={element()} />
+          </Match>
+          <Match when={element().type === "text.markdown"}>
+            <MarkdownSnippetSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type === "table.sheet"}>
             <TableSheetSection editor={props.editor} element={element()} />
@@ -443,6 +456,7 @@ export function Inspector(props: InspectorProps): JSX.Element {
               {(current) => (
                 <>
                   <PageSection editor={props.editor} page={current()} />
+                  <PageFlowControl editor={props.editor} />
                   <PresentationSection editor={props.editor} page={current()} />
                   <SlideTransitionSection
                     editor={props.editor}

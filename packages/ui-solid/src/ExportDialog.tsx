@@ -67,12 +67,19 @@ type Format =
   | "code"
   | "html"
   | "artboards"
-  | "prototype";
+  | "prototype"
+  | "document-pdf"
+  | "document-markdown";
 
 export interface ExportDialogProps {
   readonly editor: Editor;
   readonly saveArtwork?: SaveArtwork;
   readonly saveHtmlBundle?: SaveHtmlBundle;
+  readonly exportDocumentPdf?: (
+    scale: number,
+    background: string | null,
+  ) => Promise<void>;
+  readonly exportDocumentMarkdown?: () => Promise<void>;
   readonly exportBpmn: () => Promise<void>;
   readonly exportBreadboard?: (kind: BreadboardExportKind) => Promise<void>;
   /** Gerber and drill ZIP of a page drawn by Gerber import. */
@@ -96,6 +103,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     "png",
   );
   const [scale, setScale] = createSignal(2);
+  const [background, setBackground] = createSignal("#ffffff");
   const [flow, setFlow] = createSignal("");
   const [device, setDevice] = createSignal(true);
   const [exportError, setExportError] = createSignal("");
@@ -121,6 +129,16 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       { id: "svg", label: "SVG", enabled: true },
       { id: "png", label: "PNG", enabled: true },
       { id: "pdf", label: "PDF", enabled: true },
+      {
+        id: "document-pdf",
+        label: "Document as PDF...",
+        enabled: props.exportDocumentPdf !== undefined,
+      },
+      {
+        id: "document-markdown",
+        label: "Document as Markdown (ZIP)...",
+        enabled: props.exportDocumentMarkdown !== undefined,
+      },
       {
         id: "mermaid",
         label: "Mermaid",
@@ -173,6 +191,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const active = () =>
     formats().find((t) => t.id === format())?.enabled ? format() : "svg";
   const formatGroups: readonly { label: string; ids: readonly Format[] }[] = [
+    { label: "Document", ids: ["document-pdf", "document-markdown"] },
     { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
     {
       label: "Diagram source",
@@ -182,6 +201,8 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     { label: "Web & developer", ids: ["html", "prototype", "code"] },
   ];
   const descriptions: Record<Format, string> = {
+    "document-pdf": "Export each page frame as a PDF page.",
+    "document-markdown": "Export Markdown and SVG assets in a ZIP archive.",
     svg: "Scalable vector artwork for editing and sharing.",
     png: "A raster image with adjustable resolution and background.",
     pdf: "A document sized to your artwork or a printed page.",
@@ -354,6 +375,49 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                   id={selected()?.type === "frame" ? selected()?.id : undefined}
                 />
               )}
+            </Match>
+            <Match when={active() === "document-pdf"}>
+              <section>
+                <label>
+                  Resolution{" "}
+                  <select
+                    value={scale()}
+                    onChange={(event) =>
+                      setScale(Number(event.currentTarget.value))
+                    }
+                  >
+                    <option value="1">1×</option>
+                    <option value="2">2×</option>
+                    <option value="3">3×</option>
+                  </select>
+                </label>
+                <label>
+                  Background{" "}
+                  <input
+                    type="color"
+                    value={background()}
+                    onInput={(event) =>
+                      setBackground(event.currentTarget.value)
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void props.exportDocumentPdf?.(scale(), background())
+                  }
+                >
+                  Export document PDF
+                </button>
+              </section>
+            </Match>
+            <Match when={active() === "document-markdown"}>
+              <button
+                type="button"
+                onClick={() => void props.exportDocumentMarkdown?.()}
+              >
+                Export document Markdown ZIP
+              </button>
             </Match>
             <Match when={active() === "html"}>
               <HtmlExportSection

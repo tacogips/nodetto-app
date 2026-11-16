@@ -4,6 +4,9 @@
 // where there is no filesystem.
 
 import {
+  documentPdfPlan,
+  exportMarkdownDocument,
+  encodeStoredZip,
   bpmnRouteResolver,
   computeBreadboardConnectivity,
   type Editor,
@@ -15,6 +18,7 @@ import {
   exportPcbPage,
   toBreadboardNetlist,
 } from "@nodetto/core";
+import { pagesToPdf, rasterizeSvg } from "@nodetto/ui-solid";
 import type { ExportBackend } from "../file/backend.ts";
 
 /** Drop a trailing extension and anything a filesystem would refuse. */
@@ -36,6 +40,11 @@ export interface ExportHandlers {
     blob: Blob,
     extension: string,
   ) => Promise<boolean>;
+  readonly exportDocumentPdf: (
+    scale: number,
+    background: string | null,
+  ) => Promise<void>;
+  readonly exportDocumentMarkdown: () => Promise<void>;
   readonly exportBpmn: () => Promise<void>;
   readonly exportBreadboard: (
     kind: "bom" | "kicad" | "spice" | "gerber",
@@ -152,6 +161,54 @@ export function createExportHandlers(
     return true;
   };
 
+  const exportDocumentPdf = async (
+    scale: number,
+    background: string | null,
+  ): Promise<void> => {
+    setExportError(null);
+    try {
+      const name = `${exportBaseName(source.editor.getSnapshot().title)}.pdf`;
+      const pages = [];
+      for (const page of documentPdfPlan(source.editor, { background }))
+        pages.push({
+          png: await rasterizeSvg(page.svg, scale),
+          spec: page.spec,
+        });
+      const blob = await pagesToPdf(pages);
+      if (source.exportBackend.available) await saveArtwork(name, blob, "pdf");
+      else downloadBlob(blob, name);
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+  const exportDocumentMarkdown = async (): Promise<void> => {
+    setExportError(null);
+    try {
+      const base = exportBaseName(source.editor.getSnapshot().title);
+      const result = exportMarkdownDocument(source.editor, {
+        assetDir: `${base}.assets`,
+      });
+      const encoder = new TextEncoder();
+      const bytes = encodeStoredZip(
+        [
+          { path: `${base}.md`, contents: encoder.encode(result.markdown) },
+          ...result.assets.map((asset) => ({
+            path: `${base}.assets/${asset.name}`,
+            contents: encoder.encode(asset.svg),
+          })),
+        ],
+        "Document",
+      );
+      await saveZip(bytes, `${base}.zip`);
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   /** The imported board's Gerber and drill files, edits included. */
   const exportGerber = async (): Promise<void> => {
     setExportError(null);
@@ -255,6 +312,8 @@ export function createExportHandlers(
 
   return {
     saveArtwork,
+    exportDocumentPdf,
+    exportDocumentMarkdown,
     exportBpmn,
     exportBreadboard,
     exportGerber,

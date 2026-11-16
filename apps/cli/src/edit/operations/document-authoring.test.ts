@@ -1,33 +1,30 @@
 import { expect, test } from "bun:test";
 import { Editor } from "@nodetto/core";
 import { Batch } from "../batch.ts";
+import { normalizeCodeSnippetSemantic } from "./add.ts";
 
-test("code add normalizes languages and applies defaults", () => {
-  const editor = new Editor();
-  const batch = new Batch(editor);
-  batch.apply(
-    { op: "add", type: "text.code", id: "code1", semantic: { language: "TS" } },
-    0,
-  );
-  expect(editor.store.get("code1")?.semantic).toMatchObject({
-    language: "typescript",
+test("code snippet semantics normalize languages and apply defaults", () => {
+  expect(normalizeCodeSnippetSemantic({ language: "TS" }, 0)).toEqual({
+    language: "javascript",
     code: "",
   });
-  batch.apply({ op: "add", type: "text.code", id: "code2" }, 1);
-  expect(editor.store.get("code2")?.semantic).toMatchObject({
+  expect(normalizeCodeSnippetSemantic(undefined, 0)).toEqual({
     language: "plain",
     code: "",
   });
-  expect(() =>
-    batch.apply(
-      { op: "add", type: "text.code", semantic: { language: "klingon" } },
-      2,
+  expect(
+    normalizeCodeSnippetSemantic(
+      { code: "x", language: "rust", lineNumbers: true },
+      0,
     ),
-  ).toThrow('Unknown language "klingon"');
+  ).toEqual({ code: "x", language: "rust", lineNumbers: true });
   expect(() =>
-    batch.apply({ op: "add", type: "text.code", semantic: { language: 3 } }, 3),
-  ).toThrow("language");
-  batch.dispose();
+    normalizeCodeSnippetSemantic({ language: "klingon" }, 2),
+  ).toThrow('Unknown language "klingon". Choose one of:');
+  expect(() => normalizeCodeSnippetSemantic({ language: 3 }, 3)).toThrow(
+    "language",
+  );
+  expect(normalizeCodeSnippetSemantic("unchanged", 0)).toBe("unchanged");
 });
 
 test("page flow sets horizontal and removes vertical or null", () => {

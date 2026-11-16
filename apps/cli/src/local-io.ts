@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { fontCoverage } from "./font-coverage.ts";
 import type { CommandIo } from "./commands.ts";
@@ -16,6 +17,9 @@ export function localIo(): CommandIo {
     readStdin: () => readFileSync(0, "utf8"),
     writeText: writeFileAtomic,
     writeBytes: writeFileAtomic,
+    ensureDir: async (path) => {
+      await mkdir(path, { recursive: true });
+    },
     exists: (path) => existsSync(path),
     listDir: (path) =>
       readdirSync(path)

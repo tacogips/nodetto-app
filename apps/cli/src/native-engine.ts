@@ -6,7 +6,7 @@ import { exportCommand } from "./export-command.ts";
 import { compareCommand } from "./compare-command.ts";
 import { openCommand } from "./open-command.ts";
 import { desktopOpenLink } from "./open-link.ts";
-import { pdfLayout } from "@nodetto/core";
+import { pdfLayout, buildPdfTextLayer, nativePdfSpec } from "@nodetto/core";
 import { COMMAND_HELP, OVERVIEW } from "./help.ts";
 
 declare const native: {
@@ -15,6 +15,8 @@ declare const native: {
   readBytes(path: string): Uint8Array;
   listDir(path: string): string;
   writeBytes(path: string, data: Uint8Array): void;
+  ensureDir(path: string): void;
+  pdfPages(pngs: Uint8Array, spec: string): Uint8Array;
   exists(path: string): boolean;
   readStdin(): string;
   attachment(document: string, path: string): Uint8Array;
@@ -46,6 +48,7 @@ const io = {
     native.writeBytes(native.path(path), new TextEncoder().encode(text)),
   writeBytes: (path: string, bytes: Uint8Array) =>
     native.writeBytes(native.path(path), bytes),
+  ensureDir: async (path: string) => native.ensureDir(native.path(path)),
   exists: (path: string) => native.exists(native.path(path)),
   listDir: (path: string) =>
     JSON.parse(native.listDir(native.path(path))) as string[],
@@ -82,6 +85,28 @@ Object.assign(globalThis, {
                   fallback ?? false,
                 ),
               ),
+            pagesToPdf: async (pages) => {
+              const pngs = new Uint8Array(
+                pages.reduce((sum, page) => sum + page.png.length, 0),
+              );
+              let offset = 0;
+              for (const page of pages) {
+                pngs.set(page.png, offset);
+                offset += page.png.length;
+              }
+              return new Uint8Array(
+                native.pdfPages(
+                  pngs,
+                  nativePdfSpec(
+                    buildPdfTextLayer(pages.map((page) => page.spec)),
+                    pages.map((page) => ({
+                      pngLength: page.png.length,
+                      layout: page.spec.layout,
+                    })),
+                  ),
+                ),
+              );
+            },
             pngToPdf: async (png, width, height, options) =>
               new Uint8Array(
                 native.pdf(

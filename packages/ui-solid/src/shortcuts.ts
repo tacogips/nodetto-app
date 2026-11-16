@@ -15,6 +15,7 @@ import {
 // DOM-free on purpose so `bun test` can cover the enabled rules.
 
 import {
+  pageFramesInFlowOrder,
   canCopySelectionStyle,
   canFlattenBooleanGroup,
   canFlipSelection,
@@ -97,6 +98,9 @@ export type ActionId =
   | "bringForward"
   | "sendBackward"
   | "sendToBack"
+  | "addPageFrame"
+  | "nextPageFrame"
+  | "previousPageFrame"
   | "frameSelection"
   | "group"
   | "booleanUnion"
@@ -460,6 +464,37 @@ const ACTION_DEFINITIONS: readonly EditorAction[] = [
     },
   },
   {
+    id: "addPageFrame",
+    label: "Add page",
+    group: "group",
+    enabled: ({ editor }) => !editor.readOnly,
+    run: ({ editor }) => {
+      editor.addPageFrame();
+    },
+  },
+  ...(
+    [
+      ["nextPageFrame", "Next page frame", "PageDown", "next"],
+      ["previousPageFrame", "Previous page frame", "PageUp", "previous"],
+    ] as const
+  ).map(
+    ([id, label, shortcut, direction]): EditorAction => ({
+      id,
+      label,
+      shortcut,
+      group: "group",
+      enabled: ({ editor }) =>
+        pageFramesInFlowOrder(
+          editor.store,
+          editor.registry,
+          editor.currentPageId,
+        ).length > 0,
+      run: ({ editor, viewport }) => {
+        editor.goToPageFrame(direction, viewport);
+      },
+    }),
+  ),
+  {
     id: "frameSelection",
     label: "Frame selection",
     shortcut: chord(MOD, ALT, "G"),
@@ -666,6 +701,8 @@ const VIEWER_ACTIONS = new Set<ActionId>([
   "selectSameName",
   "selectSameFill",
   "selectSameStroke",
+  "nextPageFrame",
+  "previousPageFrame",
   "zoomIn",
   "zoomOut",
   "zoomReset",

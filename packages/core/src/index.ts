@@ -907,5 +907,11 @@ export * from "./markdown/index.ts";
 export * from "./page-frames/index.ts";
 export * from "./syntax/index.ts";
 export * from "./code-snippet/index.ts";
+export * from "./markdown-snippet/index.ts";
+export { codeSnippetShapeUtil } from "./code-snippet/shape.ts";
+export { renderCodeSnippet } from "./svg-export/code-snippet.ts";
+export { renderMarkdownSnippet } from "./svg-export/markdown-snippet.ts";
 
 export * from "./document-export/index.ts";
+
+export { encodeStoredZip } from "./zip.ts";

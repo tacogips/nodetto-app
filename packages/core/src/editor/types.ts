@@ -51,7 +51,14 @@ export interface CreateElementOptions {
 export type EditorListener = (diff: StoreDiff) => void;
 
 /** The one text field a double-click edits on an element, by type. */
-export type EditableField = "label" | "text" | "tableName" | "name" | "trigger";
+export type EditableField =
+  | "label"
+  | "text"
+  | "tableName"
+  | "name"
+  | "trigger"
+  | "code"
+  | "markdown";
 
 /** A style change; `null` clears a field back to the stylesheet default. */
 export type StylePatch = {

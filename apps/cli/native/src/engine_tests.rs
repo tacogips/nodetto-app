@@ -228,3 +228,14 @@ fn pdf_pages_host_returns_pdf_bytes() {
     );
     assert_eq!(result, json!([true, [37, 80, 68, 70, 45]]));
 }
+
+#[test]
+fn ensure_dir_creates_nested_directories_idempotently() {
+    let folder = tempfile::tempdir().unwrap();
+    evaluate(
+        "(() => { native.ensureDir(native.path('a/b/c')); native.ensureDir(native.path('a/b/c')); return true; })()",
+        Input::Mcp(None),
+        Some(folder.path().into()),
+    );
+    assert!(folder.path().join("a/b/c").is_dir());
+}

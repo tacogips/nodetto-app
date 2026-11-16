@@ -64,6 +64,7 @@ import {
   type SnapSettings,
 } from "./interaction.ts";
 import { prototypeViewState, isPrototypeEdge } from "./shortcuts.ts";
+import { insideSlot, isEditableTarget } from "./interaction/events.ts";
 import { PrototypeViewLayer } from "./PrototypeViewLayer.tsx";
 import { FlowsPanel } from "./FlowsPanel.tsx";
 import { ConnectorMarkers } from "./shapes/ConnectorView.tsx";
@@ -339,7 +340,30 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       onPointerUp={interaction.onPointerUp}
       onPointerCancel={interaction.onPointerCancel}
       onWheel={interaction.onWheel}
-      onKeyDown={interaction.onKeyDown}
+      onKeyDown={(event) => {
+        if (
+          !event.defaultPrevented &&
+          !event.isComposing &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.shiftKey &&
+          !prototype.presenting() &&
+          !isEditableTarget(event.target) &&
+          !insideSlot(event.target) &&
+          (event.key === "PageDown" || event.key === "PageUp")
+        ) {
+          if (
+            props.editor.goToPageFrame(
+              event.key === "PageDown" ? "next" : "previous",
+              viewport(),
+            )
+          )
+            event.preventDefault();
+          return;
+        }
+        interaction.onKeyDown(event);
+      }}
       onKeyUp={interaction.onKeyUp}
       onDblClick={interaction.onDoubleClick}
       onContextMenu={interaction.onContextMenu}

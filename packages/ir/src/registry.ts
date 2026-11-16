@@ -15,6 +15,7 @@ import { databaseObjectDefinitions } from "./database-objects.ts";
 // this module assembles them in registration order.
 
 import { GENERIC_NODE, GENERIC_EDGE } from "./registry/generic.ts";
+import { TEXT_CODE, TEXT_MARKDOWN } from "./registry/document.ts";
 import { TABLE_SHEET } from "./registry/table.ts";
 import { ERD_TABLE, ERD_RELATION } from "./registry/erd.ts";
 import {
@@ -85,6 +86,8 @@ const DEFINITIONS: readonly ElementTypeDefinition[] = [
   GENERIC_EDGE,
   ERD_TABLE,
   TABLE_SHEET,
+  TEXT_CODE,
+  TEXT_MARKDOWN,
   uiControlDefinition,
   uiIconDefinition,
   ...databaseObjectDefinitions,

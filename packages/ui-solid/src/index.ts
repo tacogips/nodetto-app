@@ -151,3 +151,8 @@ export { PresentationSection } from "./inspector/PresentationSection.tsx";
 export { effectiveShowSlideArea } from "./canvas/slide-area.ts";
 export { AppDesignProblemsPanel } from "./AppDesignProblemsPanel.tsx";
 export { CompareDialog } from "./CompareDialog.tsx";
+
+export { SnippetTextEditor } from "./snippet/SnippetTextEditor.tsx";
+
+export { pagesToPdf } from "./pdf-export.ts";
+export { rasterizeSvg } from "./raster-export.ts";

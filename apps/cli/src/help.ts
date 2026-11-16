@@ -197,6 +197,9 @@ ${EXIT_CODES}`,
 --quiet suppresses warning lines; repeated warnings collapse as
 " (and <n> more like this)". --strict still exits 3 where supported.
 
+Use set-page-flow to set vertical or horizontal page-frame flow. text.code add
+normalizes language aliases to canonical IDs and rejects unknown languages.
+
 Apply a batch of operations through the editor's command layer, so the result is
 exactly what the app would produce. The batch is all-or-nothing: an invalid
 operation prints its index and reason and nothing is written. The document is
@@ -476,7 +479,7 @@ ${EXIT_CODES}`,
   export: `Usage: nodetto-cli export <doc.jsonl> --format <format> [--page <short-id|id|name>]
                           [--element <id>] [--output <file>] [--font-dir <dir>] [--padding <n>]
                           [--background <#rrggbb|transparent>] [--scale <n>]
-                          [--pdf-page artwork|a4|letter]
+                          [--document] [--pdf-page artwork|a4|letter]
                           [--orientation portrait|landscape] [--margin <mm>]
                           [--mermaid-kind erDiagram|classDiagram|sequenceDiagram|stateDiagram-v2|flowchart]
                           [--code-format <output>]
@@ -496,7 +499,11 @@ Text exports (SVG, Mermaid, D2, draw.io) depend only on canonical content and
 referenced attachment bytes, independent of branch, time, time zone, locale,
 working directory, absolute path and Bun or native. PNG and PDF depend on fonts.
 
-  --format       svg, png, pdf, html, mermaid, d2, drawio or code (required).
+  --format       svg, png, pdf, markdown, html, mermaid, d2, drawio or code (required).
+  --document     Export all page frames (or pages) as PDF or Markdown.
+                 Examples: --format pdf --document --output file.pdf
+                 --format markdown --document --output file.md
+                 --format markdown --output file.md (equivalent shorthand).
                  html writes a website ZIP; code uses --element and --code-format;
                  drawio writes an editable draw.io file of every page.
                  SQL: use nodetto-cli ddl. BPMN XML: use nodetto-cli bpmn export.
@@ -507,7 +514,7 @@ working directory, absolute path and Bun or native. PNG and PDF depend on fonts.
   --element      Render only this element's area (a frame renders everything
                  inside it). Accepts a unique id prefix; implies its page.
                  Use it to check one part of a large diagram.
-  --output       Output file. PNG, PDF and HTML require it; text formats print
+  --output       Output file. PNG, PDF, Markdown and HTML require it; text formats print
                  to stdout when omitted.
   --mermaid-kind Mermaid diagram kind; defaults to the first available kind on
                  the selected page. Does not include any other document pages.

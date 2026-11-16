@@ -18,6 +18,8 @@ import { ShapeUtilRegistry } from "../shape-util.ts";
 import { edgeShapeUtil } from "./edge.ts";
 import { erdRelationShapeUtil } from "./erdRelation.ts";
 import { erdTableShapeUtil } from "./erdTable.ts";
+import { codeSnippetShapeUtil } from "../code-snippet/shape.ts";
+import { markdownSnippetShapeUtil } from "../markdown-snippet/shape.ts";
 import { tableSheetShapeUtil } from "../table-sheet/index.ts";
 import { geoShapeUtil } from "./geo.ts";
 import { frameShapeUtil } from "./frame.ts";
@@ -135,6 +137,8 @@ export function createDefaultRegistry(): ShapeUtilRegistry {
     .register(edgeShapeUtil)
     .register(erdTableShapeUtil)
     .register(tableSheetShapeUtil)
+    .register(codeSnippetShapeUtil)
+    .register(markdownSnippetShapeUtil)
     .register(umlClassShapeUtil)
     .register(erdRelationShapeUtil)
     .register(umlAssociationShapeUtil)

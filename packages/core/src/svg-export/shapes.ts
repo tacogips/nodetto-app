@@ -50,6 +50,8 @@ import {
   renderUmlClass,
   renderUmlComponent,
 } from "./structured-shapes.ts";
+import { renderCodeSnippet } from "./code-snippet.ts";
+import { renderMarkdownSnippet } from "./markdown-snippet.ts";
 import { renderTableSheet } from "./table-sheet.ts";
 import { renderTextNote } from "./text-note.ts";
 import { renderPcbShape } from "./pcb-shapes.ts";
@@ -299,6 +301,10 @@ export function renderShape(
       return renderDatabaseObject(element, box, theme);
     case "erd.table":
       return renderErdTable(element, box, theme);
+    case "text.code":
+      return renderCodeSnippet(element, box);
+    case "text.markdown":
+      return renderMarkdownSnippet(element, box);
     case "table.sheet":
       return renderTableSheet(element, box, theme);
     case UmlComponentType.Component:

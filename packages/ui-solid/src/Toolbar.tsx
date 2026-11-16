@@ -181,6 +181,9 @@ export const ACTION_MENUS: readonly Readonly<{
     id: "arrange",
     label: "Arrange",
     actions: actions([
+      ["addPageFrame", "Add page"],
+      ["nextPageFrame", "Next page frame"],
+      ["previousPageFrame", "Previous page frame"],
       ["frameSelection", "Frame selection"],
       ["group", "Group"],
       ["booleanUnion", "Union"],

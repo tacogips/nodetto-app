@@ -14,6 +14,11 @@ import { encodeRasterDataUrl, isRasterAttachmentPath } from "@nodetto/ir";
 
 import {
   Editor,
+  documentPdfPlan,
+  exportMarkdownDocument,
+  collectTextRuns,
+  pdfLayout,
+  type PdfPageSpec,
   orderedTopLevelFrames,
   frameFileStem,
   lintTextLayoutPage,
@@ -71,6 +76,7 @@ const EXPORT_OPTIONS = new Set([
 ]);
 
 const EXPORT_FORMATS = [
+  "markdown",
   "svg",
   "png",
   "pdf",
@@ -105,6 +111,9 @@ export interface RasterBackend {
     fontDir: string | undefined,
     fallback?: boolean,
   ): Promise<Uint8Array>;
+  pagesToPdf?(
+    pages: readonly { png: Uint8Array; spec: PdfPageSpec }[],
+  ): Promise<Uint8Array>;
   pngToPdf(
     png: Uint8Array,
     width: number,
@@ -125,7 +134,7 @@ export async function exportCommand(
   const parsed = parseArgs(
     args,
     EXPORT_OPTIONS,
-    new Set(["--prototype", "--frames"]),
+    new Set(["--prototype", "--frames", "--document"]),
   );
   if (typeof parsed === "string")
     return fail(`${parsed}\n\n${helpFor("export")}`);
@@ -153,6 +162,30 @@ export async function exportCommand(
   const frames = parsed.flags.has("--frames");
   const outputDir = parsed.options.get("--output-dir");
   const device = parsed.options.get("--device") ?? "frame";
+  const documentExport =
+    parsed.flags.has("--document") || exportFormat === "markdown";
+  if (
+    parsed.flags.has("--document") &&
+    exportFormat !== "pdf" &&
+    exportFormat !== "markdown"
+  )
+    return fail("--document is valid only with --format pdf or markdown.");
+  if (documentExport) {
+    for (const flag of [
+      "--page",
+      "--element",
+      "--frames",
+      "--pdf-page",
+      "--orientation",
+      "--margin",
+    ])
+      if (parsed.options.has(flag) || parsed.flags.has(flag))
+        return fail(`--document conflicts with ${flag}.`);
+    if (!outputPath) return fail("Document export requires --output.");
+    if (exportFormat === "markdown" && !outputPath.endsWith(".md"))
+      return fail("Markdown export requires --output ending in .md.");
+  }
+
   if (exportFormat === "prototype") {
     if (prototypeView || frames || parsed.options.has("--element"))
       return fail(
@@ -266,6 +299,76 @@ export async function exportCommand(
         : ok("", `${warnings}Wrote ${outputPath}.\n`);
     } catch (error) {
       return fail(`Cannot export drawio: ${describe(error)}`);
+    }
+  }
+  if (documentExport) {
+    try {
+      const editor = new Editor({ document: loaded.document });
+      const resolveAsset = (source: string): string => {
+        const cached = editor.assets.resolve(source);
+        if (cached) return cached;
+        if (!isRasterAttachmentPath(source) || !io.readAttachment)
+          throw new Error(`Missing attachment: ${source}`);
+        const data = encodeRasterDataUrl(io.readAttachment(path, source));
+        editor.assets.set(source, data);
+        return data;
+      };
+      const target = outputPath as string;
+      if (exportFormat === "markdown") {
+        const slash = Math.max(
+          target.lastIndexOf("/"),
+          target.lastIndexOf("\\"),
+        );
+        const directory = slash < 0 ? "." : target.slice(0, slash) || "/";
+        const stem = target.slice(slash + 1, -3);
+        const assetDir = `${stem}.assets`;
+        const result = exportMarkdownDocument(editor, {
+          assetDir,
+          resolveAsset,
+        });
+        if (result.assets.length) {
+          if (!io.ensureDir)
+            return fail("This host cannot create directories.", 1);
+          await io.ensureDir(`${directory}/${assetDir}`);
+          for (const asset of result.assets) {
+            const failure = writeOutput(
+              io,
+              `${directory}/${assetDir}/${asset.name}`,
+              asset.svg,
+            );
+            if (failure) return fail(failure, 1);
+          }
+        }
+        const failure = writeOutput(io, target, result.markdown);
+        return failure
+          ? fail(failure, 1)
+          : ok("", `${loaded.warnings}Wrote ${target}.\n`);
+      }
+      const plans = documentPdfPlan(editor, { background, resolveAsset });
+      const renderer = backend ?? (await import("./raster-backend.ts"));
+      if (!renderer.pagesToPdf)
+        return fail("This host cannot export multi-page PDF.", 1);
+      const pages = [];
+      for (const plan of plans) {
+        rasterDimensions(plan.spec.width, plan.spec.height, requestedScale);
+        pages.push({
+          png: await renderer.rasterize(
+            plan.svg,
+            requestedScale,
+            parsed.options.get("--font-dir"),
+          ),
+          spec: plan.spec,
+        });
+      }
+      if (!io.writeBytes)
+        return fail("This environment cannot write binary files.", 1);
+      io.writeBytes(target, await renderer.pagesToPdf(pages));
+      return ok(
+        "",
+        `${loaded.warnings}Wrote ${target} (${pages.length} pages).\n`,
+      );
+    } catch (cause) {
+      return fail(`Cannot export: ${describe(cause)}`, 1);
     }
   }
   const page = selectPage(
@@ -527,11 +630,45 @@ export async function exportCommand(
     bytes =
       exportFormat === "png"
         ? png
-        : await renderer.pngToPdf(png, snapped.width, snapped.height, {
-            pageSize,
-            orientation,
-            marginMm,
-          });
+        : renderer.pagesToPdf
+          ? await renderer.pagesToPdf([
+              {
+                png,
+                spec: {
+                  width: snapped.width,
+                  height: snapped.height,
+                  layout: pdfLayout(snapped.width, snapped.height, {
+                    pageSize,
+                    orientation,
+                    marginMm,
+                  }),
+                  textRuns: collectTextRuns(
+                    editor.store,
+                    editor.registry,
+                    page.id,
+                    (() => {
+                      const values =
+                        /^<svg\s[^>]*\bviewBox="([^"]+)"/
+                          .exec(svg)?.[1]
+                          ?.trim()
+                          .split(/\s+/)
+                          .map(Number) ?? [];
+                      return {
+                        x: values[0] ?? 0,
+                        y: values[1] ?? 0,
+                        width: snapped.width,
+                        height: snapped.height,
+                      };
+                    })(),
+                  ),
+                },
+              },
+            ])
+          : await renderer.pngToPdf(png, snapped.width, snapped.height, {
+              pageSize,
+              orientation,
+              marginMm,
+            });
   } catch (cause) {
     return fail(`${warnings}Cannot export: ${describe(cause)}`);
   }

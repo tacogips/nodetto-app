@@ -1,6 +1,12 @@
+import type { PDFObject, PDFPage, PDFRef } from "pdf-lib";
 import { existsSync } from "node:fs";
 import {
   type PdfOptions,
+  type PdfPageSpec,
+  type PdfLiteral,
+  type PdfLiteralDict,
+  buildPdfTextLayer,
+  emitPdfTextLayer,
   pdfLayout,
   rasterDimensions,
   svgRasterDimensions,
@@ -69,4 +75,55 @@ export async function pngToPdf(
     .addPage([layout.pageWidth, layout.pageHeight])
     .drawImage(image, layout);
   return document.save();
+}
+
+export async function pagesToPdf(
+  pages: readonly { png: Uint8Array; spec: PdfPageSpec }[],
+): Promise<Uint8Array> {
+  if (!pages.length) throw new Error("PDF export needs at least one page.");
+  const { PDFDocument, PDFName } = await import("pdf-lib");
+  const doc = await PDFDocument.create();
+  doc.setCreator("Nodetto");
+  const pdfPages: PDFPage[] = [];
+  for (const { png, spec } of pages) {
+    const image = await doc.embedPng(png);
+    const page = doc.addPage([spec.layout.pageWidth, spec.layout.pageHeight]);
+    page.drawImage(image, spec.layout);
+    pdfPages.push(page);
+  }
+  const convert = (value: PdfLiteral<PDFRef>): PDFObject => {
+    if (typeof value === "number") return doc.context.obj(value);
+    if (Array.isArray(value)) return doc.context.obj(value.map(convert));
+    if ("name" in value && typeof value.name === "string")
+      return PDFName.of(value.name.replace(/^\//, ""));
+    if (
+      "ref" in value &&
+      value.ref instanceof Object &&
+      "objectNumber" in value.ref
+    )
+      return value.ref as PDFRef;
+    const entries: Record<string, PDFObject> = {};
+    for (const [key, item] of Object.entries(value))
+      entries[key] = convert(item);
+    return doc.context.obj(entries);
+  };
+  const entries = (dict: PdfLiteralDict<PDFRef>) => {
+    const result: Record<string, PDFObject> = {};
+    for (const [key, value] of Object.entries(dict))
+      result[key] = convert(value);
+    return result;
+  };
+  emitPdfTextLayer<PDFRef>(buildPdfTextLayer(pages.map(({ spec }) => spec)), {
+    dict: (dict) => doc.context.register(doc.context.obj(entries(dict))),
+    stream: (content, dict, compress) =>
+      doc.context.register(
+        compress
+          ? doc.context.flateStream(content, entries(dict))
+          : doc.context.stream(content, entries(dict)),
+      ),
+    setPageFont: (index, name, ref) =>
+      pdfPages[index].node.setFontDictionary(PDFName.of(name), ref),
+    addPageContent: (index, ref) => pdfPages[index].node.addContentStream(ref),
+  });
+  return doc.save({ useObjectStreams: false });
 }

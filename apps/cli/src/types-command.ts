@@ -31,6 +31,8 @@ const GENERAL = [
   "edge.generic",
   "shape.geo",
   "text.note",
+  "text.code",
+  "text.markdown",
   "frame",
   "group",
   "draw.freehand",

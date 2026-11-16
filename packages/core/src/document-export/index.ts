@@ -3,3 +3,5 @@ export * from "./pdf-emit.ts";
 export * from "./pdf-text-extract.ts";
 export * from "./text-runs.ts";
 export * from "./extractors.ts";
+export * from "./markdown.ts";
+export * from "./pdf-document.ts";

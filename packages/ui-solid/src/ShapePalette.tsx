@@ -262,6 +262,10 @@ export function ShapePalette(props: {
                 suppressClick = false;
                 return;
               }
+              if (item.action === "add-page-frame") {
+                runAction(getAction("addPageFrame"), props.context);
+                return;
+              }
               if (item.action === "ios-kit" && item.kitId) {
                 insertPaletteKit(props.editor, item.kitId, centre());
                 return;
