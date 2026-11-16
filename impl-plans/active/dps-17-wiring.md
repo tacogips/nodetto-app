@@ -314,3 +314,39 @@ Decisions:
 - Resume from the partial work already in the tree (registry, core
   dispatch, extractors, tools, catalogue, ShapeView, Inspector); do not
   redo it. The verification list is unchanged.
+
+## Amendment 2026-11-16 (blocked-wave-scope-or-contract, round 2)
+
+Checkpoint blocker (wave-004, previousCheckpointCommit f47542f): the existing
+exact action-list assertion in `packages/ui-solid/src/Toolbar.test.ts` fails
+after the three required page-frame actions are added, and the file was not
+in writePaths.
+
+This is the last allowed amendment round, so it also pre-authorizes the
+co-located tests whose exact-list expectations the remaining required
+wiring can change.
+
+Decisions:
+
+- Authorize `packages/ui-solid/src/Toolbar.test.ts`. Required edit: add
+  `addPageFrame`, `nextPageFrame` and `previousPageFrame` to the expected
+  action list, in the order Toolbar.tsx exposes them.
+- Pre-authorize these tests, with the same rule: `shortcuts.test.ts`,
+  `export-dialog-artboards.test.ts`, `page-actions.test.ts`,
+  `viewer-actions.test.ts`, `interaction-keyboard-menus.test.ts` and
+  `shape-search.test.ts` (all under `packages/ui-solid/src/`),
+  `apps/cli/src/shapes-command.test.ts`,
+  `apps/cli/src/help-style-export.test.ts`, `apps/cli/src/commands.test.ts`,
+  `packages/core/src/ipd-catalogue.test.ts` and
+  `packages/core/src/semantic-field-audit.test.ts`.
+- Rule for every pre-authorized test: only extend an exact expected
+  list or table with the new required entries (the three page-frame
+  actions and the PageUp/PageDown bindings, the two Document export
+  entries, Code snippet and Markdown snippet, and text.code and
+  text.markdown). Never delete, skip or loosen an assertion, and never
+  change unrelated expectations. Record each such edit, with the failing
+  assertion it fixes, in `impl-plans/progress/dps-17-wiring.md`. Touch a
+  pre-authorized test only if it actually fails because of a required
+  change.
+- No other scope change. If any other file outside writePaths is needed,
+  stop and report it as a blocker; the amendment budget is exhausted.
