@@ -16,6 +16,7 @@ import { Tool } from "./tools.ts";
 test("every palette shape has a shape ID in the shared catalogue", () => {
   // Wires and tracks are drawn point by point, so the CLI cannot place them.
   const pointByPoint = new Set<string>([Tool.BreadboardWire, Tool.PcbTrack]);
+  const actions: string[] = [];
   for (const item of [
     ...COMMON_SHAPES,
     ...DIAGRAM_SHAPES,
@@ -25,12 +26,16 @@ test("every palette shape has a shape ID in the shared catalogue", () => {
     ...ARTBOARD_SHAPES,
     ...UI_CONTROL_SHAPES,
     ...INTERACTION_SHAPES,
-  ])
-    if (!pointByPoint.has(item.tool))
+  ]) {
+    if (item.action !== undefined) {
+      actions.push(item.action);
+    } else if (!pointByPoint.has(item.tool))
       expect({
         tool: item.tool,
         found: findShape(item.tool) !== undefined,
       }).toEqual({ tool: item.tool, found: true });
+  }
+  expect(actions.sort()).toEqual(["add-page-frame"]);
 });
 
 test("palette search finds shapes in any mode by name, ID or category", () => {

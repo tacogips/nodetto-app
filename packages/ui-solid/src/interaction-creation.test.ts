@@ -23,7 +23,12 @@ describe("left shape palette creation", () => {
     ...DIAGRAM_SHAPES,
     ...ARTBOARD_SHAPES,
   ]) {
-    if (isConnectorTool(item.tool) || item.tool === Tool.Port) continue;
+    if (
+      item.action !== undefined ||
+      isConnectorTool(item.tool) ||
+      item.tool === Tool.Port
+    )
+      continue;
     test(`${item.tool} places a selected shape, resets the tool, and undoes in one step`, () => {
       const editor = new Editor();
       editor.camera.set({ x: 10, y: 20, z: 2 });
@@ -64,6 +69,18 @@ describe("left shape palette creation", () => {
       interaction.dispose();
     });
   }
+
+  test("palette action entries are actions, not creation tools", () => {
+    const pageActions = COMMON_SHAPES.filter(
+      (item) => item.action === "add-page-frame",
+    );
+    expect(pageActions).toHaveLength(1);
+    expect(pageActions[0]).toMatchObject({
+      tool: "action:add-page-frame",
+      label: "Page",
+      action: "add-page-frame",
+    });
+  });
 
   test("semantic palettes preserve endpoint tools and workspace terminology", () => {
     expect(workspaceShapes("erd").map((item) => item.label)).toEqual([

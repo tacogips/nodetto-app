@@ -1,0 +1,9 @@
+{"kind":"document","schemaVersion":1,"id":"doc-1","title":"Test"}
+{"kind":"page","id":"p1","name":"Paper","pageKind":"freeform","pageFlow":"vertical"}
+{"kind":"page","id":"p2","name":"Deck","pageKind":"freeform","pageFlow":"horizontal"}
+{"kind":"element","id":"code","page":"p1","type":"text.code","index":"a4","semantic":{"code":"const label = \"日本語\"; // 𠮷 é\tend","language":"rust","showLineNumbers":true},"visual":{"x":40,"y":1211,"width":700,"height":180}}
+{"kind":"element","id":"f1","page":"p1","type":"frame","index":"a1","semantic":{"name":"Page 1","memberIds":["md"],"page":{"size":"a4","orientation":"portrait"}},"visual":{"x":0,"y":0,"width":794,"height":1123}}
+{"kind":"element","id":"f2","page":"p1","type":"frame","index":"a3","semantic":{"name":"Page 2","memberIds":["code","shape"],"page":{"size":"a4","orientation":"portrait"}},"visual":{"x":0,"y":1171,"width":794,"height":1123}}
+{"kind":"element","id":"md","page":"p1","type":"text.markdown","index":"a2","semantic":{"markdown":"# Ünïcode **太字** 😀"},"visual":{"x":40,"y":40,"width":700,"height":180}}
+{"kind":"element","id":"shape","page":"p1","type":"shape.geo","index":"a5","semantic":{"geo":"rect","label":"Diagram"},"visual":{"x":40,"y":1450,"width":200,"height":100}}
+{"kind":"element","id":"f3","page":"p2","type":"frame","index":"a1","semantic":{"name":"Slide","page":{"size":"slide-16-9","orientation":"landscape"}},"visual":{"x":0,"y":0,"width":1920,"height":1080}}

@@ -51,7 +51,11 @@ dispatch, and s776 must not be dispatched again. The presentation manifest
 `slt-s856-dispatch.json` also stay in `active/` with their pre-archive
 `planPath` values and must not be dispatched again. The selection toolbar
 manifest `stb-s857-dispatch.json` also stays in `active/` with its
-pre-archive `planPath` values and must not be dispatched again.
+pre-archive `planPath` values and must not be dispatched again. The document
+pages and snippets manifests `dps-s861-dispatch.json`,
+`dps-s863-dispatch.json` and `dps-s864-dispatch.json` also stay in `active/`
+with their pre-archive `planPath` values; s864 was the final dispatch, and
+s861 and s863 must not be dispatched again.
 
 ## Completed
 
@@ -643,3 +647,39 @@ the archive node moves the plans.
 | [pgl-01-page-actions](completed/pgl-01-page-actions.md) | shared page actions |
 | [pgl-02-page-list](completed/pgl-02-page-list.md) | PageList component and DOM tests |
 | [pgl-03-wiring](completed/pgl-03-wiring.md) | preference, App wiring, docs |
+
+## Document pages and snippets (dps-s861 / dps-s863 / dps-s864)
+
+Code and Markdown snippets, page frames with vertical or horizontal flow,
+page-frame slideshow, and document PDF/Markdown export. Design:
+[design-document-pages-snippets](../design-docs/specs/design-document-pages-snippets.md).
+Final verification logs: `tmp/dps-s864/dps-17-final/`. The dispatch manifests
+remain in `active/`; the archive node moves the plans.
+
+| Plan | Scope |
+| --- | --- |
+| [dps-01-syntax](completed/dps-01-syntax.md) | syntax highlighting |
+| [dps-02-markdown](completed/dps-02-markdown.md) | Markdown parsing and layout |
+| [dps-03-model](completed/dps-03-model.md) | snippet and page-frame IR model |
+| [dps-04-page-geometry](completed/dps-04-page-geometry.md) | page geometry and flow |
+| [dps-05-pdf-text-layer](completed/dps-05-pdf-text-layer.md) | PDF text layer |
+| [dps-06-pdf-native](completed/dps-06-pdf-native.md) | native PDF encoder |
+| [dps-07-docs](completed/dps-07-docs.md) | initial docs |
+| [dps-08-code-shape](completed/dps-08-code-shape.md) | code snippet shape |
+| [dps-09-markdown-shape](completed/dps-09-markdown-shape.md) | Markdown snippet shape |
+| [dps-10-snippet-ui](completed/dps-10-snippet-ui.md) | snippet palette, editing and inspector |
+| [dps-11-page-editing](completed/dps-11-page-editing.md) | page-frame editing |
+| [dps-12-presentation](completed/dps-12-presentation.md) | page-frame slideshow |
+| [dps-13-pdf-app-encoder](completed/dps-13-pdf-app-encoder.md) | app PDF encoder |
+| [dps-14-document-export](completed/dps-14-document-export.md) | document PDF/Markdown export |
+| [dps-15-cli-authoring](completed/dps-15-cli-authoring.md) | CLI snippet and page-flow authoring |
+| [dps-16-fallbacks](completed/dps-16-fallbacks.md) | fallbacks |
+| [dps-17-wiring](completed/dps-17-wiring.md) | wiring and acceptance |
+| [dps-17a-owner-tests](completed/dps-17a-owner-tests.md) | owner-decided test updates |
+| [dps-17b-golden-identity](completed/dps-17b-golden-identity.md) | golden fixture and store identity |
+| [dps-17c-page-ui-tests](completed/dps-17c-page-ui-tests.md) | page palette, action and navigation tests |
+| [dps-17d-pdf-text-individual](completed/dps-17d-pdf-text-individual.md) | PDF text for individual exports |
+| [dps-17e-desktop-export-tests](completed/dps-17e-desktop-export-tests.md) | desktop and ExportDialog export tests |
+| [dps-17f-cli-parity](completed/dps-17f-cli-parity.md) | CLI Markdown and native parity tests |
+| [dps-17g-docs-examples](completed/dps-17g-docs-examples.md) | docs and examples |
+| [dps-17-final](completed/dps-17-final.md) | final integration gates |

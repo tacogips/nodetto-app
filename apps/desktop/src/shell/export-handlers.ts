@@ -73,6 +73,9 @@ function downloadBlob(blob: Blob, name: string): void {
 export function createExportHandlers(
   source: ExportSource,
   setExportError: (message: string | null) => void,
+  deps: {
+    readonly rasterizeSvg?: (svg: string, scale: number) => Promise<Blob>;
+  } = {},
 ): ExportHandlers {
   const saveArtwork = async (
     name: string,
@@ -171,7 +174,7 @@ export function createExportHandlers(
       const pages = [];
       for (const page of documentPdfPlan(source.editor, { background }))
         pages.push({
-          png: await rasterizeSvg(page.svg, scale),
+          png: await (deps.rasterizeSvg ?? rasterizeSvg)(page.svg, scale),
           spec: page.spec,
         });
       const blob = await pagesToPdf(pages);

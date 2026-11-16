@@ -1,0 +1,100 @@
+[
+  {
+    "op": "set-page-flow",
+    "page": "p1",
+    "flow": "horizontal"
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "frame",
+    "semantic": {
+      "page": {
+        "size": "slide-16-9",
+        "orientation": "landscape"
+      }
+    },
+    "visual": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "text.markdown",
+    "semantic": {
+      "markdown": "# Purpose\n\n- Explore the problem\n- Share the result"
+    },
+    "visual": {
+      "x": 100,
+      "y": 100,
+      "width": 1500,
+      "height": 500
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "frame",
+    "semantic": {
+      "page": {
+        "size": "slide-16-9",
+        "orientation": "landscape"
+      }
+    },
+    "visual": {
+      "x": 1968,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "text.markdown",
+    "semantic": {
+      "markdown": "# Approach\n\n- Explore the problem\n- Share the result"
+    },
+    "visual": {
+      "x": 2068,
+      "y": 100,
+      "width": 1500,
+      "height": 500
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "frame",
+    "semantic": {
+      "page": {
+        "size": "slide-16-9",
+        "orientation": "landscape"
+      }
+    },
+    "visual": {
+      "x": 3936,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "text.markdown",
+    "semantic": {
+      "markdown": "# Next steps\n\n- Explore the problem\n- Share the result"
+    },
+    "visual": {
+      "x": 4036,
+      "y": 100,
+      "width": 1500,
+      "height": 500
+    }
+  }
+]

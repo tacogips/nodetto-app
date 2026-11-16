@@ -17,10 +17,12 @@ export function collectTextRuns(
   extractors: Readonly<
     Record<string, TextRunExtractor>
   > = PDF_TEXT_RUN_EXTRACTORS,
+  include?: (element: Element) => boolean,
 ): PdfTextRun[] {
   const context = createShapeContext(store, registry, 1);
   const runs: PdfTextRun[] = [];
   for (const element of store.getPageElements(pageId)) {
+    if (include && !include(element)) continue;
     const extractor = extractors[element.type];
     if (!extractor || context.isHidden?.(element.id)) continue;
     const box = registry

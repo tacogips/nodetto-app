@@ -466,3 +466,29 @@ Repeat `--band y0:y1:dy` for reference-coordinate bands when added system bars
 shift content; `dy` is the corresponding actual-image shift in points. Default
 page exports hide prototype links; `--prototype` makes a storyboard and
 `--format prototype` makes a click-through HTML file.
+
+## Document authoring and export
+
+Apply these operations with `nodetto-cli edit document.jsonl --ops ops.json`:
+
+```json
+[
+  {"op":"set-page-flow","page":"p1","flow":"horizontal"},
+  {"op":"add","page":"p1","type":"frame","semantic":{"page":{"size":"a4","orientation":"portrait"}},"visual":{"x":0,"y":0,"width":794,"height":1123}},
+  {"op":"add","page":"p1","type":"text.code","semantic":{"code":"const total = 2;","language":"javascript"},"visual":{"x":40,"y":100,"width":500,"height":100}},
+  {"op":"add","page":"p1","type":"text.markdown","semantic":{"markdown":"# Notes\n\nA short example."},"visual":{"x":40,"y":240,"width":500,"height":150}}
+]
+```
+
+Page flow accepts `vertical` or `horizontal`. Language aliases are normalized;
+TypeScript resolves to the canonical `javascript` language. See the runnable
+[document examples](../examples/document/README.md).
+
+```sh
+nodetto-cli export document.jsonl --format pdf --document --output document.pdf
+nodetto-cli export document.jsonl --format markdown --document --output document.md
+nodetto-cli export document.jsonl --format markdown --output document.md
+```
+
+The Markdown shorthand is equivalent to the explicit document form. The CLI
+writes SVG assets alongside the Markdown file in `<stem>.assets/`.

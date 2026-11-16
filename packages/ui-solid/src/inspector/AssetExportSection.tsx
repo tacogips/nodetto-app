@@ -146,7 +146,14 @@ export function AssetExportSection(props: {
         const png = await rasterizeSvg(data.svg, density, signal);
         blob =
           kind === "pdf"
-            ? await pngToPdf(png, data.width, data.height, options, signal)
+            ? await pngToPdf(
+                png,
+                data.width,
+                data.height,
+                options,
+                signal,
+                data.textRuns,
+              )
             : png;
       }
       if (signal.aborted) throw new Error("Export cancelled.");

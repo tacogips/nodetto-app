@@ -17,6 +17,7 @@ included in the images. The CLI writes the Markdown file and sibling assets:
 
 ```sh
 nodetto-cli export document.jsonl --format pdf --document --output document.pdf
+nodetto-cli export document.jsonl --format markdown --document --output document.md
 nodetto-cli export document.jsonl --format markdown --output document.md
 ```
 

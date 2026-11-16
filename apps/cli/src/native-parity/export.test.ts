@@ -1,12 +1,19 @@
 import { expect } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Editor, HANDOFF_FORMATS } from "@nodetto/core";
+import { Editor, extractPdfText, HANDOFF_FORMATS } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
 import {
   binary,
   compare,
+  cliEntry,
   decodeRgbaPng,
   fixtureRoot,
   nativeTest,
@@ -199,4 +206,79 @@ nativeTest(
     }
   },
   30000,
+);
+
+nativeTest(
+  "native document exports match Bun for snippets, PDF and Markdown",
+  async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-document-"));
+    try {
+      const source = join(fixtureRoot, "document-pages.jsonl");
+      const input = join(cwd, "document-pages.jsonl");
+      writeFileSync(input, readFileSync(source));
+      const svg = compare(["export", input, "--format", "svg", "--page", "p1"]);
+      expect(svg.exitCode).toBe(0);
+      const run = (native: boolean, args: string[]) => {
+        const executable = native
+          ? [binary as string]
+          : [process.execPath, cliEntry];
+        const result = Bun.spawnSync(
+          [...executable, "export", input, ...args],
+          { cwd },
+        );
+        expect(result.exitCode).toBe(0);
+      };
+      run(false, [
+        "--format",
+        "pdf",
+        "--document",
+        "--output",
+        join(cwd, "bun.pdf"),
+      ]);
+      run(true, [
+        "--format",
+        "pdf",
+        "--document",
+        "--output",
+        join(cwd, "native.pdf"),
+      ]);
+      const bunPages = (
+        await extractPdfText(readFileSync(join(cwd, "bun.pdf")))
+      ).pages;
+      const nativePages = (
+        await extractPdfText(readFileSync(join(cwd, "native.pdf")))
+      ).pages;
+      expect(nativePages).toHaveLength(3);
+      expect(nativePages).toEqual(bunPages);
+      const outputs: { markdown: Buffer; assets: string[]; bytes: Buffer[] }[] =
+        [];
+      for (const native of [false, true])
+        for (const explicit of [true, false]) {
+          const output = join(
+            cwd,
+            `${native ? "native" : "bun"}-${explicit ? "explicit" : "short"}`,
+            "doc.md",
+          );
+          run(native, [
+            "--format",
+            "markdown",
+            ...(explicit ? ["--document"] : []),
+            "--output",
+            output,
+          ]);
+          const assetDir = join(output, "..", "doc.assets");
+          const assets = readdirSync(assetDir).sort();
+          expect(assets.length).toBeGreaterThan(0);
+          outputs.push({
+            markdown: readFileSync(output),
+            assets,
+            bytes: assets.map((name) => readFileSync(join(assetDir, name))),
+          });
+        }
+      for (const output of outputs.slice(1)) expect(output).toEqual(outputs[0]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  60000,
 );

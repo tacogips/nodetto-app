@@ -1,0 +1,3 @@
+# dps-17-final progress
+
+Mode: issue-resolution. All seven runtime-accepted dependencies joined. Design section 10.2 final gates passed on the combined tree. Full commands, exit codes, attempt counts, logs and acceptance mapping are recorded in `impl-plans/progress/dps-17-wiring.md` under Session 864 final integration. All five gates exited 0 on attempt 1; native CLI tests used the default release binary. The two required `rg` checks exited 0. `packages/core/src/markdown-snippet/layout.ts` was unchanged. No source files or Git state were changed by this plan. Formal independent reviews and finalization remain downstream.

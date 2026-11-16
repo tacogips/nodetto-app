@@ -28,8 +28,8 @@ associations.
   data, paste TSV from spreadsheets, and build tables from CSV/TSV with the
   CLI. See [Spreadsheet tables](docs/editing.md#spreadsheet-tables).
 - **Presentation**: present pages full screen as a slideshow in tab order
-  (F5, or Shift+F5 from the current page), hide pages, set a slide size and
-  show its slide area while editing. Copy shapes from another page to build
+  (F5, or Shift+F5 from the current page), with page frames in flow order;
+  hide pages, set a slide size and show its slide area while editing. Copy shapes from another page to build
   the next slide, animate linked shapes between slides, and navigate pages in
   the collapsible Pages list. See
   [Presentation](docs/editing.md#presentation).
@@ -68,7 +68,26 @@ vector layers, and **Export > Gerber** writes the edited board back as Gerber
 and drill files. ErgoDash is copyright (c) 2018 omkbd and released under the
 MIT License.
 
+Code snippets and Markdown snippets are editable on the canvas, with syntax
+highlighting and formatted Markdown for technical notes. See
+[Code and Markdown snippets](docs/editing.md#code-and-markdown-snippets).
+
+Page frames organize content into paper or slide sizes, with vertical or
+horizontal flow and actions to add and navigate frames. See
+[Page frames and document flow](docs/editing.md#page-frames-and-document-flow).
+
+The slideshow presents each page frame in flow order, or an ordinary page as
+one slide when it has no frames.
+
+Document export produces a multi-page PDF or a Markdown ZIP with SVG assets;
+the CLI also writes Markdown and a sibling assets directory. See
+[Document export](docs/import-export.md#document-export).
+
 ## Command line
+
+Use `edit --ops` to create snippets and page frames and set page flow. Export a
+document with `--format pdf --document` or `--format markdown --output file.md`;
+see the [document examples](examples/document/README.md).
 
 ```bash
 nodetto-cli table create schema.jsonl --csv data.csv

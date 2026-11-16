@@ -1,0 +1,107 @@
+[
+  {
+    "op": "set-page-flow",
+    "page": "p1",
+    "flow": "vertical"
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "frame",
+    "semantic": {
+      "page": {
+        "size": "a4",
+        "orientation": "portrait"
+      }
+    },
+    "visual": {
+      "x": 0,
+      "y": 0,
+      "width": 794,
+      "height": 1123
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "frame",
+    "semantic": {
+      "page": {
+        "size": "a4",
+        "orientation": "portrait"
+      }
+    },
+    "visual": {
+      "x": 0,
+      "y": 1171,
+      "width": 794,
+      "height": 1123
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "text.markdown",
+    "semantic": {
+      "markdown": "# A small system\n\nThis paper describes a simple processing pipeline."
+    },
+    "visual": {
+      "x": 50,
+      "y": 60,
+      "width": 690,
+      "height": 180
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "text.code",
+    "semantic": {
+      "language": "javascript",
+      "code": "const result = input.trim();"
+    },
+    "visual": {
+      "x": 50,
+      "y": 300,
+      "width": 690,
+      "height": 100
+    }
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "semantic": {
+      "geo": "rect",
+      "label": "Input"
+    },
+    "visual": {
+      "x": 80,
+      "y": 1400,
+      "width": 180,
+      "height": 80
+    },
+    "ref": "input"
+  },
+  {
+    "op": "add",
+    "page": "p1",
+    "type": "shape.geo",
+    "semantic": {
+      "geo": "rect",
+      "label": "Process"
+    },
+    "visual": {
+      "x": 450,
+      "y": 1400,
+      "width": 180,
+      "height": 80
+    },
+    "ref": "process"
+  },
+  {
+    "op": "connect",
+    "from": "@input",
+    "to": "@process"
+  }
+]

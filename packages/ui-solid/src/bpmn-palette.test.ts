@@ -232,6 +232,9 @@ describe("BPMN palette", () => {
       [
         "arrange",
         [
+          "addPageFrame",
+          "nextPageFrame",
+          "previousPageFrame",
           "frameSelection",
           "group",
           "booleanUnion",

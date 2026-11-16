@@ -1,6 +1,9 @@
 import { rasterStage } from "./raster-stage.ts";
 import {
+  collectTextRuns,
+  createShapeContext,
   type Editor,
+  expandContainers,
   layerName,
   rasterDimensions,
   svgRasterDimensions,
@@ -44,9 +47,30 @@ export function rasterExportSnapshot(
   const element = editor.store.get(
     artboardId ?? (ids.length === 1 ? (ids[0] ?? "") : ""),
   );
+  const dimensions = svgRasterDimensions(svg);
+  const viewport = /^<svg\s[^>]*\bviewBox="([^"]+)"/.exec(svg)?.[1];
+  const [x, y] = (viewport ?? "").trim().split(/\s+/).map(Number);
+  const includedIds = wholePage
+    ? undefined
+    : new Set(
+        expandContainers(
+          editor.store,
+          artboardId ? [artboardId] : ids,
+          createShapeContext(editor.store, editor.registry, 1),
+        ),
+      );
+  const textRuns = collectTextRuns(
+    editor.store,
+    editor.registry,
+    editor.currentPageId,
+    { x: x ?? 0, y: y ?? 0, ...dimensions },
+    undefined,
+    includedIds ? (item) => includedIds.has(item.id) : undefined,
+  );
   return {
     svg,
-    ...svgRasterDimensions(svg),
+    ...dimensions,
+    textRuns,
     name: wholePage
       ? (editor.store.getPage(editor.currentPageId)?.name ?? "page")
       : element

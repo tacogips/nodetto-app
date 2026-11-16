@@ -90,6 +90,40 @@ export interface ExportDialogProps {
   readonly onCompare?: () => void;
 }
 
+export const EXPORT_FORMAT_GROUPS: readonly {
+  label: string;
+  ids: readonly Format[];
+}[] = [
+  { label: "Document", ids: ["document-pdf", "document-markdown"] },
+  { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
+  {
+    label: "Diagram source",
+    ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
+  },
+  { label: "Fabrication", ids: ["pcb"] },
+  { label: "Web & developer", ids: ["html", "prototype", "code"] },
+];
+
+export function documentExportFormats(
+  props: Pick<
+    ExportDialogProps,
+    "exportDocumentPdf" | "exportDocumentMarkdown"
+  >,
+): readonly { id: Format; label: string; enabled: boolean }[] {
+  return [
+    {
+      id: "document-pdf",
+      label: "Document as PDF...",
+      enabled: props.exportDocumentPdf !== undefined,
+    },
+    {
+      id: "document-markdown",
+      label: "Document as Markdown (ZIP)...",
+      enabled: props.exportDocumentMarkdown !== undefined,
+    },
+  ];
+}
+
 export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
   // A board is exported for fabrication far more often than as artwork.
@@ -129,16 +163,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       { id: "svg", label: "SVG", enabled: true },
       { id: "png", label: "PNG", enabled: true },
       { id: "pdf", label: "PDF", enabled: true },
-      {
-        id: "document-pdf",
-        label: "Document as PDF...",
-        enabled: props.exportDocumentPdf !== undefined,
-      },
-      {
-        id: "document-markdown",
-        label: "Document as Markdown (ZIP)...",
-        enabled: props.exportDocumentMarkdown !== undefined,
-      },
+      ...documentExportFormats(props),
       {
         id: "mermaid",
         label: "Mermaid",
@@ -190,16 +215,6 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   // Switching pages or deleting the selection cannot leave an unavailable panel active.
   const active = () =>
     formats().find((t) => t.id === format())?.enabled ? format() : "svg";
-  const formatGroups: readonly { label: string; ids: readonly Format[] }[] = [
-    { label: "Document", ids: ["document-pdf", "document-markdown"] },
-    { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
-    {
-      label: "Diagram source",
-      ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
-    },
-    { label: "Fabrication", ids: ["pcb"] },
-    { label: "Web & developer", ids: ["html", "prototype", "code"] },
-  ];
   const descriptions: Record<Format, string> = {
     "document-pdf": "Export each page frame as a PDF page.",
     "document-markdown": "Export Markdown and SVG assets in a ZIP archive.",
@@ -341,7 +356,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
               if (value?.enabled) setFormat(value.id);
             }}
           >
-            <For each={formatGroups}>
+            <For each={EXPORT_FORMAT_GROUPS}>
               {(group) => (
                 <optgroup label={group.label}>
                   <For each={group.ids}>
