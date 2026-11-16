@@ -1,6 +1,6 @@
 # dps-01-syntax progress
 
-Implemented syntax port, palette, layout, tests, and the two core barrel exports. Design sections 2 and 3.2 checked; no plan dependencies. Reference files read: `/Users/taco/gits/tacogips/chilla/src/features/pr-diff/prDiffSyntax.ts`, `prDiffSyntaxTypes.ts`, `prDiffSyntaxLanguages.ts`, and `prDiffSyntaxKeywords.ts`.
+Implemented syntax port, palette, layout, tests, and the two core barrel exports. Design sections 2 and 3.2 checked; no plan dependencies. Reference files read: `tacogips/chilla: src/features/pr-diff/prDiffSyntax.ts`, `prDiffSyntaxTypes.ts`, `prDiffSyntaxLanguages.ts`, and `prDiffSyntaxKeywords.ts`.
 
 28 kinds: plain, javascript, java, scala, lisp, ruby, python, c, cpp, zig, haskell, swift, vue, sql, groovy, xml, properties, protobuf, nix, dockerfile, makefile, rust, shell, json, markdown, css, toml, yaml.
 

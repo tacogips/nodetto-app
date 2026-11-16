@@ -46,10 +46,10 @@ The tokenizer must run in the canvas, in Bun and in the Boa native CLI.
 
 Read these files directly:
 
-- `/Users/taco/gits/tacogips/chilla/src/features/pr-diff/prDiffSyntax.ts`
-- `/Users/taco/gits/tacogips/chilla/src/features/pr-diff/prDiffSyntaxTypes.ts`
-- `/Users/taco/gits/tacogips/chilla/src/features/pr-diff/prDiffSyntaxLanguages.ts`
-- `/Users/taco/gits/tacogips/chilla/src/features/pr-diff/prDiffSyntaxKeywords.ts`
+- `tacogips/chilla: src/features/pr-diff/prDiffSyntax.ts`
+- `tacogips/chilla: src/features/pr-diff/prDiffSyntaxTypes.ts`
+- `tacogips/chilla: src/features/pr-diff/prDiffSyntaxLanguages.ts`
+- `tacogips/chilla: src/features/pr-diff/prDiffSyntaxKeywords.ts`
 
 If they cannot be read, stop. Record the blocker in the progress log. Do
 not invent kinds or aliases.
