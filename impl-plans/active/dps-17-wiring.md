@@ -1,7 +1,10 @@
 # dps-17-wiring
 
-- planId: dps-17-wiring. Wave 3, the final wiring plan.
-- dependsOn: dps-01 through dps-16.
+- planId: dps-17-wiring. Session 863 wave 2, the final wiring plan.
+- dependsOn (this run): dps-14-document-export, dps-15-cli-authoring.
+  dps-01..13 and dps-16 are accepted and committed at e8fd3c4.
+- Read the "Amendment 2026-11-16 (session 863)" section at the end first;
+  it overrides the paths, tests and verification below where they differ.
 - Design: sections 3.5, 5.4, 7.4 to 7.6, 8, 10 and 11 of
   `design-docs/specs/design-document-pages-snippets.md`.
 - writePaths (shared registration files and final docs):
@@ -208,3 +211,77 @@ final gates.
 Run after all earlier plans have been joined. Re-read each file before
 editing and record hashes. If an earlier plan's file needs a fix, record it
 as a repair finding for that plan. No git state changes.
+
+## Amendment 2026-11-16 (session 863)
+
+Source: design sections 7.4, 8, 10.1 and 11 (owner decisions
+IR-DPS14-HOST-MKDIR and IR-DPS15-DAG-VERIFY, review finding
+DR-DPS14-MARKDOWN-DOCUMENT). Ownership of every earlier file is unchanged.
+
+### Extra writePaths
+
+- `docs/editing.md`, `docs/import-export.md`: corrections only, against the
+  final UI labels and CLI (dps-07 wrote the feature sections). This replaces
+  the earlier "read only" rule in Changes 7.
+- `apps/cli/src/cli-wiring.test.ts`: only if a help/doc sync assertion there
+  needs the new `--document`/`markdown`/`set-page-flow` text.
+- `packages/core/src/markdown-snippet/layout.ts`: only if the identity test
+  below fails (then key the cache by `(semantic.markdown, width, fill)`).
+- Evidence directory is `tmp/dps-s863/dps-17-wiring` (replaces
+  `tmp/dps-s861/dps-17-wiring`).
+
+### Contracts landed by wave 1 (consume, do not edit)
+
+- dps-14: `exportMarkdownDocument`, `documentPdfPlan`,
+  `MAX_DOCUMENT_PDF_PAGES` from `@nodetto/core`; CLI `--document` with
+  `pdf` and `markdown`, `--format markdown` shorthand; `CommandIo.ensureDir?`.
+- dps-15: `normalizeCodeSnippetSemantic` in
+  `apps/cli/src/edit/operations/add.ts`; `set-page-flow`.
+
+### Additional changes and tests
+
+1. `apps/cli/src/document-wiring.test.ts` gains the moved end-to-end
+   assertion (do not mock anything): after IR registration, a `Batch` over
+   `new Editor()` applying
+   `{ op: "add", type: "text.code", id: "code1", semantic: { language: "TS" } }`
+   stores `language: "typescript", code: ""`; `{ op: "add", type: "text.code", id: "code2" }`
+   stores `language: "plain"`; `language: "klingon"` throws
+   `Unknown language "klingon"`. Imitate the removed test 1 of
+   `document-authoring.test.ts` at e8fd3c4.
+2. Same file: CLI `export --format markdown --output <tmp>/doc.md` on a page
+   holding a `text.markdown`, two shapes and a `text.code` -> Markdown
+   verbatim, one fenced block with the language, exactly one asset.
+3. `apps/cli/src/native-parity/export.test.ts` (release binary via
+   `NODETTO_CLI_TEST_BINARY`, never skipped): `--format markdown --document --output a/doc.md`
+   and `--format markdown --output b/doc.md` give byte-identical Markdown
+   and assets, equal to the Bun CLI output for the same fixture.
+4. `packages/core/src/document-snippets-wiring.test.ts`: store identity.
+   After `updateSemantic` and after `updateVisual` on a `text.markdown`,
+   `editor.store.get(id)` is a different object and
+   `markdownSnippetLayout` returns the new height and palette. Confirmed by
+   reading `packages/core/src/commands.ts:638,660,679,708` at e8fd3c4.
+5. `help.ts` export usage shows `--format pdf --document`,
+   `--format markdown --document --output <file.md>` and the shorthand;
+   `docs/cli.md` and `docs/import-export.md` show the same forms.
+
+### Verification (replaces the list above; each must exit 0; logs in tmp/dps-s863/dps-17-wiring/)
+
+1. `bun test packages/ir packages/io packages/core packages/ui-solid apps/cli/src/document-wiring.test.ts apps/cli/src/edit/operations/document-authoring.test.ts`
+2. `bun run typecheck`
+3. `mise run lint`
+4. `CARGO_TERM_QUIET=true mise run verify`
+5. `sh -c 'mkdir -p tmp/dps-s863/dps-17-wiring; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > tmp/dps-s863/dps-17-wiring/test-cli-$i.log 2>&1 && exit 0; grep -qiE "timed out|deadline" tmp/dps-s863/dps-17-wiring/test-cli-$i.log || exit 1; done; exit 1'`
+
+Do not set `CARGO_TARGET_DIR` for `mise run verify` or `mise run test-cli`:
+`test-cli` runs the binary from `$PWD/target/release/nodetto-cli`, and an
+override would test a stale or missing binary. dps-17 is the only plan in
+its wave, so the default target dir does not race. Any direct cargo command
+outside mise uses `CARGO_TARGET_DIR=target/dps-17`.
+
+### Done criteria (additional)
+
+- `rg -n "Unknown language" apps/cli/src/document-wiring.test.ts` matches.
+- `rg -n -- "--format markdown --document" apps/cli/src/help.ts docs/cli.md`
+  matches in both.
+- The progress log records the identity test result and whether
+  `markdown-snippet/layout.ts` was changed.

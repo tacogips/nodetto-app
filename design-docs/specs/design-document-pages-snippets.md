@@ -785,17 +785,48 @@ Usage: `nodetto-cli export <doc> --format pdf --document --output <file.pdf> [--
 
 - `--document` is a new flag. It conflicts with `--page`, `--element`,
   `--frames`, `--pdf-page`, `--orientation` and `--margin`, each a
-  one-line error with exit 2. It is valid only with `pdf`.
+  one-line error with exit 2. It is accepted with `--format pdf` and
+  `--format markdown`. With any other format it is the one-line error
+  `--document is valid only with --format pdf or markdown.` and exit 2.
 
-Usage: `nodetto-cli export <doc> --format markdown --output <file.md>`.
+Usage: `nodetto-cli export <doc> --format markdown --document --output <file.md>`
+(explicit form, required by the session 863 acceptance criteria), or the
+shorthand `nodetto-cli export <doc> --format markdown --output <file.md>`.
 
-- `markdown` is a new format value. `--output` is required.
+- `markdown` is a new format value. It always exports the whole document,
+  so `--document` is optional for it. The explicit and shorthand forms are
+  the same invocation: same validation (the `--document` conflicts above
+  also apply to `--format markdown` without the flag), same Markdown bytes,
+  same asset names and bytes, same `Wrote ...` summary and exit code.
+  `--output` is required.
 - The command writes `<file.md>`. When assets exist it also writes
   `<stem>.assets/<name>.svg`, where `<stem>` is the file name without
   `.md`, and the Markdown references them with
   `assetDir = "<stem>.assets"`.
 - Writes are atomic per file (`write-atomic.ts`). The assets directory is
   created when it is missing. Stale files in it are not removed.
+- Directory creation goes through a new host function on `CommandIo`
+  (`apps/cli/src/commands.ts`), added by the owner decision for integration
+  finding IR-DPS14-HOST-MKDIR:
+  - `ensureDir?(path: string): Promise<void>`. It is recursive and
+    idempotent: an existing directory resolves, a missing parent chain is
+    created, and an existing non-directory at `path` rejects with the host
+    error. It is optional, like `writeBytes?`, so existing `CommandIo`
+    fakes in unrelated tests stay unchanged.
+  - Bun: `apps/cli/src/local-io.ts` uses `mkdir(path, { recursive: true })`
+    from `node:fs/promises`.
+  - Native: `apps/cli/native/src/engine.rs` adds an `"ensureDir"` arm to
+    `host` that calls `std::fs::create_dir_all` and returns `undefined`,
+    and adds `'ensureDir'` to the `globalThis.native` name list, exactly as
+    `writeBytes` is exposed. `apps/cli/src/native-engine.ts` declares
+    `native.ensureDir(path: string): void` and maps
+    `ensureDir: async (path) => native.ensureDir(native.path(path))`.
+  - The Markdown export calls `await io.ensureDir(assetsDir)` only when
+    `assets.length > 0`, before the first asset write. A host without
+    `ensureDir` fails with exit 1 and `This host cannot create directories.`
+    The `.md` file itself is written after the assets, so a failed asset
+    write never leaves a Markdown file that points to missing assets.
+  - No dependency is added. Existing export-command tests are not changed.
 
 Both print the existing `Wrote ...` summary on stderr. The flag name stays
 `--output` (the intake's `--out` maps to it). The export help text and
@@ -843,6 +874,18 @@ export only, and points here.
 
   For `text.code`, the add path normalises `language` through
   `resolveSyntaxKind` and fails on unknown names with the list of kinds.
+- Verification boundary (owner decision for IR-DPS15-DAG-VERIFY):
+  - The normalisation is a pure exported helper in
+    `apps/cli/src/edit/operations/add.ts` (for example
+    `normalizeCodeSnippetSemantic(semantic, index)`) that `addElement`
+    calls. dps-15 tests it directly (alias to canonical id, unknown name,
+    non-string language, missing `language` gives `"plain"`, missing `code`
+    gives `""`) together with `set-page-flow`. Those tests do not need
+    `text.code` in the IR registry, so they pass when dps-15 lands alone.
+  - The end-to-end assertion "add `text.code` with `language:"TS"` through
+    the edit pipeline stores the canonical id" moves unchanged in intent to
+    dps-17's `apps/cli/src/document-wiring.test.ts`. It is neither deleted
+    nor mocked; dps-17 runs it after registering `text.code`.
 - The existing page-update edit operation (`apps/cli/src/edit/operations/pages.ts`)
   accepts `pageFlow` (`vertical`, `horizontal` or `null`). It sets the
   field only. It does not re-layout, because the CLI positions frames
@@ -909,6 +952,49 @@ Final wiring plan `dps-wiring` owns the shared registration files:
 
 The plan step may move a file between wave-2 plans if it keeps these
 contracts and the wave limit.
+
+### 10.1 Continuation (session 863)
+
+dps-01..13 and dps-16 are accepted and committed (e8fd3c4). Only dps-14,
+dps-15 and dps-17 remain. They run from a fresh dispatch manifest
+`impl-plans/active/dps-s863-dispatch.json` with the shape of
+`dps-s861-dispatch.json`:
+
+- Waves: [dps-14, dps-15] in parallel, then dps-17 with
+  `dependsOn: [dps-14, dps-15]`. Earlier plans are not listed and are not
+  re-run.
+- Every plan has a non-empty `acceptanceCriteria` and
+  `artifactRoots: ["target"]`. Rust builds use a per-plan
+  `CARGO_TARGET_DIR` (`target/dps-14`, `target/dps-15`, `target/dps-17`).
+- writePaths do not overlap between dps-14 and dps-15. Changes against the
+  committed plan files:
+  - dps-14 adds `apps/cli/src/commands.ts` (the `CommandIo.ensureDir`
+    member only), `apps/cli/src/local-io.ts`,
+    `apps/cli/native/src/engine.rs`, `apps/cli/native/src/engine_tests.rs`
+    and their co-located tests. `native-engine.ts` is already its path.
+  - dps-15 keeps `add.ts`, `pages.ts`, `batch.ts` and
+    `document-authoring.test.ts`. Its verification is the registry-free
+    test set of section 8.
+  - dps-17 adds the moved end-to-end `text.code` add assertion to its
+    `apps/cli/src/document-wiring.test.ts`, the element-identity regression
+    test of section 11, and edit rights on `docs/editing.md` and
+    `docs/import-export.md` for corrections against the final UI and CLI
+    (dps-07 already wrote the feature sections). If the identity check
+    fails it may also edit `packages/core/src/markdown-snippet/layout.ts`.
+- Plan reconciliation for review finding DR-DPS14-MARKDOWN-DOCUMENT: the
+  plan author must replace the dps-14 Rules line "`--document`: only with
+  `--format pdf`" with the section 7.4 rule (accepted with `pdf` and
+  `markdown`, explicit and shorthand Markdown forms equivalent), and add the
+  section 11 explicit/shorthand tests to dps-14 (Bun, in
+  `export-document.test.ts`) and dps-17 (native, in
+  `native-parity/export.test.ts`). Ownership does not change: export
+  behaviour stays in dps-14; `help.ts` and `docs/cli.md` text showing
+  `--format markdown --document --output` and the shorthand stays in
+  dps-17.
+- Shared CLI registration (`help.ts`, `types-command.ts`) stays in dps-17.
+  The desktop/web entry point (`ExportDialog.tsx` Document group and
+  `apps/desktop/src/shell/export-handlers.ts`) is not wired yet and stays in
+  dps-17, as in section 10.
 
 ## 11. Verification
 
@@ -1009,6 +1095,39 @@ Unit tests (Bun, co-located):
 - Native parity: the `apps/cli/src/native-parity/` export topic gains the
   snippet SVG byte identity and the document PDF page count against the
   release binary.
+- Host `ensureDir` (dps-14):
+  - Bun (`local-io` test): a nested missing path is created; a second call
+    on the same path resolves; a path that is an existing file rejects.
+  - Native (`engine_tests.rs`, run with
+    `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/dps-14 cargo test --manifest-path apps/cli/native/Cargo.toml`):
+    `native.ensureDir` creates a nested directory inside the test temp dir
+    and is idempotent.
+  - CLI: `--format markdown --output <tmp>/out/doc.md` into a fresh
+    `<tmp>/out` writes `doc.md` and `doc.assets/page-1-1.svg`; running it
+    again exits 0; a page with only snippets creates no `doc.assets/`.
+- Markdown `--document` equivalence (DR-DPS14-MARKDOWN-DOCUMENT):
+  - Bun (dps-14, `export-document.test.ts`): on the same fixture with
+    drawable content, `--format markdown --document --output a/doc.md` and
+    `--format markdown --output b/doc.md` both exit 0, the two `doc.md`
+    files are byte-identical, and the two `doc.assets/` directories hold
+    the same file names with byte-identical SVGs. `--document --format svg`
+    exits 2 with the section 7.4 message. `--format markdown --document
+    --page p1` exits 2 with the conflict message.
+  - Native (dps-17, `native-parity/export.test.ts`, release binary via
+    `NODETTO_CLI_TEST_BINARY`, never skipped): the same two invocations
+    give the same Markdown and assets as each other and as the Bun CLI.
+- Markdown layout cache identity (dps-17). `markdown-snippet/layout.ts`
+  caches by element object in a `WeakMap`. This is correct only if every
+  update replaces the element object. Checked at e8fd3c4:
+  `packages/core/src/commands.ts` writes a new object for `updateVisual`
+  (:638), `replaceVisual` (:660), `updateSemantic` (:679) and
+  `convertElement` (:708), and the cache key also covers the fill-derived
+  palette because a visual change replaces the object. dps-17 pins this
+  with a test: after `updateSemantic` and after `updateVisual` on a
+  `text.markdown`, `store` returns a different object and
+  `markdownSnippetLayout` returns the new height and palette. If that test
+  fails, the cache key becomes the `(semantic.markdown, width, fill)` tuple
+  instead of the element object.
 
 Commands, each of which must exit 0:
 

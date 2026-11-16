@@ -1,92 +1,99 @@
 # dps-15-cli-authoring
 
-- planId: dps-15-cli-authoring. Wave 2.
-- dependsOn: dps-01-syntax, dps-03-model.
-- Design: section 8 of `design-docs/specs/design-document-pages-snippets.md`.
-- writePaths:
-  - Existing files: `apps/cli/src/edit/operations/add.ts`,
-    `apps/cli/src/edit/operations/pages.ts`, `apps/cli/src/edit/batch.ts`.
-  - New test: `apps/cli/src/edit/operations/document-authoring.test.ts`.
-  - Logs and artifacts: `impl-plans/progress/dps-15-cli-authoring.md`,
-    `tmp/dps-s861/dps-15-cli-authoring`, `target`.
+- planId: dps-15-cli-authoring. Session 863 wave 1, run in parallel with
+  dps-14. Revised 2026-11-16 for the owner decision IR-DPS15-DAG-VERIFY.
+- dependsOn (this run): none. Accepted and committed at e8fd3c4:
+  dps-01-syntax, dps-03-model.
+- Design: sections 8 and 10.1 of
+  `design-docs/specs/design-document-pages-snippets.md`.
+- writePaths: `apps/cli/src/edit/operations/add.ts`,
+  `apps/cli/src/edit/operations/pages.ts`, `apps/cli/src/edit/batch.ts`,
+  `apps/cli/src/edit/operations/document-authoring.test.ts`,
+  `impl-plans/progress/dps-15-cli-authoring.md`,
+  `tmp/dps-s863/dps-15-cli-authoring`, `target` (artifact root).
 - sharedPaths: none.
-- artifactRoots: `target`.
 
 ## Intent and context
 
-The CLI must create and edit `text.code` with canonical languages, and set
-`Page.pageFlow`. The generic `add` op already creates any type from an
-inline semantic. This plan adds language normalisation and the
-`set-page-flow` op.
+The code already in the tree is the starting point:
+
+- `add.ts:115-135` normalises `text.code` `language` inline inside
+  `addElement`, but `addElement` rejects `text.code` earlier at the
+  unknown-type guard (`add.ts:37-41`) because the IR registry does not
+  list the type until dps-17.
+- `set-page-flow` (`pages.ts:setPageFlow`, dispatched in `batch.ts`) works
+  and its test passes.
+- `document-authoring.test.ts` test 1 runs the full edit pipeline and
+  therefore fails until dps-17 (progress log, exit 1, 3 pass / 1 fail).
+
+Owner decision: dps-15 verification must not depend on the registry. The
+end-to-end "add `text.code` through the edit pipeline" assertion moves to
+dps-17's `apps/cli/src/document-wiring.test.ts`.
 
 ## Non-goals
 
-- No help, types or catalogue text. Those belong to dps-17.
-- No CLI re-layout of frames. The CLI places frames explicitly (design 8).
-- No `export` changes.
+- No registry, help, types or catalogue change (dps-17).
+- No change to `edit/operations/elements.ts`; generic semantic updates of
+  `language` stay raw (IR validation reports them).
+- No frame re-layout from the CLI.
 
 ## Changes
 
-- `add.ts`: when `type === "text.code"` and the semantic has `language`:
-  - a non-string `language` is an `OperationError`;
-  - a string resolved through `resolveSyntaxKind` is replaced by the
-    canonical id;
-  - an unknown string is an
-    `OperationError(index, 'Unknown language "<x>". Choose one of: <SYNTAX_KINDS joined by ", ">')`;
-  - a missing `language` gets `"plain"`;
-  - a missing `code` gets `""`.
+1. `add.ts`: extract the inline block at :115-135 into an exported pure
+   function, called from the same place with the same behaviour:
 
-  Do not edit `edit/operations/elements.ts`. A generic semantic update of
-  `language` stays raw, and IR validation reports bad patterns. Record
-  this boundary in the progress log.
-- `pages.ts`: add `setPageFlow(batch, operation, index)` for the op
-  `{"op":"set-page-flow","page":"<id or name>","flow":"vertical"|"horizontal"|null}`.
-  - Imitate `setPageMode` (:155) for page lookup and errors.
-  - Apply `updatePage` with
-    `pageFlow: flow === "vertical" ? null : flow` and treat `null` as
-    vertical, so vertical always removes the key, as the facade does.
-  - Any other value is
-    `OperationError(index, '"flow" must be vertical, horizontal or null')`.
-- `batch.ts`: add `case "set-page-flow": setPageFlow(this, operation, index);`
-  next to `set-page-mode` (:336), with the import next to :37.
+   ```ts
+   export function normalizeCodeSnippetSemantic(semantic: Json | undefined, index: number): Json | undefined; // Json is already imported in add.ts
+   ```
+
+   Rules (unchanged): applies when `semantic` is undefined or a plain
+   object; missing `language` -> `"plain"`; non-string language ->
+   `requireText` error mentioning `language`; alias -> canonical id via
+   `resolveSyntaxKind`; unknown -> `OperationError(index, 'Unknown language "<x>". Choose one of: <SYNTAX_KINDS joined by ", ">')`;
+   missing `code` -> `""`; other keys preserved. Non-object input is
+   returned unchanged. `addElement` calls it only when `type === "text.code"`.
+2. `document-authoring.test.ts`: replace test 1 with direct tests of
+   `normalizeCodeSnippetSemantic` (no `Batch`, no `Editor`). Keep the
+   page-flow test unchanged.
+3. `pages.ts`, `batch.ts`: no change expected; edit only to fix a defect
+   found by the tests, and record why.
 
 ## Pitfalls
 
-- Use `requireText` and the existing `OperationError` conventions.
-- Unknown-field checks: follow how `setPageMode` rejects extra keys, if it
-  does.
+- Do not delete the end-to-end intent: record in the progress log that it
+  moves to dps-17 `apps/cli/src/document-wiring.test.ts`. Do not create
+  that file (dps-17 owns it).
+- Do not mock the registry or call `isKnownElementType` from the helper.
+- Keep the error texts byte-identical to the current ones.
 
-## Tests (run the edit pipeline, imitating existing operation tests in `apps/cli/src/edit/operations/table.test.ts`)
+## Tests (input -> expected)
 
-- add `text.code` with `language:"TS"` stores the canonical TypeScript id
-  from chilla.
-- `language:"klingon"` fails with "Unknown language".
-- A missing language stores `"plain"`, and a missing code stores `""`.
-- `set-page-flow` horizontal sets `pageFlow`. Vertical, then null, removes
-  it.
-- `flow:"diagonal"` fails with the message above.
-- An unknown page fails with the existing page-not-found message.
+- `{ language: "TS" }` -> `{ language: "typescript", code: "" }`.
+- `undefined` -> `{ language: "plain", code: "" }`.
+- `{ code: "x", language: "rust", lineNumbers: true }` -> same keys kept,
+  language `rust`.
+- `{ language: "klingon" }` -> throws `Unknown language "klingon"` with
+  the kinds list.
+- `{ language: 3 }` -> throws an error mentioning `language`.
+- Existing page-flow test: horizontal sets `pageFlow`; vertical and null
+  remove it; `diagonal`, unknown page and an extra field fail.
 
-## Verification (each must exit 0; logs go to tmp/dps-s861/dps-15-cli-authoring/)
+## Verification (each must exit 0; logs go to tmp/dps-s863/dps-15-cli-authoring/)
 
 1. `bun test apps/cli/src/edit/operations/document-authoring.test.ts apps/cli/src/edit/operations/table.test.ts`
-2. `bun run typecheck`, with the sibling-tolerance rule of dps-01.
+   (0 fail, at least 2 tests in document-authoring.test.ts).
+2. `bun run typecheck`
 3. `bunx biome check --diagnostic-level=warn apps/cli/src/edit/operations/add.ts apps/cli/src/edit/operations/pages.ts apps/cli/src/edit/batch.ts apps/cli/src/edit/operations/document-authoring.test.ts`
 
 ## Done criteria
 
-- Both behaviours work.
-- All three commands exit 0.
-- The progress log records the commands, exit codes and log paths.
+- `rg -n "export function normalizeCodeSnippetSemantic" apps/cli/src/edit/operations/add.ts` matches.
+- `rg -n "new Batch" apps/cli/src/edit/operations/document-authoring.test.ts`
+  matches only inside the page-flow test.
+- All three commands exit 0; the progress log records commands, exit
+  codes, log paths, file hashes and the moved-assertion note.
 
 ## Coordination
 
-Edit only your writePaths. Re-read before each edit and record hashes. No
-git state changes.
-
-## Implementation status
-
-Source and tests are authored. Verification remains incomplete: the required
-edit pipeline test needs dps-17 text.code registry wiring, and workspace
- typecheck currently reports sibling-owned errors. See
-`impl-plans/progress/dps-15-cli-authoring.md` for exact results.
+Parallel with dps-14; disjoint write sets. Re-read before each edit and
+record hashes. No git state changes.
