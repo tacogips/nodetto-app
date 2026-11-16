@@ -59,21 +59,22 @@ export async function extractPdfText(
     const ref =
       /\/ToUnicode\s+(\d+)\s+\d+\s+R/.exec(obj.body) ??
       unsupported("missing ToUnicode");
-    const cmap = await streamText(Number(ref[1]));
+    const cmap = await streamText(Number(ref[1] ?? ""));
     const map = new Map<number, string>();
     for (const block of cmap.matchAll(
       /\d+\s+beginbfchar\b([\s\S]*?)endbfchar/g,
     )) {
-      for (const item of block[1].matchAll(
+      for (const item of (block[1] ?? "").matchAll(
         /<([0-9A-Fa-f]{2})>\s*<([0-9A-Fa-f]+)>/g,
       )) {
-        if (item[2].length % 4) unsupported("invalid Unicode mapping");
+        const hex = item[2] ?? "";
+        if (hex.length % 4) unsupported("invalid Unicode mapping");
         let value = "";
-        for (let i = 0; i < item[2].length; i += 4)
+        for (let i = 0; i < hex.length; i += 4)
           value += String.fromCharCode(
-            Number.parseInt(item[2].slice(i, i + 4), 16),
+            Number.parseInt(hex.slice(i, i + 4), 16),
           );
-        map.set(Number.parseInt(item[1], 16), value);
+        map.set(Number.parseInt(item[1] ?? "", 16), value);
       }
     }
     maps.set(id, map);
@@ -99,7 +100,7 @@ export async function extractPdfText(
     if (/\/Type\s*\/Pages\b/.test(body)) {
       const kids =
         /\/Kids\s*\[([^\]]*)\]/.exec(body) ?? unsupported("missing page kids");
-      for (const kid of kids[1].matchAll(/(\d+)\s+\d+\s+R/g))
+      for (const kid of (kids[1] ?? "").matchAll(/(\d+)\s+\d+\s+R/g))
         await walk(Number(kid[1]), resources);
       return;
     }
@@ -111,14 +112,14 @@ export async function extractPdfText(
       /\/([^\s/<>\[\]]+)\s+(\d+)\s+\d+\s+R/g,
     )) {
       const map = maps.get(Number(item[2]));
-      if (map) names.set(item[1], map);
+      if (map && item[1] !== undefined) names.set(item[1], map);
     }
     const contents = /\/Contents\s*(\[[^\]]*\]|\d+\s+\d+\s+R)/.exec(body);
     if (!contents) {
       pages.push("");
       return;
     }
-    const refs = [...contents[1].matchAll(/(\d+)\s+\d+\s+R/g)];
+    const refs = [...(contents[1] ?? "").matchAll(/(\d+)\s+\d+\s+R/g)];
     const runs: string[] = [];
     for (const ref of refs) {
       const content = await streamText(Number(ref[1]));
@@ -126,19 +127,19 @@ export async function extractPdfText(
         let font: Map<number, string> | undefined;
         let run = "";
         let hasText = false;
-        for (const token of block[1].matchAll(
+        for (const token of (block[1] ?? "").matchAll(
           /\/([^\s/]+)\s+[+-]?(?:\d+\.?\d*|\.\d+)\s+Tf|<([0-9A-Fa-f]*)>\s*Tj/g,
         )) {
           if (token[1]) font = names.get(token[1]);
           else {
-            if (token[2].length % 2) unsupported("unmapped text");
+            const hex = token[2] ?? "";
+            if (hex.length % 2) unsupported("unmapped text");
             const currentFont = font ?? unsupported("unmapped text");
             hasText = true;
-            for (let i = 0; i < token[2].length; i += 2)
+            for (let i = 0; i < hex.length; i += 2)
               run +=
-                currentFont.get(
-                  Number.parseInt(token[2].slice(i, i + 2), 16),
-                ) ?? unsupported("unmapped code");
+                currentFont.get(Number.parseInt(hex.slice(i, i + 2), 16)) ??
+                unsupported("unmapped code");
           }
         }
         if (hasText) runs.push(run);

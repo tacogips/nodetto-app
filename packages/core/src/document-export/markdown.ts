@@ -19,10 +19,10 @@ function base64(text: string): string {
     const b = bytes[i + 1] ?? 0;
     const c = bytes[i + 2] ?? 0;
     result +=
-      chars[a >> 2] +
-      chars[((a & 3) << 4) | (b >> 4)] +
-      (i + 1 < bytes.length ? chars[((b & 15) << 2) | (c >> 6)] : "=") +
-      (i + 2 < bytes.length ? chars[c & 63] : "=");
+      chars.charAt(a >> 2) +
+      chars.charAt(((a & 3) << 4) | (b >> 4)) +
+      (i + 1 < bytes.length ? chars.charAt(((b & 15) << 2) | (c >> 6)) : "=") +
+      (i + 2 < bytes.length ? chars.charAt(c & 63) : "=");
   }
   return result;
 }
