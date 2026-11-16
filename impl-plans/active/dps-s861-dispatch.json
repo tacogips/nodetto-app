@@ -1,0 +1,686 @@
+{
+  "taskId": "dps-s861",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/document-snippets-page-frames",
+  "baseBranch": "feat/document-snippets-page-frames",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "774cc63e3bbf766d84676f5cfe8aed80928fd2e9",
+  "designDocPaths": [
+    "design-docs/specs/design-document-pages-snippets.md",
+    "design-docs/user-qa/document-pages-snippets.md",
+    "design-docs/specs/export.md"
+  ],
+  "evidenceRoot": "tmp/dps-s861",
+  "reviewContext": {
+    "issueReference": "none; workflowInput.requestedOutcome (opus-terra-design-and-implement-review-loop-session-861; design accepted at Step 3, comm-020371)",
+    "userProblem": "Nodetto must support writing technical documents and papers with diagrams. It needs code and Markdown snippet shapes, paper-sized page frames that flow vertically or horizontally, a slideshow that shows page frames, and multi-page PDF and Markdown document export from the app and the CLI.",
+    "requiredOutcomes": [
+      "text.code: chilla tokenizer port (28 kinds plus aliases), light and dark palettes, palette, facade and CLI creation, editing, byte-identical JSONL, SVG/PNG/PDF with selectable Unicode text.",
+      "text.markdown: the listed subset rendered on the canvas and in SVG/PDF, wraps at width, hug height, byte-identical JSONL.",
+      "Page frames: presets and orientation; Add page; flow change re-layout in one undo; next/previous navigation.",
+      "The slideshow shows one slide per page frame in flow order and is unchanged without page frames.",
+      "Multi-page PDF and Markdown export from desktop/web and nodetto-cli, with tests.",
+      "Docs (editing.md, import-export.md, cli.md, README.md) and examples (paper and deck); mise run verify and mise run test-cli pass."
+    ],
+    "nonGoals": [
+      "A new Command kind, a schema bump, a new npm or crate dependency, or new CSS tokens.",
+      "Vector PDF; Markdown math, HTML, images and footnotes (literal text).",
+      "Server, auth or deployment code; version bumps or release work."
+    ],
+    "constraints": [
+      "Workers edit only their writePaths and sharedPaths, their progress file and their evidence directory. No git state changes, no any, no emojis.",
+      "test-cli gets up to 3 attempts only on deadline timeouts. Deadlines are never relaxed and binary-less parity runs are forbidden.",
+      "No push. Local commits only, with no tool attribution."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Each wave-1 module owner appends its own export line to packages/core/src/index.ts (sharedPath); all registrations stay in dps-17-wiring.", "rationale": "Wave-2 plans in other packages import those modules through @nodetto/core. design-presentation.md section 9 sets this precedent for a barrel line as a module contract."},
+      {"decision": "dps-03-model owns the IR barrel and SemanticByType; registry.ts DEFINITIONS stays in wiring.", "rationale": "ElementTypeDefinition.type requires the SemanticByType key at compile time, and dps-03 is the only IR writer before wiring."},
+      {"decision": "The canvas snippet view paints the core renderer markup, injected by wiring.", "rationale": "Canvas and export parity are exact, and wave-2 plans need no sibling imports."},
+      {"decision": "The PDF text layer is one core description (Type3 plus ToUnicode) emitted by the pdf-lib hosts through a generic sink, and by Rust from the same JSON.", "rationale": "Design 7.3.1: Unicode-exact, no dependency, identical logical text on all hosts."},
+      {"decision": "The document sequence lives in page-frames/sequence.ts instead of document-export/sequence.ts.", "rationale": "One owner per directory in wave 1. The behaviour is unchanged."},
+      {"decision": "startIndex keeps its signature; the new startSlideIndex handles SlideRef.", "rationale": "Keeps App.tsx untouched with identical behaviour."}
+    ],
+    "intentionalTradeoffs": [
+      "PDF stays raster; snippet text becomes selectable through an invisible Type3 + ToUnicode text layer instead of vector PDF (user-qa Q2, design 7.3.1).",
+      "Snippet palettes follow the panel fill luminance (< 0.18 = dark), not the canvas theme, so exports never depend on the app theme and app/CLI SVG stays byte-identical (user-qa Q1).",
+      "App/web Markdown export saves one stored ZIP (<base>.md + <base>.assets/*.svg) with encodeStoredZip/saveZip; data-URI single-file mode exists only as a core option (user-qa Q3).",
+      "Page frames take precedence over slideSize, slideOrigin and the artboard rule; moving between slides on the same nodetto page is a cut (user-qa Q6).",
+      "CLI keeps the existing --output flag instead of the intake --out (user-qa Q9).",
+      "Wave-1 module owners append single export lines to packages/core/src/index.ts; dps-17-wiring later owns that barrel and document-export/extractors.ts serially."
+    ],
+    "supportedEdgeCases": [
+      "All 28 SyntaxKind values plus alias resolution; multi-line comment state; Boa-compatible regex features.",
+      "Exact Unicode in the PDF text layer (CJK, supplementary code points, tabs, emoji) across the app, Bun CLI and native CLI encoders; fonts split after 255 code points; CMap bfchar groups of at most 100.",
+      "Nested ordered/unordered/task lists, GFM table alignment and escapes, fences containing backticks, link scheme filtering (http/https/mailto anchors only).",
+      "Add page after the selected frame, the frame containing the single selection, or the last frame; empty pages; non-empty pages without frames (after content bounds plus a 48 px gap); later frames and descendants shift in one undo step.",
+      "Next/previous navigation at either end returns false without moving the camera; navigation applies no command and keeps the selection.",
+      "Documents without page frames: one PDF page or Markdown section per nodetto page; empty pages skipped; hidden-from-presentation pages still exported; slideshow unchanged.",
+      "Markdown export membership: each snippet emitted once; mixed groups produce exactly one asset without snippet text or the frame rect; group children not duplicated."
+    ],
+    "outOfScopeEdgeCases": [
+      "Markdown math, raw HTML, images, footnotes, indented code blocks, lazy blockquote continuation, reference-style links and bare-URL autolinks (literal text, user-qa Q4).",
+      "Vector PDF output and identical copy order or selection appearance in every third-party PDF reader.",
+      "Exact font-metric fidelity (Liberation Sans advances and 0.6 em mono advances; snippets clipped to their panel).",
+      "Changing the paper size by dragging (page frames resize like any frame).",
+      "PDF documents with more than 500 resulting pages (rejected)."
+    ],
+    "residualRisks": [
+      "8 plans exceed the ~150-line plan text guidance (dps-17 has 210 lines).",
+      "Concurrent single-line appends to packages/core/src/index.ts in wave 1; a lost dps-02 line surfaces only at dps-17.",
+      "dps-17 is broad (39 write paths).",
+      "test-cli deadline flakiness handled by up to 3 attempts with unchanged deadlines.",
+      "The chilla source and the pdf-writer API were not verified at review time; dps-01 and dps-06 stop with a blocker if their preconditions fail.",
+      "Untracked reviewer scratch file tmp/dps-s861/plan-check.ts lies outside every plan and is not committed."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-document-pages-snippets.md",
+      "design-docs/user-qa/document-pages-snippets.md",
+      "design-docs/specs/export.md",
+      "design-docs/specs/design-presentation.md",
+      "design-docs/specs/design-slide-area-copy-shapes.md",
+      "design-docs/specs/design-slide-link-animation.md",
+      "design-docs/specs/design-table-sheet.md",
+      "design-docs/specs/design-shape-lateral-consistency.md",
+      "impl-plans/active/dps-s861-dispatch.json"
+    ]
+  },
+  "waves": [
+    ["dps-01-syntax", "dps-02-markdown", "dps-03-model", "dps-04-page-geometry", "dps-05-pdf-text-layer", "dps-06-pdf-native", "dps-07-docs"],
+    ["dps-08-code-shape", "dps-09-markdown-shape", "dps-10-snippet-ui", "dps-11-page-editing", "dps-12-presentation", "dps-13-pdf-app-encoder", "dps-14-document-export", "dps-15-cli-authoring", "dps-16-fallbacks"],
+    ["dps-17-wiring"]
+  ],
+  "plans": [
+    {
+      "planId": "dps-01-syntax",
+      "planPath": "impl-plans/active/dps-01-syntax.md",
+      "progressPath": "impl-plans/progress/dps-01-syntax.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/syntax/types.ts",
+        "packages/core/src/syntax/languages.ts",
+        "packages/core/src/syntax/keywords.ts",
+        "packages/core/src/syntax/tokenize.ts",
+        "packages/core/src/syntax/palette.ts",
+        "packages/core/src/syntax/index.ts",
+        "packages/core/src/syntax/syntax.test.ts",
+        "packages/core/src/syntax/palette.test.ts",
+        "packages/core/src/syntax/boa-safe.test.ts",
+        "packages/core/src/code-snippet/layout.ts",
+        "packages/core/src/code-snippet/layout.test.ts",
+        "packages/core/src/code-snippet/index.ts",
+        "impl-plans/progress/dps-01-syntax.md",
+        "tmp/dps-s861/dps-01-syntax",
+        "target"
+      ],
+      "sharedPaths": ["packages/core/src/index.ts"],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/index.ts", "intendedEdit": "Append exactly two lines: export * from \"./syntax/index.ts\"; and export * from \"./code-snippet/index.ts\";. Re-read immediately before editing and record hashes."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "SYNTAX_KINDS has exactly chilla's 28 values with plain first; every ported alias resolves; per-kind fixtures classify as chilla does.",
+        "tokenizeCode lines round-trip the source and carry multi-line comment state.",
+        "Palettes are anchored to the light and dark --nodetto token values and every foreground passes 4.5:1 on background and inlineCodeBackground; codePaletteFor uses luminance below 0.18 for dark.",
+        "codeSnippetLayout matches design 3.2 (columns, tabs, wide characters, gutter, wrap, derived height); the Boa-safe source scan passes."
+      ],
+      "verification": [
+        "bun test packages/core/src/syntax packages/core/src/code-snippet",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/syntax packages/core/src/code-snippet"
+      ]
+    },
+    {
+      "planId": "dps-02-markdown",
+      "planPath": "impl-plans/active/dps-02-markdown.md",
+      "progressPath": "impl-plans/progress/dps-02-markdown.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/markdown/ast.ts",
+        "packages/core/src/markdown/parse.ts",
+        "packages/core/src/markdown/inline.ts",
+        "packages/core/src/markdown/layout.ts",
+        "packages/core/src/markdown/index.ts",
+        "packages/core/src/markdown/parse.test.ts",
+        "packages/core/src/markdown/inline.test.ts",
+        "packages/core/src/markdown/layout.test.ts",
+        "packages/core/src/markdown/boa-safe.test.ts",
+        "impl-plans/progress/dps-02-markdown.md",
+        "tmp/dps-s861/dps-02-markdown",
+        "target"
+      ],
+      "sharedPaths": ["packages/core/src/index.ts"],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/index.ts", "intendedEdit": "Append exactly one line: export * from \"./markdown/index.ts\";. Re-read before editing and record hashes."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "parseMarkdown covers every construct in design 4.2 and renders the user-qa Q4 items as literal text.",
+        "markdownLayout follows the design 4.3 metrics, wraps at the width, derives the height (at least 32), uses the injected highlighter, and sets href only for http, https and mailto.",
+        "A 200 kB pathological input parses in under 1 s; the Boa-safe source scan passes."
+      ],
+      "verification": [
+        "bun test packages/core/src/markdown",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/markdown"
+      ]
+    },
+    {
+      "planId": "dps-03-model",
+      "planPath": "impl-plans/active/dps-03-model.md",
+      "progressPath": "impl-plans/progress/dps-03-model.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ir/src/semantics/document.ts",
+        "packages/ir/src/registry/document.ts",
+        "packages/ir/src/registry/document.test.ts",
+        "packages/ir/src/page-flow.test.ts",
+        "packages/ir/src/semantics/design.ts",
+        "packages/ir/src/semantics.ts",
+        "packages/ir/src/index.ts",
+        "packages/ir/src/registry/containers.ts",
+        "packages/ir/src/registry/containers.test.ts",
+        "packages/ir/src/types.ts",
+        "packages/ir/src/validate.ts",
+        "packages/io/src/jsonl/records.ts",
+        "packages/io/src/jsonl/parse.ts",
+        "packages/io/src/jsonl/page-flow.test.ts",
+        "packages/collab/src/ydoc.ts",
+        "packages/collab/src/page-flow.test.ts",
+        "packages/core/src/commands.ts",
+        "packages/core/src/editor/pages.ts",
+        "packages/core/src/page-flow-commands.test.ts",
+        "impl-plans/progress/dps-03-model.md",
+        "tmp/dps-s861/dps-03-model",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "TEXT_CODE and TEXT_MARKDOWN definitions validate per design 3.1 and 4.1; the types are in SemanticByType and exported from @nodetto/ir; registry.ts is untouched.",
+        "FrameSemantic.page and Page.pageFlow validate, round-trip byte-identically in JSONL, sync through ydoc, and are copied by duplicate page.",
+        "updatePage accepts pageFlow with null meaning remove, type.enum errors and an exact inverse; no new Command kind."
+      ],
+      "verification": [
+        "bun test packages/ir packages/io/src/jsonl packages/collab packages/core/src/page-flow-commands.test.ts packages/core/src/duplicate-slide-origin.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ir/src packages/io/src/jsonl packages/collab/src/ydoc.ts packages/collab/src/page-flow.test.ts packages/core/src/commands.ts packages/core/src/editor/pages.ts packages/core/src/page-flow-commands.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-04-page-geometry",
+      "planPath": "impl-plans/active/dps-04-page-geometry.md",
+      "progressPath": "impl-plans/progress/dps-04-page-geometry.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/page-frames/presets.ts",
+        "packages/core/src/page-frames/order.ts",
+        "packages/core/src/page-frames/plan.ts",
+        "packages/core/src/page-frames/navigation.ts",
+        "packages/core/src/page-frames/sequence.ts",
+        "packages/core/src/page-frames/index.ts",
+        "packages/core/src/page-frames/presets.test.ts",
+        "packages/core/src/page-frames/order.test.ts",
+        "packages/core/src/page-frames/plan.test.ts",
+        "packages/core/src/page-frames/navigation.test.ts",
+        "packages/core/src/page-frames/sequence.test.ts",
+        "impl-plans/progress/dps-04-page-geometry.md",
+        "tmp/dps-s861/dps-04-page-geometry",
+        "target"
+      ],
+      "sharedPaths": ["packages/core/src/index.ts"],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/index.ts", "intendedEdit": "Append exactly one line: export * from \"./page-frames/index.ts\";. Re-read before editing and record hashes."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Presets and orientation sizes match design 5.1; only top-level page frames count; flow order sorts by (y, x, id) or (x, y, id).",
+        "Add and reflow geometry and planShiftPageFrames (descendants carried) match design 5.3 with a 48 gap.",
+        "referencePageFrame prefers the frame containing the viewport centre over the selection; neighbourPageFrame returns null at the ends.",
+        "documentPageSequence follows tab order then flow order, falls back to content bounds plus 16, and skips empty pages."
+      ],
+      "verification": [
+        "bun test packages/core/src/page-frames",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/page-frames"
+      ]
+    },
+    {
+      "planId": "dps-05-pdf-text-layer",
+      "planPath": "impl-plans/active/dps-05-pdf-text-layer.md",
+      "progressPath": "impl-plans/progress/dps-05-pdf-text-layer.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/document-export/pdf-pages.ts",
+        "packages/core/src/document-export/pdf-emit.ts",
+        "packages/core/src/document-export/pdf-text-extract.ts",
+        "packages/core/src/document-export/text-runs.ts",
+        "packages/core/src/document-export/extractors.ts",
+        "packages/core/src/document-export/index.ts",
+        "packages/core/src/document-export/pdf-pages.test.ts",
+        "packages/core/src/document-export/pdf-emit.test.ts",
+        "packages/core/src/document-export/text-runs.test.ts",
+        "impl-plans/progress/dps-05-pdf-text-layer.md",
+        "tmp/dps-s861/dps-05-pdf-text-layer",
+        "target"
+      ],
+      "sharedPaths": ["packages/core/src/index.ts"],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/index.ts", "intendedEdit": "Append exactly one line: export * from \"./document-export/index.ts\";. Re-read before editing and record hashes."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "buildPdfTextLayer is deterministic, assigns 255 codes per Type3 font per class, uses widths matching the layout, and writes ToUnicode bfchar groups of at most 100 with surrogate pairs for supplementary characters.",
+        "emitPdfTextLayer drives a generic sink; nativePdfSpec emits the pinned JSON contract.",
+        "extractPdfText recovers ASCII, CJK and supplementary text exactly from emitted output; collectTextRuns filters by rect and hidden state; PDF_TEXT_RUN_EXTRACTORS is empty."
+      ],
+      "verification": [
+        "bun test packages/core/src/document-export",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/document-export"
+      ]
+    },
+    {
+      "planId": "dps-06-pdf-native",
+      "planPath": "impl-plans/active/dps-06-pdf-native.md",
+      "progressPath": "impl-plans/progress/dps-06-pdf-native.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/native/src/render.rs",
+        "apps/cli/native/src/engine.rs",
+        "apps/cli/native/src/engine_tests.rs",
+        "impl-plans/progress/dps-06-pdf-native.md",
+        "tmp/dps-s861/dps-06-pdf-native",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "render::pdf_pages writes N pages from concatenated PNGs and the dps-05 JSON, with Type3 fonts, ToUnicode CMaps and per-page content; errors are returned for mismatched input.",
+        "The pdfPages host function is exposed and allow-listed; existing pdf() output is byte-identical.",
+        "cargo test, fmt --check and clippy pass for nodetto-cli."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo test -p nodetto-cli pdf",
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-cli -- --check",
+        "CARGO_TERM_QUIET=true cargo clippy -p nodetto-cli -- -D warnings"
+      ]
+    },
+    {
+      "planId": "dps-07-docs",
+      "planPath": "impl-plans/active/dps-07-docs.md",
+      "progressPath": "impl-plans/progress/dps-07-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "docs/editing.md",
+        "docs/import-export.md",
+        "impl-plans/progress/dps-07-docs.md",
+        "tmp/dps-s861/dps-07-docs",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "docs/editing.md has the 'Code and Markdown snippets' and 'Page frames and document flow' sections matching the design and user-qa defaults.",
+        "docs/import-export.md has a 'Document export' section covering multi-page PDF (Unicode text layer), Markdown export (assets and ZIP) and the fallback table."
+      ],
+      "verification": [
+        "bun test apps/cli/src/cli-wiring.test.ts",
+        "sh -c 'grep -q \"Page frames and document flow\" docs/editing.md && grep -q \"Code and Markdown snippets\" docs/editing.md && grep -q \"Document export\" docs/import-export.md && grep -q -- \"--document\" docs/import-export.md'"
+      ]
+    },
+    {
+      "planId": "dps-08-code-shape",
+      "planPath": "impl-plans/active/dps-08-code-shape.md",
+      "progressPath": "impl-plans/progress/dps-08-code-shape.md",
+      "wave": 2,
+      "dependsOn": ["dps-01-syntax", "dps-03-model", "dps-05-pdf-text-layer"],
+      "writePaths": [
+        "packages/core/src/code-snippet/shape.ts",
+        "packages/core/src/code-snippet/text-runs.ts",
+        "packages/core/src/code-snippet/shape.test.ts",
+        "packages/core/src/code-snippet/text-runs.test.ts",
+        "packages/core/src/svg-export/code-snippet.ts",
+        "packages/core/src/svg-export/code-snippet.test.ts",
+        "impl-plans/progress/dps-08-code-shape.md",
+        "tmp/dps-s861/dps-08-code-shape",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "codeSnippetShapeUtil derives height from the layout and resizes width only (minimum 80).",
+        "renderCodeSnippet emits a tspan per token with palette colours chosen by the panel fill, italic comments, escaped text, a line-number column and a deterministic clipPath.",
+        "codeSnippetTextRuns returns one mono run per visual line with the source text (tabs kept)."
+      ],
+      "verification": [
+        "bun test packages/core/src/code-snippet packages/core/src/svg-export/code-snippet.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/code-snippet packages/core/src/svg-export/code-snippet.ts packages/core/src/svg-export/code-snippet.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-09-markdown-shape",
+      "planPath": "impl-plans/active/dps-09-markdown-shape.md",
+      "progressPath": "impl-plans/progress/dps-09-markdown-shape.md",
+      "wave": 2,
+      "dependsOn": ["dps-01-syntax", "dps-02-markdown", "dps-03-model", "dps-05-pdf-text-layer"],
+      "writePaths": [
+        "packages/core/src/markdown-snippet/layout.ts",
+        "packages/core/src/markdown-snippet/shape.ts",
+        "packages/core/src/markdown-snippet/text-runs.ts",
+        "packages/core/src/markdown-snippet/index.ts",
+        "packages/core/src/markdown-snippet/shape.test.ts",
+        "packages/core/src/markdown-snippet/text-runs.test.ts",
+        "packages/core/src/svg-export/markdown-snippet.ts",
+        "packages/core/src/svg-export/markdown-snippet.test.ts",
+        "impl-plans/progress/dps-09-markdown-shape.md",
+        "tmp/dps-s861/dps-09-markdown-shape",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "markdownSnippetShapeUtil derives height from the cached layout and resizes width only.",
+        "renderMarkdownSnippet draws boxes and runs with palette colours, weight, italic and text-decoration, and wraps only safe links in <a href>; fenced code is highlighted.",
+        "markdownSnippetTextRuns returns sans, sans-bold and mono runs with verbatim text."
+      ],
+      "verification": [
+        "bun test packages/core/src/markdown-snippet packages/core/src/svg-export/markdown-snippet.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/markdown-snippet packages/core/src/svg-export/markdown-snippet.ts packages/core/src/svg-export/markdown-snippet.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-10-snippet-ui",
+      "planPath": "impl-plans/active/dps-10-snippet-ui.md",
+      "progressPath": "impl-plans/progress/dps-10-snippet-ui.md",
+      "wave": 2,
+      "dependsOn": ["dps-01-syntax", "dps-03-model"],
+      "writePaths": [
+        "packages/ui-solid/src/shapes/SnippetView.tsx",
+        "packages/ui-solid/src/shapes/snippet-view-model.ts",
+        "packages/ui-solid/src/shapes/snippet-view-model.test.ts",
+        "packages/ui-solid/src/snippet/SnippetTextEditor.tsx",
+        "packages/ui-solid/src/snippet/snippet-editor-keys.ts",
+        "packages/ui-solid/src/snippet/snippet-editor-keys.test.ts",
+        "packages/ui-solid/src/inspector/CodeSnippetSection.tsx",
+        "packages/ui-solid/src/inspector/MarkdownSnippetSection.tsx",
+        "packages/ui-solid/src/inspector/snippet-edits.ts",
+        "packages/ui-solid/src/inspector/snippet-edits.test.ts",
+        "impl-plans/progress/dps-10-snippet-ui.md",
+        "tmp/dps-s861/dps-10-snippet-ui",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "SnippetView paints injected renderer markup in an svg sized to the box.",
+        "SnippetTextEditor handles Tab, Escape, Mod+Enter and blur with exactly one setText commit and no commit when unchanged.",
+        "The inspector sections produce one command per change; snippet-edits pure functions match the plan tests."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/shapes/snippet-view-model.test.ts packages/ui-solid/src/snippet packages/ui-solid/src/inspector/snippet-edits.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/shapes/SnippetView.tsx packages/ui-solid/src/shapes/snippet-view-model.ts packages/ui-solid/src/shapes/snippet-view-model.test.ts packages/ui-solid/src/snippet packages/ui-solid/src/inspector/CodeSnippetSection.tsx packages/ui-solid/src/inspector/MarkdownSnippetSection.tsx packages/ui-solid/src/inspector/snippet-edits.ts packages/ui-solid/src/inspector/snippet-edits.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-11-page-editing",
+      "planPath": "impl-plans/active/dps-11-page-editing.md",
+      "progressPath": "impl-plans/progress/dps-11-page-editing.md",
+      "wave": 2,
+      "dependsOn": ["dps-03-model", "dps-04-page-geometry"],
+      "writePaths": [
+        "packages/core/src/page-frames/editing.ts",
+        "packages/core/src/page-frames/editing.test.ts",
+        "packages/core/src/editor/facade/page-editing.ts",
+        "packages/ui-solid/src/inspector/PageFrameSection.tsx",
+        "packages/ui-solid/src/inspector/PageFlowControl.tsx",
+        "packages/ui-solid/src/inspector/page-frame-edits.ts",
+        "packages/ui-solid/src/inspector/page-frame-edits.test.ts",
+        "impl-plans/progress/dps-11-page-editing.md",
+        "tmp/dps-s861/dps-11-page-editing",
+        "target"
+      ],
+      "sharedPaths": ["packages/core/src/page-frames/index.ts"],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/page-frames/index.ts", "intendedEdit": "Created by dps-04 in wave 1. Append exactly export * from \"./editing.ts\";."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "addPageFrame inserts after the anchor with a 48 gap, shifts later frames with their descendants, names the frame Page N, selects it, and is one undo step.",
+        "setPageFlow writes updatePage pageFlow (null for vertical) plus the re-layout in one undo step and returns false when unchanged.",
+        "goToPageFrame resolves from the viewed frame (A selected: next, next, previous gives B, C, B in both flows), returns false at the ends, and applies no command."
+      ],
+      "verification": [
+        "bun test packages/core/src/page-frames packages/ui-solid/src/inspector/page-frame-edits.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/page-frames/editing.ts packages/core/src/page-frames/editing.test.ts packages/core/src/editor/facade/page-editing.ts packages/ui-solid/src/inspector/PageFrameSection.tsx packages/ui-solid/src/inspector/PageFlowControl.tsx packages/ui-solid/src/inspector/page-frame-edits.ts packages/ui-solid/src/inspector/page-frame-edits.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-12-presentation",
+      "planPath": "impl-plans/active/dps-12-presentation.md",
+      "progressPath": "impl-plans/progress/dps-12-presentation.md",
+      "wave": 2,
+      "dependsOn": ["dps-04-page-geometry"],
+      "writePaths": [
+        "packages/core/src/presentation/slides.ts",
+        "packages/core/src/presentation/slides.test.ts",
+        "packages/core/src/presentation/navigation.ts",
+        "packages/core/src/presentation/navigation.test.ts",
+        "packages/core/src/presentation/labels.ts",
+        "packages/core/src/presentation/labels.test.ts",
+        "packages/ui-solid/src/presentation/controller.ts",
+        "packages/ui-solid/src/presentation/controller.test.ts",
+        "packages/ui-solid/src/presentation/controller-navigation.test.ts",
+        "packages/ui-solid/src/presentation/controller-transition.test.ts",
+        "packages/ui-solid/src/presentation/slide-render.ts",
+        "packages/ui-solid/src/presentation/slide-render.test.ts",
+        "packages/ui-solid/src/presentation/page-frame-slides.test.ts",
+        "packages/ui-solid/src/canvas/SlideAreaOverlay.tsx",
+        "impl-plans/progress/dps-12-presentation.md",
+        "tmp/dps-s861/dps-12-presentation",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "expandSlides yields one SlideRef per page frame in flow order, or one per page without frames; hidden pages are excluded.",
+        "renderSlide clips frame slides to the frame and takes precedence over slideSize; same-page slide changes are cuts.",
+        "Documents without page frames keep identical slides, counter, size and transitions; existing presentation tests pass."
+      ],
+      "verification": [
+        "bun test packages/core/src/presentation packages/ui-solid/src/presentation",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/presentation/slides.ts packages/core/src/presentation/navigation.ts packages/core/src/presentation/labels.ts packages/ui-solid/src/presentation packages/ui-solid/src/canvas/SlideAreaOverlay.tsx"
+      ]
+    },
+    {
+      "planId": "dps-13-pdf-app-encoder",
+      "planPath": "impl-plans/active/dps-13-pdf-app-encoder.md",
+      "progressPath": "impl-plans/progress/dps-13-pdf-app-encoder.md",
+      "wave": 2,
+      "dependsOn": ["dps-05-pdf-text-layer"],
+      "writePaths": [
+        "packages/ui-solid/src/pdf-export.ts",
+        "packages/ui-solid/src/pdf-export.test.ts",
+        "impl-plans/progress/dps-13-pdf-app-encoder.md",
+        "tmp/dps-s861/dps-13-pdf-app-encoder",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "pagesToPdf writes N raster pages with per-page MediaBox and the Type3/ToUnicode text layer, saved without object streams.",
+        "extractPdfText recovers the ASCII, CJK, supplementary and tab test strings exactly; pngToPdf keeps its signature, adds optional textRuns, and keeps abort behaviour."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/pdf-export.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/pdf-export.ts packages/ui-solid/src/pdf-export.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-14-document-export",
+      "planPath": "impl-plans/active/dps-14-document-export.md",
+      "progressPath": "impl-plans/progress/dps-14-document-export.md",
+      "wave": 2,
+      "dependsOn": ["dps-03-model", "dps-04-page-geometry", "dps-05-pdf-text-layer", "dps-06-pdf-native"],
+      "writePaths": [
+        "packages/core/src/document-export/markdown.ts",
+        "packages/core/src/document-export/markdown.test.ts",
+        "packages/core/src/document-export/pdf-document.ts",
+        "packages/core/src/document-export/pdf-document.test.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/raster-backend.ts",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/export-document.test.ts",
+        "impl-plans/progress/dps-14-document-export.md",
+        "tmp/dps-s861/dps-14-document-export",
+        "target"
+      ],
+      "sharedPaths": ["packages/core/src/document-export/index.ts"],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/document-export/index.ts", "intendedEdit": "Created by dps-05 in wave 1. Append exactly export * from \"./markdown.ts\"; and export * from \"./pdf-document.ts\";."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "exportMarkdownDocument excludes the page frame and all page frames, de-duplicates members, emits snippets once, groups the other members into page-R-G.svg assets, and is deterministic; snippet-only pages give zero assets.",
+        "documentPdfPlan produces one page per DocumentPageRef with viewport SVG, a 0.75 pt layout and collected text runs; it rejects 0 or more than 500 pages.",
+        "nodetto-cli export supports --format pdf --document (conflict checks, multi-page via pagesToPdf) and --format markdown (writes .md and <stem>.assets/); existing export tests pass."
+      ],
+      "verification": [
+        "bun test packages/core/src/document-export apps/cli/src/export-document.test.ts apps/cli/src/export-command.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/core/src/document-export/markdown.ts packages/core/src/document-export/markdown.test.ts packages/core/src/document-export/pdf-document.ts packages/core/src/document-export/pdf-document.test.ts apps/cli/src/export-command.ts apps/cli/src/raster-backend.ts apps/cli/src/native-engine.ts apps/cli/src/export-document.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-15-cli-authoring",
+      "planPath": "impl-plans/active/dps-15-cli-authoring.md",
+      "progressPath": "impl-plans/progress/dps-15-cli-authoring.md",
+      "wave": 2,
+      "dependsOn": ["dps-01-syntax", "dps-03-model"],
+      "writePaths": [
+        "apps/cli/src/edit/operations/add.ts",
+        "apps/cli/src/edit/operations/pages.ts",
+        "apps/cli/src/edit/batch.ts",
+        "apps/cli/src/edit/operations/document-authoring.test.ts",
+        "impl-plans/progress/dps-15-cli-authoring.md",
+        "tmp/dps-s861/dps-15-cli-authoring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The add op normalises text.code language to its canonical id, rejects unknown names, and defaults language to plain and code to an empty string.",
+        "The set-page-flow op sets horizontal and removes the key for vertical or null, with clear errors."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit/operations/document-authoring.test.ts apps/cli/src/edit/operations/table.test.ts",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/edit/operations/add.ts apps/cli/src/edit/operations/pages.ts apps/cli/src/edit/batch.ts apps/cli/src/edit/operations/document-authoring.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-16-fallbacks",
+      "planPath": "impl-plans/active/dps-16-fallbacks.md",
+      "progressPath": "impl-plans/progress/dps-16-fallbacks.md",
+      "wave": 2,
+      "dependsOn": ["dps-03-model"],
+      "writePaths": [
+        "packages/io/src/drawio/export-page.ts",
+        "packages/io/src/d2/export.ts",
+        "packages/core/src/interface-code.ts",
+        "packages/io/src/snippet-fallbacks.test.ts",
+        "packages/core/src/interface-code-snippets.test.ts",
+        "impl-plans/progress/dps-16-fallbacks.md",
+        "tmp/dps-s861/dps-16-fallbacks",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "draw.io exports both types as text vertices (monospace for code); D2 exports them as text shapes labelled with the source; Mermaid omits them without error; HTML emits escaped <pre><code class=language-*> and a pre-wrap div.",
+        "Existing exporter tests pass unchanged."
+      ],
+      "verification": [
+        "bun test packages/io/src/snippet-fallbacks.test.ts packages/core/src/interface-code-snippets.test.ts packages/io/src/drawio packages/io/src/d2",
+        "bun run typecheck",
+        "bunx biome check --diagnostic-level=warn packages/io/src/drawio/export-page.ts packages/io/src/d2/export.ts packages/core/src/interface-code.ts packages/io/src/snippet-fallbacks.test.ts packages/core/src/interface-code-snippets.test.ts"
+      ]
+    },
+    {
+      "planId": "dps-17-wiring",
+      "planPath": "impl-plans/active/dps-17-wiring.md",
+      "progressPath": "impl-plans/progress/dps-17-wiring.md",
+      "wave": 3,
+      "dependsOn": ["dps-01-syntax", "dps-02-markdown", "dps-03-model", "dps-04-page-geometry", "dps-05-pdf-text-layer", "dps-06-pdf-native", "dps-07-docs", "dps-08-code-shape", "dps-09-markdown-shape", "dps-10-snippet-ui", "dps-11-page-editing", "dps-12-presentation", "dps-13-pdf-app-encoder", "dps-14-document-export", "dps-15-cli-authoring", "dps-16-fallbacks"],
+      "writePaths": [
+        "packages/ir/src/registry.ts",
+        "packages/ir/src/registry.test.ts",
+        "packages/io/src/jsonl/golden.test.ts",
+        "packages/io/src/__fixtures__/document-pages.jsonl",
+        "packages/core/src/index.ts",
+        "packages/core/src/shapes/index.ts",
+        "packages/core/src/svg-export/shapes.ts",
+        "packages/core/src/tools.ts",
+        "packages/core/src/shape-catalogue.ts",
+        "packages/core/src/shape-catalogue.test.ts",
+        "packages/core/src/editor/style-text.ts",
+        "packages/core/src/editor/types.ts",
+        "packages/core/src/document-export/extractors.ts",
+        "packages/core/src/document-snippets-wiring.test.ts",
+        "packages/ui-solid/src/shapes/ShapeView.tsx",
+        "packages/ui-solid/src/Inspector.tsx",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/interaction/pointer.ts",
+        "packages/ui-solid/src/shape-palette.ts",
+        "packages/ui-solid/src/shortcuts.ts",
+        "packages/ui-solid/src/Toolbar.tsx",
+        "packages/ui-solid/src/ExportDialog.tsx",
+        "packages/ui-solid/src/inspector/AssetExportSection.tsx",
+        "packages/ui-solid/src/index.ts",
+        "packages/ui-solid/src/document-wiring.test.ts",
+        "apps/desktop/src/shell/export-handlers.ts",
+        "apps/desktop/src/App.tsx",
+        "apps/cli/src/help.ts",
+        "apps/cli/src/types-command.ts",
+        "apps/cli/src/document-wiring.test.ts",
+        "apps/cli/src/native-parity/export.test.ts",
+        "docs/cli.md",
+        "README.md",
+        "examples/document/README.md",
+        "examples/document/paper.ops.json",
+        "examples/document/deck.ops.json",
+        "impl-plans/progress/dps-17-wiring.md",
+        "tmp/dps-s861/dps-17-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Both types are registered (IR, shape utils, SVG dispatch, tools, catalogue, palette, inspector, double-click editor, editable fields, PDF text extractors); the golden fixture round-trips byte-identically.",
+        "The Add page, Next page frame (PageDown) and Previous page frame (PageUp) actions work; the Export dialog offers Document as PDF and Document as Markdown (ZIP).",
+        "App and CLI SVG are byte-identical; Bun and native document PDFs extract the exact Unicode test strings with equal page counts.",
+        "docs/cli.md, README.md and examples/document (paper and deck) are complete; mise run verify passes and mise run test-cli passes within 3 attempts (retries only on deadline timeouts)."
+      ],
+      "verification": [
+        "bun test packages/ir packages/io packages/core packages/ui-solid apps/cli/src/document-wiring.test.ts",
+        "bun run typecheck",
+        "mise run lint",
+        "CARGO_TERM_QUIET=true mise run verify",
+        "sh -c 'mkdir -p tmp/dps-s861/dps-17-wiring; for i in 1 2 3; do CARGO_TERM_QUIET=true mise run test-cli > tmp/dps-s861/dps-17-wiring/test-cli-$i.log 2>&1 && exit 0; grep -qiE \"timed out|deadline\" tmp/dps-s861/dps-17-wiring/test-cli-$i.log || exit 1; done; exit 1'"
+      ]
+    }
+  ]
+}

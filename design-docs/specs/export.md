@@ -31,6 +31,16 @@ PDF, selection export from the CLI, a CLI `--check`/`--strict` mode for
 export, changes to the existing inspector PNG asset export behavior,
 version bumps or release work.
 
+Amendment (2026-11-16, session 861): the "multi-page PDF" non-goal is
+lifted for document export only. That export gives one PDF page per page
+frame, or one per nodetto page when there are no page frames. It works in
+the desktop/web Export dialog and with `nodetto-cli export --format pdf
+--document`. Pages stay raster, with an invisible, Unicode-preserving
+text layer (Type3 fonts with ToUnicode CMaps) for code and Markdown
+snippets. Markdown document export (`--format markdown`) is added
+at the same time. See `design-docs/specs/design-document-pages-snippets.md`
+section 7. Single-page PDF behavior is otherwise unchanged.
+
 ## 2. Baseline (current behavior that is preserved)
 
 - `renderPageSvg`, `renderSelectionSvg`, `renderArtboardSvg` in
