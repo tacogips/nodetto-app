@@ -285,3 +285,32 @@ outside mise uses `CARGO_TARGET_DIR=target/dps-17`.
   matches in both.
 - The progress log records the identity test result and whether
   `markdown-snippet/layout.ts` was changed.
+
+## Amendment 2026-11-16 (blocked-wave-scope-or-contract, round 1)
+
+Checkpoint blocker (wave-003, previousCheckpointCommit 0de47b2): the Page
+palette tile must run `addPageFrame`, but the tile click handler lives in
+`packages/ui-solid/src/ShapePalette.tsx`, which was not in writePaths.
+
+Decisions:
+
+- Authorize exactly `packages/ui-solid/src/ShapePalette.tsx` and its
+  co-located test `packages/ui-solid/src/app-palette.test.ts` (manifest
+  writePaths and sharedPathNotes updated). No other path is added.
+- Contract: `shape-palette.ts` declares the Page tile with an `action` id
+  (for example `"add-page-frame"`). `ShapePalette.tsx` `onClick` adds one
+  branch for that id, next to the existing `item.action === "ios-kit"`
+  branch (ShapePalette.tsx:265), that runs the `addPageFrame` action through
+  the existing `ActionContext` (`props.context`). The disabled state keeps
+  the existing `item.action ? readOnly() : ...` rule (:257). The tile is not
+  draggable; the existing `item.action` early return in `on:pointerdown`
+  (:233) already covers that.
+- Do not change other tiles, drag handling or palette layout.
+- Superseded literal: the moved end-to-end assertion expects
+  `language: "javascript"` for `"TS"` (accepted canonical id,
+  `packages/core/src/syntax/languages.ts:14`), not `"typescript"` as
+  written in the session 863 amendment above (integration finding
+  IR-W1-DPS17-CANONICAL-LANG).
+- Resume from the partial work already in the tree (registry, core
+  dispatch, extractors, tools, catalogue, ShapeView, Inspector); do not
+  redo it. The verification list is unchanged.

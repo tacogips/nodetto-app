@@ -38,7 +38,8 @@
       {"decision": "CommandIo.ensureDir?(path): Promise<void> is optional; Bun uses mkdir recursive, native uses create_dir_all through a host arm exposed like writeBytes.", "rationale": "Owner decision IR-DPS14-HOST-MKDIR; optional matches writeBytes? and keeps unrelated CommandIo fakes unchanged (design 7.4)."},
       {"decision": "--document is accepted with pdf and markdown; markdown with and without --document is one code path with byte-identical output.", "rationale": "Review finding DR-DPS14-MARKDOWN-DOCUMENT and workflowInput.acceptanceCriteria[0] (design 7.4, 11)."},
       {"decision": "dps-15 tests a pure normalizeCodeSnippetSemantic helper; the end-to-end text.code add assertion moves to dps-17 document-wiring.test.ts.", "rationale": "Owner decision IR-DPS15-DAG-VERIFY (design 8, 10.1)."},
-      {"decision": "dps-14 tests avoid text.code/text.markdown registry dependence; CLI snippet export is tested by dps-17.", "rationale": "IR DEFINITIONS gains both types only in dps-17; keeps wave-1 verification green on its own."}
+      {"decision": "dps-14 tests avoid text.code/text.markdown registry dependence; CLI snippet export is tested by dps-17.", "rationale": "IR DEFINITIONS gains both types only in dps-17; keeps wave-1 verification green on its own."},
+      {"decision": "Amendment 2026-11-16 round 1: authorize dps-17-wiring edits to packages/ui-solid/src/ShapePalette.tsx (Page tile onClick branch calling addPageFrame) and its co-located packages/ui-solid/src/app-palette.test.ts.", "rationale": "Blocked plan dps-17-wiring (blocked-wave-scope-or-contract): the required Page palette tile handler lives in ShapePalette.tsx, which was absent from writePaths; design 5.4/10 already assign the Page tile to wiring, so no redesign. dps-14 and dps-15 remain acceptedDependencies."}
     ],
     "residualRisks": [
       "Whole-repo bun run typecheck in a parallel wave can see a sibling mid-edit; rerun after joining before declaring failure.",
@@ -193,6 +194,8 @@
         "packages/ui-solid/src/Canvas.tsx",
         "packages/ui-solid/src/interaction/pointer.ts",
         "packages/ui-solid/src/shape-palette.ts",
+        "packages/ui-solid/src/ShapePalette.tsx",
+        "packages/ui-solid/src/app-palette.test.ts",
         "packages/ui-solid/src/shortcuts.ts",
         "packages/ui-solid/src/Toolbar.tsx",
         "packages/ui-solid/src/ExportDialog.tsx",
@@ -221,6 +224,8 @@
       "sharedPathNotes": [
         {"path": "packages/core/src/markdown-snippet/layout.ts", "intendedEdit": "Edit only if the store identity test fails: key the layout cache by (semantic.markdown, width, fill) instead of the element object."},
         {"path": "apps/cli/src/cli-wiring.test.ts", "intendedEdit": "Edit only if a help/doc sync assertion needs the new --document, markdown or set-page-flow text."},
+        {"path": "packages/ui-solid/src/ShapePalette.tsx", "intendedEdit": "Amendment 2026-11-16 round 1: add one branch in the tile onClick handler for the Page tile action (item.action === \"add-page-frame\" or the id chosen in shape-palette.ts) that runs the addPageFrame action, imitating the existing ios-kit action branch; disabled when read-only via the existing item.action ? readOnly() rule. No other change."},
+        {"path": "packages/ui-solid/src/app-palette.test.ts", "intendedEdit": "Amendment round 1: optional assertion that the palette contains the Code snippet, Markdown snippet and Page tiles, if the existing test enumerates palette items."},
         {"path": "docs/editing.md", "intendedEdit": "Corrections only against the final UI labels."},
         {"path": "docs/import-export.md", "intendedEdit": "Corrections only; show --format pdf --document, --format markdown --document --output and the shorthand."}
       ],
