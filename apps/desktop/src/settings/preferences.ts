@@ -11,6 +11,7 @@ export interface EditorPreferences {
   readonly showSlideArea?: boolean;
   readonly showRulers: boolean;
   readonly pagesListOpen: boolean;
+  readonly layersOpen: boolean;
   readonly leftPaneOpen: boolean;
   readonly rightPaneOpen: boolean;
   readonly snap: SnapSettings;
@@ -25,6 +26,7 @@ const defaults: EditorPreferences = {
   showGrid: true,
   showRulers: true,
   pagesListOpen: true,
+  layersOpen: true,
   leftPaneOpen: true,
   rightPaneOpen: true,
   snap: { grid: true, objects: true, guides: true },
@@ -53,6 +55,7 @@ export function loadEditorPreferences(
         | "showGrid"
         | "showRulers"
         | "pagesListOpen"
+        | "layersOpen"
         | "leftPaneOpen"
         | "rightPaneOpen",
     ) =>
@@ -65,6 +68,7 @@ export function loadEditorPreferences(
         : {}),
       showRulers: bool("showRulers"),
       pagesListOpen: bool("pagesListOpen"),
+      layersOpen: bool("layersOpen"),
       leftPaneOpen: bool("leftPaneOpen"),
       rightPaneOpen: bool("rightPaneOpen"),
       snap: {

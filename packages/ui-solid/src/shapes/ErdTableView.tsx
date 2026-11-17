@@ -13,6 +13,8 @@ import { fillPaintStyle, strokeBorderStyle } from "./visual.ts";
 
 export interface ErdTableViewProps {
   readonly element: Element;
+  /** Leave the column rows out: the table keeps its size, header and outline. */
+  readonly headerOnly?: boolean;
 }
 
 function semanticOf(element: Element): ErdTableSemantic {
@@ -42,7 +44,7 @@ export function ErdTableView(props: ErdTableViewProps): JSX.Element {
         {semantic().tableName}
       </div>
       <div class="nodetto-erd-body">
-        <For each={semantic().columns}>
+        <For each={props.headerOnly ? [] : semantic().columns}>
           {(column: ErdColumn) => (
             <div
               class="nodetto-erd-row"

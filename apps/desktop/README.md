@@ -126,6 +126,24 @@ pointer-held resizing before release. It prints selection processing timings
 without imposing machine-dependent latency thresholds. Fixture files are
 served only by the dev server and are not production application entry points.
 
+### Large pages
+
+`bun run check:erd-scale` (same dev server and Chrome requirements) mounts
+the application over one ERD page of 2,000 tables and their relations and
+drives it with real pointer and wheel input, at 100% zoom and at the
+overview. It prints the main-thread time of each gesture's frames with the
+browser's split into script, style and layout. Useful flags: `--tables <n>`,
+`--routing orthogonal` (every relation avoiding obstacles), `--budget` (exit
+non-zero when a single-element gesture's median frame exceeds 50 ms), `--profile
+"<scenario>"` (save a CPU profile) and `--trace "<scenario>"` (print the
+browser's time per rendering stage). `bun run bench:erd-scale` measures the
+editor core alone on the same document, without a browser. The design and
+the measurements are in
+`design-docs/specs/design-large-page-performance.md`.
+
+Elements outside the view are not mounted: a fixture that looks up an
+element's DOM node has to bring it into view first.
+
 ### UML component diagrams
 
 The **UML component** editing mode provides Component, provided/required Interface,

@@ -211,10 +211,10 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
       ? undefined
       : new ResizeObserver(syncEdges);
   createEffect(() => {
-    // Tab widths follow names, renames, and the page list.
-    pageIds();
+    // Tab widths follow names, renames, and the page list. Not every commit:
+    // measuring the strip forces layout of the whole document.
     renaming();
-    signals.rev();
+    tabLabels();
     queueMicrotask(() => {
       if (!list) return;
       resize?.disconnect();
@@ -334,6 +334,12 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
     () => new Map(pages().map((page) => [page.id, page])),
   );
   const pageIds = createMemo(() => pages().map((page) => page.id));
+  /** The strip's content as one value: which tabs, in what order, named what. */
+  const tabLabels = createMemo(() =>
+    pages()
+      .map((page) => `${page.id}\n${page.name}`)
+      .join("\n"),
+  );
   const currentId = (): PageId => {
     signals.rev();
     return props.editor.currentPageId;

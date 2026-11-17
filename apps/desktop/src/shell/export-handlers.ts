@@ -3,8 +3,11 @@
 // the export backend's save dialog, or falls back to a browser download
 // where there is no filesystem.
 
+import { decodeRasterDataUrl } from "@nodetto/ir";
 import {
+  DOCUMENT_BUNDLE_EXTENSION,
   documentPdfPlan,
+  encodeDocumentBundle,
   exportMarkdownDocument,
   encodeStoredZip,
   bpmnRouteResolver,
@@ -45,6 +48,8 @@ export interface ExportHandlers {
     background: string | null,
   ) => Promise<void>;
   readonly exportDocumentMarkdown: () => Promise<void>;
+  /** The document and its images as one `.nodetto` bundle. */
+  readonly exportDocumentBundle: () => Promise<void>;
   readonly exportBpmn: () => Promise<void>;
   readonly exportBreadboard: (
     kind: "bom" | "kicad" | "spice" | "gerber",
@@ -212,6 +217,33 @@ export function createExportHandlers(
     }
   };
 
+  const exportDocumentBundle = async (): Promise<void> => {
+    setExportError(null);
+    try {
+      const snapshot = source.editor.getSnapshot();
+      // Images are held as data URLs once the session has loaded them.
+      const { bytes } = encodeDocumentBundle(snapshot, (src) => {
+        const data = source.editor.assets.resolve(src);
+        return data ? decodeRasterDataUrl(data).bytes : undefined;
+      });
+      const name = `${exportBaseName(snapshot.title)}.${DOCUMENT_BUNDLE_EXTENSION}`;
+      if (!source.exportBackend.available) {
+        downloadBlob(new Blob([bytes], { type: "application/zip" }), name);
+        return;
+      }
+      const path = await source.exportBackend.pickExportPath(
+        name,
+        DOCUMENT_BUNDLE_EXTENSION,
+      );
+      if (path === null) return;
+      await source.exportBackend.writeBytes(path, bytes);
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   /** The imported board's Gerber and drill files, edits included. */
   const exportGerber = async (): Promise<void> => {
     setExportError(null);
@@ -317,6 +349,7 @@ export function createExportHandlers(
     saveArtwork,
     exportDocumentPdf,
     exportDocumentMarkdown,
+    exportDocumentBundle,
     exportBpmn,
     exportBreadboard,
     exportGerber,

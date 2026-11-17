@@ -15,6 +15,8 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 const FILTER_NAME: &str = "nodetto document";
 const OPEN_FILTER_EXTENSIONS: &[&str] = &[
     "jsonl",
+    // Document bundle: a ZIP of the JSONL and its image attachments.
+    "nodetto",
     "mmd",
     "mermaid",
     "bpmn",
@@ -227,6 +229,11 @@ mod tests {
     #[test]
     fn open_filter_includes_bpmn() {
         assert!(OPEN_FILTER_EXTENSIONS.contains(&"bpmn"));
+    }
+
+    #[test]
+    fn open_filter_includes_document_bundles() {
+        assert!(OPEN_FILTER_EXTENSIONS.contains(&"nodetto"));
     }
 
     #[test]

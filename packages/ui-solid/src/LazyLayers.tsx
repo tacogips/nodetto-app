@@ -21,12 +21,19 @@ export function Layers(props: {
     onPlaced: () => void,
   ) => void;
   readonly onCancelCommentPlacement?: () => void;
+  readonly layersOpen?: boolean;
+  readonly onLayersOpenChange?: (open: boolean) => void;
 }): JSX.Element {
   return (
     <Suspense
       fallback={
         <nav class="nodetto-layers" aria-label="Layers">
-          <h2>Layers</h2>
+          <details
+            class="nodetto-navigation-group"
+            open={props.layersOpen ?? true}
+          >
+            <summary>Layers</summary>
+          </details>
         </nav>
       }
     >

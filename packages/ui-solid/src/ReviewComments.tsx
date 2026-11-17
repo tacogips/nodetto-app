@@ -1,6 +1,8 @@
 import { Switch } from "./Switch.tsx";
 import {
   createReviewComment,
+  findIcon,
+  renderIconMarkup,
   focusReviewComment,
   type ViewportSize,
   type Editor,
@@ -128,77 +130,34 @@ export function ReviewComments(
     if (!draft.body || !props.onPlaceComment) return;
     props.onPlaceComment(draft, () => setBody(""));
   };
+  const canSend = () =>
+    !readOnly() && body().trim() !== "" && !props.commentPlacementActive;
   return (
     <section class="nodetto-review-comments" aria-label="Review comments">
-      <Show
-        when={props.showHeading !== false}
-        fallback={
-          <HelpHint text="Anchor feedback to the selection, or to the visible canvas." />
-        }
-      >
-        <h2>
-          Comments{" "}
-          <HelpHint text="Anchor feedback to the selection, or to the visible canvas." />
-        </h2>
+      <Show when={props.showHeading !== false}>
+        <h2>Comments</h2>
       </Show>
-      <input
-        type="search"
-        aria-label="Search comments"
-        placeholder="Search feedback, authors or pages"
-        value={query()}
-        onInput={(event) => setQuery(event.currentTarget.value)}
-        on:keydown={(event) => event.stopPropagation()}
-        on:keyup={(event) => event.stopPropagation()}
-      />
-      <label>
-        <Switch
-          checked={allPages()}
-          onChange={(event) => setAllPages(event.currentTarget.checked)}
+      <div class="nodetto-comment-toolbar">
+        <input
+          type="search"
+          aria-label="Search comments"
+          placeholder="Search comments"
+          title="Search feedback, authors or pages"
+          value={query()}
+          onInput={(event) => setQuery(event.currentTarget.value)}
+          on:keydown={(event) => event.stopPropagation()}
+          on:keyup={(event) => event.stopPropagation()}
         />
-        All pages
-      </label>
-      <Show when={target()}>
-        {(id) => (
-          <label for="nodetto-new-comment">
-            {(() => {
-              const element = props.editor.store.get(id());
-              return element ? layerName(element) : "Selection";
-            })()}
-          </label>
-        )}
-      </Show>
-      <textarea
-        ref={composer}
-        id="nodetto-new-comment"
-        aria-label="New comment"
-        placeholder="Leave design feedback…"
-        value={body()}
-        disabled={readOnly() || props.commentPlacementActive}
-        onInput={(event) => setBody(event.currentTarget.value)}
-        on:keydown={(event) => event.stopPropagation()}
-        on:keyup={(event) => event.stopPropagation()}
-      />
-      <div class="nodetto-comment-actions">
-        <button
-          type="button"
-          disabled={
-            readOnly() || !body().trim() || props.commentPlacementActive
-          }
-          onClick={add}
-        >
-          {target() ? "Comment on selection" : "Add comment"}
-        </button>
-        <Show when={props.onPlaceComment}>
-          <button
-            type="button"
-            disabled={
-              readOnly() || !body().trim() || props.commentPlacementActive
-            }
-            onClick={place}
-          >
-            Place on canvas
-          </button>
-        </Show>
+        <HelpHint text="Anchor feedback to the selection, or place it anywhere on the canvas. Ctrl/Cmd + Enter sends." />
+      </div>
+      <div class="nodetto-comment-filters">
+        <label>
+          <Switch
+            checked={allPages()}
+            onChange={(event) => setAllPages(event.currentTarget.checked)}
+          />
+          All pages
+        </label>
         <label>
           <Switch
             checked={showResolved()}
@@ -207,18 +166,82 @@ export function ReviewComments(
           Resolved
         </label>
       </div>
+      <div class="nodetto-comment-composer">
+        <Show when={target()}>
+          {(id) => (
+            <label for="nodetto-new-comment" class="nodetto-comment-target">
+              On {(() => {
+                const element = props.editor.store.get(id());
+                return element ? layerName(element) : "Selection";
+              })()}
+            </label>
+          )}
+        </Show>
+        <textarea
+          ref={composer}
+          id="nodetto-new-comment"
+          aria-label="New comment"
+          placeholder="Leave design feedback…"
+          value={body()}
+          disabled={readOnly() || props.commentPlacementActive}
+          onInput={(event) => setBody(event.currentTarget.value)}
+          on:keydown={(event) => {
+            event.stopPropagation();
+            if (
+              event.key === "Enter" &&
+              (event.metaKey || event.ctrlKey) &&
+              !event.isComposing &&
+              canSend()
+            ) {
+              event.preventDefault();
+              add();
+            }
+          }}
+          on:keyup={(event) => event.stopPropagation()}
+        />
+        <div class="nodetto-comment-actions">
+          <Show when={props.onPlaceComment}>
+            <CommentIconButton
+              icon="map-pin-plus"
+              label="Place on canvas"
+              disabled={!canSend()}
+              onClick={place}
+            />
+          </Show>
+          <CommentIconButton
+            icon="send-horizontal"
+            label={target() ? "Comment on selection" : "Add comment"}
+            primary
+            disabled={!canSend()}
+            onClick={add}
+          />
+        </div>
+      </div>
       <Show when={props.commentPlacementActive}>
         <div class="nodetto-comment-placement" role="status">
           <span>Click canvas to place</span>
-          <button type="button" onClick={props.onCancelCommentPlacement}>
-            Cancel
-          </button>
+          <CommentIconButton
+            icon="x"
+            label="Cancel placement"
+            onClick={() => props.onCancelCommentPlacement?.()}
+          />
         </div>
       </Show>
       <For each={threads()}>
         {(thread) => {
           const semantic = () => thread.element.semantic;
           const reply = () => replies()[thread.element.id] ?? "";
+          const pageName = () =>
+            props.editor.store.getPage(thread.element.page)?.name ?? "page";
+          const sendReply = (): void => {
+            if (
+              replyToReviewComment(props.editor, thread.element.id, {
+                author: authorName(props.author),
+                body: reply(),
+              })
+            )
+              setReplies({ ...replies(), [thread.element.id]: "" });
+          };
           return (
             <article
               class="nodetto-comment-thread"
@@ -226,55 +249,20 @@ export function ReviewComments(
             >
               <header>
                 <strong>#{thread.number}</strong>
-                <Show when={allPages()}>
-                  <span>
-                    {props.editor.store.getPage(thread.element.page)?.name}
-                  </span>
-                </Show>
-                <span>{threadTarget(props.editor, semantic())}</span>
-                <button
-                  type="button"
-                  disabled={readOnly()}
-                  onClick={() =>
-                    setReviewCommentResolved(
-                      props.editor,
-                      thread.element.id,
-                      !semantic().resolved,
-                    )
+                <span
+                  title={
+                    allPages()
+                      ? `${pageName()} / ${threadTarget(props.editor, semantic())}`
+                      : threadTarget(props.editor, semantic())
                   }
                 >
-                  {semantic().resolved ? "Reopen" : "Resolve"}
-                </button>
-              </header>
-              <For each={semantic().messages}>
-                {(message) => (
-                  <div class="nodetto-comment-message">
-                    <strong>{message.author}</strong>
-                    <time dateTime={message.createdAt}>
-                      {messageTime(message.createdAt)}
-                    </time>
-                    <p>{message.body}</p>
-                  </div>
-                )}
-              </For>
-              <textarea
-                aria-label={`Reply to comment ${thread.number} on ${props.editor.store.getPage(thread.element.page)?.name ?? "page"}`}
-                placeholder="Reply…"
-                value={reply()}
-                disabled={readOnly()}
-                onInput={(event) =>
-                  setReplies({
-                    ...replies(),
-                    [thread.element.id]: event.currentTarget.value,
-                  })
-                }
-                on:keydown={(event) => event.stopPropagation()}
-                on:keyup={(event) => event.stopPropagation()}
-              />
-              <div class="nodetto-comment-actions">
+                  <Show when={allPages()}>{pageName()} / </Show>
+                  {threadTarget(props.editor, semantic())}
+                </span>
                 <Show when={props.viewport}>
-                  <button
-                    type="button"
+                  <CommentIconButton
+                    icon="locate-fixed"
+                    label="Show on canvas"
                     onClick={() => {
                       if (props.viewport)
                         focusReviewComment(
@@ -283,41 +271,83 @@ export function ReviewComments(
                           props.viewport,
                         );
                     }}
-                  >
-                    Show on canvas
-                  </button>
+                  />
                 </Show>
-                <button
-                  type="button"
-                  disabled={readOnly() || !reply().trim()}
-                  onClick={() => {
-                    if (
-                      replyToReviewComment(props.editor, thread.element.id, {
-                        author: authorName(props.author),
-                        body: reply(),
-                      })
+                <CommentIconButton
+                  icon={semantic().resolved ? "rotate-ccw" : "check"}
+                  label={semantic().resolved ? "Reopen" : "Resolve"}
+                  disabled={readOnly()}
+                  onClick={() =>
+                    setReviewCommentResolved(
+                      props.editor,
+                      thread.element.id,
+                      !semantic().resolved,
                     )
-                      setReplies({ ...replies(), [thread.element.id]: "" });
-                  }}
-                >
-                  Reply
-                </button>
-                <button
-                  type="button"
+                  }
+                />
+                <CommentIconButton
+                  icon="trash-2"
+                  label="Delete"
                   disabled={readOnly()}
                   onClick={() =>
                     props.editor.deleteElements([thread.element.id])
                   }
-                >
-                  Delete
-                </button>
+                />
+              </header>
+              <For each={semantic().messages}>
+                {(message) => (
+                  <div class="nodetto-comment-message">
+                    <div class="nodetto-comment-meta">
+                      <strong>{message.author}</strong>
+                      <time dateTime={message.createdAt}>
+                        {messageTime(message.createdAt)}
+                      </time>
+                    </div>
+                    <p>{message.body}</p>
+                  </div>
+                )}
+              </For>
+              <div class="nodetto-comment-reply">
+                <textarea
+                  aria-label={`Reply to comment ${thread.number} on ${pageName()}`}
+                  placeholder="Reply…"
+                  rows={1}
+                  value={reply()}
+                  disabled={readOnly()}
+                  onInput={(event) =>
+                    setReplies({
+                      ...replies(),
+                      [thread.element.id]: event.currentTarget.value,
+                    })
+                  }
+                  on:keydown={(event) => {
+                    event.stopPropagation();
+                    if (
+                      event.key === "Enter" &&
+                      (event.metaKey || event.ctrlKey) &&
+                      !event.isComposing &&
+                      !readOnly() &&
+                      reply().trim()
+                    ) {
+                      event.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                  on:keyup={(event) => event.stopPropagation()}
+                />
+                <CommentIconButton
+                  icon="reply"
+                  label="Reply"
+                  disabled={readOnly() || !reply().trim()}
+                  onClick={sendReply}
+                />
               </div>
             </article>
           );
         }}
       </For>
       <Show when={threads().length === 0}>
-        <p>
+        <p class="nodetto-comment-empty">
           {query().trim()
             ? "No matches"
             : showResolved()
@@ -326,6 +356,40 @@ export function ReviewComments(
         </p>
       </Show>
     </section>
+  );
+}
+
+/** A square icon button; the label doubles as tooltip and accessible name. */
+function CommentIconButton(props: {
+  readonly icon: string;
+  readonly label: string;
+  readonly disabled?: boolean;
+  readonly primary?: boolean;
+  readonly onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      class="nodetto-comment-icon-button"
+      classList={{ "is-primary": props.primary === true }}
+      aria-label={props.label}
+      title={props.label}
+      disabled={props.disabled}
+      onClick={() => props.onClick()}
+    >
+      <svg
+        aria-hidden="true"
+        {...{ focusable: "false" }}
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        innerHTML={renderIconMarkup(
+          findIcon(props.icon) ?? { path: "" },
+          { x: 0, y: 0, width: 24, height: 24 },
+          { stroke: "currentColor", strokeWidth: 2, fill: "none", viewBox: 24 },
+        )}
+      />
+    </button>
   );
 }
 

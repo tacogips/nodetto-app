@@ -175,3 +175,21 @@ test("slide area preference is optional and boolean only", () => {
   storeEditorPreferences(prefs, store);
   expect(loadEditorPreferences(store)).toEqual(prefs);
 });
+
+test("layers section preference defaults open and persists boolean values", () => {
+  const store = storage();
+  expect(loadEditorPreferences(store).layersOpen).toBe(true);
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({ layersOpen: "no" }),
+  );
+  expect(loadEditorPreferences(store).layersOpen).toBe(true);
+  store.setItem(
+    "nodetto.editor.preferences.v1",
+    JSON.stringify({ layersOpen: false }),
+  );
+  const preferences = loadEditorPreferences(store);
+  expect(preferences.layersOpen).toBe(false);
+  storeEditorPreferences(preferences, store);
+  expect(loadEditorPreferences(store)).toEqual(preferences);
+});

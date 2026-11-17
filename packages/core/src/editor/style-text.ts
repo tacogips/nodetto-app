@@ -46,6 +46,7 @@ const EDITABLE_FIELDS: Readonly<Record<string, EditableField>> = {
   "edge.generic": "label",
   "erd.relation": "label",
   "uml.association": "label",
+  "sequence.participant": "name",
   "sequence.message": "label",
   "bpmn.participant": "name",
   "bpmn.lane": "name",

@@ -26,6 +26,7 @@ import { sameBreadboardProbe } from "../../editor/breadboard.ts";
 import { crossLinkedPages, dirtyPages } from "../../editor/dirty-pages.ts";
 import { emptyDocument, PAGE_SWITCH_DIFF } from "../../editor/pages.ts";
 import {
+  EDITOR_STATE_DIFF,
   HISTORY_DIFF,
   permittedCommands,
   planDerivedCommands,
@@ -57,6 +58,35 @@ import type {
 import { createDefaultRegistry } from "../../shapes/index.ts";
 import { USECASE_NODE_SIZES } from "../../shapes/usecase.ts";
 import { Store, type StoreDiff } from "../../store.ts";
+
+/** One diff describing everything a run of announcements changed. */
+function mergeDiffs(diffs: readonly StoreDiff[]): StoreDiff {
+  const changes = diffs.filter(
+    (diff) =>
+      diff.pagesChanged ||
+      diff.added.length > 0 ||
+      diff.updated.length > 0 ||
+      diff.removed.length > 0,
+  );
+  // Nothing in the document moved: the announcement is history-only unless
+  // one of them stood for some other editor state.
+  if (changes.length === 0)
+    return (diffs.find((diff) => diff.ephemeral === undefined) ??
+      diffs[0]) as StoreDiff;
+  if (changes.length === 1) return changes[0] as StoreDiff;
+  // The oldest record of an id is what it was before the whole run.
+  const previous = new Map<ElementId, Element>();
+  for (const diff of changes)
+    for (const [id, element] of diff.previous ?? [])
+      if (!previous.has(id)) previous.set(id, element);
+  return {
+    added: changes.flatMap((diff) => diff.added),
+    updated: changes.flatMap((diff) => diff.updated),
+    removed: changes.flatMap((diff) => diff.removed),
+    pagesChanged: changes.some((diff) => diff.pagesChanged),
+    previous,
+  };
+}
 
 export class EditorCore {
   private lastApplyStoreRevision: number | undefined;
@@ -104,6 +134,8 @@ export class EditorCore {
   private revisionCount = 0;
   /** Set while a reset is mid-flight and the editor is not yet consistent. */
   private silenceHistory = false;
+  /** Announcements held back until the running operation completes. */
+  private deferredDiffs: StoreDiff[] | null = null;
 
   // ---------------------------------------------------------------- export
 
@@ -123,7 +155,7 @@ export class EditorCore {
   setReadOnly(value: boolean): void {
     if (value === this.readonlyMode) return;
     this.readonlyMode = value;
-    this.notify(HISTORY_DIFF);
+    this.notify(EDITOR_STATE_DIFF);
   }
   /** Changes on explicit opens, not same-document collaboration refreshes. */
   get documentOpenRevision(): number {
@@ -131,7 +163,7 @@ export class EditorCore {
   }
 
   constructor(options: EditorOptions = {}) {
-    this.assets.subscribe(() => this.notify(HISTORY_DIFF));
+    this.assets.subscribe(() => this.notify(EDITOR_STATE_DIFF));
     this.idSource = options.idSource ?? (() => newElementId());
     this.rng = options.rng ?? Math.random;
     this.registry = options.registry ?? createDefaultRegistry();
@@ -296,6 +328,13 @@ export class EditorCore {
     options: ApplyOptions = {},
   ): CommandResult {
     if (this.readOnly) return { undo: [], redo: [] };
+    return this.announceOnce(() => this.applyNow(commands, options));
+  }
+
+  private applyNow(
+    commands: readonly Command[],
+    options: ApplyOptions,
+  ): CommandResult {
     const context = this.createShapeContext();
     const permitted = permittedCommands(this.store, context, commands);
     const pages =
@@ -345,12 +384,12 @@ export class EditorCore {
 
   undo(): boolean {
     if (this.readOnly) return false;
-    return this.history.undo();
+    return this.announceOnce(() => this.history.undo());
   }
 
   redo(): boolean {
     if (this.readOnly) return false;
-    return this.history.redo();
+    return this.announceOnce(() => this.history.redo());
   }
 
   canUndo(): boolean {
@@ -369,7 +408,7 @@ export class EditorCore {
   }
 
   endBatch(): void {
-    this.history.endBatch();
+    this.announceOnce(() => this.history.endBatch());
   }
 
   /**
@@ -377,7 +416,7 @@ export class EditorCore {
    * the document exactly as it found it, and cost no undo step.
    */
   abortBatch(): void {
-    this.history.abortBatch();
+    this.announceOnce(() => this.history.abortBatch());
   }
 
   // ---------------------------------------------------------------- shapes
@@ -554,7 +593,31 @@ export class EditorCore {
     return true;
   }
 
+  /**
+   * Run one editor operation and announce it to subscribers exactly once.
+   *
+   * A transaction changes the store and then the undo stack; announcing each
+   * on its own makes every renderer recompute twice for one edit, and the
+   * first time against undo state the edit has not reached yet. The store's
+   * own subscribers are not deferred: they still see each commit as it lands.
+   */
+  private announceOnce<T>(operation: () => T): T {
+    if (this.deferredDiffs) return operation();
+    const deferred: StoreDiff[] = [];
+    this.deferredDiffs = deferred;
+    try {
+      return operation();
+    } finally {
+      this.deferredDiffs = null;
+      if (deferred.length > 0) this.notify(mergeDiffs(deferred));
+    }
+  }
+
   private notify(diff: StoreDiff): void {
+    if (this.deferredDiffs) {
+      this.deferredDiffs.push(diff);
+      return;
+    }
     this.revisionCount += 1;
     for (const listener of [...this.listeners]) {
       listener(diff);

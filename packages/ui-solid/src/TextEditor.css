@@ -1,7 +1,8 @@
 /* The text being edited shows only in the editor, never twice. */
 .nodetto-text-editing .nodetto-label,
 .nodetto-text-editing .nodetto-node-label,
-.nodetto-text-editing .nodetto-text-note {
+.nodetto-text-editing .nodetto-text-note,
+.nodetto-text-editing .nodetto-sequence-participant-head strong {
   visibility: hidden;
 }
 /* An edge label sits on its line and often over other shapes: an opaque

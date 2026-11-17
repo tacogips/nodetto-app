@@ -404,7 +404,18 @@ async function runErd(
   await frame();
   const selection = [];
   const movement = [];
+  // Only tables in or near the view are mounted: bring each one into it.
+  const reveal = async (id: string) => {
+    const visual = editor.store.get(id)?.visual;
+    editor.camera.set({
+      x: 100 - (visual?.x ?? 0),
+      y: 100 - (visual?.y ?? 0),
+      z: 1,
+    });
+    await frame();
+  };
   for (const table of tables.slice(0, 30)) {
+    await reveal(table.id);
     const start = performance.now();
     editor.selection.set([table.id]);
     selection.push(performance.now() - start);
@@ -415,6 +426,7 @@ async function runErd(
     );
   }
   const table = tables[0];
+  await reveal(table.id);
   editor.selection.set([table.id]);
   await frame();
   const originalNode = node(table.id);
@@ -483,14 +495,21 @@ async function runInvalidation() {
   const tables = editor.store
     .listElements()
     .filter((element) => element.type === "erd.table");
-  const target = tables[0];
-  const untouched = tables[20];
+  // Two tables that share the view runErd left: only those are mounted.
+  const named = (name: string) =>
+    editor.store
+      .listElements()
+      .find(
+        (element) =>
+          element.type === "erd.table" &&
+          (element.semantic as { tableName?: string }).tableName === name,
+      );
+  const target = named("Table 0");
+  const untouched = named("Table 1");
   assert(target && untouched, "missing invalidation fixtures");
   const row = Array.from(document.querySelectorAll(".nodetto-layer-row")).find(
     (candidate) =>
-      candidate
-        .querySelector(".nodetto-layer-name")
-        ?.textContent?.startsWith("Table 20"),
+      candidate.querySelector(".nodetto-layer-name")?.textContent === "Table 1",
   );
   assert(row, "missing untouched layer row");
   const shape = node(untouched.id);

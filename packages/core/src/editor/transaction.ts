@@ -44,6 +44,18 @@ export const HISTORY_DIFF: StoreDiff = {
   updated: [],
   removed: [],
   pagesChanged: false,
+  ephemeral: "history",
+};
+
+/**
+ * Announced when editor state outside the document changes what a renderer
+ * should draw: read-only mode, or an attachment finishing its load.
+ */
+export const EDITOR_STATE_DIFF: StoreDiff = {
+  added: [],
+  updated: [],
+  removed: [],
+  pagesChanged: false,
 };
 
 /** The commands of a batch that do not edit a locked layer. */

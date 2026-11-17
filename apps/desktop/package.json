@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "checklist": "bun scripts/canvas-checklist.mjs",
     "tauri": "tauri",
-    "check:responsiveness": "bun scripts/responsiveness-check.mjs"
+    "check:responsiveness": "bun scripts/responsiveness-check.mjs",
+    "check:erd-scale": "bun scripts/erd-scale-check.mjs",
+    "bench:erd-scale": "bun scripts/erd-scale-bench.ts"
   },
   "dependencies": {
     "@nodetto/collab": "workspace:*",

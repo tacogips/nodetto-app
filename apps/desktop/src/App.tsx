@@ -297,6 +297,7 @@ export function App(props: AppProps): JSX.Element {
   const [pagesListOpen, setPagesListOpen] = createSignal(
     preferences.pagesListOpen,
   );
+  const [layersOpen, setLayersOpen] = createSignal(preferences.layersOpen);
   const panes = createPaneLayout({
     leftPaneOpen: preferences.leftPaneOpen,
     rightPaneOpen: preferences.rightPaneOpen,
@@ -310,6 +311,7 @@ export function App(props: AppProps): JSX.Element {
           : { showSlideArea: showSlideArea() }),
         showRulers: showRulers(),
         pagesListOpen: pagesListOpen(),
+        layersOpen: layersOpen(),
         leftPaneOpen: panes.leftPaneOpen(),
         rightPaneOpen: panes.rightPaneOpen(),
         snap: snap(),
@@ -713,6 +715,7 @@ export function App(props: AppProps): JSX.Element {
           }}
           exportDocumentPdf={exportHandlers.exportDocumentPdf}
           exportDocumentMarkdown={exportHandlers.exportDocumentMarkdown}
+          exportDocumentBundle={exportHandlers.exportDocumentBundle}
           exportBpmn={exportHandlers.exportBpmn}
           exportBreadboard={exportHandlers.exportBreadboard}
           exportGerber={exportHandlers.exportGerber}
@@ -901,12 +904,6 @@ export function App(props: AppProps): JSX.Element {
             context={actionContext()}
             onShapeDrop={(tool, client) => setShapeDrop({ tool, client })}
           />
-          <PageList
-            editor={props.editor}
-            open={pagesListOpen()}
-            onOpenChange={setPagesListOpen}
-            onCopyShapesFrom={openCopyShapes}
-          />
           <Layers
             simple={simpleWorkspace()}
             editor={props.editor}
@@ -918,6 +915,14 @@ export function App(props: AppProps): JSX.Element {
             }
             onPlaceComment={beginCommentPlacement}
             onCancelCommentPlacement={() => setActiveTool("select")}
+            layersOpen={layersOpen()}
+            onLayersOpenChange={setLayersOpen}
+          />
+          <PageList
+            editor={props.editor}
+            open={pagesListOpen()}
+            onOpenChange={setPagesListOpen}
+            onCopyShapesFrom={openCopyShapes}
           />
         </SidePane>
         <PaneDivider layout={panes} side="left" label="Shapes and layers" />

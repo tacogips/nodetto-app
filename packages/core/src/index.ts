@@ -915,3 +915,13 @@ export { renderMarkdownSnippet } from "./svg-export/markdown-snippet.ts";
 export * from "./document-export/index.ts";
 
 export { encodeStoredZip } from "./zip.ts";
+export * from "./document-bundle.ts";
+export {
+  isSelfContainedNode,
+  obstacleReach,
+  type RenderImpact,
+  type RenderScope,
+  renderImpact,
+  renderScope,
+} from "./render-scope.ts";
+export { type BoxIndex, createBoxIndex } from "./spatial-grid.ts";

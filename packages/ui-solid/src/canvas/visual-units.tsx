@@ -24,6 +24,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import type { SceneSignals } from "../adapter.ts";
 import { pcbHiddenLayers } from "../pcb-state.ts";
 import { ConnectorMarkers, ConnectorView } from "../shapes/ConnectorView.tsx";
 import { ShapeView } from "../shapes/ShapeView.tsx";
@@ -78,6 +79,10 @@ export interface VisualUnitDeps {
   readonly rev: Accessor<unknown>;
   readonly context: Accessor<ShapeContext>;
   readonly isSelected: (id: ElementId) => boolean;
+  /** Per-element document dependencies; see the adapter. */
+  readonly scene: SceneSignals;
+  /** True when the view is zoomed out too far for fine content to read. */
+  readonly lowDetail?: Accessor<boolean>;
 }
 
 export interface VisualUnitRenderer {
@@ -93,7 +98,15 @@ export interface VisualUnitRenderer {
 export function createVisualUnitRenderer(
   deps: VisualUnitDeps,
 ): VisualUnitRenderer {
-  const { props, context, isSelected } = deps;
+  const { props, context, isSelected, scene } = deps;
+
+  /**
+   * The shape context to draw `id` from, subscribing the caller to what that
+   * drawing depends on: the element's own records where its type allows,
+   * every commit and zoom change otherwise.
+   */
+  const contextFor = (id: ElementId): ShapeContext =>
+    scene.track(id) ? untrack(context) : context();
 
   // Keep visual units mounted through immutable position/style updates.
   const renderStableVisualUnit = (
@@ -103,7 +116,7 @@ export function createVisualUnitRenderer(
     const initial = props.editor.store.get(id);
     if (!initial) return null;
     const element = createMemo(() => {
-      deps.rev();
+      scene.record(id);
       return props.editor.store.get(initial.id) ?? initial;
     });
     return (
@@ -229,11 +242,11 @@ export function createVisualUnitRenderer(
   };
 
   const renderShape = (element: () => Element): JSX.Element => {
-    const warnings = createMemo(() => {
-      deps.rev();
-      return shapeAuthoringWarnings(element(), context());
-    });
-    const box = createMemo(() => context().boundsOf(element().id), null, {
+    const id = untrack(() => element().id);
+    const warnings = createMemo(() =>
+      shapeAuthoringWarnings(element(), contextFor(id)),
+    );
+    const box = createMemo(() => contextFor(id).boundsOf(id), null, {
       equals: (a, b) =>
         a === b ||
         Boolean(
@@ -245,6 +258,10 @@ export function createVisualUnitRenderer(
             a.height === b.height,
         ),
     });
+    const clip = createMemo(() => {
+      const drawing = contextFor(id);
+      return clipCss(drawing.clipPolygonOf?.(id) ?? drawing.clipOf?.(id));
+    });
     return (
       <Show when={box()}>
         {(bounds) => (
@@ -252,10 +269,7 @@ export function createVisualUnitRenderer(
             style={{
               position: "absolute",
               inset: 0,
-              "clip-path": clipCss(
-                context().clipPolygonOf?.(element().id) ??
-                  context().clipOf?.(element().id),
-              ),
+              "clip-path": clip(),
             }}
           >
             <ShapeView
@@ -266,9 +280,10 @@ export function createVisualUnitRenderer(
               warnings={warnings()}
               element={element()}
               box={bounds()}
-              selected={isSelected(element().id)}
+              selected={isSelected(id)}
               pcbHidden={() => pcbHiddenLayers(props.editor.currentPageId)}
               showLayoutGrids
+              lowDetail={deps.lowDetail?.() ?? false}
             />
           </div>
         )}
@@ -280,16 +295,17 @@ export function createVisualUnitRenderer(
     const initial = props.editor.store.get(id);
     if (!initial) return null;
     const element = createMemo(() => {
-      deps.rev();
+      scene.record(id);
       return props.editor.store.get(id) ?? initial;
+    });
+    const clip = createMemo(() => {
+      const drawing = contextFor(id);
+      return clipCss(drawing.clipPolygonOf?.(id) ?? drawing.clipOf?.(id));
     });
     return (
       <g
         style={{
-          "clip-path": clipCss(
-            context().clipPolygonOf?.(element().id) ??
-              context().clipOf?.(element().id),
-          ),
+          "clip-path": clip(),
           opacity: element().visual.style?.opacity ?? 1,
           filter: effectsCss(element().visual.style),
           "backdrop-filter": backdropEffectsCss(element().visual.style),
@@ -298,8 +314,8 @@ export function createVisualUnitRenderer(
       >
         <ConnectorView
           element={element()}
-          context={context()}
-          selected={isSelected(element().id)}
+          context={contextFor(id)}
+          selected={isSelected(id)}
         />
       </g>
     );

@@ -50,6 +50,7 @@ import {
   Show,
   Suspense,
 } from "solid-js";
+import { isServer } from "solid-js/web";
 import { createTableSheetSelection } from "./table-sheet/selection.ts";
 import { resetColumnWidth, tableSheetRegionAt } from "./table-sheet/resize.ts";
 import { TableSheetCellEditor } from "./table-sheet/CellEditor.tsx";
@@ -78,6 +79,7 @@ import { EditHandles } from "./canvas/EditHandles.tsx";
 import { GRID_SPACING, isConnector } from "./canvas/geometry.ts";
 import { createImageDrop, ImageDropStatus } from "./canvas/image-drop.tsx";
 import { listenForNavigationKeys } from "./canvas/navigation-keys.ts";
+import { createCulling } from "./canvas/culling.ts";
 import { createOverlayTargets } from "./canvas/overlay-targets.ts";
 import { SlideAreaOverlay } from "./canvas/SlideAreaOverlay.tsx";
 import { SelectionOutlines } from "./canvas/SelectionOutlines.tsx";
@@ -85,6 +87,9 @@ import { TransformHandles } from "./canvas/TransformHandles.tsx";
 import { createVisualUnitRenderer } from "./canvas/visual-units.tsx";
 
 const CanvasRulers = lazy(() => import("./CanvasRulers.tsx"));
+
+/** Row text is 12px: under a quarter zoom it renders below three pixels. */
+const LOW_DETAIL_ZOOM = 0.25;
 
 export interface NodettoCanvasProps {
   readonly editor: Editor;
@@ -135,6 +140,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     width: 0,
     height: 0,
   });
+  // A server render never measures; it draws the whole page.
+  const [measured, setMeasured] = createSignal(isServer);
   const tableSheetSelection = createTableSheetSelection();
   createEffect(() => {
     signals.rev();
@@ -202,6 +209,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     onCleanup(installRasterMaskSampler(props.editor));
     const element = container;
     if (!element) {
+      setMeasured(true);
       return;
     }
     element.focus();
@@ -209,7 +217,10 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     const report = (): void => {
       const rect = element.getBoundingClientRect();
       const size = { width: rect.width, height: rect.height };
-      setViewport(size);
+      batch(() => {
+        setViewport(size);
+        setMeasured(true);
+      });
       props.onViewportResize?.(size);
     };
     report();
@@ -222,7 +233,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   // A nudge batch still waiting on its timer must not outlive the canvas.
   onCleanup(() => interaction.dispose());
 
-  const cameraZoom = createMemo(() => signals.camera().z);
+  const cameraZoom = signals.zoom;
   const isBreadboardPage = createMemo(() => {
     signals.rev();
     return (
@@ -293,6 +304,37 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     ),
   );
 
+  // Only what can paint in or near the view is mounted (see culling.ts).
+  const culling = createCulling({
+    editor: () => props.editor,
+    camera: signals.camera,
+    viewport,
+    scene: signals.scene,
+    measured,
+  });
+  /** The ids of `list` to mount; the same array while they do not change. */
+  const mounted = (list: () => readonly Element[]) =>
+    createMemo<readonly ElementId[]>((previous) => {
+      const drawing = context();
+      const next: ElementId[] = [];
+      for (const element of list())
+        if (culling.mounts(element, drawing)) next.push(element.id);
+      return previous.length === next.length &&
+        next.every((id, index) => id === previous[index])
+        ? previous
+        : next;
+    }, []);
+  const backdropRootIds = mounted(backdropRoots);
+  const connectorIds = mounted(connectors);
+  const visualRootIds = mounted(visualRoots);
+  createEffect(() => {
+    const all = elements();
+    culling.retain(all.length, (id) => props.editor.store.has(id));
+  });
+  // Below this zoom a table's rows are a few unreadable pixels each; its
+  // header and outline are drawn alone.
+  const lowDetail = createMemo(() => cameraZoom() < LOW_DETAIL_ZOOM);
+
   const isSelected = createSelector(signals.selection, (id: ElementId, ids) =>
     ids.has(id),
   );
@@ -311,6 +353,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
     rev: signals.rev,
     context,
     isSelected,
+    scene: signals.scene,
+    lowDetail,
   });
 
   return (
@@ -383,7 +427,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
       >
         <Show when={backdropRoots().length > 0}>
           <div class="nodetto-layer nodetto-shape-layer nodetto-backdrop-layer">
-            <For each={backdropRoots().map((element) => element.id)}>
+            <For each={backdropRootIds()}>
               {(id) => renderStableVisualUnit(id)}
             </For>
           </div>
@@ -392,9 +436,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
         <svg class="nodetto-layer nodetto-connector-layer">
           <title>Connectors</title>
           <ConnectorMarkers />
-          <For each={connectors().map((element) => element.id)}>
-            {(id) => renderConnector(id)}
-          </For>
+          <For each={connectorIds()}>{(id) => renderConnector(id)}</For>
           <Show when={interaction.pending()}>
             {(pending) => (
               <line
@@ -409,9 +451,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
         </svg>
 
         <div class="nodetto-layer nodetto-shape-layer">
-          <For each={visualRoots().map((element) => element.id)}>
-            {(id) => renderStableVisualUnit(id)}
-          </For>
+          <For each={visualRootIds()}>{(id) => renderStableVisualUnit(id)}</For>
         </div>
 
         <svg class="nodetto-layer nodetto-overlay-layer">

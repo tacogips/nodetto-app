@@ -9,8 +9,7 @@ Usage: nodetto-cli <command> [options]
 
 Look at a document
   nodetto-cli open <file>         Open a file in the desktop app
-  nodetto-cli pages <doc>         List page numbers, short IDs, names and kinds
-  nodetto-cli pages copy-shapes  Copy shapes between pages
+  nodetto-cli pages <doc>         List pages (IDs, names, kinds); copy-shapes
   nodetto-cli inspect <doc>       Compact outline (or JSON) of pages and elements
   nodetto-cli types [<type>]      Element types and the fields each one takes
   nodetto-cli validate <doc>      Check that a document parses and is valid
@@ -28,6 +27,7 @@ Convert and check
   nodetto-cli merge <base> <ours> <theirs>  Merge document versions
   nodetto-cli ddl <doc>           Database DDL from an ERD page
   nodetto-cli format <doc>        Canonical JSONL formatting
+  nodetto-cli bundle pack|unpack  One .nodetto file with a document and its images
   nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
@@ -47,6 +47,31 @@ const EXIT_CODES = `Exit codes: 0 success, 1 out of date (--check), 2 usage or i
 3 warnings with --strict.`;
 
 export const COMMAND_HELP: Readonly<Record<string, string>> = {
+  bundle: `Usage: nodetto-cli bundle pack <doc.jsonl> --output <file.nodetto>
+       nodetto-cli bundle unpack <file.nodetto> --output <doc.jsonl> [--force]
+
+A bundle is one ZIP file (.nodetto) holding a document and every raster image
+it references, for sending a document that has attachments beside it.
+
+pack reads the document and its attachments (paths relative to the document)
+and writes the bundle. Embedded data-URL images move into attachment files.
+A missing attachment fails the command rather than dropping the image.
+
+unpack writes the document to --output and its attachments beside it, at the
+paths the document references (usually artifacts/...), ready to commit. The
+desktop app's Open does the same and asks where to extract. A ZIP holding
+exactly one .jsonl next to its images is accepted as well.
+
+Options:
+  --output  pack: the bundle to write; unpack: the .jsonl to write (required).
+  --force   (unpack) Replace existing files whose contents differ. Without it
+            unpack refuses and writes nothing; identical files are left alone.
+
+${EXIT_CODES}
+
+Examples:
+  nodetto-cli bundle pack design.jsonl --output design.nodetto
+  nodetto-cli bundle unpack design.nodetto --output docs/design/design.jsonl`,
   table: TABLE_HELP,
   authorize: `Usage: nodetto-cli authorize [project-folder]
 

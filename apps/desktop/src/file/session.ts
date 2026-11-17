@@ -876,6 +876,7 @@ export class DocumentSession {
       importDocument: (document, name, importWarnings) =>
         this.importDocument(document, name, importWarnings),
       fail: (message) => this.fail(message),
+      extractTo: () => this.saveAs(),
     };
   }
 

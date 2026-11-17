@@ -1,7 +1,7 @@
 // What lies under a page point: the element a press hits, the elements a
 // marquee covers, and the element and port a connector end would land on.
 
-import type { Box, Vec } from "@nodetto/core";
+import type { Box, ShapeContext, Vec } from "@nodetto/core";
 import {
   boxContains,
   connectionPorts,
@@ -45,11 +45,16 @@ export interface HitTesting {
 export function createHitTesting(ctx: InteractionContext): HitTesting {
   const { editor, options, state } = ctx;
 
-  const canvasHitTest = (point: Vec): ElementId | null => {
-    if (!ctx.isPcbPage()) {
-      const context = editor.createShapeContext();
+  // The picking view of a context hides prototype links. It is derived once
+  // per context: resolved routes and paint order are cached by context, so a
+  // fresh one per pointer move would re-route the whole page on every move.
+  const pickingContexts = new WeakMap<ShapeContext, ShapeContext>();
+  const pickingContext = (): ShapeContext => {
+    const context = editor.createShapeContext();
+    let picking = pickingContexts.get(context);
+    if (!picking) {
       const hidden = context.isHidden;
-      return editor.hitTest(point, {
+      picking = {
         ...context,
         isHidden: (id) => {
           const element = editor.store.get(id);
@@ -58,8 +63,14 @@ export function createHitTesting(ctx: InteractionContext): HitTesting {
             Boolean(element && isPrototypeEdge(element))
           );
         },
-      });
+      };
+      pickingContexts.set(context, picking);
     }
+    return picking;
+  };
+
+  const canvasHitTest = (point: Vec): ElementId | null => {
+    if (!ctx.isPcbPage()) return editor.hitTest(point, pickingContext());
     const context = editor.createShapeContext();
     const elements = editor.store.getPageElements(editor.currentPageId);
     const hidden = pcbHiddenLayers(editor.currentPageId);

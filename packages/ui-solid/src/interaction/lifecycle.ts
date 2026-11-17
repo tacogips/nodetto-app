@@ -33,7 +33,15 @@ export function createGestureLifecycle(
     ctx.discardDragFrame();
     if (latest) applyPointerMove(latest);
     const gesture = state.gesture;
-    if (gesture.kind === "translating" && gesture.moved) {
+    if (
+      gesture.kind === "translating" &&
+      gesture.moved &&
+      // Only a frame can adopt what was dropped; without one there is
+      // nothing to look for, however many elements moved.
+      editor.store
+        .getPageElements(editor.currentPageId)
+        .some((element) => element.type === "frame")
+    ) {
       const moving = new Set(gesture.origins.keys());
       const context = editor.createShapeContext();
       const descendants = new Set<string>();

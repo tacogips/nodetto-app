@@ -16,8 +16,12 @@ export function SlideAreaOverlay(props: {
 }): JSX.Element {
   const model = createMemo(() => {
     props.revision();
-    const pageId = props.editor.currentPageId;
     const meta = props.editor.store.getMeta();
+    const show = effectiveShowSlideArea(props.show(), meta.slideSize);
+    // Framing the page's content measures every element on it; skip that
+    // for the usual case of a page that shows no slide area at all.
+    if (!show) return null;
+    const pageId = props.editor.currentPageId;
     const page = props.editor.store.getPage(pageId);
     const pages = props.editor.store.listPages();
     const counts = new Map<string, number>();
@@ -35,7 +39,7 @@ export function SlideAreaOverlay(props: {
         { slideSize: meta.slideSize, slideOrigin: page?.slideOrigin },
       ),
       label: slideLabel(pages, pageId, counts),
-      show: effectiveShowSlideArea(props.show(), meta.slideSize),
+      show,
     });
   });
   return (

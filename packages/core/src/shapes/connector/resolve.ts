@@ -19,7 +19,13 @@ import {
   rotatePoint,
   type Vec,
 } from "../../geometry.ts";
-import { avoidOrthogonalObstacles } from "../../orthogonal-routing.ts";
+import {
+  avoidOrthogonalObstacles,
+  routedAttempts,
+  type RoutingObstacle,
+  type RoutingObstacleSource,
+} from "../../orthogonal-routing.ts";
+import { type BoxIndex, createBoxIndex } from "../../spatial-grid.ts";
 import {
   connectorLabelExtent,
   connectorLabelLayout,
@@ -47,20 +53,23 @@ import {
 
 export const CONNECTOR_OBSTACLE_CLEARANCE = 12;
 
-interface RoutingObstacle {
+interface PageObstacle {
   readonly id: ElementId;
   readonly box: Box;
 }
 
-const pageObstacles = new WeakMap<
-  ShapeContext,
-  Map<string, readonly RoutingObstacle[]>
->();
+/** A page's obstacles in paint order, indexed so routes query by region. */
+interface PageObstacles {
+  readonly list: readonly PageObstacle[];
+  readonly index: BoxIndex;
+}
+
+const pageObstacles = new WeakMap<ShapeContext, Map<string, PageObstacles>>();
 
 function routingObstacles(
   element: Element,
   context: ShapeContext,
-): readonly RoutingObstacle[] {
+): PageObstacles {
   let pages = pageObstacles.get(context);
   if (!pages) {
     pages = new Map();
@@ -70,7 +79,7 @@ function routingObstacles(
   if (cached) return cached;
   const elements = context.elementsOnPage?.(element.page) ?? [];
   const grouped = groupedIds(elements);
-  const obstacles: RoutingObstacle[] = [];
+  const list: PageObstacle[] = [];
   for (const candidate of elements) {
     const category = getElementTypeDefinition(candidate.type)?.category;
     if (
@@ -85,7 +94,7 @@ function routingObstacles(
     const raw = context.boundsOf(candidate.id);
     if (!raw) continue;
     const visible = rotatedBox(raw, candidate.visual.rotation ?? 0);
-    obstacles.push({
+    list.push({
       id: candidate.id,
       box: {
         x: visible.x - CONNECTOR_OBSTACLE_CLEARANCE,
@@ -95,37 +104,80 @@ function routingObstacles(
       },
     });
   }
+  const obstacles = {
+    list,
+    index: createBoxIndex(list.map((obstacle) => obstacle.box)),
+  };
   pages.set(element.page, obstacles);
   return obstacles;
 }
 
-function obstacleBoxes(
+const boxHolds = (box: Box, point: Vec): boolean =>
+  point.x >= box.x &&
+  point.x <= box.x + box.width &&
+  point.y >= box.y &&
+  point.y <= box.y + box.height;
+
+/**
+ * The obstacles one connector routes around: the page's, minus its own
+ * endpoints and anything an end already sits in, each grown by the
+ * connector's lane, behind the `fixed` endpoint boxes. Answered by region,
+ * so a route looks only at the shapes along it.
+ */
+function obstacleSource(
   element: Element,
   endpointIds: ReadonlySet<ElementId>,
   start: Vec,
   end: Vec,
   context: ShapeContext,
   lane: number,
-): readonly Box[] {
-  const boxes: Box[] = [];
-  for (const { id, box } of routingObstacles(element, context)) {
-    if (endpointIds.has(id)) continue;
-    const contains = (b: Box, point: Vec) =>
-      point.x >= b.x &&
-      point.x <= b.x + b.width &&
-      point.y >= b.y &&
-      point.y <= b.y + b.height;
-    if (contains(box, start) || contains(box, end)) continue;
-    const grow = lane * 8;
-    const grown = {
-      x: box.x - grow,
-      y: box.y - grow,
-      width: box.width + 2 * grow,
-      height: box.height + 2 * grow,
-    };
-    boxes.push(contains(grown, start) || contains(grown, end) ? box : grown);
-  }
-  return boxes;
+  fixed: readonly Box[],
+): RoutingObstacleSource {
+  const page = routingObstacles(element, context);
+  const grow = lane * 8;
+  const leading = fixed.map((box, order) => ({ order, box }));
+  const resolved = new Map<number, RoutingObstacle | null>();
+  const obstacleAt = (position: number): RoutingObstacle | null => {
+    const known = resolved.get(position);
+    if (known !== undefined) return known;
+    const { id, box } = page.list[position] as PageObstacle;
+    let obstacle: RoutingObstacle | null = null;
+    if (!endpointIds.has(id) && !boxHolds(box, start) && !boxHolds(box, end)) {
+      const grown = {
+        x: box.x - grow,
+        y: box.y - grow,
+        width: box.width + 2 * grow,
+        height: box.height + 2 * grow,
+      };
+      obstacle = {
+        order: fixed.length + position,
+        box: boxHolds(grown, start) || boxHolds(grown, end) ? box : grown,
+      };
+    }
+    resolved.set(position, obstacle);
+    return obstacle;
+  };
+  return {
+    size: fixed.length + page.list.length,
+    near(region) {
+      const out = [...leading];
+      // A lane-grown obstacle reaches `grow` further than the indexed box.
+      const reach =
+        region === null
+          ? null
+          : {
+              x: region.x - grow,
+              y: region.y - grow,
+              width: region.width + 2 * grow,
+              height: region.height + 2 * grow,
+            };
+      for (const position of page.index.query(reach)) {
+        const obstacle = obstacleAt(position);
+        if (obstacle) out.push(obstacle);
+      }
+      return out;
+    },
+  };
 }
 
 // Reuse routes across bounds, picking, handles and paint in one context.
@@ -176,6 +228,81 @@ function freeConnectorEndpoint(
     semantic: { label: "" },
     visual: { x: point.x, y: point.y, width: 0, height: 0 },
   };
+}
+
+/** The routing fields of a connector, wherever a document stored them. */
+function storedRouting(element: Element): (key: string) => unknown {
+  const semantic =
+    typeof element.semantic === "object" && element.semantic !== null
+      ? (element.semantic as Record<string, unknown>)
+      : {};
+  const visual =
+    typeof element.visual === "object" && element.visual !== null
+      ? (element.visual as unknown as Record<string, unknown>)
+      : {};
+  const extensions =
+    typeof visual["extensions"] === "object" && visual["extensions"] !== null
+      ? (visual["extensions"] as Record<string, unknown>)
+      : {};
+  return (key) =>
+    key in semantic
+      ? semantic[key]
+      : key in visual
+        ? visual[key]
+        : extensions[key];
+}
+
+/**
+ * Whether routing `element` looks at the shapes of its page besides its two
+ * endpoints, to steer around them. Deliberately errs towards `true`: it
+ * mirrors the orthogonal branch of the routing rules below without resolving
+ * anything.
+ */
+export function connectorAvoidsObstacles(element: Element): boolean {
+  const stored = storedRouting(element);
+  if (stored("routingAvoidObstacles") === false) return false;
+  const semantic = element.semantic as Record<string, unknown> | null;
+  // Pinned self loops take the orthogonal branch whatever `routing` says.
+  return (
+    stored("routing") === "orthogonal" ||
+    semantic?.["fromPort"] !== undefined ||
+    semantic?.["toPort"] !== undefined
+  );
+}
+
+/**
+ * How far from a tried path a shape can sit and still matter to the route:
+ * the clearance kept around it, the widest lane growth, and the longest
+ * pinned-port escape.
+ */
+const OBSTACLE_REACH = CONNECTOR_OBSTACLE_CLEARANCE + 8 * MAX_ROUTING_LANE + 64;
+
+/**
+ * The parts of the page whose shapes decide an obstacle-avoiding route, as
+ * boxes around every path its search tried. A shape whose bounds stay clear
+ * of all of them, before and after a change, leaves the route as it is.
+ * Empty when the connector currently resolves to nothing.
+ */
+export function connectorObstacleReach(
+  element: Element,
+  context: ShapeContext,
+  readEndpoints: EndpointReader,
+): readonly Box[] {
+  resolveConnector(element, context, readEndpoints);
+  const boxes: Box[] = [];
+  for (const attempt of routedAttempts(element) ?? []) {
+    for (let index = 1; index < attempt.length; index += 1) {
+      const from = attempt[index - 1] as Vec;
+      const to = attempt[index] as Vec;
+      boxes.push({
+        x: Math.min(from.x, to.x) - OBSTACLE_REACH,
+        y: Math.min(from.y, to.y) - OBSTACLE_REACH,
+        width: Math.abs(from.x - to.x) + 2 * OBSTACLE_REACH,
+        height: Math.abs(from.y - to.y) + 2 * OBSTACLE_REACH,
+      });
+    }
+  }
+  return boxes;
 }
 
 function computeConnector(
@@ -545,9 +672,15 @@ function computeConnector(
       if (!pin || lane === 0 || avoid === false) return escapeDistance;
       const base = portEscape(point, pin, node, box, port, baseEscape);
       const candidate = portEscape(point, pin, node, box, port, escapeDistance);
-      const obstacles = routingObstacles(element, context);
-      for (let i = 0; i < obstacles.length; i++) {
-        const obstacle = obstacles[i];
+      // Only a shape the longer escape reaches into can veto it.
+      const page = routingObstacles(element, context);
+      for (const position of page.index.query({
+        x: candidate.x,
+        y: candidate.y,
+        width: 0,
+        height: 0,
+      })) {
+        const obstacle = page.list[position];
         if (!obstacle || obstacle.id === ids.from || obstacle.id === ids.to)
           continue;
         const bounds = obstacle.box;
@@ -644,17 +777,15 @@ function computeConnector(
     const obstacles =
       avoid === false
         ? endpointObstacles
-        : [
-            ...endpointObstacles,
-            ...obstacleBoxes(
-              element,
-              new Set([ids.from, ids.to]),
-              routeStart,
-              routeEnd,
-              context,
-              lane,
-            ),
-          ];
+        : obstacleSource(
+            element,
+            new Set([ids.from, ids.to]),
+            routeStart,
+            routeEnd,
+            context,
+            lane,
+            endpointObstacles,
+          );
     const middle = avoidOrthogonalObstacles(
       preferred,
       obstacles,

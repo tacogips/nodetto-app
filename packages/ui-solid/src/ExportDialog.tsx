@@ -69,7 +69,8 @@ type Format =
   | "artboards"
   | "prototype"
   | "document-pdf"
-  | "document-markdown";
+  | "document-markdown"
+  | "document-bundle";
 
 export interface ExportDialogProps {
   readonly editor: Editor;
@@ -80,6 +81,7 @@ export interface ExportDialogProps {
     background: string | null,
   ) => Promise<void>;
   readonly exportDocumentMarkdown?: () => Promise<void>;
+  readonly exportDocumentBundle?: () => Promise<void>;
   readonly exportBpmn: () => Promise<void>;
   readonly exportBreadboard?: (kind: BreadboardExportKind) => Promise<void>;
   /** Gerber and drill ZIP of a page drawn by Gerber import. */
@@ -94,7 +96,10 @@ export const EXPORT_FORMAT_GROUPS: readonly {
   label: string;
   ids: readonly Format[];
 }[] = [
-  { label: "Document", ids: ["document-pdf", "document-markdown"] },
+  {
+    label: "Document",
+    ids: ["document-pdf", "document-markdown", "document-bundle"],
+  },
   { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
   {
     label: "Diagram source",
@@ -107,7 +112,7 @@ export const EXPORT_FORMAT_GROUPS: readonly {
 export function documentExportFormats(
   props: Pick<
     ExportDialogProps,
-    "exportDocumentPdf" | "exportDocumentMarkdown"
+    "exportDocumentPdf" | "exportDocumentMarkdown" | "exportDocumentBundle"
   >,
 ): readonly { id: Format; label: string; enabled: boolean }[] {
   return [
@@ -120,6 +125,11 @@ export function documentExportFormats(
       id: "document-markdown",
       label: "Document as Markdown (ZIP)...",
       enabled: props.exportDocumentMarkdown !== undefined,
+    },
+    {
+      id: "document-bundle",
+      label: "Document as Nodetto bundle...",
+      enabled: props.exportDocumentBundle !== undefined,
     },
   ];
 }
@@ -218,6 +228,8 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const descriptions: Record<Format, string> = {
     "document-pdf": "Export each page frame as a PDF page.",
     "document-markdown": "Export Markdown and SVG assets in a ZIP archive.",
+    "document-bundle":
+      "One .nodetto file with the document and every image it uses. Opening it asks where to extract the JSONL and its artifacts/ folder.",
     svg: "Scalable vector artwork for editing and sharing.",
     png: "A raster image with adjustable resolution and background.",
     pdf: "A document sized to your artwork or a printed page.",
@@ -432,6 +444,14 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                 onClick={() => void props.exportDocumentMarkdown?.()}
               >
                 Export document Markdown ZIP
+              </button>
+            </Match>
+            <Match when={active() === "document-bundle"}>
+              <button
+                type="button"
+                onClick={() => void props.exportDocumentBundle?.()}
+              >
+                Export Nodetto bundle
               </button>
             </Match>
             <Match when={active() === "html"}>

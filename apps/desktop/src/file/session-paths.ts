@@ -64,6 +64,11 @@ export function isKicadPcbPath(path: string): boolean {
   return path.toLowerCase().endsWith(".kicad_pcb");
 }
 
+/** A document bundle: one ZIP with a JSONL and its attachments. */
+export function isBundlePath(path: string): boolean {
+  return /\.nodetto$/i.test(path);
+}
+
 /** Gerber and drill files, alone or in a board house ZIP. */
 const PCB_PATH =
   /\.(?:zip|gbr|ger|gtl|gbl|gts|gbs|gto|gbo|gtp|gbp|gko|gm1|gml|drl|xln|exc)$/i;

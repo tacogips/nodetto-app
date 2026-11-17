@@ -136,12 +136,52 @@
   height: 28px;
   padding: 1px;
 }
-.nodetto-review-comments > textarea,
-.nodetto-comment-thread textarea {
+.nodetto-review-comments {
+  display: grid;
+  gap: 8px;
+  padding: 8px 8px 12px;
+}
+.nodetto-review-comments > h2 {
+  margin: 4px 2px 0;
+}
+.nodetto-comment-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nodetto-comment-toolbar input[type="search"] {
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
-  width: calc(100% - 16px);
+}
+.nodetto-comment-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.nodetto-comment-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.nodetto-comment-composer {
+  display: grid;
+  gap: 4px;
+}
+.nodetto-comment-target {
+  overflow: hidden;
+  color: var(--app-muted-label);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodetto-review-comments textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   min-height: 54px;
-  margin: 0 8px;
+  margin: 0;
   resize: vertical;
   border: 1px solid var(--nodetto-line);
   border-radius: 6px;
@@ -152,14 +192,41 @@
 }
 .nodetto-comment-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-  margin: 6px 8px;
+  justify-content: flex-end;
+  gap: 4px;
 }
-.nodetto-comment-actions button,
-.nodetto-comment-placement button,
-.nodetto-comment-thread header button,
+.nodetto-review-comments button.nodetto-comment-icon-button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--app-chrome-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.nodetto-review-comments
+  button.nodetto-comment-icon-button:hover:not(:disabled) {
+  color: var(--nodetto-ink);
+  background: var(--app-chrome-hover);
+}
+.nodetto-review-comments
+  button.nodetto-comment-icon-button.is-primary:not(:disabled) {
+  color: var(--nodetto-on-accent);
+  background: var(--nodetto-accent);
+}
+.nodetto-review-comments button.nodetto-comment-icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.nodetto-comment-icon-button svg {
+  width: 15px;
+  height: 15px;
+}
 .nodetto-comment-popover button {
   border: 1px solid var(--nodetto-line);
   border-radius: 5px;
@@ -170,7 +237,6 @@
   cursor: pointer;
 }
 .nodetto-comment-thread {
-  margin: 8px;
   border: 1px solid var(--nodetto-line);
   border-radius: 7px;
   background: var(--app-chrome-surface);
@@ -182,22 +248,37 @@
 .nodetto-comment-thread header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px;
+  gap: 2px;
+  padding: 3px 4px 3px 8px;
   background: var(--app-component-header);
+}
+.nodetto-comment-thread header strong {
+  margin-right: 4px;
 }
 .nodetto-comment-thread header span {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  color: var(--app-muted-label);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .nodetto-comment-message {
   padding: 6px 8px 0;
 }
-.nodetto-comment-message time {
-  display: block;
+.nodetto-comment-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.nodetto-comment-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodetto-comment-meta time {
+  flex: 0 0 auto;
   color: var(--app-muted-label);
   font-size: 10px;
 }
@@ -206,18 +287,32 @@
   color: inherit;
   white-space: pre-wrap;
 }
+.nodetto-comment-reply {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 2px 6px 6px 8px;
+}
+.nodetto-comment-reply textarea {
+  flex: 1;
+}
+.nodetto-review-comments .nodetto-comment-reply textarea {
+  min-height: 28px;
+}
 .nodetto-comment-placement {
   display: flex;
   gap: 6px;
   align-items: center;
   justify-content: space-between;
-  margin: 6px 8px;
-  padding: 7px;
+  padding: 3px 3px 3px 8px;
   border: 1px solid var(--nodetto-accent);
   border-radius: 7px;
   color: var(--nodetto-ink);
   background: var(--nodetto-accent-soft);
   font-size: 11px;
+}
+.nodetto-review-comments > p.nodetto-comment-empty {
+  margin: 0 2px;
 }
 .nodetto-comment-pins {
   position: absolute;

@@ -58,6 +58,11 @@ export interface ShapeViewProps {
   /** Expose authored semantics in interactive prototype DOM, not editor chrome. */
   readonly exposeAccessibility?: boolean;
   readonly pcbHidden?: Accessor<ReadonlySet<string>>;
+  /**
+   * Draw without content too small to read at the current zoom. Canvas-only:
+   * previews and exports always draw in full.
+   */
+  readonly lowDetail?: boolean;
 }
 
 const HTML_ROLES: Partial<
@@ -273,7 +278,10 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
             <TableSheetView element={props.element} />
           </Match>
           <Match when={props.element.type === "erd.table"}>
-            <ErdTableView element={props.element} />
+            <ErdTableView
+              element={props.element}
+              headerOnly={props.lowDetail}
+            />
           </Match>
           <Match
             when={[

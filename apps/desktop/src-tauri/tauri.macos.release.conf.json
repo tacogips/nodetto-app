@@ -36,6 +36,16 @@
       },
       {
         "ext": [
+          "nodetto"
+        ],
+        "name": "Nodetto bundle",
+        "description": "nodetto document with its images in one ZIP",
+        "role": "Editor",
+        "rank": "Owner",
+        "mimeType": "application/zip"
+      },
+      {
+        "ext": [
           "mmd",
           "mermaid"
         ],

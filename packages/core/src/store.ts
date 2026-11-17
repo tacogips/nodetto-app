@@ -30,6 +30,19 @@ export interface StoreDiff {
   readonly removed: readonly ElementId[];
   /** True when the page list or document metadata was replaced. */
   readonly pagesChanged: boolean;
+  /**
+   * The records this commit replaced or removed, by id. Lets a subscriber
+   * tell what a removed element was, and what an updated one used to be,
+   * without keeping its own copy of the document. Absent on a whole-document
+   * load, which is announced with `pagesChanged`.
+   */
+  readonly previous?: ReadonlyMap<ElementId, Element>;
+  /**
+   * Set on an announcement that changed nothing in the document: `"history"`
+   * means only undo/redo availability moved. Renderers that follow elements
+   * individually can ignore such an announcement.
+   */
+  readonly ephemeral?: "history";
 }
 
 /** Document-level fields that are not pages or elements. */
@@ -87,6 +100,9 @@ export class Store {
   private readonly layerFlagIds = new Set<ElementId>();
   private readonly listeners = new Set<StoreListener>();
   private readonly pageElements = new Map<PageId, readonly Element[]>();
+  private snapshot:
+    | { readonly revision: number; readonly document: Document }
+    | undefined;
 
   constructor(document?: Document, fallbackId = "document") {
     this.meta = emptyMeta(fallbackId);
@@ -196,6 +212,7 @@ export class Store {
     const added: ElementId[] = [];
     const updated: ElementId[] = [];
     const removed: ElementId[] = [];
+    const previousRecords = new Map<ElementId, Element>();
     let pagesChanged = false;
     if (commit.meta !== undefined) {
       this.meta = commit.meta;
@@ -222,8 +239,13 @@ export class Store {
       this.pageMap.set(page.id, page);
       pagesChanged = true;
     }
+    const remember = (previous: Element | undefined): void => {
+      if (previous && !previousRecords.has(previous.id))
+        previousRecords.set(previous.id, previous);
+    };
     for (const element of commit.insert ?? []) {
       const previous = this.elementMap.get(element.id);
+      remember(previous);
       if (previous) this.pageElementIds.get(previous.page)?.delete(previous.id);
       this.elementMap.set(element.id, element);
       this.indexElement(element);
@@ -231,6 +253,7 @@ export class Store {
     }
     for (const element of commit.update ?? []) {
       const previous = this.elementMap.get(element.id);
+      remember(previous);
       if (previous) this.pageElementIds.get(previous.page)?.delete(previous.id);
       this.elementMap.set(element.id, element);
       this.indexElement(element);
@@ -238,6 +261,7 @@ export class Store {
     }
     for (const id of commit.remove ?? []) {
       const previous = this.elementMap.get(id);
+      remember(previous);
       if (previous) this.pageElementIds.get(previous.page)?.delete(id);
       this.layerFlagIds.delete(id);
       if (this.elementMap.delete(id)) {
@@ -249,7 +273,13 @@ export class Store {
         pagesChanged = true;
       }
     }
-    const diff: StoreDiff = { added, updated, removed, pagesChanged };
+    const diff: StoreDiff = {
+      added,
+      updated,
+      removed,
+      pagesChanged,
+      previous: previousRecords,
+    };
     if (
       pagesChanged ||
       added.length > 0 ||
@@ -267,6 +297,10 @@ export class Store {
    * this to `@nodetto/io` twice yields byte-identical JSONL.
    */
   getSnapshot(): Document {
+    // Sorting every element is the cost here; planners and panels ask for
+    // the same snapshot several times per commit.
+    if (this.snapshot?.revision === this.revisionCount)
+      return this.snapshot.document;
     const pages = [...this.pageMap.values()].sort(comparePageOrder);
     const elements = [...this.elementMap.values()].sort(compareSnapshotOrder);
     const snapshot: Document = {
@@ -283,6 +317,7 @@ export class Store {
         : {}),
       ...(this.meta.extensions ? { extensions: this.meta.extensions } : {}),
     };
+    this.snapshot = { revision: this.revisionCount, document: snapshot };
     return snapshot;
   }
 

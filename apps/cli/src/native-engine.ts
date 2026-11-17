@@ -5,6 +5,7 @@ import { runCli } from "./commands.ts";
 import { exportCommand } from "./export-command.ts";
 import { compareCommand } from "./compare-command.ts";
 import { openCommand } from "./open-command.ts";
+import { bundleCommand } from "./bundle-command.ts";
 import { desktopOpenLink } from "./open-link.ts";
 import { pdfLayout, buildPdfTextLayer, nativePdfSpec } from "@nodetto/core";
 import { COMMAND_HELP, OVERVIEW } from "./help.ts";
@@ -129,7 +130,9 @@ Object.assign(globalThis, {
             })
           : command === "open" && !help
             ? await openCommand(io, rest)
-            : runCli(args, io, version);
+            : command === "bundle" && !help
+              ? await bundleCommand(io, rest)
+              : runCli(args, io, version);
     return JSON.stringify(
       extracted.quiet ? applyQuiet(command ?? "", result) : result,
     );

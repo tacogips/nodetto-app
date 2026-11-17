@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { Box, Vec } from "./geometry.ts";
-import { avoidOrthogonalObstacles } from "./orthogonal-routing.ts";
+import {
+  avoidOrthogonalObstacles,
+  type RoutingObstacleSource,
+  routedAttempts,
+} from "./orthogonal-routing.ts";
+import { createBoxIndex } from "./spatial-grid.ts";
+import { seededRng } from "./test-helpers.ts";
 
 function crossesInterior(from: Vec, to: Vec, box: Box): boolean {
   if (from.y === to.y)
@@ -139,4 +145,128 @@ test("cached routing matches fresh routing across deterministic scene edits", ()
       avoidOrthogonalObstacles(preferred, obstacles, direction, key),
     ).toEqual(avoidOrthogonalObstacles(preferred, obstacles, direction));
   }
+});
+
+describe("orthogonal routing over an obstacle source", () => {
+  /** The same obstacles, answered by region the way a page index does. */
+  function indexed(boxes: readonly Box[]): RoutingObstacleSource {
+    const index = createBoxIndex(boxes);
+    const all = boxes.map((box, order) => ({ order, box }));
+    return {
+      size: boxes.length,
+      near: (region) =>
+        index.query(region).map((position) => all[position] as (typeof all)[0]),
+    };
+  }
+
+  test("routes exactly as it does over the plain list, cached or not", () => {
+    const random = seededRng(5);
+    let detours = 0;
+    for (let round = 0; round < 400; round += 1) {
+      const boxes: Box[] = Array.from(
+        { length: 1 + Math.floor(random() * 40) },
+        () => ({
+          x: Math.floor(random() * 2000),
+          y: Math.floor(random() * 2000),
+          width: 20 + Math.floor(random() * 300),
+          height: 20 + Math.floor(random() * 300),
+        }),
+      );
+      const from = {
+        x: Math.floor(random() * 2200) - 100,
+        y: Math.floor(random() * 2200) - 100,
+      };
+      const to = {
+        x: Math.floor(random() * 2200) - 100,
+        y: Math.floor(random() * 2200) - 100,
+      };
+      const horizontal = random() < 0.5;
+      const middle = horizontal ? (from.x + to.x) / 2 : (from.y + to.y) / 2;
+      const preferred = horizontal
+        ? [from, { x: middle, y: from.y }, { x: middle, y: to.y }, to]
+        : [from, { x: from.x, y: middle }, { x: to.x, y: middle }, to];
+      const direction = horizontal ? "h" : "v";
+      const listKey = {};
+      const sourceKey = {};
+      // The second pass moves one obstacle and goes through cache validation.
+      for (let pass = 0; pass < 2; pass += 1) {
+        if (pass === 1) {
+          const moved = Math.floor(random() * boxes.length);
+          const box = boxes[moved] as Box;
+          boxes[moved] = {
+            ...box,
+            x: box.x + Math.floor(random() * 400) - 200,
+          };
+        }
+        const plain = avoidOrthogonalObstacles(preferred, boxes, direction);
+        expect(
+          avoidOrthogonalObstacles(preferred, boxes, direction, listKey),
+        ).toEqual(plain);
+        expect(
+          avoidOrthogonalObstacles(
+            preferred,
+            indexed(boxes),
+            direction,
+            sourceKey,
+          ),
+        ).toEqual(plain);
+        if (plain !== preferred) detours += 1;
+      }
+    }
+    // The comparison is only worth something if routes actually detour.
+    expect(detours).toBeGreaterThan(100);
+  });
+
+  test("looks only at obstacles near the paths it tries", () => {
+    const boxes: Box[] = Array.from({ length: 2000 }, (_, position) => ({
+      x: (position % 50) * 360,
+      y: Math.floor(position / 50) * 300,
+      width: 240,
+      height: 176,
+    }));
+    const index = createBoxIndex(boxes);
+    const all = boxes.map((box, order) => ({ order, box }));
+    let visited = 0;
+    const source: RoutingObstacleSource = {
+      size: boxes.length,
+      near(region) {
+        const found = index.query(region);
+        visited += found.length;
+        return found.map((position) => all[position] as (typeof all)[0]);
+      },
+    };
+    // From the gutter left of one table to the gutter right of the next.
+    const route = avoidOrthogonalObstacles(
+      [
+        { x: 3590, y: 3050 },
+        { x: 3900, y: 3050 },
+        { x: 3900, y: 3100 },
+        { x: 4210, y: 3100 },
+      ],
+      source,
+      "h",
+    );
+    expect(route.length).toBeGreaterThan(2);
+    expect(visited).toBeLessThan(200);
+  });
+
+  test("remembers the paths a cached search tried", () => {
+    const key = {};
+    expect(routedAttempts(key)).toBeNull();
+    const preferred = [
+      { x: 0, y: 0 },
+      { x: 50, y: 0 },
+      { x: 50, y: 100 },
+      { x: 100, y: 100 },
+    ];
+    const route = avoidOrthogonalObstacles(
+      preferred,
+      [{ x: 40, y: 20, width: 20, height: 60 }],
+      "h",
+      key,
+    );
+    const attempts = routedAttempts(key);
+    expect(attempts?.[0]).toBe(preferred);
+    expect(attempts?.at(-1)).toEqual(route);
+  });
 });

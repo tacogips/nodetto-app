@@ -52,9 +52,26 @@ export function sharedAnimationValue<K extends ShapeKey>(
   elements: readonly Element[],
   key: K,
 ): ElementAnimation[K] | "mixed" {
-  const values = elements
-    .filter((e) => e.type !== SLIDE_SETTINGS_TYPE)
-    .map((e) => normalized(e.visual.animation)[key]);
-  const first = values[0];
-  return values.every((value) => value === first) ? first : "mixed";
+  // Read the one field as `normalized` would leave it, without building a
+  // normalized copy per element: the Inspector asks this for every field of
+  // a selection that can hold thousands of elements.
+  const read = (element: Element): ElementAnimation[K] | undefined => {
+    const value = element.visual.animation?.[key];
+    return value == null ||
+      ((key === "enter" || key === "exit" || key === "linked") &&
+        value === "auto")
+      ? undefined
+      : value;
+  };
+  let first: ElementAnimation[K] | undefined;
+  let seen = false;
+  for (const element of elements) {
+    if (element.type === SLIDE_SETTINGS_TYPE) continue;
+    const value = read(element);
+    if (!seen) {
+      first = value;
+      seen = true;
+    } else if (value !== first) return "mixed";
+  }
+  return first as ElementAnimation[K];
 }

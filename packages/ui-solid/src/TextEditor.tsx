@@ -38,6 +38,10 @@ import { createEditorSignals } from "./adapter.ts";
 import { textEditorRotation } from "./text-editor-rotation.ts";
 import { alignTextEditor } from "./text-editor-alignment.ts";
 import { textEditDraft } from "./text-edit-draft.ts";
+import {
+  SEQUENCE_PARTICIPANT_HEAD_HEIGHT,
+  sequenceParticipantViewModel,
+} from "./shapes/SequenceParticipantView.tsx";
 import "./TextEditor.css";
 
 export interface TextEditorTarget {
@@ -62,6 +66,7 @@ const HIDES_OWN_TEXT: ReadonlySet<string> = new Set([
   "shape.geo",
   "node.generic",
   "text.note",
+  "sequence.participant",
 ]);
 
 interface Placement {
@@ -163,6 +168,31 @@ function placeEditor(
       bold: true,
       color: undefined,
       padding: `${(height - BASE_FONT_SIZE * LINE_HEIGHT) / 2}px 8px`,
+    };
+  }
+
+  if (element.type === "sequence.participant") {
+    // The name sits in the head the lifeline hangs from, not in the middle
+    // of the (tall) participant bounds.
+    const fontSize = style.fontSize ?? BASE_FONT_SIZE;
+    const lineHeight = fontSize * LINE_HEIGHT + 8;
+    const label = sequenceParticipantViewModel(element, box)?.labelBox ?? {
+      x: 0,
+      y: 0,
+      width: box.width,
+      height: SEQUENCE_PARTICIPANT_HEAD_HEIGHT,
+    };
+    const height = Math.max(label.height, lineHeight);
+    return {
+      x: box.x + label.x,
+      y: box.y + label.y + (label.height - height) / 2,
+      width: Math.max(24, label.width),
+      height,
+      fontSize,
+      align: "center",
+      bold: true,
+      color: style.color,
+      padding: `${Math.max(0, (height - fontSize * LINE_HEIGHT) / 2)}px 6px`,
     };
   }
 

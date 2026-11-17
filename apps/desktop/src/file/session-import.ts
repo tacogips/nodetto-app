@@ -13,6 +13,7 @@ import type { BpmnImportWarning } from "@nodetto/io";
 import type { FileBackend } from "./backend.ts";
 import {
   baseName,
+  isBundlePath,
   bpmnTitle,
   describeError,
   drawioTitle,
@@ -36,6 +37,11 @@ export interface ImportHost {
     importWarnings?: readonly BpmnImportWarning[],
   ): Promise<boolean>;
   fail(message: string): void;
+  /**
+   * Ask where to write the open (imported) document as a JSONL with its
+   * attachments beside it, and adopt that file. False when cancelled.
+   */
+  extractTo?(): Promise<boolean>;
 }
 
 /**
@@ -48,6 +54,8 @@ export function importUnreadPath(
   stale: () => boolean,
 ): Promise<boolean> | null {
   if (isKicadPcbPath(path)) return importKicadPcbPath(host, path, stale);
+  if (isBundlePath(path) || /\.zip$/i.test(path))
+    return importArchivePath(host, path, stale);
   if (isPcbPath(path)) return importPcbPath(host, path, stale);
   return null;
 }
@@ -72,6 +80,81 @@ export function importInterchangeText(
 }
 
 /**
+ * A `.nodetto` bundle, or a ZIP that holds one JSONL document; any other ZIP
+ * is a board house archive of Gerber and drill files.
+ */
+async function importArchivePath(
+  host: ImportHost,
+  path: string,
+  stale: () => boolean,
+): Promise<boolean> {
+  const name = baseName(path);
+  let bytes: Uint8Array;
+  try {
+    if (!host.backend.readDocumentBytes)
+      throw new Error("this build cannot read ZIP archives");
+    bytes = await host.backend.readDocumentBytes(path);
+  } catch (error) {
+    if (!stale())
+      host.fail(`could not import ${name}: ${describeError(error)}`);
+    return false;
+  }
+  if (stale()) return false;
+  const { looksLikeDocumentBundle } = await import("@nodetto/core");
+  if (stale()) return false;
+  if (isBundlePath(path) || looksLikeDocumentBundle(bytes))
+    return importBundleBytes(host, name, bytes, stale);
+  return importPcbPath(host, path, stale, bytes);
+}
+
+/**
+ * A bundle opens detached with its images held in memory, then asks where to
+ * extract it: the chosen JSONL and its `artifacts/` become the document's
+ * files, ready to commit. Cancelling keeps the detached document open.
+ */
+async function importBundleBytes(
+  host: ImportHost,
+  name: string,
+  bytes: Uint8Array,
+  stale: () => boolean,
+): Promise<boolean> {
+  try {
+    const { decodeDocumentBundle } = await import("@nodetto/core");
+    const { encodeRasterDataUrl } = await import("@nodetto/ir");
+    if (stale()) return false;
+    const bundle = decodeDocumentBundle(bytes);
+    const assets = new Map<string, string>();
+    const warnings = bundle.missing.map((src) => ({
+      element: src,
+      message: "image is not in the bundle",
+    }));
+    for (const [src, contents] of bundle.attachments) {
+      try {
+        assets.set(src, encodeRasterDataUrl(contents));
+      } catch (error) {
+        warnings.push({ element: src, message: describeError(error) });
+      }
+    }
+    const stem = name.replace(/\.(?:nodetto|zip)$/i, "");
+    const imported = await host.importDocument(
+      bundle.document,
+      `${stem}.jsonl`,
+      warnings,
+    );
+    if (!imported) return false;
+    for (const [src, data] of assets) host.editor.assets.set(src, data);
+    // `importDocument` succeeding makes this document current (it starts its
+    // own open request), so the original request's staleness no longer
+    // applies here.
+    await host.extractTo?.();
+    return true;
+  } catch (error) {
+    if (!stale()) host.fail(`could not open ${name}: ${describeError(error)}`);
+    return false;
+  }
+}
+
+/**
  * Gerber and drill files are an interchange source: the board becomes a
  * detached document so autosave never rewrites the fabrication files.
  */
@@ -79,6 +162,7 @@ async function importPcbPath(
   host: ImportHost,
   path: string,
   stale: () => boolean,
+  archive?: Uint8Array,
 ): Promise<boolean> {
   const name = baseName(path);
   try {
@@ -87,7 +171,9 @@ async function importPcbPath(
     if (/\.zip$/i.test(path)) {
       if (!host.backend.readDocumentBytes)
         throw new Error("this build cannot read ZIP archives");
-      files = pcbFilesFromZip(await host.backend.readDocumentBytes(path));
+      files = pcbFilesFromZip(
+        archive ?? (await host.backend.readDocumentBytes(path)),
+      );
       if (files.length === 0)
         throw new Error("the archive holds no Gerber or drill file");
     } else {
