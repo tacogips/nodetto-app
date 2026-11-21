@@ -77,9 +77,10 @@ test("semantic workspaces promote their own authoring tools and share endpoint-a
   ]);
   for (const workspace of WORKSPACES.filter((entry) => !entry.design)) {
     for (const { tool } of workspace.tools) {
-      expect(canUseTool(tool, true)).toBe(false);
+      expect(canUseTool(tool, true)).toBe(tool === Tool.Select);
       expect(canUseTool(tool, false)).toBe(true);
-      if (!isConnectorTool(tool)) expect(creationFor(tool)).not.toBeNull();
+      if (tool === Tool.Select) expect(creationFor(tool)).toBeNull();
+      else if (!isConnectorTool(tool)) expect(creationFor(tool)).not.toBeNull();
     }
   }
 });

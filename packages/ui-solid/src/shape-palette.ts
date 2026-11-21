@@ -1,6 +1,11 @@
 import { IOS_KIT } from "@nodetto/core";
+import type { ToolbarIconKey } from "./ToolbarIcon.tsx";
 import { Tool, type ToolKind } from "./tools.ts";
-import { workspaceById, type WorkspaceId } from "./workspaces.ts";
+import {
+  CAD_CREATION_TOOLS,
+  workspaceById,
+  type WorkspaceId,
+} from "./workspaces.ts";
 
 export const PALETTE_ICONS = {
   view: "M2 16Q16 1 30 16Q16 31 2 16zM21 16a5 5 0 11-10 0 5 5 0 0110 0z",
@@ -84,13 +89,15 @@ export const PALETTE_ICONS = {
   package: "M3 5h11v5H3zM3 10h26v18H3z",
 } as const;
 
-export interface ShapePaletteItem {
+export type ShapePaletteItem = {
   readonly tool: ToolKind;
   readonly action?: "icon-picker" | "ios-kit" | "add-page-frame";
   readonly kitId?: string;
   readonly label: string;
-  readonly icon: keyof typeof PALETTE_ICONS;
-}
+} & (
+  | { readonly icon: keyof typeof PALETTE_ICONS }
+  | { readonly toolbarIcon: ToolbarIconKey }
+);
 
 export const UI_CONTROL_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.Radio, label: "Radio button", icon: "ellipse" },
@@ -327,6 +334,18 @@ export const PCB_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.PcbVia, label: "Via", icon: "ellipse" },
 ];
 
+const CAD_TOOL_ICONS = {
+  [Tool.CadSketch]: "cadSketch",
+  [Tool.CadLine]: "cadLine",
+  [Tool.CadRect]: "cadRect",
+  [Tool.CadArc]: "cadArc",
+  [Tool.CadCircle]: "cadCircle",
+  [Tool.CadExtrude]: "cadExtrude",
+} as const;
+const CAD_SHAPES: readonly ShapePaletteItem[] = CAD_CREATION_TOOLS.map(
+  (item) => ({ ...item, toolbarIcon: CAD_TOOL_ICONS[item.tool] }),
+);
+
 export const INTERACTION_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.ScreenTransition, label: "Screen transition", icon: "edge" },
   { tool: Tool.PopupFrame, label: "Popup / dialog", icon: "frame" },
@@ -385,6 +404,7 @@ const PRIMARY_TOOLS = {
     Tool.BreadboardWire,
   ],
   pcb: [Tool.PcbTrack, Tool.PcbVia],
+  cad3d: CAD_CREATION_TOOLS.map(({ tool }) => tool),
   component: [
     Tool.Component,
     Tool.ProvidedInterface,
@@ -472,6 +492,7 @@ const PALETTE_SHAPES = [
   ...BPMN_SHAPES,
   ...BREADBOARD_SHAPES,
   ...PCB_SHAPES,
+  ...CAD_SHAPES,
 ];
 
 /** Preserve semantic workspace labels, such as Relationship or Message. */
@@ -487,6 +508,7 @@ export function workspaceShapes(id: WorkspaceId): readonly ShapePaletteItem[] {
 
 /** Secondary sections never repeat a tool already shown in the primary grid. */
 export function additionalShapes(id: WorkspaceId): readonly ShapePaletteItem[] {
+  if (id === "cad3d") return [];
   const primary = new Set<ToolKind>(PRIMARY_TOOLS[id]);
   return (
     id === "bpmn"
@@ -514,6 +536,16 @@ export interface ShapePaletteGroup {
 export function shapePaletteGroups(
   id: WorkspaceId,
 ): readonly ShapePaletteGroup[] {
+  if (id === "cad3d")
+    return [
+      {
+        label: workspaceById(id).label,
+        items: [
+          { tool: Tool.Select, label: "Select", toolbarIcon: "cadSelect" },
+          ...workspaceShapes(id),
+        ],
+      },
+    ];
   const items = [
     ...workspaceShapes(id),
     ...additionalShapes(id),

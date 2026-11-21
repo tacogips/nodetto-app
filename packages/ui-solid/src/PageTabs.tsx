@@ -26,6 +26,7 @@ import {
   pageMenuItems,
   togglePagePresentation,
 } from "./page-actions.ts";
+import { newPageOptionsFor } from "./page-kind-ui.ts";
 import {
   PageTabDrag,
   type PageTabDrop,
@@ -50,6 +51,7 @@ export interface PageTabsProps {
   readonly editor: Editor;
   readonly placement?: "top" | "bottom";
   readonly onCopyShapesFrom?: (targetId: PageId) => void;
+  readonly cadAllowed?: boolean;
 }
 
 const reducedMotion = (): boolean =>
@@ -351,6 +353,7 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
       ? []
       : pageMenuItems(props.editor, id, {
           copyShapes: Boolean(props.onCopyShapesFrom),
+          cadAllowed: props.cadAllowed,
           axis: "horizontal",
         });
   });
@@ -392,7 +395,7 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
   const duplicate = (page: Page): void => {
     if (props.editor.readOnly) return;
     setMenuFor(null);
-    duplicatePageAction(props.editor, page.id);
+    duplicatePageAction(props.editor, page.id, props.cadAllowed);
     focusPage(props.editor.currentPageId);
   };
 
@@ -788,7 +791,13 @@ export function PageTabs(props: PageTabsProps): JSX.Element {
         aria-label="Add page"
         disabled={readOnly()}
         onClick={() => {
-          props.editor.createPage();
+          props.editor.createPage(
+            newPageOptionsFor(
+              props.editor.store.getPage(props.editor.currentPageId),
+              props.editor.store.listPages(),
+              props.cadAllowed ?? true,
+            ),
+          );
           focusPage(props.editor.currentPageId);
         }}
       >

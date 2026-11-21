@@ -55,6 +55,28 @@ test("page editing modes survive Yjs wire round trips", () => {
   remote.destroy();
 });
 
+test("the CAD page kind and mode survive a Yjs wire round trip", () => {
+  const page = {
+    id: "part",
+    name: "Part",
+    kind: "cad3d",
+    mode: "cad3d",
+  } as const;
+  const source = irToYDoc({
+    ...freeformDocument(),
+    pages: [page],
+    elements: [],
+  });
+  const remote = new Y.Doc();
+  try {
+    Y.applyUpdate(remote, Y.encodeStateAsUpdate(source));
+    expect(ydocToIr(remote).pages).toEqual([page]);
+  } finally {
+    source.destroy();
+    remote.destroy();
+  }
+});
+
 test("portable column identity survives Yjs wire round trips", () => {
   const base = erdDocument();
   const doc = {

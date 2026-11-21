@@ -13,6 +13,16 @@ export interface Workspace {
     readonly label: string;
   }[];
 }
+
+export const CAD_CREATION_TOOLS = [
+  { tool: Tool.CadSketch, label: "Sketch" },
+  { tool: Tool.CadLine, label: "Line" },
+  { tool: Tool.CadRect, label: "Rectangle" },
+  { tool: Tool.CadArc, label: "Arc" },
+  { tool: Tool.CadCircle, label: "Circle" },
+  { tool: Tool.CadExtrude, label: "Extrude" },
+] as const;
+
 export const WORKSPACES = [
   {
     id: "flow",
@@ -125,6 +135,13 @@ export const WORKSPACES = [
       { tool: Tool.PcbTrack, label: "Track" },
       { tool: Tool.PcbVia, label: "Via" },
     ],
+  },
+  {
+    id: "cad3d",
+    label: "3D CAD",
+    design: false,
+    shapes: false,
+    tools: [{ tool: Tool.Select, label: "Select" }, ...CAD_CREATION_TOOLS],
   },
   {
     id: "state",

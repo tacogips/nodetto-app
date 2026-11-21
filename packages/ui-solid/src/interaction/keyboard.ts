@@ -8,7 +8,8 @@ import {
   groupOf,
   pasteSelectionStyle,
 } from "@nodetto/core";
-import { Tool, type ToolKind } from "../tools.ts";
+import { canUseTool, Tool, type ToolKind } from "../tools.ts";
+import { isShapeEntryEnabled } from "../page-kind-ui.ts";
 import {
   copyTableRange,
   cutTableRange,
@@ -428,7 +429,9 @@ export function createKeyboardHandlers(
       const tool = TOOL_KEYS[key];
       if (tool !== undefined) {
         event.preventDefault();
-        if (editor.readOnly && tool !== "select" && tool !== "hand") return;
+        const page = editor.store.getPage(editor.currentPageId);
+        if (!canUseTool(tool, editor.readOnly || !isShapeEntryEnabled(page)))
+          return;
         options.setTool(tool);
       }
     }

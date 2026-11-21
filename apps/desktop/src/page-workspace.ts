@@ -7,6 +7,7 @@ export const DEDICATED_WORKSPACES: Readonly<
   bpmn: "bpmn",
   breadboard: "breadboard",
   pcb: "pcb",
+  cad3d: "cad3d",
 };
 
 export const DEDICATED_PAGE_NAMES: Readonly<Partial<Record<PageKind, string>>> =
@@ -14,6 +15,7 @@ export const DEDICATED_PAGE_NAMES: Readonly<Partial<Record<PageKind, string>>> =
     bpmn: "Process",
     breadboard: "Breadboard",
     pcb: "PCB",
+    cad3d: "3D CAD",
   };
 
 export function dedicatedWorkspaceFor(
@@ -38,5 +40,12 @@ export function workspaceForPage(
   page: Pick<Page, "kind" | "mode"> | undefined,
   fallback: WorkspaceId,
 ): WorkspaceId {
-  return (page && pageModeOf(page)) ?? fallback;
+  return (
+    (page && pageModeOf(page)) ?? (fallback === "cad3d" ? "flow" : fallback)
+  );
+}
+
+// Enable cloud creation after the Worker rollout in design-cad3d.md section 15.
+export function cadCreationAllowed(isCloud: boolean): boolean {
+  return !isCloud;
 }

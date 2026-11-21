@@ -15,8 +15,10 @@ import {
   PCB_SHAPES,
   type ShapePaletteItem,
   UI_CONTROL_SHAPES,
+  workspaceShapes,
 } from "./shape-palette.ts";
 import type { ToolKind } from "./tools.ts";
+import type { WorkspaceId } from "./workspaces.ts";
 
 function paletteItems(): readonly ShapePaletteItem[] {
   const byTool = new Map<string, ShapePaletteItem>();
@@ -41,9 +43,15 @@ function paletteItems(): readonly ShapePaletteItem[] {
 /** Palette shapes whose catalogue entry or palette label has every word. */
 export function searchPaletteShapes(
   query: string,
+  workspace?: WorkspaceId,
 ): readonly ShapePaletteItem[] {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return [];
+  if (workspace === "cad3d") {
+    return workspaceShapes(workspace).filter(({ label, tool }) =>
+      words.every((word) => `${label.toLowerCase()} ${tool}`.includes(word)),
+    );
+  }
   const matched = new Set(
     searchShapes({ query }).map((shape): ToolKind => shape.id),
   );

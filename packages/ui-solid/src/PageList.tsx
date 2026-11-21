@@ -16,6 +16,7 @@ import {
   togglePagePresentation,
   type PageMenuItemKey,
 } from "./page-actions.ts";
+import { newPageOptionsFor } from "./page-kind-ui.ts";
 import {
   pageListKeyAction,
   pageListRevealTop,
@@ -30,6 +31,7 @@ export interface PageListProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCopyShapesFrom?: (id: PageId) => void;
+  cadAllowed?: boolean;
 }
 
 export function PageList(props: PageListProps) {
@@ -65,6 +67,7 @@ export function PageList(props: PageListProps) {
       : pageMenuItems(props.editor, id, {
           axis: "vertical",
           copyShapes: Boolean(props.onCopyShapesFrom),
+          cadAllowed: props.cadAllowed,
         });
   });
   const menuKeys = createMemo(() => menuItems().map((item) => item.key));
@@ -150,7 +153,7 @@ export function PageList(props: PageListProps) {
         startRename(id);
         return;
       case "duplicate":
-        duplicatePageAction(props.editor, id);
+        duplicatePageAction(props.editor, id, props.cadAllowed);
         break;
       case "copyShapes":
         props.onCopyShapesFrom?.(id);
@@ -371,7 +374,15 @@ export function PageList(props: PageListProps) {
           type="button"
           class="nodetto-page-list-add"
           aria-label="Add page"
-          onClick={() => props.editor.createPage()}
+          onClick={() =>
+            props.editor.createPage(
+              newPageOptionsFor(
+                props.editor.store.getPage(props.editor.currentPageId),
+                props.editor.store.listPages(),
+                props.cadAllowed ?? true,
+              ),
+            )
+          }
         >
           +
         </button>

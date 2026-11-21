@@ -130,8 +130,8 @@ milestone that breaks it, not in M18.
 | M22 | accepted |
 | M3 | accepted |
 | M4 | accepted |
-| M5 | implemented |
-| M6 | pending |
+| M5 | accepted |
+| M6 | implemented |
 | M7 | pending |
 | M8 | pending |
 | M19 | pending |
@@ -279,6 +279,24 @@ intersect produces a sheet. A real-WASM JSONL regression covers this case
 regenerated in 72.3 ms in both milestone checks. Logs are under
 `tmp/cad3d/m5/rework/`. The milestone plan and dependency resolutions are
 unchanged.
+
+M6 added the dedicated 3D CAD workspace, its six creation tools and Select,
+the diagram-format lock, and CAD-aware page creation in the list and tabs.
+The cloud guard hides the CAD workspace option and keeps CAD pages openable.
+The light and dark DOM checks exercise the palette, toolbar, inspector, and
+both add-page buttons. All three milestone checks and `mise run verify`
+passed. Workspace verification passed 4,274 Bun and 91 Rust tests, with 74
+Bun tests skipped. Verification logs are under `tmp/cad3d/m6/`.
+
+M6 deviations: global palette search needed a CAD-only scope while on a CAD
+page. The temporary 2D canvas declines CAD placement and 2D tool shortcuts
+on CAD pages until the dedicated gestures are wired. The default workspace
+setting excludes CAD, and a stored CAD mode on another page falls back to
+that page's normal workspace. The template button and native callback
+follow the current page kind, and the cloud guard also covers CAD page
+duplication. The workspace and icon tests account for the added tools and
+icons, including Select's read-only behavior. The M6 plan now names M22 as
+the emitter backstop (DR3-02).
 
 ## Completion
 

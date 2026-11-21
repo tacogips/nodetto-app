@@ -32,6 +32,7 @@ import {
 import { canUseTool, Tool, type ToolKind } from "./tools.ts";
 import "./Toolbar.css";
 import { WORKSPACES, workspaceById, type WorkspaceId } from "./workspaces.ts";
+import { isShapeEntryEnabled } from "./page-kind-ui.ts";
 
 const PrototypePreview = lazy(() =>
   import("./PrototypePreview.tsx").then((module) => ({
@@ -43,6 +44,7 @@ export interface ToolbarProps {
   readonly toolsContent?: JSX.Element;
   readonly utilitiesContent?: JSX.Element;
   readonly workspace?: WorkspaceId;
+  readonly hiddenWorkspaces?: readonly WorkspaceId[];
   readonly onWorkspaceChange?: (id: WorkspaceId) => void;
   readonly editor: Editor;
   readonly tool: ToolKind;
@@ -238,8 +240,19 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
   const [menuPosition, setMenuPosition] = createSignal({ x: 8, y: 44 });
   const signals = createEditorSignals(props.editor);
   const workspace = () => workspaceById(props.workspace ?? "flow");
+  const visibleWorkspaces = () =>
+    WORKSPACES.filter(({ id }) => !props.hiddenWorkspaces?.includes(id));
+  const selectedWorkspace = () =>
+    props.hiddenWorkspaces?.includes(workspace().id) ? "" : workspace().id;
+  const shapeEntriesEnabled = () => {
+    signals.rev();
+    return isShapeEntryEnabled(
+      props.editor.store.getPage(props.editor.currentPageId),
+    );
+  };
   const comprehensive = () =>
-    workspace().id === "flow" || workspace().id === "all";
+    shapeEntriesEnabled() &&
+    (workspace().id === "flow" || workspace().id === "all");
   createEffect(() => {
     workspace().id;
     setOpen(null);
@@ -457,7 +470,7 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
             <select
               class="nodetto-workspace-select"
               aria-label="Mode"
-              value={workspace().id}
+              value={selectedWorkspace()}
               onKeyDown={(event) => event.stopPropagation()}
               onChange={(event) =>
                 props.onWorkspaceChange?.(
@@ -465,8 +478,20 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
                 )
               }
             >
-              <For each={WORKSPACES}>
-                {(entry) => <option value={entry.id}>{entry.label}</option>}
+              <Show when={selectedWorkspace() === ""}>
+                <option value="" disabled selected>
+                  Choose mode
+                </option>
+              </Show>
+              <For each={visibleWorkspaces()}>
+                {(entry) => (
+                  <option
+                    value={entry.id}
+                    selected={entry.id === selectedWorkspace()}
+                  >
+                    {entry.label}
+                  </option>
+                )}
               </For>
             </select>
           </label>
@@ -503,7 +528,7 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
               style={menuStyle()}
               onKeyDown={menuKey}
             >
-              <Show when={workspace().design}>
+              <Show when={workspace().design && shapeEntriesEnabled()}>
                 {" "}
                 <ImageImport
                   hiddenWhenIdle={!workspace().design}
@@ -552,10 +577,12 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
                     <For
                       each={menu.actions.filter(
                         (item) =>
-                          comprehensive() ||
-                          (!item.id.startsWith("boolean") &&
-                            item.id !== "flattenBoolean" &&
-                            item.id !== "frameSelection"),
+                          (item.id !== "addPageFrame" ||
+                            shapeEntriesEnabled()) &&
+                          (comprehensive() ||
+                            (!item.id.startsWith("boolean") &&
+                              item.id !== "flattenBoolean" &&
+                              item.id !== "frameSelection")),
                       )}
                     >
                       {(item) => (

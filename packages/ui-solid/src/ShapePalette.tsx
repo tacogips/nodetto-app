@@ -33,6 +33,7 @@ import {
 } from "./tools.ts";
 import type { WorkspaceId } from "./workspaces.ts";
 import { searchPaletteShapes } from "./shape-search.ts";
+import { ToolbarIcon } from "./ToolbarIcon.tsx";
 import "./ShapePalette.css";
 
 function insertionLocation(editor: Editor, point: Vec) {
@@ -189,7 +190,7 @@ export function ShapePalette(props: {
       y: props.context.viewport.height / 2,
     });
   const [query, setQuery] = createSignal("");
-  const results = () => searchPaletteShapes(query());
+  const results = () => searchPaletteShapes(query(), props.workspace);
   const signals = createEditorSignals(props.editor);
   const readOnly = () => {
     signals.rev();
@@ -207,33 +208,40 @@ export function ShapePalette(props: {
           <button
             type="button"
             class="nodetto-shape-tile"
-            aria-label={`Draw ${item.label.toLowerCase()}`}
+            aria-label={
+              "toolbarIcon" in item
+                ? item.label
+                : `Draw ${item.label.toLowerCase()}`
+            }
             aria-pressed={!item.action && props.tool === item.tool}
             title={
-              item.tool === Tool.Relation
-                ? "Relation — connect columns to document a join path; no database constraint or DDL"
-                : item.tool === Tool.ForeignKey
-                  ? "Foreign key — connect columns with an enforced database constraint included in DDL"
-                  : item.tool === Tool.View
-                    ? "View — a saved database query"
-                    : item.tool === Tool.MaterializedView
-                      ? "Materialized view — stored query results"
-                      : item.tool === Tool.Function
-                        ? "Function — a callable routine that returns a value"
-                        : item.tool === Tool.Procedure
-                          ? "Procedure — a callable sequence of database operations"
-                          : item.tool === Tool.Freehand
-                            ? "Freehand — drag on the canvas"
-                            : isConnectorTool(item.tool)
-                              ? `${item.label} — drag from one shape to another`
-                              : item.tool === Tool.Port
-                                ? "Port — click a component boundary"
-                                : `${item.label} — select, then click the canvas`
+              "toolbarIcon" in item
+                ? item.label
+                : item.tool === Tool.Relation
+                  ? "Relation — connect columns to document a join path; no database constraint or DDL"
+                  : item.tool === Tool.ForeignKey
+                    ? "Foreign key — connect columns with an enforced database constraint included in DDL"
+                    : item.tool === Tool.View
+                      ? "View — a saved database query"
+                      : item.tool === Tool.MaterializedView
+                        ? "Materialized view — stored query results"
+                        : item.tool === Tool.Function
+                          ? "Function — a callable routine that returns a value"
+                          : item.tool === Tool.Procedure
+                            ? "Procedure — a callable sequence of database operations"
+                            : item.tool === Tool.Freehand
+                              ? "Freehand — drag on the canvas"
+                              : isConnectorTool(item.tool)
+                                ? `${item.label} — drag from one shape to another`
+                                : item.tool === Tool.Port
+                                  ? "Port — click a component boundary"
+                                  : `${item.label} — select, then click the canvas`
             }
             on:pointerdown={(event) => {
               if (
                 item.action ||
                 event.button !== 0 ||
+                props.workspace === "cad3d" ||
                 !creationFor(item.tool) ||
                 readOnly()
               )
@@ -280,9 +288,13 @@ export function ShapePalette(props: {
                 props.onToolChange(item.tool);
             }}
           >
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-              <path d={PALETTE_ICONS[item.icon]} />
-            </svg>
+            {"toolbarIcon" in item ? (
+              <ToolbarIcon name={item.toolbarIcon} class="" />
+            ) : (
+              <svg viewBox="0 0 32 32" aria-hidden="true">
+                <path d={PALETTE_ICONS[item.icon]} />
+              </svg>
+            )}
             <span>{item.label}</span>
           </button>
         )}
@@ -338,7 +350,11 @@ export function ShapePalette(props: {
         class="nodetto-palette-search"
         placeholder="Search shapes"
         aria-label="Search shapes"
-        title="Search every shape by name, shape ID or category, such as actor or uml"
+        title={
+          props.workspace === "cad3d"
+            ? "Search CAD tools by name or ID"
+            : "Search every shape by name, shape ID or category, such as actor or uml"
+        }
         value={query()}
         onInput={(event) => setQuery(event.currentTarget.value)}
         onKeyDown={(event) => {
@@ -384,11 +400,13 @@ export function ShapePalette(props: {
           }}
         />
       </Show>
-      <div class="nodetto-palette-actions" role="group" aria-label="Grouping">
-        {action("frameSelection", "Frame selection")}
-        {action("group", "Group")}
-        {action("ungroup", "Ungroup")}
-      </div>
+      <Show when={props.workspace !== "cad3d"}>
+        <div class="nodetto-palette-actions" role="group" aria-label="Grouping">
+          {action("frameSelection", "Frame selection")}
+          {action("group", "Group")}
+          {action("ungroup", "Ungroup")}
+        </div>
+      </Show>
     </section>
   );
 }

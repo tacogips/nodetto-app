@@ -190,7 +190,7 @@ export function SettingsDialog(props: SettingsDialogProps): JSX.Element {
                   )
                 }
               >
-                <For each={WORKSPACES}>
+                <For each={WORKSPACES.filter(({ id }) => id !== "cad3d")}>
                   {(workspace) => (
                     <option value={workspace.id}>{workspace.label}</option>
                   )}

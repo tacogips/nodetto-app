@@ -59,6 +59,7 @@ export const PAGE_MODES = [
   "bpmn",
   "breadboard",
   "pcb",
+  "cad3d",
   "all",
 ] as const;
 
@@ -69,6 +70,7 @@ const DEDICATED_PAGE_MODES: Readonly<Partial<Record<string, PageMode>>> = {
   bpmn: "bpmn",
   breadboard: "breadboard",
   pcb: "pcb",
+  cad3d: "cad3d",
 };
 
 /** Notation pages open in their notation's mode until another is chosen. */
@@ -88,7 +90,9 @@ export function pageModeOf(
   page: Pick<Page, "kind" | "mode">,
 ): PageMode | undefined {
   return (
-    DEDICATED_PAGE_MODES[page.kind] ?? page.mode ?? KIND_PAGE_MODES[page.kind]
+    DEDICATED_PAGE_MODES[page.kind] ??
+    (page.mode === "cad3d" ? undefined : page.mode) ??
+    KIND_PAGE_MODES[page.kind]
   );
 }
 

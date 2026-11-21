@@ -115,6 +115,7 @@ import {
 } from "./shell/presentation-fullscreen.ts";
 import { watchWindowInput } from "./shell/window-input.ts";
 import { followPageWorkspace, selectWorkspacePage } from "./shell/workspace.ts";
+import { cadCreationAllowed, workspaceForPage } from "./page-workspace.ts";
 import { TemplateDialog } from "./TemplateDialog.tsx";
 import "./square-chrome.css";
 import "./pane.css";
@@ -172,7 +173,7 @@ export function App(props: AppProps): JSX.Element {
   // Pages remember their own mode; the preference is the mode for pages
   // that never chose one.
   const [defaultWorkspace, setDefaultWorkspace] = createSignal<WorkspaceId>(
-    readWorkspacePreference(preferenceStorage()),
+    workspaceForPage(undefined, readWorkspacePreference(preferenceStorage())),
   );
   const [workspace, setWorkspaceSignal] = createSignal<WorkspaceId>(
     defaultWorkspace(),
@@ -185,6 +186,7 @@ export function App(props: AppProps): JSX.Element {
     setWorkspaceSignal(id);
   };
   const changeWorkspace = (id: WorkspaceId) => {
+    if (id === "cad3d" && !cadAllowed()) return;
     selectWorkspacePage(props.editor, id);
     setWorkspace(id);
   };
@@ -382,6 +384,13 @@ export function App(props: AppProps): JSX.Element {
   const mode = (): DocumentMode =>
     cloud()?.ownsEditor ? { kind: "cloud" } : { kind: "file" };
   const isCloud = (): boolean => mode().kind === "cloud";
+  const cadAllowed = (): boolean => cadCreationAllowed(isCloud());
+  const isCadPage = (): boolean => {
+    editorSignals.rev();
+    return (
+      props.editor.store.getPage(props.editor.currentPageId)?.kind === "cad3d"
+    );
+  };
   let wasViewer = false;
   createEffect(() => {
     const viewer = cloud()?.role === "viewer";
@@ -419,9 +428,11 @@ export function App(props: AppProps): JSX.Element {
     );
 
   const [templatesOpen, setTemplatesOpen] = createSignal(false);
-  const openTemplates = () => setTemplatesOpen(true);
+  const openTemplates = () => {
+    if (!isCloud() && !isCadPage()) setTemplatesOpen(true);
+  };
   const useTemplate = async (id: DesignTemplateId) => {
-    if (isCloud() || !mayDiscard()) return;
+    if (isCloud() || isCadPage() || !mayDiscard()) return;
     const document = createDesignTemplate(id);
     if (await props.session.importDocument(document, document.title)) {
       changeWorkspace(id === "web-workspace" ? "web" : "app");
@@ -823,6 +834,7 @@ export function App(props: AppProps): JSX.Element {
       </Show>
       <Toolbar
         workspace={workspace()}
+        hiddenWorkspaces={cadAllowed() ? undefined : ["cad3d"]}
         onWorkspaceChange={changeWorkspace}
         editor={props.editor}
         tool={tool()}
@@ -835,6 +847,7 @@ export function App(props: AppProps): JSX.Element {
             file={file()}
             onNew={newDocument}
             onNewFromTemplate={openTemplates}
+            templateDisabled={isCadPage()}
             onOpen={open}
             onReload={reload}
             onExport={openExport}
@@ -920,6 +933,7 @@ export function App(props: AppProps): JSX.Element {
           />
           <PageList
             editor={props.editor}
+            cadAllowed={cadAllowed()}
             open={pagesListOpen()}
             onOpenChange={setPagesListOpen}
             onCopyShapesFrom={openCopyShapes}
@@ -1064,6 +1078,7 @@ export function App(props: AppProps): JSX.Element {
           >
             <PageTabs
               editor={props.editor}
+              cadAllowed={cadAllowed()}
               placement="bottom"
               onCopyShapesFrom={openCopyShapes}
             />

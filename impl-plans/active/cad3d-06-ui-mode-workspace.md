@@ -51,7 +51,7 @@ only CAD tools, reachable from the toolbar, and lock the page kind in the UI.
   `isShapeEntryEnabled(page)` is false on a CAD page. `PageList.tsx:374`
   and `PageTabs.tsx:791` pass the options to `editor.createPage`. The
   toolbar hides or disables the image import control and the template,
-  kit and block entries on a CAD page (the guards of M2 remain the
+  kit and block entries on a CAD page (the guards of M22 remain the
   backstop).
 - Cloud guard: `Toolbar` gains `hiddenWorkspaces?: readonly WorkspaceId[]`;
   `App.tsx` passes `["cad3d"]` and `cadAllowed = false` while

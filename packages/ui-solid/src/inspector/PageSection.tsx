@@ -4,6 +4,7 @@ import type { Editor } from "@nodetto/core";
 import { PAGE_KINDS, type Page, type PageKind, shortPageId } from "@nodetto/ir";
 import { type JSX, lazy, Suspense } from "solid-js";
 import { Switch } from "../Switch.tsx";
+import { isShapeEntryEnabled } from "../page-kind-ui.ts";
 import {
   Field,
   Section,
@@ -14,10 +15,15 @@ import {
 
 const PageGuidesSection = lazy(() => import("./PageGuidesSection.tsx"));
 
-const PAGE_KIND_OPTIONS: readonly SelectOption[] = PAGE_KINDS.map((kind) => ({
+const PAGE_KIND_OPTIONS: readonly SelectOption[] = PAGE_KINDS.filter(
+  (kind) => kind !== "cad3d",
+).map((kind) => ({
   value: kind,
   label: kind.charAt(0).toUpperCase() + kind.slice(1),
 }));
+const CAD_KIND_OPTION: readonly SelectOption[] = [
+  { value: "cad3d", label: "3D CAD" },
+];
 
 export interface PageSectionProps {
   readonly editor: Editor;
@@ -62,7 +68,12 @@ export function PageSection(props: PageSectionProps): JSX.Element {
           <SelectInput
             label="Page diagram format"
             value={props.page.kind}
-            options={PAGE_KIND_OPTIONS}
+            options={
+              isShapeEntryEnabled(props.page)
+                ? PAGE_KIND_OPTIONS
+                : CAD_KIND_OPTION
+            }
+            disabled={!isShapeEntryEnabled(props.page)}
             onCommit={(kind) =>
               props.editor.setPageKind(props.page.id, kind as PageKind)
             }

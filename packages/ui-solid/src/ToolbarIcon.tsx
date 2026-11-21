@@ -40,18 +40,26 @@ export const TOOLBAR_ICONS = {
   verticalBottom: "align-vertical-justify-end",
   distributeHorizontal: "align-horizontal-distribute-center",
   distributeVertical: "align-vertical-distribute-center",
+  cadSelect: "mouse-pointer-2",
+  cadSketch: "pencil",
+  cadLine: "slash",
+  cadRect: "rectangle-horizontal",
+  cadArc: "spline",
+  cadCircle: "circle",
+  cadExtrude: "box",
 } as const;
 
 export type ToolbarIconKey = keyof typeof TOOLBAR_ICONS;
 
 export function ToolbarIcon(props: {
   readonly name: ToolbarIconKey;
+  readonly class?: string;
 }): JSX.Element {
   return (
     <svg
       aria-hidden="true"
       {...{ focusable: "false" }}
-      class="nodetto-toolbar-icon"
+      class={props.class ?? "nodetto-toolbar-icon"}
       width="16"
       height="16"
       viewBox="0 0 24 24"

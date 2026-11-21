@@ -3,7 +3,11 @@
 
 import type { Box, Vec } from "@nodetto/core";
 import { findInsertionParent, planAttachToFrame } from "@nodetto/core";
-import type { BreadboardElementType, Element } from "@nodetto/ir";
+import {
+  type BreadboardElementType,
+  type Element,
+  isCadTypeName,
+} from "@nodetto/ir";
 import { Tool, type ToolKind, creationFor } from "../tools.ts";
 import type { CircuitTools } from "./circuit.ts";
 import type { InteractionContext } from "./context.ts";
@@ -26,7 +30,12 @@ export function createCreationTools(
 
   const placeShape = (point: Vec, tool: ToolKind): void => {
     const creation = creationFor(tool);
-    if (!creation || !editor.canCreateOn(editor.currentPageId, creation.type)) {
+    // CAD tools are handled by the CAD viewport's sketch and feature gestures.
+    if (
+      !creation ||
+      isCadTypeName(creation.type) ||
+      !editor.canCreateOn(editor.currentPageId, creation.type)
+    ) {
       return;
     }
     if (tool === Tool.PcbTrack || tool === Tool.PcbVia) {

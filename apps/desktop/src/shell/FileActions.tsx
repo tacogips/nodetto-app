@@ -13,6 +13,7 @@ export interface FileActionsProps {
   readonly file: SessionState;
   readonly onNew: () => void;
   readonly onNewFromTemplate: () => void;
+  readonly templateDisabled?: boolean;
   readonly onOpen: () => void;
   readonly onReload: () => void;
   readonly onExport: () => void;
@@ -56,7 +57,7 @@ export function FileActions(props: FileActionsProps): JSX.Element {
             <button
               type="button"
               class="app-file-button"
-              disabled={props.isCloud}
+              disabled={props.isCloud || props.templateDisabled}
               onClick={() => props.onNewFromTemplate()}
               aria-label="New from template"
               title="New from template"

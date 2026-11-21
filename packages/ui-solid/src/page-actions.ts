@@ -39,8 +39,22 @@ export function deletePageWithConfirm(
   return "deleted";
 }
 
-export function duplicatePageAction(editor: Editor, id: PageId): boolean {
-  return !editor.readOnly && editor.duplicatePage(id) !== null;
+function canDuplicatePage(editor: Editor, id: PageId, cadAllowed: boolean) {
+  return (
+    !editor.readOnly &&
+    (cadAllowed || editor.store.getPage(id)?.kind !== "cad3d")
+  );
+}
+
+export function duplicatePageAction(
+  editor: Editor,
+  id: PageId,
+  cadAllowed = true,
+): boolean {
+  return (
+    canDuplicatePage(editor, id, cadAllowed) &&
+    editor.duplicatePage(id) !== null
+  );
 }
 
 export function togglePagePresentation(editor: Editor, id: PageId): void {
@@ -55,7 +69,11 @@ export function togglePagePresentation(editor: Editor, id: PageId): void {
 export function pageMenuItems(
   editor: Editor,
   id: PageId,
-  options: { copyShapes: boolean; axis: "horizontal" | "vertical" },
+  options: {
+    copyShapes: boolean;
+    axis: "horizontal" | "vertical";
+    cadAllowed?: boolean;
+  },
 ): readonly PageMenuItem[] {
   const pages = editor.store.listPages();
   const canDelete = canDeletePage(editor);
@@ -65,7 +83,7 @@ export function pageMenuItems(
       key: "duplicate",
       label: "Duplicate",
       title: "Duplicate page and everything on it",
-      disabled: false,
+      disabled: !canDuplicatePage(editor, id, options.cadAllowed ?? true),
     },
     ...(options.copyShapes
       ? [

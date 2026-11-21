@@ -55,6 +55,12 @@ export const Tool = {
   BreadboardWire: "breadboard:wire",
   PcbTrack: "pcb:track",
   PcbVia: "pcb:via",
+  CadSketch: "cad:sketch",
+  CadLine: "cad:line",
+  CadRect: "cad:rect",
+  CadArc: "cad:arc",
+  CadCircle: "cad:circle",
+  CadExtrude: "cad:extrude",
 
   Select: "select",
   Hand: "hand",
@@ -539,6 +545,17 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.PcbTrack:
     case Tool.PcbVia:
       return PCB_CREATIONS[tool];
+    case Tool.CadSketch:
+      return { type: "cad.sketch" };
+    case Tool.CadLine:
+    case Tool.CadRect:
+      return { type: "cad.line" };
+    case Tool.CadArc:
+      return { type: "cad.arc" };
+    case Tool.CadCircle:
+      return { type: "cad.circle" };
+    case Tool.CadExtrude:
+      return { type: "cad.extrude" };
     case Tool.BpmnPool:
     case Tool.BpmnPoolCollapsed:
     case Tool.BpmnLane:
