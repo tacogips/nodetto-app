@@ -34,6 +34,8 @@ import {
   viewProjection,
   zoomAt,
 } from "./camera3d.ts";
+import { createExtrudeAuthoring } from "./extrude-authoring.ts";
+import { CAD_DRAG_THRESHOLD } from "./extrude-interaction.ts";
 import { type CadPick, pickBodies } from "./pick.ts";
 import { type CadRenderer, createWebgl2Renderer } from "./renderer.ts";
 import { handleCadSelectionKey } from "./selection-keys.ts";
@@ -97,7 +99,7 @@ export function CadViewport(props: CadViewportProps) {
   );
   const [size, setSize] = createSignal<ViewportSize>({ width: 0, height: 0 });
   let fitted = props.initialCamera !== undefined;
-  let sketchPointer: number | undefined;
+  let sketchPointer: { id: number; x: number; y: number } | undefined;
   let drag:
     | {
         readonly pointerId: number;
@@ -125,6 +127,18 @@ export function CadViewport(props: CadViewportProps) {
     changeCamera,
     size,
     renderer,
+  });
+  const extrude = createExtrudeAuthoring({
+    editor: props.editor,
+    pageId,
+    revision,
+    selection,
+    tool,
+    selectTool: () => props.onToolChange?.(Tool.Select),
+    focus: () => root.focus(),
+    camera,
+    changeCamera,
+    size,
   });
 
   function changeCamera(next: Camera3d): void {
@@ -324,6 +338,12 @@ export function CadViewport(props: CadViewportProps) {
   });
   createEffect(() => renderer()?.setGridVisible?.(props.showGrid !== false));
   createEffect(() => {
+    renderer()?.setOverlay(
+      extrude.lines() ?? sketch.previewLines(),
+      extrude.mesh(),
+    );
+  });
+  createEffect(() => {
     const view = renderer();
     const current = camera();
     const { width, height } = size();
@@ -334,7 +354,9 @@ export function CadViewport(props: CadViewportProps) {
     picked();
     revision();
     sketch.entityLines();
-    sketch.gesture();
+    sketch.previewLines();
+    extrude.lines();
+    extrude.mesh();
     if (!view || width <= 0 || height <= 0) return;
     const frame = window.requestAnimationFrame(() => {
       const scale = window.devicePixelRatio || 1;
@@ -358,13 +380,24 @@ export function CadViewport(props: CadViewportProps) {
     if (
       drag ||
       sketchPointer !== undefined ||
+      extrude.dragging() ||
       (event.button !== 0 && event.button !== 1)
     )
       return;
     const panning = event.button === 1 || event.shiftKey;
     const point = pointerPosition(event);
+    if (!panning && extrude.start(event.pointerId, point)) {
+      canvas.setPointerCapture?.(event.pointerId);
+      root.focus();
+      event.preventDefault();
+      return;
+    }
     if (sketch.drawing() && !panning) {
-      sketchPointer = event.pointerId;
+      sketchPointer = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
       canvas.setPointerCapture?.(event.pointerId);
       root.focus();
       event.preventDefault();
@@ -409,10 +442,14 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   function pointerMove(event: PointerEvent): void {
+    if (extrude.dragging()) {
+      extrude.move(event.pointerId, pointerPosition(event));
+      return;
+    }
     if (
       !drag &&
       sketch.drawing() &&
-      (sketchPointer === undefined || sketchPointer === event.pointerId)
+      (sketchPointer === undefined || sketchPointer.id === event.pointerId)
     ) {
       sketch.input("move", pointerPosition(event), event.altKey);
       return;
@@ -420,7 +457,8 @@ export function CadViewport(props: CadViewportProps) {
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (
       !drag.moved &&
-      Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 3
+      Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) <
+        CAD_DRAG_THRESHOLD
     )
       return;
     drag.moved = true;
@@ -434,11 +472,16 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   function endDrag(event: PointerEvent): void {
-    if (sketchPointer === event.pointerId) {
+    const commit = event.type === "pointerup";
+    if (extrude.end(event.pointerId, pointerPosition(event), commit)) return;
+    if (sketchPointer?.id === event.pointerId) {
+      const { x, y } = sketchPointer;
       sketchPointer = undefined;
-      if (event.type === "pointerup")
+      if (!commit) sketch.cancelPointer();
+      else if (
+        Math.hypot(event.clientX - x, event.clientY - y) >= CAD_DRAG_THRESHOLD
+      )
         sketch.input("up", pointerPosition(event), event.altKey);
-      else sketch.cancelPointer();
       return;
     }
     if (drag?.pointerId !== event.pointerId) return;
@@ -461,6 +504,7 @@ export function CadViewport(props: CadViewportProps) {
 
   function zoom(event: WheelEvent): void {
     event.preventDefault();
+    if (extrude.dragging()) return;
     const unit =
       event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size().height : 1;
     const delta = event.deltaY * unit;
@@ -471,6 +515,7 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   const status = () =>
+    extrude.status() ??
     sketch.status() ??
     (!props.engine
       ? "The CAD engine is unavailable."
@@ -487,7 +532,7 @@ export function CadViewport(props: CadViewportProps) {
       !event.ctrlKey &&
       !event.metaKey &&
       !event.altKey &&
-      sketch.cancel()
+      (extrude.cancel() || sketch.cancel())
     ) {
       event.preventDefault();
       event.stopPropagation();

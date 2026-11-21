@@ -69,6 +69,7 @@ for (const mode of ["light", "dark"] as const) {
   let lastCamera: Camera3d | undefined;
   let theme: CadTheme | undefined;
   let lineOverlay: Float32Array | null = null;
+  let meshOverlay: Parameters<CadRenderer["setOverlay"]>[1] = null;
   let gridOverlay: Float32Array | null = null;
   let highlight = new Float32Array();
   const renderer: CadRenderer = {
@@ -78,8 +79,9 @@ for (const mode of ["light", "dark"] as const) {
     },
     setBodies: () => {},
     setHighlight: () => {},
-    setOverlay: (lines) => {
+    setOverlay: (lines, mesh) => {
       lineOverlay = lines;
+      meshOverlay = mesh;
     },
     setSketchGrid: (lines) => {
       gridOverlay = lines;
@@ -204,6 +206,11 @@ for (const mode of ["light", "dark"] as const) {
       (gridOverlay as Float32Array).every((v, i) => i % 3 !== 2 || v === z),
     );
     const before = evaluations;
+    pointer("pointerdown", point([20.45, 20.45]));
+    pointer("pointerup", point([20.55, 20.55]));
+    assert.equal(entities(id).length, 0);
+    assert.equal(evaluations, before);
+    pressEscape();
     pointer("pointerdown", point([20, 20]));
     pointer("pointermove", point([32, 28]));
     assert.equal(entities(id).length, 0);
@@ -306,12 +313,106 @@ for (const mode of ["light", "dark"] as const) {
   assert.equal(tool(), Tool.Select);
   assert.equal(hasErrors(validateDocument(editor.getSnapshot())), false);
 
+  function chooseExtrude(sketch: string, op: "new" | "add") {
+    editor.selection.set([sketch]);
+    const before = evaluations;
+    setTool(Tool.CadExtrude);
+    const id = selectedId();
+    assert.equal(tool(), Tool.Select);
+    assert.equal(evaluations, before + 1);
+    assert.equal(editor.store.get(id)?.type, "cad.extrude");
+    assert.deepEqual(editor.store.get(id)?.semantic, {
+      sketch,
+      op,
+      distance: 10,
+      name: op === "new" ? "Extrude 1" : "Extrude 2",
+      ...(op === "add" ? { bodies: ["ex1"] } : {}),
+    });
+    return id;
+  }
+
+  const baseExtrude = chooseExtrude(base, "new");
+  const faceExtrude = chooseExtrude(face, "add");
+  await nextFrame();
+  const handle = lineOverlay as Float32Array | null;
+  assert.ok(handle);
+  const tail: Vec3 = [handle[0], handle[1], handle[2]];
+  const tip: Vec3 = [handle[3], handle[4], handle[5]];
+  assert.equal(tail[2], 5);
+  assert.equal(tip[2], 15);
+  const inward: Vec3 = [tail[0], tail[1], 2];
+  const beforeDrag = editor.getSnapshot();
+  const beforeEvaluation = evaluations;
+  pointer("pointerdown", tip);
+  pointer("pointermove", inward);
+  assert.equal(editor.getSnapshot(), beforeDrag);
+  assert.equal(evaluations, beforeEvaluation);
+  assert.match(viewport.textContent ?? "", /-3 mm/);
+  const preview = meshOverlay as Parameters<CadRenderer["setOverlay"]>[1];
+  assert.ok(
+    preview && preview.indices.length > 0 && preview.positions.includes(2),
+  );
+  pointer("pointerup", inward);
+  assert.equal(evaluations, beforeEvaluation + 1);
+  assert.equal(meshOverlay, null);
+  assert.deepEqual(editor.store.get(faceExtrude)?.semantic, {
+    sketch: face,
+    name: "Extrude 2",
+    distance: -3,
+    op: "cut",
+    bodies: ["ex1"],
+  });
+  assert.ok(editor.undo());
+  assert.deepEqual(editor.store.get(faceExtrude)?.semantic, {
+    sketch: face,
+    name: "Extrude 2",
+    distance: 10,
+    op: "add",
+    bodies: ["ex1"],
+  });
+  assert.ok(editor.redo());
+  assert.deepEqual(editor.store.get(faceExtrude)?.semantic, {
+    sketch: face,
+    name: "Extrude 2",
+    distance: -3,
+    op: "cut",
+    bodies: ["ex1"],
+  });
+  editor.selection.set([faceExtrude]);
+  const beforeCancel = editor.getSnapshot();
+  pointer("pointerdown", inward);
+  pointer("pointermove", tip);
+  assert.ok(meshOverlay);
+  pressEscape();
+  pointer("pointerup", tip);
+  assert.equal(meshOverlay, null);
+  assert.equal(editor.getSnapshot(), beforeCancel);
+  assert.equal(selectedId(), faceExtrude);
+  click(inward);
+  assert.equal(editor.getSnapshot(), beforeCancel);
+
+  editor.selection.set([baseExtrude]);
+  const baseHandle = lineOverlay as Float32Array | null;
+  assert.ok(baseHandle);
+  pointer("pointerdown", [baseHandle[3], baseHandle[4], baseHandle[5]]);
+  pointer("pointerup", [baseHandle[0], baseHandle[1], -2]);
+  assert.deepEqual(editor.store.get(baseExtrude)?.semantic, {
+    sketch: base,
+    name: "Extrude 1",
+    distance: -2,
+    op: "new",
+  });
+  assert.equal(hasErrors(validateDocument(editor.getSnapshot())), false);
+
   editor.setCurrentPage("free");
   const beforeFreeform = editor.getSnapshot();
   setTool(Tool.CadSketch);
   assert.equal(host.querySelector(".nodetto-cad-surface"), null);
   assert.equal(editor.getSnapshot(), beforeFreeform);
+  setTool(Tool.CadExtrude);
+  assert.equal(editor.getSnapshot(), beforeFreeform);
   dispose();
   host.remove();
   console.log(`sketch ok ${mode}`);
+  console.log(`extrude ok ${mode}`);
 }

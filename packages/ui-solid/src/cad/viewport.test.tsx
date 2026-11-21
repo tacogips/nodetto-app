@@ -18,7 +18,7 @@ test("CAD viewport mounts, evaluates, selects, and fails safely in light and dar
   expect(output).toContain("ok dark");
 });
 
-test("CAD sketch tools commit atomic base and face sketches in light and dark", () => {
+test("CAD sketch and extrude tools commit atomically in light and dark", () => {
   const result = Bun.spawnSync(
     [
       process.execPath,
@@ -34,4 +34,6 @@ test("CAD sketch tools commit atomic base and face sketches in light and dark", 
   expect(result.exitCode, output).toBe(0);
   expect(output).toContain("sketch ok light");
   expect(output).toContain("sketch ok dark");
+  expect(output).toContain("extrude ok light");
+  expect(output).toContain("extrude ok dark");
 });

@@ -1,12 +1,20 @@
 import { expect, test } from "bun:test";
 import {
+  type CadEvaluation,
+  type CadIds,
+  type KernelHandle,
   Store,
   applyCommands,
+  circleCommands,
   createCadMemo,
+  defaultExtrude,
+  Editor,
   evaluateCadPage,
+  extrudeCommands,
+  extrudeIntent,
+  rectangleCommands,
+  sketchCommands,
   tessellateCircle,
-  type CadEvaluation,
-  type KernelHandle,
 } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
 import type { CadXY, Document } from "@nodetto/ir";
@@ -20,15 +28,16 @@ import {
   rectangle,
   sketch,
 } from "../../core/src/cad/testing/documents.ts";
+import { extrudeFaceCases } from "../../core/src/cad/testing/extrude-faces.ts";
 import { createManifoldKernel } from "./index.ts";
 
 function roundTrip(document: Document): Document {
   return parseDocument(serializeDocument(document));
 }
 
-function onlyBody(result: CadEvaluation): KernelHandle {
+function onlyBody(result: CadEvaluation, id = "ex1"): KernelHandle {
   expect([...result.status.values()].filter(({ ok }) => !ok)).toEqual([]);
-  expect(result.bodies).toMatchObject([{ id: "ex1", reference: false }]);
+  expect(result.bodies).toMatchObject([{ id, reference: false }]);
   return result.bodies[0].handle;
 }
 
@@ -44,6 +53,162 @@ function circleArea(radius: number): number {
 
 function expectVolume(actual: number, expected: number): void {
   expect(Math.abs(actual / expected - 1)).toBeLessThan(1e-5);
+}
+
+function authoringIds(): CadIds {
+  let next = 0;
+  return {
+    next: () => `authored-${++next}`,
+    indexAfter: (index) => `${index ?? ""}a1`,
+  };
+}
+
+test("builders author a plate through a named face, then edit, undo and redo its holes", async () => {
+  const initial = plateWithHoles(0);
+  const editor = new Editor({ document: { ...initial, elements: [] } });
+  const page = CAD_TEST_PAGE.id;
+  const ids = authoringIds();
+  const get = (id: string) => {
+    const element = editor.store.get(id);
+    if (!element) throw new Error(`Missing authored element ${id}`);
+    return element;
+  };
+  const insert = (result: ReturnType<typeof extrudeCommands>) => {
+    expect(result.commands.length).toBe(1);
+    editor.apply(result.commands);
+    return get(result.id);
+  };
+  const outline = insert(sketchCommands(page, { base: "xy" }, "Outline", ids));
+  editor.apply(rectangleCommands(page, outline, [0, 0], [100, 60], ids));
+  const plate = insert(
+    extrudeCommands(
+      page,
+      outline,
+      {
+        ...defaultExtrude(editor.store.listElements(), outline.id),
+        name: "Plate",
+        distance: 5,
+      },
+      ids,
+    ),
+  );
+  const face = insert(
+    sketchCommands(
+      page,
+      { face: { feature: plate.id, role: "end" } },
+      "Holes",
+      ids,
+      plate.index,
+    ),
+  );
+  const first = circleCommands(page, face, [20, 30], 3, ids);
+  const second = circleCommands(page, face, [65, 30], 3, ids);
+  const circle = first[0];
+  if (circle?.type !== "createElement") throw new Error("Missing hole circle");
+  editor.apply([...first, ...second]);
+  const elements = editor.store.listElements();
+  insert(
+    extrudeCommands(
+      page,
+      face,
+      {
+        ...defaultExtrude(elements, face.id),
+        name: "Through holes",
+        distance: -5,
+        op: extrudeIntent(elements, face, -5),
+      },
+      ids,
+    ),
+  );
+
+  const kernel = await createManifoldKernel();
+  const memo = createCadMemo(kernel);
+  const volume = () =>
+    kernel.measure(
+      onlyBody(
+        evaluateCadPage(roundTrip(editor.getSnapshot()).elements, kernel, memo),
+        plate.id,
+      ),
+    ).volume;
+  const baseline = volume();
+  expectVolume(baseline, 30_000 - 10 * circleArea(3));
+  const saved = serializeDocument(editor.getSnapshot());
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: circle.element.id,
+      semantic: { sketch: face.id, c: [20, 30], r: 4 },
+    },
+  ]);
+  const edited = volume();
+  expectVolume(edited, 30_000 - 5 * (circleArea(4) + circleArea(3)));
+  expect(editor.undo()).toBe(true);
+  expect(serializeDocument(editor.getSnapshot())).toBe(saved);
+  expect(volume()).toBe(baseline);
+  expect(editor.redo()).toBe(true);
+  expect(volume()).toBe(edited);
+});
+
+for (const item of extrudeFaceCases()) {
+  test(`real kernel adds outwards and cuts inwards on the ${item.label}`, async () => {
+    const page = CAD_TEST_PAGE.id;
+    const store = new Store(
+      roundTrip({ ...plateWithHoles(0), elements: [...item.elements] }),
+    );
+    const ids = authoringIds();
+    const kernel = await createManifoldKernel();
+    const memo = createCadMemo(kernel);
+    const volume = () =>
+      kernel.measure(
+        onlyBody(evaluateCadPage(store.listElements(), kernel, memo)),
+      ).volume;
+    expectVolume(volume(), item.volume);
+    const face = sketchCommands(
+      page,
+      { face: item.face },
+      "Face sketch",
+      ids,
+      "a5",
+    );
+    applyCommands(store, face.commands);
+    const owner = store.get(face.id);
+    if (!owner) throw new Error("Missing face sketch");
+    const radius = item.label === "pocket floor" ? 3 : 0.75;
+    const area = circleArea(radius);
+    applyCommands(store, circleCommands(page, owner, item.centre, radius, ids));
+    const elements = store.listElements();
+    const params = defaultExtrude(elements, owner.id);
+    const { id, commands } = extrudeCommands(
+      page,
+      owner,
+      { ...params, name: "Face feature" },
+      ids,
+    );
+    expect(params).toEqual({
+      op: "add",
+      distance: 10 * item.sign,
+      bodies: ["ex1"],
+    });
+    applyCommands(store, commands);
+    expectVolume(volume() - item.volume, 10 * area);
+    const distance = -item.sign;
+    const op = extrudeIntent(elements, owner, distance);
+    expect(op).toBe("cut");
+    applyCommands(store, [
+      {
+        type: "updateSemantic",
+        id,
+        semantic: {
+          sketch: owner.id,
+          name: "Face feature",
+          bodies: params.bodies,
+          distance,
+          op,
+        },
+      },
+    ]);
+    expectVolume(item.volume - volume(), area);
+  });
 }
 
 test("a JSONL plate has six named holes and regenerates after edit and undo", async () => {

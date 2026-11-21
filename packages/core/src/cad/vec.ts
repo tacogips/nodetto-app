@@ -10,7 +10,7 @@ export function cross3(a: Vec3, b: Vec3): Vec3 {
 
 export const NM_PER_MM = 1_000_000;
 
-export function coordinate(points: readonly number[], index: number): number {
+export function coordinate(points: ArrayLike<number>, index: number): number {
   const value = points[index];
   if (value === undefined) throw new RangeError("Missing polygon coordinate");
   return value;

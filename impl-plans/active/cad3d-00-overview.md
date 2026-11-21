@@ -136,8 +136,8 @@ milestone that breaks it, not in M18.
 | M8 | accepted |
 | M19 | accepted |
 | M9 | accepted |
-| M10 | implemented |
-| M11 | pending |
+| M10 | accepted |
+| M11 | implemented |
 | M12 | pending |
 | M13 | pending |
 | M20 | pending |
@@ -447,6 +447,35 @@ Workspace check and lint passed. The Bun suite passed 4,329 tests with
 74 skipped. The Rust workspace passed 73 of 91 tests. The other 18 hit
 macOS replacement-file permissions under the worktree write restriction.
 Verification logs are under `tmp/cad3d/m10/`.
+
+M11 adds extrusion from a selected sketch. A base-plane sketch creates a
+new body. A face sketch starts with an outward boss on the face's body.
+The viewport handle previews a signed distance in 0.1 mm steps and
+commits one undoable edit on release. Dragging across the face switches
+between add and cut. Cancelled and unchanged drags preserve the document.
+
+M11 deviations: the viewport keeps extrude gesture state in a dedicated
+controller and shares the overlay and index helpers with sketch
+authoring. A face-on drawing view tilts when the tool needs a visible
+drag axis. The preview uses the history geometry resolver and caches
+loop triangulation for the drag. The renderer draws the translucent
+tool volume through the body so an inward cut is visible. The core
+intent helper accepts the current operation for base and unresolved
+planes. The shared 3 px drag threshold also fixes IR10-01. The light
+and dark DOM checks extend the existing canvas harness. The core and
+real-kernel tests share face cases, including an intersection-created
+face for DR1-07.
+
+All three milestone checks passed with 187, 4 and 3 tests respectively.
+Workspace check and lint passed, and the Bun suite passed 4,356 tests
+with 74 skipped. Chromium passed all ten production CSP smoke assertions
+and all eighteen assertions in the face extrusion probe. The probe
+used pointer input, the worker and WebGL2 in both canvas modes and
+confirmed a rendered cut preview, one committed edit, undo and redo.
+The Rust workspace passed 73 of 91 tests. The other 18 hit macOS
+replacement-file permissions under the worktree write restriction.
+Verification logs are under `tmp/cad3d/m11/`. The browser probe report
+and screenshots are under `tmp/cad3d/m11-gl/`.
 
 ## Completion
 

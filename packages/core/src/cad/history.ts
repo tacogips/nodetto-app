@@ -479,6 +479,21 @@ export function sketchFrameOf(
   return sketchFrameLookup(elements)(sketchId);
 }
 
+export function extrudeGeometryOf(
+  elements: readonly Element[],
+  semantic: CadExtrudeSemantic,
+): ExtrudeGeometry | Failure {
+  const { sketch } = semantic;
+  if (sketch === undefined) return cadFailure("cad.reference.missing");
+  const history = scanCadPage(elements);
+  const status = history.status.get(sketch);
+  if (status && !status.ok) return status;
+  const geometry = geometryFor(history, sketch);
+  return geometry
+    ? geometry.extrude(semantic)
+    : cadFailure("cad.reference.failed", sketch);
+}
+
 export function sketchFrameLookup(
   elements: readonly Element[],
 ): (sketchId: ElementId) => CadFrame | null {

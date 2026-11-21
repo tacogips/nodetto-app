@@ -7,6 +7,9 @@ import {
   arcCommands,
   type CadIds,
   circleCommands,
+  defaultExtrude,
+  extrudeCommands,
+  extrudeIntent,
   lineCommands,
   rectangleCommands,
   sketchCommands,
@@ -14,7 +17,8 @@ import {
 } from "./authoring.ts";
 import { baseFrame, faceFrame } from "./frames.ts";
 import { buildLoops } from "./loops.ts";
-import { CAD_TEST_PAGE, plateElements } from "./testing/documents.ts";
+import { CAD_TEST_PAGE, plateElements, sketch } from "./testing/documents.ts";
+import { extrudeFaceCases } from "./testing/extrude-faces.ts";
 import { faceName, parseFaceName } from "./tool-solid.ts";
 
 const page = CAD_TEST_PAGE.id;
@@ -144,6 +148,17 @@ test("every builder reaches the page content rule even for a non-CAD target", ()
     rectangleCommands(freeform, sketch, [0, 0], [1, 1], source),
     circleCommands(freeform, sketch, [0, 0], 1, source),
     arcCommands(freeform, sketch, [0, 0], [1, 1], [2, 0], source),
+    extrudeCommands(
+      freeform,
+      sketch,
+      {
+        op: "new",
+        distance: 10,
+        bodies: [],
+        name: "Wrong page",
+      },
+      source,
+    ).commands,
   ];
   for (const commands of batches) {
     expect(commands.length).toBeGreaterThan(0);
@@ -157,3 +172,78 @@ test("every builder reaches the page content rule even for a non-CAD target", ()
   }
   expect(store.listElements()).toEqual([]);
 });
+
+test("base extrudes default to a new body and preserve an explicit operation", () => {
+  const first = sketch("first", "a1");
+  const second = sketch("second", "a3", { base: "zx", offset: 5 });
+  const elements = [first, second];
+  for (const owner of elements) {
+    expect(defaultExtrude(elements, owner.id)).toEqual({
+      op: "new",
+      distance: 10,
+      bodies: [],
+    });
+    expect(extrudeIntent(elements, owner, -5, "intersect")).toBe("intersect");
+  }
+  expect(
+    defaultExtrude(
+      [sketch("detached", "a1", { face: { role: "end" } })],
+      "detached",
+    ),
+  ).toEqual({ op: "new", distance: 10, bodies: [] });
+  const store = new Store(document(elements, [CAD_TEST_PAGE]));
+  const { id, commands } = extrudeCommands(
+    page,
+    first,
+    { op: "new", distance: 10.1234567, bodies: [], name: "Bracket" },
+    ids("a2"),
+  );
+  applyCommands(store, commands);
+  expect(store.get(id)).toMatchObject({
+    index: "a2a1",
+    semantic: {
+      sketch: first.id,
+      distance: 10.123457,
+      op: "new",
+      name: "Bracket",
+    },
+  });
+  expect(hasErrors(validateDocument(store.getSnapshot()))).toBe(false);
+  for (const distance of [Number.NaN, Number.POSITIVE_INFINITY, 0, 10_001])
+    expect(
+      extrudeCommands(
+        page,
+        first,
+        { ...defaultExtrude(elements, first.id), name: "Bracket", distance },
+        ids(),
+      ).commands,
+    ).toEqual([]);
+});
+
+for (const item of extrudeFaceCases()) {
+  test(`default and drag intent follow the outward normal on the ${item.label}`, () => {
+    const owner = sketch("face", "a5", { face: item.face });
+    const elements = [...item.elements, owner];
+    const params = defaultExtrude(elements, owner.id);
+    expect(params).toEqual({
+      op: "add",
+      distance: 10 * item.sign,
+      bodies: ["ex1"],
+    });
+    expect(extrudeIntent(elements, owner, item.sign)).toBe("add");
+    expect(extrudeIntent(elements, owner, -item.sign)).toBe("cut");
+    const store = new Store(document(elements, [CAD_TEST_PAGE]));
+    const { id, commands } = extrudeCommands(
+      page,
+      owner,
+      { ...params, name: "Boss" },
+      ids("a1"),
+    );
+    applyCommands(store, commands);
+    expect(store.get(id)).toMatchObject({
+      index: "a5a1",
+      semantic: { ...params, sketch: owner.id, name: "Boss" },
+    });
+    expect(hasErrors(validateDocument(store.getSnapshot()))).toBe(false);
+  });
+}

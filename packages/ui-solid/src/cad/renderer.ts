@@ -337,9 +337,12 @@ export function createWebgl2Renderer(
         }
       }
       if (overlayMesh) {
+        // Show the tool volume even where an inward extrusion is inside the body.
+        gl.disable(gl.DEPTH_TEST);
         gl.depthMask(false);
-        color(faces, theme.highlight, 0.45);
+        color(faces, theme.highlight, 0.25);
         triangles(overlayMesh, 0, overlayMesh.count);
+        gl.enable(gl.DEPTH_TEST);
       }
       gl.disable(gl.POLYGON_OFFSET_FILL);
 
@@ -373,10 +376,11 @@ export function createWebgl2Renderer(
         segments(sketchHighlight);
       }
       if (overlayLines) {
+        gl.disable(gl.DEPTH_TEST);
         color(lines, theme.highlight);
         segments(overlayLines);
       }
-      if (drawingSketch) gl.enable(gl.DEPTH_TEST);
+      if (drawingSketch || overlayLines) gl.enable(gl.DEPTH_TEST);
       gl.depthMask(true);
       gl.bindVertexArray(null);
     },

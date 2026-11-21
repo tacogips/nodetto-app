@@ -15,6 +15,7 @@ export {
 export type * from "./kernel.ts";
 export { contentKey } from "./keys.ts";
 export * from "./loops.ts";
+export * from "./preview.ts";
 export * from "./tessellate.ts";
 export * from "./tool-solid.ts";
 export * from "./triangulate.ts";

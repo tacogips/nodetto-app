@@ -54,7 +54,7 @@ import {
 
 const EMPTY_LINES = new Float32Array();
 
-function sketchIds(elements: readonly Element[]): CadIds {
+export function cadAuthoringIds(elements: readonly Element[]): CadIds {
   const indexes = elements.map(({ index }) => index).sort();
   return {
     next: newElementId,
@@ -245,7 +245,7 @@ export function createSketchAuthoring(options: {
       pageId,
       plane,
       `Sketch ${number}`,
-      sketchIds(current),
+      cadAuthoringIds(current),
       after,
     );
     const command = commands[0];
@@ -266,7 +266,8 @@ export function createSketchAuthoring(options: {
     setGesture(
       isSketchTool(current) ? { tool: current, points: [] } : undefined,
     );
-    if (isSketchTool(current)) setNotice(undefined);
+    if (isSketchTool(current) || current === Tool.CadExtrude)
+      setNotice(undefined);
   });
   createEffect(() => {
     if (drawing()) options.focus();
@@ -324,14 +325,11 @@ export function createSketchAuthoring(options: {
         : null,
     );
   });
-  createEffect(() => {
+  const previewLines = createMemo(() => {
     const frame = activeFrame();
     const state = gesture();
     const preview = state && frame ? sketchPreview(state) : undefined;
-    renderer()?.setOverlay(
-      frame && preview ? sketchOverlaySegments(frame, [], preview) : null,
-      null,
-    );
+    return frame && preview ? sketchOverlaySegments(frame, [], preview) : null;
   });
 
   const profileNotice = createMemo(() => {
@@ -420,7 +418,7 @@ export function createSketchAuthoring(options: {
         result.commit,
         pageId,
         owner,
-        sketchIds(elements()),
+        cadAuthoringIds(elements()),
       );
       if (!commands.length) {
         setNotice("The points do not define a valid sketch entity.");
@@ -456,7 +454,7 @@ export function createSketchAuthoring(options: {
   return {
     drawing,
     entityLines,
-    gesture,
+    previewLines,
     sketchId,
     status,
     input,
