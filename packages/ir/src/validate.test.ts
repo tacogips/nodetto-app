@@ -90,6 +90,63 @@ function warningsOf(document: Document): ValidationIssue[] {
   );
 }
 
+test("reports page.contentKind for shapes on incompatible pages", () => {
+  const doc: Document = {
+    ...base(),
+    pages: [
+      { id: "freeform", name: "Overview", kind: "freeform" },
+      { id: "cad", name: "Part", kind: "cad3d" },
+    ],
+    elements: [
+      {
+        id: "line",
+        page: "freeform",
+        type: "cad.line",
+        index: "a0",
+        semantic: { a: [0, 0], b: [10, 0] },
+        visual: {},
+      },
+      {
+        id: "shape",
+        page: "cad",
+        type: "shape.geo",
+        index: "a1",
+        semantic: { kind: "rectangle" },
+        visual: {},
+      },
+    ],
+  };
+  expect(
+    errorsOf(doc)
+      .filter((issue) => issue.code === "page.contentKind")
+      .map((issue) => issue.path),
+  ).toEqual(["elements[0].page", "elements[1].page"]);
+  expect(
+    validateDocument(doc, { elementPages: new Set(["cad"]) })
+      .filter((issue) => issue.code === "page.contentKind")
+      .map((issue) => issue.path),
+  ).toEqual(["elements[1].page"]);
+});
+
+test("keeps unknown CAD types on CAD pages forward-compatible", () => {
+  const doc: Document = {
+    ...base(),
+    pages: [{ id: "cad", name: "Part", kind: "cad3d" }],
+    elements: [
+      {
+        id: "future",
+        page: "cad",
+        type: "cad.future",
+        index: "a0",
+        semantic: {},
+        visual: {},
+      },
+    ],
+  };
+  expect(errorsOf(doc)).toEqual([]);
+  expect(codes(warningsOf(doc))).toEqual(["type.unknown"]);
+});
+
 test("reserves Default as the implicit page token mode", () => {
   const doc = base();
   const pages = [{ ...doc.pages[0], tokenMode: "Default" }];

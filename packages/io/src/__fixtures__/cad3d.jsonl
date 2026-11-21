@@ -1,0 +1,12 @@
+{"kind":"document","schemaVersion":1,"id":"cad3d-fixture","title":"Plate with a mounting hole"}
+{"kind":"page","id":"part","name":"Plate","pageKind":"cad3d"}
+{"kind":"element","id":"arc-rim","page":"part","type":"cad.arc","index":"a3","semantic":{"sketch":"sketch-base","a":[40,0],"m":[50,10],"b":[40,20]}}
+{"kind":"element","id":"circle-bore","page":"part","type":"cad.circle","index":"a7","semantic":{"sketch":"sketch-top","c":[30,10],"r":2.125001}}
+{"kind":"element","id":"cut","page":"part","type":"cad.extrude","index":"a8","semantic":{"name":"Bore","sketch":"sketch-top","loops":["circle-bore"],"distance":-6,"op":"cut","bodies":["plate"]}}
+{"kind":"element","id":"line-bottom","page":"part","type":"cad.line","index":"a1","semantic":{"sketch":"sketch-base","a":[0,0],"b":[40,0]}}
+{"kind":"element","id":"line-left","page":"part","type":"cad.line","index":"a2","semantic":{"sketch":"sketch-base","a":[0,20],"b":[0,0]}}
+{"kind":"element","id":"line-top","page":"part","type":"cad.line","index":"a4","semantic":{"sketch":"sketch-base","a":[40,20],"b":[0,20]}}
+{"kind":"element","id":"plate","page":"part","type":"cad.extrude","index":"a5","semantic":{"name":"Plate","sketch":"sketch-base","distance":6,"op":"new"}}
+{"kind":"element","id":"sketch-base","page":"part","type":"cad.sketch","index":"a0","semantic":{"name":"Outline","plane":{"base":"xy"}}}
+{"kind":"element","id":"sketch-top","page":"part","type":"cad.sketch","index":"a6","semantic":{"name":"Mounting hole","plane":{"face":{"feature":"plate","role":"end"}}}}
+{"kind":"element","id":"token-tone","page":"part","type":"design.token","index":"a9","semantic":{"name":"Plate tone","kind":"color","value":"#537083"}}

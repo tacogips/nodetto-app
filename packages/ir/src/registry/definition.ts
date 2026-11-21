@@ -33,6 +33,8 @@ export interface ElementTypeDefinition {
    * reference (`detach`, e.g. a group losing one member).
    */
   readonly onReferenceDeleted: ReferencePolicy;
+  /** Preserve references to elements outside a copied fragment. */
+  readonly keepsExternalReferences?: boolean;
   validateSemantic(semantic: unknown, path: string): ValidationIssue[];
   /** Element ids this payload points at, in declaration order. */
   references(semantic: unknown): readonly ElementReference[];

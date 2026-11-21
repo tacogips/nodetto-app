@@ -39,6 +39,7 @@ const GOLDEN = [
   "ui-icon",
   "slide-settings",
   "document-pages",
+  "cad3d",
 ] as const;
 
 describe("golden files", () => {

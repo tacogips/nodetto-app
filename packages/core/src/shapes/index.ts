@@ -43,6 +43,7 @@ import {
 
 import { umlComponentShapeUtils } from "./umlComponent.ts";
 import { breadboardShapeUtils } from "./breadboard.ts";
+import { cadShapeUtils } from "./cad.ts";
 import { pcbShapeUtils } from "./pcb.ts";
 
 export function createDefaultRegistry(): ShapeUtilRegistry {
@@ -152,6 +153,7 @@ export function createDefaultRegistry(): ShapeUtilRegistry {
   for (const util of bpmnNodeShapeUtils) registry.register(util);
   for (const util of breadboardShapeUtils) registry.register(util);
   for (const util of pcbShapeUtils) registry.register(util);
+  for (const util of cadShapeUtils) registry.register(util);
   return registry
     .register(bpmnSequenceFlowShapeUtil)
     .register(bpmnMessageFlowShapeUtil)

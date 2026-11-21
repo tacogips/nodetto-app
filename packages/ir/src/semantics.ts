@@ -7,6 +7,13 @@ import type { UiIconSemantic } from "./registry/icons.ts";
 import type { UiControlSemantic } from "./ui-controls.ts";
 import type { DatabaseObjectSemantic } from "./database-objects.ts";
 import type {
+  CadArcSemantic,
+  CadCircleSemantic,
+  CadExtrudeSemantic,
+  CadLineSemantic,
+  CadSketchSemantic,
+} from "./cad.ts";
+import type {
   PcbBoardSemantic,
   PcbFootprintSemantic,
   PcbGraphicSemantic,
@@ -178,6 +185,11 @@ export interface SemanticByType {
   "pcb.via": PcbViaSemantic;
   "pcb.zone": PcbZoneSemantic;
   "pcb.graphic": PcbGraphicSemantic;
+  "cad.sketch": CadSketchSemantic;
+  "cad.line": CadLineSemantic;
+  "cad.arc": CadArcSemantic;
+  "cad.circle": CadCircleSemantic;
+  "cad.extrude": CadExtrudeSemantic;
 }
 
 export type ElementType = keyof SemanticByType;

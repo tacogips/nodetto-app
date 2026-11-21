@@ -33,6 +33,7 @@ import {
   VISUAL_KEY_ORDER,
   VISUAL_STYLE_KEY_ORDER,
 } from "./keyOrder.ts";
+import { pageAcceptsElementType } from "./page-content.ts";
 import { getElementTypeDefinition } from "./registry.ts";
 import {
   BLEND_MODES,
@@ -831,7 +832,7 @@ function validateElement(
   out: ValidationIssue[],
   raw: unknown,
   path: string,
-  pageIds: ReadonlySet<string>,
+  pageKinds: ReadonlyMap<string, unknown>,
 ): void {
   if (!checkObject(out, raw, path)) {
     return;
@@ -841,7 +842,7 @@ function validateElement(
 
   const page = raw["page"];
   if (checkString(out, page, `${path}.page`) && typeof page === "string") {
-    if (!pageIds.has(page)) {
+    if (!pageKinds.has(page)) {
       out.push(
         error(
           "reference.missingPage",
@@ -855,6 +856,17 @@ function validateElement(
   const type = raw["type"];
   if (!checkString(out, type, `${path}.type`) || typeof type !== "string") {
     return;
+  }
+
+  const kind = typeof page === "string" ? pageKinds.get(page) : undefined;
+  if (typeof kind === "string" && !pageAcceptsElementType(kind, type)) {
+    out.push(
+      error(
+        "page.contentKind",
+        `${path}.page`,
+        `element type "${type}" is not allowed on a "${kind}" page`,
+      ),
+    );
   }
 
   // Every element carries an object payload, whether or not this build knows
@@ -968,7 +980,7 @@ export function validateDocument(
     "range.slideSize",
   );
 
-  const pageIds = new Set<string>();
+  const pageKinds = new Map<string, unknown>();
   const pages = asArray(root["pages"]);
   if (pages) {
     for (const [i, page] of pages.entries()) {
@@ -978,12 +990,11 @@ export function validateDocument(
       }
       const id = page["id"];
       if (checkString(out, id, `${path}.id`) && typeof id === "string") {
-        if (pageIds.has(id)) {
+        if (pageKinds.has(id)) {
           out.push(
             error("id.duplicate", `${path}.id`, `duplicate page id "${id}"`),
           );
-        }
-        pageIds.add(id);
+        } else pageKinds.set(id, page["kind"]);
       }
       checkString(out, page["name"], `${path}.name`, { allowEmpty: true });
       checkEnum(out, page["kind"], `${path}.kind`, PAGE_KINDS);
@@ -1086,7 +1097,7 @@ export function validateDocument(
       typeof page !== "string" ||
       options.elementPages.has(page)
     ) {
-      validateElement(out, element, path, pageIds);
+      validateElement(out, element, path, pageKinds);
     }
     const semantic = readField(element, "semantic");
     const flowName = readField(semantic, "prototypeFlowName");

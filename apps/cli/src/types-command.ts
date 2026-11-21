@@ -3,6 +3,7 @@
 
 import { Editor } from "@nodetto/core";
 import {
+  CAD_ELEMENT_TYPES,
   getElementTypeDefinition,
   isKnownElementType,
   type KeyOrder,
@@ -40,7 +41,7 @@ const GENERAL = [
   "image.raster",
 ];
 
-/** Types typically drawn on each page kind (a guide, not an enforced rule). */
+/** Types typically drawn on each page kind. */
 const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
   freeform: GENERAL,
   architecture: [...GENERAL, "usecase.node", "usecase.relationship"],
@@ -116,6 +117,7 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "pcb.zone",
     "pcb.graphic",
   ],
+  cad3d: CAD_ELEMENT_TYPES,
 };
 
 function isPageKind(value: string): value is PageKind {

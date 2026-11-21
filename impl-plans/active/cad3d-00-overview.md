@@ -1,0 +1,160 @@
+# cad3d: 3D CAD pages, overview
+
+- Design: `design-docs/specs/design-cad3d.md` (revision 3)
+- Evidence root: `tmp/cad3d/<planId>/` (ignored by git)
+- Base commit: `0a35708` on `feat/cad3d-pages`
+- Spike evidence (not committed): `tmp/cad3d-spike/spike.ts`, `spike.log`,
+  `spike2.ts`, `spike2.log`
+
+## Goal
+
+Ship the first slice of design section 2.2: the `cad3d` page kind with its
+content rule at every entry point, sketch and extrude modelling with a
+Manifold kernel behind a port, a themed 3D viewport, the NMESH and STL
+codecs, a PCB board reference body, CLI support and format verification.
+
+## Non-goals
+
+Everything in design sections 2.3 and 2.4, and all work in the private
+nodetto-cloud repository (design section 15).
+
+## Milestones
+
+One implementer session each. Ids are stable across plan revisions, so the
+milestones split off in revisions 2 and 3 carry the ids M19 to M22; the
+order of work follows `dependsOn`, not the id.
+
+| Id | Plan | Scope | dependsOn |
+| --- | --- | --- | --- |
+| M1 | cad3d-01-ir-page-kind | Page kind, sketch and extrude types, lenient validators, rule R in IR validation, shape utils, golden fixture | - |
+| M2 | cad3d-02-core-enforcement | Rules R and K in commands and page operations, clipboard semantics, delete and detach tests | M1 |
+| M22 | cad3d-22-emitter-guards | `canCreateOn` guards for reachable emitters, classified emitter list test | M2 |
+| M3 | cad3d-03-core-sketch-geometry | Frames, outward sign, loops, tessellation, triangulation (pure TS) | M1 |
+| M4 | cad3d-04-core-evaluate | History order, statuses, tool solids, kernel port, memoised driver | M3 |
+| M5 | cad3d-05-kernel-manifold | `packages/cad-kernel`, Manifold adapter, licence inventory, headless vertical slice | M4 |
+| M6 | cad3d-06-ui-mode-workspace | Mode `cad3d`, workspace, palette exclusivity, tools, kind lock, add CAD page, cloud guard | M2 |
+| M7 | cad3d-07-engine-worker | Display buffers, engine protocol, worker host, desktop wiring, CSP and devCsp | M5 |
+| M8 | cad3d-08-viewport | Viewport pure modules: camera, picking, canvas-mode theme | M7 |
+| M19 | cad3d-19-viewport-renderer | WebGL2 renderer, viewport mount, browser check | M6, M8 |
+| M9 | cad3d-09-feature-list-inspector | Layer names and rename, feature list, inspector parameter edits | M19 |
+| M10 | cad3d-10-sketch-tools | Sketch authoring commands and interaction | M9 |
+| M11 | cad3d-11-extrude-tool | Extrude tool, preview, sketch on face | M10 |
+| M12 | cad3d-12-nmesh-stl | NMESH and STL modules with measurements | - |
+| M13 | cad3d-13-mesh-import-export | `cad.mesh` type, evaluation, worker decode | M7, M12 |
+| M20 | cad3d-20-mesh-ui | STL import and export in the UI | M13, M10, M19 |
+| M14 | cad3d-14-pcb-reference | `cad.pcb` type, board outline, evaluation, engine input | M7, M2 |
+| M21 | cad3d-21-pcb-ui | PCB board tool, authoring command, inspector fields | M14, M10 |
+| M15 | cad3d-15-collab | Non-destructive content repair, concurrent edit tests | M2, M4 |
+| M16 | cad3d-16-cli | `cad check`, exclusions, enforcement and native tests | M4, M2 |
+| M17 | cad3d-17-format-verification | Determinism, churn, size, speed, three-way and git merge | M16 |
+| M18 | cad3d-18-export-docs-final | Wireframe export, docs, real-host checks, full verification | M11, M20, M21, M22, M15, M17 |
+
+Shared files: `packages/ir/src/cad.ts`, `packages/ir/src/registry/cad.ts`,
+`packages/ir/src/registry.test.ts`, `packages/io/src/__fixtures__/cad3d.jsonl`
+and `packages/core/src/cad/evaluate.ts` are edited by M13 and M14;
+`packages/core/src/cad/authoring.ts` by M10, M11 and M21;
+`packages/core/src/cad/detach.test.ts` and `clipboard.test.ts` are created
+by M2 and extended by M14. Milestones
+that share a file run one after the other in the table order above.
+
+## Rules for every implementer
+
+- Read the design sections named in the plan first. The design wins over a
+  plan when they disagree; report the disagreement in the commit message.
+- English only, no emojis, strict TypeScript. `packages/core` and
+  `packages/ir` never import `manifold-3d`, `@nodetto/cad-kernel`, DOM or
+  Worker APIs.
+- Strict index gate (the private sync Worker compiles `packages/core` and
+  `packages/ir` with `noUncheckedIndexedAccess`; at the base commit the
+  flag reports no error in any non-test file of those two packages). Every
+  milestone that touches either package runs this gate over both whole
+  packages, not only over its own files:
+  `mkdir -p tmp/cad3d/<m>; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/cad3d/<m>/strict.log 2>&1; ! grep -E "^packages/(core|ir)/src/" tmp/cad3d/<m>/strict.log | grep -vqE "\.test\.tsx?\("`
+  It fails when any non-test file under `packages/core/src` or
+  `packages/ir/src` has an error. Each plan embeds it in a command that also
+  runs a test.
+- Code that the CLI runs (`packages/ir`, `packages/core`, `packages/io`,
+  `apps/cli`) follows the Boa rules: no `split` with a regex on whole
+  documents, no per-point destructuring or allocation in hot loops, no
+  recursion deeper than 64 frames.
+- Deterministic geometry under `packages/core/src/cad`: coordinates are
+  computed with `+ - * /` and `Math.sqrt` only. The only `Math` members
+  allowed there are `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`,
+  `trunc` and `sign`; the `**` operator is forbidden. A test enforces the
+  allow-list (M3).
+- Third-party projects are references only. Write own code and own
+  fixtures with neutral names (Plate, Bracket, Holes). Never copy code,
+  files or test data from other projects or from user material.
+- Pre-authorised test edits are named in each plan with the exact permitted
+  change. No other existing assertion is weakened and no existing deadline
+  is relaxed; a new deadline that fails is fixed in code.
+- Every verification command must exit 0 and runs at least one test.
+- One local commit per milestone, no attribution lines, never push, never
+  rewrite history. Cargo runs with `CARGO_TERM_QUIET=true`.
+
+## Tests that enumerate every element type or page kind
+
+Found by grepping tests for `ELEMENT_TYPES`, `PAGE_KINDS`, `PAGE_MODES` and
+`WORKSPACES` at the base commit. Each is run by the milestone that can break
+it:
+
+| Test | Effect of this work | Milestone and permitted change |
+| --- | --- | --- |
+| `packages/ir/src/registry.test.ts:33` exact type list | new types | M1, M13, M14: append the new types |
+| `packages/io/src/jsonl/golden.test.ts:90` every type has a fixture | new types | M1, M13, M14: add `cad3d` to `GOLDEN`, extend the fixture |
+| `apps/cli/src/edit/label-field.test.ts:34-52` creates every type on a default page | rule R rejects `cad.*` on a freeform page | M1 runs it unchanged (valid defaults from the CAD shape utils); M2 may change the loop so that for a type with `isCadTypeName(type)` the editor first creates and selects a page of kind `cad3d`; nothing else |
+| `packages/ui-solid/src/canvas/canvas-background.test.ts:28` loops `PAGE_KINDS` | none (`cad3d` follows the diagram setting) | M1 and M6 run it unchanged |
+| `packages/ui-solid/src/workspaces.test.ts` loops `WORKSPACES` | new workspace | M6 runs it; no assertion change expected |
+| `apps/desktop/src/page-workspace.test.ts` dedicated mappings | new mapping | M6: extend the two mapping tests |
+| `apps/cli/src/arrange-modes.test.ts:130`, `apps/cli/src/cli-wiring.test.ts:147-180` exit-code lists | new excluded kind | M16: append `cad3d` |
+| Tests that only read `ELEMENT_TYPES` to filter one family (`breadboard`, `pcb`, `bpmn` tests in `packages/core`, `packages/ir`, `packages/collab`, `packages/ui-solid`) | none | run by `bun test` in M1 verification |
+
+M1 and M2 additionally run the whole `bun test` once (recorded in
+`tmp/cad3d/<m>/full.log`) so an unlisted enumeration test is found in the
+milestone that breaks it, not in M18.
+
+## Final verification (M18)
+
+1. `mise run verify`
+2. `mise run test-cli` (native parity not skipped)
+3. The strict index gate, the bundle check, the browser check and the
+   WKWebView check
+   (design section 14)
+
+## Progress
+
+| Milestone | Status |
+| --- | --- |
+| M1 | implemented |
+| M2 | pending |
+| M22 | pending |
+| M3 | pending |
+| M4 | pending |
+| M5 | pending |
+| M6 | pending |
+| M7 | pending |
+| M8 | pending |
+| M19 | pending |
+| M9 | pending |
+| M10 | pending |
+| M11 | pending |
+| M12 | pending |
+| M13 | pending |
+| M20 | pending |
+| M14 | pending |
+| M21 | pending |
+| M15 | pending |
+| M16 | pending |
+| M17 | pending |
+| M18 | pending |
+
+M1 added the CAD IR and document content rule, registered shape defaults,
+advertised CAD types through the CLI, and added the canonical CAD fixture.
+Implementation followed the milestone plan without changes to its scope.
+Verification logs are under `tmp/cad3d/m1/`.
+
+## Completion
+
+All twenty-two milestones accepted by the adversarial implementation
+review, the plan files moved to `impl-plans/completed/`, and the cloud
+follow-up of design section 15 handed over as a list.

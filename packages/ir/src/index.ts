@@ -447,3 +447,21 @@ export {
   readSlideSettings,
 } from "./registry/presentation-slide.ts";
 export { ANIMATION_LIMITS, validateElementAnimation } from "./validate.ts";
+export {
+  CAD_ELEMENT_TYPES,
+  CAD_OPERATIONS,
+  CAD_PAGE_KIND,
+  type CadArcSemantic,
+  type CadCircleSemantic,
+  type CadElementType,
+  type CadExtrudeSemantic,
+  type CadFaceRef,
+  type CadLineSemantic,
+  type CadPlane,
+  type CadSketchSemantic,
+  type CadXY,
+  isCadElementType,
+  isCadTypeName,
+  isOnCadGrid,
+} from "./cad.ts";
+export { pageAcceptsElementType } from "./page-content.ts";

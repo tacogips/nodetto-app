@@ -60,6 +60,7 @@ import {
 import { PRESENTATION_SLIDE } from "./registry/presentation-slide.ts";
 import { BREADBOARD_DEFINITIONS } from "./registry/breadboard.ts";
 import { PCB_DEFINITIONS } from "./registry/pcb.ts";
+import { CAD_DEFINITIONS } from "./registry/cad.ts";
 import {
   DESIGN_GUIDE,
   DESIGN_TOKEN,
@@ -78,6 +79,7 @@ export type {
 const DEFINITIONS: readonly ElementTypeDefinition[] = [
   ...BREADBOARD_DEFINITIONS,
   ...PCB_DEFINITIONS,
+  ...CAD_DEFINITIONS,
   DESIGN_GUIDE,
   PRESENTATION_SLIDE,
   DESIGN_TOKEN,

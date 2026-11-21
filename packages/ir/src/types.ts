@@ -5,6 +5,7 @@
 
 import type { PageFlow } from "./semantics/document.ts";
 import type { AccessibilityMetadata } from "./accessibility.ts";
+import { CAD_PAGE_KIND } from "./cad.ts";
 
 /** Identifier of a {@link Document}. ULIDs in practice; any non-empty string parses. */
 export type DocId = string;
@@ -20,8 +21,8 @@ export type ElementId = string;
 export type FractionalIndex = string;
 
 /**
- * A page kind selects the default tool palette; it never restricts which
- * element types may live on the page.
+ * A page kind selects the default tool palette. CAD shapes are exclusive
+ * to CAD pages, which accept only CAD shapes and shared resources.
  */
 export const PAGE_KINDS = [
   "freeform",
@@ -34,14 +35,15 @@ export const PAGE_KINDS = [
   "bpmn",
   "breadboard",
   "pcb",
+  CAD_PAGE_KIND,
 ] as const;
 
 export type PageKind = (typeof PAGE_KINDS)[number];
 
 /**
  * An editing mode chooses the tool palette shown while a page is open. A page
- * remembers its own mode, so switching pages switches the palette too. Like a
- * page kind, it never restricts which element types may live on the page.
+ * remembers its own mode, so switching pages switches the palette too.
+ * Editing modes do not restrict which element types may live on the page.
  */
 export const PAGE_MODES = [
   "flow",

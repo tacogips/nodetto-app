@@ -86,6 +86,11 @@ describe("registry contents", () => {
         "pcb.via",
         "pcb.zone",
         "pcb.graphic",
+        "cad.sketch",
+        "cad.line",
+        "cad.arc",
+        "cad.circle",
+        "cad.extrude",
       ].sort(),
     );
   });
