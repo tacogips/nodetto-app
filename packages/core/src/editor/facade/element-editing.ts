@@ -1,10 +1,11 @@
-import type {
-  ConnectorPorts,
-  ElementId,
-  PageId,
-  TextMark,
-  TextMarkKind,
-  TextNoteSemantic,
+import {
+  type ConnectorPorts,
+  type ElementId,
+  pageAcceptsElementType,
+  type PageId,
+  type TextMark,
+  type TextMarkKind,
+  type TextNoteSemantic,
 } from "@nodetto/ir";
 import {
   editableFieldOf,
@@ -38,7 +39,7 @@ export class ElementEditing extends EditorCore {
   /**
    * Connect two elements with an `edge.generic`. Returns `null` rather than
    * throwing for the cases a drag gesture routinely produces: a self
-   * connection, or an endpoint that is no longer there.
+   * connection, a missing endpoint, or a page that disallows edges.
    */
   connect(
     from: ElementId,
@@ -50,6 +51,8 @@ export class ElementEditing extends EditorCore {
     if (from === to || !this.store.has(from) || !this.store.has(to)) {
       return null;
     }
+    const kind = this.store.getPage(page)?.kind;
+    if (kind && !pageAcceptsElementType(kind, "edge.generic")) return null;
     return this.createElement(
       "edge.generic",
       {
@@ -59,9 +62,7 @@ export class ElementEditing extends EditorCore {
           from,
           to,
           arrowheads: { end: "arrow" },
-          ...(this.store.getPage(page)?.kind === "flowchart"
-            ? { routing: "orthogonal" }
-            : {}),
+          ...(kind === "flowchart" ? { routing: "orthogonal" } : {}),
         },
       },
       applyOptions,

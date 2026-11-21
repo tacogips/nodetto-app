@@ -5,7 +5,7 @@
 // paths (`from.table`, `memberIds[2]`). Everything that has to *edit* those
 // paths lives here: the delete expansion rewrites them to drop a reference,
 // paste rewrites them to point at a copy, and a copied fragment is trimmed
-// until every reference it still carries lands inside the fragment itself.
+// by resolving outside references according to the registry.
 
 import {
   type Element,
@@ -189,7 +189,11 @@ export function remapReferences(
 
 function detachOutside(element: Element, ids: ReadonlySet<ElementId>): Element {
   const definition = getElementTypeDefinition(element.type);
-  if (!definition || definition.onReferenceDeleted === "cascade") {
+  if (
+    !definition ||
+    definition.keepsExternalReferences ||
+    definition.onReferenceDeleted === "cascade"
+  ) {
     return element;
   }
   let semantic = element.semantic;
@@ -206,7 +210,7 @@ function detachOutside(element: Element, ids: ReadonlySet<ElementId>): Element {
 /** Whether `element` can stand on its own given the surviving `ids`. */
 function survives(element: Element, ids: ReadonlySet<ElementId>): boolean {
   const definition = getElementTypeDefinition(element.type);
-  if (!definition) {
+  if (!definition || definition.keepsExternalReferences) {
     return true;
   }
   const dangling = definition
@@ -222,14 +226,15 @@ function survives(element: Element, ids: ReadonlySet<ElementId>): boolean {
 }
 
 /**
- * The largest sub-fragment of `elements` that references nothing outside
- * itself, in input order.
+ * The largest sub-fragment of `elements` that keeps only permitted outside
+ * references, in input order.
  *
  * Same policy as a delete, run the other way round: a cascade-policy element
  * whose target was not copied dies with it (a relation without both tables),
  * a detach-policy one loses the reference and stays. Removals feed back into
  * the surviving set until it stops shrinking, so a group whose last member
- * was left behind goes too.
+ * was left behind goes too. Definitions may opt into keeping outside
+ * references and resolving them at insertion.
  */
 export function selfContained(elements: readonly Element[]): Element[] {
   const ids = new Set(elements.map((element) => element.id));

@@ -125,8 +125,8 @@ milestone that breaks it, not in M18.
 
 | Milestone | Status |
 | --- | --- |
-| M1 | implemented |
-| M2 | pending |
+| M1 | accepted |
+| M2 | implemented |
 | M22 | pending |
 | M3 | pending |
 | M4 | pending |
@@ -152,6 +152,24 @@ M1 added the CAD IR and document content rule, registered shape defaults,
 advertised CAD types through the CLI, and added the canonical CAD fixture.
 Implementation followed the milestone plan without changes to its scope.
 Verification logs are under `tmp/cad3d/m1/`.
+
+M2 enforced rules R and K in the command layer, filtered incompatible
+clipboard copies, preserved CAD references, and covered page operations and
+delete-detach round trips. The accepted design and milestone plans are
+included in the M2 commit, resolving IR1-02.
+
+M2 deviations: group, frame, generic connection, and component placement
+can reach command creation on a CAD page, so those paths check rule R before
+emitting a command. Boolean grouping shares the group check. A filtered
+paste that inserts nothing preserves selection and paste offset. The editor
+facade treats restoration of a mislabeled CAD page as a repair and skips
+the undo entry because rule K forbids undoing that repair. The command
+layer applies the same checks to inverse commands.
+
+All four M2 checks and the repository TypeScript lint passed. The
+supplemental `mise run verify` stopped at `cargo check` because mise
+could not resolve its Cargo shim. Full Rust verification remains in M18.
+Logs are under `tmp/cad3d/m2/`.
 
 ## Completion
 

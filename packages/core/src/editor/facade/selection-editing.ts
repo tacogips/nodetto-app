@@ -94,9 +94,10 @@ export class SelectionEditing extends ElementEditing {
     if (payload === null || payload.elements.length === 0) {
       return [];
     }
-    this.clipboard.pasteGeneration += 1;
-    const step = PASTE_OFFSET * this.clipboard.pasteGeneration;
-    return this.insertCopies(payload, { x: step, y: step }, applyOptions);
+    const step = PASTE_OFFSET * (this.clipboard.pasteGeneration + 1);
+    const ids = this.insertCopies(payload, { x: step, y: step }, applyOptions);
+    if (ids.length) this.clipboard.pasteGeneration += 1;
+    return ids;
   }
 
   /**

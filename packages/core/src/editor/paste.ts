@@ -2,7 +2,13 @@
 // commands a copy needs to fit in — fresh breadboard references, and (for a
 // duplicate) membership in the frames and groups its originals belong to.
 
-import type { ElementId, FrameSemantic } from "@nodetto/ir";
+import {
+  CAD_PAGE_KIND,
+  type ElementId,
+  type FrameSemantic,
+  isPlainObject,
+  pageAcceptsElementType,
+} from "@nodetto/ir";
 import { type ClipboardPayload, planPaste } from "../clipboard.ts";
 import type { Command } from "../commands.ts";
 import type { EditorCore } from "./facade/core.ts";
@@ -33,8 +39,8 @@ export function topLevelAmong(
 
 /**
  * The commands that paste `payload` onto the current page at `offset`, and
- * the ids they create. `null` when a duplicate would have to join a locked
- * frame, in which case nothing is inserted.
+ * the ids they create. `null` when nothing can be inserted or a duplicate
+ * would have to join a locked frame.
  */
 export function planInsertCopies(
   editor: EditorCore,
@@ -45,14 +51,34 @@ export function planInsertCopies(
 ): { readonly commands: Command[]; readonly ids: readonly ElementId[] } | null {
   const store = editor.store;
   const pageId = editor.currentPageId;
-  const plan = planPaste(payload, {
-    page: pageId,
-    idSource,
-    nextIndex: () => editor.nextIndex(),
-    offset,
-  });
+  const page = store.getPage(pageId);
+  if (!page) return null;
+  let elements = payload.elements.filter(({ type }) =>
+    pageAcceptsElementType(page.kind, type),
+  );
+  if (page.kind === CAD_PAGE_KIND) {
+    const copiesById = new Map(
+      elements.map((element) => [element.id, element]),
+    );
+    elements = elements.filter(({ type, semantic }) => {
+      if (type !== "cad.line" && type !== "cad.arc" && type !== "cad.circle")
+        return true;
+      const sketchId = isPlainObject(semantic) ? semantic["sketch"] : undefined;
+      if (typeof sketchId !== "string") return false;
+      // planPaste remaps copied ids onto this page and leaves other ids alone.
+      const copy = copiesById.get(sketchId);
+      if (copy) return copy.type === "cad.sketch";
+      const sketch = store.get(sketchId);
+      return sketch?.type === "cad.sketch" && sketch.page === pageId;
+    });
+  }
+  const plan = planPaste(
+    { elements },
+    { page: pageId, idSource, nextIndex: () => editor.nextIndex(), offset },
+  );
+  if (!plan.ids.length) return null;
   const annotation: Command[] =
-    store.getPage(pageId)?.kind === "breadboard"
+    page.kind === "breadboard"
       ? planPastedBreadboardReferences(store, pageId, plan.commands)
       : [];
   const membership: Command[] = [];

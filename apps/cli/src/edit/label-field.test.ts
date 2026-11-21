@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Editor } from "@nodetto/core";
-import { ELEMENT_TYPES, isPlainObject } from "@nodetto/ir";
+import { ELEMENT_TYPES, isCadTypeName, isPlainObject } from "@nodetto/ir";
 import { labelField } from "./label-field.ts";
 import { Batch } from "./batch.ts";
 
@@ -48,6 +48,7 @@ test("all registered types accept their mapped label or report no label", () => 
       else if (isPlainObject(semantic[key]) && semantic[key].table === "")
         semantic[key] = { ...semantic[key], table: "target" };
     }
+    if (isCadTypeName(type)) editor.createPage({ kind: "cad3d" });
     const id = editor.createElement(type, { semantic });
     const element = editor.store.get(id)!;
     const batch = new Batch(editor);

@@ -7,8 +7,8 @@ import {
 //
 // A copied fragment is a detached snapshot: structurally cloned, so nothing
 // the user does to the document afterwards can reach into it, and trimmed by
-// `selfContained` so it never carries a reference to an element that was
-// left behind. Pasting it is a pure function of the fragment plus an id
+// `selfContained` according to each type's outside-reference policy.
+// Pasting it is a pure function of the fragment plus an id
 // source, an index source and an offset — the editor supplies those three
 // and applies the resulting commands as one batch.
 //
@@ -38,8 +38,8 @@ export interface ClipboardPayload {
 }
 
 /**
- * Snapshot `ids` out of the store, bottom to top, with every reference that
- * pointed outside the set resolved the way a delete would resolve it.
+ * Snapshot `ids` out of the store, bottom to top, resolving outside
+ * references unless the type keeps them for insertion.
  */
 export function copyElements(
   store: Store,

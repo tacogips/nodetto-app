@@ -4,6 +4,7 @@ import {
   type FrameSemantic,
   getElementTypeDefinition,
   type GroupSemantic,
+  pageAcceptsElementType,
 } from "@nodetto/ir";
 import type { Command } from "./commands.ts";
 import { keyAfter, type Rng } from "./fractional.ts";
@@ -73,6 +74,8 @@ function frameSelectionTarget(
   const first = units[0] ? store.get(units[0]) : undefined;
   if (!first) return null;
   const page = first.page;
+  const kind = store.getPage(page)?.kind;
+  if (kind && !pageAcceptsElementType(kind, "frame")) return null;
   if (units.some((id) => store.get(id)?.page !== page)) return null;
 
   const frames = frameParents(store, page, context);

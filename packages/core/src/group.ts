@@ -12,7 +12,12 @@
 // visited set: a group that lists itself, or two that list each other, is
 // a file to open, not a reason to hang.
 
-import type { Element, ElementId, PageId } from "@nodetto/ir";
+import {
+  type Element,
+  type ElementId,
+  type PageId,
+  pageAcceptsElementType,
+} from "@nodetto/ir";
 import type { Command } from "./commands.ts";
 import {
   compareFractional,
@@ -228,6 +233,8 @@ export function planGroup(
   if (page === undefined || members.length < 2) {
     return null;
   }
+  const kind = store.getPage(page)?.kind;
+  if (kind && !pageAcceptsElementType(kind, GROUP_TYPE)) return null;
   if (members.some((member) => member.page !== page)) {
     return null;
   }

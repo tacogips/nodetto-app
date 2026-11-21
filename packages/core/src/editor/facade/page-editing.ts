@@ -1,9 +1,17 @@
-import type { ElementId, PageId, PageKind, PageMode, Page } from "@nodetto/ir";
+import {
+  CAD_PAGE_KIND,
+  type ElementId,
+  type PageId,
+  type PageKind,
+  type PageMode,
+  type Page,
+} from "@nodetto/ir";
 import {
   type FitOptions,
   nextZoomStep,
   type ViewportSize,
 } from "../../camera.ts";
+import { canChangePageKind } from "../../commands.ts";
 import {
   planDuplicatePage,
   planNewPage,
@@ -222,10 +230,19 @@ export class PageEditing extends SelectionEditing {
     applyOptions: ApplyOptions = {},
   ): boolean {
     const page = this.store.getPage(id);
-    if (!page || page.kind === kind) {
+    if (
+      !page ||
+      page.kind === kind ||
+      !canChangePageKind(page.kind, kind, () => this.store.getPageElements(id))
+    ) {
       return false;
     }
-    this.apply([{ type: "updatePage", id, page: { kind } }], applyOptions);
+    // Restoring a CAD page is a repair. Its former kind is invalid.
+    const options =
+      kind === CAD_PAGE_KIND
+        ? { ...applyOptions, history: "ignore" as const }
+        : applyOptions;
+    this.apply([{ type: "updatePage", id, page: { kind } }], options);
     return true;
   }
 
@@ -354,10 +371,13 @@ export class PageEditing extends SelectionEditing {
     toPageId: PageId,
     applyOptions: ApplyOptions = {},
   ): ElementId[] | null {
+    const source = this.store.getPage(fromPageId);
+    const target = this.store.getPage(toPageId);
     if (
       fromPageId === toPageId ||
-      !this.store.getPage(fromPageId) ||
-      !this.store.getPage(toPageId)
+      !source ||
+      !target ||
+      (source.kind === CAD_PAGE_KIND) !== (target.kind === CAD_PAGE_KIND)
     )
       return null;
     if (this.store.getPageElements(fromPageId).length === 0) return [];

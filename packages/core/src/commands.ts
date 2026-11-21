@@ -13,6 +13,7 @@
 
 import {
   type AccessibilityMetadata,
+  CAD_PAGE_KIND,
   type Element,
   type ElementId,
   error,
@@ -20,6 +21,7 @@ import {
   getElementTypeDefinition,
   connectorEndpointIssues,
   hasErrors,
+  isCadTypeName,
   isPageKind,
   isPageMode,
   isPlainObject,
@@ -27,6 +29,7 @@ import {
   type PageId,
   type PageFlow,
   PAGE_FLOWS,
+  pageAcceptsElementType,
   type PageKind,
   type PageMode,
   type SlideSize,
@@ -148,6 +151,32 @@ export class CommandError extends Error {
     this.name = "CommandError";
     this.issues = issues;
   }
+}
+
+/** A CAD kind change is allowed only to restore a page holding CAD content. */
+export function canChangePageKind(
+  from: PageKind,
+  to: PageKind,
+  elements: () => Iterable<Element>,
+): boolean {
+  if (from === to || (from !== CAD_PAGE_KIND && to !== CAD_PAGE_KIND))
+    return true;
+  if (to !== CAD_PAGE_KIND) return false;
+  let hasCad = false;
+  for (const { type } of elements()) {
+    if (!pageAcceptsElementType(to, type)) return false;
+    if (isCadTypeName(type)) hasCad = true;
+  }
+  return hasCad;
+}
+
+function pageContentIssue(page: Page | undefined, type: string) {
+  if (page && !pageAcceptsElementType(page.kind, type))
+    return error(
+      "page.contentKind",
+      "element.type",
+      `page kind "${page.kind}" does not accept element type "${type}"`,
+    );
 }
 
 /** Inverse and replay command lists for one applied batch. */
@@ -529,6 +558,17 @@ export function applyCommands(
   const removedPages = new Set<PageId>();
   const undo: Command[] = [];
 
+  function* workingPageElements(pageId: PageId): Iterable<Element> {
+    for (const { id } of store.getPageElements(pageId)) {
+      const element = working.get(id);
+      if (element?.page === pageId && !created.has(id)) yield element;
+    }
+    for (const id of created) {
+      const element = working.get(id);
+      if (element?.page === pageId) yield element;
+    }
+  }
+
   const markCreate = (id: ElementId): void => {
     created.add(id);
     removed.delete(id);
@@ -611,6 +651,11 @@ export function applyCommands(
             `createElement: invalid element "${command.element.id}"`,
           );
         }
+        const contentIssue = pageContentIssue(
+          pages.get(command.element.page),
+          command.element.type,
+        );
+        if (contentIssue) fail([contentIssue], contentIssue.message);
         working.set(command.element.id, command.element);
         markCreate(command.element.id);
         undo.unshift({
@@ -705,6 +750,11 @@ export function applyCommands(
         else issues.push(...validateVisualFields(command.visual));
         if (hasErrors(issues))
           fail(issues, `convertElement: invalid payload for "${command.id}"`);
+        const contentIssue = pageContentIssue(
+          pages.get(previous.page),
+          command.elementType,
+        );
+        if (contentIssue) fail([contentIssue], contentIssue.message);
         working.set(command.id, {
           ...previous,
           type: command.elementType,
@@ -893,6 +943,16 @@ export function applyCommands(
           throw new CommandError(
             [error("type.enum", "page.pageFlow", "invalid page flow")],
             "updatePage: invalid page flow",
+          );
+        if (
+          patch.kind !== undefined &&
+          !canChangePageKind(previous.kind, patch.kind, () =>
+            workingPageElements(previous.id),
+          )
+        )
+          fail(
+            [error("page.kindLocked", "page.kind", "CAD page kind is locked")],
+            "updatePage: CAD page kind is locked",
           );
         const {
           pageFlow: _oldPageFlow,

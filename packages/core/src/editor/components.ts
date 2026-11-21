@@ -2,12 +2,13 @@
 // placing, rebuilding and re-flowing a copy of a source artboard. Each plan
 // is pure; the editor applies it as one undo step and fixes the selection.
 
-import type {
-  Document,
-  Element,
-  ElementId,
-  FrameSemantic,
-  Visual,
+import {
+  type Document,
+  type Element,
+  type ElementId,
+  type FrameSemantic,
+  pageAcceptsElementType,
+  type Visual,
 } from "@nodetto/ir";
 import {
   copyElements,
@@ -75,6 +76,8 @@ export function planComponentInstance(
     !(source.semantic as FrameSemantic).component
   )
     return null;
+  const kind = editor.store.getPage(editor.currentPageId)?.kind;
+  if (kind && !pageAcceptsElementType(kind, "frame")) return null;
   const payload = copyElements(
     editor.store,
     expandContainers(editor.store, [id], editor.createShapeContext()),
