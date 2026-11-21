@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { Element } from "@nodetto/ir";
+import { type Element, isPlainObject } from "@nodetto/ir";
 import { contentKey, createCadMemo, evaluateCadPage } from "./index.ts";
 import {
   bossOnFace,
@@ -11,6 +11,15 @@ import {
   sketch,
 } from "./testing/documents.ts";
 import { RecordingKernel } from "./testing/recording-kernel.ts";
+
+function updateSemantic(
+  element: Element,
+  fields: Record<string, unknown>,
+): Element {
+  if (!isPlainObject(element.semantic))
+    throw new Error("Expected CAD semantic fields");
+  return { ...element, semantic: { ...element.semantic, ...fields } };
+}
 
 test("content keys use two deterministic FNV-1a passes and preserve part boundaries", () => {
   expect(contentKey([])).toBe("811c9dc5811c9dc5");
@@ -94,6 +103,27 @@ test("a plate and six holes create seven prisms, then reuse every unchanged resu
   );
   expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(1);
   expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toEqual([]);
+});
+
+test("renames and explicit false feature flags reuse the same body", () => {
+  const { elements } = plateWithHoles();
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  const before = evaluateCadPage(elements, kernel, memo);
+  const revised = elements.map((element) => {
+    if (element.type === "cad.sketch")
+      return updateSemantic(element, { name: "Sketch" });
+    if (element.type === "cad.extrude")
+      return updateSemantic(element, {
+        name: "Extrude",
+        suppressed: false,
+        symmetric: false,
+      });
+    return element;
+  });
+  kernel.calls.length = 0;
+  expect(evaluateCadPage(revised, kernel, memo)).toEqual(before);
+  expect(kernel.calls).toEqual([]);
 });
 
 test("nested loops subtract a hole then restore its island", () => {
@@ -401,19 +431,175 @@ test.each([{ entries: 1 }, { triangles: 100 }])(
     );
     kernel.calls.length = 0;
     const second = evaluateCadPage(elements, kernel, memo);
-    expect(second.bodies.map(({ handle }) => handle)).toEqual([3, 2]);
+    expect(second).toEqual(first);
     expect(second.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(
       true,
     );
-    expect(kernel.calls.filter(({ kind }) => kind === "solid")).toMatchObject([
-      { handle: 3 },
-    ]);
+    expect(kernel.calls).toEqual([]);
     evaluateCadPage([], kernel, memo);
     const retained = evaluateCadPage(elements.slice(0, -1), kernel, memo);
-    expect(retained.bodies.map(({ handle }) => handle)).toEqual([4]);
+    expect(retained.bodies.map(({ handle }) => handle)).toEqual([3]);
     const released = kernel.calls.flatMap((call) =>
       call.kind === "release" ? [call.handle] : [],
     );
-    expect(released.sort((a, b) => a - b)).toEqual([1, 2, 3]);
+    expect(released.sort((a, b) => a - b)).toEqual([1, 2]);
   },
 );
+
+function stackedPlate(count: number): Element[] {
+  return [
+    ...plateElements(),
+    ...Array.from({ length: count }, (_, i) =>
+      extrude(`layer-${i}`, `b${String(i).padStart(3, "0")}a`, {
+        sketch: "base",
+        distance: i + 6,
+        op: "add",
+        bodies: ["ex1"],
+      }),
+    ),
+  ];
+}
+
+test.each([
+  ["entry", 300, 12],
+  ["triangle", 60, 100_000],
+] as const)(
+  "history beyond the %s limit reuses cached late body states",
+  (_limit, count, triangles) => {
+    const kernel = new RecordingKernel({ triangles });
+    const memo = createCadMemo(kernel);
+    const model = stackedPlate(count);
+    const first = evaluateCadPage(model, kernel, memo);
+    expect(first.bodies).toHaveLength(1);
+    expect(kernel.calls.some(({ kind }) => kind === "release")).toBe(true);
+
+    kernel.calls.length = 0;
+    expect(evaluateCadPage(model, kernel, memo)).toEqual(first);
+    expect(kernel.calls).toEqual([]);
+
+    const last = `layer-${count - 1}`;
+    const revised = model.map((element) =>
+      element.id === last
+        ? updateSemantic(element, { distance: 500 })
+        : element,
+    );
+    const second = evaluateCadPage(revised, kernel, memo);
+    expect(second.status.get(last)).toEqual({ ok: true });
+    expect(second.bodies[0]?.key).not.toBe(first.bodies[0]?.key);
+    expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(1);
+    expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toHaveLength(
+      1,
+    );
+    expect(second.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(
+      true,
+    );
+  },
+);
+
+test("prism, tool and body keys for the same handle share one cache entry", () => {
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel, { entries: 3 });
+  const model = stackedPlate(1);
+  const first = evaluateCadPage(model, kernel, memo);
+  expect(first.bodies).toHaveLength(1);
+  expect(kernel.calls.filter(({ kind }) => kind === "release")).toEqual([]);
+
+  kernel.calls.length = 0;
+  evaluateCadPage(model.slice(0, -1), kernel, memo);
+  expect(kernel.calls).toEqual([]);
+  expect(evaluateCadPage(model, kernel, memo)).toEqual(first);
+  expect(kernel.calls).toEqual([]);
+});
+
+test("editing a late multi-body feature builds one tool and one boolean per target", () => {
+  const kernel = new RecordingKernel({ triangles: 100_000 });
+  const memo = createCadMemo(kernel);
+  const model = [
+    ...stackedPlate(60),
+    extrude("second", "c0a", { sketch: "base", distance: 3, op: "new" }),
+    extrude("cut", "c1a", {
+      sketch: "base",
+      distance: 5,
+      op: "cut",
+      bodies: ["ex1", "second"],
+    }),
+  ];
+  const before = evaluateCadPage(model, kernel, memo);
+  kernel.calls.length = 0;
+  expect(evaluateCadPage(model, kernel, memo)).toEqual(before);
+  expect(kernel.calls).toEqual([]);
+
+  const revised = model.map((element) =>
+    element.id === "cut" ? updateSemantic(element, { distance: 7 }) : element,
+  );
+  const after = evaluateCadPage(revised, kernel, memo);
+  expect(after.status.get("cut")).toEqual({ ok: true });
+  expect(after.bodies.map(({ id }) => id)).toEqual(["ex1", "second"]);
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(1);
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toMatchObject([
+    { op: "cut" },
+    { op: "cut" },
+  ]);
+});
+
+test("without a retained predecessor a last edit replays at most its body history", () => {
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel, { entries: 0 });
+  const model = stackedPlate(4);
+  const first = evaluateCadPage(model, kernel, memo);
+  kernel.calls.length = 0;
+  expect(evaluateCadPage(model, kernel, memo)).toEqual(first);
+  expect(kernel.calls).toEqual([]);
+
+  const revised = model.map((element) =>
+    element.id === "layer-3"
+      ? updateSemantic(element, { distance: 500 })
+      : element,
+  );
+  const second = evaluateCadPage(revised, kernel, memo);
+  expect(second.status.get("layer-3")).toEqual({ ok: true });
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(5);
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toHaveLength(4);
+  expect(first.bodies.every(({ handle }) => !kernel.isLive(handle))).toBe(true);
+  expect(second.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(true);
+});
+
+test("a replay failure is attributed to its feature and independent bodies survive", () => {
+  let failReplay = false;
+  const kernel = new RecordingKernel({
+    beforeMeasure() {
+      if (failReplay) {
+        failReplay = false;
+        throw new Error("Replay measure failed");
+      }
+    },
+  });
+  const memo = createCadMemo(kernel, { entries: 0 });
+  const model = [
+    ...stackedPlate(2),
+    extrude("independent", "c0a", { sketch: "base", distance: 3, op: "new" }),
+  ];
+  const before = evaluateCadPage(model, kernel, memo);
+  const revised = model.map((element) =>
+    element.id === "layer-1"
+      ? updateSemantic(element, { distance: 500 })
+      : element,
+  );
+  failReplay = true;
+  const failed = evaluateCadPage(revised, kernel, memo);
+  expect(failed.status.get("ex1")).toEqual({
+    ok: false,
+    code: "cad.kernel.failed",
+    detail: "Replay measure failed",
+  });
+  expect(failed.status.get("layer-1")).toMatchObject({
+    code: "cad.reference.failed",
+  });
+  expect(failed.bodies).toEqual(
+    before.bodies.filter(({ id }) => id === "independent"),
+  );
+  expect(failed.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(true);
+  expect(evaluateCadPage(revised, kernel, memo).status.get("layer-1")).toEqual({
+    ok: true,
+  });
+});

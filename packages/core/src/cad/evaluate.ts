@@ -1,4 +1,4 @@
-import type { Element, ElementId } from "@nodetto/ir";
+import type { CadSketchSemantic, Element, ElementId } from "@nodetto/ir";
 import { compareFractional } from "../fractional.ts";
 import {
   cadFailure,
@@ -39,9 +39,23 @@ interface KeyedSolid {
   readonly solid: Solid;
 }
 
-interface BodyState extends KeyedSolid {
+interface ToolState {
   readonly id: ElementId;
+  readonly key: string;
+  readonly contextKey: string;
+  readonly geometry: ExtrudeGeometry;
 }
+
+type BodyState = {
+  readonly id: ElementId;
+  readonly key: string;
+  readonly tool: ToolState;
+} & (
+  | { readonly op: "new" }
+  | { readonly op: "add" | "cut" | "intersect"; readonly previous: BodyState }
+);
+
+type SolidKeyKind = "prism" | "tool step" | "tool" | "body";
 
 const memoState: unique symbol = Symbol("CAD memo");
 
@@ -50,7 +64,9 @@ interface MemoState {
   readonly entries: number;
   readonly triangleLimit: number;
   readonly cache: Map<string, Solid>;
-  visible: Set<Solid>;
+  readonly lru: Map<Solid, Map<SolidKeyKind, string>>;
+  visible: Map<string, Solid>;
+  successful: Set<string>;
 }
 
 export interface CadMemo {
@@ -67,7 +83,9 @@ export function createCadMemo(
       entries: limits.entries ?? 256,
       triangleLimit: limits.triangles ?? 4_000_000,
       cache: new Map(),
-      visible: new Set(),
+      lru: new Map(),
+      visible: new Map(),
+      successful: new Set(),
     },
   };
 }
@@ -81,17 +99,62 @@ class SolidFailure extends Error {
   }
 }
 
+class BodyBuildFailure extends Error {
+  readonly status: CadStatus;
+
+  constructor(
+    readonly featureId: ElementId,
+    error: unknown,
+  ) {
+    const detail = error instanceof Error ? error.message : String(error);
+    super(detail, { cause: error });
+    this.status = cadFailure(
+      error instanceof SolidFailure ? error.code : "cad.kernel.failed",
+      detail || undefined,
+    );
+  }
+}
+
+function markUsed(
+  memo: MemoState,
+  solid: Solid,
+  keys: Map<SolidKeyKind, string>,
+): void {
+  memo.lru.delete(solid);
+  memo.lru.set(solid, keys);
+}
+
+function retain(
+  memo: MemoState,
+  kind: SolidKeyKind,
+  key: string,
+  solid: Solid,
+): void {
+  const keys = memo.lru.get(solid) ?? new Map<SolidKeyKind, string>();
+  // Keep one alias per role. Changes that produce the same prism or tool
+  // must not accumulate an unbounded number of keys for a single handle.
+  const oldKey = keys.get(kind);
+  if (oldKey !== undefined) memo.cache.delete(oldKey);
+  keys.set(kind, key);
+  memo.cache.set(key, solid);
+  markUsed(memo, solid, keys);
+}
+
 function cached(memo: MemoState, key: string): Solid | undefined {
   const solid = memo.cache.get(key);
-  if (solid !== undefined) {
-    memo.cache.delete(key);
-    memo.cache.set(key, solid);
+  if (solid) {
+    const keys = memo.lru.get(solid);
+    if (keys) markUsed(memo, solid, keys);
+    return solid;
   }
-  return solid;
+  const visible = memo.visible.get(key);
+  if (visible) retain(memo, "body", key, visible);
+  return visible;
 }
 
 function getSolid(
   memo: MemoState,
+  kind: SolidKeyKind,
   key: string,
   build: () => KernelHandle,
 ): Solid {
@@ -108,7 +171,7 @@ function getSolid(
         "More than 2000000 triangles in a solid",
       );
     const solid = { handle, triangles };
-    memo.cache.set(key, solid);
+    retain(memo, kind, key, solid);
     retained = true;
     return solid;
   } finally {
@@ -116,52 +179,42 @@ function getSolid(
   }
 }
 
-function finish(
-  memo: MemoState,
-  bodies: ReadonlyMap<ElementId, BodyState>,
-): void {
-  const visible = new Set([...bodies.values()].map(({ solid }) => solid));
-  const references = new Map<Solid, number>();
+function finish(memo: MemoState, visible: Map<string, Solid>): void {
+  const retained = new Set(visible.values());
   let triangles = 0;
-  for (const solid of memo.cache.values()) {
-    const count = references.get(solid) ?? 0;
-    if (count === 0) triangles += solid.triangles;
-    references.set(solid, count + 1);
-  }
+  for (const solid of memo.lru.keys()) triangles += solid.triangles;
 
   // Several keys can refer to the same handle, such as a one-loop tool and
   // the body it creates. Count its triangles once and release it once.
-  const candidates = memo.visible;
-  for (const [key, solid] of memo.cache) {
-    if (memo.cache.size <= memo.entries && triangles <= memo.triangleLimit)
-      break;
-    memo.cache.delete(key);
-    const count = references.get(solid) ?? 0;
-    if (count <= 1) {
-      references.delete(solid);
-      triangles -= solid.triangles;
-      candidates.add(solid);
-    } else {
-      references.set(solid, count - 1);
-    }
+  const candidates = new Set(memo.visible.values());
+  for (const [solid, keys] of memo.lru) {
+    if (memo.lru.size <= memo.entries && triangles <= memo.triangleLimit) break;
+    memo.lru.delete(solid);
+    for (const key of keys.values()) memo.cache.delete(key);
+    triangles -= solid.triangles;
+    candidates.add(solid);
   }
 
   // An over-budget result still has to stay live for the consumer. Those
   // solids leave the LRU and are retained only until the next evaluation.
   memo.visible = visible;
   for (const solid of candidates) {
-    if (!visible.has(solid) && !references.has(solid))
+    if (!retained.has(solid) && !memo.lru.has(solid))
       memo.kernel.release(solid.handle);
   }
 }
 
-function sketchKey(sketch: Element, entities: readonly Element[]): string {
+function sketchKey(
+  sketch: Element<CadSketchSemantic>,
+  entities: readonly Element[],
+): string {
   const byId = entities.slice().sort((a, b) => compareFractional(a.id, b.id));
-  return contentKey(
-    [sketch, ...byId].map(({ id, type, semantic }) =>
+  return contentKey([
+    canonicalCadJson([sketch.id, sketch.type, sketch.semantic.plane]),
+    ...byId.map(({ id, type, semantic }) =>
       canonicalCadJson([id, type, semantic]),
     ),
-  );
+  ]);
 }
 
 function getPrism(
@@ -178,7 +231,7 @@ function getPrism(
     canonicalCadJson(loop.points),
     canonicalCadJson(loop.sources),
   ]);
-  const solid = getSolid(memo, key, () => {
+  const solid = getSolid(memo, "prism", key, () => {
     let mesh: ReturnType<typeof prismTool>;
     try {
       mesh = prismTool(loop, tool.frame, tool.span, feature);
@@ -228,7 +281,7 @@ function getTool(
       target.key,
       ...prisms.map(({ key }) => key),
     ]);
-    const solid = getSolid(memo, stepKey, () =>
+    const solid = getSolid(memo, "tool step", stepKey, () =>
       memo.kernel.boolean(
         op,
         target.solid.handle,
@@ -238,8 +291,44 @@ function getTool(
     aggregate = { key: stepKey, solid };
   }
   if (!aggregate) throw new SolidFailure("cad.profile.empty");
-  memo.cache.set(key, aggregate.solid);
+  retain(memo, "tool", key, aggregate.solid);
   return aggregate.solid;
+}
+
+function materializeBody(memo: MemoState, body: BodyState): Solid {
+  const missing: BodyState[] = [];
+  let solid: Solid | undefined;
+  // Start at the requested state and replay only the suffix after a hit.
+  for (
+    let step: BodyState | undefined = body;
+    step;
+    step = step.op === "new" ? undefined : step.previous
+  ) {
+    solid = cached(memo, step.key);
+    if (solid) break;
+    missing.push(step);
+  }
+
+  for (const { key, op, tool } of missing.reverse()) {
+    const previous = solid;
+    const operand = () =>
+      getTool(memo, tool.geometry, tool.id, tool.key, tool.contextKey);
+    try {
+      if (op === "new") {
+        solid = operand();
+        retain(memo, "body", key, solid);
+      } else {
+        if (!previous) throw new Error("Missing preceding body state");
+        solid = getSolid(memo, "body", key, () =>
+          memo.kernel.boolean(op, previous.handle, [operand().handle]),
+        );
+      }
+    } catch (error) {
+      throw new BodyBuildFailure(tool.id, error);
+    }
+  }
+  if (!solid) throw new Error("Missing CAD body state");
+  return solid;
 }
 
 export function evaluateCadPage(
@@ -251,11 +340,27 @@ export function evaluateCadPage(
   if (state.kernel !== kernel)
     throw new TypeError("The CAD memo belongs to a different kernel");
 
+  try {
+    return evaluateHistory(elements, state);
+  } catch (error) {
+    if (!(error instanceof BodyBuildFailure)) throw error;
+    // If replay of a previously successful feature fails, evaluate in
+    // history order so dependents and all targets see the same failure.
+    return evaluateHistory(elements, state, error);
+  }
+}
+
+function evaluateHistory(
+  elements: readonly Element[],
+  state: MemoState,
+  replayFailure?: BodyBuildFailure,
+): CadEvaluation {
   const history = scanCadPage(elements);
   const geometry = createCadGeometry(history);
   const status = new Map(history.status);
   const bodies = new Map<ElementId, BodyState>();
   const sketchKeys = new Map<ElementId, string>();
+  const successful = new Set<string>();
   for (const { id } of history.features) {
     if (!status.get(id)?.ok) continue;
     const item = history.typed.get(id);
@@ -274,7 +379,14 @@ export function evaluateCadPage(
       continue;
     }
 
-    const { sketch, op, suppressed } = item.semantic;
+    const {
+      sketch,
+      op,
+      suppressed,
+      name: _name,
+      symmetric,
+      ...dimensions
+    } = item.semantic;
     if (suppressed) continue;
     const targets: BodyState[] = [];
     for (const target of history.targets.get(id) ?? []) {
@@ -283,77 +395,86 @@ export function evaluateCadPage(
       else status.set(id, cadFailure("cad.reference.failed", target));
     }
     if (!status.get(id)?.ok) continue;
-    const tool = geometry.extrude(item.semantic);
-    if ("ok" in tool) {
-      status.set(id, tool);
+    const extrude = geometry.extrude(item.semantic);
+    if ("ok" in extrude) {
+      status.set(id, extrude);
       continue;
     }
 
-    try {
-      const source =
-        sketch === undefined ? undefined : history.byId.get(sketch);
-      if (source === undefined) {
-        status.set(id, cadFailure("cad.reference.missing", "sketch"));
-        continue;
-      }
-      let sourceKey = sketchKeys.get(source.id);
-      if (sourceKey === undefined) {
-        sourceKey = sketchKey(source, history.entitiesOf(source.id));
-        sketchKeys.set(source.id, sourceKey);
-      }
-      const contextKey = contentKey([
-        id,
-        kernel.id,
-        canonicalCadJson(tool.frame),
-        canonicalCadJson(tool.span),
-        String(CAD_CHORD_TOLERANCE_MM),
-        String(CAD_MAX_BISECTION_DEPTH),
-      ]);
-      const toolKey = contentKey([
+    const source = sketch === undefined ? undefined : history.typed.get(sketch);
+    if (source?.type !== "cad.sketch") {
+      status.set(id, cadFailure("cad.reference.missing", "sketch"));
+      continue;
+    }
+    let sourceKey = sketchKeys.get(source.id);
+    if (sourceKey === undefined) {
+      sourceKey = sketchKey(source, history.entitiesOf(source.id));
+      sketchKeys.set(source.id, sourceKey);
+    }
+    const contextKey = contentKey([
+      id,
+      state.kernel.id,
+      canonicalCadJson(extrude.frame),
+      canonicalCadJson(extrude.span),
+      String(CAD_CHORD_TOLERANCE_MM),
+      String(CAD_MAX_BISECTION_DEPTH),
+    ]);
+    const tool: ToolState = {
+      id,
+      contextKey,
+      geometry: extrude,
+      key: contentKey([
         "tool",
         contextKey,
         sourceKey,
-        canonicalCadJson(item.semantic),
-      ]);
-      if (op === "new") {
-        const key = contentKey(["body", toolKey]);
-        const solid =
-          cached(state, key) ?? getTool(state, tool, id, toolKey, contextKey);
-        state.cache.set(key, solid);
-        bodies.set(id, { id, key, solid });
-      } else {
-        const updated: BodyState[] = [];
-        for (const body of targets) {
-          const key = contentKey(["body", body.key, toolKey]);
-          const solid = getSolid(state, key, () => {
-            const operand = getTool(state, tool, id, toolKey, contextKey);
-            return kernel.boolean(op, body.solid.handle, [operand.handle]);
-          });
-          updated.push({ id: body.id, key, solid });
-        }
-        // A multi-body feature is one edit. Publish only if all targets succeeded.
-        for (const body of updated) bodies.set(body.id, body);
+        canonicalCadJson({
+          ...dimensions,
+          sketch,
+          op,
+          symmetric: symmetric === true,
+        }),
+      ]),
+    };
+    const updated: BodyState[] =
+      op === "new"
+        ? [{ id, key: contentKey(["body", tool.key]), op, tool }]
+        : targets.map((previous) => ({
+            id: previous.id,
+            key: contentKey(["body", previous.key, tool.key]),
+            op,
+            tool,
+            previous,
+          }));
+    const featureKey = contentKey(updated.map(({ key }) => key));
+    try {
+      if (replayFailure?.featureId === id) throw replayFailure;
+      // A known success carries the entire atomic outcome, even if some
+      // handles are gone. Unknown outcomes still need a kernel check.
+      if (replayFailure || !state.successful.has(featureKey)) {
+        for (const body of updated) materializeBody(state, body);
       }
-      geometry.extrudes.set(id, tool);
+      for (const body of updated) bodies.set(body.id, body);
+      successful.add(featureKey);
+      geometry.extrudes.set(id, extrude);
     } catch (error) {
-      status.set(
-        id,
-        cadFailure(
-          error instanceof SolidFailure ? error.code : "cad.kernel.failed",
-          error instanceof Error ? error.message || undefined : String(error),
-        ),
-      );
+      if (!(error instanceof BodyBuildFailure) || error.featureId !== id)
+        throw error;
+      status.set(id, error.status);
     }
   }
 
-  finish(state, bodies);
-  return {
-    bodies: [...bodies.values()].map(({ id, key, solid }) => ({
-      id,
-      key,
+  const visible = new Map<string, Solid>();
+  const results = [...bodies.values()].map((body) => {
+    const solid = materializeBody(state, body);
+    visible.set(body.key, solid);
+    return {
+      id: body.id,
+      key: body.key,
       handle: solid.handle,
       reference: false,
-    })),
-    status,
-  };
+    };
+  });
+  finish(state, visible);
+  state.successful = successful;
+  return { bodies: results, status };
 }

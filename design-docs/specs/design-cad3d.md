@@ -567,26 +567,39 @@ the CLI needs (section 10).
 
 ### 6.5 Incremental regeneration
 
-Evaluation walks features in history order and keeps, per body, a kernel
-handle. Every step has a content key: a hash of the canonical JSON of the
-feature, the keys of the sketches and entities it uses, the keys of the body
-states it modifies, the kernel id and the tessellation constants (input
-addressing as in build systems [R-33]). The worker memoises handles by key
-in an LRU bounded both by entry count (256) and by the total triangle count
-of the retained solids (4,000,000), released with `release`. An edit
-therefore recomputes the edited
-feature and the later features that touch the same bodies; untouched bodies
-and earlier states are reused. Keys are in-memory only in the slice (64-bit
-non-cryptographic), so a collision can never reach a file.
+Evaluation walks features in history order and chains content keys per
+body. A key hashes canonical geometry inputs, the preceding body state
+keys, the kernel id and the tessellation constants (input addressing as in
+build systems [R-33]). Sketch and feature names are excluded. An explicit
+`false` extrusion flag has the same key as an omitted flag.
+
+The memo records which feature keys succeeded in the preceding evaluation.
+For those keys, it can defer obtaining handles until a changed feature
+needs a boolean input or the viewport needs a final body. If that state is
+missing, it replays only the suffix after the newest retained predecessor.
+If no predecessor survives, it may replay the affected body from its creator.
+A multi-body feature succeeds only when all targets succeed.
+
+The LRU retains up to 256 distinct solids and 4,000,000 total triangles.
+Keys that alias the same handle share one entry, with one key per role.
+Final bodies stay reusable
+through the next evaluation even if they exceed either cache limit. The memo
+calls `release` when a handle is neither cached nor visible. Keys are
+in-memory only in the slice (64-bit non-cryptographic), so a collision can
+never reach a file.
 
 ### 6.6 Statuses, tolerances, limits
 
 - Statuses are derived, never persisted: `ok`, or an error code
-  (`cad.reference.missing`, `cad.order.forward`, `cad.cycle`,
-  `cad.profile.*`, `cad.plane.notPlanar`, `cad.body.missing`,
-  `cad.body.reference`, `cad.result.empty`, `cad.limit`, `cad.mesh.*`,
-  `cad.pcb.*`, `cad.kernel.failed`). A failed or
+  (`cad.reference.missing`, `cad.reference.failed`, `cad.order.forward`,
+  `cad.cycle`, `cad.feature.invalid`, `cad.profile.*`, `cad.plane.notPlanar`,
+  `cad.body.missing`, `cad.body.reference`, `cad.result.empty`, `cad.limit`,
+  `cad.mesh.*`, `cad.pcb.*`, `cad.kernel.failed`). A failed or
   suppressed feature is skipped and its bodies pass through unchanged.
+  `cad.feature.invalid` covers invalid sketch or extrusion payloads.
+  `cad.profile.invalid` covers invalid sketch entity payloads or a profile
+  that cannot be turned into a prism. A sketch on a face of a suppressed
+  extrusion reports `cad.reference.failed` because that face is unavailable.
 - Units: mm on a 1 nm grid in text; the kernel works in doubles; display and
   mesh payloads quantise to 1 micrometre, above the Float32 resolution of the
   kernel's JS mesh output at 1 m (6e-5 mm).

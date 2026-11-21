@@ -222,6 +222,27 @@ All three milestone checks passed. Workspace verification, including the
 repository TypeScript lint, passed with 4245 Bun tests and 91 Rust tests.
 The workspace run skipped 74 Bun tests.
 
+M4 review follow-up: the evaluator chains body keys before rebuilding
+solids and reuses the newest retained state, including a still-visible
+handle outside the LRU. The entry limit counts distinct solids. Unchanged
+evaluations of a 501-feature model and an 81-feature model with
+100,000-triangle boolean results issued zero solid or boolean calls.
+With the predecessor retained, a last-feature edit issued one tool and one
+boolean per target body. When no predecessor survives, the affected body
+may replay from its creator. The recording kernel checks handle liveness
+and release, including when a replay fails (IR4-01).
+
+M4 review deviations: design section 6.5 now excludes sketch and feature
+names from the keys and equates explicit false extrusion flags with omitted
+flags (IR4-02). Section 6.6 lists `cad.feature.invalid`,
+`cad.profile.invalid`, and `cad.reference.failed` for sketches on suppressed
+faces (IR4-03). The LRU regression now requires reuse of visible handles
+under pressure and checks release when they leave both the cache and the
+visible result. The M4 plan and its acceptance criteria are unchanged.
+All three milestone checks and full workspace verification passed. The
+workspace run reported 4252 Bun tests and 91 Rust tests passed, with 74 Bun
+tests skipped. Verification logs are under `tmp/cad3d/m4/rework/`.
+
 ## Completion
 
 All twenty-two milestones accepted by the adversarial implementation
