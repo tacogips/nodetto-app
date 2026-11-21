@@ -11,6 +11,7 @@ export default defineConfig(() => ({
   resolve: {
     dedupe: ["solid-js"],
   },
+  worker: { format: "es" },
   build: {
     rollupOptions: {
       output: {

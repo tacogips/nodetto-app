@@ -77,6 +77,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { getCadEngine } from "./cad/engine.ts";
 import { CloudPanel } from "./cloud/CloudPanel.tsx";
 import { PresenceOverlay } from "./cloud/PresenceOverlay.tsx";
 import type { CloudSession, CloudSessionState } from "./cloud/session.ts";
@@ -391,6 +392,13 @@ export function App(props: AppProps): JSX.Element {
       props.editor.store.getPage(props.editor.currentPageId)?.kind === "cad3d"
     );
   };
+  const cadPageActive = createMemo(isCadPage);
+  createEffect(() => {
+    if (cadPageActive()) {
+      const engine = getCadEngine();
+      onCleanup(() => engine.dispose());
+    }
+  });
   let wasViewer = false;
   createEffect(() => {
     const viewer = cloud()?.role === "viewer";

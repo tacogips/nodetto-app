@@ -12,15 +12,18 @@
     "tauri": "tauri",
     "check:responsiveness": "bun scripts/responsiveness-check.mjs",
     "check:erd-scale": "bun scripts/erd-scale-check.mjs",
+    "check:cad-bundle": "bun scripts/cad-bundle-check.ts",
     "bench:erd-scale": "bun scripts/erd-scale-bench.ts"
   },
   "dependencies": {
+    "@nodetto/cad-kernel": "workspace:*",
     "@nodetto/collab": "workspace:*",
     "@nodetto/core": "workspace:*",
     "@nodetto/io": "workspace:*",
     "@nodetto/ir": "workspace:*",
     "@nodetto/ui-solid": "workspace:*",
     "@tauri-apps/api": "^2.0.0",
+    "manifold-3d": "3.5.5",
     "solid-js": "^1.9.0",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.32"

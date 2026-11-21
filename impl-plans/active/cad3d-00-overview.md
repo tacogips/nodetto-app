@@ -131,8 +131,8 @@ milestone that breaks it, not in M18.
 | M3 | accepted |
 | M4 | accepted |
 | M5 | accepted |
-| M6 | implemented |
-| M7 | pending |
+| M6 | accepted |
+| M7 | implemented |
 | M8 | pending |
 | M19 | pending |
 | M9 | pending |
@@ -297,6 +297,48 @@ follow the current page kind, and the cloud guard also covers CAD page
 duplication. The workspace and icon tests account for the added tools and
 icons, including Select's read-only behavior. The M6 plan now names M22 as
 the emitter backstop (DR3-02).
+
+M7 added the CAD display buffers, coalescing engine client, Manifold worker,
+and desktop wiring. A request id distinguishes worker replies even when
+two requests share a store revision. The worker transfers owned display
+buffers and keeps a memo between requests. Timeouts and WASM traps restart
+the worker. Display positions follow the 1 micrometre grid in design
+section 6.6. Edge classification uses the original kernel coordinates.
+
+M7 deviations: the desktop shell starts the worker on CAD pages so the
+production build can already exercise its real entry point. It disposes
+the worker on leaving CAD. The renderer still mounts in M19. The transport
+has optional errors and disposal hooks for worker lifecycle management. The
+desktop manifest and workspace lockfile link the approved kernel and pinned
+Manifold asset without changing any existing resolution. The bundle audit
+script is included in the repository TypeScript check.
+
+The production audit registers its plugin in both Vite graphs and requires
+`manifold.js` in the worker graph (DR3-01). It records one byte-identical
+WASM asset. The only inventory name shared with the existing desktop bundle
+is `tslib`. The audit exempts the existing `tslib@1.14.1` ES module only
+when its recorded importers are all under `pdf-lib` and the module is absent
+from the worker. The Manifold inventory's `tslib@2.9.1` remains forbidden.
+
+The adapter detects rounding residue in face-touching intersections
+(IR5-02). A real-kernel regression covers decimal contact and a genuine
+thin overlap. The 3,000-case contact probe found no remaining sheets
+reported as solids. The 300-cut history probe measured zero booleans on
+an unchanged model, one on a last-feature edit, and 300 on a mid-history
+edit after its predecessor was evicted (340.0 ms, IR4-04).
+
+All four milestone checks passed. The real Bun worker returned the
+60-hole plate with 15,612 triangles. The in-process host transferred that
+plate in 100.5 ms and transferred a radius edit in 60.0 ms in the focused
+check. The existing light and dark CAD workspace DOM checks passed.
+Workspace verification passed from a tree without desktop dist, with 4283
+Bun and 91 Rust tests passing and 74 Bun tests skipped. The extracted
+upstream audit and prior review probe were temporarily moved out of Bun
+test discovery and restored afterwards. Cargo used the installed toolchain
+and caches inside the worktree with automatic installation disabled.
+Verification and probe logs are under `tmp/cad3d/m7/`. The supplemental
+Chromium attempt could not start while restricted to writing inside the
+worktree. Browser and WKWebView rendering checks remain in M19 and M18.
 
 ## Completion
 

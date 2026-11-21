@@ -1,3 +1,5 @@
+export * from "./display.ts";
+export * from "./engine.ts";
 export * from "./evaluate.ts";
 export * from "./frames.ts";
 export {

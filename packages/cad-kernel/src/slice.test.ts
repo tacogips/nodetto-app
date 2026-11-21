@@ -9,10 +9,11 @@ import {
   type KernelHandle,
 } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
-import type { Document } from "@nodetto/ir";
+import type { CadXY, Document } from "@nodetto/ir";
 import {
   CAD_TEST_PAGE,
   bossOnFace,
+  cadElement,
   extrude,
   plateElements,
   plateWithHoles,
@@ -155,6 +156,62 @@ test("a face-touching intersect keeps the plate and reports an empty result", as
   });
   expect(result.bodies).toEqual(initial.bodies);
   expectVolume(kernel.measure(originalHandle).volume, 30_000);
+});
+
+test("a decimal face contact is empty but a thin overlap still produces a solid", async () => {
+  const distance = 7;
+  function decimalRectangle(id: string, left: number, right: number) {
+    const points: CadXY[] = [
+      [left, -72.34],
+      [right, -72.34],
+      [right, 41.12],
+      [left, 41.12],
+    ];
+    return points.map((a, i) =>
+      cadElement(`${id}-edge-${i}`, "cad.line", "a1", {
+        sketch: id,
+        a,
+        b: points[(i + 1) % points.length],
+      }),
+    );
+  }
+  const base = [
+    sketch("base", "a1"),
+    ...decimalRectangle("base", 73.56, 191.14),
+    extrude("ex1", "a2", { sketch: "base", distance, op: "new" }),
+  ];
+  const kernel = await createManifoldKernel();
+  const memo = createCadMemo(kernel);
+  const original = evaluateCadPage(base, kernel, memo);
+  function intersect(x: number): CadEvaluation {
+    const { elements } = roundTrip({
+      ...plateWithHoles(0),
+      elements: [
+        ...base,
+        sketch("adjacent", "a3"),
+        ...decimalRectangle("adjacent", x, 199.82),
+        extrude("ex2", "a4", {
+          sketch: "adjacent",
+          distance,
+          op: "intersect",
+          bodies: ["ex1"],
+        }),
+      ],
+    });
+    return evaluateCadPage(elements, kernel, memo);
+  }
+  const contact = intersect(191.14);
+  expect(contact.status.get("ex2")).toMatchObject({
+    ok: false,
+    code: "cad.result.empty",
+  });
+  expect(contact.bodies).toEqual(original.bodies);
+
+  const overlap = intersect(191.139);
+  const measure = kernel.measure(onlyBody(overlap));
+  expect(measure.empty).toBe(false);
+  expect(measure.volume).toBeGreaterThan(0);
+  expect(measure.volume).toBeLessThan(1);
 });
 
 test("two fresh kernels produce byte-identical meshes from the same JSONL", async () => {

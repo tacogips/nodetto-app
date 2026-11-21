@@ -16,6 +16,7 @@
     "apps/cli/src",
     "apps/cli/scripts",
     "apps/desktop/vite.config.ts",
+    "apps/desktop/scripts/cad-bundle-check.ts",
     "apps/desktop/scripts/fixtures"
   ]
 }

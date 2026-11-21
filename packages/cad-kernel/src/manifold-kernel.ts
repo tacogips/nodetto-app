@@ -155,11 +155,14 @@ export async function createManifoldKernel(options?: {
     measure(handle) {
       const { solid } = get(handle);
       const volume = solid.volume();
+      const area = solid.surfaceArea();
       return {
         volume,
-        area: solid.surfaceArea(),
-        // A face-only intersection can have triangles but no solid volume.
-        empty: volume === 0 || solid.isEmpty(),
+        area,
+        // A face-only intersection can have triangles and a rounding
+        // residue for volume. Compare its thickness to half the 1 nm grid.
+        empty:
+          solid.isEmpty() || volume === 0 || 2 * Math.abs(volume) < area * 5e-7,
         triangles: solid.numTri(),
       };
     },
