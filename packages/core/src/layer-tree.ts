@@ -1,9 +1,11 @@
 import {
+  CAD_PAGE_KIND,
   type Element,
   type ElementId,
   getElementTypeDefinition,
   isDatabaseObjectType,
 } from "@nodetto/ir";
+import { cadFeatureRows } from "./cad/feature-list.ts";
 import type { Editor } from "./editor.ts";
 import { frameParents } from "./frame-tree.ts";
 import { groupOf } from "./group.ts";
@@ -118,35 +120,47 @@ export function layerRows(
   query = "",
   pageId = editor.currentPageId,
 ) {
-  const elements = [...editor.store.getPageElements(pageId)]
-    .filter(
-      (element) =>
-        getElementTypeDefinition(element.type)?.category !== "resource",
-    )
-    .reverse();
-  const ids = new Set(elements.map((element) => element.id));
-  const frames = frameParents(
-    editor.store,
-    pageId,
-    editor.createShapeContext(),
-  );
+  const pageElements = editor.store.getPageElements(pageId);
   const parents = new Map<string, string>();
-  for (const element of elements) {
-    const parent =
-      groupOf(editor.store, element.id)?.id ?? frames.get(element.id);
-    if (parent && ids.has(parent)) parents.set(element.id, parent);
-  }
-  // Imported malformed cycles must not make every involved layer disappear.
-  for (const element of elements) {
-    const seen = new Set<string>([element.id]);
-    let parent = parents.get(element.id);
-    while (parent) {
-      if (seen.has(parent)) {
-        parents.delete(element.id);
-        break;
+  let elements: readonly Element[];
+  if (editor.store.getPage(pageId)?.kind === CAD_PAGE_KIND) {
+    let feature: ElementId | undefined;
+    elements = cadFeatureRows(pageElements).flatMap(({ id, depth }) => {
+      if (depth === 0) feature = id;
+      else if (feature) parents.set(id, feature);
+      const element = editor.store.get(id);
+      return element ? [element] : [];
+    });
+  } else {
+    elements = pageElements
+      .filter(
+        (element) =>
+          getElementTypeDefinition(element.type)?.category !== "resource",
+      )
+      .reverse();
+    const ids = new Set(elements.map((element) => element.id));
+    const frames = frameParents(
+      editor.store,
+      pageId,
+      editor.createShapeContext(),
+    );
+    for (const element of elements) {
+      const parent =
+        groupOf(editor.store, element.id)?.id ?? frames.get(element.id);
+      if (parent && ids.has(parent)) parents.set(element.id, parent);
+    }
+    // Imported malformed cycles must not make every involved layer disappear.
+    for (const element of elements) {
+      const seen = new Set<string>([element.id]);
+      let parent = parents.get(element.id);
+      while (parent) {
+        if (seen.has(parent)) {
+          parents.delete(element.id);
+          break;
+        }
+        seen.add(parent);
+        parent = parents.get(parent);
       }
-      seen.add(parent);
-      parent = parents.get(parent);
     }
   }
   const search = query.trim().toLowerCase();

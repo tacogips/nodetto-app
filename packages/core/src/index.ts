@@ -529,7 +529,7 @@ export { planFitStrokeBounds } from "./stroke-edit.ts";
 export { planStrokeClosed } from "./stroke-edit.ts";
 export { insertUiBlock, UI_BLOCKS, type UiBlock } from "./ui-blocks.ts";
 export { prototypeFitScale } from "./prototype-scale.ts";
-export { layerName, renameLayer } from "./layer-name.ts";
+export { canRenameLayer, layerName, renameLayer } from "./layer-name.ts";
 export { layerSearchMatchIds, selectLayerSearchMatches } from "./layer-tree.ts";
 export {
   previewNoteTextReplacement,

@@ -1,6 +1,7 @@
 import "./ShapeWarnings.css";
 import { Switch } from "./Switch.tsx";
 import {
+  canRenameLayer,
   type Editor,
   type ViewportSize,
   layerRows,
@@ -9,7 +10,7 @@ import {
   selectLayerRow,
   selectLayerSearchMatches,
 } from "@nodetto/core";
-import type { ElementId } from "@nodetto/ir";
+import { type ElementId, isCadTypeName } from "@nodetto/ir";
 import {
   createMemo,
   createSelector,
@@ -23,6 +24,8 @@ import {
   onMount,
 } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
+import { handleCadSelectionKey } from "./cad/selection-keys.ts";
+import { useCadStatus } from "./cad/status-store.ts";
 import { ComponentLibrary } from "./ComponentLibrary.tsx";
 import { ColorTokens } from "./ColorTokens.tsx";
 import { NumberTokens } from "./NumberTokens.tsx";
@@ -56,6 +59,7 @@ export function Layers(props: {
   const [localLayersOpen, setLocalLayersOpen] = createSignal(true);
   const layersOpen = () => props.layersOpen ?? localLayersOpen();
   const signals = createEditorSignals(props.editor);
+  const statusFor = useCadStatus(props.editor);
   const isSelected = createSelector(signals.selection, (id: ElementId, ids) =>
     ids.has(id),
   );
@@ -63,6 +67,9 @@ export function Layers(props: {
   const [query, setQuery] = createSignal("");
   const [allPages, setAllPages] = createSignal(false);
   const [renaming, setRenaming] = createSignal<ElementId>();
+  let draggedFeature:
+    | { id: ElementId; documentOpenRevision: number }
+    | undefined;
   createEffect(() => {
     if (readOnly()) setRenaming(undefined);
   });
@@ -385,13 +392,47 @@ export function Layers(props: {
               <Show when={rowSignals.get(id)?.read()}>
                 {(row) => {
                   const warning = createMemo(() => warningsFor(id).join("\n"));
+                  const cad = () => isCadTypeName(row().element.type);
+                  const feature = () => cad() && canRenameLayer(row().element);
+                  const statusCode = createMemo(() => {
+                    if (!cad()) return undefined;
+                    const status = statusFor(id);
+                    return status && !status.ok ? status.code : undefined;
+                  });
+                  const canDrag = () =>
+                    !readOnly() &&
+                    feature() &&
+                    row().element.page === props.editor.currentPageId &&
+                    !query().trim() &&
+                    !props.editor.createShapeContext().isLocked?.(id);
+                  const dropSource = (): ElementId | undefined => {
+                    if (
+                      !draggedFeature ||
+                      draggedFeature.id === id ||
+                      draggedFeature.documentOpenRevision !==
+                        props.editor.documentOpenRevision ||
+                      readOnly() ||
+                      query().trim() ||
+                      !feature() ||
+                      row().element.page !== props.editor.currentPageId ||
+                      props.editor
+                        .createShapeContext()
+                        .isLocked?.(draggedFeature.id)
+                    )
+                      return undefined;
+                    return props.editor.store.get(draggedFeature.id)?.page ===
+                      row().element.page
+                      ? draggedFeature.id
+                      : undefined;
+                  };
                   let nameButton: HTMLButtonElement | undefined;
                   onCleanup(() => {
                     nameButtons.delete(id);
                     if (renaming() === id) setRenaming(undefined);
                   });
                   const startRename = (): void => {
-                    if (props.editor.readOnly) return;
+                    if (props.editor.readOnly || !canRenameLayer(row().element))
+                      return;
                     if (!props.editor.createShapeContext().isLocked?.(id))
                       setRenaming(id);
                   };
@@ -399,6 +440,26 @@ export function Layers(props: {
                     <div
                       class="nodetto-layer-row"
                       style={{ "padding-left": `${8 + row().depth * 14}px` }}
+                      onDragOver={(event) => {
+                        if (!dropSource()) return;
+                        event.preventDefault();
+                        if (event.dataTransfer)
+                          event.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(event) => {
+                        const source = dropSource();
+                        if (!source) return;
+                        event.preventDefault();
+                        draggedFeature = undefined;
+                        const bounds =
+                          event.currentTarget.getBoundingClientRect();
+                        props.editor.orderElements(
+                          [source],
+                          event.clientY < bounds.top + bounds.height / 2
+                            ? { before: id }
+                            : { after: id },
+                        );
+                      }}
                     >
                       <Show
                         when={row().hasChildren}
@@ -441,6 +502,23 @@ export function Layers(props: {
                           }}
                           type="button"
                           class="nodetto-layer-name"
+                          draggable={feature() ? canDrag() : undefined}
+                          onDragStart={(event) => {
+                            if (!canDrag() || !event.dataTransfer) return;
+                            draggedFeature = {
+                              id,
+                              documentOpenRevision:
+                                props.editor.documentOpenRevision,
+                            };
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData(
+                              "application/x-nodetto-cad-feature",
+                              id,
+                            );
+                          }}
+                          onDragEnd={() => {
+                            draggedFeature = undefined;
+                          }}
                           aria-pressed={isSelected(id)}
                           title={
                             row().matchDetail ??
@@ -468,6 +546,13 @@ export function Layers(props: {
                               event.altKey
                             )
                               return;
+                            if (
+                              cad() &&
+                              row().element.page === props.editor.currentPageId
+                            ) {
+                              handleCadSelectionKey(props.editor, event);
+                              if (event.defaultPrevented) return;
+                            }
                             if (event.key === "F2") {
                               event.preventDefault();
                               event.stopPropagation();
@@ -507,6 +592,16 @@ export function Layers(props: {
                           }}
                         >
                           {layerName(row().element)}
+                          <Show when={statusCode()}>
+                            {(code) => (
+                              <span
+                                class="nodetto-layer-warning nodetto-layer-cad-status"
+                                title={code()}
+                              >
+                                {code()}
+                              </span>
+                            )}
+                          </Show>
                           <Show when={warning()}>
                             <span
                               class="nodetto-layer-warning"

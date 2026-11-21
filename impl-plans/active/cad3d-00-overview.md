@@ -134,8 +134,8 @@ milestone that breaks it, not in M18.
 | M6 | accepted |
 | M7 | accepted |
 | M8 | accepted |
-| M19 | implemented |
-| M9 | pending |
+| M19 | accepted |
+| M9 | implemented |
 | M10 | pending |
 | M11 | pending |
 | M12 | pending |
@@ -396,6 +396,28 @@ its socket directory under the worktree-only restriction. A separate
 Rust workspace run passed 73 tests and reported 18 file tests blocked by
 macOS replacement-directory permissions. M18 still owns the full
 workspace and native host checks.
+
+M9 lists CAD features in history order, nests sketch entities, and shows
+worker status codes on rows and in the inspector. The CAD inspector snaps
+numeric inputs to the 1 nm grid and applies one semantic command per valid
+change. CAD rename uses the same semantic name in the layer list and
+inspector. The untitled autosave test writes a CAD-only model.
+
+M9 deviations: the shared layer tree uses the CAD row order so searching,
+collapse and keyboard navigation also respect sketch nesting. The layer
+list and evaluator share the history comparator. CAD feature drag uses
+the existing relative reorder command. The viewport and CAD layer rows share
+Delete, Backspace and Escape handling. The target-body list uses existing
+checkbox controls for multi-selection. The light and dark DOM harness
+covers panel integration, drag reorder, undo and the per-feature fallback
+when a worker reports only a top-level failure.
+
+All three milestone checks passed with 46, 5 and 4 tests respectively.
+Workspace check and lint passed, and the Bun suite passed 4,315 tests
+with 74 skipped, including the three browser cases using the worktree's
+headless Chrome. The Rust workspace ran all 91 tests. It passed 73, and
+18 file tests reported permission errors when macOS attempted to use its
+replacement-file directory. Verification logs are under `tmp/cad3d/m9/`.
 
 ## Completion
 

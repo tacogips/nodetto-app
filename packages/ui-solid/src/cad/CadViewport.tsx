@@ -2,6 +2,7 @@ import {
   type CadDisplayBody,
   type CadEngine,
   type CadEngineInput,
+  type CadEngineResult,
   CadSupersededError,
   collectCadInput,
   type Editor,
@@ -21,6 +22,8 @@ import {
   CANVAS_DARK_CLASS,
   type CanvasMode,
 } from "../canvas/canvas-background.ts";
+import { handleCadSelectionKey } from "./selection-keys.ts";
+import { cadStatusStoreFor } from "./status-store.ts";
 import {
   type Camera3d,
   fitBounds,
@@ -70,6 +73,7 @@ export function CadViewport(props: CadViewportProps) {
   let root!: HTMLDivElement;
   let canvas!: HTMLCanvasElement;
   const pageId = props.pageId ?? props.editor.currentPageId;
+  const statusStore = cadStatusStoreFor(props.editor);
   const [revision, setRevision] = createSignal(props.editor.revision);
   const [selection, setSelection] = createSignal(props.editor.selection.ids());
   const [renderer, setRenderer] = createSignal<CadRenderer | null>(null);
@@ -155,6 +159,7 @@ export function CadViewport(props: CadViewportProps) {
     const engine = props.engine;
     if (!engine) {
       previous = undefined;
+      statusStore.clear(pageId);
       return;
     }
     // The editor snapshot contains plain IR records. Compare the collected
@@ -182,12 +187,28 @@ export function CadViewport(props: CadViewportProps) {
 
     const request = { engine, input };
     previous = request;
+    const publishFailure = (
+      code: string,
+      statuses: CadEngineResult["status"] = [],
+    ): void => {
+      const known = new Map(statuses);
+      const failure = { ok: false, code } as const;
+      statusStore.set(
+        pageId,
+        input.elements.flatMap(({ id, page }) => {
+          if (page !== pageId) return [];
+          const status = known.get(id);
+          return [[id, status && !status.ok ? status : failure] as const];
+        }),
+      );
+    };
     const evaluate = async (): Promise<void> => {
       try {
         const result = await engine.evaluate(input);
         if (previous !== request || result.revision !== version) return;
         if (result.failure) {
           setFailure(`CAD evaluation failed (${result.failure}).`);
+          publishFailure(result.failure, result.status);
           return;
         }
         const failed = result.status.find(([, status]) => !status.ok)?.[1];
@@ -197,15 +218,18 @@ export function CadViewport(props: CadViewportProps) {
             : undefined,
         );
         setBodies(result.bodies);
+        statusStore.set(pageId, result.status);
       } catch (error) {
         if (previous !== request || error instanceof CadSupersededError) return;
         setFailure("CAD evaluation failed.");
+        publishFailure("cad.kernel.failed");
       }
     };
     void evaluate();
   });
   onCleanup(() => {
     previous = undefined;
+    statusStore.clear(pageId);
   });
 
   createEffect(() => {
@@ -368,6 +392,7 @@ export function CadViewport(props: CadViewportProps) {
         [CANVAS_DARK_CLASS]: props.canvasMode === "dark",
       }}
       tabindex="0"
+      on:keydown={(event) => handleCadSelectionKey(props.editor, event)}
     >
       <canvas
         ref={canvas}

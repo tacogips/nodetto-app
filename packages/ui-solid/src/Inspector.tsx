@@ -32,12 +32,14 @@ import { BatchRenameSection } from "./inspector/BatchRenameSection.tsx";
 import { ReplaceNoteTextSection } from "./inspector/ReplaceNoteTextSection.tsx";
 import { BpmnSection } from "./inspector/BpmnSection.tsx";
 import { BreadboardSection } from "./inspector/BreadboardSection.tsx";
+import { CadSection } from "./inspector/CadSection.tsx";
 import { PcbSection } from "./inspector/PcbSection.tsx";
 import {
   type Element,
   type ElementId,
   getElementTypeDefinition,
   isBreadboardPartType,
+  isCadTypeName,
 } from "@nodetto/ir";
 import {
   createMemo,
@@ -210,6 +212,7 @@ export function Inspector(props: InspectorProps): JSX.Element {
     if (type === "pcb.via") return "Via";
     if (type === "pcb.zone") return "Zone";
     if (type === "pcb.graphic") return "Graphic";
+    if (isCadTypeName(type)) return "3D CAD";
     const labels: Record<string, string> = {
       "ui.control": "Control",
       "ui.icon": "Icon",
@@ -242,11 +245,14 @@ export function Inspector(props: InspectorProps): JSX.Element {
     const context = props.editor.createShapeContext();
     return selectedIds().some((id) => context.isLocked?.(id));
   });
-  // Fill and stroke mean nothing on a board item: open its own fields.
+  // Open the modelling fields first for PCB and CAD elements.
   createEffect(
-    on(selectedElementId, () =>
-      setActiveTab(single()?.type.startsWith("pcb.") ? "specific" : "shape"),
-    ),
+    on(selectedElementId, () => {
+      const type = single()?.type ?? "";
+      setActiveTab(
+        type.startsWith("pcb.") || isCadTypeName(type) ? "specific" : "shape",
+      );
+    }),
   );
   createEffect(
     on([() => props.focus, selectedElementId], ([focus, id]) => {
@@ -369,6 +375,16 @@ export function Inspector(props: InspectorProps): JSX.Element {
           <Match when={element().type.startsWith("pcb.")}>
             <PcbSection editor={props.editor} element={element()} />
           </Match>
+          <Match when={isCadTypeName(element().type)}>
+            <Show when={element().id} keyed>
+              {(id) => (
+                <CadSection
+                  editor={props.editor}
+                  element={props.editor.store.get(id) ?? element()}
+                />
+              )}
+            </Show>
+          </Match>
           <Match when={element().type === "group"}>
             <GroupSection editor={props.editor} element={element()} />
           </Match>
@@ -485,18 +501,20 @@ export function Inspector(props: InspectorProps): JSX.Element {
               <Show when={single()}>
                 {(element) => (
                   <>
-                    <Section title="Layer">
-                      <Field label="Name">
-                        <TextInput
-                          label="Layer name"
-                          value={element().visual.layerName ?? ""}
-                          placeholder={layerName(element())}
-                          onCommit={(name) =>
-                            renameLayer(props.editor, element().id, name)
-                          }
-                        />
-                      </Field>
-                    </Section>
+                    <Show when={!isCadTypeName(element().type)}>
+                      <Section title="Layer">
+                        <Field label="Name">
+                          <TextInput
+                            label="Layer name"
+                            value={element().visual.layerName ?? ""}
+                            placeholder={layerName(element())}
+                            onCommit={(name) =>
+                              renameLayer(props.editor, element().id, name)
+                            }
+                          />
+                        </Field>
+                      </Section>
+                    </Show>
                     <Show when={hasOwnGeometry(element())}>
                       <GeometrySection
                         editor={props.editor}

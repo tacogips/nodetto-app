@@ -1,7 +1,8 @@
-import type { Element } from "@nodetto/ir";
+import { type Element, isCadTypeName, isPlainObject } from "@nodetto/ir";
 import type { Editor } from "./editor.ts";
 
 export function layerName(element: Element): string {
+  if (isCadTypeName(element.type)) return cadLayerName(element);
   if (element.visual.layerName?.trim()) return element.visual.layerName;
   const data = element.semantic as Record<string, unknown> | null;
   for (const field of ["name", "label", "tableName", "text"]) {
@@ -26,6 +27,54 @@ export function layerName(element: Element): string {
     return "Screen transition";
   if (element.type.startsWith("pcb.")) return pcbLayerName(element.type, data);
   return element.type === "frame" ? "Artboard" : element.type;
+}
+
+function defaultCadName(type: string): string {
+  switch (type) {
+    case "cad.sketch":
+      return "Sketch";
+    case "cad.extrude":
+      return "Extrude";
+    case "cad.line":
+      return "Line";
+    case "cad.arc":
+      return "Arc";
+    case "cad.circle":
+      return "Circle";
+    case "cad.pcb":
+      return "Board";
+    case "cad.mesh":
+      return "Mesh";
+    default:
+      return type;
+  }
+}
+
+function cadAuthoredName({ type, semantic }: Element): string | undefined {
+  if (
+    type !== "cad.line" &&
+    type !== "cad.arc" &&
+    type !== "cad.circle" &&
+    isPlainObject(semantic) &&
+    typeof semantic.name === "string"
+  )
+    return semantic.name;
+}
+
+function cadLayerName(element: Element): string {
+  const { type, semantic } = element;
+  if (
+    type === "cad.circle" &&
+    isPlainObject(semantic) &&
+    typeof semantic.r === "number"
+  )
+    return `Circle ${semantic.r} mm`;
+  const name = cadAuthoredName(element);
+  return name?.trim() ? name : defaultCadName(type);
+}
+
+export function canRenameLayer(element: Element): boolean {
+  return !isCadTypeName(element.type) || cadAuthoredName(element) !== undefined;
 }
 
 /** Footprints by reference; copper items by kind and net; graphics by layer. */
@@ -67,6 +116,20 @@ export function renameLayer(editor: Editor, id: string, name: string): boolean {
   const element = editor.store.get(id);
   if (!element || editor.createShapeContext().isLocked?.(id)) return false;
   const value = name.trim();
+  if (isCadTypeName(element.type)) {
+    if (!canRenameLayer(element) || !isPlainObject(element.semantic))
+      return false;
+    const next = value || defaultCadName(element.type);
+    if (element.semantic.name === next) return false;
+    editor.apply([
+      {
+        type: "updateSemantic",
+        id,
+        semantic: { ...element.semantic, name: next },
+      },
+    ]);
+    return true;
+  }
   if ((element.visual.layerName ?? "") === value) return false;
   const { layerName: _name, ...rest } = element.visual;
   editor.apply([

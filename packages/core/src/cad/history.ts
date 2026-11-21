@@ -53,8 +53,15 @@ interface HistoryDetails extends CadHistory {
   readonly targets: ReadonlyMap<ElementId, readonly ElementId[]>;
 }
 
-function isSketchEntity(type: string): boolean {
+export function isSketchEntity(type: string): boolean {
   return type === "cad.line" || type === "cad.arc" || type === "cad.circle";
+}
+
+export function compareCadHistoryOrder(left: Element, right: Element): number {
+  return (
+    compareFractional(left.index, right.index) ||
+    compareFractional(left.id, right.id)
+  );
 }
 
 function validatePayload(element: Element): CadStatus {
@@ -243,10 +250,7 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
   const byId = new Map(cad.map((element) => [element.id, element]));
   const features = cad
     .filter(({ type }) => type === "cad.sketch" || type === "cad.extrude")
-    .sort(
-      (a, b) =>
-        compareFractional(a.index, b.index) || compareFractional(a.id, b.id),
-    );
+    .sort(compareCadHistoryOrder);
   const ranks = new Map(features.map(({ id }, index) => [id, index]));
   const typed = new Map<ElementId, CadFeature>();
   const dependencies = new Map<ElementId, readonly ElementId[]>();
