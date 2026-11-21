@@ -21,6 +21,7 @@ import {
 } from "./settings/appearance.ts";
 import { createCliInstaller } from "./settings/cli-install.ts";
 import { loadEditorPreferences } from "./settings/preferences.ts";
+import { installFileDropGuard } from "./shell/file-drop-guard.ts";
 import { installNativeContextMenuGuard } from "./shell/native-context-menu.ts";
 import "./style.css";
 import "./inspector.css";
@@ -45,6 +46,7 @@ void installCloseGuard(session).catch((error) => {
 
 // The webview's own menu offers Reload, which would drop the open document.
 installNativeContextMenuGuard(window);
+installFileDropGuard(window);
 
 try {
   let storage: Storage | undefined;

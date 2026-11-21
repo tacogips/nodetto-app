@@ -208,12 +208,22 @@ export function createExportHandlers(
         throw new Error("The CAD engine could not export this page.");
       if (stl.byteLength === 84)
         throw new Error("There are no visible solid bodies to export.");
-      await saveBinary(
+      const saved = await saveBinary(
         stl,
         `${exportBaseName(page.name)}.stl`,
         "stl",
         "model/stl",
       );
+      if (saved) {
+        const issues = result.status.filter(([, status]) => !status.ok).length;
+        if (issues > 0) {
+          const features =
+            issues === 1 ? "1 feature has" : `${issues} features have`;
+          setExportError(
+            `STL saved. ${features} issues that may affect the exported model. Check the feature list for details.`,
+          );
+        }
+      }
     } catch (error) {
       setExportError(
         `could not export: ${error instanceof Error ? error.message : String(error)}`,

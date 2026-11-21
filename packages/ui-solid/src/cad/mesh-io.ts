@@ -58,7 +58,10 @@ export function stlToMeshCommands(
   };
 }
 
-/** Serialize already-visible display bodies. The desktop export uses kernel coordinates. */
+/**
+ * Serialize rounded display buffers. Callers must filter out hidden bodies.
+ * Use the worker's full-precision STL request for document export.
+ */
 export function bodiesToStl(
   bodies: readonly CadDisplayBody[],
   options?: { includeReference?: boolean },

@@ -205,5 +205,15 @@ test("real CAD client saves a closed import and refuses a page with only an open
   expect(picked).toEqual([["Housing.stl", "stl"]]);
   expect(writes).toHaveLength(1);
   expect(readStl(writes[0].bytes).triangles.length / 3).toBe(4);
-  expect(errors.at(-1)).toBeNull();
+  expect(errors.at(-1)).toContain("STL saved. 1 feature has issues");
+
+  const sketch = editor.createElement("cad.sketch");
+  editor.createElement("cad.extrude", {
+    semantic: { name: "Incomplete extrusion", sketch, op: "new", distance: 2 },
+  });
+  await handlers.exportStl();
+  expect(picked).toHaveLength(2);
+  expect(writes).toHaveLength(2);
+  expect(writes.at(-1)?.bytes).toEqual(writes[0].bytes);
+  expect(errors.at(-1)).toContain("STL saved. 2 features have issues");
 });

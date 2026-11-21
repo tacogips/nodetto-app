@@ -63,6 +63,12 @@ export function cadPageSvgBody(wireframe: CadWireframe, options: { stroke: strin
   the WebKit and macOS versions. A wrapper script entry
   `check:cad-wkwebview` in `apps/desktop/package.json` runs both
   processes in the foreground and returns the Swift exit code.
+- In the packaged desktop webview, drop a valid STL onto the CAD viewport
+  and verify that one undo removes the mesh. Drop a file on the palette
+  or an open Export dialog and verify that the app stays on the current
+  document with unsaved edits intact. Also exercise the STL picker and
+  save dialog and import a raster image by dropping it onto a 2D canvas.
+  Record the host and each outcome alongside the WKWebView report.
 - Native mesh validation deadline: a generated document with four
   `cad.mesh` elements of maximum payload length passes `validate` in the
   native binary in under 10,000 ms and with byte parity to Bun.

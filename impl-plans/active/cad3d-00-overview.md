@@ -586,6 +586,31 @@ tests with 18 macOS file-replacement permission failures under the same
 restriction. The native drag path was not exercised in a desktop webview.
 Verification logs are under `tmp/cad3d/m20/`.
 
+M20 review rework remains implemented and awaits review. The desktop shell
+cancels unhandled file drops at the window, after component handlers have a
+chance to accept them (IR20-01). The DOM harness checks the palette, layers
+panel, inspector and open Export dialog in both themes. It also verifies
+that viewport STL import, 2D image import and layer reordering work.
+
+Rework deviations: enabling HTML file drops in the desktop webview also
+enables the existing 2D raster image drop there. M18 now includes native
+host checks for the CAD viewport drop, an off-target drop, STL picker and
+save, and 2D image drop. A successful STL save reports the count of CAD
+features with evaluation issues (IR20-02). The real-kernel test confirms
+that the warning accompanies a save of the available solid. The display
+helper documents its visibility and precision requirements and points
+document exporters to the worker request (IR20-03).
+
+The three milestone checks and repository TypeScript lint passed. The
+emitter inventory passed, and the bundle audit found one worker chunk and
+one pinned WASM asset. Workspace check and lint passed. Full verification
+discovered extracted upstream tests under `tmp/`. The scoped Bun run
+passed 4,407 tests with 74 skipped and three Chrome startup failures under
+the worktree write restriction. The Rust workspace passed 73 of 91 tests
+with 18 macOS file-replacement permission failures under that restriction.
+Packaged webview verification remains scheduled in M18. Rework logs are
+under `tmp/cad3d/m20-rework/`.
+
 ## Completion
 
 All twenty-two milestones accepted by the adversarial implementation
