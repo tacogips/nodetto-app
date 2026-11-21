@@ -103,6 +103,7 @@ export function ShapePalette(props: {
   readonly onToolChange: (tool: ToolKind) => void;
   readonly context: ActionContext;
   readonly onShapeDrop?: (tool: ToolKind, client: Vec) => void;
+  readonly onImportStl?: () => void;
 }): JSX.Element {
   let drag:
     | {
@@ -399,6 +400,18 @@ export function ShapePalette(props: {
             setIconPicker(false);
           }}
         />
+      </Show>
+      <Show when={props.workspace === "cad3d" && props.onImportStl}>
+        <div class="nodetto-palette-actions">
+          <button
+            type="button"
+            class="nodetto-palette-action"
+            disabled={readOnly()}
+            onClick={() => props.onImportStl?.()}
+          >
+            Import STL...
+          </button>
+        </div>
       </Show>
       <Show when={props.workspace !== "cad3d"}>
         <div class="nodetto-palette-actions" role="group" aria-label="Grouping">

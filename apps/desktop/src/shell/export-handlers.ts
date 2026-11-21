@@ -11,6 +11,8 @@ import {
   exportMarkdownDocument,
   encodeStoredZip,
   bpmnRouteResolver,
+  type CadEngine,
+  collectCadInput,
   computeBreadboardConnectivity,
   type Editor,
   encodeBreadboardPcbZip,
@@ -56,6 +58,7 @@ export interface ExportHandlers {
   ) => Promise<void>;
   readonly exportGerber: () => Promise<void>;
   readonly exportPcbGerber: () => Promise<void>;
+  readonly exportStl: () => Promise<void>;
 }
 
 /** Hand `blob` to the browser as a download named `name`. */
@@ -80,6 +83,7 @@ export function createExportHandlers(
   setExportError: (message: string | null) => void,
   deps: {
     readonly rasterizeSvg?: (svg: string, scale: number) => Promise<Blob>;
+    readonly createCadEngine?: () => CadEngine;
   } = {},
 ): ExportHandlers {
   const saveArtwork = async (
@@ -157,16 +161,64 @@ export function createExportHandlers(
       );
   };
 
-  /** Saves a ZIP through the export backend, or downloads it; false if cancelled. */
-  const saveZip = async (bytes: Uint8Array, name: string): Promise<boolean> => {
+  const saveBinary = async (
+    bytes: Uint8Array,
+    name: string,
+    extension: string,
+    type: string,
+  ): Promise<boolean> => {
     if (!source.exportBackend.available) {
-      downloadBlob(new Blob([bytes], { type: "application/zip" }), name);
+      downloadBlob(new Blob([bytes], { type }), name);
       return true;
     }
-    const path = await source.exportBackend.pickExportPath(name, "zip");
+    const path = await source.exportBackend.pickExportPath(name, extension);
     if (path === null) return false;
     await source.exportBackend.writeBytes(path, bytes);
     return true;
+  };
+
+  const saveZip = (bytes: Uint8Array, name: string): Promise<boolean> =>
+    saveBinary(bytes, name, "zip", "application/zip");
+
+  const exportStl = async (): Promise<void> => {
+    setExportError(null);
+    const { editor } = source;
+    const page = editor.store.getPage(editor.currentPageId);
+    if (page?.kind !== "cad3d") return;
+    const input = collectCadInput(
+      editor.getSnapshot(),
+      page.id,
+      editor.revision,
+    );
+    const bodyIds = input.elements.flatMap(({ type, id, visual }) =>
+      !visual.hidden && (type === "cad.extrude" || type === "cad.mesh")
+        ? [id]
+        : [],
+    );
+    try {
+      if (bodyIds.length === 0)
+        throw new Error("There are no visible solid bodies to export.");
+      const engine = deps.createCadEngine?.();
+      if (!engine) throw new Error("The CAD engine is unavailable.");
+      const result = await engine
+        .evaluate({ ...input, exportStl: { bodyIds } })
+        .finally(() => engine.dispose());
+      const { stl } = result;
+      if (result.failure || !stl || stl.byteLength < 84)
+        throw new Error("The CAD engine could not export this page.");
+      if (stl.byteLength === 84)
+        throw new Error("There are no visible solid bodies to export.");
+      await saveBinary(
+        stl,
+        `${exportBaseName(page.name)}.stl`,
+        "stl",
+        "model/stl",
+      );
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   };
 
   const exportDocumentPdf = async (
@@ -354,5 +406,6 @@ export function createExportHandlers(
     exportBreadboard,
     exportGerber,
     exportPcbGerber,
+    exportStl,
   };
 }

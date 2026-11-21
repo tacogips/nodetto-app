@@ -331,7 +331,7 @@ checks these forms in non-test TypeScript under `packages/*/src` and
 | A. Can create without existing 2D content, or from generic endpoints | Core paths are `templates/design-templates.ts`, `ui-blocks.ts`, `kits/ios/insert.ts`, `shape-catalogue.ts`, `html-layout.ts`, `editor/facade/notation-editing.ts` (sequence participant), `page-frames/editing.ts` (through `editor/facade/page-editing.ts`), `freehand-gesture.ts`. UI paths are `image-import.ts`, `ShapePalette.tsx`. Desktop paths are `seed.ts`. | Live-page helpers check `editor.canCreateOn(pageId, type)` (a facade over `pageAcceptsElementType`) before editing. The template and HTML layout builders create their own freeform document. M6 hides or disables the template, image import, kit and block controls on CAD pages. |
 | A0. Generic entry points | Core paths are `editor/facade/core.ts`, `editor/facade/element-editing.ts`. CLI paths are `edit/operations/add.ts`. | The command choke point reports `page.contentKind`. Specialized CLI kit and sequence add operations report an operation error when their helper declines creation. |
 | B. Requires 2D content or has a guard in M2 | Core paths are `group.ts`, `frame-selection.ts`, `boolean-operations.ts`, `editor/components.ts`, `editor/connections.ts`, `editor/sequence.ts`, `editor/bpmn.ts`, `bpmn/containment.ts`, `screen-transition.ts`. | These helpers return without editing for a CAD-only page or selection. |
-| C. Canvas interaction | UI paths are `interaction/creation.ts`, `interaction/connectors.ts`. The CAD viewport calls the command builders in core `cad/authoring.ts`. | M22 checks the page kind for 2D placements and connectors. Those controls do not mount inside the CAD viewport, which checks `canCreateOn` before applying a sketch command. The command layer enforces rule R in both cases. |
+| C. Canvas interaction | UI paths are `interaction/creation.ts`, `interaction/connectors.ts` and `cad/mesh-io.ts`. The CAD viewport also calls the command builders in core `cad/authoring.ts`. | M22 checks the page kind for 2D placements and connectors. The CAD viewport checks `canCreateOn` before applying sketch or STL import commands. The command layer enforces rule R in both cases. |
 | D. Resource carriers | Core paths are `color-tokens.ts`, `number-tokens.ts`, `text-styles.ts`, `page-guides.ts`, `comments.ts`. UI paths are `inspector/slide-transition-edits.ts`. | Rule R permits these elements. Comment pins and guides are absent from the 3D viewport in the slice. Comments stay listed in the comments panel. |
 | E. Fixtures, inverse commands and clipboard planning | CLI paths are `__fixtures__/bpmn-layered.ts`, `__fixtures__/connector-arrange.ts`, `__fixtures__/dense-relations.ts`, `__fixtures__/obstacle-routing-batch.ts`, `__fixtures__/sequence-self-timing.ts`, `__fixtures__/text-layout.ts`. Desktop paths are `file/session-test-helpers.ts`. Core paths are `commands.ts`, `clipboard.ts`. UI paths are `interaction-test-helpers.ts`, `test-dom/text-editor.dom.tsx`. | The list includes test-support files that lack a `.test.ts` or `.test.tsx` suffix. |
 
@@ -870,7 +870,8 @@ reverse direction (deriving `Edge.Cuts` from a CAD face).
   canonicalization. For export, the worker evaluates the selected page
   snapshot with a fresh memo and writes the selected kernel bodies at
   Float32 precision before viewport rounding. Open imports stay visible
-  as references and have no kernel body to export.
+  as references and have no kernel body to export. A page with no visible
+  exportable solids reports an error before offering a save location.
 - Existing exports: `packages/core/src/svg-export/` draws a CAD page as an
   isometric wireframe of the feature tool solids (loops at both caps plus
   the connecting edges), computed without a kernel so the CLI produces the
@@ -988,9 +989,11 @@ never runs a kernel. It needs none for its job:
 | Corrupt mesh payload | `cad.mesh` reports `cad.mesh.invalid`; other bodies unaffected |
 | Inward-wound closed mesh | After solidification, negative signed volume triggers a rebuild with reversed triangle winding. Evaluation and STL export use the outward solid, while the saved NMESH remains unchanged. A rebuild that still has negative signed volume reports `cad.mesh.invalid`. |
 
-Import limitation: self-intersections, including overlaps between closed
-shells, are undetected. Such meshes may double-count volume and produce
-incorrect booleans. Repair the source mesh before importing it.
+The viewport import notice covers two mesh limitations. Self-intersections,
+including overlaps between closed shells, can double-count volume and produce
+incorrect booleans. Separate shells with mixed winding can also produce an
+incorrect volume or appear as reference geometry when their volumes cancel.
+Repair these problems in the source mesh before importing it.
 
 ## 14. Performance budgets and measurement
 

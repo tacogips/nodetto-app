@@ -6,11 +6,8 @@ import {
 import CadWorker from "@nodetto/cad-kernel/worker?worker";
 import wasmAsset from "manifold-3d/manifold.wasm?url";
 
-let engine: CadEngine | undefined;
-
+/** Each caller owns its worker so an export cannot supersede a viewport request. */
 export function getCadEngine(): CadEngine {
-  if (engine) return engine;
-
   let worker: Worker | undefined;
   let handler: (message: unknown) => void;
   let onError: () => void;
@@ -61,12 +58,9 @@ export function getCadEngine(): CadEngine {
       close();
       open();
     },
-    dispose() {
-      close();
-      engine = undefined;
-    },
+    dispose: close,
   };
-  engine = createCadEngineClient(transport);
+  const engine = createCadEngineClient(transport);
   try {
     open();
   } catch {

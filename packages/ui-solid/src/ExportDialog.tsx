@@ -64,6 +64,7 @@ type Format =
   | "breadboard"
   | "gerber"
   | "pcb"
+  | "stl"
   | "code"
   | "html"
   | "artboards"
@@ -87,6 +88,7 @@ export interface ExportDialogProps {
   /** Gerber and drill ZIP of a page drawn by Gerber import. */
   readonly exportGerber?: () => Promise<void>;
   readonly exportPcb?: () => Promise<void>;
+  readonly exportStl?: () => Promise<void>;
   readonly error?: string | null;
   readonly onClose: () => void;
   readonly onCompare?: () => void;
@@ -105,7 +107,7 @@ export const EXPORT_FORMAT_GROUPS: readonly {
     label: "Diagram source",
     ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
   },
-  { label: "Fabrication", ids: ["pcb"] },
+  { label: "Fabrication", ids: ["pcb", "stl"] },
   { label: "Web & developer", ids: ["html", "prototype", "code"] },
 ];
 
@@ -136,12 +138,16 @@ export function documentExportFormats(
 
 export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const signals = createEditorSignals(props.editor);
+  const initialKind = props.editor.store.getPage(
+    props.editor.currentPageId,
+  )?.kind;
   // A board is exported for fabrication far more often than as artwork.
   const [format, setFormat] = createSignal<Format>(
-    props.exportPcb &&
-      props.editor.store.getPage(props.editor.currentPageId)?.kind === "pcb"
+    props.exportPcb && initialKind === "pcb"
       ? "pcb"
-      : "svg",
+      : props.exportStl && initialKind === "cad3d"
+        ? "stl"
+        : "svg",
   );
   const [artboardFormat, setArtboardFormat] = createSignal<"png" | "svg">(
     "png",
@@ -219,6 +225,11 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
         label: "PCB",
         enabled: pcbExportEnabled(page()?.kind, props.exportPcb !== undefined),
       },
+      {
+        id: "stl",
+        label: "STL (3D model)",
+        enabled: page()?.kind === "cad3d" && props.exportStl !== undefined,
+      },
       { id: "code", label: "Code", enabled: selected() !== undefined },
     ] satisfies readonly { id: Format; label: string; enabled: boolean }[];
   });
@@ -243,6 +254,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     gerber:
       "The imported board's Gerber and drill files with your edits, for a board house. Nothing is checked.",
     pcb: "Gerber copper, solder mask, silkscreen, outline and drill files.",
+    stl: "Export visible solid bodies as a binary STL in millimetres.",
     html: "A website ZIP containing artboard HTML, CSS and assets.",
     code: "Design details, web code and native code for the selected element.",
     artboards: "Export each artboard as an image in a ZIP archive.",
@@ -302,6 +314,15 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       }
     } catch (error) {
       setExportError(error instanceof Error ? error.message : "Export failed.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+  const runStlExport = async () => {
+    if (exportBusy()) return;
+    setExportBusy(true);
+    try {
+      await props.exportStl?.();
     } finally {
       setExportBusy(false);
     }
@@ -376,9 +397,11 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                       const item = () =>
                         formats().find((entry) => entry.id === id);
                       return (
-                        <option value={id} disabled={!item()?.enabled}>
-                          {item()?.label}
-                        </option>
+                        <Show when={id !== "stl" || item()?.enabled}>
+                          <option value={id} disabled={!item()?.enabled}>
+                            {item()?.label}
+                          </option>
+                        </Show>
                       );
                     }}
                   </For>
@@ -579,6 +602,15 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
             <Match when={active() === "pcb"}>
               <button type="button" onClick={() => void props.exportPcb?.()}>
                 Gerber and drill (.zip)
+              </button>
+            </Match>
+            <Match when={active() === "stl"}>
+              <button
+                type="button"
+                disabled={exportBusy()}
+                onClick={() => void runStlExport()}
+              >
+                Export STL
               </button>
             </Match>
             <Match when={active() === "code" && selected()}>

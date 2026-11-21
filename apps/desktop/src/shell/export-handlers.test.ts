@@ -1,5 +1,15 @@
 import { expect, test } from "bun:test";
-import { Editor, extractPdfText } from "@nodetto/core";
+import { createManifoldKernel } from "@nodetto/cad-kernel";
+import {
+  type CadEngine,
+  type CadEngineInput,
+  createCadEngineClient,
+  Editor,
+  extractPdfText,
+} from "@nodetto/core";
+import { stlToInlineMesh } from "@nodetto/io/cad-mesh";
+import { readStl, writeBinaryStl } from "@nodetto/io/stl";
+import { createWorkerHost } from "../../../../packages/cad-kernel/src/worker-host.ts";
 import type { ExportBackend } from "../file/backend.ts";
 import { createExportHandlers } from "./export-handlers.ts";
 
@@ -15,6 +25,7 @@ const png = new Blob(
 
 function fixture(
   rasterizeSvg: (svg: string, scale: number) => Promise<Blob> = async () => png,
+  createCadEngine?: () => CadEngine,
 ) {
   const editor = new Editor();
   editor.loadDocument({ ...editor.getSnapshot(), title: "Paper" });
@@ -49,13 +60,14 @@ function fixture(
     },
   };
   return {
+    editor,
     picked,
     writes,
     errors,
     handlers: createExportHandlers(
       { editor, exportBackend: backend },
       (message) => errors.push(message),
-      { rasterizeSvg },
+      { rasterizeSvg, createCadEngine },
     ),
   };
 }
@@ -92,4 +104,106 @@ test("document PDF reports rasterizer failures without writing", async () => {
   await handlers.exportDocumentPdf(1, "#ffffff");
   expect(writes).toEqual([]);
   expect(errors.at(-1)).toBe("could not export: boom");
+});
+
+const openTriangle = {
+  positions: Float32Array.of(0, 0, 0, 3, 0, 0, 0, 2, 0),
+  triangles: Uint32Array.of(0, 1, 2),
+};
+
+test("STL export sends a CAD snapshot with visible body IDs and saves the worker bytes", async () => {
+  const bytes = writeBinaryStl([openTriangle]);
+  const requests: CadEngineInput[] = [];
+  let disposed = 0;
+  const { editor, handlers, picked, writes, errors } = fixture(
+    undefined,
+    () => ({
+      async evaluate(input) {
+        requests.push(input);
+        return { revision: input.revision, status: [], bodies: [], stl: bytes };
+      },
+      dispose() {
+        disposed++;
+      },
+    }),
+  );
+  await handlers.exportStl();
+  expect(requests).toEqual([]);
+  expect(picked).toEqual([]);
+  const page = editor.createPage({ kind: "cad3d", name: "Carrier: preview" });
+  const data = stlToInlineMesh(bytes);
+  const id = editor.createElement("cad.mesh", {
+    semantic: { name: "Bracket", data },
+  });
+  editor.createElement("cad.sketch");
+  editor.createElement("cad.mesh", {
+    semantic: { name: "Hidden", data },
+    visual: { hidden: true },
+  });
+  await handlers.exportStl();
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toMatchObject({
+    pageId: page,
+    revision: editor.revision,
+    exportStl: { bodyIds: [id] },
+  });
+  expect(requests[0].elements.every((element) => element.page === page)).toBe(
+    true,
+  );
+  expect(disposed).toBe(1);
+  expect(picked).toEqual([["Carrier- preview.stl", "stl"]]);
+  expect(writes).toEqual([{ path: "/out/Carrier- preview.stl", bytes }]);
+  expect(errors.at(-1)).toBeNull();
+});
+
+test("real CAD client saves a closed import and refuses a page with only an open mesh", async () => {
+  const kernel = createManifoldKernel();
+  const { editor, handlers, writes, picked, errors } = fixture(
+    undefined,
+    () => {
+      const host = createWorkerHost(kernel);
+      let receive: (message: unknown) => void;
+      return createCadEngineClient({
+        post(message) {
+          void host(message, (reply, transfer) =>
+            receive(structuredClone(reply, { transfer: [...transfer] })),
+          );
+        },
+        onMessage(handler) {
+          receive = handler;
+        },
+        restart() {},
+      });
+    },
+  );
+  editor.createPage({ kind: "cad3d", name: "Housing" });
+  editor.createElement("cad.mesh", {
+    semantic: {
+      name: "Open",
+      data: stlToInlineMesh(writeBinaryStl([openTriangle])),
+    },
+  });
+  await handlers.exportStl();
+  expect(picked).toEqual([]);
+  expect(writes).toEqual([]);
+  expect(errors.at(-1)).toContain("no visible solid bodies");
+
+  editor.createElement("cad.mesh", {
+    semantic: {
+      name: "Closed",
+      data: stlToInlineMesh(
+        writeBinaryStl([
+          {
+            positions: Float32Array.of(0, 0, 0, 3, 0, 0, 0, 2, 0, 0, 0, 4),
+            triangles: Uint32Array.of(0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3),
+          },
+        ]),
+      ),
+    },
+  });
+  await handlers.exportStl();
+  expect(picked).toEqual([["Housing.stl", "stl"]]);
+  expect(writes).toHaveLength(1);
+  expect(readStl(writes[0].bytes).triangles.length / 3).toBe(4);
+  expect(errors.at(-1)).toBeNull();
 });

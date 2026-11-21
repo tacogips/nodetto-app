@@ -36,10 +36,17 @@ import {
 } from "./camera3d.ts";
 import { createExtrudeAuthoring } from "./extrude-authoring.ts";
 import { CAD_DRAG_THRESHOLD } from "./extrude-interaction.ts";
+import {
+  STL_IMPORT_NOTE,
+  STL_MAX_BYTES,
+  STL_SIZE_ERROR,
+  stlToMeshCommands,
+} from "./mesh-io.ts";
 import { type CadPick, pickBodies } from "./pick.ts";
 import { type CadRenderer, createWebgl2Renderer } from "./renderer.ts";
 import { handleCadSelectionKey } from "./selection-keys.ts";
 import {
+  cadAuthoringIds,
   createSketchAuthoring,
   type SketchViewportPoint,
 } from "./sketch-authoring.ts";
@@ -55,6 +62,7 @@ export interface CadViewportProps {
   readonly showGrid?: boolean;
   readonly tool?: ToolKind;
   readonly onToolChange?: (tool: ToolKind) => void;
+  readonly onImportPicker?: (open: (() => void) | undefined) => void;
   readonly createRenderer?: (canvas: HTMLCanvasElement) => CadRenderer | null;
   readonly pageId?: PageId;
   readonly initialCamera?: Camera3d;
@@ -85,6 +93,7 @@ function fitBodies(
 export function CadViewport(props: CadViewportProps) {
   let root!: HTMLDivElement;
   let canvas!: HTMLCanvasElement;
+  let fileInput!: HTMLInputElement;
   const pageId = props.pageId ?? props.editor.currentPageId;
   const statusStore = cadStatusStoreFor(props.editor);
   const [revision, setRevision] = createSignal(props.editor.revision);
@@ -92,6 +101,10 @@ export function CadViewport(props: CadViewportProps) {
   const [renderer, setRenderer] = createSignal<CadRenderer | null>(null);
   const [bodies, setBodies] = createSignal<readonly CadDisplayBody[]>([]);
   const [failure, setFailure] = createSignal<string>();
+  const [importNotice, setImportNotice] = createSignal<string>();
+  let importing = false;
+  let pickerRevision: number | undefined;
+  let mounted = false;
   const [themeUnavailable, setThemeUnavailable] = createSignal(false);
   const [picked, setPicked] = createSignal<CadPick | null>(null);
   const [camera, setCamera] = createSignal(
@@ -153,7 +166,74 @@ export function CadViewport(props: CadViewportProps) {
     changeCamera(fitBodies(drawnBodies(), width / height));
   }
 
+  function canImport(documentRevision: number): boolean {
+    const { editor } = props;
+    return (
+      mounted &&
+      !editor.readOnly &&
+      editor.currentPageId === pageId &&
+      editor.documentOpenRevision === documentRevision &&
+      editor.canCreateOn(pageId, "cad.mesh")
+    );
+  }
+
+  function openImportPicker(): void {
+    const version = props.editor.documentOpenRevision;
+    if (!canImport(version) || importing) return;
+    pickerRevision = version;
+    fileInput.click();
+  }
+
+  async function importStl(
+    file: File,
+    documentRevision: number,
+  ): Promise<void> {
+    if (!canImport(documentRevision) || importing) return;
+    if (!/\.stl$/i.test(file.name)) {
+      setImportNotice("Choose an STL file.");
+      return;
+    }
+    if (file.size > STL_MAX_BYTES) {
+      setImportNotice(STL_SIZE_ERROR);
+      return;
+    }
+    const { editor } = props;
+    importing = true;
+    setImportNotice(undefined);
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (!canImport(documentRevision)) return;
+      const elements = editor.store.getPageElements(pageId);
+      const after = elements.reduce<string | undefined>(
+        (last, { index }) =>
+          last === undefined || last < index ? index : last,
+        undefined,
+      );
+      const result = stlToMeshCommands(
+        pageId,
+        bytes,
+        file.name,
+        cadAuthoringIds(elements),
+        after,
+      );
+      if ("error" in result) {
+        setImportNotice(result.error);
+        return;
+      }
+      editor.apply(result.commands);
+      setImportNotice(STL_IMPORT_NOTE);
+    } catch {
+      if (canImport(documentRevision))
+        setImportNotice("Could not import the STL file.");
+    } finally {
+      importing = false;
+    }
+  }
+
   onMount(() => {
+    mounted = true;
+    const registerImportPicker = props.onImportPicker;
+    registerImportPicker?.(openImportPicker);
     const initialize = () =>
       setRenderer((props.createRenderer ?? createWebgl2Renderer)(canvas));
     initialize();
@@ -186,6 +266,8 @@ export function CadViewport(props: CadViewportProps) {
     observer?.observe(root);
     measure();
     onCleanup(() => {
+      mounted = false;
+      registerImportPicker?.(undefined);
       unsubscribe();
       unsubscribeSelection();
       window.removeEventListener("resize", measure);
@@ -384,6 +466,7 @@ export function CadViewport(props: CadViewportProps) {
       (event.button !== 0 && event.button !== 1)
     )
       return;
+    setImportNotice(undefined);
     const panning = event.button === 1 || event.shiftKey;
     const point = pointerPosition(event);
     if (!panning && extrude.start(event.pointerId, point)) {
@@ -550,7 +633,40 @@ export function CadViewport(props: CadViewportProps) {
       }}
       tabindex="0"
       on:keydown={keyDown}
+      on:dragover={(event) => {
+        const transfer = event.dataTransfer;
+        if (!transfer?.types.includes("Files")) return;
+        event.preventDefault();
+        transfer.dropEffect =
+          canImport(props.editor.documentOpenRevision) && !importing
+            ? "copy"
+            : "none";
+      }}
+      on:drop={(event) => {
+        const files = event.dataTransfer?.files;
+        if (!files?.length) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const version = props.editor.documentOpenRevision;
+        if (!canImport(version) || importing) return;
+        const file = files[0];
+        if (files.length === 1 && file) void importStl(file, version);
+        else setImportNotice("Drop one STL file at a time.");
+      }}
     >
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".stl"
+        hidden
+        on:change={() => {
+          const file = fileInput.files?.[0];
+          const version = pickerRevision;
+          pickerRevision = undefined;
+          fileInput.value = "";
+          if (file && version !== undefined) void importStl(file, version);
+        }}
+      />
       <canvas
         ref={canvas}
         class="nodetto-cad-surface"
@@ -563,9 +679,9 @@ export function CadViewport(props: CadViewportProps) {
         onWheel={zoom}
         onDblClick={fit}
       />
-      <Show when={status()}>
+      <Show when={importNotice() || status()}>
         <div class="nodetto-cad-status" role="status">
-          {status()}
+          {[importNotice(), status()].filter(Boolean).join(" ")}
         </div>
       </Show>
     </div>

@@ -15,7 +15,7 @@ test("export format groups retain their labels and order", () => {
       label: "Diagram source",
       ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
     },
-    { label: "Fabrication", ids: ["pcb"] },
+    { label: "Fabrication", ids: ["pcb", "stl"] },
     { label: "Web & developer", ids: ["html", "prototype", "code"] },
   ]);
 });

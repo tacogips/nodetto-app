@@ -393,6 +393,7 @@ export function App(props: AppProps): JSX.Element {
     );
   };
   const cadPageActive = createMemo(isCadPage);
+  let openCadImport: (() => void) | undefined;
   const [cadEngine, setCadEngine] =
     createSignal<ReturnType<typeof getCadEngine>>();
   createEffect(() => {
@@ -543,7 +544,9 @@ export function App(props: AppProps): JSX.Element {
   const openExport = () => {
     setExportRequest((value) => value + 1);
   };
-  const exportHandlers = createExportHandlers(props, setExportError);
+  const exportHandlers = createExportHandlers(props, setExportError, {
+    createCadEngine: getCadEngine,
+  });
 
   /** Everything the shared action table needs from the shell. */
   const actionContext = (): ActionContext => ({
@@ -744,6 +747,7 @@ export function App(props: AppProps): JSX.Element {
           exportBreadboard={exportHandlers.exportBreadboard}
           exportGerber={exportHandlers.exportGerber}
           exportPcb={exportHandlers.exportPcbGerber}
+          exportStl={exportHandlers.exportStl}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />
@@ -929,6 +933,7 @@ export function App(props: AppProps): JSX.Element {
             onToolChange={setActiveTool}
             context={actionContext()}
             onShapeDrop={(tool, client) => setShapeDrop({ tool, client })}
+            onImportStl={cadPageActive() ? () => openCadImport?.() : undefined}
           />
           <Layers
             simple={simpleWorkspace()}
@@ -974,6 +979,9 @@ export function App(props: AppProps): JSX.Element {
           >
             <NodettoCanvas
               cadEngine={cadEngine()}
+              onCadImportPicker={(open) => {
+                openCadImport = open;
+              }}
               canvasBackground={{
                 diagram: resolveCanvasMode(canvasBackground(), resolvedTheme()),
                 pcb: resolveCanvasMode(pcbCanvasBackground(), resolvedTheme()),

@@ -166,6 +166,7 @@ const classifiedEmitters = {
   "packages/core/src/screen-transition.ts": "B",
   "packages/ui-solid/src/interaction/connectors.ts": "C",
   "packages/ui-solid/src/interaction/creation.ts": "C",
+  "packages/ui-solid/src/cad/mesh-io.ts": "C",
   "packages/core/src/cad/authoring.ts": "C",
   "packages/core/src/color-tokens.ts": "D",
   "packages/core/src/comments.ts": "D",

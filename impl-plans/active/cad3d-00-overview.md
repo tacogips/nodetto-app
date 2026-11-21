@@ -139,8 +139,8 @@ milestone that breaks it, not in M18.
 | M10 | accepted |
 | M11 | accepted |
 | M12 | accepted |
-| M13 | implemented |
-| M20 | pending |
+| M13 | accepted |
+| M20 | implemented |
 | M14 | pending |
 | M21 | pending |
 | M15 | pending |
@@ -552,6 +552,39 @@ passed 4,398 tests, skipped 74 and had three Chrome startup permission
 failures. The Rust workspace passed 73 of 91 tests, with 18 macOS
 replacement-file permission failures under the worktree write
 restriction. Rework logs are under `tmp/cad3d/m13-rework/`.
+
+M20 adds STL import through the CAD palette and viewport drop. The resulting
+named mesh appends to feature history in one undo step. The status strip
+reports invalid files, the inline size limit, and the limits for
+self-intersections and mixed shell winding (IR13-03 and IR13-06). The export
+dialog offers STL on CAD pages. It saves the visible solid bodies and
+reports a page containing only open or hidden bodies before the save dialog
+(IR13-05).
+
+M20 deviations: the desktop exports the current page snapshot through its
+own short-lived worker, using the full-precision export request added in
+M13. This keeps the export independent of viewport evaluation and allows
+it to run before the first viewport result. The display-body helper still
+meets the standalone plan contract. The palette and canvas pass the picker
+action to the CAD viewport, and the desktop webview lets HTML handle file
+drops so the same drag path works with WebView2
+([Tauri window configuration](https://v2.tauri.app/reference/config/#dragdropenabled)).
+The emitter inventory and
+design document cover the new import path. The existing layer-name fallback
+already uses the mesh name or “Mesh.”
+
+All three M20 verification commands passed with 52, 7 and 7 tests. The
+light and dark DOM runs cover picking a file, dropping a file, import
+status, undo, a page switch during a read, and the CAD-only STL option.
+The real-kernel tests cover stable re-export and refuse an open-only page.
+The bundle audit found one worker chunk and the pinned WASM asset.
+Workspace check and lint passed. Full verification picked up extracted
+upstream tests under `tmp/`. The scoped Bun run passed 4,407 tests with
+74 skipped and three existing Chrome tests blocked at startup by the
+worktree-only write restriction. The Rust workspace passed 73 of 91
+tests with 18 macOS file-replacement permission failures under the same
+restriction. The native drag path was not exercised in a desktop webview.
+Verification logs are under `tmp/cad3d/m20/`.
 
 ## Completion
 
