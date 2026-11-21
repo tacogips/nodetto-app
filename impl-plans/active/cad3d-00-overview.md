@@ -126,8 +126,8 @@ milestone that breaks it, not in M18.
 | Milestone | Status |
 | --- | --- |
 | M1 | accepted |
-| M2 | implemented |
-| M22 | pending |
+| M2 | accepted |
+| M22 | implemented |
 | M3 | pending |
 | M4 | pending |
 | M5 | pending |
@@ -170,6 +170,26 @@ All four M2 checks and the repository TypeScript lint passed. The
 supplemental `mise run verify` stopped at `cargo check` because mise
 could not resolve its Cargo shim. Full Rust verification remains in M18.
 Logs are under `tmp/cad3d/m2/`.
+
+M22 added the facade check and guarded live-page emitters, along with a
+source inventory test and regressions for the core, browser DOM, and CLI.
+
+The M22 audit found that page frames, freehand strokes and
+sequence participants can be created without existing 2D content, so class A
+now covers them. The 2D canvas still mounts before M6, so its creation and
+connector handlers also check the page. The editor can create a kit on a
+freeform page even if an existing CAD page is named iOS kit. The CLI kit
+and sequence routes report an operation error when insertion is declined.
+Template and HTML layout builders already create separate freeform
+documents, prototype HTML only exports, and Gerber import already
+creates a freeform page. Tests cover these destinations where applicable
+and the inventory excludes DOM-only calls.
+
+All three M22 checks, the repository TypeScript lint, and the targeted
+CLI and M2 entry-point regressions passed. The full Bun suite reports
+4185 passed and 74 skipped. The supplemental workspace verification
+passed with 91 Rust tests using the installed toolchain and a local
+cache. Logs are under `tmp/cad3d/m22/`.
 
 ## Completion
 

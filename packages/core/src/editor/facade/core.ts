@@ -7,6 +7,7 @@ import {
   type FractionalIndex,
   type PageId,
   isPlainObject,
+  pageAcceptsElementType,
   type Visual,
 } from "@nodetto/ir";
 import { AssetCache } from "../../asset-cache.ts";
@@ -477,6 +478,11 @@ export class EditorCore {
     return hitTestPoint(this.store, this.registry, this.pageId, point, {
       context,
     });
+  }
+
+  canCreateOn(pageId: PageId, type: string): boolean {
+    const page = this.store.getPage(pageId);
+    return page !== undefined && pageAcceptsElementType(page.kind, type);
   }
 
   /** The next z-order key above everything currently on `page`. */

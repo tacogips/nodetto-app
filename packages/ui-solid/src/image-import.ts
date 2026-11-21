@@ -78,7 +78,11 @@ export function insertRasterAssets(
   assets: readonly DecodedRasterAsset[],
   at: Vec,
 ): readonly string[] {
-  if (!assets.length) return [];
+  if (
+    !assets.length ||
+    !editor.canCreateOn(editor.currentPageId, "image.raster")
+  )
+    return [];
   const elements = rasterAssetPlacements(assets, at).map((asset) =>
     editor.buildElement("image.raster", {
       semantic: { src: asset.src, alt: asset.alt, fit: "contain" },
@@ -204,7 +208,11 @@ export async function importRasterFiles(
   files: readonly File[],
   at: Vec,
 ): Promise<readonly string[]> {
-  if (!files.length) return [];
+  if (
+    !files.length ||
+    !editor.canCreateOn(editor.currentPageId, "image.raster")
+  )
+    return [];
   if (files.length > MAX_RASTER_IMPORT_FILES)
     throw new Error(`Drop at most ${MAX_RASTER_IMPORT_FILES} images at once.`);
   const guard = watchImportContext(editor);

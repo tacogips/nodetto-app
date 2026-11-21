@@ -2,17 +2,10 @@
 
 - dependsOn: M2 (rule R in the command layer, CAD shape utils and types)
 - Design: section 4 (emitter class table)
-- writePaths: `packages/core/src/editor/facade/core.ts` (`canCreateOn`
-  only), one guard and no other change in each class A emitter:
-  `packages/core/src/templates/design-templates.ts`,
-  `packages/core/src/ui-blocks.ts`, `packages/core/src/kits/ios/insert.ts`,
-  `packages/core/src/shape-catalogue.ts`, `packages/core/src/html-layout.ts`,
-  `packages/core/src/prototype-html.ts`,
-  `packages/core/src/pcb-import.ts` (target page choice),
-  `packages/ui-solid/src/image-import.ts`,
-  `packages/ui-solid/src/ShapePalette.tsx`, `apps/desktop/src/seed.ts`;
-  new tests `packages/core/src/cad/emitters.test.ts`,
-  `packages/ui-solid/src/cad-emitters.test.ts`
+- writePaths: `packages/core/src/editor/facade/core.ts` (`canCreateOn`),
+  live-page emitters listed in design section 4, and specialized CLI kit
+  and sequence add paths that handle a declined insertion. Add regression
+  tests in core, UI and CLI.
 
 ## Intent
 
@@ -30,32 +23,28 @@ canCreateOn(pageId: PageId, type: string): boolean; // pageAcceptsElementType fo
 
 ## Behavior
 
-- Each class A emitter calls `canCreateOn` for the page it is about to
-  write to, with the first element type it would create, before building
-  any command, and returns the value it already returns when nothing is
-  created (null, empty string, empty list or false, as the function does
-  today). No emitter changes behaviour on a page that accepts its type.
-- Imports that draw on the current page
-  (`packages/core/src/pcb-import.ts:481`) target a new freeform page when
-  the current page is `cad3d`.
-- Generic entry points (class A0: `Editor.createElement`, `buildElement`,
-  CLI `add`) are not changed; they keep failing through the choke point.
-- If reading an emitter shows that the design's class is wrong (for
-  example a file listed in class B is reachable without existing 2D
-  content), move it to class A, add the guard, and correct the design
-  table in the same commit.
+- The live-page emitters in class A check `canCreateOn` for the page
+  they will write to and the first type they would create. They return an
+  empty result before building commands when the page refuses that type.
+- The template and HTML layout builders already create separate freeform
+  documents. Gerber import also produces its own freeform page, including
+  when the CLI appends it to an existing document.
+- Class C canvas handlers also check rule R until the CAD viewport is
+  mounted in place of the 2D interaction surface.
+- Generic entry points in class A0 still enforce rule R through commands.
+  Specialized CLI kit and sequence adds turn a guarded return into an
+  operation error before attaching or recording anything.
 
 ## Tests
 
 - `emitters.test.ts`:
-  1. Each class A emitter in `packages/core`, called with a CAD page
-     current, returns its "nothing" value, creates no element and does not
-     throw; called on a freeform page it still creates what it created
-     before (one positive case each).
+  1. Live-page emitters in class A return an empty result on CAD pages
+     and create elements on compatible pages. Template and HTML layout
+     builders produce valid documents with a fresh freeform page.
   2. Class B helpers (group, frame selection, boolean operations,
      component creation, connection creation, sequence, BPMN containment,
-     screen transition, page frames) called with a CAD-only selection or
-     page do not throw and change nothing.
+     screen transition) leave CAD-only selections unchanged. The M2
+     entry-point tests cover the helpers already guarded there.
   3. Class D carriers (`createColorToken`, number token, text style,
      guide, review comment) succeed on a CAD page and
      `validateDocument` stays clean.
@@ -66,15 +55,18 @@ canCreateOn(pageId: PageId, type: string): boolean; // pageAcceptsElementType fo
      test in which every entry carries its class (A, A0, B, C, D or E) as
      in design section 4. A file missing from the literal list, or listed
      but no longer an emitter, fails the test.
-- `cad-emitters.test.ts` (ui-solid): image import and the palette icon
-  insert do nothing on a CAD page; `slide-transition-edits` creates its
-  `presentation.slide` carrier on a CAD page (class D).
+- `cad-emitters.test.ts` (UI): in the browser DOM with both light and
+  dark theme settings, image import, icon and kit insertion, the seed,
+  and canvas placement and connectors respect rule R. Slide settings
+  create their `presentation.slide` carrier on a CAD page.
+- `cad-emitters.test.ts` (CLI): specialized adds fail as operation errors;
+  Gerber import appends a freeform page to a document containing CAD.
 - Existing tests of the touched emitters pass unmodified.
 
 ## Acceptance criteria
 
-- Every class A emitter has a negative and a positive test; the literal
-  list in the test equals the design table.
+- Every guarded class A emitter has a negative and a positive test.
+  The literal list in the test matches the design table.
 
 ## Verification (each must exit 0)
 

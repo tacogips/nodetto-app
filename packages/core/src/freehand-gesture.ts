@@ -19,7 +19,11 @@ export class FreehandGesture {
   }
 
   start(pointer: number, point: FreehandPoint): boolean {
-    if (this.pointer !== null) return false;
+    if (
+      this.pointer !== null ||
+      !this.editor.canCreateOn(this.editor.currentPageId, "draw.freehand")
+    )
+      return false;
     this.pointer = pointer;
     this.points = [point];
     this.changed(this.points.slice());

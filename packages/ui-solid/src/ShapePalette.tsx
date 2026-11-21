@@ -54,6 +54,7 @@ function insertionLocation(editor: Editor, point: Vec) {
 }
 
 export function insertPaletteKit(editor: Editor, id: string, point: Vec) {
+  if (!editor.canCreateOn(editor.currentPageId, "frame")) return "";
   const location = insertionLocation(editor, point);
   editor.beginBatch();
   try {
@@ -68,6 +69,7 @@ export function insertPaletteKit(editor: Editor, id: string, point: Vec) {
 }
 
 export function insertPaletteIcon(editor: Editor, name: string, point: Vec) {
+  if (!editor.canCreateOn(editor.currentPageId, "ui.icon")) return null;
   const location = insertionLocation(editor, point);
   editor.beginBatch();
   try {

@@ -12,6 +12,7 @@ import type { Command, Editor } from "@nodetto/core";
 import type { Element } from "@nodetto/ir";
 
 export function seed(editor: Editor): void {
+  if (!editor.canCreateOn(editor.currentPageId, "erd.table")) return;
   const elements: Element[] = [];
   const add = (element: Element): Element => {
     elements.push(element);

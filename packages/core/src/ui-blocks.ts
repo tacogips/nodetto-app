@@ -7,6 +7,7 @@ export type UiBlock = (typeof UI_BLOCKS)[number];
 
 /** UI blocks are ordinary editable components, not opaque widgets. */
 export function insertUiBlock(editor: Editor, kind: UiBlock, at: Vec): string {
+  if (!editor.canCreateOn(editor.currentPageId, "frame")) return "";
   const horizontal = kind !== "card";
   const size =
     kind === "button"

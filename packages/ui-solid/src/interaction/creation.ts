@@ -26,7 +26,7 @@ export function createCreationTools(
 
   const placeShape = (point: Vec, tool: ToolKind): void => {
     const creation = creationFor(tool);
-    if (!creation) {
+    if (!creation || !editor.canCreateOn(editor.currentPageId, creation.type)) {
       return;
     }
     if (tool === Tool.PcbTrack || tool === Tool.PcbVia) {

@@ -18,6 +18,7 @@ export function insertKitComponent(
 ): ElementId {
   const kit = findKitComponent(kitId);
   if (!kit) throw new Error(`unknown kit component "${kitId}"`);
+  if (!editor.canCreateOn(options.page, "frame")) return "";
   const previousPage = editor.currentPageId;
   try {
     let definition = editor.store
@@ -30,7 +31,12 @@ export function insertKitComponent(
       );
     if (!definition) {
       const page =
-        editor.store.listPages().find((item) => item.name === "iOS kit")?.id ??
+        editor.store
+          .listPages()
+          .find(
+            (item) =>
+              item.name === "iOS kit" && editor.canCreateOn(item.id, "frame"),
+          )?.id ??
         editor.createPage({ name: "iOS kit", kind: "freeform", mode: "app" });
       editor.setCurrentPage(page);
       const frames = editor.store

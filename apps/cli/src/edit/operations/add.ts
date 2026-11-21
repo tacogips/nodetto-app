@@ -276,6 +276,11 @@ function addParticipant(
     kind === "actor" || kind === "db" ? kind : "service",
     { x, y },
   );
+  if (!id)
+    throw new OperationError(
+      index,
+      "page.contentKind: page cannot hold sequence participants",
+    );
   const created = batch.editor.store.get(id);
   if (created && isPlainObject(semantic))
     batch.editor.apply([

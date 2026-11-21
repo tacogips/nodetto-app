@@ -157,6 +157,8 @@ export class NotationEditing extends PageEditing {
     centre: Vec,
     applyOptions: ApplyOptions = {},
   ): ElementId {
+    if (!this.canCreateOn(this.currentPageId, "sequence.participant"))
+      return "";
     const element = buildSequenceParticipant(this, this.rng, kind, centre);
     this.apply([{ type: "createElement", element }], applyOptions);
     return element.id;

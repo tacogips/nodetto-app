@@ -316,6 +316,13 @@ export function createConnectorGestures(
     gesture: GestureOf<"connecting">,
     event: PointerEvent,
   ): void => {
+    if (
+      !editor.canCreateOn(
+        editor.currentPageId,
+        gesture.connectorType ?? "edge.generic",
+      )
+    )
+      return;
     const point = ctx.pagePoint(event);
     const dropped = targetUnder(
       point,

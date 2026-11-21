@@ -340,6 +340,7 @@ export function connectShape(
     const source = editor.store.get(from);
     const target = editor.store.get(to);
     if (!source || !target || source.page !== target.page) return null;
+    if (!editor.canCreateOn(source.page, "edge.generic")) return null;
     return editor.createElement("edge.generic", {
       page: source.page,
       semantic: { from, to, arrowheads: { end: "arrow" } },

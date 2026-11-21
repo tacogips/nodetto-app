@@ -71,7 +71,8 @@ export class PageEditing extends SelectionEditing {
       orientation?: "portrait" | "landscape";
     } = {},
   ): ElementId | null {
-    if (this.readOnly) return null;
+    if (this.readOnly || !this.canCreateOn(this.currentPageId, "frame"))
+      return null;
     const plan = planAddPageFrame(this.store, this.registry, this.pageId, {
       id: this.idSource(),
       anchorId: options.after ?? this.pageFrameAnchor(),

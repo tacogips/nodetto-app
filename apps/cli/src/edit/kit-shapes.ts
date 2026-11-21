@@ -42,6 +42,11 @@ export function addKitShape(
       parentId: placement?.parentId,
       props,
     });
+    if (!id)
+      throw new OperationError(
+        index,
+        "page.contentKind: page cannot hold frames",
+      );
     attachToParent(
       batch,
       id,
