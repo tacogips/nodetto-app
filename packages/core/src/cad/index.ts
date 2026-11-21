@@ -1,3 +1,4 @@
+export * from "./authoring.ts";
 export * from "./display.ts";
 export * from "./engine.ts";
 export * from "./evaluate.ts";

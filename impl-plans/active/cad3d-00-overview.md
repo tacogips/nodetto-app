@@ -135,8 +135,8 @@ milestone that breaks it, not in M18.
 | M7 | accepted |
 | M8 | accepted |
 | M19 | accepted |
-| M9 | implemented |
-| M10 | pending |
+| M9 | accepted |
+| M10 | implemented |
 | M11 | pending |
 | M12 | pending |
 | M13 | pending |
@@ -418,6 +418,35 @@ with 74 skipped, including the three browser cases using the worktree's
 headless Chrome. The Rust workspace ran all 91 tests. It passed 73, and
 18 file tests reported permission errors when macOS attempted to use its
 replacement-file directory. Verification logs are under `tmp/cad3d/m9/`.
+
+M10 adds sketch creation on XY and on named planar faces, line chains,
+rectangles, circles and three-point arcs. The 3D canvas projects pointer
+positions onto the analytic frame, snaps in millimetres, and draws
+construction dashes, an aligned grid and uncommitted previews using the
+canvas theme. Each completed shape is one command batch and one undo step.
+
+M10 deviations: the entity builders accept an optional last-entity index
+lookup on `CadIds` because a sketch record does not hold its entities.
+The viewport supplies the lookup and uses fractional gaps to keep new
+entities next to their siblings when possible. The CAD command builder is
+an additional class C emitter. The design inventory and its exact-list
+test include it. The existing canvas forwards its controlled tool and tool
+callback to the viewport. Frame resolution reuses the kernel-free history
+resolver, and a face pick selects its defining feature. Active sketch
+lines draw over solids, and dragging from a solid or empty space orbits
+while a click still picks the face or sketch entity. This resolves IR19-02.
+Alt or Option selects the 0.1 mm snap grid. The preview and status
+coordination live in a separate viewport module.
+
+All three milestone checks passed with 39, 4 and 5 tests respectively.
+The light and dark DOM checks drew and undid rectangles and circles on
+base and face planes, and exercised line chaining, arc retry, cancellation,
+locked sketches, and the curved-face status. The real Chromium smoke
+test passed all ten renderer, worker and production CSP assertions.
+Workspace check and lint passed. The Bun suite passed 4,329 tests with
+74 skipped. The Rust workspace passed 73 of 91 tests. The other 18 hit
+macOS replacement-file permissions under the worktree write restriction.
+Verification logs are under `tmp/cad3d/m10/`.
 
 ## Completion
 

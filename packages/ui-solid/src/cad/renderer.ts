@@ -12,6 +12,12 @@ export interface CadRenderer {
   setHighlight(pick: Highlight | null): void;
   setOverlay(lines: Float32Array | null, mesh: Mesh | null): void;
   setGridVisible?(visible: boolean): void;
+  setSketchLines?(
+    lines: Float32Array,
+    highlighted: Float32Array,
+    drawing: boolean,
+  ): void;
+  setSketchGrid?(lines: Float32Array | null): void;
   draw(camera: Camera3d, widthPx: number, heightPx: number): void;
   readonly diagnostics: {
     readonly programsLinked: boolean;
@@ -193,6 +199,10 @@ export function createWebgl2Renderer(
   }[] = [];
   let overlayLines: Geometry | null = null;
   let overlayMesh: Geometry | null = null;
+  let sketchGrid: Geometry | null = null;
+  let sketchLines: Geometry | null = null;
+  let sketchHighlight: Geometry | null = null;
+  let drawingSketch = false;
   let theme: CadTheme | undefined;
   let highlight: Highlight | null = null;
   let showGrid = true;
@@ -273,6 +283,17 @@ export function createWebgl2Renderer(
     setGridVisible(visible) {
       showGrid = visible;
     },
+    setSketchLines(nextLines, highlighted, drawing) {
+      release(sketchLines);
+      release(sketchHighlight);
+      sketchLines = nextLines.length ? upload(nextLines) : null;
+      sketchHighlight = highlighted.length ? upload(highlighted) : null;
+      drawingSketch = drawing;
+    },
+    setSketchGrid(next) {
+      release(sketchGrid);
+      sketchGrid = next?.length ? upload(next) : null;
+    },
     draw(camera, widthPx, heightPx) {
       if (!theme || widthPx <= 0 || heightPx <= 0) return;
       if (canvas.width !== widthPx) canvas.width = widthPx;
@@ -339,19 +360,32 @@ export function createWebgl2Renderer(
       if (showGrid) {
         gl.depthMask(false);
         color(lines, theme.grid, 0.6);
-        segments(grid);
+        segments(sketchGrid ?? grid);
+      }
+      gl.depthMask(false);
+      if (sketchLines) {
+        color(lines, theme.line);
+        segments(sketchLines);
+      }
+      if (drawingSketch) gl.disable(gl.DEPTH_TEST);
+      if (sketchHighlight) {
+        color(lines, theme.highlight);
+        segments(sketchHighlight);
       }
       if (overlayLines) {
-        gl.depthMask(false);
         color(lines, theme.highlight);
         segments(overlayLines);
       }
+      if (drawingSketch) gl.enable(gl.DEPTH_TEST);
       gl.depthMask(true);
       gl.bindVertexArray(null);
     },
     dispose() {
       clearBodies();
       clearOverlay();
+      release(sketchGrid);
+      release(sketchLines);
+      release(sketchHighlight);
       release(grid);
       gl.deleteProgram(faces.id);
       gl.deleteProgram(lines.id);

@@ -1,4 +1,4 @@
-import type { ElementId } from "@nodetto/ir";
+import type { CadFaceRef, ElementId } from "@nodetto/ir";
 import type { CadFrame } from "./frames.ts";
 import type { ToolMesh } from "./kernel.ts";
 import type { CadLoop } from "./loops.ts";
@@ -17,6 +17,19 @@ export function faceName(
   return entity === undefined
     ? `${escapeFaceId(feature)}:${role}`
     : `${escapeFaceId(feature)}:${role}:${escapeFaceId(entity)}`;
+}
+
+export function parseFaceName(name: string): CadFaceRef | null {
+  const [source, role, side, extra] = name.split(":");
+  if (!source || extra !== undefined) return null;
+  const unescapeId = (id: string) =>
+    id.replaceAll("%3A", ":").replaceAll("%25", "%");
+  const feature = unescapeId(source);
+  if (role === "side" && side)
+    return { feature, role, entity: unescapeId(side) };
+  if ((role === "start" || role === "end") && side === undefined)
+    return { feature, role };
+  return null;
 }
 
 export function prismTool(

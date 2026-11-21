@@ -6,9 +6,10 @@ import {
   CadSupersededError,
   collectCadInput,
   type Editor,
+  parseFaceName,
   type ViewportSize,
 } from "@nodetto/core";
-import { isCadTypeName, type PageId } from "@nodetto/ir";
+import { type ElementId, isCadTypeName, type PageId } from "@nodetto/ir";
 import {
   batch,
   createEffect,
@@ -22,18 +23,26 @@ import {
   CANVAS_DARK_CLASS,
   type CanvasMode,
 } from "../canvas/canvas-background.ts";
-import { handleCadSelectionKey } from "./selection-keys.ts";
-import { cadStatusStoreFor } from "./status-store.ts";
+import { isComposing } from "../NumberInput.tsx";
+import { Tool, type ToolKind } from "../tools.ts";
 import {
   type Camera3d,
   fitBounds,
   orbit,
   pan,
   screenRay,
+  viewProjection,
   zoomAt,
 } from "./camera3d.ts";
 import { type CadPick, pickBodies } from "./pick.ts";
 import { type CadRenderer, createWebgl2Renderer } from "./renderer.ts";
+import { handleCadSelectionKey } from "./selection-keys.ts";
+import {
+  createSketchAuthoring,
+  type SketchViewportPoint,
+} from "./sketch-authoring.ts";
+import { pickSketchEntity } from "./sketch-overlay.ts";
+import { cadStatusStoreFor } from "./status-store.ts";
 import { readCadTheme } from "./theme.ts";
 import "./CadViewport.css";
 
@@ -42,6 +51,8 @@ export interface CadViewportProps {
   readonly engine: CadEngine | undefined;
   readonly canvasMode?: CanvasMode;
   readonly showGrid?: boolean;
+  readonly tool?: ToolKind;
+  readonly onToolChange?: (tool: ToolKind) => void;
   readonly createRenderer?: (canvas: HTMLCanvasElement) => CadRenderer | null;
   readonly pageId?: PageId;
   readonly initialCamera?: Camera3d;
@@ -86,11 +97,13 @@ export function CadViewport(props: CadViewportProps) {
   );
   const [size, setSize] = createSignal<ViewportSize>({ width: 0, height: 0 });
   let fitted = props.initialCamera !== undefined;
+  let sketchPointer: number | undefined;
   let drag:
     | {
         readonly pointerId: number;
-        readonly mode: "pan" | "orbit" | "pick";
+        readonly mode: "pan" | "orbit";
         readonly hit: CadPick | null;
+        readonly entity: ElementId | null;
         readonly startX: number;
         readonly startY: number;
         x: number;
@@ -98,6 +111,21 @@ export function CadViewport(props: CadViewportProps) {
         moved: boolean;
       }
     | undefined;
+  const tool = () => props.tool ?? Tool.Select;
+  const sketch = createSketchAuthoring({
+    editor: props.editor,
+    pageId,
+    revision,
+    selection,
+    tool,
+    selectTool: () => props.onToolChange?.(Tool.Select),
+    focus: () => root.focus(),
+    picked,
+    camera,
+    changeCamera,
+    size,
+    renderer,
+  });
 
   function changeCamera(next: Camera3d): void {
     fitted = true;
@@ -107,6 +135,7 @@ export function CadViewport(props: CadViewportProps) {
 
   function fit(): void {
     const { width, height } = size();
+    if (sketch.drawing()) return;
     changeCamera(fitBodies(drawnBodies(), width / height));
   }
 
@@ -273,15 +302,24 @@ export function CadViewport(props: CadViewportProps) {
     const view = renderer();
     const ids = selection();
     const hit = picked();
-    if (hit && !ids.has(hit.bodyId)) setPicked(null);
+    const definingFeature = hit && parseFaceName(hit.faceName)?.feature;
+    const current =
+      hit &&
+      (definingFeature ? ids.has(definingFeature) : ids.has(hit.bodyId)) &&
+      drawnBodies().some(
+        (body) =>
+          body.id === hit.bodyId && body.faceNames.includes(hit.faceName),
+      )
+        ? hit
+        : null;
+    if (hit && !current) setPicked(null);
     const body = drawnBodies().find(({ id }) => ids.has(id));
     view?.setHighlight(
-      body
-        ? {
-            bodyId: body.id,
-            faceName: hit?.bodyId === body.id ? hit.faceName : undefined,
-          }
-        : null,
+      current
+        ? { bodyId: current.bodyId, faceName: current.faceName }
+        : body
+          ? { bodyId: body.id }
+          : null,
     );
   });
   createEffect(() => renderer()?.setGridVisible?.(props.showGrid !== false));
@@ -294,6 +332,9 @@ export function CadViewport(props: CadViewportProps) {
     drawnBodies();
     selection();
     picked();
+    revision();
+    sketch.entityLines();
+    sketch.gesture();
     if (!view || width <= 0 || height <= 0) return;
     const frame = window.requestAnimationFrame(() => {
       const scale = window.devicePixelRatio || 1;
@@ -302,28 +343,60 @@ export function CadViewport(props: CadViewportProps) {
     onCleanup(() => window.cancelAnimationFrame(frame));
   });
 
-  function pick(event: PointerEvent): CadPick | null {
+  function pointerPosition(event: PointerEvent): SketchViewportPoint | null {
     const { width, height, left, top } = canvas.getBoundingClientRect();
     if (width <= 0 || height <= 0) return null;
-    return pickBodies(
-      drawnBodies(),
-      screenRay(
-        camera(),
-        width / height,
-        (2 * (event.clientX - left)) / width - 1,
-        1 - (2 * (event.clientY - top)) / height,
-      ),
-    );
+    return {
+      width,
+      height,
+      x: (2 * (event.clientX - left)) / width - 1,
+      y: 1 - (2 * (event.clientY - top)) / height,
+    };
   }
 
   function pointerDown(event: PointerEvent): void {
-    if (drag || (event.button !== 0 && event.button !== 1)) return;
+    if (
+      drag ||
+      sketchPointer !== undefined ||
+      (event.button !== 0 && event.button !== 1)
+    )
+      return;
     const panning = event.button === 1 || event.shiftKey;
-    const hit = panning ? null : pick(event);
+    const point = pointerPosition(event);
+    if (sketch.drawing() && !panning) {
+      sketchPointer = event.pointerId;
+      canvas.setPointerCapture?.(event.pointerId);
+      root.focus();
+      event.preventDefault();
+      sketch.input("down", point, event.altKey);
+      return;
+    }
+    const aspect = point ? point.width / point.height : 1;
+    const hit =
+      panning || !point
+        ? null
+        : pickBodies(
+            drawnBodies(),
+            screenRay(camera(), aspect, point.x, point.y),
+          );
+    const entity =
+      panning || !point || tool() !== Tool.Select
+        ? null
+        : pickSketchEntity(
+            sketch.entityLines(),
+            viewProjection(camera(), aspect),
+            point.x,
+            point.y,
+            point.width,
+            point.height,
+            hit?.point,
+            sketch.sketchId(),
+          );
     drag = {
       pointerId: event.pointerId,
-      mode: panning ? "pan" : hit ? "pick" : "orbit",
+      mode: panning ? "pan" : "orbit",
       hit,
+      entity,
       startX: event.clientX,
       startY: event.clientY,
       x: event.clientX,
@@ -336,6 +409,14 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   function pointerMove(event: PointerEvent): void {
+    if (
+      !drag &&
+      sketch.drawing() &&
+      (sketchPointer === undefined || sketchPointer === event.pointerId)
+    ) {
+      sketch.input("move", pointerPosition(event), event.altKey);
+      return;
+    }
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (
       !drag.moved &&
@@ -353,14 +434,28 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   function endDrag(event: PointerEvent): void {
+    if (sketchPointer === event.pointerId) {
+      sketchPointer = undefined;
+      if (event.type === "pointerup")
+        sketch.input("up", pointerPosition(event), event.altKey);
+      else sketch.cancelPointer();
+      return;
+    }
     if (drag?.pointerId !== event.pointerId) return;
-    const { hit, mode, moved } = drag;
+    const { hit, entity, mode, moved } = drag;
     drag = undefined;
     if (event.type !== "pointerup" || moved || mode === "pan") return;
-    const selected = hit && props.editor.store.has(hit.bodyId) ? hit : null;
+    const selectableEntity =
+      entity && props.editor.store.has(entity) ? entity : null;
+    const feature = hit && (parseFaceName(hit.faceName)?.feature ?? hit.bodyId);
+    const selected =
+      !selectableEntity && hit && feature && props.editor.store.has(feature)
+        ? hit
+        : null;
     batch(() => {
       setPicked(selected);
-      props.editor.selection.set(selected ? [selected.bodyId] : []);
+      const id = selectableEntity ?? (selected ? feature : undefined);
+      props.editor.selection.set(id ? [id] : []);
     });
   }
 
@@ -376,13 +471,30 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   const status = () =>
-    !props.engine
+    sketch.status() ??
+    (!props.engine
       ? "The CAD engine is unavailable."
       : !renderer()
         ? "WebGL2 is unavailable. The CAD model can still be edited in the panels."
         : themeUnavailable()
           ? "The CAD canvas colours are unavailable."
-          : failure();
+          : failure());
+
+  function keyDown(event: KeyboardEvent): void {
+    if (
+      event.key === "Escape" &&
+      !isComposing(event) &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      sketch.cancel()
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    handleCadSelectionKey(props.editor, event);
+  }
 
   return (
     <div
@@ -392,7 +504,7 @@ export function CadViewport(props: CadViewportProps) {
         [CANVAS_DARK_CLASS]: props.canvasMode === "dark",
       }}
       tabindex="0"
-      on:keydown={(event) => handleCadSelectionKey(props.editor, event)}
+      on:keydown={keyDown}
     >
       <canvas
         ref={canvas}

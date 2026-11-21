@@ -1,0 +1,317 @@
+import assert from "node:assert/strict";
+import {
+  type CadDisplayBody,
+  type CadEngine,
+  Editor,
+  sketchFrameOf,
+  sketchParentOf,
+  toWorld,
+  type Vec3,
+} from "@nodetto/core";
+import { type CadXY, hasErrors, validateDocument } from "@nodetto/ir";
+import { createSignal } from "solid-js";
+import { render } from "solid-js/web";
+import { plateWithHoles } from "../../../core/src/cad/testing/documents.ts";
+import { type Camera3d, viewProjection } from "../cad/camera3d.ts";
+import type { CadRenderer } from "../cad/renderer.ts";
+import type { CadTheme } from "../cad/theme.ts";
+import { NodettoCanvas } from "../Canvas.tsx";
+import { Tool, type ToolKind } from "../tools.ts";
+
+const style = document.createElement("style");
+style.textContent = await Bun.file(
+  new URL("../../../../apps/desktop/src/styles/canvas.css", import.meta.url),
+).text();
+document.head.append(style);
+window.HTMLElement.prototype.getBoundingClientRect = () =>
+  new window.DOMRect(0, 0, 500, 500);
+
+const nextFrame = () =>
+  new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
+
+for (const mode of ["light", "dark"] as const) {
+  document.documentElement.dataset.nodettoTheme = mode;
+  const doc = plateWithHoles(1);
+  const editor = new Editor({
+    document: {
+      ...doc,
+      pages: [...doc.pages, { id: "free", kind: "freeform", name: "Drawing" }],
+    },
+  });
+  editor.setCurrentPage("cad");
+  const [tool, setTool] = createSignal<ToolKind>(Tool.Select);
+  let faceName = "ex1:end";
+  const body: CadDisplayBody = {
+    id: "ex1",
+    positions: new Float32Array([0, 0, 5, 100, 0, 5, 100, 60, 5, 0, 60, 5]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    triFace: new Uint32Array([0, 0]),
+    faceNames: [faceName],
+    edges: new Float32Array(),
+    reference: false,
+  };
+  let evaluations = 0;
+  const engine: CadEngine = {
+    evaluate: async ({ revision }) => {
+      evaluations++;
+      return {
+        revision,
+        bodies: [{ ...body, faceNames: [faceName] }],
+        status: [],
+      };
+    },
+    dispose: () => {},
+  };
+  let lastCamera: Camera3d | undefined;
+  let theme: CadTheme | undefined;
+  let lineOverlay: Float32Array | null = null;
+  let gridOverlay: Float32Array | null = null;
+  let highlight = new Float32Array();
+  const renderer: CadRenderer = {
+    diagnostics: { programsLinked: true, renderer: "DOM stub" },
+    setTheme: (next) => {
+      theme = next;
+    },
+    setBodies: () => {},
+    setHighlight: () => {},
+    setOverlay: (lines) => {
+      lineOverlay = lines;
+    },
+    setSketchGrid: (lines) => {
+      gridOverlay = lines;
+    },
+    setSketchLines: (_, selected) => {
+      highlight = new Float32Array(selected);
+    },
+    draw: (camera) => {
+      lastCamera = camera;
+    },
+    dispose: () => {},
+  };
+  const host = document.createElement("main");
+  document.body.append(host);
+  const dispose = render(
+    () => (
+      <NodettoCanvas
+        editor={editor}
+        tool={tool()}
+        onToolChange={setTool}
+        cadEngine={engine}
+        createCadRenderer={() => renderer}
+        canvasBackground={{ diagram: mode, pcb: mode }}
+        snap={{ grid: true, objects: true }}
+        showGrid
+      />
+    ),
+    host,
+  );
+  await nextFrame();
+  const canvas = host.querySelector<HTMLCanvasElement>(".nodetto-cad-surface");
+  const viewport = host.querySelector<HTMLElement>(".nodetto-cad-viewport");
+  assert.ok(canvas && viewport);
+  function coords(point: Vec3): [number, number] {
+    assert.ok(lastCamera);
+    const v = viewProjection(lastCamera, 1);
+    const [x, y, z] = point;
+    const clip = (i: number) =>
+      v[i] * x + v[4 + i] * y + v[8 + i] * z + v[12 + i];
+    return [250 * (1 + clip(0) / clip(3)), 250 * (1 - clip(1) / clip(3))];
+  }
+  function pointer(type: string, point: Vec3, altKey = false) {
+    const [x, y] = coords(point);
+    canvas?.dispatchEvent(
+      new PointerEvent(type, {
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+        altKey,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }
+  function click(point: Vec3, altKey = false) {
+    pointer("pointerdown", point, altKey);
+    pointer("pointerup", point, altKey);
+  }
+  function pressEscape() {
+    viewport?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }
+  const selectedId = () => [...editor.selection.ids()][0];
+  const entities = (id: string) =>
+    editor.store.getPageElements("cad").filter((e) => sketchParentOf(e) === id);
+
+  assert.deepEqual(
+    theme?.highlight,
+    mode === "light" ? [51, 92, 103] : [95, 180, 199],
+  );
+  const beforeOrbit = lastCamera?.yaw;
+  const beforeNavigation = editor.getSnapshot();
+  pointer("pointerdown", [73, 42, 5]);
+  pointer("pointermove", [62, 28, 5]);
+  pointer("pointerup", [62, 28, 5]);
+  await nextFrame();
+  assert.notEqual(lastCamera?.yaw, beforeOrbit);
+  assert.equal(editor.getSnapshot(), beforeNavigation);
+
+  function begin() {
+    setTool(Tool.CadSketch);
+    const id = selectedId();
+    assert.equal(tool(), Tool.Select);
+    assert.equal(editor.store.get(id)?.type, "cad.sketch");
+    return id;
+  }
+  function undoRedo(id: string, before: number, types: readonly string[]) {
+    assert.deepEqual(
+      entities(id).map(({ type }) => type),
+      types,
+    );
+    assert.ok(editor.undo());
+    assert.equal(entities(id).length, before);
+    assert.ok(editor.redo());
+    assert.deepEqual(
+      entities(id).map(({ type }) => type),
+      types,
+    );
+  }
+
+  const base = begin();
+  assert.deepEqual(editor.store.get(base)?.semantic, {
+    name: "Sketch 1",
+    plane: { base: "xy" },
+  });
+
+  async function drawShapes(id: string, z: number) {
+    const frame = sketchFrameOf(editor.store.getPageElements("cad"), id);
+    assert.ok(frame);
+    const point = (p: CadXY) => toWorld(frame, p);
+    setTool(Tool.CadRect);
+    await nextFrame();
+    assert.equal(lastCamera?.ortho, true);
+    assert.ok(gridOverlay && (gridOverlay as Float32Array).length > 0);
+    assert.ok(
+      (gridOverlay as Float32Array).every((v, i) => i % 3 !== 2 || v === z),
+    );
+    const before = evaluations;
+    pointer("pointerdown", point([20, 20]));
+    pointer("pointermove", point([32, 28]));
+    assert.equal(entities(id).length, 0);
+    assert.equal(evaluations, before);
+    assert.equal((lineOverlay as Float32Array | null)?.length, 24);
+    pointer("pointerup", point([32, 28]));
+    assert.equal(evaluations, before + 1);
+    assert.equal(highlight.length, 24);
+    const lines = ["cad.line", "cad.line", "cad.line", "cad.line"];
+    undoRedo(id, 0, lines);
+    editor.selection.set([id]);
+
+    setTool(Tool.CadCircle);
+    await nextFrame();
+    click(point([45, 37]), true);
+    click(point([47.4, 37]), true);
+    undoRedo(id, 4, [...lines, "cad.circle"]);
+    assert.deepEqual(entities(id).at(-1)?.semantic, {
+      sketch: id,
+      c: [45, 37],
+      r: 2.4,
+    });
+    assert.ok(highlight.every((v, i) => i % 3 !== 2 || v === z));
+    return point;
+  }
+
+  await drawShapes(base, 0);
+  setTool(Tool.Select);
+  click([73, 42, 5]);
+  assert.equal(selectedId(), "ex1");
+  const face = begin();
+  assert.deepEqual(editor.store.get(face)?.semantic, {
+    name: "Sketch 2",
+    plane: { face: { feature: "ex1", role: "end" } },
+  });
+  const facePoint = await drawShapes(face, 5);
+
+  setTool(Tool.Select);
+  click(facePoint([26, 20]));
+  const edge = editor.store.get(selectedId());
+  assert.ok(edge && sketchParentOf(edge) === face);
+  setTool(Tool.CadLine);
+  const beforeLine = evaluations;
+  click(facePoint([60, 25]));
+  pointer("pointermove", facePoint([60, 32]));
+  assert.equal(evaluations, beforeLine);
+  click(facePoint([60, 32]));
+  assert.equal(evaluations, beforeLine + 1);
+  assert.equal(entities(face).length, 6);
+  assert.match(viewport.textContent ?? "", /profile is open/);
+  pressEscape();
+  assert.equal(tool(), Tool.CadLine);
+  pressEscape();
+  assert.equal(tool(), Tool.Select);
+  assert.equal(selectedId(), edge.id);
+  assert.ok(editor.undo());
+  assert.equal(entities(face).length, 5);
+
+  setTool(Tool.CadArc);
+  await nextFrame();
+  click(facePoint([65, 24]));
+  click(facePoint([75, 24]));
+  click(facePoint([70, 24]));
+  assert.equal(entities(face).length, 5);
+  assert.match(viewport.textContent ?? "", /valid sketch entity/);
+  click(facePoint([70, 30]));
+  assert.deepEqual(entities(face).at(-1)?.semantic, {
+    sketch: face,
+    a: [65, 24],
+    m: [70, 30],
+    b: [75, 24],
+  });
+  assert.ok(editor.undo());
+  assert.equal(entities(face).length, 5);
+
+  editor.selection.set([face]);
+  setTool(Tool.CadRect);
+  await nextFrame();
+  pointer("pointerdown", facePoint([65, 24]));
+  pointer("pointermove", facePoint([75, 30]));
+  pointer("pointercancel", facePoint([75, 30]));
+  assert.equal(entities(face).length, 5);
+  assert.equal(lineOverlay, null);
+  editor.apply([{ type: "updateVisual", id: face, visual: { locked: true } }]);
+  click(facePoint([65, 24]));
+  click(facePoint([75, 30]));
+  assert.equal(entities(face).length, 5);
+  assert.match(viewport.textContent ?? "", /read-only/);
+
+  setTool(Tool.Select);
+  faceName = "ex2:side:hole-0";
+  editor.apply([{ type: "updateVisual", id: face, visual: { locked: false } }]);
+  await nextFrame();
+  click([73, 42, 5]);
+  assert.equal(selectedId(), "ex2");
+  const beforeInvalid = editor.getSnapshot();
+  setTool(Tool.CadSketch);
+  assert.equal(editor.getSnapshot(), beforeInvalid);
+  assert.match(viewport.textContent ?? "", /face is curved/);
+  assert.equal(tool(), Tool.Select);
+  assert.equal(hasErrors(validateDocument(editor.getSnapshot())), false);
+
+  editor.setCurrentPage("free");
+  const beforeFreeform = editor.getSnapshot();
+  setTool(Tool.CadSketch);
+  assert.equal(host.querySelector(".nodetto-cad-surface"), null);
+  assert.equal(editor.getSnapshot(), beforeFreeform);
+  dispose();
+  host.remove();
+  console.log(`sketch ok ${mode}`);
+}

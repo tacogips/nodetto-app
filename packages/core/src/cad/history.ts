@@ -444,6 +444,60 @@ export function createCadGeometry(history: HistoryDetails) {
   };
 }
 
+function geometryFor(history: HistoryDetails, feature: ElementId) {
+  const needed = new Set<ElementId>();
+  const todo = [feature];
+  for (let id = todo.pop(); id !== undefined; id = todo.pop()) {
+    if (needed.has(id)) continue;
+    needed.add(id);
+    for (const ref of history.dependencies.get(id) ?? []) todo.push(ref);
+  }
+  const geometry = createCadGeometry(history);
+  for (const { id } of history.features) {
+    if (!needed.has(id)) continue;
+    if (!history.status.get(id)?.ok) return null;
+    const item = history.typed.get(id);
+    if (item?.type === "cad.sketch") {
+      const frame = geometry.sketch(item.semantic.plane);
+      if ("ok" in frame) return null;
+      geometry.frames.set(id, frame);
+    } else if (item?.type === "cad.extrude" && !item.semantic.suppressed) {
+      const tool = geometry.extrude(item.semantic);
+      if ("ok" in tool) return null;
+      geometry.extrudes.set(id, tool);
+    } else {
+      return null;
+    }
+  }
+  return geometry;
+}
+
+export function sketchFrameOf(
+  elements: readonly Element[],
+  sketchId: ElementId,
+): CadFrame | null {
+  return sketchFrameLookup(elements)(sketchId);
+}
+
+export function sketchFrameLookup(
+  elements: readonly Element[],
+): (sketchId: ElementId) => CadFrame | null {
+  const history = scanCadPage(elements);
+  const frames = new Map<ElementId, CadFrame | null>();
+  return (sketchId) => {
+    const sketch = history.typed.get(sketchId);
+    if (sketch?.type !== "cad.sketch" || !history.status.get(sketchId)?.ok)
+      return null;
+    const { plane } = sketch.semantic;
+    if ("base" in plane) return baseFrame(plane.base, plane.offset);
+    const cached = frames.get(sketchId);
+    if (cached !== undefined) return cached;
+    const frame = geometryFor(history, sketchId)?.frames.get(sketchId) ?? null;
+    frames.set(sketchId, frame);
+    return frame;
+  };
+}
+
 export function faceOutwardSign(
   elements: readonly Element[],
   face: CadFaceRef,
@@ -453,32 +507,7 @@ export function faceOutwardSign(
   const source = history.typed.get(face.feature);
   if (source?.type !== "cad.extrude") return 0;
 
-  const needed = new Set<ElementId>();
-  const todo = [source.id];
-  for (let id = todo.pop(); id !== undefined; id = todo.pop()) {
-    if (needed.has(id)) continue;
-    needed.add(id);
-    for (const ref of history.dependencies.get(id) ?? []) todo.push(ref);
-  }
-  const geometry = createCadGeometry(history);
-  for (const { id } of history.features) {
-    if (!needed.has(id)) continue;
-    if (!history.status.get(id)?.ok) return 0;
-    const item = history.typed.get(id);
-    if (item?.type === "cad.sketch") {
-      const frame = geometry.sketch(item.semantic.plane);
-      if ("ok" in frame) return 0;
-      geometry.frames.set(id, frame);
-    } else if (item?.type === "cad.extrude" && !item.semantic.suppressed) {
-      const tool = geometry.extrude(item.semantic);
-      if ("ok" in tool) return 0;
-      geometry.extrudes.set(id, tool);
-    } else {
-      return 0;
-    }
-  }
-
-  const tool = geometry.extrudes.get(source.id);
+  const tool = geometryFor(history, source.id)?.extrudes.get(source.id);
   if (!tool) return 0;
   let sign: 0 | 1 | -1;
   if (face.role === "side") {

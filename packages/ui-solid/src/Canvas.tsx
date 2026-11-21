@@ -176,6 +176,8 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
           pageId={id}
           canvasMode={canvasModeFor("cad3d", props.canvasBackground)}
           showGrid={props.showGrid}
+          tool={props.tool}
+          onToolChange={props.onToolChange}
           createRenderer={props.createCadRenderer}
           initialCamera={cameras.get(id)}
           onCameraChange={(camera) => cameras.set(id, camera)}

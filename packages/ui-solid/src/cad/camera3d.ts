@@ -83,7 +83,7 @@ export function pan(
 ): Camera3d {
   if (viewportHeightPx <= 0) return camera;
   const { right, up } = cameraAxes(camera);
-  const mmPerPixel = (2 * camera.distance * TAN_HALF_FOV) / viewportHeightPx;
+  const mmPerPixel = cameraViewHeight(camera) / viewportHeightPx;
   const target = offsetBy(
     camera.target,
     right,
@@ -92,6 +92,10 @@ export function pan(
     dyPx * mmPerPixel,
   );
   return { ...camera, target };
+}
+
+export function cameraViewHeight(camera: Camera3d): number {
+  return 2 * camera.distance * TAN_HALF_FOV;
 }
 
 /** Factors above one move the camera farther from the target. */
