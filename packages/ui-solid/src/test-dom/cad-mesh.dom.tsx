@@ -64,6 +64,31 @@ function fileDrop(
   );
 }
 
+function textDrop(target: Element, allowed = false) {
+  const url = "https://example.invalid/reference";
+  const values = {
+    "text/uri-list": url,
+    "text/plain": allowed ? "diagram text" : url,
+  };
+  for (const [type, value] of Object.entries(values)) {
+    const transfer = new window.DataTransfer();
+    transfer.setData(type, value);
+    transfer.dropEffect = "copy";
+    const label = `${type} on ${target.tagName}.${target.className}`;
+    assert.equal(
+      drag(target, "dragover", transfer).defaultPrevented,
+      !allowed,
+      label,
+    );
+    assert.equal(transfer.dropEffect, allowed ? "copy" : "none", label);
+    assert.equal(
+      drag(target, "drop", transfer).defaultPrevented,
+      !allowed,
+      label,
+    );
+  }
+}
+
 const settle = () => Bun.sleep(0);
 
 for (const theme of ["light", "dark"] as const) {
@@ -122,6 +147,7 @@ for (const theme of ["light", "dark"] as const) {
     assert.ok(dialog?.open);
     const stl = new window.File([asciiStl], "off-target.stl");
     fileDrop(dialog, stl, "none");
+    textDrop(dialog);
     dialog.close();
     for (const selector of [
       ".nodetto-shape-palette",
@@ -131,11 +157,26 @@ for (const theme of ["light", "dark"] as const) {
       const panel = host.querySelector(selector);
       assert.ok(panel, selector);
       fileDrop(panel, stl, "none");
+      textDrop(panel);
     }
-    const text = new window.DataTransfer();
-    text.setData("text/plain", "diagram text");
-    assert.equal(drag(host, "dragover", text).defaultPrevented, false);
-    assert.equal(drag(host, "drop", text).defaultPrevented, false);
+    const textInput = host.querySelector('input[placeholder="Search shapes"]');
+    assert.ok(textInput);
+    textDrop(textInput, true);
+    fileDrop(textInput, stl, "none");
+
+    const fields = document.createElement("div");
+    fields.innerHTML =
+      '<textarea></textarea><div contenteditable=""><span class="editable-child">Draft</span><span class="non-editable-child" contenteditable="false">Label</span></div>';
+    host.append(fields);
+    const textarea = fields.querySelector("textarea");
+    const editableChild = fields.querySelector(".editable-child");
+    const nonEditableChild = fields.querySelector(".non-editable-child");
+    assert.ok(textarea && editableChild && nonEditableChild);
+    textDrop(textarea, true);
+    textDrop(editableChild, true);
+    textDrop(nonEditableChild);
+    fileDrop(editableChild, stl, "none");
+    fields.remove();
     assert.equal(editor.store.getPageElements(cad).length, 0);
 
     const cadViewport = host.querySelector(".nodetto-cad-viewport");
@@ -145,6 +186,8 @@ for (const theme of ["light", "dark"] as const) {
       (item) => item.textContent?.trim() === "Import STL...",
     );
     assert.ok(cadViewport && fileInput && opener);
+    textDrop(cadViewport);
+    textDrop(fileInput);
     assert.equal(fileInput.accept, ".stl");
     let openings = 0;
     fileInput.addEventListener("click", () => {
@@ -239,6 +282,7 @@ for (const theme of ["light", "dark"] as const) {
 
     const canvas = host.querySelector(".nodetto-canvas");
     assert.ok(canvas && !canvas.classList.contains("nodetto-cad-viewport"));
+    textDrop(canvas);
     // A two-pixel GIF with a black and white palette.
     const gif = Buffer.from(
       "47494638396102000100800000000000ffffff2c0000000002000100000202440a003b",

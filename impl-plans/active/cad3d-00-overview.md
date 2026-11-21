@@ -611,6 +611,24 @@ with 18 macOS file-replacement permission failures under that restriction.
 Packaged webview verification remains scheduled in M18. Rework logs are
 under `tmp/cad3d/m20-rework/`.
 
+M20 remains implemented and awaits review. The window guard also cancels
+unhandled link and plain-text drops outside editable fields (IR20-04).
+External text can now be dropped into editable text fields on desktop.
+The light and dark DOM regression checks the palette, layers, inspector,
+both canvases, the open Export dialog, and editable fields. It preserves
+CAD STL import, 2D image import, and layer reordering. M18 now includes
+link and plain-text drops in the packaged webview check. The packaged
+webview and WebKitGTK were not checked in this rework.
+
+All three M20 checks passed with 52, 7, and 7 tests. Repository TypeScript
+lint, workspace check and lint, the emitter inventory, and the production
+bundle audit passed. Full verification discovered extracted upstream tests
+under `tmp/`. The scoped Bun suite passed 4,407 tests with 74 skipped and
+three Chrome startup failures under the worktree write restriction. The
+Rust workspace passed 73 of 91 tests, with 18 macOS file-write permission
+failures under the same restriction. Logs are under
+`tmp/cad3d/m20-link-rework/`.
+
 ## Completion
 
 All twenty-two milestones accepted by the adversarial implementation
