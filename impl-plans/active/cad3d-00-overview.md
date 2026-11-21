@@ -267,6 +267,19 @@ passed, with 74 Bun tests skipped. The local Rust toolchain emitted
 debug-stripping warnings during the passing run. Timing and verification
 logs are under `tmp/cad3d/m5/`.
 
+M5 rework for review: the Manifold notices now include dset, tbtSVD,
+QuickHull, and the PhysX routines used by `tri_dist.h` (IR5-01). To reproduce
+the audit, search the v3.5.5 tag's `src/` and `include/` for copyright and
+licence lines other than those for The Manifold Authors, then check source
+attributions and build entries. The adapter treats zero-volume results as
+empty, so the evaluator retains the preceding body when a face-touching
+intersect produces a sheet. A real-WASM JSONL regression covers this case
+(IR5-02). Both milestone checks and `mise run verify` passed, including
+4267 Bun and 91 Rust tests, with 74 Bun tests skipped. The 60-hole plate
+regenerated in 72.3 ms in both milestone checks. Logs are under
+`tmp/cad3d/m5/rework/`. The milestone plan and dependency resolutions are
+unchanged.
+
 ## Completion
 
 All twenty-two milestones accepted by the adversarial implementation

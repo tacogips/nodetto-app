@@ -23,6 +23,81 @@ under BSL-1.0. Manifold's
 [`linalg.h`](https://github.com/elalish/manifold/blob/v3.5.5/include/manifold/linalg.h)
 is based on Sterling Orsten's public-domain [linalg](https://github.com/sgorsten/linalg).
 
+Other bundled sources in the Manifold tag include:
+
+- [`disjoint_sets.h`](https://github.com/elalish/manifold/blob/v3.5.5/src/disjoint_sets.h)
+  is adapted from [dset](https://github.com/wjakob/dset), copyright (c) 2015
+  Wenzel Jakob, under the zlib-style terms in the header.
+- [`svd.h`](https://github.com/elalish/manifold/blob/v3.5.5/src/svd.h) is
+  adapted from [tbtSVD](https://github.com/wi-re/tbtSVD), copyright (c) 2019
+  wi-re, under MIT. The header's notice follows below.
+- [`quickhull.h`](https://github.com/elalish/manifold/blob/v3.5.5/src/quickhull.h)
+  and [`quickhull.cpp`](https://github.com/elalish/manifold/blob/v3.5.5/src/quickhull.cpp)
+  are copyright 2024 The Manifold Authors under Apache-2.0 and derive from
+  Antti Kuukka's public-domain [QuickHull](https://github.com/akuukka/quickhull).
+- [`tri_dist.h`](https://github.com/elalish/manifold/blob/v3.5.5/src/tri_dist.h)
+  adapts routines from NVIDIA PhysX's
+  [`GuSweepCapsuleCapsule.cpp`](https://github.com/NVIDIA-Omniverse/PhysX/blob/107.3-physx-5.6.1/physx/source/geomutils/src/sweep/GuSweepCapsuleCapsule.cpp)
+  and [`GuDistanceTriangleTriangle.cpp`](https://github.com/NVIDIA-Omniverse/PhysX/blob/107.3-physx-5.6.1/physx/source/geomutils/src/distance/GuDistanceTriangleTriangle.cpp)
+  under BSD-3-Clause. Their notice follows below.
+
+MIT notice from Manifold's `svd.h`:
+
+```text
+Copyright (c) 2019 wi-re
+Copyright 2023 The Manifold Authors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+BSD-3-Clause notice for the adapted PhysX routines:
+
+```text
+Copyright (c) 2008-2025 NVIDIA Corporation. All rights reserved.
+Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
+Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+ * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+ * Neither the name of NVIDIA CORPORATION nor the names of its
+   contributors may be used to endorse or promote products derived
+   from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
 The [publish workflow](https://github.com/elalish/manifold/blob/v3.5.5/.github/workflows/publish_npm.yml)
 pins [Emscripten 5.0.2](https://github.com/emscripten-core/emscripten/blob/5.0.2/LICENSE).
 The generated glue and Embind use Emscripten's MIT option. The runtime

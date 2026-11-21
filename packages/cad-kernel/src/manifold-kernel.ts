@@ -154,10 +154,12 @@ export async function createManifoldKernel(options?: {
     },
     measure(handle) {
       const { solid } = get(handle);
+      const volume = solid.volume();
       return {
-        volume: solid.volume(),
+        volume,
         area: solid.surfaceArea(),
-        empty: solid.isEmpty(),
+        // A face-only intersection can have triangles but no solid volume.
+        empty: volume === 0 || solid.isEmpty(),
         triangles: solid.numTri(),
       };
     },

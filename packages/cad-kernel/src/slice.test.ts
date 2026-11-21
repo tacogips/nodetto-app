@@ -127,6 +127,36 @@ test("intersecting two plates returns the overlap with faces from both tools", a
   expect(faceNames.some((name) => name.startsWith("ex2:side:"))).toBe(true);
 });
 
+test("a face-touching intersect keeps the plate and reports an empty result", async () => {
+  const base = plateElements();
+  const { elements } = roundTrip({
+    ...plateWithHoles(0),
+    elements: [
+      ...base,
+      sketch("adjacent", "a3"),
+      ...rectangle("adjacent", 100, 0, 50, 60),
+      extrude("ex2", "a4", {
+        sketch: "adjacent",
+        distance: 5,
+        op: "intersect",
+        bodies: ["ex1"],
+      }),
+    ],
+  });
+  const kernel = await createManifoldKernel();
+  const memo = createCadMemo(kernel);
+  const initial = evaluateCadPage(base, kernel, memo);
+  const originalHandle = onlyBody(initial);
+  const result = evaluateCadPage(elements, kernel, memo);
+
+  expect(result.status.get("ex2")).toMatchObject({
+    ok: false,
+    code: "cad.result.empty",
+  });
+  expect(result.bodies).toEqual(initial.bodies);
+  expectVolume(kernel.measure(originalHandle).volume, 30_000);
+});
+
 test("two fresh kernels produce byte-identical meshes from the same JSONL", async () => {
   const { elements } = roundTrip(plateWithHoles());
   async function mesh() {
