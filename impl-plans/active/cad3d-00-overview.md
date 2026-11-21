@@ -127,8 +127,8 @@ milestone that breaks it, not in M18.
 | --- | --- |
 | M1 | accepted |
 | M2 | accepted |
-| M22 | implemented |
-| M3 | pending |
+| M22 | accepted |
+| M3 | implemented |
 | M4 | pending |
 | M5 | pending |
 | M6 | pending |
@@ -190,6 +190,14 @@ CLI and M2 entry-point regressions passed. The full Bun suite reports
 4185 passed and 74 skipped. The supplemental workspace verification
 passed with 91 Rust tests using the installed toolchain and a local
 cache. Logs are under `tmp/cad3d/m22/`.
+
+M3 added kernel-free sketch frames, outward directions, circle and arc
+tessellation, profile assembly with edge provenance, and cap triangulation.
+Grid predicates preserve the orientation of nearly collinear edges, and
+triangulation retains collinear boundary vertices for the prism sides.
+All three milestone checks, repository TypeScript lint, and workspace
+verification passed. The workspace run reported 4214 Bun tests and 91 Rust
+tests passed, with 74 Bun tests skipped. Logs are under `tmp/cad3d/m3/`.
 
 ## Completion
 

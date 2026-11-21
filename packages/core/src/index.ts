@@ -925,3 +925,4 @@ export {
   renderScope,
 } from "./render-scope.ts";
 export { type BoxIndex, createBoxIndex } from "./spatial-grid.ts";
+export * from "./cad/index.ts";
