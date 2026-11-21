@@ -1,0 +1,419 @@
+import { expect, test } from "bun:test";
+import type { Element } from "@nodetto/ir";
+import { contentKey, createCadMemo, evaluateCadPage } from "./index.ts";
+import {
+  bossOnFace,
+  cadElement,
+  extrude,
+  plateElements,
+  plateWithHoles,
+  rectangle,
+  sketch,
+} from "./testing/documents.ts";
+import { RecordingKernel } from "./testing/recording-kernel.ts";
+
+test("content keys use two deterministic FNV-1a passes and preserve part boundaries", () => {
+  expect(contentKey([])).toBe("811c9dc5811c9dc5");
+  expect(contentKey(["a"])).toMatch(/^[0-9a-f]{16}$/);
+  expect(contentKey(["ab", "c"])).not.toBe(contentKey(["a", "bc"]));
+  expect(contentKey(["", ""])).not.toBe(contentKey([""]));
+});
+
+test("a plate and six holes create seven prisms, then reuse every unchanged result", () => {
+  const { elements } = plateWithHoles();
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  const before = evaluateCadPage(elements, kernel, memo);
+  expect([...before.status.values()].every(({ ok }) => ok)).toBe(true);
+  expect(before.bodies).toMatchObject([{ id: "ex1", reference: false }]);
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(7);
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toMatchObject([
+    { op: "add", tools: [3, 4, 5, 6, 7] },
+    { op: "cut", target: 1, tools: [8] },
+  ]);
+
+  kernel.calls.length = 0;
+  const reordered = elements
+    .map((element) =>
+      element.id === "ex2"
+        ? extrude("ex2", "a4", {
+            op: "cut",
+            distance: -5,
+            sketch: "holes",
+            bodies: ["ex1"],
+          })
+        : element,
+    )
+    .reverse();
+  expect(evaluateCadPage(reordered, kernel, memo).bodies).toEqual(
+    before.bodies,
+  );
+  expect(kernel.calls).toEqual([]);
+
+  const revised = elements.map((item) =>
+    item.id === "hole-2"
+      ? cadElement(item.id, item.type, item.index, {
+          sketch: "holes",
+          c: [25, 5],
+          r: 4,
+        })
+      : item,
+  );
+  const after = evaluateCadPage(revised, kernel, memo);
+  expect(after.bodies[0]?.key).not.toBe(before.bodies[0]?.key);
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toMatchObject([
+    { mesh: { faceNames: ["ex2:start", "ex2:end", "ex2:side:hole-2"] } },
+  ]);
+  expect(
+    kernel.calls.flatMap((call) => (call.kind === "boolean" ? [call.op] : [])),
+  ).toEqual(["add", "cut"]);
+
+  kernel.calls.length = 0;
+  const unrelated = extrude("separate", "a5", {
+    sketch: "base",
+    distance: 2,
+    op: "new",
+  });
+  const withSeparate = evaluateCadPage([...revised, unrelated], kernel, memo);
+  expect(withSeparate.bodies.find(({ id }) => id === "ex1")).toEqual(
+    after.bodies[0],
+  );
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toMatchObject([
+    { mesh: { faceNames: expect.arrayContaining(["separate:start"]) } },
+  ]);
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toEqual([]);
+
+  kernel.calls.length = 0;
+  const longer = {
+    ...unrelated,
+    semantic: { ...unrelated.semantic, distance: 4 },
+  };
+  const changedSeparate = evaluateCadPage([...revised, longer], kernel, memo);
+  expect(changedSeparate.bodies.find(({ id }) => id === "ex1")).toEqual(
+    after.bodies[0],
+  );
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(1);
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toEqual([]);
+});
+
+test("nested loops subtract a hole then restore its island", () => {
+  const kernel = new RecordingKernel();
+  const result = evaluateCadPage(
+    [
+      ...plateElements(),
+      cadElement("hole", "cad.circle", "a1", {
+        sketch: "base",
+        c: [15, 15],
+        r: 9,
+      }),
+      cadElement("island", "cad.circle", "a1", {
+        sketch: "base",
+        c: [15, 15],
+        r: 3,
+      }),
+    ],
+    kernel,
+    createCadMemo(kernel),
+  );
+  expect(result.status.get("ex1")).toEqual({ ok: true });
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toMatchObject([
+    { op: "cut", target: 1, tools: [2] },
+    { op: "add", target: 3, tools: [4] },
+  ]);
+});
+
+test("on-face sketch frames are recomputed when the source plane moves", () => {
+  const { elements } = bossOnFace();
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  const evaluate = (model: readonly Element[]) => {
+    expect(evaluateCadPage(model, kernel, memo).status.get("ex2")).toEqual({
+      ok: true,
+    });
+    const prism = kernel.calls.find(
+      (call) =>
+        call.kind === "solid" && call.mesh.faceNames.includes("ex2:end"),
+    );
+    if (prism?.kind !== "solid") throw new Error("Expected the boss prism");
+    return [prism.mesh.positions[2], prism.mesh.positions[14]];
+  };
+  expect(evaluate(elements)).toEqual([5, 15]);
+  kernel.calls.length = 0;
+  const raised = elements.map((item) =>
+    item.id === "ex1"
+      ? extrude("ex1", "a2", { sketch: "base", distance: 7, op: "new" })
+      : item,
+  );
+  expect(evaluate(raised)).toEqual([7, 17]);
+});
+
+test("a long stack of face-based sketches resolves iteratively", () => {
+  const kernel = new RecordingKernel();
+  const elements: Element[] = [...plateElements()];
+  let support = "ex1";
+  for (let i = 0; i < 250; i += 1) {
+    const index = `b${String(i).padStart(3, "0")}`;
+    elements.push(
+      sketch(`s-${i}`, `${index}a`, {
+        face: { feature: support, role: "end" },
+      }),
+    );
+    elements.push(...rectangle(`s-${i}`, 0, 0, 1, 1));
+    support = `x-${i}`;
+    elements.push(
+      extrude(support, `${index}b`, {
+        sketch: `s-${i}`,
+        distance: 1,
+        op: "add",
+        bodies: ["ex1"],
+      }),
+    );
+  }
+  const result = evaluateCadPage(elements, kernel, createCadMemo(kernel));
+  expect(result.status.get(support)).toEqual({ ok: true });
+  const last = kernel.calls.find(
+    (call) =>
+      call.kind === "solid" && call.mesh.faceNames.includes(`${support}:end`),
+  );
+  expect(last?.kind === "solid" && last.mesh.positions[14]).toBe(255);
+});
+
+test.each([
+  ["cad.circle", { sketch: "bad", r: 1 }, "cad.profile.invalid"],
+  ["cad.line", { sketch: "bad", b: [1, 0] }, "cad.profile.invalid"],
+  [
+    "cad.arc",
+    { sketch: "bad", a: [0, 0], m: [0, Number.NaN], b: [0, 1] },
+    "cad.profile.invalid",
+  ],
+  ["cad.circle", { sketch: "bad", c: [0, 0], r: -1 }, "cad.profile.invalid"],
+  ["cad.circle", { sketch: "bad", c: [0, 0], r: 1e9 }, "cad.limit"],
+  ["cad.circle", { sketch: "bad", c: [9999, 0], r: 2 }, "cad.limit"],
+] as const)(
+  "a bad %s entity with %j reports %s before reaching the kernel",
+  (type, semantic, code) => {
+    const kernel = new RecordingKernel();
+    const result = evaluateCadPage(
+      [
+        ...plateElements(),
+        sketch("bad", "a3"),
+        cadElement("bad-entity", type, "a1", semantic),
+        extrude("bad-tool", "a4", { sketch: "bad", distance: 1, op: "new" }),
+        sketch("dependent", "a5", {
+          face: { feature: "bad-tool", role: "end" },
+        }),
+      ],
+      kernel,
+      createCadMemo(kernel),
+    );
+    expect(result.status.get("bad-tool")).toMatchObject({ code });
+    expect(result.status.get("dependent")).toMatchObject({
+      code: "cad.reference.failed",
+    });
+    expect(result.bodies.map(({ id }) => id)).toEqual(["ex1"]);
+    expect(kernel.calls.filter(({ kind }) => kind === "solid")).toHaveLength(1);
+  },
+);
+
+test.each([1e9, -1e9, 7000])(
+  "distance %s cannot create out-of-bounds tool vertices",
+  (distance) => {
+    const kernel = new RecordingKernel();
+    const result = evaluateCadPage(
+      [
+        sketch("raised", "a1", { base: "xy", offset: 4000 }),
+        ...rectangle("raised", 0, 0, 1, 1),
+        extrude("out-of-bounds", "a2", {
+          sketch: "raised",
+          distance,
+          op: "new",
+        }),
+      ],
+      kernel,
+      createCadMemo(kernel),
+    );
+    expect(result.status.get("out-of-bounds")).toMatchObject({
+      code: "cad.limit",
+    });
+    expect(kernel.calls).toEqual([]);
+  },
+);
+
+test("an empty cut preserves every target and makes its dependent sketch fail", () => {
+  const kernel = new RecordingKernel({
+    booleanResult: (_op, target) => ({ empty: target === 2 }),
+  });
+  const memo = createCadMemo(kernel);
+  const plate = [
+    ...plateElements(),
+    extrude("body2", "a3", { sketch: "base", distance: 5, op: "new" }),
+  ];
+  const before = evaluateCadPage(plate, kernel, memo);
+  const after = evaluateCadPage(
+    [
+      ...plate,
+      extrude("empty-cut", "a4", {
+        sketch: "base",
+        distance: 5,
+        op: "cut",
+        bodies: ["ex1", "body2"],
+      }),
+      sketch("dependent", "a5", {
+        face: { feature: "empty-cut", role: "end" },
+      }),
+    ],
+    kernel,
+    memo,
+  );
+  expect(after.bodies).toEqual(before.bodies);
+  expect(after.status.get("empty-cut")).toMatchObject({
+    code: "cad.result.empty",
+  });
+  expect(after.status.get("dependent")).toMatchObject({
+    code: "cad.reference.failed",
+  });
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toMatchObject([
+    { op: "cut", target: 1 },
+    { op: "cut", target: 2 },
+  ]);
+  expect(kernel.calls.filter(({ kind }) => kind === "release")).toMatchObject([
+    { handle: 5 },
+  ]);
+});
+
+test("a body whose creator exceeds the extent fails dependent modifications", () => {
+  const kernel = new RecordingKernel();
+  const result = evaluateCadPage(
+    [
+      sketch("base", "a1"),
+      ...rectangle("base", 0, 0, 1, 1),
+      extrude("too-long", "a2", { sketch: "base", distance: 1e9, op: "new" }),
+      extrude("dependent", "a3", {
+        sketch: "base",
+        distance: 1,
+        op: "cut",
+        bodies: ["too-long"],
+      }),
+    ],
+    kernel,
+    createCadMemo(kernel),
+  );
+  expect(result.status.get("too-long")).toMatchObject({ code: "cad.limit" });
+  expect(result.status.get("dependent")).toMatchObject({
+    code: "cad.reference.failed",
+    detail: "too-long",
+  });
+  expect(kernel.calls).toEqual([]);
+});
+
+test("undefined alternatives in sketch planes do not shadow valid planes", () => {
+  const { elements } = bossOnFace();
+  const kernel = new RecordingKernel();
+  const model = elements.map((item) => {
+    if (item.id === "base")
+      return cadElement(item.id, item.type, item.index, {
+        name: "Base",
+        plane: { base: "xy", face: undefined },
+      });
+    if (item.id === "boss")
+      return cadElement(item.id, item.type, item.index, {
+        name: "Boss",
+        plane: { base: undefined, face: { feature: "ex1", role: "end" } },
+      });
+    return item;
+  });
+  expect(
+    evaluateCadPage(model, kernel, createCadMemo(kernel)).status.get("ex2"),
+  ).toEqual({ ok: true });
+});
+
+test("suppressed tools, malformed inputs and kernel errors leave other bodies usable", () => {
+  const kernel = new RecordingKernel({
+    beforeMeasure(handle) {
+      if (handle === 1) throw new Error("Measure failed");
+    },
+  });
+  const result = evaluateCadPage(
+    [
+      ...plateElements(),
+      sketch("dependent", "a3", { face: { feature: "ex1", role: "end" } }),
+      extrude("suppressed", "a4", {
+        sketch: "base",
+        distance: 3,
+        op: "new",
+        suppressed: true,
+      }),
+      extrude("from-suppressed", "a5", {
+        sketch: "base",
+        distance: 2,
+        op: "cut",
+        bodies: ["suppressed"],
+      }),
+      extrude("independent", "a6", { sketch: "base", distance: 3, op: "new" }),
+    ],
+    kernel,
+    createCadMemo(kernel),
+  );
+  expect(result.bodies.map(({ id }) => id)).toEqual(["independent"]);
+  expect(result.status.get("ex1")).toEqual({
+    ok: false,
+    code: "cad.kernel.failed",
+    detail: "Measure failed",
+  });
+  expect(result.status.get("dependent")).toMatchObject({
+    code: "cad.reference.failed",
+  });
+  expect(result.status.get("suppressed")).toEqual({ ok: true });
+  expect(result.status.get("from-suppressed")).toMatchObject({
+    code: "cad.reference.failed",
+  });
+  expect(kernel.calls.filter(({ kind }) => kind === "release")).toMatchObject([
+    { handle: 1 },
+  ]);
+});
+
+test("a solid above the triangle limit is released and never published", () => {
+  const kernel = new RecordingKernel({ triangles: 2_000_001 });
+  const result = evaluateCadPage(
+    plateElements(),
+    kernel,
+    createCadMemo(kernel),
+  );
+  expect(result.status.get("ex1")).toMatchObject({ code: "cad.limit" });
+  expect(result.bodies).toEqual([]);
+  expect(kernel.calls.filter(({ kind }) => kind === "release")).toMatchObject([
+    { handle: 1 },
+  ]);
+});
+
+test.each([{ entries: 1 }, { triangles: 100 }])(
+  "LRU honors %j and each evicted handle is released once",
+  (limits) => {
+    const kernel = new RecordingKernel({ triangles: 60 });
+    const memo = createCadMemo(kernel, limits);
+    const elements = [
+      ...plateElements(),
+      extrude("body2", "a3", { sketch: "base", distance: 3, op: "new" }),
+    ];
+    const first = evaluateCadPage(elements, kernel, memo);
+    expect(first.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(
+      true,
+    );
+    kernel.calls.length = 0;
+    const second = evaluateCadPage(elements, kernel, memo);
+    expect(second.bodies.map(({ handle }) => handle)).toEqual([3, 2]);
+    expect(second.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(
+      true,
+    );
+    expect(kernel.calls.filter(({ kind }) => kind === "solid")).toMatchObject([
+      { handle: 3 },
+    ]);
+    evaluateCadPage([], kernel, memo);
+    const retained = evaluateCadPage(elements.slice(0, -1), kernel, memo);
+    expect(retained.bodies.map(({ handle }) => handle)).toEqual([4]);
+    const released = kernel.calls.flatMap((call) =>
+      call.kind === "release" ? [call.handle] : [],
+    );
+    expect(released.sort((a, b) => a - b)).toEqual([1, 2, 3]);
+  },
+);

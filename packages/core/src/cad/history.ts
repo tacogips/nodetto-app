@@ -1,0 +1,494 @@
+import {
+  type CadCircleSemantic,
+  type CadExtrudeSemantic,
+  type CadFaceRef,
+  type CadLineSemantic,
+  type CadSketchSemantic,
+  type Element,
+  type ElementId,
+  getElementTypeDefinition,
+  isCadTypeName,
+  isPlainObject,
+} from "@nodetto/ir";
+import { compareFractional } from "../fractional.ts";
+import {
+  baseFrame,
+  type CadFrame,
+  capOutwardSign,
+  extrudeSpan,
+  faceFrame,
+  sideOutwardSign,
+} from "./frames.ts";
+import { buildLoops, type CadLoop } from "./loops.ts";
+import { coordinate } from "./vec.ts";
+
+export type CadStatus =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: string; readonly detail?: string };
+
+export interface CadHistory {
+  readonly features: readonly Element[];
+  readonly entitiesOf: (sketchId: ElementId) => readonly Element[];
+  readonly status: ReadonlyMap<ElementId, CadStatus>;
+}
+
+type Failure = Extract<CadStatus, { ok: false }>;
+const cadOk = { ok: true } as const;
+const CAD_MAX_EXTENT_MM = 10_000;
+
+export function cadFailure(code: string, detail?: string): Failure {
+  return detail === undefined
+    ? { ok: false, code }
+    : { ok: false, code, detail };
+}
+
+type CadFeature =
+  | (Element<CadSketchSemantic> & { readonly type: "cad.sketch" })
+  | (Element<CadExtrudeSemantic> & { readonly type: "cad.extrude" });
+
+interface HistoryDetails extends CadHistory {
+  readonly byId: ReadonlyMap<ElementId, Element>;
+  readonly typed: ReadonlyMap<ElementId, CadFeature>;
+  readonly dependencies: ReadonlyMap<ElementId, readonly ElementId[]>;
+  readonly targets: ReadonlyMap<ElementId, readonly ElementId[]>;
+}
+
+function isSketchEntity(type: string): boolean {
+  return type === "cad.line" || type === "cad.arc" || type === "cad.circle";
+}
+
+function validatePayload(element: Element): CadStatus {
+  const issue = getElementTypeDefinition(element.type)?.validateSemantic(
+    element.semantic,
+    "semantic",
+  )[0];
+  if (issue !== undefined) {
+    const code =
+      issue.code === "cad.coordinate"
+        ? "cad.limit"
+        : isSketchEntity(element.type)
+          ? "cad.profile.invalid"
+          : "cad.feature.invalid";
+    return cadFailure(code, `${issue.path}: ${issue.message}`);
+  }
+  if (
+    (element.type === "cad.circle" &&
+      (element.semantic as CadCircleSemantic).r > CAD_MAX_EXTENT_MM) ||
+    (element.type === "cad.extrude" &&
+      Math.abs((element.semantic as CadExtrudeSemantic).distance) >
+        CAD_MAX_EXTENT_MM)
+  ) {
+    return cadFailure("cad.limit", "CAD lengths must be within 10000 mm");
+  }
+  return cadOk;
+}
+
+function localElement(
+  byId: ReadonlyMap<ElementId, Element>,
+  owner: Element,
+  id: ElementId | undefined,
+): Element | undefined {
+  const candidate = id === undefined ? undefined : byId.get(id);
+  return candidate?.page === owner.page ? candidate : undefined;
+}
+
+// Reverse postorder over the reference graph, followed by walks on the
+// reversed graph, identifies only the features that belong to a cycle.
+function markCycles(
+  dependencies: ReadonlyMap<ElementId, readonly ElementId[]>,
+  status: Map<ElementId, CadStatus>,
+): void {
+  const reversed = new Map<ElementId, ElementId[]>();
+  for (const [id, refs] of dependencies) {
+    for (const ref of refs) {
+      const incoming = reversed.get(ref);
+      if (incoming) incoming.push(id);
+      else reversed.set(ref, [id]);
+    }
+  }
+
+  const visited = new Set<ElementId>();
+  const order: ElementId[] = [];
+  for (const id of dependencies.keys()) {
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const stack = [{ id, refs: (dependencies.get(id) ?? []).values() }];
+    for (let top = stack.at(-1); top !== undefined; top = stack.at(-1)) {
+      const next = top.refs.next();
+      if (next.done) {
+        order.push(top.id);
+        stack.pop();
+      } else if (!visited.has(next.value)) {
+        visited.add(next.value);
+        stack.push({
+          id: next.value,
+          refs: (dependencies.get(next.value) ?? []).values(),
+        });
+      }
+    }
+  }
+
+  visited.clear();
+  for (const id of order.reverse()) {
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const component = [id];
+    const todo = [id];
+    for (let next = todo.pop(); next !== undefined; next = todo.pop()) {
+      for (const ref of reversed.get(next) ?? []) {
+        if (visited.has(ref)) continue;
+        visited.add(ref);
+        todo.push(ref);
+        component.push(ref);
+      }
+    }
+    if (component.length > 1 || dependencies.get(id)?.includes(id)) {
+      for (const member of component)
+        status.set(member, cadFailure("cad.cycle"));
+    }
+  }
+}
+
+function faceDependencies(
+  history: HistoryDetails,
+  feature: CadFeature,
+  face: CadFaceRef,
+  refs: ElementId[],
+): CadStatus {
+  const source = localElement(history.byId, feature, face.feature);
+  if (source?.type !== "cad.extrude") {
+    return cadFailure(
+      "cad.reference.missing",
+      face.feature ?? "plane.face.feature",
+    );
+  }
+  refs.push(source.id);
+  if (face.role !== "side") return cadOk;
+  const entity = localElement(history.byId, feature, face.entity);
+  if (!entity || !isSketchEntity(entity.type))
+    return cadFailure(
+      "cad.reference.missing",
+      face.entity ?? "plane.face.entity",
+    );
+
+  const extrude = history.typed.get(source.id);
+  if (extrude?.type !== "cad.extrude") return cadOk;
+  const sketch = extrude.semantic.sketch;
+  if (
+    sketch === undefined ||
+    !isPlainObject(entity.semantic) ||
+    entity.semantic["sketch"] !== sketch
+  )
+    return cadFailure("cad.reference.missing", entity.id);
+  return entity.type === "cad.line"
+    ? cadOk
+    : cadFailure("cad.plane.notPlanar", entity.id);
+}
+
+function extrudeDependencies(
+  history: HistoryDetails,
+  feature: Extract<CadFeature, { type: "cad.extrude" }>,
+  ranks: ReadonlyMap<ElementId, number>,
+  refs: ElementId[],
+  targets: Map<ElementId, readonly ElementId[]>,
+): CadStatus {
+  const { sketch, loops, op, bodies } = feature.semantic;
+  const parent = localElement(history.byId, feature, sketch);
+  if (parent?.type === "cad.sketch") refs.push(parent.id);
+
+  const earlier: ElementId[] = [];
+  const named = new Set(bodies);
+  const rank = ranks.get(feature.id) ?? -1;
+  let later: ElementId | undefined;
+  if (op !== "new") {
+    for (const id of named) {
+      const body = localElement(history.byId, feature, id);
+      if (
+        body?.type !== "cad.extrude" ||
+        !isPlainObject(body.semantic) ||
+        body.semantic["op"] !== "new"
+      )
+        continue;
+      refs.push(id);
+      if ((ranks.get(id) ?? Number.POSITIVE_INFINITY) < rank) earlier.push(id);
+      else later ??= id;
+    }
+    targets.set(feature.id, earlier);
+  }
+
+  if (parent?.type !== "cad.sketch")
+    return cadFailure("cad.reference.missing", sketch ?? "sketch");
+  if (loops?.length === 0) return cadFailure("cad.profile.empty");
+  for (const id of loops ?? []) {
+    const member = localElement(history.byId, feature, id);
+    if (
+      !member ||
+      !isSketchEntity(member.type) ||
+      !isPlainObject(member.semantic) ||
+      member.semantic["sketch"] !== sketch
+    )
+      return cadFailure("cad.reference.missing", id);
+  }
+
+  if (op === "new") return cadOk;
+  if (later !== undefined) return cadFailure("cad.order.forward", later);
+  if (earlier.length === 0) return cadFailure("cad.body.missing");
+  if (named.size !== earlier.length || (op === "add" && named.size !== 1))
+    return cadFailure("cad.body.reference");
+  return cadOk;
+}
+
+export function scanCadPage(elements: readonly Element[]): HistoryDetails {
+  const cad = elements.filter(({ type }) => isCadTypeName(type));
+  const byId = new Map(cad.map((element) => [element.id, element]));
+  const features = cad
+    .filter(({ type }) => type === "cad.sketch" || type === "cad.extrude")
+    .sort(
+      (a, b) =>
+        compareFractional(a.index, b.index) || compareFractional(a.id, b.id),
+    );
+  const ranks = new Map(features.map(({ id }, index) => [id, index]));
+  const typed = new Map<ElementId, CadFeature>();
+  const dependencies = new Map<ElementId, readonly ElementId[]>();
+  const targets = new Map<ElementId, readonly ElementId[]>();
+  const status = new Map<ElementId, CadStatus>();
+  const entities = new Map<ElementId, Element[]>();
+  const counts = new Map<string, number>();
+  for (const { page } of cad) counts.set(page, (counts.get(page) ?? 0) + 1);
+
+  for (const element of cad) {
+    const { id, type, page, semantic } = element;
+    if ((counts.get(page) ?? 0) > 20_000) {
+      status.set(
+        id,
+        cadFailure("cad.limit", "More than 20000 CAD elements on the page"),
+      );
+      continue;
+    }
+    if (
+      !isSketchEntity(type) &&
+      type !== "cad.sketch" &&
+      type !== "cad.extrude"
+    )
+      continue;
+    const payload = validatePayload(element);
+    status.set(id, payload);
+    if (type === "cad.sketch" || type === "cad.extrude") {
+      if (payload.ok) typed.set(id, element as CadFeature);
+      continue;
+    }
+    const sketch = isPlainObject(semantic) ? semantic["sketch"] : undefined;
+    const parent = localElement(
+      byId,
+      element,
+      typeof sketch === "string" ? sketch : undefined,
+    );
+    if (parent?.type === "cad.sketch") {
+      const list = entities.get(parent.id);
+      if (list) list.push(element);
+      else entities.set(parent.id, [element]);
+    } else if (payload.ok) {
+      status.set(
+        id,
+        cadFailure(
+          "cad.reference.missing",
+          typeof sketch === "string" ? sketch : "sketch",
+        ),
+      );
+    }
+  }
+
+  const history = {
+    features,
+    entitiesOf: (id: ElementId) => entities.get(id) ?? [],
+    status,
+    byId,
+    typed,
+    dependencies,
+    targets,
+  };
+  for (const feature of features) {
+    const item = typed.get(feature.id);
+    if (!item) continue;
+    const refs: ElementId[] = [];
+    const structural =
+      item.type === "cad.extrude"
+        ? extrudeDependencies(history, item, ranks, refs, targets)
+        : "face" in item.semantic.plane &&
+            item.semantic.plane.face !== undefined
+          ? faceDependencies(history, item, item.semantic.plane.face, refs)
+          : cadOk;
+    dependencies.set(item.id, refs);
+    const ownRank = ranks.get(item.id) ?? -1;
+    const later = refs.find((id) => (ranks.get(id) ?? -1) >= ownRank);
+    status.set(
+      item.id,
+      structural.ok && later !== undefined
+        ? cadFailure("cad.order.forward", later)
+        : structural,
+    );
+  }
+  markCycles(dependencies, status);
+  return history;
+}
+
+export function analyzeCadPage(elements: readonly Element[]): CadHistory {
+  const { features, entitiesOf, status } = scanCadPage(elements);
+  return { features, entitiesOf, status };
+}
+
+export function faceBody(
+  elements: readonly Element[],
+  face: CadFaceRef,
+): ElementId | null {
+  if (face.feature === undefined) return null;
+  const history = scanCadPage(elements);
+  const feature = history.typed.get(face.feature);
+  if (feature?.type !== "cad.extrude") return null;
+  return feature.semantic.op === "new"
+    ? feature.id
+    : (history.targets.get(feature.id)?.[0] ?? null);
+}
+
+export interface ExtrudeGeometry {
+  readonly frame: CadFrame;
+  readonly span: ReturnType<typeof extrudeSpan>;
+  readonly loops: readonly CadLoop[];
+}
+
+// Test the endpoints of each swept vertex. This uses the same coordinates
+// as the tool solid and works without creating a mesh or triangulating.
+function withinExtent(
+  loops: readonly CadLoop[],
+  { o, u, v, n }: CadFrame,
+  { t0, t1 }: ExtrudeGeometry["span"],
+): boolean {
+  // Allow for basis-vector rounding at the 10000 mm boundary.
+  const bound = CAD_MAX_EXTENT_MM + 1e-9;
+  const withinAxis = (base: number, normal: number) =>
+    Math.abs(base + normal * t0) <= bound &&
+    Math.abs(base + normal * t1) <= bound;
+  for (const loop of loops) {
+    for (let i = 0; i < loop.points.length; i += 2) {
+      const x = coordinate(loop.points, i);
+      const y = coordinate(loop.points, i + 1);
+      if (
+        !withinAxis(o[0] + u[0] * x + v[0] * y, n[0]) ||
+        !withinAxis(o[1] + u[1] * x + v[1] * y, n[1]) ||
+        !withinAxis(o[2] + u[2] * x + v[2] * y, n[2])
+      )
+        return false;
+    }
+  }
+  return true;
+}
+
+export function createCadGeometry(history: HistoryDetails) {
+  const frames = new Map<ElementId, CadFrame>();
+  const extrudes = new Map<ElementId, ExtrudeGeometry>();
+  return {
+    frames,
+    extrudes,
+    sketch(plane: CadSketchSemantic["plane"]): CadFrame | Failure {
+      if ("base" in plane && plane.base !== undefined)
+        return baseFrame(plane.base, plane.offset);
+      if (!("face" in plane) || plane.face === undefined)
+        return cadFailure("cad.feature.invalid", "Expected a sketch plane");
+      const { feature, role, entity } = plane.face;
+      const tool = feature === undefined ? undefined : extrudes.get(feature);
+      if (tool === undefined)
+        return cadFailure("cad.reference.failed", feature);
+      if (role !== "side") return faceFrame(tool.frame, tool.span, role);
+      const line = entity === undefined ? undefined : history.byId.get(entity);
+      if (
+        !line ||
+        line.type !== "cad.line" ||
+        !tool.loops.some((loop) => loop.members.includes(line.id))
+      )
+        return cadFailure("cad.reference.missing", entity);
+      return faceFrame(
+        tool.frame,
+        tool.span,
+        role,
+        line.semantic as CadLineSemantic,
+      );
+    },
+    extrude(semantic: CadExtrudeSemantic): ExtrudeGeometry | Failure {
+      const sketch = semantic.sketch;
+      const frame = sketch === undefined ? undefined : frames.get(sketch);
+      if (sketch === undefined || frame === undefined)
+        return cadFailure("cad.reference.failed", sketch);
+
+      const entities = history.entitiesOf(sketch);
+      for (const { id } of entities) {
+        const failure = history.status.get(id);
+        if (failure && !failure.ok) return failure;
+      }
+      const profile = buildLoops(entities, semantic.loops);
+      if ("error" in profile) return cadFailure(profile.error, profile.at);
+      if (!profile.loops.some(({ depth }) => depth % 2 === 0))
+        return cadFailure("cad.profile.empty");
+
+      const span = extrudeSpan(semantic);
+      if (!withinExtent(profile.loops, frame, span))
+        return cadFailure(
+          "cad.limit",
+          "Tool vertices must lie within 10000 mm of the origin along each axis",
+        );
+      return { frame, span, loops: profile.loops };
+    },
+  };
+}
+
+export function faceOutwardSign(
+  elements: readonly Element[],
+  face: CadFaceRef,
+): 1 | -1 | 0 {
+  if (face.feature === undefined) return 0;
+  const history = scanCadPage(elements);
+  const source = history.typed.get(face.feature);
+  if (source?.type !== "cad.extrude") return 0;
+
+  const needed = new Set<ElementId>();
+  const todo = [source.id];
+  for (let id = todo.pop(); id !== undefined; id = todo.pop()) {
+    if (needed.has(id)) continue;
+    needed.add(id);
+    for (const ref of history.dependencies.get(id) ?? []) todo.push(ref);
+  }
+  const geometry = createCadGeometry(history);
+  for (const { id } of history.features) {
+    if (!needed.has(id)) continue;
+    if (!history.status.get(id)?.ok) return 0;
+    const item = history.typed.get(id);
+    if (item?.type === "cad.sketch") {
+      const frame = geometry.sketch(item.semantic.plane);
+      if ("ok" in frame) return 0;
+      geometry.frames.set(id, frame);
+    } else if (item?.type === "cad.extrude" && !item.semantic.suppressed) {
+      const tool = geometry.extrude(item.semantic);
+      if ("ok" in tool) return 0;
+      geometry.extrudes.set(id, tool);
+    } else {
+      return 0;
+    }
+  }
+
+  const tool = geometry.extrudes.get(source.id);
+  if (!tool) return 0;
+  let sign: 0 | 1 | -1;
+  if (face.role === "side") {
+    const entity = face.entity;
+    if (entity === undefined || history.byId.get(entity)?.type !== "cad.line")
+      return 0;
+    const loop = tool.loops.find((candidate) =>
+      candidate.members.includes(entity),
+    );
+    if (!loop) return 0;
+    sign = sideOutwardSign(loop, entity);
+  } else {
+    sign = capOutwardSign(tool.span, face.role);
+  }
+  if (sign === 0 || source.semantic.op !== "cut") return sign;
+  return sign === 1 ? -1 : 1;
+}

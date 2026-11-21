@@ -128,8 +128,8 @@ milestone that breaks it, not in M18.
 | M1 | accepted |
 | M2 | accepted |
 | M22 | accepted |
-| M3 | implemented |
-| M4 | pending |
+| M3 | accepted |
+| M4 | implemented |
 | M5 | pending |
 | M6 | pending |
 | M7 | pending |
@@ -198,6 +198,29 @@ triangulation retains collinear boundary vertices for the prism sides.
 All three milestone checks, repository TypeScript lint, and workspace
 verification passed. The workspace run reported 4214 Bun tests and 91 Rust
 tests passed, with 74 Bun tests skipped. Logs are under `tmp/cad3d/m3/`.
+
+M4 added feature history and dependency statuses, analytic face frames and
+outward directions, named prism meshes, the kernel port, and memoised
+evaluation. Results keep their handles until the next evaluation even when
+the LRU cannot retain all visible bodies. A failed multi-body operation
+preserves every target's preceding state.
+
+M4 reports malformed sketch entities before building loops (IR3-01). It
+reports `cad.limit` when a radius, absolute extrusion distance, or swept
+vertex on any world axis exceeds 10,000 mm (IR1-01). Under design section
+3.3, a reference to a later body creator reports `cad.order.forward`. Face
+names escape percent and colon characters inside element IDs to distinguish
+all feature, role and entity combinations.
+
+History and face analysis use no triangulation (IR3-03). A Bun run on a
+19,998-vertex spiral band measured 49.3 ms for loop building and 53.4 ms for
+face analysis including history, profiles and bounds. Triangulating the
+same cap took 1,886.4 ms. The M3 review measured 2,392 ms for a similar
+20,000-vertex spiral band. M16's CLI check should keep cap triangulation
+out of its path. Timing and verification logs are under `tmp/cad3d/m4/`.
+All three milestone checks passed. Workspace verification, including the
+repository TypeScript lint, passed with 4245 Bun tests and 91 Rust tests.
+The workspace run skipped 74 Bun tests.
 
 ## Completion
 
