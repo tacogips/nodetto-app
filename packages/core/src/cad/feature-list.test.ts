@@ -22,6 +22,7 @@ const expected: [string, 0 | 1, string][] = [
   ["sketch-top", 0, "Mounting hole"],
   ["circle-bore", 1, "Circle 2.125001 mm"],
   ["cut", 0, "Bore"],
+  ["mesh-sample", 0, "Tetrahedron"],
 ];
 
 test("feature rows follow history and sort entities by index and id", () => {

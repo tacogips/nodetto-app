@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./mermaid/import": "./src/mermaid/import.ts",
     "./bpmn": "./src/bpmn/index.ts",
+    "./cad-mesh": "./src/cad-mesh.ts",
     "./drawio": "./src/drawio/index.ts",
     "./kicad": "./src/kicad/index.ts",
     "./nmesh": "./src/nmesh/index.ts",

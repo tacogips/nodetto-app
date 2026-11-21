@@ -220,7 +220,11 @@ export function isCanonical({
   return offset === triangles.length && used === positions.length / 3;
 }
 
-export function toTriangleMesh(mesh: QuantizedMesh): TriangleMesh {
+export function toTriangleMesh(mesh: QuantizedMesh): {
+  positions: Float64Array;
+  triangles: Uint32Array;
+  triFace: Uint32Array;
+} {
   const positions = Float64Array.from(
     mesh.positions,
     (value) => value / unitsPerMillimetre,

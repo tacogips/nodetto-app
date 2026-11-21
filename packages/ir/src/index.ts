@@ -449,6 +449,7 @@ export {
 export { ANIMATION_LIMITS, validateElementAnimation } from "./validate.ts";
 export {
   CAD_ELEMENT_TYPES,
+  CAD_MESH_DATA_MAX_CHARS,
   CAD_OPERATIONS,
   CAD_PAGE_KIND,
   type CadArcSemantic,
@@ -457,6 +458,7 @@ export {
   type CadExtrudeSemantic,
   type CadFaceRef,
   type CadLineSemantic,
+  type CadMeshSemantic,
   type CadPlane,
   type CadSketchSemantic,
   type CadXY,

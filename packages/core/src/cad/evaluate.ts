@@ -7,7 +7,7 @@ import {
   type ExtrudeGeometry,
   scanCadPage,
 } from "./history.ts";
-import type { CadKernel, KernelHandle } from "./kernel.ts";
+import type { CadKernel, KernelHandle, ToolMesh } from "./kernel.ts";
 import { canonicalCadJson, contentKey } from "./keys.ts";
 import type { CadLoop } from "./loops.ts";
 import {
@@ -26,7 +26,12 @@ export interface CadBodyResult {
 
 export interface CadEvaluation {
   readonly bodies: readonly CadBodyResult[];
+  readonly displayOnly: readonly { id: ElementId; mesh: ToolMesh }[];
   readonly status: ReadonlyMap<ElementId, CadStatus>;
+}
+
+export interface CadEvaluateOptions {
+  readonly decodeMesh?: (data: string) => ToolMesh;
 }
 
 interface Solid {
@@ -49,10 +54,14 @@ interface ToolState {
 type BodyState = {
   readonly id: ElementId;
   readonly key: string;
-  readonly tool: ToolState;
 } & (
-  | { readonly op: "new" }
-  | { readonly op: "add" | "cut" | "intersect"; readonly previous: BodyState }
+  | { readonly op: "mesh"; readonly decode: () => ToolMesh }
+  | { readonly op: "new"; readonly tool: ToolState }
+  | {
+      readonly op: "add" | "cut" | "intersect";
+      readonly tool: ToolState;
+      readonly previous: BodyState;
+    }
 );
 
 type SolidKeyKind = "prism" | "tool step" | "tool" | "body";
@@ -90,6 +99,16 @@ export function createCadMemo(
   };
 }
 
+export function releaseCadMemo(memo: CadMemo): void {
+  const state = memo[memoState];
+  const solids = new Set([...state.lru.keys(), ...state.visible.values()]);
+  state.cache.clear();
+  state.lru.clear();
+  state.visible.clear();
+  state.successful.clear();
+  for (const { handle } of solids) state.kernel.release(handle);
+}
+
 class SolidFailure extends Error {
   constructor(
     readonly code: string,
@@ -99,8 +118,18 @@ class SolidFailure extends Error {
   }
 }
 
+class OpenMesh extends SolidFailure {
+  constructor(
+    readonly mesh: ToolMesh,
+    detail?: string,
+  ) {
+    super("cad.mesh.open", detail);
+  }
+}
+
 class BodyBuildFailure extends Error {
   readonly status: CadStatus;
+  readonly displayMesh: ToolMesh | undefined;
 
   constructor(
     readonly featureId: ElementId,
@@ -112,6 +141,7 @@ class BodyBuildFailure extends Error {
       error instanceof SolidFailure ? error.code : "cad.kernel.failed",
       detail || undefined,
     );
+    this.displayMesh = error instanceof OpenMesh ? error.mesh : undefined;
   }
 }
 
@@ -295,6 +325,42 @@ function getTool(
   return aggregate.solid;
 }
 
+function getMesh(
+  memo: MemoState,
+  body: Extract<BodyState, { op: "mesh" }>,
+): Solid {
+  let mesh: ToolMesh | undefined;
+  try {
+    return getSolid(memo, "body", body.key, () => {
+      const decoded = body.decode();
+      if (decoded.triangles.length === 0)
+        throw new SolidFailure("cad.mesh.invalid", "Mesh has no triangles");
+      mesh = {
+        positions: decoded.positions,
+        triangles: decoded.triangles,
+        triFace: new Uint32Array(decoded.triangles.length / 3),
+        faceNames: [`${body.id}:mesh`],
+      };
+      try {
+        return memo.kernel.solid(mesh);
+      } catch (error) {
+        throw new OpenMesh(
+          mesh,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    });
+  } catch (error) {
+    if (
+      mesh &&
+      error instanceof SolidFailure &&
+      error.code === "cad.result.empty"
+    )
+      throw new OpenMesh(mesh);
+    throw error;
+  }
+}
+
 function materializeBody(memo: MemoState, body: BodyState): Solid {
   const missing: BodyState[] = [];
   let solid: Solid | undefined;
@@ -302,18 +368,24 @@ function materializeBody(memo: MemoState, body: BodyState): Solid {
   for (
     let step: BodyState | undefined = body;
     step;
-    step = step.op === "new" ? undefined : step.previous
+    step = "previous" in step ? step.previous : undefined
   ) {
     solid = cached(memo, step.key);
     if (solid) break;
     missing.push(step);
   }
 
-  for (const { key, op, tool } of missing.reverse()) {
+  for (const step of missing.reverse()) {
+    const { key, op } = step;
     const previous = solid;
-    const operand = () =>
-      getTool(memo, tool.geometry, tool.id, tool.key, tool.contextKey);
     try {
+      if (op === "mesh") {
+        solid = getMesh(memo, step);
+        continue;
+      }
+      const { tool } = step;
+      const operand = () =>
+        getTool(memo, tool.geometry, tool.id, tool.key, tool.contextKey);
       if (op === "new") {
         solid = operand();
         retain(memo, "body", key, solid);
@@ -324,7 +396,7 @@ function materializeBody(memo: MemoState, body: BodyState): Solid {
         );
       }
     } catch (error) {
-      throw new BodyBuildFailure(tool.id, error);
+      throw new BodyBuildFailure(op === "mesh" ? step.id : step.tool.id, error);
     }
   }
   if (!solid) throw new Error("Missing CAD body state");
@@ -335,47 +407,95 @@ export function evaluateCadPage(
   elements: readonly Element[],
   kernel: CadKernel,
   memo: CadMemo,
+  { decodeMesh }: CadEvaluateOptions = {},
 ): CadEvaluation {
   const state = memo[memoState];
   if (state.kernel !== kernel)
     throw new TypeError("The CAD memo belongs to a different kernel");
 
   try {
-    return evaluateHistory(elements, state);
+    return evaluateHistory(elements, state, decodeMesh);
   } catch (error) {
     if (!(error instanceof BodyBuildFailure)) throw error;
     // If replay of a previously successful feature fails, evaluate in
     // history order so dependents and all targets see the same failure.
-    return evaluateHistory(elements, state, error);
+    return evaluateHistory(elements, state, decodeMesh, error);
   }
 }
 
 function evaluateHistory(
   elements: readonly Element[],
   state: MemoState,
+  decodeMesh: CadEvaluateOptions["decodeMesh"],
   replayFailure?: BodyBuildFailure,
 ): CadEvaluation {
   const history = scanCadPage(elements);
   const geometry = createCadGeometry(history);
   const status = new Map(history.status);
   const bodies = new Map<ElementId, BodyState>();
+  const displayOnly: { id: ElementId; mesh: ToolMesh }[] = [];
   const sketchKeys = new Map<ElementId, string>();
   const successful = new Set<string>();
   for (const { id } of history.features) {
     if (!status.get(id)?.ok) continue;
     const item = history.typed.get(id);
     if (!item) continue;
+    const targetIds = history.targets.get(id) ?? [];
     const failed = history.dependencies
       .get(id)
       ?.find((ref) => !status.get(ref)?.ok);
     if (failed !== undefined) {
-      status.set(id, cadFailure("cad.reference.failed", failed));
+      const code =
+        targetIds.includes(failed) &&
+        history.byId.get(failed)?.type === "cad.mesh"
+          ? "cad.body.missing"
+          : "cad.reference.failed";
+      status.set(id, cadFailure(code, failed));
       continue;
     }
     if (item.type === "cad.sketch") {
       const frame = geometry.sketch(item.semantic.plane);
       if ("ok" in frame) status.set(id, frame);
       else geometry.frames.set(id, frame);
+      continue;
+    }
+
+    if (item.type === "cad.mesh") {
+      const { data, suppressed } = item.semantic;
+      if (suppressed) continue;
+      if (!decodeMesh) {
+        status.set(id, cadFailure("cad.mesh.unsupported"));
+        continue;
+      }
+      const key = contentKey(["mesh", id, state.kernel.id, data]);
+      const body: BodyState = {
+        id,
+        key,
+        op: "mesh",
+        decode() {
+          try {
+            return decodeMesh(data);
+          } catch (error) {
+            throw new SolidFailure(
+              "cad.mesh.invalid",
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+        },
+      };
+      try {
+        if (replayFailure?.featureId === id) throw replayFailure;
+        if (replayFailure || !state.successful.has(key))
+          materializeBody(state, body);
+        bodies.set(id, body);
+        successful.add(key);
+      } catch (error) {
+        if (!(error instanceof BodyBuildFailure) || error.featureId !== id)
+          throw error;
+        status.set(id, error.status);
+        if (error.displayMesh)
+          displayOnly.push({ id, mesh: error.displayMesh });
+      }
       continue;
     }
 
@@ -389,10 +509,16 @@ function evaluateHistory(
     } = item.semantic;
     if (suppressed) continue;
     const targets: BodyState[] = [];
-    for (const target of history.targets.get(id) ?? []) {
+    for (const target of targetIds) {
       const body = bodies.get(target);
       if (body) targets.push(body);
-      else status.set(id, cadFailure("cad.reference.failed", target));
+      else {
+        const code =
+          history.byId.get(target)?.type === "cad.mesh"
+            ? "cad.body.missing"
+            : "cad.reference.failed";
+        status.set(id, cadFailure(code, target));
+      }
     }
     if (!status.get(id)?.ok) continue;
     const extrude = geometry.extrude(item.semantic);
@@ -476,5 +602,5 @@ function evaluateHistory(
   });
   finish(state, visible);
   state.successful = successful;
-  return { bodies: results, status };
+  return { bodies: results, displayOnly, status };
 }

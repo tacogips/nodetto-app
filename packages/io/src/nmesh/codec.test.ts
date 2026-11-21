@@ -195,6 +195,24 @@ describe("NMESH v1", () => {
     );
   });
 
+  test("rejects overlong encodings of counts and group face IDs", () => {
+    const triangle = [3, 1, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 1, 0, 0, 0, 0];
+    expect(decodeNmesh(file(triangle)).triangles).toEqual(
+      Uint32Array.of(0, 1, 2),
+    );
+    expectCode(
+      () => decodeNmesh(file([0x83, 0, ...triangle.slice(1)])),
+      "nmesh.range",
+    );
+    expectCode(
+      () =>
+        decodeNmesh(
+          file([...triangle.slice(0, 3), 0x80, 0, ...triangle.slice(4)]),
+        ),
+      "nmesh.range",
+    );
+  });
+
   test("checks the combined count bound before allocating or validating the checksum", () => {
     const size = 1_048_576;
     const claimed = varint(Math.floor((size - 12) / 3));

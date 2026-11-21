@@ -6,7 +6,11 @@ import {
   createCadMemo,
   displayBody,
   evaluateCadPage,
+  releaseCadMemo,
+  type ToolMesh,
 } from "@nodetto/core";
+import { decodeNmesh, fromInline, toTriangleMesh } from "@nodetto/io/nmesh";
+import { writeBinaryStl } from "@nodetto/io/stl";
 import { type Element, isPlainObject } from "@nodetto/ir";
 
 function isElement(value: unknown): value is Element {
@@ -30,8 +34,23 @@ function isRequest(message: unknown): message is CadEngineRequest {
     Number.isSafeInteger(input.revision) &&
     typeof input.pageId === "string" &&
     Array.isArray(input.elements) &&
-    input.elements.every(isElement)
+    input.elements.every(isElement) &&
+    (input.exportStl === undefined ||
+      (isPlainObject(input.exportStl) &&
+        Array.isArray(input.exportStl.bodyIds) &&
+        input.exportStl.bodyIds.every((id) => typeof id === "string") &&
+        (input.exportStl.includeReference === undefined ||
+          typeof input.exportStl.includeReference === "boolean")))
   );
+}
+
+function decodeMesh(data: string): ToolMesh {
+  const mesh = toTriangleMesh(decodeNmesh(fromInline(data)));
+  mesh.triFace.fill(0);
+  return {
+    ...mesh,
+    faceNames: ["mesh"],
+  };
 }
 
 function transferableBuffer(view: ArrayBufferView): ArrayBuffer {
@@ -94,7 +113,7 @@ export function createWorkerHost(
     }
     const {
       id,
-      input: { revision, pageId, elements },
+      input: { revision, pageId, elements, exportStl },
     } = message;
     let response: CadEngineReply;
     let transfer: ArrayBuffer[] = [];
@@ -104,34 +123,51 @@ export function createWorkerHost(
       const pageElements = elements.filter(
         (element) => element.page === pageId,
       );
-      const evaluation = evaluateCadPage(
-        pageElements,
-        state.kernel,
-        state.memo,
-      );
-      if (trap) {
-        response = {
-          id,
-          result: {
-            ...cadEngineFailure(revision),
-            status: [...evaluation.status],
-          },
-          restart: true,
-        };
-      } else {
-        const bodies = evaluation.bodies.map(({ id, reference, handle }) =>
-          displayBody(id, reference, state.kernel.mesh(handle)),
-        );
-        transfer = bodies.flatMap(({ positions, indices, triFace, edges }) =>
-          [positions, indices, triFace, edges].map(transferableBuffer),
-        );
-        response = {
-          id,
-          result: { revision, status: [...evaluation.status], bodies },
-        };
+      // The interactive cache can change mesh order. Export from a fresh
+      // evaluation and use kernel coordinates before viewport rounding.
+      const memo = exportStl ? createCadMemo(state.kernel) : state.memo;
+      try {
+        const evaluation = evaluateCadPage(pageElements, state.kernel, memo, {
+          decodeMesh,
+        });
+        const status = [...evaluation.status];
+        if (trap) {
+          response = {
+            id,
+            result: { ...cadEngineFailure(revision), status },
+            restart: true,
+          };
+        } else if (exportStl) {
+          const ids = new Set(exportStl.bodyIds);
+          const meshes = evaluation.bodies
+            .filter(
+              ({ id, reference }) =>
+                ids.has(id) && (!reference || exportStl.includeReference),
+            )
+            .map(({ handle }) => state.kernel.mesh(handle));
+          const stl = writeBinaryStl(meshes);
+          transfer = [transferableBuffer(stl)];
+          response = { id, result: { revision, status, bodies: [], stl } };
+        } else {
+          const bodies = [
+            ...evaluation.bodies.map(({ id, reference, handle }) =>
+              displayBody(id, reference, state.kernel.mesh(handle)),
+            ),
+            ...evaluation.displayOnly.map(({ id, mesh }) =>
+              displayBody(id, true, mesh),
+            ),
+          ];
+          transfer = bodies.flatMap(({ positions, indices, triFace, edges }) =>
+            [positions, indices, triFace, edges].map(transferableBuffer),
+          );
+          response = { id, result: { revision, status, bodies } };
+        }
+      } finally {
+        if (exportStl && !trap) releaseCadMemo(memo);
       }
     } catch {
       response = { id, result: cadEngineFailure(revision), restart: true };
+      transfer = [];
     }
     reply(response, transfer);
   };

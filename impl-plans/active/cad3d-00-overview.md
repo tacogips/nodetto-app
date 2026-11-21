@@ -138,8 +138,8 @@ milestone that breaks it, not in M18.
 | M9 | accepted |
 | M10 | accepted |
 | M11 | accepted |
-| M12 | implemented |
-| M13 | pending |
+| M12 | accepted |
+| M13 | implemented |
 | M20 | pending |
 | M14 | pending |
 | M21 | pending |
@@ -496,6 +496,37 @@ existing browser tests hit Chrome startup permissions under the
 worktree write restriction. The Rust workspace passed 73 of 91 tests,
 with 18 macOS replacement-file permission errors under that restriction.
 Verification logs and measurements are under `tmp/cad3d/m12/`.
+
+M13 registers `cad.mesh` and round-trips a tetrahedron in the CAD fixture.
+Closed imports become ordinary bodies that can be cut by an extrude.
+Open meshes are drawn as references and cannot be used as boolean
+targets. A corrupt mesh leaves other bodies intact.
+
+M13 deviations: the IR exports and semantic map expose the new type,
+the history scanner recognizes mesh body creators, the display converter
+accepts the decoded triangles, and the feature-list test expects the
+additional fixture row. The lockfile records the existing IO dependency
+moving from dev to runtime in `cad-kernel`.
+
+The worker accepts an explicit STL export request for selected body IDs
+and returns the binary file in a transferable buffer. It uses a fresh
+memo and the unrounded kernel buffers. M20 can request export for the
+selected page snapshot and use `stlToInlineMesh` to prepare imports.
+This addresses IR7-01, IR7-02, IR12-02 and IR12-03 with independent
+edit-history, precision, empty-import and default-header tests. The
+NMESH reader rejects overlong varints, addressing IR12-01. The design
+documents the byte rules and export path.
+
+All three milestone commands passed with 551, 31 and 6 tests,
+respectively. The separate NMESH and STL checks passed 32 tests.
+Workspace check and lint passed. The production bundle audit found one
+worker chunk and the single pinned WASM asset. The supplemental Bun run
+followed a symlink in the new mise state and ran out of memory. After
+moving that state into the in-worktree dependency cache, the rerun
+passed 4,392 tests with 74 skipped and three Chrome startup permission
+failures. The Rust suite passed 73 of 91 tests with 18 macOS replacement
+file permission failures under the worktree write restriction.
+Verification logs are under `tmp/cad3d/m13/`.
 
 ## Completion
 

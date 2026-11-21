@@ -1,15 +1,264 @@
 import { expect, test } from "bun:test";
 import {
   type CadEngineReply,
+  type CadEngineInput,
   type CadKernel,
   collectCadInput,
 } from "@nodetto/core";
+import { stlToInlineMesh } from "@nodetto/io/cad-mesh";
+import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
+import { readStl } from "@nodetto/io/stl";
 import {
   CAD_TEST_PAGE,
+  cadElement,
+  extrude,
   plateWithHoles,
+  rectangle,
+  sketch,
 } from "../../core/src/cad/testing/documents.ts";
 import { createManifoldKernel } from "./manifold-kernel.ts";
 import { createWorkerHost } from "./worker-host.ts";
+
+function evaluator(host: ReturnType<typeof createWorkerHost>) {
+  let revision = 0;
+  return async (
+    elements: CadEngineInput["elements"],
+    exportStl?: CadEngineInput["exportStl"],
+  ) => {
+    const id = ++revision;
+    let result: CadEngineReply["result"] | undefined;
+    await host(
+      {
+        id,
+        input: { revision: id, pageId: CAD_TEST_PAGE.id, elements, exportStl },
+      },
+      (message, transfer) => {
+        const reply = message as CadEngineReply;
+        expect(reply.result.failure).toBeUndefined();
+        expect(reply.result.revision).toBe(id);
+        if (exportStl) {
+          if (!reply.result.stl) throw new Error("Missing STL reply");
+          const buffers: readonly ArrayBufferLike[] = transfer;
+          expect(buffers).toEqual([reply.result.stl.buffer]);
+        }
+        result = structuredClone(reply.result, { transfer: [...transfer] });
+      },
+    );
+    if (!result) throw new Error("Missing worker reply");
+    return result;
+  };
+}
+
+const box = {
+  positions: Float64Array.of(
+    0,
+    0,
+    0,
+    12,
+    0,
+    0,
+    12,
+    10,
+    0,
+    0,
+    10,
+    0,
+    0,
+    0,
+    5,
+    12,
+    0,
+    5,
+    12,
+    10,
+    5,
+    0,
+    10,
+    5,
+  ),
+  triangles: Uint32Array.of(
+    0,
+    2,
+    1,
+    0,
+    3,
+    2,
+    4,
+    5,
+    6,
+    4,
+    6,
+    7,
+    0,
+    1,
+    5,
+    0,
+    5,
+    4,
+    1,
+    2,
+    6,
+    1,
+    6,
+    5,
+    2,
+    3,
+    7,
+    2,
+    7,
+    6,
+    3,
+    0,
+    4,
+    3,
+    4,
+    7,
+  ),
+};
+
+function meshElement(mesh: typeof box) {
+  return cadElement("mesh", "cad.mesh", "a0", {
+    name: "Box",
+    data: toInline(encodeNmesh(canonicalize(mesh))),
+  });
+}
+
+function volumeOfStl(bytes: Uint8Array | undefined): number {
+  if (!bytes) throw new Error("Missing STL");
+  const { positions } = readStl(bytes);
+  let volume = 0;
+  for (let offset = 0; offset < positions.length; offset += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.subarray(
+      offset,
+      offset + 9,
+    );
+    volume +=
+      ax * (by * cz - bz * cy) +
+      ay * (bz * cx - bx * cz) +
+      az * (bx * cy - by * cx);
+  }
+  return volume / 6;
+}
+
+test("a real imported box displays, exports, round-trips, and can be cut", async () => {
+  const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
+  const imported = meshElement(box);
+  const original = await evaluate([imported]);
+  expect(original.status).toEqual([["mesh", { ok: true }]]);
+  expect(original.bodies).toHaveLength(1);
+  const body = original.bodies[0];
+  expect(body).toMatchObject({ reference: false, faceNames: ["mesh:mesh"] });
+  const bounds = [0, 1, 2].map((axis) => {
+    const values = body.positions.filter((_, i) => i % 3 === axis);
+    return [Math.min(...values), Math.max(...values)];
+  });
+  expect(bounds).toEqual([
+    [0, 12],
+    [0, 10],
+    [0, 5],
+  ]);
+
+  const options = { bodyIds: ["mesh"] };
+  const { stl } = await evaluate([imported], options);
+  expect(volumeOfStl(stl)).toBeCloseTo(600, 6);
+  if (!stl) throw new Error("Missing STL");
+  const reimported = {
+    ...imported,
+    semantic: { ...imported.semantic, data: stlToInlineMesh(stl) },
+  };
+  expect((await evaluate([reimported], options)).stl).toEqual(stl);
+
+  const cut = [
+    imported,
+    sketch("opening", "a1"),
+    ...rectangle("opening", 2, 2, 3, 4),
+    extrude("cut", "a2", {
+      sketch: "opening",
+      distance: 5,
+      op: "cut",
+      bodies: ["mesh"],
+    }),
+  ];
+  const machined = await evaluate(cut, options);
+  expect(machined.status).toContainEqual(["cut", { ok: true }]);
+  expect(volumeOfStl(machined.stl)).toBeCloseTo(600 - 3 * 4 * 5, 6);
+});
+
+test("the worker displays an open mesh as reference geometry and omits it from STL", async () => {
+  const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
+  for (const triangles of [box.triangles.slice(3), box.triangles.slice(0, 3)]) {
+    const open = meshElement({ ...box, triangles });
+    const result = await evaluate([open]);
+    expect(result.status).toContainEqual([
+      "mesh",
+      expect.objectContaining({ code: "cad.mesh.open" }),
+    ]);
+    expect(result.bodies).toMatchObject([
+      {
+        id: "mesh",
+        reference: true,
+        faceNames: ["mesh:mesh"],
+      },
+    ]);
+    expect(result.bodies[0].indices.length).toBe(triangles.length);
+    const { stl } = await evaluate([open], {
+      bodyIds: ["mesh"],
+      includeReference: true,
+    });
+    if (!stl) throw new Error("Missing STL");
+    expect(readStl(stl).triangles.length).toBe(0);
+  }
+  const corrupt = cadElement("bad", "cad.mesh", "a0", {
+    name: "Broken",
+    data: "nmesh1:AAAA",
+  });
+  const result = await evaluate([corrupt]);
+  expect(result.status).toContainEqual([
+    "bad",
+    expect.objectContaining({ code: "cad.mesh.invalid" }),
+  ]);
+  expect(result.bodies).toEqual([]);
+});
+
+test("STL output ignores interactive edit history and preserves sub-micrometre coordinates", async () => {
+  const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
+  const other = evaluator(createWorkerHost(createManifoldKernel()));
+  const { elements } = plateWithHoles();
+  function changeRadius(radius: number) {
+    return elements.map((element) =>
+      element.id === "hole-0"
+        ? { ...element, semantic: { sketch: "holes", c: [5, 5], r: radius } }
+        : element,
+    );
+  }
+  await evaluate(changeRadius(2));
+  await evaluate(elements);
+  await other(changeRadius(4));
+  await other(changeRadius(1));
+  await other(elements);
+  const selection = { bodyIds: ["ex1"] };
+  const first = await evaluate(elements, selection);
+  const second = await other(elements.slice().reverse(), selection);
+  expect(first.stl?.byteLength).toBeGreaterThan(84);
+  expect(first.stl).toEqual(second.stl);
+
+  const fine = [
+    sketch("fine", "a0"),
+    ...rectangle("fine", 0.0004, 0, 2, 2),
+    extrude("fine-body", "a2", { sketch: "fine", distance: 1, op: "new" }),
+  ];
+  const { bodies } = await evaluate(fine);
+  expect(Math.min(...bodies[0].positions.filter((_, i) => i % 3 === 0))).toBe(
+    0,
+  );
+  const { stl } = await evaluate(fine, { bodyIds: ["fine-body"] });
+  if (!stl) throw new Error("Missing STL");
+  expect(new TextDecoder().decode(stl.subarray(0, 7))).toBe("nodetto");
+  const { positions } = readStl(stl);
+  expect(Math.min(...positions.filter((_, i) => i % 3 === 0))).toBe(
+    Math.fround(0.0004),
+  );
+});
 
 test("the real kernel host transfers a reference plate and a radius edit", async () => {
   const doc = plateWithHoles(60);

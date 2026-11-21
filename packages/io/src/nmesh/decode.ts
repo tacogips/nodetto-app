@@ -25,7 +25,10 @@ export function decodeNmesh(bytes: Uint8Array): QuantizedMesh {
       const next = bytes[offset++];
       if (place === 4 && next > 15) throw new NmeshError("nmesh.range");
       value += (next % 128) * factor;
-      if (next < 128) return value;
+      if (next < 128) {
+        if (place !== 0 && next === 0) throw new NmeshError("nmesh.range");
+        return value;
+      }
       factor *= 128;
     }
     throw new NmeshError("nmesh.range");

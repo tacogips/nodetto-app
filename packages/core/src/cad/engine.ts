@@ -12,12 +12,17 @@ export interface CadEngineInput {
   readonly revision: number;
   readonly pageId: PageId;
   readonly elements: readonly Element[];
+  readonly exportStl?: {
+    readonly bodyIds: readonly ElementId[];
+    readonly includeReference?: boolean;
+  };
 }
 
 export interface CadEngineResult {
   readonly revision: number;
   readonly status: readonly (readonly [ElementId, CadStatus])[];
   readonly bodies: readonly CadDisplayBody[];
+  readonly stl?: Uint8Array;
   readonly failure?: string;
 }
 
@@ -103,6 +108,7 @@ function isReply(value: unknown): value is CadEngineReply {
     isPlainObject(result) &&
     Number.isSafeInteger(result.revision) &&
     (result.failure === undefined || typeof result.failure === "string") &&
+    (result.stl === undefined || result.stl instanceof Uint8Array) &&
     Array.isArray(result.status) &&
     result.status.every(
       (pair: unknown) =>

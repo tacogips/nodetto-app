@@ -2,6 +2,7 @@ import { roundNm } from "./pcb.ts";
 import type { ElementId } from "./types.ts";
 
 export const CAD_PAGE_KIND = "cad3d";
+export const CAD_MESH_DATA_MAX_CHARS = 1_048_576 + 7;
 
 export const CAD_ELEMENT_TYPES = [
   "cad.sketch",
@@ -9,6 +10,7 @@ export const CAD_ELEMENT_TYPES = [
   "cad.arc",
   "cad.circle",
   "cad.extrude",
+  "cad.mesh",
 ] as const;
 
 export type CadElementType = (typeof CAD_ELEMENT_TYPES)[number];
@@ -70,6 +72,12 @@ export interface CadExtrudeSemantic {
   symmetric?: boolean;
   op: (typeof CAD_OPERATIONS)[number];
   bodies?: readonly ElementId[];
+  suppressed?: boolean;
+}
+
+export interface CadMeshSemantic {
+  name: string;
+  data: string;
   suppressed?: boolean;
 }
 

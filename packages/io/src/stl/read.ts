@@ -12,8 +12,11 @@ export interface StlLimits {
 }
 
 export class StlError extends Error {
-  constructor(readonly code: string) {
-    super(code);
+  constructor(
+    readonly code: string,
+    message = code,
+  ) {
+    super(message);
     this.name = "StlError";
   }
 }

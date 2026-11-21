@@ -717,7 +717,8 @@ output arrays together (12 bytes per vertex and per triangle) are at most
 four times the input size; reject an
 index code greater than the used count, a first-use count different from V,
 group counts not summing to T, trailing bytes, CRC mismatch, coordinates
-beyond +-10^7 units (10 m). The reader accepts a well-formed file whose
+beyond +-10^7 units (10 m), and overlong varints (a zero final group
+after one or more continuation bytes). The reader accepts a well-formed file whose
 triangles are not in canonical order (another tool may have written it);
 `isCanonical(mesh)` reports it. Byte stability is a property of nodetto's
 writer: every path that stores a mesh (`stlToMeshCommands`) canonicalises
@@ -732,7 +733,9 @@ native regex pass per mesh; M18 measures a document with four maximum-size
 meshes natively against the 10 s deadline class.
 
 Inline armour: `cad.mesh.data` is the string `nmesh1:` followed by standard
-base64 of the file bytes, at most 1,048,576 characters, the size class of an
+base64 of the file bytes. The decoder and writer cap the full string at
+1,048,576 characters. The registry's coarse check allows the prefix in
+addition to that length. This is the size class of an
 inline image in a collaboration message (`MAX_IMAGE_BYTES`,
 `packages/ir/src/image.ts:5`). Larger imports are refused with a message in
 the slice; phase 2 stores the same bytes as `artifacts/<sha256>.nmesh`, the
@@ -863,6 +866,11 @@ reverse direction (deriving `Edge.Cuts` from a CAD face).
   `packages/io/src/stl/`. NMESH codec in `packages/io/src/nmesh/`. Both
   modules import nothing from the rest of the repository and take plain
   typed arrays, so they can be extracted as libraries.
+  The import adapter refuses a file with no triangles left after
+  canonicalization. For export, the worker evaluates the selected page
+  snapshot with a fresh memo and writes the selected kernel bodies at
+  Float32 precision before viewport rounding. Open imports stay visible
+  as references and have no kernel body to export.
 - Existing exports: `packages/core/src/svg-export/` draws a CAD page as an
   isometric wireframe of the feature tool solids (loops at both caps plus
   the connecting edges), computed without a kernel so the CLI produces the

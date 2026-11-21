@@ -28,6 +28,126 @@ test("content keys use two deterministic FNV-1a passes and preserve part boundar
   expect(contentKey(["", ""])).not.toBe(contentKey([""]));
 });
 
+const imported = cadElement("imported", "cad.mesh", "a0", {
+  name: "Imported body",
+  data: "nmesh1:AAAA",
+});
+const decodedMesh = {
+  positions: Float64Array.of(0, 0, 0, 2, 0, 0, 0, 2, 0),
+  triangles: Uint32Array.of(0, 1, 2),
+  triFace: Uint32Array.of(7),
+  faceNames: [],
+};
+const meshCut = [
+  sketch("opening", "a1"),
+  ...rectangle("opening", 1, 1, 2, 3),
+  extrude("mesh-cut", "a2", {
+    sketch: "opening",
+    distance: 5,
+    op: "cut",
+    bodies: ["imported"],
+  }),
+];
+
+test("a CAD mesh creates a named, memoized solid that can be cut", () => {
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  const decoded: string[] = [];
+  const options = {
+    decodeMesh(data: string) {
+      decoded.push(data);
+      return decodedMesh;
+    },
+  };
+  const first = evaluateCadPage([imported], kernel, memo, options);
+  expect(first.bodies).toMatchObject([{ id: "imported", reference: false }]);
+  expect(first.displayOnly).toEqual([]);
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toMatchObject([
+    { mesh: { triFace: Uint32Array.of(0), faceNames: ["imported:mesh"] } },
+  ]);
+
+  kernel.calls.length = 0;
+  const renamed = updateSemantic(imported, { name: "New name" });
+  const unchanged = evaluateCadPage([renamed], kernel, memo, options);
+  expect(unchanged.bodies).toEqual(first.bodies);
+  expect(kernel.calls).toEqual([]);
+  expect(decoded).toEqual([imported.semantic.data]);
+
+  const cut = evaluateCadPage([renamed, ...meshCut], kernel, memo, options);
+  expect(cut.status.get("mesh-cut")).toEqual({ ok: true });
+  expect(kernel.calls.filter(({ kind }) => kind === "boolean")).toMatchObject([
+    { op: "cut", target: first.bodies[0]?.handle },
+  ]);
+  expect(
+    evaluateCadPage([imported, ...meshCut], kernel, memo).status.get(
+      "mesh-cut",
+    ),
+  ).toMatchObject({ code: "cad.body.missing" });
+
+  const changed = updateSemantic(imported, { data: "nmesh1:BBBB" });
+  expect(
+    evaluateCadPage([changed], kernel, memo, options).bodies[0]?.key,
+  ).not.toBe(first.bodies[0]?.key);
+  expect(decoded).toEqual([imported.semantic.data, "nmesh1:BBBB"]);
+});
+
+test("failed mesh decoding stays local and suppressed meshes are skipped", () => {
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  expect(
+    evaluateCadPage([imported], kernel, memo).status.get("imported"),
+  ).toMatchObject({ code: "cad.mesh.unsupported" });
+  const decodeMesh = () => {
+    throw new Error("Bad checksum");
+  };
+  const failed = evaluateCadPage([imported, ...plateElements()], kernel, memo, {
+    decodeMesh,
+  });
+  expect(failed.status.get("imported")).toEqual({
+    ok: false,
+    code: "cad.mesh.invalid",
+    detail: "Bad checksum",
+  });
+  expect(failed.bodies).toMatchObject([{ id: "ex1" }]);
+  expect(failed.displayOnly).toEqual([]);
+  const suppressed = updateSemantic(imported, { suppressed: true });
+  const skipped = evaluateCadPage([suppressed, ...meshCut], kernel, memo, {
+    decodeMesh,
+  });
+  expect(skipped.status.get("imported")).toEqual({ ok: true });
+  expect(skipped.status.get("mesh-cut")).toMatchObject({
+    code: "cad.body.missing",
+  });
+});
+
+test("a mesh rejected by the kernel is display-only and cannot be cut", () => {
+  class RejectMeshKernel extends RecordingKernel {
+    override solid(mesh: Parameters<RecordingKernel["solid"]>[0]): number {
+      if (mesh.faceNames.includes("imported:mesh"))
+        throw new Error("Not manifold");
+      return super.solid(mesh);
+    }
+  }
+  const kernel = new RejectMeshKernel();
+  const result = evaluateCadPage(
+    [imported, ...meshCut],
+    kernel,
+    createCadMemo(kernel),
+    { decodeMesh: () => decodedMesh },
+  );
+  expect(result.bodies).toEqual([]);
+  expect(result.displayOnly).toMatchObject([
+    { id: "imported", mesh: { faceNames: ["imported:mesh"] } },
+  ]);
+  expect(result.status.get("imported")).toMatchObject({
+    code: "cad.mesh.open",
+  });
+  expect(result.status.get("mesh-cut")).toMatchObject({
+    code: "cad.body.missing",
+  });
+  expect(kernel.calls).toEqual([]);
+});
+
 test("a plate and six holes create seven prisms, then reuse every unchanged result", () => {
   const { elements } = plateWithHoles();
   const kernel = new RecordingKernel();

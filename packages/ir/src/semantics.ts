@@ -11,6 +11,7 @@ import type {
   CadCircleSemantic,
   CadExtrudeSemantic,
   CadLineSemantic,
+  CadMeshSemantic,
   CadSketchSemantic,
 } from "./cad.ts";
 import type {
@@ -190,6 +191,7 @@ export interface SemanticByType {
   "cad.arc": CadArcSemantic;
   "cad.circle": CadCircleSemantic;
   "cad.extrude": CadExtrudeSemantic;
+  "cad.mesh": CadMeshSemantic;
 }
 
 export type ElementType = keyof SemanticByType;

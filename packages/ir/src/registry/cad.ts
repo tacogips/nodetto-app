@@ -1,4 +1,9 @@
-import { CAD_OPERATIONS, type CadXY, isOnCadGrid } from "../cad.ts";
+import {
+  CAD_MESH_DATA_MAX_CHARS,
+  CAD_OPERATIONS,
+  type CadXY,
+  isOnCadGrid,
+} from "../cad.ts";
 import {
   checkArray,
   checkBoolean,
@@ -21,6 +26,7 @@ const MAX_COORDINATE = 10_000;
 const OPTIONAL = { optional: true } as const;
 
 const CAD_SHAPE = { category: "node", keepsExternalReferences: true } as const;
+const MESH_DATA = /^nmesh1:[A-Za-z0-9+/]+={0,2}$/;
 
 function checkLength(
   out: ValidationIssue[],
@@ -235,10 +241,36 @@ const EXTRUDE: ElementTypeDefinition = {
   },
 };
 
+const MESH: ElementTypeDefinition = {
+  ...CAD_SHAPE,
+  type: "cad.mesh",
+  onReferenceDeleted: "cascade",
+  keyOrder: { keys: ["name", "data", "suppressed"] },
+  references: () => [],
+  validateSemantic(semantic, path) {
+    const out: ValidationIssue[] = [];
+    if (!checkObject(out, semantic, path)) return out;
+    const { name, data, suppressed } = semantic;
+    checkString(out, name, `${path}.name`, { allowEmpty: true });
+    if (
+      typeof data !== "string" ||
+      data.length > CAD_MESH_DATA_MAX_CHARS ||
+      !MESH_DATA.test(data)
+    ) {
+      out.push(
+        error("cad.mesh.invalid", `${path}.data`, "expected inline NMESH data"),
+      );
+    }
+    checkBoolean(out, suppressed, `${path}.suppressed`, OPTIONAL);
+    return out;
+  },
+};
+
 export const CAD_DEFINITIONS: readonly ElementTypeDefinition[] = [
   SKETCH,
   LINE,
   ARC,
   CIRCLE,
   EXTRUDE,
+  MESH,
 ];

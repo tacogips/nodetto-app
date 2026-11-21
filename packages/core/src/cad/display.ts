@@ -1,5 +1,7 @@
 import type { ElementId } from "@nodetto/ir";
-import type { KernelMesh } from "./kernel.ts";
+import type { KernelMesh, ToolMesh } from "./kernel.ts";
+
+type DisplayMesh = KernelMesh | ToolMesh;
 
 export interface CadDisplayBody {
   readonly id: ElementId;
@@ -20,7 +22,10 @@ function meshValue(data: ArrayLike<number>, index: number): number {
   return value;
 }
 
-function edgeSegments(mesh: KernelMesh, positions: Float32Array): Float32Array {
+function edgeSegments(
+  mesh: DisplayMesh,
+  positions: Float32Array,
+): Float32Array {
   const vertexCount = positions.length / 3;
   const normals = new Float64Array(mesh.triangles.length);
   const unmatched = new Map<number, number>();
@@ -86,7 +91,7 @@ function edgeSegments(mesh: KernelMesh, positions: Float32Array): Float32Array {
 export function displayBody(
   id: ElementId,
   reference: boolean,
-  mesh: KernelMesh,
+  mesh: DisplayMesh,
 ): CadDisplayBody {
   const positions = Float32Array.from(
     mesh.positions,

@@ -3,6 +3,7 @@ import {
   type CadExtrudeSemantic,
   type CadFaceRef,
   type CadLineSemantic,
+  type CadMeshSemantic,
   type CadSketchSemantic,
   type Element,
   type ElementId,
@@ -44,7 +45,8 @@ export function cadFailure(code: string, detail?: string): Failure {
 
 type CadFeature =
   | (Element<CadSketchSemantic> & { readonly type: "cad.sketch" })
-  | (Element<CadExtrudeSemantic> & { readonly type: "cad.extrude" });
+  | (Element<CadExtrudeSemantic> & { readonly type: "cad.extrude" })
+  | (Element<CadMeshSemantic> & { readonly type: "cad.mesh" });
 
 interface HistoryDetails extends CadHistory {
   readonly byId: ReadonlyMap<ElementId, Element>;
@@ -55,6 +57,10 @@ interface HistoryDetails extends CadHistory {
 
 export function isSketchEntity(type: string): boolean {
   return type === "cad.line" || type === "cad.arc" || type === "cad.circle";
+}
+
+function isFeatureType(type: string): boolean {
+  return type === "cad.sketch" || type === "cad.extrude" || type === "cad.mesh";
 }
 
 export function compareCadHistoryOrder(left: Element, right: Element): number {
@@ -73,9 +79,11 @@ function validatePayload(element: Element): CadStatus {
     const code =
       issue.code === "cad.coordinate"
         ? "cad.limit"
-        : isSketchEntity(element.type)
-          ? "cad.profile.invalid"
-          : "cad.feature.invalid";
+        : element.type === "cad.mesh"
+          ? "cad.mesh.invalid"
+          : isSketchEntity(element.type)
+            ? "cad.profile.invalid"
+            : "cad.feature.invalid";
     return cadFailure(code, `${issue.path}: ${issue.message}`);
   }
   if (
@@ -211,9 +219,10 @@ function extrudeDependencies(
     for (const id of named) {
       const body = localElement(history.byId, feature, id);
       if (
-        body?.type !== "cad.extrude" ||
-        !isPlainObject(body.semantic) ||
-        body.semantic["op"] !== "new"
+        body?.type !== "cad.mesh" &&
+        (body?.type !== "cad.extrude" ||
+          !isPlainObject(body.semantic) ||
+          body.semantic["op"] !== "new")
       )
         continue;
       refs.push(id);
@@ -249,7 +258,7 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
   const cad = elements.filter(({ type }) => isCadTypeName(type));
   const byId = new Map(cad.map((element) => [element.id, element]));
   const features = cad
-    .filter(({ type }) => type === "cad.sketch" || type === "cad.extrude")
+    .filter(({ type }) => isFeatureType(type))
     .sort(compareCadHistoryOrder);
   const ranks = new Map(features.map(({ id }, index) => [id, index]));
   const typed = new Map<ElementId, CadFeature>();
@@ -269,15 +278,11 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
       );
       continue;
     }
-    if (
-      !isSketchEntity(type) &&
-      type !== "cad.sketch" &&
-      type !== "cad.extrude"
-    )
-      continue;
+    const isFeature = isFeatureType(type);
+    if (!isFeature && !isSketchEntity(type)) continue;
     const payload = validatePayload(element);
     status.set(id, payload);
-    if (type === "cad.sketch" || type === "cad.extrude") {
+    if (isFeature) {
       if (payload.ok) typed.set(id, element as CadFeature);
       continue;
     }
@@ -318,7 +323,8 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
     const structural =
       item.type === "cad.extrude"
         ? extrudeDependencies(history, item, ranks, refs, targets)
-        : "face" in item.semantic.plane &&
+        : item.type === "cad.sketch" &&
+            "face" in item.semantic.plane &&
             item.semantic.plane.face !== undefined
           ? faceDependencies(history, item, item.semantic.plane.face, refs)
           : cadOk;
@@ -465,7 +471,7 @@ function geometryFor(history: HistoryDetails, feature: ElementId) {
       const tool = geometry.extrude(item.semantic);
       if ("ok" in tool) return null;
       geometry.extrudes.set(id, tool);
-    } else {
+    } else if (item?.type !== "cad.mesh" || item.semantic.suppressed) {
       return null;
     }
   }

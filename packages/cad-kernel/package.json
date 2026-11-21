@@ -9,11 +9,9 @@
   },
   "dependencies": {
     "@nodetto/core": "workspace:*",
+    "@nodetto/io": "workspace:*",
     "@nodetto/ir": "workspace:*",
     "manifold-3d": "3.5.5"
-  },
-  "devDependencies": {
-    "@nodetto/io": "workspace:*"
   },
   "license": "MIT"
 }

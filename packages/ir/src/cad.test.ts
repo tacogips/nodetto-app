@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   CAD_ELEMENT_TYPES,
+  CAD_MESH_DATA_MAX_CHARS,
   CAD_OPERATIONS,
   type CadElementType,
   isOnCadGrid,
@@ -12,6 +13,34 @@ function definition(type: CadElementType) {
   if (!result) throw new Error(`Missing definition for ${type}`);
   return result;
 }
+
+test("checks the CAD mesh prefix, alphabet and size without decoding", () => {
+  const entry = definition("cad.mesh");
+  const data =
+    "nmesh1:Tk1TSAEAAwAEBAEABAAAAAAA0A8A0A/PD9APzw8AAAAAAwEABAEDAwECP/0Vww==";
+  const validate = (data: unknown) =>
+    entry.validateSemantic({ name: "Tetrahedron", data }, "semantic");
+  expect(validate(data)).toEqual([]);
+  expect(entry.references({ name: "Tetrahedron", data })).toEqual([]);
+  const largest = `nmesh1:${"A".repeat(CAD_MESH_DATA_MAX_CHARS - 7)}`;
+  const start = performance.now();
+  expect(validate(largest)).toEqual([]);
+  expect(performance.now() - start).toBeLessThan(50);
+  for (const invalid of [
+    `${largest}A`,
+    "nmesh1:",
+    "nmesh2:AAAA",
+    "nmesh1:AA_A",
+    null,
+  ]) {
+    expect(validate(invalid)).toEqual([
+      expect.objectContaining({
+        code: "cad.mesh.invalid",
+        path: "semantic.data",
+      }),
+    ]);
+  }
+});
 
 test("registers all CAD shapes as nodes with the expected reference policies", () => {
   for (const type of CAD_ELEMENT_TYPES) {

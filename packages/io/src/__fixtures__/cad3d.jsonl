@@ -6,6 +6,7 @@
 {"kind":"element","id":"line-bottom","page":"part","type":"cad.line","index":"a1","semantic":{"sketch":"sketch-base","a":[0,0],"b":[40,0]}}
 {"kind":"element","id":"line-left","page":"part","type":"cad.line","index":"a2","semantic":{"sketch":"sketch-base","a":[0,20],"b":[0,0]}}
 {"kind":"element","id":"line-top","page":"part","type":"cad.line","index":"a4","semantic":{"sketch":"sketch-base","a":[40,20],"b":[0,20]}}
+{"kind":"element","id":"mesh-sample","page":"part","type":"cad.mesh","index":"aA","semantic":{"name":"Tetrahedron","data":"nmesh1:Tk1TSAEAAwAEBAEABAAAAAAA0A8A0A/PD9APzw8AAAAAAwEABAEDAwECP/0Vww=="}}
 {"kind":"element","id":"plate","page":"part","type":"cad.extrude","index":"a5","semantic":{"name":"Plate","sketch":"sketch-base","distance":6,"op":"new"}}
 {"kind":"element","id":"sketch-base","page":"part","type":"cad.sketch","index":"a0","semantic":{"name":"Outline","plane":{"base":"xy"}}}
 {"kind":"element","id":"sketch-top","page":"part","type":"cad.sketch","index":"a6","semantic":{"name":"Mounting hole","plane":{"face":{"feature":"plate","role":"end"}}}}
