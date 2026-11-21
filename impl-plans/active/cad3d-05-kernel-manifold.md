@@ -73,9 +73,14 @@ imported or shipped. Therefore:
   binary's strings show Clipper2, Boost Software Licence 1.0, and linalg,
   public domain); a sentence that the remaining packages of the tree are
   installed for the dependency's optional tooling and are not distributed,
-  with a pointer to the inventory file. Stop and report if a component
-  compiled into the WASM has a licence other than Apache-2.0, BSL-1.0,
-  MIT, BSD, zlib, Unlicense or public domain.
+  with a pointer to the inventory file. Record permissive licences such as
+  Apache-2.0, BSL-1.0, MIT, BSD, zlib, Unlicense, public domain, and the
+  reviewed SunPro and Apache-2.0 WITH LLVM-exception terms. SunPro requires
+  preservation of its notice. The LLVM exception grants additional
+  permissions. Record other permissive attribution or notice-preservation
+  terms and continue. Stop and report copyleft or weak copyleft, usage
+  restrictions such as non-commercial or field-of-use terms, advertising
+  clauses, or any compiled component with an unidentified licence.
 
 ## Tests (real WASM under Bun)
 

@@ -1,0 +1,400 @@
+[
+  {
+    "name": "@emnapi/runtime",
+    "version": "1.11.3",
+    "license": "MIT",
+    "use": "not-installed"
+  },
+  {
+    "lockKey": "@emnapi/runtime/tslib",
+    "name": "tslib",
+    "version": "2.9.1",
+    "license": "0BSD",
+    "use": "not-installed"
+  },
+  {
+    "name": "@gltf-transform/core",
+    "version": "4.5.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@gltf-transform/extensions",
+    "version": "4.5.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@gltf-transform/functions",
+    "version": "4.5.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@img/colour",
+    "version": "1.1.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@img/sharp-darwin-arm64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "installed-only"
+  },
+  {
+    "name": "@img/sharp-darwin-x64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-freebsd-wasm32",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-darwin-arm64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "installed-only"
+  },
+  {
+    "name": "@img/sharp-libvips-darwin-x64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linux-arm",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linux-arm64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linux-ppc64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linux-riscv64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linux-s390x",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linux-x64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linuxmusl-arm64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-libvips-linuxmusl-x64",
+    "version": "1.3.4",
+    "license": "LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linux-arm",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linux-arm64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linux-ppc64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linux-riscv64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linux-s390x",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linux-x64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linuxmusl-arm64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-linuxmusl-x64",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-wasm32",
+    "version": "0.35.5",
+    "license": "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-webcontainers-wasm32",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-win32-arm64",
+    "version": "0.35.5",
+    "license": "Apache-2.0 AND LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-win32-ia32",
+    "version": "0.35.5",
+    "license": "Apache-2.0 AND LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@img/sharp-win32-x64",
+    "version": "0.35.5",
+    "license": "Apache-2.0 AND LGPL-3.0-or-later",
+    "use": "not-installed"
+  },
+  {
+    "name": "@jridgewell/resolve-uri",
+    "version": "3.1.2",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@jridgewell/sourcemap-codec",
+    "version": "1.5.5",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@jridgewell/trace-mapping",
+    "version": "0.3.31",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@jscadui/3mf-export",
+    "version": "0.5.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@nodable/entities",
+    "version": "3.1.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@types/ndarray",
+    "version": "1.1.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "@types/node",
+    "version": "26.2.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "anynum",
+    "version": "1.0.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "commander",
+    "version": "13.1.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "convert-source-map",
+    "version": "2.0.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "cwise-compiler",
+    "version": "1.1.3",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "detect-libc",
+    "version": "2.1.2",
+    "license": "Apache-2.0",
+    "use": "installed-only"
+  },
+  {
+    "name": "esbuild-wasm",
+    "version": "0.27.7",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "fast-xml-builder",
+    "version": "1.3.2",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "fast-xml-parser",
+    "version": "5.12.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "fflate",
+    "version": "0.8.3",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "iota-array",
+    "version": "1.0.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "is-buffer",
+    "version": "1.1.6",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "is-unsafe",
+    "version": "2.0.3",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "ktx-parse",
+    "version": "1.1.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "magic-string",
+    "version": "0.30.21",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "manifold-3d",
+    "version": "3.5.5",
+    "license": "Apache-2.0",
+    "use": "distributed"
+  },
+  {
+    "name": "ndarray",
+    "version": "1.1.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "ndarray-lanczos",
+    "version": "0.3.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "ndarray-ops",
+    "version": "1.2.2",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "ndarray-pixels",
+    "version": "5.2.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "path-expression-matcher",
+    "version": "1.6.2",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "property-graph",
+    "version": "4.1.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "sharp",
+    "version": "0.35.5",
+    "license": "Apache-2.0",
+    "use": "installed-only"
+  },
+  {
+    "lockKey": "sharp/semver",
+    "name": "semver",
+    "version": "7.8.6",
+    "license": "ISC",
+    "use": "installed-only"
+  },
+  {
+    "name": "strnum",
+    "version": "2.5.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "undici-types",
+    "version": "8.3.0",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "uniq",
+    "version": "1.0.1",
+    "license": "MIT",
+    "use": "installed-only"
+  },
+  {
+    "name": "xml-naming",
+    "version": "0.3.0",
+    "license": "MIT",
+    "use": "installed-only"
+  }
+]

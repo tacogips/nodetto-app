@@ -129,8 +129,8 @@ milestone that breaks it, not in M18.
 | M2 | accepted |
 | M22 | accepted |
 | M3 | accepted |
-| M4 | implemented |
-| M5 | pending |
+| M4 | accepted |
+| M5 | implemented |
 | M6 | pending |
 | M7 | pending |
 | M8 | pending |
@@ -242,6 +242,30 @@ visible result. The M4 plan and its acceptance criteria are unchanged.
 All three milestone checks and full workspace verification passed. The
 workspace run reported 4252 Bun tests and 91 Rust tests passed, with 74 Bun
 tests skipped. Verification logs are under `tmp/cad3d/m4/rework/`.
+
+M5 added the pinned Manifold WASM adapter, reference-counted face provenance,
+and the headless JSONL slice. The tests measure a plate with six holes, edit
+one radius and undo, build an additive boss on a named face, and intersect
+two plates. Fresh kernels return byte-identical mesh buffers. The 60-hole
+plate regenerated in 74.5 to 81.0 ms in the two milestone checks, with
+WASM load times of 3.2 to 4.3 ms.
+
+M5 review deviations (M5-LIC-01 and M5-LIC-02): the milestone plan and design
+section 11 record SunPro and Apache-2.0 WITH LLVM-exception and apply the
+reviewed licence rule by class. The notices reproduce the SunPro notice,
+pin the distributed WASM hash, and list the Emscripten runtime conservatively
+from its link rules. The npm inventory uses exact registry manifests for
+uninstalled packages, since the Windows and WASM variants declare different
+terms from the installed macOS sibling. The lockfile retains all existing
+resolutions.
+
+The adapter uses Manifold's execution-context factory to free a rejected
+solid before reporting its status. The workspace adds `@nodetto/io` as a test
+dependency for the JSONL round trip. Both milestone checks and workspace
+verification passed. The workspace run reported 4266 Bun and 91 Rust tests
+passed, with 74 Bun tests skipped. The local Rust toolchain emitted
+debug-stripping warnings during the passing run. Timing and verification
+logs are under `tmp/cad3d/m5/`.
 
 ## Completion
 

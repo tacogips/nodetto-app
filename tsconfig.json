@@ -4,6 +4,7 @@
     "paths": {
       "@nodetto/ir": ["./packages/ir/src/index.ts"],
       "@nodetto/core": ["./packages/core/src/index.ts"],
+      "@nodetto/cad-kernel": ["./packages/cad-kernel/src/index.ts"],
       "@nodetto/io": ["./packages/io/src/index.ts"],
       "@nodetto/collab": ["./packages/collab/src/index.ts"],
       "@nodetto/ui-solid": ["./packages/ui-solid/src/index.ts"]

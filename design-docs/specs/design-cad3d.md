@@ -890,9 +890,16 @@ never runs a kernel. It needs none for its job:
   into it; the binary's strings show Clipper2 (Boost Software Licence 1.0)
   and linalg (public domain / Unlicense); M5 confirms the list against the
   upstream source tree of the pinned tag, because the package README does
-  not list them, and records it in `THIRD_PARTY_NOTICES.md`. Apache-2.0 and
-  BSL-1.0 have no relinking duty, so desktop, Mac App Store and web SPA
-  distribution are unaffected; the CLI does not ship the kernel.
+  not list them, and records it in `THIRD_PARTY_NOTICES.md` with the WASM
+  SHA-256 and the Emscripten runtime components. The reviewed permissive
+  terms include SunPro, which requires preservation of its notice, and
+  Apache-2.0 WITH LLVM-exception, which grants additional permissions.
+  Record permissive attribution or notice-preservation terms and continue.
+  Stop and report copyleft or weak copyleft, usage restrictions such as
+  non-commercial or field-of-use terms, advertising clauses, or any
+  compiled component with an unidentified licence. This applies to
+  desktop, Mac App Store and web SPA distribution. The CLI ships no
+  kernel.
 - Installed but not distributed: the package declares eleven hard
   dependencies for its optional `manifoldCAD` tooling (`@gltf-transform/*`,
   `@jscadui/3mf-export`, `commander`, `convert-source-map`,
