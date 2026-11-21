@@ -99,3 +99,24 @@ export {
   type PcbImportResult,
 } from "./kicad/index.ts";
 export { isZip, readZip, type ZipFile, ZipReadError } from "./zip-read.ts";
+export {
+  NMESH_INLINE_MAX_CHARS,
+  NMESH_INLINE_PREFIX,
+  NmeshError,
+  type QuantizedMesh,
+  type TriangleMesh,
+  canonicalize,
+  decodeNmesh,
+  encodeNmesh,
+  fromInline,
+  isCanonical,
+  toInline,
+  toTriangleMesh,
+} from "./nmesh/index.ts";
+export {
+  StlError,
+  type StlLimits,
+  type StlMesh,
+  readStl,
+  writeBinaryStl,
+} from "./stl/index.ts";

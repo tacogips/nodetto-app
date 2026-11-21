@@ -137,8 +137,8 @@ milestone that breaks it, not in M18.
 | M19 | accepted |
 | M9 | accepted |
 | M10 | accepted |
-| M11 | implemented |
-| M12 | pending |
+| M11 | accepted |
+| M12 | implemented |
 | M13 | pending |
 | M20 | pending |
 | M14 | pending |
@@ -476,6 +476,26 @@ The Rust workspace passed 73 of 91 tests. The other 18 hit macOS
 replacement-file permissions under the worktree write restriction.
 Verification logs are under `tmp/cad3d/m11/`. The browser probe report
 and screenshots are under `tmp/cad3d/m11-gl/`.
+
+M12 adds the standalone NMESH v1 codec and STL reader and writer with
+public IO subpaths. NMESH preserves winding and face groups, validates
+untrusted files before allocating mesh buffers, and gives the same bytes
+after renumbering vertices or reordering triangles. STL reads binary and
+ASCII and writes little-endian Float32 facets with computed normals.
+
+Both milestone commands passed with 30 and 1 tests, respectively.
+Workspace check and lint passed. The 128,008-vertex plate took 106 ms
+to canonicalize and encode and 10 ms to decode in the standalone
+measurement. Across the four meshes NMESH used 31–44% of raw typed
+arrays and 21–29% of JSON number arrays. The M12 plate differs from the
+spike by more than five percentage points, so design section 7.3 records
+the new ratios alongside the spike measurements. The STL module uses
+its own structurally compatible mesh type to preserve folder isolation.
+The Bun workspace run passed 4,383 tests with 74 skipped. Three
+existing browser tests hit Chrome startup permissions under the
+worktree write restriction. The Rust workspace passed 73 of 91 tests,
+with 18 macOS replacement-file permission errors under that restriction.
+Verification logs and measurements are under `tmp/cad3d/m12/`.
 
 ## Completion
 

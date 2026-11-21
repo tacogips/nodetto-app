@@ -766,13 +766,21 @@ Curved meshes, where deltas are less regular (spike2, own generators):
 | torus 256 x 96 (24,576 / 49,152) | 373,037 | 15.2 | 42% | 28% |
 | sphere 200 x 100 with pseudo-random noise (20,200 / 40,000) | 305,114 | 15.1 | 42% | 28% |
 
-Over plates and curved meshes that is 13.9 to 16.0 bytes per vertex (6.8 to
-7.9 per triangle), 28 to 31% of JSON and 41 to 44% of raw binary. The
-inline cap (786,432 bytes before base64) holds about 50,000 vertices, which
-decodes in about 1 ms in Bun; at 40 to 100 times slower the native CLI would
-need 40 to 100 ms. M12 measures the Bun time against a deadline. The CLI
-does not decode mesh payloads in the slice (the validator only tests a
-pattern), so no native decode deadline exists yet.
+M12 measurements use the shipped codec, generated meshes and JSON number
+arrays at the same coordinate precision. M12 uses a separately generated
+plate with its own hole layout and cap triangulation.
+
+| Mesh (welded vertices / triangles) | NMESH bytes | Bytes per vertex | Of raw | Of JSON | Estimated vertices inline |
+| --- | --- | --- | --- | --- | --- |
+| 1,000-hole plate (128,008 / 260,012) | 1,460,594 | 11.4 | 31% | 21% | 68,923 |
+| Sphere 360 x 180 (64,442 / 128,880) | 1,012,875 | 15.7 | 44% | 28% | 50,034 |
+| Torus 256 x 96 (24,576 / 49,152) | 364,598 | 14.8 | 41% | 28% | 53,009 |
+| Noisy sphere 200 x 100 (19,802 / 39,600) | 303,186 | 15.3 | 43% | 29% | 51,363 |
+
+The inline limit allows up to 786,426 binary bytes after accounting for
+the prefix and base64 padding. M12 measures Bun encode and decode time
+against the deadlines in section 14. The native CLI validates only the
+inline string, so it has no mesh decode deadline in the slice.
 
 ### 7.4 Git behaviour
 

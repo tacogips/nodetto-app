@@ -8,7 +8,9 @@
     "./mermaid/import": "./src/mermaid/import.ts",
     "./bpmn": "./src/bpmn/index.ts",
     "./drawio": "./src/drawio/index.ts",
-    "./kicad": "./src/kicad/index.ts"
+    "./kicad": "./src/kicad/index.ts",
+    "./nmesh": "./src/nmesh/index.ts",
+    "./stl": "./src/stl/index.ts"
   },
   "dependencies": {
     "@nodetto/ir": "workspace:*"
