@@ -184,6 +184,47 @@ test("a real imported box displays, exports, round-trips, and can be cut", async
   expect(volumeOfStl(machined.stl)).toBeCloseTo(600 - 3 * 4 * 5, 6);
 });
 
+test("a real inward-wound mesh exports outward and supports add and cut", async () => {
+  const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
+  const reversed = box.triangles.map((index, offset, indices) => {
+    if (offset % 3 === 1) return indices[offset + 1];
+    if (offset % 3 === 2) return indices[offset - 1];
+    return index;
+  });
+  const imported = meshElement({ ...box, triangles: reversed });
+  const selection = { bodyIds: ["mesh"] };
+  const original = await evaluate([imported]);
+  expect(original.status).toEqual([["mesh", { ok: true }]]);
+  expect(original.bodies).toMatchObject([
+    { reference: false, faceNames: ["mesh:mesh"] },
+  ]);
+  expect(volumeOfStl((await evaluate([imported], selection)).stl)).toBeCloseTo(
+    600,
+    6,
+  );
+
+  for (const [op, x, volume] of [
+    ["add", 20, 660],
+    ["cut", 2, 540],
+  ] as const) {
+    const elements = [
+      imported,
+      sketch("profile", "a1"),
+      ...rectangle("profile", x, 2, 3, 4),
+      extrude("feature", "a2", {
+        sketch: "profile",
+        distance: 5,
+        op,
+        bodies: ["mesh"],
+      }),
+    ];
+    const result = await evaluate(elements, selection);
+    expect(result.status).toContainEqual(["mesh", { ok: true }]);
+    expect(result.status).toContainEqual(["feature", { ok: true }]);
+    expect(volumeOfStl(result.stl)).toBeCloseTo(volume, 6);
+  }
+});
+
 test("the worker displays an open mesh as reference geometry and omits it from STL", async () => {
   const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
   for (const triangles of [box.triangles.slice(3), box.triangles.slice(0, 3)]) {

@@ -986,6 +986,11 @@ never runs a kernel. It needs none for its job:
 | Violating record in a file | Validation error naming the record; file not modified |
 | Violating element or page kind from a non-conforming peer | Reconcile repair restores the kind or moves elements to a deterministic page; nothing is deleted |
 | Corrupt mesh payload | `cad.mesh` reports `cad.mesh.invalid`; other bodies unaffected |
+| Inward-wound closed mesh | After solidification, negative signed volume triggers a rebuild with reversed triangle winding. Evaluation and STL export use the outward solid, while the saved NMESH remains unchanged. A rebuild that still has negative signed volume reports `cad.mesh.invalid`. |
+
+Import limitation: self-intersections, including overlaps between closed
+shells, are undetected. Such meshes may double-count volume and produce
+incorrect booleans. Repair the source mesh before importing it.
 
 ## 14. Performance budgets and measurement
 

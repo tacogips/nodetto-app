@@ -528,6 +528,31 @@ failures. The Rust suite passed 73 of 91 tests with 18 macOS replacement
 file permission failures under the worktree write restriction.
 Verification logs are under `tmp/cad3d/m13/`.
 
+M13 review rework addresses IR13-01 by releasing the inward solid and
+rebuilding from a copy with reversed triangle winding. The original
+NMESH data and face identity are preserved. Recording-kernel tests
+check cache reuse and handle cleanup, including a failed rebuild.
+The real worker exports signed volumes of 600 mm³ for the imported box,
+660 mm³ after a disjoint add, and 540 mm³ after a through cut.
+
+Rework deviations: design section 13 specifies winding normalization
+and documents the self-intersection limit (IR13-03). The dependency
+guard is in the existing CAD source contract tests
+(`packages/core/src/cad/determinism.test.ts`) and checks the core
+manifest and non-test CAD imports (IR13-02). M20 still owns the import
+message and the empty STL export action (IR13-05). The optional mesh
+memoization improvement (IR13-04) remains assigned to M18.
+
+The three milestone commands passed with 557, 35 and 7 tests. The
+codec tests passed 32 tests. The production bundle check found 974
+modules, one worker chunk and one pinned WASM asset. Workspace check
+and lint passed. The default verification run discovered upstream
+tests under the ignored `tmp/` directory. The project-only Bun run
+passed 4,398 tests, skipped 74 and had three Chrome startup permission
+failures. The Rust workspace passed 73 of 91 tests, with 18 macOS
+replacement-file permission failures under the worktree write
+restriction. Rework logs are under `tmp/cad3d/m13-rework/`.
+
 ## Completion
 
 All twenty-two milestones accepted by the adversarial implementation

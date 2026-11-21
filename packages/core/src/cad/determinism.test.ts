@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
-import type { CadXY } from "@nodetto/ir";
+import { dirname, relative, resolve, sep } from "node:path";
+import { type CadXY, isPlainObject } from "@nodetto/ir";
 import ts from "typescript";
 import { tessellateCircle } from "./index.ts";
 
@@ -72,6 +72,48 @@ test("CAD source uses only deterministic arithmetic", () => {
       node.forEachChild(visit);
     }
     visit(file);
+  }
+  expect(violations).toEqual([]);
+});
+
+test("CAD core receives mesh decoding without depending on the IO package", () => {
+  const manifest: unknown = JSON.parse(
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  );
+  if (!isPlainObject(manifest)) throw new Error("Expected the core manifest");
+  const { dependencies } = manifest;
+  if (dependencies !== undefined) {
+    if (!isPlainObject(dependencies))
+      throw new Error("Expected the core dependencies");
+    expect(Object.hasOwn(dependencies, "@nodetto/io")).toBe(false);
+  }
+
+  const violations: string[] = [];
+  const ioDir = resolve(import.meta.dir, "../../../io");
+  for (const entry of readdirSync(import.meta.dir, {
+    recursive: true,
+    withFileTypes: true,
+  })) {
+    if (
+      !entry.isFile() ||
+      !/\.tsx?$/.test(entry.name) ||
+      /\.test\.tsx?$/.test(entry.name)
+    )
+      continue;
+    const path = resolve(entry.parentPath, entry.name);
+    const source = ts.preProcessFile(readFileSync(path, "utf8"), true, true);
+    for (const { fileName } of source.importedFiles) {
+      const relativeImport = fileName.startsWith(".")
+        ? resolve(dirname(path), fileName)
+        : undefined;
+      if (
+        fileName === "@nodetto/io" ||
+        fileName.startsWith("@nodetto/io/") ||
+        relativeImport === ioDir ||
+        relativeImport?.startsWith(ioDir + sep)
+      )
+        violations.push(`${relative(import.meta.dir, path)}: ${fileName}`);
+    }
   }
   expect(violations).toEqual([]);
 });

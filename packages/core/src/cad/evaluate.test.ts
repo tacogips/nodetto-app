@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test";
 import { type Element, isPlainObject } from "@nodetto/ir";
-import { contentKey, createCadMemo, evaluateCadPage } from "./index.ts";
+import {
+  contentKey,
+  createCadMemo,
+  evaluateCadPage,
+  releaseCadMemo,
+} from "./index.ts";
+import type { CadKernel } from "./kernel.ts";
 import {
   bossOnFace,
   cadElement,
@@ -90,6 +96,80 @@ test("a CAD mesh creates a named, memoized solid that can be cut", () => {
   ).not.toBe(first.bodies[0]?.key);
   expect(decoded).toEqual([imported.semantic.data, "nmesh1:BBBB"]);
 });
+
+test("an inward-wound CAD mesh is rebuilt without changing the decoded input", () => {
+  class InwardMeshKernel extends RecordingKernel {
+    override measure(handle: number): ReturnType<CadKernel["measure"]> {
+      return { ...super.measure(handle), volume: handle === 1 ? -1 : 1 };
+    }
+  }
+  const kernel = new InwardMeshKernel();
+  const memo = createCadMemo(kernel);
+  const options = { decodeMesh: () => decodedMesh };
+  const result = evaluateCadPage([imported], kernel, memo, options);
+  expect(result.status.get("imported")).toEqual({ ok: true });
+  expect(result.bodies).toMatchObject([{ handle: 2, reference: false }]);
+  expect(kernel.calls.filter(({ kind }) => kind === "solid")).toMatchObject([
+    { handle: 1, mesh: { triangles: Uint32Array.of(0, 1, 2) } },
+    {
+      handle: 2,
+      mesh: {
+        triangles: Uint32Array.of(0, 2, 1),
+        triFace: Uint32Array.of(0),
+        faceNames: ["imported:mesh"],
+      },
+    },
+  ]);
+  expect(kernel.isLive(1)).toBe(false);
+  expect(kernel.isLive(2)).toBe(true);
+  expect(decodedMesh.triangles).toEqual(Uint32Array.of(0, 1, 2));
+  kernel.calls.length = 0;
+  expect(evaluateCadPage([imported], kernel, memo, options).bodies).toEqual(
+    result.bodies,
+  );
+  expect(kernel.calls).toEqual([]);
+  releaseCadMemo(memo);
+  expect(kernel.calls).toEqual([{ kind: "release", handle: 2 }]);
+});
+
+test.each([
+  ["rebuild", "cad.mesh.open"],
+  ["measure", "cad.kernel.failed"],
+  ["still inward", "cad.mesh.invalid"],
+] as const)(
+  "a failed inward mesh %s leaves no live handle",
+  (failure, code) => {
+    class FailingMeshKernel extends RecordingKernel {
+      override solid(mesh: Parameters<CadKernel["solid"]>[0]): number {
+        if (failure === "rebuild" && mesh.triangles[1] === 2)
+          throw new Error("Rebuild failed");
+        return super.solid(mesh);
+      }
+
+      override measure(handle: number): ReturnType<CadKernel["measure"]> {
+        if (failure === "measure" && handle === 2)
+          throw new Error("Measurement failed");
+        return { ...super.measure(handle), volume: -1 };
+      }
+    }
+    const kernel = new FailingMeshKernel();
+    const memo = createCadMemo(kernel);
+    const result = evaluateCadPage([imported], kernel, memo, {
+      decodeMesh: () => decodedMesh,
+    });
+    expect(result.status.get("imported")).toMatchObject({ code });
+    expect(result.bodies).toEqual([]);
+    expect(kernel.calls.filter(({ kind }) => kind === "release")).toEqual(
+      failure === "rebuild"
+        ? [{ kind: "release", handle: 1 }]
+        : [
+            { kind: "release", handle: 1 },
+            { kind: "release", handle: 2 },
+          ],
+    );
+    releaseCadMemo(memo);
+  },
+);
 
 test("failed mesh decoding stays local and suppressed meshes are skipped", () => {
   const kernel = new RecordingKernel();

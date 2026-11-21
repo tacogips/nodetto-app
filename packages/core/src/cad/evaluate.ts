@@ -187,13 +187,27 @@ function getSolid(
   kind: SolidKeyKind,
   key: string,
   build: () => KernelHandle,
+  rebuildInward?: () => KernelHandle,
 ): Solid {
   const hit = cached(memo, key);
   if (hit) return hit;
-  const handle = build();
+  let handle: KernelHandle | undefined = build();
   let retained = false;
   try {
-    const { empty, triangles } = memo.kernel.measure(handle);
+    let measurement = memo.kernel.measure(handle);
+    if (rebuildInward && !measurement.empty && measurement.volume < 0) {
+      const inward = handle;
+      handle = undefined;
+      memo.kernel.release(inward);
+      handle = rebuildInward();
+      measurement = memo.kernel.measure(handle);
+      if (!measurement.empty && measurement.volume < 0)
+        throw new SolidFailure(
+          "cad.mesh.invalid",
+          "Mesh still has inward winding",
+        );
+    }
+    const { empty, triangles } = measurement;
     if (empty) throw new SolidFailure("cad.result.empty");
     if (triangles > 2_000_000)
       throw new SolidFailure(
@@ -205,7 +219,7 @@ function getSolid(
     retained = true;
     return solid;
   } finally {
-    if (!retained) memo.kernel.release(handle);
+    if (!retained && handle !== undefined) memo.kernel.release(handle);
   }
 }
 
@@ -330,26 +344,49 @@ function getMesh(
   body: Extract<BodyState, { op: "mesh" }>,
 ): Solid {
   let mesh: ToolMesh | undefined;
+  function solidify(input: ToolMesh): KernelHandle {
+    try {
+      return memo.kernel.solid(input);
+    } catch (error) {
+      throw new OpenMesh(
+        input,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
   try {
-    return getSolid(memo, "body", body.key, () => {
-      const decoded = body.decode();
-      if (decoded.triangles.length === 0)
-        throw new SolidFailure("cad.mesh.invalid", "Mesh has no triangles");
-      mesh = {
-        positions: decoded.positions,
-        triangles: decoded.triangles,
-        triFace: new Uint32Array(decoded.triangles.length / 3),
-        faceNames: [`${body.id}:mesh`],
-      };
-      try {
-        return memo.kernel.solid(mesh);
-      } catch (error) {
-        throw new OpenMesh(
-          mesh,
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-    });
+    return getSolid(
+      memo,
+      "body",
+      body.key,
+      () => {
+        const decoded = body.decode();
+        if (decoded.triangles.length === 0)
+          throw new SolidFailure("cad.mesh.invalid", "Mesh has no triangles");
+        mesh = {
+          positions: decoded.positions,
+          triangles: decoded.triangles,
+          triFace: new Uint32Array(decoded.triangles.length / 3),
+          faceNames: [`${body.id}:mesh`],
+        };
+        return solidify(mesh);
+      },
+      () => {
+        if (!mesh) throw new Error("Missing decoded mesh");
+        // Reverse each triangle in place in a copy so the face indices and
+        // decoded input stay unchanged.
+        const triangles = mesh.triangles.slice();
+        for (let offset = 0; offset < triangles.length; offset += 3) {
+          const second = triangles[offset + 1];
+          const third = triangles[offset + 2];
+          if (second === undefined || third === undefined)
+            throw new SolidFailure("cad.mesh.invalid", "Incomplete triangle");
+          triangles[offset + 1] = third;
+          triangles[offset + 2] = second;
+        }
+        return solidify({ ...mesh, triangles });
+      },
+    );
   } catch (error) {
     if (
       mesh &&
