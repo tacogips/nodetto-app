@@ -132,8 +132,8 @@ milestone that breaks it, not in M18.
 | M4 | accepted |
 | M5 | accepted |
 | M6 | accepted |
-| M7 | implemented |
-| M8 | pending |
+| M7 | accepted |
+| M8 | implemented |
 | M19 | pending |
 | M9 | pending |
 | M10 | pending |
@@ -339,6 +339,26 @@ and caches inside the worktree with automatic installation disabled.
 Verification and probe logs are under `tmp/cad3d/m7/`. The supplemental
 Chromium attempt could not start while restricted to writing inside the
 worktree. Browser and WKWebView rendering checks remain in M19 and M18.
+
+M8 added the pure viewport camera, CPU face picking and theme reader. The
+camera fits bounds, orbits, pans and zooms, and computes perspective and
+orthographic projections and matching screen rays. Picking uses both
+triangle windings and tolerates roundoff on shared edges. The theme reader
+checks the existing canvas tokens in light and dark modes.
+
+M8 deviation: `Camera3d` has an optional `roll` so alignment preserves
+the sketch frame's U and V axes for arbitrary planar faces. `screenRay`
+starts at the near plane so picking respects near clipping.
+
+Both milestone checks and repository TypeScript lint passed. The existing
+light and dark CAD DOM harness passed. The 200,000-triangle pick met the
+50 ms budget, and the shared-edge probe found zero misses in 20,000 rays.
+The supplemental workspace run passed 4,297 Bun tests and skipped 74.
+Three existing browser tests failed when macOS tried to create Chrome
+socket directories outside the worktree. The separate Rust run passed 73
+tests. Eighteen existing file tests failed when macOS attempted to create
+replacement directories outside the worktree. Verification logs are under
+`tmp/cad3d/m8/`.
 
 ## Completion
 
