@@ -1,0 +1,253 @@
+import {
+  type CadDisplayBody,
+  type CadEngine,
+  type CadEngineResult,
+  Editor,
+} from "@nodetto/core";
+import { isPlainObject } from "@nodetto/ir";
+import type { CanvasMode, CadRenderer } from "@nodetto/ui-solid";
+import { createWebgl2Renderer, NodettoCanvas } from "@nodetto/ui-solid";
+import { createSignal } from "solid-js";
+import { render } from "solid-js/web";
+import { plateWithHoles } from "../../../../packages/core/src/cad/testing/documents.ts";
+import {
+  type Camera3d,
+  fitBounds,
+  orbit,
+  viewProjection,
+} from "../../../../packages/ui-solid/src/cad/camera3d.ts";
+import {
+  CAD_THEME_TOKENS,
+  parseCssColor,
+} from "../../../../packages/ui-solid/src/cad/theme.ts";
+import { getCadEngine } from "../../src/cad/engine.ts";
+import "../../src/styles/base.css";
+import "../../src/styles/canvas.css";
+
+const mountStart = performance.now();
+const editor = new Editor({ document: plateWithHoles(60) });
+const worker = getCadEngine();
+const [mode, setMode] = createSignal<CanvasMode>("light");
+const timings = { loadMs: 0, editToDisplayMs: 0 };
+let evaluated: CadEngineResult | undefined;
+let uploaded: CadEngineResult | undefined;
+let displayed: CadEngineResult | undefined;
+
+const engine: CadEngine = {
+  async evaluate(input) {
+    evaluated = await worker.evaluate(input);
+    return evaluated;
+  },
+  dispose: () => worker.dispose(),
+};
+
+let frame:
+  | {
+      camera: Camera3d;
+      width: number;
+      height: number;
+      renderer: CadRenderer;
+      gl: WebGL2RenderingContext;
+    }
+  | undefined;
+
+function createRenderer(canvas: HTMLCanvasElement): CadRenderer | null {
+  const renderer = createWebgl2Renderer(canvas);
+  const gl = canvas.getContext("webgl2");
+  if (!renderer || !gl) return null;
+  return {
+    ...renderer,
+    setBodies(bodies) {
+      renderer.setBodies(bodies);
+      if (evaluated?.bodies.length && bodies[0] === evaluated.bodies[0])
+        uploaded = evaluated;
+    },
+    draw(camera, width, height) {
+      renderer.draw(camera, width, height);
+      frame = { camera, width, height, renderer, gl };
+      if (!displayed && uploaded)
+        timings.loadMs = performance.now() - mountStart;
+      displayed = uploaded;
+    },
+  };
+}
+
+function painted(): Promise<number> {
+  return new Promise((resolve) =>
+    requestAnimationFrame(() => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = () => {
+        channel.port1.close();
+        channel.port2.close();
+        resolve(performance.now());
+      };
+      channel.port2.postMessage(null);
+    }),
+  );
+}
+
+function requireFrame() {
+  if (!frame) throw new Error("CAD viewport has not drawn a frame");
+  return frame;
+}
+
+function readPixels(x: number, y: number): readonly number[] {
+  const { gl, renderer, camera, width, height } = requireFrame();
+  renderer.draw(camera, width, height);
+  const pixel = new Uint8Array(4);
+  gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  if (gl.getError() !== gl.NO_ERROR) throw new Error("WebGL pixel read failed");
+  return Array.from(pixel);
+}
+
+function firstHolePixel(): [number, number] {
+  const { camera, width, height } = requireFrame();
+  const matrix = viewProjection(camera, width / height);
+  // Point two millimetres from the centre of the first through hole on its
+  // upper face: inside the original hole and outside the edited hole.
+  const x = 7;
+  const y = 5;
+  const z = 5;
+  const w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+  const nx = (matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]) / w;
+  const ny = (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) / w;
+  return [
+    Math.floor(((nx + 1) * width) / 2),
+    Math.floor(((ny + 1) * height) / 2),
+  ];
+}
+
+async function editRadius(mm: number): Promise<number> {
+  const hole = editor.store.get("hole-0");
+  if (!hole || !isPlainObject(hole.semantic))
+    throw new Error("The fixture hole is missing");
+  const start = performance.now();
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: hole.id,
+      semantic: { ...hole.semantic, r: mm },
+    },
+  ]);
+  const revision = editor.revision;
+  for (let now = await painted(); now - start < 5000; now = await painted()) {
+    if (displayed?.revision === revision) {
+      timings.editToDisplayMs = now - start;
+      return timings.editToDisplayMs;
+    }
+    if (evaluated?.revision === revision && evaluated.failure)
+      throw new Error(evaluated.failure);
+  }
+  throw new Error("The edited CAD plate did not reach the viewport");
+}
+
+function cameraFrames(): number[] {
+  const { renderer, gl, width, height } = requireFrame();
+  const columns = 500;
+  const rows = 200;
+  const positions = new Float32Array((columns + 1) * (rows + 1) * 3);
+  const indices = new Uint32Array(columns * rows * 6);
+  for (let row = 0; row <= rows; row++) {
+    for (let col = 0; col <= columns; col++) {
+      const i = row * (columns + 1) + col;
+      positions.set(
+        [col / 5, row / 2, Math.sin(col / 30) * Math.sin(row / 20)],
+        i * 3,
+      );
+    }
+  }
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      const i = row * (columns + 1) + col;
+      const next = i + columns + 1;
+      indices.set(
+        [i, i + 1, next, i + 1, next + 1, next],
+        (row * columns + col) * 6,
+      );
+    }
+  }
+  const body: CadDisplayBody = {
+    id: "camera-benchmark",
+    positions,
+    indices,
+    faceNames: ["camera-benchmark:surface"],
+    triFace: new Uint32Array(indices.length / 3),
+    edges: new Float32Array(),
+    reference: false,
+  };
+  let camera = fitBounds([0, 0, -1], [100, 100, 1], width / height);
+  renderer.setBodies([body]);
+  try {
+    renderer.draw(camera, width, height);
+    gl.finish();
+    return Array.from({ length: 30 }, () => {
+      camera = orbit(camera, 2, 1);
+      const start = performance.now();
+      renderer.draw(camera, width, height);
+      gl.finish();
+      return performance.now() - start;
+    });
+  } finally {
+    renderer.setBodies(displayed?.bodies ?? []);
+  }
+}
+
+const root = document.getElementById("app");
+if (!root) throw new Error("CAD fixture root is missing");
+render(
+  () => (
+    <NodettoCanvas
+      editor={editor}
+      tool="select"
+      snap={{ grid: false, objects: false }}
+      showGrid={false}
+      canvasBackground={{ diagram: mode(), pcb: mode() }}
+      cadEngine={engine}
+      createCadRenderer={createRenderer}
+    />
+  ),
+  root,
+);
+
+const check = {
+  get engineResult() {
+    return (
+      evaluated && {
+        revision: evaluated.revision,
+        bodyCount: evaluated.bodies.length,
+        triangles: evaluated.bodies.reduce(
+          (count, body) => count + body.indices.length / 3,
+          0,
+        ),
+        failure: evaluated.failure,
+      }
+    );
+  },
+  get diagnostics() {
+    return frame?.renderer.diagnostics;
+  },
+  get ready() {
+    return Boolean(displayed);
+  },
+  get size() {
+    const { width, height } = requireFrame();
+    return { width, height };
+  },
+  get background() {
+    const canvas = document.querySelector(".nodetto-cad-viewport");
+    if (!canvas) throw new Error("CAD viewport is missing");
+    return parseCssColor(
+      getComputedStyle(canvas).getPropertyValue(CAD_THEME_TOKENS.background),
+    );
+  },
+  timings,
+  readPixels,
+  firstHolePixel,
+  async setCanvasMode(next: CanvasMode) {
+    setMode(next);
+    await painted();
+  },
+  editRadius,
+  cameraFrames,
+};
+Object.assign(window, { __cadCheck: check });

@@ -62,12 +62,15 @@ function viewAspect(aspect: number): number {
 
 export function orbit(camera: Camera3d, dxPx: number, dyPx: number): Camera3d {
   if (dxPx === 0 && dyPx === 0) return camera;
+  const roll = camera.roll ?? 0;
+  const dx = dxPx * Math.cos(roll) + dyPx * Math.sin(roll);
+  const dy = dyPx * Math.cos(roll) - dxPx * Math.sin(roll);
   return {
     ...camera,
-    yaw: camera.yaw - dxPx * ORBIT_RADIANS_PER_PIXEL,
+    yaw: camera.yaw - dx * ORBIT_RADIANS_PER_PIXEL,
     pitch: Math.max(
       -MAX_ORBIT_PITCH,
-      Math.min(MAX_ORBIT_PITCH, camera.pitch + dyPx * ORBIT_RADIANS_PER_PIXEL),
+      Math.min(MAX_ORBIT_PITCH, camera.pitch + dy * ORBIT_RADIANS_PER_PIXEL),
     ),
   };
 }
@@ -93,6 +96,7 @@ export function pan(
 
 /** Factors above one move the camera farther from the target. */
 export function zoomAt(camera: Camera3d, factor: number): Camera3d {
+  if (!Number.isFinite(factor) || factor <= 0) return camera;
   const distance = Math.max(
     MIN_DISTANCE,
     Math.min(MAX_DISTANCE, camera.distance * factor),

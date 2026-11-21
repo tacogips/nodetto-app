@@ -34,6 +34,7 @@ const UI_SOLID_CHROME_FILES = [
   "ZoomControls.css",
   "SelectionToolbar.css",
   "inspector/AssetExportSection.css",
+  "cad/CadViewport.css",
 ];
 const LITERAL = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\b(?:white|black)\b/gi;
 const ROOT_SELECTOR = ":root";

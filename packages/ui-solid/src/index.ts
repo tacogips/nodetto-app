@@ -4,6 +4,8 @@
 export { createEditorSignals, type EditorSignals } from "./adapter.ts";
 export { HelpHint } from "./HelpHint.tsx";
 export { type NodettoCanvasProps, NodettoCanvas } from "./Canvas.tsx";
+export { type CadViewportProps, CadViewport } from "./cad/CadViewport.tsx";
+export { type CadRenderer, createWebgl2Renderer } from "./cad/renderer.ts";
 export {
   CANVAS_DARK_CLASS,
   type CanvasBackgroundSetting,

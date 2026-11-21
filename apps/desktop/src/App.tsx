@@ -393,11 +393,16 @@ export function App(props: AppProps): JSX.Element {
     );
   };
   const cadPageActive = createMemo(isCadPage);
+  const [cadEngine, setCadEngine] =
+    createSignal<ReturnType<typeof getCadEngine>>();
   createEffect(() => {
-    if (cadPageActive()) {
-      const engine = getCadEngine();
-      onCleanup(() => engine.dispose());
-    }
+    if (!cadPageActive()) return;
+    const engine = getCadEngine();
+    setCadEngine(engine);
+    onCleanup(() => {
+      setCadEngine(undefined);
+      engine.dispose();
+    });
   });
   let wasViewer = false;
   createEffect(() => {
@@ -968,6 +973,7 @@ export function App(props: AppProps): JSX.Element {
             onPointerLeave={presence.onCanvasPointerLeave}
           >
             <NodettoCanvas
+              cadEngine={cadEngine()}
               canvasBackground={{
                 diagram: resolveCanvasMode(canvasBackground(), resolvedTheme()),
                 pcb: resolveCanvasMode(pcbCanvasBackground(), resolvedTheme()),

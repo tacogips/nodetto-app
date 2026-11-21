@@ -22,14 +22,14 @@ import { paletteDropInsideCanvas } from "./palette-drag.ts";
 // selection (overlay-targets), the overlay components themselves, image
 // file drops, and the editor-wide navigation keys.
 
-import type { Box, Editor, Vec, ViewportSize } from "@nodetto/core";
+import type { Box, CadEngine, Editor, Vec, ViewportSize } from "@nodetto/core";
 import {
   connectorBackdropIds,
   containerPaintOrder,
   groupOf,
   tableSheetLayout,
 } from "@nodetto/core";
-import type { Element, ElementId } from "@nodetto/ir";
+import type { Element, ElementId, PageId } from "@nodetto/ir";
 import {
   CANVAS_DARK_CLASS,
   canvasModeFor,
@@ -56,6 +56,8 @@ import { resetColumnWidth, tableSheetRegionAt } from "./table-sheet/resize.ts";
 import { TableSheetCellEditor } from "./table-sheet/CellEditor.tsx";
 import { TableSheetSelectionOverlay } from "./table-sheet/SelectionOverlay.tsx";
 import { createEditorSignals } from "./adapter.ts";
+import { CadViewport, type CadViewportProps } from "./cad/CadViewport.tsx";
+import type { Camera3d } from "./cad/camera3d.ts";
 import { FreehandInput } from "./FreehandInput.tsx";
 import { installRasterMaskSampler } from "./raster-mask-sampler.ts";
 import {
@@ -93,6 +95,8 @@ const LOW_DETAIL_ZOOM = 0.25;
 
 export interface NodettoCanvasProps {
   readonly editor: Editor;
+  readonly cadEngine?: CadEngine;
+  readonly createCadRenderer?: CadViewportProps["createRenderer"];
   readonly tool: ToolKind;
   readonly onToolChange?: (tool: ToolKind) => void;
   readonly shapeDrop?: { readonly tool: ToolKind; readonly client: Vec };
@@ -123,6 +127,70 @@ export interface NodettoCanvasProps {
 }
 
 export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
+  const activeCadPage = () => {
+    const { currentPageId, store, documentOpenRevision } = props.editor;
+    return store.getPage(currentPageId)?.kind === "cad3d"
+      ? { id: currentPageId, documentOpenRevision }
+      : undefined;
+  };
+  const [cadPage, setCadPage] = createSignal(activeCadPage(), {
+    equals: (before, after) =>
+      before?.id === after?.id &&
+      before?.documentOpenRevision === after?.documentOpenRevision,
+  });
+  const cameras = new Map<PageId, Camera3d>();
+  let openRevision = props.editor.documentOpenRevision;
+  onCleanup(
+    props.editor.subscribe(() => {
+      if (openRevision !== props.editor.documentOpenRevision) {
+        openRevision = props.editor.documentOpenRevision;
+        cameras.clear();
+      }
+      setCadPage(activeCadPage());
+    }),
+  );
+
+  // The app retains the last palette drop. Switching back to 2D must not
+  // place it a second time, or place one that arrived while on a CAD page.
+  let lastDrop: NodettoCanvasProps["shapeDrop"];
+  const takeDrop = () => {
+    const drop = props.shapeDrop;
+    if (drop === lastDrop) return undefined;
+    lastDrop = drop;
+    return drop;
+  };
+  createEffect(() => {
+    if (cadPage()) takeDrop();
+  });
+
+  return (
+    <Show
+      when={cadPage()}
+      keyed
+      fallback={<DiagramCanvas {...props} takeDrop={takeDrop} />}
+    >
+      {({ id }) => (
+        <CadViewport
+          editor={props.editor}
+          engine={props.cadEngine}
+          pageId={id}
+          canvasMode={canvasModeFor("cad3d", props.canvasBackground)}
+          showGrid={props.showGrid}
+          createRenderer={props.createCadRenderer}
+          initialCamera={cameras.get(id)}
+          onCameraChange={(camera) => cameras.set(id, camera)}
+          onViewportResize={props.onViewportResize}
+        />
+      )}
+    </Show>
+  );
+}
+
+function DiagramCanvas(
+  props: NodettoCanvasProps & {
+    takeDrop: () => NodettoCanvasProps["shapeDrop"];
+  },
+): JSX.Element {
   const signals = createEditorSignals(props.editor);
   const prototype = prototypeViewState(props.editor);
   const [probeRevision, setProbeRevision] = createSignal(0);
@@ -185,7 +253,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
   });
 
   createEffect(() => {
-    const drop = props.shapeDrop;
+    const drop = props.takeDrop();
     const bounds = container?.getBoundingClientRect();
     if (!drop || !bounds || !container) return;
     const hit = document.elementFromPoint(drop.client.x, drop.client.y);

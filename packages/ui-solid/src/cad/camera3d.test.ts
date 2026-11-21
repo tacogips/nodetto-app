@@ -94,10 +94,29 @@ test("orbit keeps its target and distance and stops short of both poles", () => 
   expect(down.pitch).toBe(-up.pitch);
 });
 
+test("orbit respects the screen axes of a zx-aligned sketch", () => {
+  const aligned = alignToFrame(baseFrame("zx"), 100);
+  const point: Vec3 = [0, 10, 0];
+  const [x, y] = project(viewProjection(orbit(aligned, 40, 0), 1), point);
+  expect(Math.abs(x)).toBeGreaterThan(0.04);
+  expect(y).toBeCloseTo(0, 6);
+  const [verticalX, verticalY] = project(
+    viewProjection(orbit(aligned, 0, 40), 1),
+    point,
+  );
+  expect(verticalX).toBeCloseTo(0, 6);
+  expect(Math.abs(verticalY)).toBeGreaterThan(0.04);
+});
+
 test("zoom changes distance within the CAD range", () => {
   expect(zoomAt(camera, 0.5)).toEqual({ ...camera, distance: 30 });
   expect(zoomAt(camera, 0.00001).distance).toBe(0.1);
   expect(zoomAt(camera, 1_000_000).distance).toBe(100_000);
+});
+
+test("nonfinite or nonpositive zoom factors leave the camera valid", () => {
+  for (const factor of [Number.NaN, Number.POSITIVE_INFINITY, 0, -1])
+    expect(zoomAt(camera, factor)).toBe(camera);
 });
 
 test("pan moves the scene by the pointer delta at the target depth", () => {

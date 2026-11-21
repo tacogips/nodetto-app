@@ -133,8 +133,8 @@ milestone that breaks it, not in M18.
 | M5 | accepted |
 | M6 | accepted |
 | M7 | accepted |
-| M8 | implemented |
-| M19 | pending |
+| M8 | accepted |
+| M19 | implemented |
 | M9 | pending |
 | M10 | pending |
 | M11 | pending |
@@ -359,6 +359,43 @@ socket directories outside the worktree. The separate Rust run passed 73
 tests. Eighteen existing file tests failed when macOS attempted to create
 replacement directories outside the worktree. Verification logs are under
 `tmp/cad3d/m8/`.
+
+M19 mounts a dedicated WebGL2 viewport for CAD pages. The worker evaluates
+the plain editor snapshot, and the viewport only submits another request
+when the collected inputs change. The last successful geometry stays
+visible on a worker failure. The renderer draws shaded indexed solids,
+edges, grid lines and previews using the current canvas tokens. Camera
+controls and face selection do not alter the document, and each CAD page
+keeps its own session camera.
+
+M19 deviations: the CAD viewport supplies the existing `nodetto-canvas`
+root in the CAD branch so the 2D interaction and its listeners are never
+instantiated there. The renderer seam is forwarded through
+`NodettoCanvas` so the browser fixture can inspect the actual GL output.
+The Bun test delegates to the existing Happy DOM JSX harness. The camera
+module and its tests also cover rolled orbit axes (IR8-02) and invalid zoom
+factors (IR8-03). Viewport orbit returns to perspective. Triangle lighting
+is two-sided and culling is disabled so collapsed and reversed display
+slivers do not require consistently wound display buffers (IR7-02).
+
+All three milestone checks and repository TypeScript lint passed. Headless
+Chrome rendered the 15,612-triangle, 60-hole plate under the production
+CSP. All ten functional assertions passed, including light and dark
+framebuffer colours and the changed pixel after editing the first hole.
+Edit to display took 118.2 ms in the functional check and 193.9 ms in
+the budget run, both within 250 ms. The browser used SwiftShader, so the
+hardware camera-frame budget remains unverified. The Chrome profile, browser data and logs stayed inside the
+worktree using the headless shell and an outer write sandbox. The status
+of WebKit host verification remains with M18. Logs and the functional
+report are under `tmp/cad3d/m19/`.
+
+The supplemental workspace check passed Cargo check, formatting, Clippy
+and TypeScript lint, then reported 4,300 Bun tests passing, 74 skipped
+and three existing Chrome tests failing because Chrome could not create
+its socket directory under the worktree-only restriction. A separate
+Rust workspace run passed 73 tests and reported 18 file tests blocked by
+macOS replacement-directory permissions. M18 still owns the full
+workspace and native host checks.
 
 ## Completion
 
