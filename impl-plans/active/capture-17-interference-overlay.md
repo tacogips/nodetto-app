@@ -1,123 +1,103 @@
-# M17 capture-17-interference-overlay
+# M17 capture-17-interference-overlay (revision 4: overlay units)
 
-- dependsOn: M20 (the CLI writes scenes with the analysis on and prints
-  the pairs; `describeInterference` knows the source `view`)
-- Design: sections 6.5, 6.6 (picture), 7
-- writePaths: `crates/capture/src/raster.rs`, `crates/capture/src/shade.rs`,
-  `crates/capture/src/interference.rs`, `crates/capture/src/lib.rs`,
-  `crates/capture/tests/overlay.rs` (new),
-  `crates/capture/tests/render.rs` (the digest constant only),
-  `packages/core/src/capture/cad-request.ts` and its test (draw bit),
-  `apps/cli/src/capture-cad.ts` and its test,
-  `apps/cli/src/capture-help/interference.ts`,
-  `apps/cli/src/__fixtures__/capture-plate-default.ncs1`,
-  `apps/cli/src/native-parity/capture.test.ts`
-- Pre-authorised: the committed pixel digest of the Plate fixture in
-  `crates/capture/tests/render.rs` is replaced by the new value, because
-  that scene has the draw bit set and an interfering pair and now shows
-  the hatch; the commit message states the old and the new value. No
-  other assertion of that file changes. `capture-plate-default.ncs1` is
-  regenerated (draw bit on).
+- Stage: wave 2. dependsOn: M10 (shared `tool_view`, total lattice
+  functions, `analyse_pair`, the empty `overlay.rs` module).
+- Design: sections 6.5 (theme), 6.6 (Picture and hatch), 7, 8.5.
+- writePaths: `crates/capture/src/overlay.rs`,
+  `crates/capture/src/interference.rs`,
+  `impl-plans/active/capture-17-interference-overlay.md`, `tmp/capture/m17`, `target`
+- Pre-authorised: none. No pixel digest changes (the picture pass is not
+  touched; M23 wires these units).
 
-## Contract
+## Intent
+
+Everything the picture needs for interference marking, as tested units:
+which pairs mark a sample, the box of their marked stretches, the 4,096
+picture-only limit, the hatch colour, and analysing picture-only pairs so
+that no stripe exists without a text line.
+
+## Non-goals
+
+No edit of `raster.rs`, `shade.rs`, `lib.rs`, `report.rs`, `lattice.rs`,
+tests under `crates/capture/tests/`, or any TypeScript. No render-level
+tests (M23 owns `tests/overlay.rs`).
+
+## Contract (all `pub`, so no dead-code warnings before M23)
 
 ```rust
-// interference.rs
-/// Pairs that marked a picture sample and are not in `pairs`: analyse each in the box of
-/// its marked samples and append it with from_view = true.
-pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPair], cell: f64);
-pub struct ViewPair { pub a: u32, pub b: u32, pub min: [f64; 3], pub max: [f64; 3] }
-// shade.rs
+// overlay.rs
+pub const NEAREST_BODIES: usize = 8;
+pub const VIEW_PAIR_LIMIT: usize = 4096;
+pub struct SampleBody<'a> { pub body: u32, pub intervals: &'a [Boundary] }
+/// Pairs (a < b) among the eight bodies whose first boundary is nearest (ties by body index)
+/// that overlap by more than `tolerance`; pushes (a, b, s_start, s_end); adds comparisons made.
+pub fn overlapping_pairs(bodies: &[SampleBody], tolerance: f64, comparisons: &mut u64, out: &mut Vec<(u32, u32, f64, f64)>);
+/// World box of a marked stretch: ray origin plus/minus half a sample step along right and up.
+pub fn stretch_box(ray: &Ray, forward: [f64; 3], right: [f64; 3], up: [f64; 3], half_step: f64, s0: f64, s1: f64) -> ([f64; 3], [f64; 3]);
+#[derive(Default)] pub struct MarkTable { /* per pair: union box; deterministic order */ }
+impl MarkTable {
+  pub fn record(&mut self, a: u32, b: u32, min: [f64; 3], max: [f64; 3]);
+  pub fn merge(&mut self, later_band: MarkTable);           // band order
+  pub fn picture_only(&self, reported: &[PairReport]) -> Result<Vec<ViewPair>, CaptureError>;
+}
 pub fn hatch(x: u32, y: u32, body: [u8; 3], interference: [u8; 3], outline: bool) -> [u8; 3];
+// interference.rs
+pub struct ViewPair { pub a: u32, pub b: u32, pub min: [f64; 3], pub max: [f64; 3] }
+pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPair], cell: f64);
 ```
 
-## Behavior
+## Behaviour
 
-- Marking (when the draw bit is set): a sample is marked when two
-  distinct bodies with the analysed flag, neither an open mesh, overlap
-  along its ray by more than the tolerance. Only bodies that have an
-  interval on the ray are compared, and of those only the eight whose
-  first boundary is nearest (ties in body order), so a ray costs at most
-  28 comparisons. For every marking pair the band keeps the 3D box of
-  its overlap stretches (ray position plus half a sample step sideways,
-  the stretch along the ray); bands are merged in band order. When the
-  merged table holds more than 4,096 pairs that the analysis did not
-  report, `render_rgb` fails with `Too many interfering pairs in this
-  view (<n>). Use --interference-bodies or --no-interference.`
-- Agreement of text and picture: after the picture pass, every marking
-  pair that is not among the analysed pairs is passed to
-  `add_view_pairs`: `sample_axis` on the three axes over its box (grown
-  by one sample step, the cell being the smaller of the analysis cell
-  and a sixteenth of the box's largest side), reported with `from_view`.
-  A pair that marked a sample is therefore always in `Report.pairs`; if
-  the lattice finds no overlap in that box (a sliver below every cell),
-  the pair is still reported, with the volume `0.000` and the box of the
-  marked stretches. Pairs are sorted by `(a, b)` at the end.
-- Hatch (design 6.6), applied after shading, edges and before
-  downsampling, also where another body is in front: a marked sample is
-  the interference colour when `((x + y) / 8) % 2 == 0` in sample
-  coordinates and the body colour otherwise; a marked sample with an
-  unmarked neighbour on any of its four sides is the interference colour
-  (outline). The hatch replaces the shaded colour; it is not blended.
-- Without the draw bit nothing is marked and no view pair is added.
-- `prepareCadCapture` writes the draw bit on when interference is
-  requested.
-- Help part: the picture marks every reported interference with a
-  striped region that is visible through other bodies and replaces the
-  shading there; `--no-interference` gives the same view without it; a
-  pair that only the picture's rays found is listed with `(found in the
-  picture only)`.
+- `overlapping_pairs`: callers pass only bodies with the analysed flag,
+  not open meshes, with a non-empty interval list. Keep the eight with the
+  nearest first boundary; compare each pair with `interval::overlap`
+  (`crates/capture/src/interval.rs:52`), at most 28 comparisons.
+- `MarkTable` keys are `(a, b)`; use a `BTreeMap` or a sorted `Vec` so the
+  order is deterministic; `merge` unions boxes.
+- `picture_only`: pairs not in `reported` (by `(a, b)`), sorted by `(a, b)`;
+  more than `VIEW_PAIR_LIMIT` -> `Err(CaptureError("Too many interfering
+  pairs in this view (<n>). Use --interference-bodies or
+  --no-interference."))`.
+- `add_view_pairs`: for each `ViewPair`, grow its box by `cell` on every
+  side, use the cell `min(cell, largest box side / 16)` and the three-axis
+  lattice of `analyse_pair` on that box; append a `PairReport` with
+  `from_view: true`; if the lattice finds nothing, append it anyway with
+  volume 0 and the marked box. Sort `pairs` by `(a, b)` at the end.
+- `hatch`: interference colour when `outline` or `((x + y) / 8) % 2 == 0`,
+  else the body colour; never blended.
 
-## Tests
+## Pitfalls
 
-- `tests/overlay.rs`:
-  - Plate fixture: pixels inside the projected overlap box are one of the
-    two hatch colours or their anti-aliased mixes, also where the block's
-    own face is in front; the centre of the hole inside the overlap is
-    not marked from `top`; with the draw bit clear the picture equals the
-    M8 picture of the same scene; with the block moved 30 mm away the
-    two pictures are equal;
-  - the hatch does not depend on the face shade: the set of colours in
-    the marked area is the same on the lit top face and on the darkest
-    side face (from `front`);
-  - agreement, 100 scenes from a seeded generator (two to four bodies,
-    boxes and cylinders, some with pins of 0.05 to 2 mm): the set of
-    pairs that marked a sample is a subset of the reported pairs, in
-    every one; and for every reported pair whose box projects inside the
-    picture at more than two samples, at least one sample is marked;
-  - a pin of 0.05 mm (below the analysis refinement at a target cell of
-    10 and wider than a sample in a close-up camera) is absent from the
-    analysis, marks samples, and appears with `from_view`;
-  - bounds: 40 bodies stacked on one place render with at most 28
-    comparisons per sample (a counter in the test support) and every
-    marked pair is in the report; 200 small bodies that pairwise overlap
-    only below the analysis cell (more than 4,096 picture-only pairs)
-    return the error;
-  - reports and buffers are equal for 1, 2 and 5 threads.
-- `tests/render.rs`: the digest constant (pre-authorised).
-- `capture-cad.test.ts`: the view source is printed as `(found in the
-  picture only)`; the regenerated default fixture equals the command's
-  scene.
-- `native-parity/capture.test.ts`: decoded pixels in the overlap region
-  of `capture-plate.jsonl` differ between the default run and
-  `--no-interference` and contain both hatch colours (`#335c67` and
-  `#fffdf8` within the anti-aliasing mix); two runs give equal bytes;
-  `--theme dark` uses `#5fb4c7` and `#1f2427`.
+- No floating accumulation that depends on band count; boxes use min/max.
+- `add_view_pairs` must not reorder or alter existing analysis pairs.
+- Do not touch the shading path; the hatch replaces colour only in M23.
+
+## Tests (`#[cfg(test)] mod tests` inside `overlay.rs` and `interference.rs`)
+
+- Two bodies overlapping 1 mm on a ray -> one pair with that stretch;
+  touching (gap 0) -> none; overlap 0.0005 with tolerance 0.001 -> none.
+- Ten stacked bodies -> comparisons <= 28 and only pairs among the
+  nearest eight.
+- `MarkTable`: records from two bands merged in either split give the same
+  boxes; `picture_only` excludes reported pairs; 4,097 picture-only pairs ->
+  the exact error text.
+- `hatch`: (0,0) interference colour; (8,0) body colour; outline forces the
+  interference colour; light `#335c67`/`#fffdf8` and dark `#5fb4c7`/`#1f2427`.
+- `add_view_pairs`: Plate-and-pin scene with a 0.05 mm pin whose
+  `ViewPair` box covers it -> pair appended with `from_view` and volume > 0;
+  a box over empty space -> pair appended with volume 0; result sorted.
 
 ## Acceptance criteria
 
-- Interference is drawn distinctly, independent of the shade underneath,
-  in both themes.
-- No stripe exists without a text line for its pair.
+- All contract items exist with the behaviour above; unit tests pass; no
+  file outside writePaths changed.
 
 ## Verification (each must exit 0)
 
-1. `sh -c 'CARGO_TERM_QUIET=true cargo fmt --all -- --check && CARGO_TERM_QUIET=true cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo test -p nodetto-capture'`
-2. `sh -c 'mkdir -p tmp/capture/m17 && CARGO_TERM_QUIET=true cargo test --release -p nodetto-capture --test overlay --test render -- --nocapture > tmp/capture/m17/overlay.txt 2>&1 && grep -Eq "test result: ok\. [1-9][0-9]* passed; 0 failed; 0 ignored" tmp/capture/m17/overlay.txt'`
-3. `sh -c 'bun run typecheck && bun run lint:ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/ai-commands.test.ts'`
-4. `sh -c 'mkdir -p tmp/capture/m17; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/capture/m17/strict.log 2>&1; ! grep -E "^packages/(core|ir)/src/" tmp/capture/m17/strict.log | grep -vqE "\.test\.tsx?\(" && bun test packages/core/src/capture/cad-request.test.ts'`
-5. `sh -c 'CARGO_TERM_QUIET=true cargo test -p nodetto-cli && CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts'`
+1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/overlay.rs crates/capture/src/interference.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m17 cargo clippy -p nodetto-capture --all-targets -- -D warnings'`
+2. `sh -c 'mkdir -p tmp/capture/m17 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m17 cargo test -p nodetto-capture --lib -- overlay:: interference:: > tmp/capture/m17/unit.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m17/unit.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m17/unit.txt'`
+3. `sh -c 'CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m17 cargo test -p nodetto-capture --test interference --test render'` (unchanged tests still pass)
 
 ## Progress
 
-Pending.
+Pending (revision 4).

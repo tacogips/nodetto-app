@@ -1,105 +1,89 @@
-# M12 capture-12-scale-budget
+# M12 capture-12-scale-budget (revision 4: tile list units)
 
-- dependsOn: M11 (all tool kinds, the marking pass and the occupancy
-  figures of `PrismView` and `MeshView` that the lists and the estimate
-  must cover)
-- Design: sections 10.1 (606-tool row), 10.2 (work limit), 11, 12
-- writePaths: `crates/capture/src/tiles.rs` (new),
-  `crates/capture/src/raster.rs`, `crates/capture/src/lib.rs`,
-  `crates/capture/tests/scale.rs` (new),
-  `apps/cli/src/native-parity/capture.test.ts`
-- Pre-authorised: none. The pixel digest committed in
-  `crates/capture/tests/render.rs` must not change: this milestone is an
-  optimisation with equal output.
+- Stage: wave 2. dependsOn: M10 (`tool_view` with `average_occupancy`,
+  empty `tiles.rs`).
+- Design: sections 10.1 (606-tool row), 10.2 (work limit), 11, 12, 8.5.
+- writePaths: `crates/capture/src/tiles.rs`,
+  `impl-plans/active/capture-12-scale-budget.md`, `tmp/capture/m12`, `target`
+- Pre-authorised: none.
+
+## Intent
+
+Per-tile step lists so a picture ray visits only steps whose tools cover
+its tile, and the work estimate that refuses pathological scenes before
+rendering. M23 uses both in the picture pass and runs the render-level and
+native budget tests.
+
+## Non-goals
+
+No edit of `raster.rs`, `lib.rs`, `tool_view.rs`, tests under
+`crates/capture/tests/`, the CLI or any TypeScript. No render here.
 
 ## Contract
 
 ```rust
 // tiles.rs
 pub const TILE: u32 = 32;                         // samples per tile side
-pub struct TileLists { /* per body and tile: indices of the steps to evaluate, in step order */ }
+pub const WORK_LIMIT: u64 = 4_000_000_000;
+#[derive(Clone, Copy)] pub struct SampleRect { pub x0: u32, pub y0: u32, pub x1: u32, pub y1: u32 } // inclusive-exclusive
+pub struct TileLists { /* per body: offsets and step indices, in step order */ }
 impl TileLists {
-  pub fn build(scene: &Scene, rects: &[SampleRect]) -> TileLists;   // one rect per tool
+  /// `rects[tool]` is None when the tool projects outside the picture.
+  pub fn build(scene: &Scene, rects: &[Option<SampleRect>], samples_x: u32, samples_y: u32) -> TileLists;
   pub fn steps(&self, body: u32, tile_x: u32, tile_y: u32) -> &[u32];
   /// Sum over tiles of samples in the tile times the summed weights of its listed steps.
-  pub fn work(&self, weights: &[u64]) -> u64;                       // one weight per tool
+  pub fn work(&self, weights: &[u64]) -> u64;   // one weight per tool, saturating
 }
-pub const WORK_LIMIT: u64 = 4_000_000_000;
+pub fn tool_weight(average_occupancy: f64) -> u64;   // ceil, at least 1
+pub fn work_error(work: u64) -> CaptureError;        // the message below
 ```
 
-## Behavior
+## Behaviour
 
-- A tool's sample rectangle is the bounding rectangle of its projected
-  vertices, grown by one sample. A step is listed in every tile its
-  tool's rectangle touches. An intersection step is listed in every tile
-  of the picture, because a ray outside its tool empties the body. A body
-  whose union steps touch no tile has an empty list there, and its later
-  steps are not evaluated for that tile.
-- The sample loop of `raster.rs` iterates `steps(body, tile)` instead of
-  all steps. The result is the same boundary list as before for every
-  sample (a skipped step had an empty tool interval and was a union or a
-  difference). Body flags and the marking pass are unchanged in meaning:
-  a sample compares two bodies only when both have material on its ray.
-  Per-step liveness (M18) keeps its meaning without visiting unlisted
-  steps: a step that is not listed leaves the interval list as it was,
-  so material after listed step `j` holds up to the next listed step
-  `k`; each sample records `reach[j] = max(reach[j], k)` and one pass
-  over the steps at the end turns the ranges into `alive_after`.
-- Storage: one `Vec<u32>` of step indices and one offset table per body;
-  built once per picture on the calling thread; read-only afterwards.
-- Work limit (design 10.2): a tool's weight is its view's average
-  occupancy rounded up (entries per non-empty edge bucket or mesh cell,
-  at least 1). `render_rgb` fails with `The scene is too heavy for this
-  picture size (work <n>, limit 4000000000). Use a smaller --size.` when
-  `work()` exceeds `WORK_LIMIT`, before any sample is evaluated. The CLI
-  prints it with exit 2.
+- A tool's rectangle (computed by M23 from projected vertices, grown by
+  one sample) lists the step in every tile it touches. An intersection
+  step is listed in every tile of the picture. A body whose union steps
+  touch no tile has an empty list there.
+- Storage: one `Vec<u32>` of step indices and one offset table per body,
+  built once per picture; read-only afterwards; listings bounded by
+  `steps * tiles`.
+- `work_error`: `The scene is too heavy for this picture size (work <n>,
+  limit 4000000000). Use a smaller --size.`
+- Saturating arithmetic everywhere; no overflow panic.
 
-## Tests
+## Pitfalls
 
-- `tests/scale.rs`:
-  - equality: for the Plate fixture and for three generated scenes (a
-    grid of 20 x 15 plates each with 4 holes; one plate with 600 holes;
-    50 bodies with intersect steps; a plate emptied by a cut and
-    refilled by an add), the buffer and the report, including every
-    `emptied_by_step`, with tile lists equal those of a reference path
-    that evaluates all steps (kept in the test support module, not in
-    the library);
-  - the committed digest in `tests/render.rs` is unchanged (that test
-    runs in the same command);
-  - occupancy: a tool whose single loop has 20,000 long zig-zag edges at
-    2048 x 2048 gives a weight far above 1 and an estimate above the
-    limit, and the render is refused in under 1,000 ms; 20,000
-    overlapping one-edge-bucket tools at 2048 x 2048 are refused as well;
-  - `work()` of the fixture is printed for the record;
-  - release only: the 600-hole plate renders on one thread in under
-    1,500 ms (the spike needed 2,177 ms without lists), printed to
-    `tmp/capture/m12/scale.txt`.
-- `native-parity/capture.test.ts` (native binary):
-  - a generated CAD document of 1,000 elements in 50 bodies placed on a
-    grid (built in the test with the core test helpers; the bodies do not
-    overlap) captures in under 10,000 ms wall time; measured three times,
-    values in `tmp/capture/m12/timing.json`;
-  - the same document with the bodies stacked on one place (1,225
-    candidate pairs) captures in under 10,000 ms, prints that all 1,225
-    candidate pairs were checked and the cell that was used, and lists
-    the interfering pairs;
-  - the M9 budget test of the reference page still passes (same file).
+- Partial edge tiles: count their real sample count, not `TILE * TILE`.
+- Keep step order inside each list (the fold depends on it).
+- A difference step outside its tool's rectangle may be skipped (its tool
+  interval is empty); an intersection step never.
+
+## Tests (`#[cfg(test)]` in `tiles.rs`, scenes built in code)
+
+- Two box tools in opposite corners of a 128 x 96 sample picture -> each
+  listed only in its tiles; a union body absent from a tile -> empty list.
+- Intersection step -> listed in every tile.
+- Step order preserved for a body with union, difference, union.
+- `work`: hand-computed value for a 3 x 2 tile picture with weights 1 and 5,
+  including partial edge tiles.
+- 20,000 overlapping one-bucket tools on a 2048 x 2048 sample picture ->
+  `work > WORK_LIMIT`; `work_error` text exact; build time under 1,000 ms
+  (release only, printed).
+- `tool_weight(0.2) == 1`, `tool_weight(3.1) == 4`; saturation at `u64::MAX`.
+- A `PrismView` of a loop with 20,000 long zig-zag edges at 2048 x 2048 has
+  `tool_weight` far above 1 and its single-tool `work` exceeds the limit.
 
 ## Acceptance criteria
 
-- Render cost follows the tools that cover a region, not the feature
-  count of the page.
-- No scene can make the renderer run unbounded or allocate unbounded
-  tables: the work limit, which counts edge and triangle occupancy,
-  answers before rendering.
-- The budgets of design section 10.2 hold with recorded measurements.
+- Lists and work estimate match the contract; estimate refuses the two
+  pathological scenes; unit tests pass.
 
 ## Verification (each must exit 0)
 
-1. `sh -c 'CARGO_TERM_QUIET=true cargo fmt --all -- --check && CARGO_TERM_QUIET=true cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo test -p nodetto-capture'`
-2. `sh -c 'mkdir -p tmp/capture/m12 && CARGO_TERM_QUIET=true cargo test --release -p nodetto-capture --test scale --test render -- --nocapture > tmp/capture/m12/scale.txt 2>&1 && grep -Eq "test result: ok\. [1-9][0-9]* passed; 0 failed; 0 ignored" tmp/capture/m12/scale.txt'`
-3. `sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts'`
+1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/tiles.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m12 cargo clippy -p nodetto-capture --all-targets -- -D warnings'`
+2. `sh -c 'mkdir -p tmp/capture/m12 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m12 cargo test -p nodetto-capture --lib -- tiles:: > tmp/capture/m12/unit.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m12/unit.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m12/unit.txt'`
+3. `sh -c 'CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m12 cargo test --release -p nodetto-capture --lib -- tiles:: --include-ignored --nocapture > tmp/capture/m12/release.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m12/release.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m12/release.txt'`
 
 ## Progress
 
-Pending.
+Pending (revision 4).

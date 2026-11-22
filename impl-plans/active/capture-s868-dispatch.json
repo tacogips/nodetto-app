@@ -1,0 +1,511 @@
+{
+  "taskId": "capture-s868",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "be8fa5d71cad28b26de2226b44e7a16129f78995",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md"
+  ],
+  "evidenceRoot": "tmp/capture-s868",
+  "reviewContext": {
+    "issueReference": "none (no GitHub issue); opus-terra-design-and-implement-review-loop-session-868; source of truth is the workflow requestedOutcome, design-docs/specs/design-ai-capture.md revision 4 and impl-plans/active/capture-*.md",
+    "userProblem": "Finish the nodetto AI capture feature on feat/ai-capture: capture the current page as PNG or JPG for every page kind; for a 3D CAD page from a chosen camera with interference between bodies visible in the image and reported as text, so an AI agent can capture its own work and feed back on it. M10 (be8fa5d) is unreviewed and is repaired; M20, M22, M15, M17, M18, M11, M12, M14, M23 and M16 remain.",
+    "requiredOutcomes": [
+      "M10 repaired and sound: interference between distinct bodies detected within the stated cell and ray budget, shared tool views, streamed level 0, total inputs, tool_view seam and wave-2 stub modules, with tests (design 6.6, 18 CAP-R4-01/02, CAP-DR4-01/02).",
+      "nodetto-cli capture on a 3D CAD page reports interference as text (bodies, where, how much), has the options and exit code of M20, and draws the interfering region as a hatched overlay agreeing with the text (M17, M22, M23).",
+      "Body states and sampled emptied-body errors are reported (M18); imported meshes, open meshes and translucent reference bodies render (M11, M23); the large-page work limit and budget hold and are measured (M12, M23).",
+      "The desktop app offers the capture for the current page through a Tauri command, export backend method and Export dialog entry, including JPG for 2D artwork, in light and dark themes (M14, M15).",
+      "Docs and CLI help let an agent discover capture unprompted; measured budgets recorded in the design; progress table marks every milestone accepted; mise run verify, nodetto-native tests and CLI native parity pass on the final tree (M16).",
+      "Existing export behaviour and documents keep working; captures stay deterministic; all commits local on feat/ai-capture."
+    ],
+    "nonGoals": [
+      "Redoing accepted milestones M1-M9, M19, M13.",
+      "cad3d M21 (PCB board tool) and cad3d M18 (wireframe export and docs); edits of cad3d design or plan files; README.md edits.",
+      "Design sections 2.3 and 2.4; any nodetto-cloud, server, auth, secret or deployment code.",
+      "Changing refinement priority, budgets or JSON reply keys of the interference analysis."
+    ],
+    "constraints": [
+      "Workers edit only their writePaths, their own plan file Progress section and their evidence directories (tmp/capture/<mNN> named in the plan and tmp/capture-s868/<planId>). No git state changes, no stash, branches or worktrees, never push.",
+      "English only, no emojis, strict TypeScript without any; cargo with CARGO_TERM_QUIET=true and a per-plan CARGO_TARGET_DIR=target/capture-<mNN>; format only owned files (rustfmt --edition 2021 <files>, bunx biome format --write <files>).",
+      "crates/capture: forbid(unsafe_code), no panic on any input, only + - * / and sqrt on geometry, dependencies only png and jpeg-encoder. Heavy or timed tests are release only.",
+      "Boa-run code (packages/core, apps/cli/src, packages/io): no whole-document regex, no per-point allocation in geometry loops, no deep recursion. packages/core never imports @nodetto/io, DOM, Node or the kernel.",
+      "Existing tests and deadlines are never weakened except the exact pre-authorised changes named in each plan; timing tests may be retried up to three attempts, then run in isolation, all logged.",
+      "Third-party code is reference only; own fixtures with neutral names; new dependencies need compatible licences recorded in THIRD_PARTY_NOTICES.md; theme tokens only, dark theme supported.",
+      "A failure located only in a same-wave sibling's file is logged and re-run after the sibling lands; never edit the sibling's file."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "Revision 4 stage order: wave 1 M10, M20, M22, M15; wave 2 M17, M18, M11, M12, M14; wiring M23; closing M16 (design 8.5).", "rationale": "Requested maximum concurrency with at most two waves before wiring; dependencies only on real contracts; one final wiring plan owns the shared registration files (lib.rs, raster.rs, shade.rs, report.rs, capture-cad.ts, capture-command.ts, native-parity/capture.test.ts)."},
+      {"decision": "M10 repairs be8fa5d in place and adds tool_view.rs plus empty overlay.rs, census.rs, mesh.rs, tiles.rs modules.", "rationale": "Design 18 CAP-R4-01 ratifies be8fa5d rules; feat/ai-capture-m10 (6280745, 19c1dbf) is a reference only for shared views and guards; stubs let wave-2 crate plans run in parallel without touching lib.rs."},
+      {"decision": "M20 and M22 publish the full TypeScript request and report contracts in wave 1 (cad-request.ts, describe.ts, capture-interference-options.ts, decodeCaptureMesh).", "rationale": "M11, M14 and M23 depend only on these contracts, so desktop and crate work proceed in wave 2 without CLI wiring."},
+      {"decision": "App.tsx wiring moved from M15 to M14; M15 exports only prop types from packages/ui-solid.", "rationale": "Removes the M15/M14 shared file and keeps M15 in wave 1."},
+      {"decision": "Files written in more than one stage are written in serial stage order: lattice.rs (M10, M18), interference.rs (M10, M17), tool_view.rs (M10, M11, M23), cad-request.ts and test (M20, M11), export-handlers.test.ts (M14, M23 new cases only).", "rationale": "Overview write-ownership table; dependsOn edges enforce the order, so no file has two writers within a stage."}
+    ],
+    "intentionalTradeoffs": [
+      "Wave-2 crate plans each run clippy over nodetto-capture and wave-1 TS plans run the repo-wide bun run typecheck, so a sibling's half-finished edit can fail a gate temporarily; recorded and re-run after the sibling lands.",
+      "M14 adds the nodetto-capture path dependency to the app crate; sibling cargo runs may rewrite Cargo.lock with identical content; M14 records the Cargo.lock hash after its own cargo run.",
+      "M23 replaces the render.rs pixel digest and lines 407, 410, 411 of references_meshes_and_interference_stay_out_of_the_m8_picture, and regenerates capture-plate-default.ncs1, exactly as design 8.5 authorises.",
+      "M23 verification 2 checks exit 0 and no failed tests without a positive pass-count grep; verification 1 of the same plan runs the crate tests."
+    ],
+    "supportedEdgeCases": [
+      "Touching faces and overlaps at or below 0.001 mm are not interference; sub-cell slivers seen in the picture are reported as (found in the picture only).",
+      "Capped refinement pairs are marked approximate in text and JSON; unchecked candidates are listed (first twenty) and counted; --fail-on-interference exits 1 for pairs or unchecked candidates, never for capped pairs alone.",
+      "More than 4,096 picture-only pairs and scenes above WORK_LIMIT are refused with exact error texts (CLI exit 2).",
+      "Bodies emptied by a difference or intersection step report cad.result.empty (sampled); emptied-and-refilled bodies keep their state; sound models cost zero census rays.",
+      "Closed meshes are solids; open meshes are drawn translucent and labelled [open mesh, not checked]; PCB reference bodies drawn at 45% and take part in interference.",
+      "Invalid lattice inputs (NaN, zero, negative, infinite cell, inverted box) never panic, loop or divide by zero.",
+      "Desktop: Current view only when a camera exists; entry disabled outside cad3d pages or without the native backend (Available in the desktop app.); cancelled save writes nothing; dark theme."
+    ],
+    "outOfScopeEdgeCases": [
+      "Perspective projection, wireframe capture and PCB board tool behaviour (cad3d M18, M21).",
+      "Cloud document capture and server-side rendering (design 14).",
+      "Interference between faces of a single body."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/capture-00-overview.md",
+      "impl-plans/active/capture-10-interference.md",
+      "impl-plans/active/capture-20-interference-cli.md",
+      "impl-plans/active/capture-22-report-text.md",
+      "impl-plans/active/capture-15-desktop-ui.md",
+      "impl-plans/active/capture-17-interference-overlay.md",
+      "impl-plans/active/capture-18-body-census.md",
+      "impl-plans/active/capture-11-mesh-reference.md",
+      "impl-plans/active/capture-12-scale-budget.md",
+      "impl-plans/active/capture-14-desktop-backend.md",
+      "impl-plans/active/capture-23-wiring.md",
+      "impl-plans/active/capture-16-docs-final.md"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "capture-01-base-repair", "planPath": "impl-plans/active/capture-01-base-repair.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M1 accepted base repair."},
+    {"planId": "capture-02-output-safety", "planPath": "impl-plans/active/capture-02-output-safety.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M2 accepted output path safety."},
+    {"planId": "capture-19-core-basics", "planPath": "impl-plans/active/capture-19-core-basics.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M19 accepted core capture basics."},
+    {"planId": "capture-03-cli-2d-png", "planPath": "impl-plans/active/capture-03-cli-2d-png.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M3 accepted CLI 2D PNG capture and capture help parts."},
+    {"planId": "capture-04-encoders-jpg", "planPath": "impl-plans/active/capture-04-encoders-jpg.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M4 accepted PNG/JPG encoders."},
+    {"planId": "capture-05-camera-scene", "planPath": "impl-plans/active/capture-05-camera-scene.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M5 accepted camera and scene model (scene.ts)."},
+    {"planId": "capture-06-scene-binary", "planPath": "impl-plans/active/capture-06-scene-binary.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M6 accepted NCS1 scene format."},
+    {"planId": "capture-07-ray-intervals", "planPath": "impl-plans/active/capture-07-ray-intervals.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M7 accepted prism ray intervals."},
+    {"planId": "capture-08-shaded-image", "planPath": "impl-plans/active/capture-08-shaded-image.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M8 accepted shaded orthographic picture and pixel digest."},
+    {"planId": "capture-09-cli-3d", "planPath": "impl-plans/active/capture-09-cli-3d.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M9 accepted native CLI shaded CAD capture."},
+    {"planId": "capture-13-mcp", "planPath": "impl-plans/active/capture-13-mcp.md", "commit": "be8fa5d71cad28b26de2226b44e7a16129f78995", "provides": "M13 accepted MCP nodetto_capture tool."}
+  ],
+  "waves": [
+    ["capture-10-interference", "capture-20-interference-cli", "capture-22-report-text", "capture-15-desktop-ui"],
+    ["capture-17-interference-overlay", "capture-18-body-census", "capture-11-mesh-reference", "capture-12-scale-budget", "capture-14-desktop-backend"],
+    ["capture-23-wiring"],
+    ["capture-16-docs-final"]
+  ],
+  "plans": [
+    {
+      "planId": "capture-10-interference",
+      "planPath": "impl-plans/active/capture-10-interference.md",
+      "progressPath": "impl-plans/active/capture-10-interference.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/lattice.rs",
+        "crates/capture/src/interference.rs",
+        "crates/capture/src/prism.rs",
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/report.rs",
+        "crates/capture/src/lib.rs",
+        "crates/capture/src/tool_view.rs",
+        "crates/capture/src/overlay.rs",
+        "crates/capture/src/census.rs",
+        "crates/capture/src/mesh.rs",
+        "crates/capture/src/tiles.rs",
+        "crates/capture/tests/interference.rs",
+        "crates/capture/tests/render.rs",
+        "impl-plans/active/capture-10-interference.md",
+        "tmp/capture/m10r",
+        "tmp/capture-s868/capture-10-interference",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/tests/render.rs", "intendedEdit": "Report assertions near :404-408 may become a full Analysis equality; pixel digest and every other assertion stay."},
+        {"path": "crates/capture/src/raster.rs", "intendedEdit": "Only if the repair needs it; no picture behaviour change. M23 writes it later."},
+        {"path": "crates/capture/src/report.rs", "intendedEdit": "Only if the repair needs it; JSON keys and order unchanged. M23 writes it later."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Setup work is bounded by three shared ToolViews per tool (X, Y, Z); every cast ray is counted; refinements that do not fit the allowance are not cast and set capped.",
+        "Level 0 is streamed with a three-row window; the minimum-grid fallback samples and reports its prefix; invalid plan and sample_axis inputs never panic, loop or divide by zero.",
+        "Plate result stays 590.404 mm3 with box (85,45,2)..(100,60,5) and the M8 digest is unchanged; tool_view and the four stub modules overlay, census, mesh, tiles exist as pub mod.",
+        "New tests (exact allowance, inner-square box, centre-only witness, 1,302 checked candidates, invalid inputs, wide-box guarantee, release 200-body case under 5,000 ms) pass; existing assertions kept."
+      ],
+      "verification": [
+        "sh -c 'rustfmt --edition 2021 --check crates/capture/src/lattice.rs crates/capture/src/interference.rs crates/capture/src/prism.rs crates/capture/src/tool_view.rs crates/capture/src/lib.rs crates/capture/tests/interference.rs crates/capture/tests/render.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo test -p nodetto-capture'",
+        "sh -c 'mkdir -p tmp/capture/m10r && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo test --release -p nodetto-capture --test interference -- --nocapture > tmp/capture/m10r/interference.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m10r/interference.txt; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed; 0 failed; 0 ignored\" tmp/capture/m10r/interference.txt'",
+        "sh -c '! grep -rnE \"mul_add|\\.sin\\(|\\.cos\\(|\\.tan\\(|powf|powi|unsafe \" crates/capture/src && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo test -p nodetto-capture --test render'"
+      ]
+    },
+    {
+      "planId": "capture-20-interference-cli",
+      "planPath": "impl-plans/active/capture-20-interference-cli.md",
+      "progressPath": "impl-plans/active/capture-20-interference-cli.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "apps/cli/src/capture-interference-options.ts",
+        "apps/cli/src/capture-interference-options.test.ts",
+        "packages/io/src/nmesh/capture-decoder.ts",
+        "packages/io/src/nmesh/capture-decoder.test.ts",
+        "packages/io/src/nmesh/index.ts",
+        "impl-plans/active/capture-20-interference-cli.md",
+        "tmp/capture/m20",
+        "tmp/capture-s868/capture-20-interference-cli",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/io/src/nmesh/index.ts", "intendedEdit": "One export line for decodeCaptureMesh; packages/io/src/index.ts is not edited."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "CadCaptureInterference, CaptureMeshDecoder, the interference and decodeMesh request fields and the frozen DEFAULT_CAD_INTERFERENCE { cellMm: 0.25 } are exported; absent or null interference keeps capture-plate-default.ncs1 byte-identical.",
+        "With interference, NCS1 options 3, budget 24, tolerance 0.001, cell at offset 152 and the analysed bit per selected body; cell outside 0.01..10 and unknown, ambiguous or single-body queries raise CaptureInputError listing body names.",
+        "parseInterferenceOptions and interferenceExitCode match design 4.1, 4.2 and 12 (exit 1 only with the flag and pairs or unchecked candidates; capped only gives 0).",
+        "decodeCaptureMesh round-trips a 12-triangle cube to Float64Array positions and 36 indices and throws NmeshError on corrupt input."
+      ],
+      "verification": [
+        "sh -c 'bun run typecheck && bunx biome check packages/core/src/capture/cad-request.ts packages/core/src/capture/cad-request.test.ts apps/cli/src/capture-interference-options.ts apps/cli/src/capture-interference-options.test.ts packages/io/src/nmesh/capture-decoder.ts packages/io/src/nmesh/capture-decoder.test.ts packages/io/src/nmesh/index.ts && bun test packages/core/src/capture apps/cli/src/capture-interference-options.test.ts packages/io/src/nmesh/capture-decoder.test.ts'",
+        "sh -c 'mkdir -p tmp/capture/m20; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/capture/m20/strict.log 2>&1; ! grep -E \"^packages/(core|ir)/src/\" tmp/capture/m20/strict.log | grep -vqE \"\\.test\\.tsx?\\(\" && bun test packages/core/src/capture/cad-request.test.ts'",
+        "sh -c 'bun test apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts'"
+      ]
+    },
+    {
+      "planId": "capture-22-report-text",
+      "planPath": "impl-plans/active/capture-22-report-text.md",
+      "progressPath": "impl-plans/active/capture-22-report-text.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/capture/report.ts",
+        "packages/core/src/capture/report.test.ts",
+        "packages/core/src/capture/describe.ts",
+        "packages/core/src/capture/describe.test.ts",
+        "packages/core/src/capture/index.ts",
+        "apps/cli/src/capture-help/interference.ts",
+        "impl-plans/active/capture-22-report-text.md",
+        "tmp/capture/m22",
+        "tmp/capture-s868/capture-22-report-text",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/capture/index.ts", "intendedEdit": "One line: export * from \"./describe.ts\"."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "parseSolidReport requires cappedCount, budget and cappedWithoutHit when analysis is present and still accepts absent analysis.",
+        "describeInterference text and JSON match design 4.2 and mark the same approximate pairs; unchecked listing (first twenty plus remainder), capped line, view-only suffix and not-checked form are exact; number formatting is locale-free.",
+        "describeBodies prints the body line with every design 4.2 note and one cad.result.empty (sampled) error per body with emptiedByStep not -1, naming the feature of that step.",
+        "describeInterference and describeBodies are exported from @nodetto/core; capture-help/interference.ts documents every option and capture-command.test.ts passes unchanged."
+      ],
+      "verification": [
+        "sh -c 'bun run typecheck && bunx biome check packages/core/src/capture/report.ts packages/core/src/capture/report.test.ts packages/core/src/capture/describe.ts packages/core/src/capture/describe.test.ts packages/core/src/capture/index.ts apps/cli/src/capture-help/interference.ts && bun test packages/core/src/capture apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts'",
+        "sh -c 'mkdir -p tmp/capture/m22; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/capture/m22/strict.log 2>&1; ! grep -E \"^packages/(core|ir)/src/\" tmp/capture/m22/strict.log | grep -vqE \"\\.test\\.tsx?\\(\" && bun test packages/core/src/capture/describe.test.ts'"
+      ]
+    },
+    {
+      "planId": "capture-15-desktop-ui",
+      "planPath": "impl-plans/active/capture-15-desktop-ui.md",
+      "progressPath": "impl-plans/active/capture-15-desktop-ui.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/ExportDialog.tsx",
+        "packages/ui-solid/src/CadImageExportSection.tsx",
+        "packages/ui-solid/src/cad/capture-camera.ts",
+        "packages/ui-solid/src/cad/capture-camera.test.ts",
+        "packages/ui-solid/src/Canvas.tsx",
+        "packages/ui-solid/src/index.ts",
+        "packages/ui-solid/src/raster-export.ts",
+        "packages/ui-solid/src/raster-export.test.ts",
+        "packages/ui-solid/src/inspector/AssetExportSection.tsx",
+        "packages/ui-solid/src/export-dialog-document.test.ts",
+        "packages/ui-solid/src/cad/camera3d.ts",
+        "packages/ui-solid/src/test-dom/cad-image.dom.tsx",
+        "packages/ui-solid/src/cad/capture-image.test.ts",
+        "impl-plans/active/capture-15-desktop-ui.md",
+        "tmp/capture/m15",
+        "tmp/capture-s868/capture-15-desktop-ui",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/ui-solid/src/export-dialog-document.test.ts", "intendedEdit": "Pre-authorised: insert \"image3d\" after \"pdf\" in the Artwork ids at :8-20; nothing else."},
+        {"path": "packages/ui-solid/src/cad/camera3d.ts", "intendedEdit": "Add export to cameraAxes only."},
+        {"path": "packages/ui-solid/src/Canvas.tsx", "intendedEdit": "One optional onCadCameraChange prop and its call at the camera store (:185)."},
+        {"path": "packages/ui-solid/src/index.ts", "intendedEdit": "Exports of the new prop types only."},
+        {"path": "packages/ui-solid/src/raster-export.test.ts", "intendedEdit": "New cases only."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "ExportDialog Artwork ids are svg, png, pdf, image3d, artboards; the 3D view image entry is enabled only on cad3d pages with captureCadImage, otherwise disabled with Available in the desktop app. on CAD pages; STL stays the default format.",
+        "CadImageExportSection offers view (Current view default when a camera exists, else Isometric), PNG/JPG and three sizes, calls captureCadImage once with the canvas-mode theme and uses only existing dialog classes in light and dark modes.",
+        "captureRequestFromCamera gives direction -back, camera up, target and cameraViewHeight; Canvas exposes onCadCameraChange; App.tsx is not edited.",
+        "2D artwork can be saved as JPG with an opaque background; rasterizeSvg without output behaves as before; cad-mesh.dom.tsx, export-dialog-artboards, raster-lifecycle and theme-tokens tests pass unmodified."
+      ],
+      "verification": [
+        "sh -c 'bun run typecheck && bunx biome check packages/ui-solid/src && bun test packages/ui-solid/src/export-dialog-document.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts packages/ui-solid/src/cad/capture-camera.test.ts packages/ui-solid/src/raster-export.test.ts packages/ui-solid/src/raster-lifecycle.test.ts'",
+        "sh -c 'bun test packages/ui-solid/src/cad/capture-image.test.ts packages/ui-solid/src/cad/mesh-io.test.ts apps/desktop/src/styles/theme-tokens.test.ts apps/desktop/src/shell/export-handlers.test.ts'",
+        "sh -c 'bun --cwd=apps/desktop run build && bun test packages/ui-solid/src/export-dialog-document.test.ts'"
+      ]
+    },
+    {
+      "planId": "capture-17-interference-overlay",
+      "planPath": "impl-plans/active/capture-17-interference-overlay.md",
+      "progressPath": "impl-plans/active/capture-17-interference-overlay.md",
+      "wave": 2,
+      "dependsOn": ["capture-10-interference"],
+      "writePaths": [
+        "crates/capture/src/overlay.rs",
+        "crates/capture/src/interference.rs",
+        "impl-plans/active/capture-17-interference-overlay.md",
+        "tmp/capture/m17",
+        "tmp/capture-s868/capture-17-interference-overlay",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "overlay.rs provides NEAREST_BODIES, VIEW_PAIR_LIMIT, SampleBody, overlapping_pairs (at most 28 comparisons among the nearest eight, tolerance respected), stretch_box, a deterministic MarkTable with record, merge and picture_only (exact too-many-pairs error above 4,096) and hatch with the design 6.5 colours.",
+        "interference.rs provides ViewPair and add_view_pairs that appends from_view pairs (volume 0 when the lattice finds nothing), keeps existing analysis pairs unaltered and sorts by (a, b).",
+        "Unit tests in overlay.rs and interference.rs pass; existing interference and render integration tests pass unchanged; no file outside writePaths changed."
+      ],
+      "verification": [
+        "sh -c 'rustfmt --edition 2021 --check crates/capture/src/overlay.rs crates/capture/src/interference.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m17 cargo clippy -p nodetto-capture --all-targets -- -D warnings'",
+        "sh -c 'mkdir -p tmp/capture/m17 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m17 cargo test -p nodetto-capture --lib -- overlay:: interference:: > tmp/capture/m17/unit.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m17/unit.txt; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" tmp/capture/m17/unit.txt'",
+        "sh -c 'CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m17 cargo test -p nodetto-capture --test interference --test render'"
+      ]
+    },
+    {
+      "planId": "capture-18-body-census",
+      "planPath": "impl-plans/active/capture-18-body-census.md",
+      "progressPath": "impl-plans/active/capture-18-body-census.md",
+      "wave": 2,
+      "dependsOn": ["capture-10-interference"],
+      "writePaths": [
+        "crates/capture/src/census.rs",
+        "crates/capture/src/lattice.rs",
+        "apps/cli/src/capture-help/cad.ts",
+        "impl-plans/active/capture-18-body-census.md",
+        "tmp/capture/m18",
+        "tmp/capture-s868/capture-18-body-census",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/lattice.rs", "intendedEdit": "Add sample_body_axis (one-body mode, bodies.1 == None) only; pair analysis behaviour unchanged."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "census.rs provides CENSUS_LIMIT, Liveness (new, mark, merge), is_suspect, CensusStats and resolve giving the states and first emptying step of design 6.7.",
+        "A sound model costs zero lattice rays; the ray budget and the 4,096 suspect limit hold, leaving the rest Unknown with emptied_by_step -1; results are independent of thread count.",
+        "lattice.rs sample_body_axis follows the M10 totality rules; existing interference tests pass unchanged; capture-help/cad.ts documents body notes, sampled cad.result.empty, meshes and reference bodies."
+      ],
+      "verification": [
+        "sh -c 'rustfmt --edition 2021 --check crates/capture/src/census.rs crates/capture/src/lattice.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m18 cargo clippy -p nodetto-capture --all-targets -- -D warnings'",
+        "sh -c 'mkdir -p tmp/capture/m18 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m18 cargo test -p nodetto-capture --lib -- census:: lattice:: > tmp/capture/m18/unit.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m18/unit.txt; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" tmp/capture/m18/unit.txt'",
+        "sh -c 'CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m18 cargo test -p nodetto-capture --test interference && bunx biome check apps/cli/src/capture-help/cad.ts && bun test apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts'"
+      ]
+    },
+    {
+      "planId": "capture-11-mesh-reference",
+      "planPath": "impl-plans/active/capture-11-mesh-reference.md",
+      "progressPath": "impl-plans/active/capture-11-mesh-reference.md",
+      "wave": 2,
+      "dependsOn": ["capture-10-interference", "capture-20-interference-cli"],
+      "writePaths": [
+        "crates/capture/src/mesh.rs",
+        "crates/capture/src/tool_view.rs",
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "impl-plans/active/capture-11-mesh-reference.md",
+        "tmp/capture/m11",
+        "tmp/capture-s868/capture-11-mesh-reference",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/capture/cad-request.ts", "intendedEdit": "prepareCadCapture forwards { decodeMesh: request.decodeMesh } to buildCadCaptureModel; nothing else."},
+        {"path": "packages/core/src/capture/scene.test.ts", "intendedEdit": "Pre-authorised: the M5 mesh-in-skipped test expects skipped only when no decoder is given."},
+        {"path": "crates/capture/src/tool_view.rs", "intendedEdit": "ToolView::Mesh(MeshView) replaces Unsupported for meshes; is_solid = is_closed; tool_bounds covers meshes."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "mesh.rs provides MeshView (new, intervals, first_hit, average_occupancy, listings), is_closed (edge sort by vertex indices) and mesh_bounds with grid listings at most 4 * triangles + cells.",
+        "Closed meshes take part in analysis and census through tool_view (cube-box overlap volume within 2% of exact); open meshes are never solids or candidates.",
+        "buildCadCaptureModel turns cad.mesh features into mesh tools and bodies when given a decoder, maps a throwing decoder to cad.mesh.invalid, and keeps today's behaviour without one; core tests use fake decoders only."
+      ],
+      "verification": [
+        "sh -c 'rustfmt --edition 2021 --check crates/capture/src/mesh.rs crates/capture/src/tool_view.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m11 cargo clippy -p nodetto-capture --all-targets -- -D warnings'",
+        "sh -c 'mkdir -p tmp/capture/m11 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m11 cargo test -p nodetto-capture --lib -- mesh:: tool_view:: > tmp/capture/m11/unit.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m11/unit.txt; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" tmp/capture/m11/unit.txt && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m11 cargo test -p nodetto-capture --test interference --test render'",
+        "sh -c 'bun run typecheck && bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts packages/core/src/capture/cad-request.ts packages/core/src/capture/cad-request.test.ts && bun test packages/core/src/capture'",
+        "sh -c 'mkdir -p tmp/capture/m11; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/capture/m11/strict.log 2>&1; ! grep -E \"^packages/(core|ir)/src/\" tmp/capture/m11/strict.log | grep -vqE \"\\.test\\.tsx?\\(\" && bun test packages/core/src/capture/scene.test.ts'"
+      ]
+    },
+    {
+      "planId": "capture-12-scale-budget",
+      "planPath": "impl-plans/active/capture-12-scale-budget.md",
+      "progressPath": "impl-plans/active/capture-12-scale-budget.md",
+      "wave": 2,
+      "dependsOn": ["capture-10-interference"],
+      "writePaths": [
+        "crates/capture/src/tiles.rs",
+        "impl-plans/active/capture-12-scale-budget.md",
+        "tmp/capture/m12",
+        "tmp/capture-s868/capture-12-scale-budget",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "tiles.rs provides TILE, WORK_LIMIT, SampleRect, TileLists (build, steps, work), tool_weight and work_error with the exact message; step order kept, intersection steps listed in every tile, partial edge tiles counted by real samples, saturating arithmetic.",
+        "The 20,000-tool and 20,000-edge zig-zag scenes exceed WORK_LIMIT; build time under 1,000 ms in release; unit tests pass."
+      ],
+      "verification": [
+        "sh -c 'rustfmt --edition 2021 --check crates/capture/src/tiles.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m12 cargo clippy -p nodetto-capture --all-targets -- -D warnings'",
+        "sh -c 'mkdir -p tmp/capture/m12 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m12 cargo test -p nodetto-capture --lib -- tiles:: > tmp/capture/m12/unit.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m12/unit.txt; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" tmp/capture/m12/unit.txt'",
+        "sh -c 'mkdir -p tmp/capture/m12 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m12 cargo test --release -p nodetto-capture --lib -- tiles:: --include-ignored --nocapture > tmp/capture/m12/release.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m12/release.txt; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" tmp/capture/m12/release.txt'"
+      ]
+    },
+    {
+      "planId": "capture-14-desktop-backend",
+      "planPath": "impl-plans/active/capture-14-desktop-backend.md",
+      "progressPath": "impl-plans/active/capture-14-desktop-backend.md",
+      "wave": 2,
+      "dependsOn": ["capture-15-desktop-ui", "capture-20-interference-cli", "capture-22-report-text"],
+      "writePaths": [
+        "apps/desktop/src-tauri/Cargo.toml",
+        "Cargo.lock",
+        "apps/desktop/src-tauri/src/capture.rs",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src/file/backend.ts",
+        "apps/desktop/src/shell/export-handlers.ts",
+        "apps/desktop/src/shell/export-handlers.test.ts",
+        "apps/desktop/src/App.tsx",
+        "impl-plans/active/capture-14-desktop-backend.md",
+        "tmp/capture/m14",
+        "tmp/capture-s868/capture-14-desktop-backend",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "Cargo.lock", "intendedEdit": "Changes only by the nodetto-capture path dependency of the app crate; record its hash after M14's own cargo run."},
+        {"path": "apps/desktop/src-tauri/src/lib.rs", "intendedEdit": "Module line and one capture_solid entry in generate_handler!."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "capture_solid (async, spawn_blocking) and capture_solid_blocking render a scene with nodetto_capture::render_scene, validate format and quality and touch no file; no new entitlement or capability.",
+        "ExportBackend.captureSolid and ExportHandlers.captureCadImage use prepareCadCapture with DEFAULT_CAD_INTERFERENCE and decodeCaptureMesh, save through pickExportPath and writeBytes, and report Image saved. plus describeInterference lines and describeBodies errors; errors and cancelled dialogs write nothing.",
+        "App.tsx keeps the last camera per page from onCadCameraChange and passes cadCurrentView, captureCadImage (only when captureSolid exists) and canvasMode to the Export dialog."
+      ],
+      "verification": [
+        "sh -c 'mkdir -p tmp/capture/m14 && rustfmt --edition 2021 --check apps/desktop/src-tauri/src/capture.rs apps/desktop/src-tauri/src/lib.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m14 cargo clippy -p app --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m14 cargo test -p app capture > tmp/capture/m14/app-test.log 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m14/app-test.log; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" tmp/capture/m14/app-test.log'",
+        "sh -c 'bun run typecheck && bunx biome check apps/desktop/src/file/backend.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts apps/desktop/src/App.tsx && bun test apps/desktop/src/shell/export-handlers.test.ts packages/core/src/capture'",
+        "sh -c 'bun --cwd=apps/desktop run build && bun test packages/ui-solid/src/cad/capture-image.test.ts apps/desktop/src/styles/theme-tokens.test.ts'"
+      ]
+    },
+    {
+      "planId": "capture-23-wiring",
+      "planPath": "impl-plans/active/capture-23-wiring.md",
+      "progressPath": "impl-plans/active/capture-23-wiring.md",
+      "wave": 3,
+      "dependsOn": ["capture-17-interference-overlay", "capture-18-body-census", "capture-11-mesh-reference", "capture-12-scale-budget", "capture-14-desktop-backend", "capture-20-interference-cli", "capture-22-report-text"],
+      "writePaths": [
+        "crates/capture/src/lib.rs",
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/shade.rs",
+        "crates/capture/src/report.rs",
+        "crates/capture/src/tool_view.rs",
+        "crates/capture/tests/render.rs",
+        "crates/capture/tests/support/mod.rs",
+        "crates/capture/tests/overlay.rs",
+        "crates/capture/tests/census.rs",
+        "crates/capture/tests/mesh.rs",
+        "crates/capture/tests/scale.rs",
+        "apps/cli/src/capture-command.ts",
+        "apps/cli/src/capture-command.test.ts",
+        "apps/cli/src/capture-cad.ts",
+        "apps/cli/src/capture-cad.test.ts",
+        "apps/cli/src/__fixtures__/capture-plate-default.ncs1",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "apps/desktop/src/shell/export-handlers.test.ts",
+        "impl-plans/active/capture-23-wiring.md",
+        "tmp/capture/m23",
+        "tmp/capture-s868/capture-23-wiring",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/tests/render.rs", "intendedEdit": "Pre-authorised: replace the pixel digest (commit message states old and new values) and lines 407, 410, 411 of references_meshes_and_interference_stay_out_of_the_m8_picture as design 8.5 requires; nothing else weakened."},
+        {"path": "apps/cli/src/__fixtures__/capture-plate-default.ncs1", "intendedEdit": "Regenerated to equal prepareCadCapture(Plate, iso, 1024x768, light, DEFAULT_CAD_INTERFERENCE, decodeCaptureMesh)."},
+        {"path": "apps/cli/src/capture-cad.test.ts", "intendedEdit": "Pre-authorised: the M9 [not in the picture] expectation for an absent body changes to the final-state notes."},
+        {"path": "apps/desktop/src/shell/export-handlers.test.ts", "intendedEdit": "New cases only (fixture equality, mesh-only parity, interference null options 0)."},
+        {"path": "crates/capture/src/tool_view.rs", "intendedEdit": "Picture-family constructor only, if needed."},
+        {"path": "crates/capture/tests/support/mod.rs", "intendedEdit": "New helpers only."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The picture pass evaluates tools through tool_view with tile lists, refuses scenes above WORK_LIMIT before sampling, records liveness, marks and hatches interference (picture_only then add_view_pairs), mixes reference bodies at 45%, resolves the census and sets open; JSON keys unchanged; captures deterministic across thread counts.",
+        "nodetto-cli capture accepts the interference options for CAD pages only, prints the body line, sampled errors and describeInterference lines, adds the JSON forms, uses interferenceExitCode and exits 2 on work-limit or too-many-pairs errors.",
+        "Crate integration tests overlay, census, mesh and scale pass (release timings printed); capture-cad, capture-command, export-handlers and native parity capture tests pass with the Plate x Block volume within 1% of 590.721 and positive parity evidence; apps/cli/native/src/engine_tests.rs passes unedited."
+      ],
+      "verification": [
+        "sh -c 'rustfmt --edition 2021 --check crates/capture/src/raster.rs crates/capture/src/shade.rs crates/capture/src/lib.rs crates/capture/src/report.rs crates/capture/src/tool_view.rs crates/capture/tests/*.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test -p nodetto-capture'",
+        "sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test --release -p nodetto-capture --test overlay --test census --test mesh --test scale --test render -- --nocapture > tmp/capture/m23/release.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m23/release.txt; test $s -eq 0 && ! grep -Eq \"[1-9][0-9]* failed\" tmp/capture/m23/release.txt'",
+        "sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/desktop/src/shell/export-handlers.test.ts'",
+        "sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/capture-m23\" cargo test -p nodetto-cli && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/capture-m23\" cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/capture-m23/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts > tmp/capture/m23/native-parity.txt 2>&1; s=$?; echo \"exit=$s\" >> tmp/capture/m23/native-parity.txt; test $s -eq 0 && grep -Eq \"[1-9][0-9]* pass\" tmp/capture/m23/native-parity.txt && ! grep -Eq \"[1-9][0-9]* skip\" tmp/capture/m23/native-parity.txt'"
+      ]
+    },
+    {
+      "planId": "capture-16-docs-final",
+      "planPath": "impl-plans/active/capture-16-docs-final.md",
+      "progressPath": "impl-plans/active/capture-16-docs-final.md",
+      "wave": 4,
+      "dependsOn": ["capture-23-wiring"],
+      "writePaths": [
+        "docs/capture.md",
+        "docs/cli.md",
+        "apps/cli/src/capture-docs.test.ts",
+        "design-docs/specs/design-ai-capture.md",
+        "impl-plans/active/capture-00-overview.md",
+        "impl-plans/active/capture-16-docs-final.md",
+        "impl-plans/README.md",
+        "tmp/capture/m16",
+        "tmp/capture-s868/capture-16-docs-final",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "docs/cli.md", "intendedEdit": "Append section ## Capturing page images at the end and one capture line above the three export --format png lines of the AI section near :141-143."},
+        {"path": "design-docs/specs/design-ai-capture.md", "intendedEdit": "Status line implemented (slice), a Measured table in section 10 and a short Deviations list."},
+        {"path": "impl-plans/active/capture-00-overview.md", "intendedEdit": "Progress table only; every milestone accepted only when all final gates passed."},
+        {"path": "impl-plans/README.md", "intendedEdit": "One Completed index entry for the capture plans."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "docs/capture.md and the docs/cli.md section let an agent discover and use capture: every COMMAND_HELP.capture option, outputs, guarantees, interference, determinism, MCP, desktop entry and licences; capture-docs.test.ts parses every documented command line.",
+        "Measured budgets and revision 4 deviations are recorded in the design; the progress table marks every milestone accepted.",
+        "All three final gates (mise run verify or its documented fallback, cargo test -p nodetto-native, nodetto-cli tests with native parity over apps/cli/src) exit 0 with logs under tmp/capture/m16 and capture parity tests passed, none skipped."
+      ],
+      "verification": [
+        "sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-docs.test.ts && bun test apps/cli/src/capture-docs.test.ts apps/cli/src/table-docs.test.ts apps/cli/src/help-convert-frame.test.ts apps/cli/src/document-examples.test.ts packages/core/src/bpmn/docs-example.test.ts'",
+        "sh -c 'mkdir -p tmp/capture/m16; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/capture/m16/strict.log 2>&1; ! grep -E \"^packages/(core|ir)/src/\" tmp/capture/m16/strict.log | grep -vqE \"\\.test\\.tsx?\\(\" && bun test packages/core/src/capture'",
+        "env CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/capture-m16\" mise run verify",
+        "env CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/capture-m16\" cargo test -p nodetto-native",
+        "env CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/capture-m16\" sh -c 'cargo test -p nodetto-cli && cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$CARGO_TARGET_DIR/release/nodetto-cli\" bun test apps/cli/src'"
+      ]
+    }
+  ]
+}

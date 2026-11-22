@@ -1,194 +1,123 @@
-# M10 capture-10-interference
+# M10 capture-10-interference (revision 4 repair)
 
-- dependsOn: M8 (`render_rgb`, `Report`, the per-ray body fold)
-- Design: sections 3.4, 6.6 (analysis), 10.2, 11
-- writePaths: `crates/capture/src/lattice.rs` (new),
-  `crates/capture/src/interference.rs` (new),
-  `crates/capture/src/report.rs` (JSON of `analysis` and `pairs`),
-  `crates/capture/src/lib.rs`, `crates/capture/tests/interference.rs`
-  (new), `crates/capture/src/raster.rs` (call the analysis),
-  `crates/capture/src/prism.rs` (cap ownership for volume rays),
-  `crates/capture/tests/render.rs` (report assertions),
-  `impl-plans/active/capture-00-overview.md`,
-  `design-docs/specs/design-ai-capture.md`
-- The committed pixel digest remains the M8 digest.
+- Stage: wave 1. dependsOn: none (base `be8fa5d`, which implements M10).
+- Design: sections 6.6 (steps 1 to 6, guarantee), 6.3 (reply keys), 8.5,
+  10.2, 11, 18 (CAP-R4-01, CAP-R4-02, CAP-DR4-01, CAP-DR4-02).
+- Reference only: `feat/ai-capture-m10` commits `6280745`, `19c1dbf`. Read
+  `git show 19c1dbf -- crates/capture` for the shared-view and guard ideas;
+  write own code; do not cherry-pick.
+- writePaths: `crates/capture/src/lattice.rs`, `crates/capture/src/interference.rs`,
+  `crates/capture/src/prism.rs`, `crates/capture/src/raster.rs`,
+  `crates/capture/src/report.rs`, `crates/capture/src/lib.rs`,
+  `crates/capture/src/tool_view.rs` (new), `crates/capture/src/overlay.rs`,
+  `crates/capture/src/census.rs`, `crates/capture/src/mesh.rs`,
+  `crates/capture/src/tiles.rs` (four empty stubs), `crates/capture/tests/interference.rs`,
+  `crates/capture/tests/render.rs` (report assertions only),
+  `impl-plans/active/capture-10-interference.md`, `tmp/capture/m10r`, `target`
+- Pre-authorised: `tests/render.rs` analysis assertions near `:404-408` may
+  be replaced by a full `Analysis` equality (stronger). The pixel digest
+  and every other assertion stay. `raster.rs` and `report.rs` change only
+  if the repair needs it (no behaviour change to the picture).
 
-## Contract
+## Intent
 
-```rust
-// lattice.rs: the adaptive two-level lattice of design 6.6, steps 3 and 4
-pub struct LatticeRequest<'a> { pub scene: &'a Scene, pub bodies: (u32, Option<u32>),   // one body, or a pair
-  pub min: [f64; 3], pub max: [f64; 3], pub cell: f64, pub tolerance: f64 }
-pub struct AxisSample { pub hit: bool, pub volume: f64, pub min: [f64; 3], pub max: [f64; 3],
-  pub cell: f64, pub rays: u64, pub capped: bool }             // cell: the larger level-0 side
-pub fn sample_axis(request: &LatticeRequest, axis: usize) -> AxisSample;
-pub fn level0_rays(min: [f64; 3], max: [f64; 3], cell: f64) -> u64;   // sum over the three axes
+`be8fa5d` is sound in its rules (ratified in design CAP-R4-01: small-loop
+first across axes, centre-hit retention, world-coordinate plane ownership,
+`cappedCount`/`cappedWithoutHit`/`budget`). Repair what breaks the budget
+and totality promises, adopt the reference's stronger tests, and add the
+`tool_view` seam plus empty modules so wave 2 can run in parallel.
 
-// interference.rs
-pub struct Candidate { pub a: u32, pub b: u32, pub min: [f64; 3], pub max: [f64; 3], pub weight: u64 }
-/// The first `keep` candidates in body order and the number of all candidates.
-pub fn candidates(scene: &Scene, boxes: &[([f64; 3], [f64; 3])], keep: usize) -> (Vec<Candidate>, u64);
-/// The cell for all candidates and how many of them are checked (design 6.6 step 2).
-pub fn plan(candidates: &[Candidate], total: u64, target_cell: f64, budget: u64) -> (f64, usize);
-/// `refinement` is this candidate's allowance of weighted refinement rays.
-pub fn analyse_pair(scene: &Scene, candidate: &Candidate, cell: f64, refinement: u64) -> (Option<PairReport>, f64); // result, cell used
-```
+## Non-goals
 
-## Behavior
+No change to the refinement priority, the budgets, the JSON keys or their
+order, the M8 pixel digest, the CLI or any TypeScript. No mesh support
+(M11). No picture-pass routing through `tool_view` (M23).
 
-- `candidates`: pairs `a < b` of bodies with the analysed flag whose
-  conservative boxes (the box of each body's union tools) overlap by more
-  than the tolerance on all three axes, in body order; the box is the
-  overlap. `weight = max(1, ceil(steps / 8))`, where `steps` counts the
-  steps of the two bodies that survive the filter below. Only the first
-  `keep` candidates are stored (`keep = budget / 768 + 256`); the others
-  are counted, so a page of 20,000 mutually overlapping bodies does not
-  allocate a table of 2e8 pairs.
-- `plan`: with `n(extent, c) = clamp(ceil(extent / c), 16, 1024)` per
-  lattice side, the level-0 rays of a candidate are the sum over the
-  three axes of the product of its two side counts, and its work is
-  that number times its weight. Start with `c = target_cell` and double
-  it until the work of all candidates is within the budget (in weighted
-  rays); all candidates are then checked. If the minimum work (768 times
-  the weight, summed) exceeds the budget, or `total` exceeds the stored
-  candidates, `c` is infinite (every side is 16) and candidates are
-  checked in order while their minimum work fits.
-- `sample_axis` (design 6.6 steps 3 and 4): level 0 one ray per cell
-  centre along the axis; evaluate only the requested bodies, and of
-  their steps only the unions and differences whose tool box meets the
-  box and every intersection; within a ray, a union or difference step
-  whose tool's projected box does not contain the ray is skipped; a ray
-  hits when the overlap
-  of the two bodies (or, for one body, its material) exceeds the
-  tolerance. Refinement: a cell whose hit state differs from one of its
-  four neighbours gets 8 x 8 sub-rays; a cell that meets the projected
-  box of a small loop (a loop of any step tool of the requested bodies
-  whose projected box is narrower than four cells in a lattice direction)
-  gets `m x m` with `m = clamp(ceil(8 * max(cell_a / side_a, cell_b /
-  side_b)), 8, 64)`; the larger `m` wins. Reserve small-loop cells across
-  all axes before boundary-only cells, then visit by row within each
-  priority and axis. The 2,000,000-ray axis cap and the pair allowance
-  bound refinement. If either truncates work, set `capped`. Unrefined
-  cells retain their centre ray. A centre hit survives when all its sub-rays
-  miss. The allowance is fixed before the pairs run, so results do not depend on
-  thread scheduling: the analysis budget again, shared out in proportion
-  to each checked candidate's level-0 work (`allowance = floor(budget *
-  work / total work)`, which is at least the candidate's own level-0
-  work). Volume is the sum over leaf
-  cells of overlap length times leaf area; the extent is the union of
-  hit leaves and their overlap stretches.
-- `analyse_pair`: the three axes; no result when no axis hits; else
-  volume = mean of the axes that hit, box = union of their extents
-  rounded to 0.001, `capped` if any axis was capped, `from_view` false.
-  The cell used is the largest level-0 side of the three lattices.
-- `render_rgb`: when the analyse bit is set: candidates, `plan` with the
-  scene's target cell and budget, `analyse_pair` for the checked
-  candidates (distributed over the render threads, results placed in
-  candidate order), `Report.pairs`, and `Report.analysis` with
-  `candidates`, `checked`, `cell` (the largest cell used on any checked
-  candidate; the target cell when there is none), `unchecked_count` and
-  the first 256 unchecked pairs. Report the weighted budget, the number
-  of capped candidates and every capped candidate without a hit.
-  The picture is not changed here.
-- Only `+ - * /`, comparisons and `sqrt`; lattice coordinates are
-  computed as `min + (i + 0.5) * side / n`, never accumulated.
+## Changes
 
-## Tests (`tests/interference.rs`, scenes built in code; exact volumes computed in the test from the polygons)
+1. `tool_view.rs` (new, `pub mod tool_view;` in `lib.rs`):
+   `pub enum ToolView { Prism(PrismView), Unsupported }` with
+   `pub fn new(tool: &Tool, index: u32, family: &RayFamily) -> ToolView`,
+   `pub fn intervals(&self, ray: &Ray, scratch: &mut Vec<Boundary>, out: &mut Intervals)`
+   (empty for `Unsupported`), `pub fn average_occupancy(&self) -> f64`
+   (1.0 for `Unsupported`); free functions moved from `lattice.rs`:
+   `pub fn tool_loops(tool: &Tool) -> Vec<Bounds>` (loop boxes; empty for a
+   mesh), `pub fn tool_bounds(tool: &Tool) -> Option<Bounds>`, and
+   `pub fn is_solid(tool: &Tool) -> bool` (prism true, mesh false until M11).
+   `lattice` and `interference` evaluate tools only through these.
+   Candidates skip a body whose first step's tool is not solid.
+2. Shared views (CAP-R4-02): one lazily built `ToolView` per tool and axis
+   (X, Y, Z), at most three per tool, shared read-only by all candidates and
+   worker threads (for example `std::sync::OnceLock` slots in a struct
+   built once per `analyse_scene`). Replace the per-candidate build in
+   `lattice.rs` `AxisFold::new` (around `:199-228`).
+3. Streamed level 0 (CAP-DR4-01): replace the whole-axis `base` vector in
+   `AxisSampler::sample` (`:362-431`) with a three-row window; decide a
+   cell once its row and both neighbour rows are cast; same row order,
+   same reservation of small-loop rays, same allowances. No ray is cast
+   twice; refinement cost `m * m` is charged before sub-rays are cast; a
+   refinement that does not fit is not cast and sets `capped`. Commit a
+   cell's volume and box after the choice, from retained leaves only.
+   `AxisSample.rays` counts exactly the cast rays.
+4. Inputs (CAP-DR4-02): `plan` keeps `f64::INFINITY` as the valid
+   minimum-grid marker (16 per side) used identically by work accounting
+   and sampling; the reported cell is the finite side actually used
+   (rounded up by `report.rs` as today). A target cell that is NaN, `<= 0`
+   or infinite returns `(target, 0)` at once. `sample_axis` with axis > 2,
+   an empty or inverted box, a NaN coordinate, or a NaN or `<= 0` cell
+   returns an empty sample with `rays == 0`. Side counts are clamped after
+   conversion so NaN cannot produce 0.
+5. Four empty modules `overlay.rs`, `census.rs`, `mesh.rs`, `tiles.rs`, each
+   a single `//!` line naming its milestone, declared `pub mod` in `lib.rs`.
 
-- Fixture pair Plate and Block: one pair, volume within 1% of its analytical
-  polygonal volume, box within 0.25 mm of (85,45,2)..(100,60,5).
-  Puck interferes with nothing. The reported cell is 0.25.
-- The reviewer's case: plate 200 x 200 x 5 with an added pin of diameter
-  1.5 and height 10 at the centre, cover 200 x 200 x 5 on top: one pair,
-  volume within 3% of the 64-sided pin's 8.822 mm3; the same with the pin
-  left standing by a ring-shaped cut; a 0.8 mm peg of the other body at
-  (37.3, 211.7) on a 300 mm part (cell 0.293); each also at a target
-  cell of 4 (found through loop refinement alone).
-- A body made by intersecting a box with a tool that lies outside the
-  candidate box has no material there: no pair (the intersection step is
-  not filtered away).
-- Two boxes sharing a face: no pair; overlapping by 0.0005 mm: no pair;
-  by 0.01 mm: one pair within 5%; a box in a pocket that clears it by
-  0.1 mm: no pair; a reference body and a body: reported; a body without
-  the analysed flag: no candidate.
-- Guarantee: 200 scenes from a seeded generator, each a 100 mm box and a
-  100 mm right-triangle prism whose corner enters the box at a random
-  place so that the overlap, seen along Z, contains an axis-aligned
-  square of side 1.2 cells: every one is found. Neither body has a small
-  loop, and the candidate box is far larger than the overlap, so this
-  exercises the level-0 lattice alone.
-- Enclosure: a shell (box with a cut cavity) created first and 40 parts
-  inside it, part 37 poking 1 mm through a wall: every candidate is
-  checked (`unchecked_count` 0) and exactly the pair with part 37 is
-  reported.
-- Budget: 2,000 mutually overlapping boxes with budget 1: the checked
-  count is `floor(1e6 / 768)`, the rest are unchecked, the first 256 are
-  listed and no more than `keep` candidates are stored; 40 overlapping
-  200 mm boxes with budget 24 are all checked with a reported cell of 2;
-  `plan` never exceeds the budget for 1,000 generated candidate sets; the
-  refinement rays of any run stay within the budget (a counter in the
-  test support).
-- Weight: a 300 mm pair in which one body is a plate with 600 hole cuts
-  inside the candidate box has weight 76, is checked with a reported
-  cell above 0.25 mm that the test derives from `plan`, and still finds
-  a 0.8 mm peg through loop refinement.
-- A loop of 2,000,000 potential refinement rays is capped and flagged.
-- Results and reports are equal for 1 and 5 threads and for two runs.
-- Release only: the 200 mm pin pair at cell 0.25 analyses on one thread
-  in under 500 ms (the spike measured 58 ms); the 2,000-box case and the
-  600-hole pair each in under 2,000 ms; values printed to
-  `tmp/capture/m10/`.
+## Pitfalls
+
+- Do not change which cells refine or their order; the Plate report must
+  stay exactly 590.404 mm3 with box (85,45,2)..(100,60,5).
+- `OnceLock<ToolView>` must be `Sync`; do not wrap in `Mutex` per ray.
+- Keep `#[cfg_attr(debug_assertions, ignore = "release only")]` for timing
+  tests; replace `#[cfg(not(debug_assertions))]` at
+  `tests/interference.rs:578-600` with it (one test per timed case).
+
+## Tests (`tests/interference.rs`; existing tests keep their assertions)
+
+- Exact allowance: allowance equal to the cost of the first two
+  refinements -> counted rays == level 0 + that allowance, never one more.
+- A coarse hit cell whose sub-rays hit only an inner square -> reported box
+  equals the sub-ray footprint, strictly smaller than the coarse cell.
+- Centre-only witness: all sub-rays miss a real coarse hit -> pair reported.
+- `candidate_table_bounds_and_unchecked_order` (`:440-464`) gains: all
+  1,302 checked candidates sampled and reported as hits, unchecked order
+  unchanged, finite reported cell.
+- Invalid `plan` targets (NaN, 0, -1, infinity) -> `(_, 0)` promptly; invalid
+  `sample_axis` requests -> empty sample, zero rays.
+- Guarantee with a wide box (from the reference): 100 x 100 x 20 mm box,
+  cell 1, zero refinement, 200 seeded triangle corners -> every one found;
+  an overlap one cell square and 0.002 mm thick seen only along Z -> found.
+- Release only: 200 bodies sharing one 20,000-point loop (19,900 pairs),
+  one thread, under 5,000 ms; existing pin (< 500 ms), 2,000-box and
+  600-hole (< 2,000 ms) cases unchanged.
+- `tests/render.rs`: full `Analysis` equality for the Plate scene.
 
 ## Acceptance criteria
 
-- The analysis finds pins and pegs far smaller than the parts, reports
-  the cell that states its guarantee, and never drops a candidate without
-  listing it.
+- Setup work is bounded by three views per tool; every cast is counted.
+- The minimum-grid fallback samples and reports its prefix; invalid inputs
+  never panic, loop or divide by zero.
+- Plate result and M8 digest unchanged; `tool_view` and the four stub
+  modules exist as `pub mod`.
 
 ## Verification (each must exit 0)
 
-1. `sh -c 'CARGO_TERM_QUIET=true cargo fmt --all -- --check && CARGO_TERM_QUIET=true cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo test -p nodetto-capture'`
-2. `sh -c 'mkdir -p tmp/capture/m10 && CARGO_TERM_QUIET=true cargo test --release -p nodetto-capture --test interference -- --nocapture > tmp/capture/m10/interference.txt 2>&1 && grep -Eq "test result: ok\. [1-9][0-9]* passed; 0 failed; 0 ignored" tmp/capture/m10/interference.txt'`
-3. `sh -c '! grep -rnE "mul_add|\.sin\(|\.cos\(|\.tan\(|powf|powi" crates/capture/src && CARGO_TERM_QUIET=true cargo test -p nodetto-capture --test interference --test render'`
+1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/lattice.rs crates/capture/src/interference.rs crates/capture/src/prism.rs crates/capture/src/tool_view.rs crates/capture/src/lib.rs crates/capture/tests/interference.rs crates/capture/tests/render.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo test -p nodetto-capture'`
+   (evidence: interference and render tests pass, 0 failed)
+2. `sh -c 'mkdir -p tmp/capture/m10r && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo test --release -p nodetto-capture --test interference -- --nocapture > tmp/capture/m10r/interference.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m10r/interference.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed; 0 failed; 0 ignored" tmp/capture/m10r/interference.txt'`
+   (evidence: release timings printed, including the 200-body case)
+3. `sh -c '! grep -rnE "mul_add|\.sin\(|\.cos\(|\.tan\(|powf|powi|unsafe " crates/capture/src && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m10 cargo test -p nodetto-capture --test render'`
 
 ## Progress
 
-Implemented, awaiting review.
-
-- The renderer runs three-axis prism analysis when the scene enables
-  it. Reports preserve candidate order across workers and keep capped
-  candidates without hits. The crate reports the weighted budget and
-  the cap count. M20 will surface these fields and the qualified
-  guarantee in CLI output and help.
-- CAP-M7-02: volume rays use world-coordinate boundary ownership in
-  shared cap and side planes. Tests exercise opposite sketch frames
-  and a lattice ray in a shared plane. M17 still needs the overlay
-  contact test. CAP-M6-02: analysis is gated on the analyse bit, with a
-  regression for a draw bit set alone.
-- CAP-R3-01 and CAP-R3-02: small-loop work has priority across axes.
-  The analysis JSON preserves capped misses and exposes the weighted
-  ray budget. CAP-M8-02: serialization supplies a numeric zero for a
-  non-finite field. The wire cell rounds up to the displayed precision.
-- The planned Plate and Block value of 637.362 mm3 counted only one
-  hole. Their shared box covers one whole hole, two half holes and a
-  quarter hole. The polygonal volume is 590.721 mm3, and the measured
-  590.404 mm3 is within the original 1% tolerance.
-- The render test updates the expected report and still pins the M8
-  pixel digest. M9 added different tests at the end of that file, so
-  the shared path has disjoint edits and neither milestone needs the
-  other's changes. The overview records the shared path.
-- All three milestone gates passed. Debug tests passed with 61 and 28
-  tests in gates 1 and 3, respectively. Gate 2 passed 15 release tests.
-  The one-worker release cases took 86 ms for the pin, 82 ms for the
-  2,000-box page and 390 ms for the 600-hole plate. Logs are in
-  `tmp/capture/m10/`.
-
-- Workspace typecheck, formatting and lint passed. The full Bun suite
-  passed with 4,682 passes and 82 skips across 738 files. The later
-  desktop test phase of `mise run verify` hit the same 17 Foundation
-  atomic-write denials recorded in M9 under the worktree-only write
-  guard. All 29 native CLI tests passed. The supplemental native
-  file-contract suite hit the Foundation atomic-write denial recorded
-  in M3. See `tmp/capture/m10/workspace-verify.log` and
-  `tmp/capture/m10/native-tests.log`. The rebuilt release CLI passed
-  all five capture parity tests in `tmp/capture/m10/native-parity.log`.
+- Before revision 4: implemented at `be8fa5d` (68 passed, 2 ignored,
+  `tmp/capture/m10/v1-committed.log`; 15 release tests,
+  `tmp/capture/m10/interference.txt`). Review findings: design 18 CAP-R4-01/02.
+- Revision 4 repair: pending.

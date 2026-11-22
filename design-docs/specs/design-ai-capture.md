@@ -1,7 +1,9 @@
 # AI capture: PNG and JPG pictures of any page, with 3D CAD camera and interference
 
-Status: design revision 3, base commit `ebcac57`, branch `feat/ai-capture`.
-Section 18 lists what revisions 2 and 3 changed and why.
+Status: design revision 4, base commit `ebcac57`, branch `feat/ai-capture`
+(revision 4 checked against `be8fa5d`). Section 18 lists what revisions 2,
+3 and 4 changed and why; section 8.5 gives the completion order of the
+remaining milestones.
 Implementation plan: `impl-plans/active/capture-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[S-n]` are external sources listed in section 17. Measurements
@@ -331,8 +333,13 @@ frame: complete
 bodies: 2 (Plate, Block)
 errors: 0
 interference: 1 (1 candidate pair checked, cell 0.25 mm)
-  Plate x Block: volume 636.5 mm3, box 85,45,2 .. 100,60,5 mm
+  Plate x Block: volume 590.4 mm3, box 85,45,2 .. 100,60,5 mm
 ```
+
+(The fixture's exact polygonal overlap is 590.721 mm3: its shared box holds
+one whole hole, two half holes and a quarter hole. The 637.362 mm3 of the
+spike table in section 6.6 belongs to the spike scene, which had one hole
+in the overlap.)
 
 `camera`, `frame`, `bodies`, `errors` and `interference` appear only for
 CAD pages.
@@ -361,20 +368,26 @@ CAD pages.
   the picture only)`. When pairs could not be checked: `interference: 0
   found, 12 of 40 candidate pairs not checked (cell 4 mm)`, then lines
   `not checked: <a> x <b>` (the first twenty, then a count) and the hint
-  to narrow with `--interference-bodies`. Report how many checked pairs
-  reached a refinement cap, including checked pairs where no hit was
-  sampled. The displayed cell still describes level 0 for those pairs.
-  With `--no-interference`: `interference: not checked`.
+  to narrow with `--interference-bodies`. A pair whose refinement was
+  capped ends with `, approximate`. When `cappedCount` is above 0 one more
+  line follows the pairs: `  refinement capped on <k> checked pairs
+  (<j> without a hit); sub-cell parts of those pairs may be missed;
+  narrow with --interference-bodies`. The printed cell still holds for
+  capped pairs (their level 0 is complete); a capped pair does not change
+  the exit code. With `--no-interference`: `interference: not checked`.
 
 `--json` prints the same data as one object with the keys `path`,
 `format`, `width`, `height`, `bytes`, `page` (`number`, `count`, `id`,
 `name`, `kind`), and for CAD pages `camera` (`view`, `direction`, `up`,
 `right`, `centre`, `mmPerPixel`), `frame`, `bodies` (`id`, `name`,
 `state`), `errors`, `interference` (`cellMm`, `candidates`, `checked`,
-`unchecked` as id pairs, `cappedCount`, `cappedWithoutHit` as id pairs,
-`budget` in weighted rays, and `pairs` with `a`, `b`, names, `volumeMm3`,
-`min`, `max`, `source`). Warnings (document load, missing glyphs) go to
-stderr as today.
+`unchecked` as id pairs (at most the first 256), `uncheckedCount` (the
+exact total, also when the list is truncated), `cappedCount`,
+`cappedWithoutHit` as id pairs, `budget` in weighted rays, and `pairs`
+with `a`, `b`, `aName`, `bName`, `volumeMm3`, `min`, `max`, `source` and
+`approximate`, which is the wire pair's `capped` flag, so text and JSON
+mark the same pairs as approximate). Warnings (document load, missing
+glyphs) go to stderr as today.
 
 Exit codes: 0 when the image was written (also when it already existed
 with the same bytes), 1 with `--fail-on-interference` when a pair
@@ -634,8 +647,14 @@ The reply is `u32 length`, that many bytes of JSON, then the image. The
 JSON is written by hand with fixed number formatting: `width`, `height`,
 `bodies` (per body `state`: `drawn`, `hidden`, `outside`, `empty` or
 `unknown`; `emptiedByStep`; `open`), `analysis` (`cell`, `candidates`,
-`checked`, `unchecked`, `uncheckedCount`), `pairs` (`a`, `b`, `volume`,
-`min`, `max`, `source`, `capped`).
+`checked`, `unchecked`, `uncheckedCount`, `cappedCount`, `budget` in
+weighted rays, `cappedWithoutHit` as index pairs), `pairs` (`a`, `b`,
+`volume`, `min`, `max`, `source`, `capped`). These keys, in this order, are
+the contract between the crate and `packages/core/src/capture/report.ts`
+(revision 4 fixes them as written by `be8fa5d`); the picture-pass state
+`absent` exists only before the census of section 6.7 resolves it (until
+M23 wires the census, the text prints it as `[not in the picture]`, the
+M9 note).
 
 ### 6.4 Ray intervals
 
@@ -801,6 +820,59 @@ Analysis (independent of the camera):
    axis is the sum over leaf cells of overlap length times leaf area; the
    reported volume is the mean of the axes that hit; the box is the union
    of the hit leaves and their overlap stretches, rounded to 0.001 mm.
+6. Work outside the ray count (revision 4). The ray budget bounds the
+   whole analysis only if the setup does not grow with the pair count.
+   Tool views (the bucketed edges of section 6.4, and the mesh grids of
+   M11) are therefore built at most once per tool and axis, lazily, and
+   shared read-only by every candidate and worker; at most three per tool
+   exist.
+
+   Memory and ray accounting of one axis. Level 0 is cast row by row into
+   a window of three rows of stretches; the decision for a cell (keep the
+   coarse stretch or refine) is taken once its own row and both neighbour
+   rows are cast, so the boundary rule of step 4 sees the same neighbours
+   as before, and cells are decided in the same row order with the same
+   small-loop reservation and allowances. Working memory is therefore
+   proportional to the lattice width, not its area. No ray is cast twice:
+   the coarse stretch stays in the window until its cell is decided, so a
+   centre witness needs no re-cast. Every cast is charged: level-0 rays
+   count once each, a refinement is charged `m * m` against the per-axis
+   cap and the candidate's weighted allowance before its sub-rays are
+   cast, and a refinement that does not fit is not cast (the cell keeps
+   its coarse stretch and the pair is `capped`). A cell's volume and box
+   are committed only after that choice, from the retained leaves only:
+   the sub-ray leaves when one of them hits, else the coarse leaf; a
+   replaced coarse stretch never enters the box. Results are those of
+   storing the whole level-0 record, in the same deterministic order.
+
+   Inputs. `plan` returns either a finite cell or the minimum-grid marker
+   (today `f64::INFINITY`), which means 16 rays per side; it is a valid
+   result, not an error. Work accounting and sampling read the marker the
+   same way (16 per side), the candidates in the history-order prefix
+   that fits are sampled and reported like any other, and the reported
+   cell is the finite physical side actually used (box extent / 16,
+   rounded up to 0.001 mm). Invalid inputs are separate: a target cell
+   passed to `plan` that is NaN, not positive or not finite gives no
+   checked candidate (all are listed as unchecked) and returns at once; a
+   lattice request with an axis outside 0 to 2, an empty or inverted box,
+   a NaN coordinate, or a cell that is NaN or not positive (the marker is
+   allowed) gives an empty sample with zero rays. Nothing panics, loops
+   without end or divides by zero, because later modules call these
+   functions with values the scene reader has not checked.
+
+   M10 regressions for these rules: an allowance exactly equal to the
+   cost of the first refinements (the counted rays equal level 0 plus
+   that allowance, never one more); a coarse hit whose replacement
+   sub-rays hit only inside the cell (the reported box is the sub-ray
+   footprint, smaller than the coarse cell); a centre-only witness (all
+   sub-rays miss, the pair is still reported); the existing 2,000-body
+   minimum-grid test (`candidate_table_bounds_and_unchecked_order`,
+   `crates/capture/tests/interference.rs:440-464`) keeps its assertions
+   and gains new ones: all 1,302 checked candidates are sampled and
+   reported as hits, the unchecked order is unchanged, and the cell is
+   finite; invalid target cells (NaN, 0, negative,
+   infinite) and invalid lattice requests return at once. The Plate
+   result (590.404 mm3) and the M8 digest stay pinned.
 
 Guarantee, printed with every result: the cell `c`, the largest level-0
 cell side used on any checked pair (`cell 0.25 mm`; larger when the
@@ -943,10 +1015,11 @@ names `--no-interference` for an unobstructed picture of the same view.
 | `capture/cad-request.ts`, `capture/report.ts` | `packages/core/src` | One function from request to scene bytes; report type and parser |
 | `capture/describe.ts` | `packages/core/src` | Body, error and interference text shared by CLI and desktop |
 | `capture-command.ts`, `capture-cad.ts` | `apps/cli/src` | Arguments, page choice, 2D and CAD pipelines |
+| `capture-interference-options.ts` | `apps/cli/src` | The four interference options: parsing, ranges, exclusions, the `--fail-on-interference` exit rule (pure; registered by `capture-command.ts`) |
 | `capture-help.ts`, `capture-help/*.ts` | `apps/cli/src` | Help page assembled from one part per topic |
 | `capture-io.ts`, `capture-backend.ts` | `apps/cli/src` | Bun host: capture directory, exclusive write, digest, 2D rasterizer |
 | `mcp-image.ts` | `apps/cli/src` | Inline image decision for MCP results |
-| `nodetto-capture` | `crates/capture` (new workspace member) | `scene` (reader), `interval`, `view`, `prism`, `mesh`, `tiles`, `raster`, `shade`, `lattice`, `interference`, `census`, `report`, `flatten`, `encode::{png,jpeg}` |
+| `nodetto-capture` | `crates/capture` (new workspace member) | `scene` (reader), `interval`, `view`, `prism`, `tool_view`, `mesh`, `tiles`, `raster`, `shade`, `overlay`, `lattice`, `interference`, `census`, `report`, `flatten`, `encode::{png,jpeg}` |
 | host operations | `apps/cli/native/src/engine.rs` | `captureDir`, `captureAbsolute`, `writeCapture`, `digest`, `captureEncode`, `captureSolid` |
 | Tauri command | `apps/desktop/src-tauri/src/capture.rs` | `capture_solid` |
 
@@ -995,6 +1068,151 @@ branches merge without conflict. Nothing else of M21 is taken. With the
 patch applied, `bun run typecheck`, `bun run lint:ts` and the CAD tests
 pass (`tmp/capture/design/`).
 
+### 8.5 Completion order and file ownership (revision 4)
+
+M1 to M9, M13 and M19 are accepted; M10 is implemented at `be8fa5d` and
+reviewed in revision 4. The remaining work was a chain M20, M17, M18,
+M11, M12 whose links mostly handed over shared files, not data. Revision
+4 runs it as two waves of plans that write disjoint files, one wiring
+milestone that is the last writer of the shared registration files, and
+the closing milestone M16. Ids stay stable; the two new milestones take
+M22 and M23 (21 is skipped so it is not confused with cad3d M21).
+
+| Stage | Milestone | Owns (writes) | Uses |
+| --- | --- | --- | --- |
+| Wave 1 | M10 repair | `lattice.rs`, `interference.rs`, `prism.rs`, Rust `report.rs` and `raster.rs` only where the repair needs them, `tool_view.rs` (new), `lib.rs` (module lines), empty `overlay.rs`, `census.rs`, `mesh.rs`, `tiles.rs` declared `pub mod`, `tests/interference.rs`, `tests/render.rs` (report assertions only) | `be8fa5d` |
+| Wave 1 | M20 request and options | `cad-request.ts` and test (the request shape below, the draw-bit rule, `DEFAULT_CAD_INTERFERENCE`), `apps/cli/src/capture-interference-options.ts` (new) and test, `packages/io/src/nmesh/capture-decoder.ts` (new: `decodeCaptureMesh`) and test, `packages/io/src/nmesh/index.ts` (one export line) | report contract of 6.3 |
+| Wave 1 | M22 report text | TS `report.ts` and test (all 6.3 keys, mapping wire `capped` to public `approximate`), `describe.ts` (new: `describeInterference`, `describeBodies`) and test, `packages/core/src/capture/index.ts` (one export line), `capture-help/interference.ts` (usage and body, including the overlay and capped sentences) | report contract of 6.3 |
+| Wave 1 | M15 desktop dialog | the M15 files except `apps/desktop/src/App.tsx` | crate public API, existing core types |
+| Wave 2 | M17 overlay | `overlay.rs` (marking table, eight-nearest rule, 4,096 limit, hatch colour, view-pair boxes), `interference.rs` (`add_view_pairs`) | M10 |
+| Wave 2 | M18 census | `census.rs`, `lattice.rs` (one-body mode with per-step liveness and early exit), `capture-help/cad.ts` (body notes and the two M11 sentences on meshes and reference bodies) | M10 |
+| Wave 2 | M11 meshes | `mesh.rs`, `tool_view.rs` (mesh arm), `scene.ts` and test (decoder option of `buildCadCaptureModel`), `cad-request.ts` and test (forward `decodeMesh` to the model builder; nothing else) | M10, M20 |
+| Wave 2 | M12 tiles | `tiles.rs` (lists, `work`, `WORK_LIMIT`) | M10 |
+| Wave 2 | M14 desktop backend | the M14 files plus `apps/desktop/src/App.tsx` (the M15 wiring) | M15, M20, M22, crate public API |
+| Wiring | M23 | crate `lib.rs`, `raster.rs`, `shade.rs`, `report.rs`; `tests/render.rs` (the digest constant and the superseded assertions named below, nothing else); new `tests/overlay.rs`, `census.rs`, `mesh.rs`, `scale.rs`; `capture-command.ts`, `capture-cad.ts` and tests; `__fixtures__/capture-plate-default.ncs1`; `native-parity/capture.test.ts`; `apps/desktop/src/shell/export-handlers.test.ts` (new cases only: fixture equality and mesh-only parity) | M17, M18, M11, M12, M14, M20, M22 |
+| Closing | M16 | docs, design measured values, progress table | M23 |
+
+Contracts that make the waves possible:
+
+- `tool_view` is the one crate-internal place that turns a tool into
+  intervals for a ray family: a closed enum with a prism arm (M10) and a
+  mesh arm (M11), offering intervals, bounds, average occupancy, the
+  small-loop boxes (none for a mesh) and whether the tool is a solid.
+  `lattice` and `interference` evaluate tools only through it, so meshes
+  enter the analysis and the census when M11 lands without M11 editing
+  those files; candidates skip a body whose creating tool is not a solid
+  (an open mesh). Until M11 the mesh arm keeps today's behaviour (no
+  intervals, not a solid). M23 routes the picture pass through it.
+- Wave 2 modules are complete units with their own unit tests
+  (`#[cfg(test)]` inside the module, scenes built in code, synthetic
+  picture liveness for the census). Their contract items are `pub`, so
+  they compile without dead-code warnings before M23 calls them. All
+  render-level and native tests of M17, M18, M11 and M12 move to M23.
+- Request contract, complete after wave 1 (M20), before any consumer runs
+  alone:
+  `CadCaptureRequest` gains `interference?: { cellMm: number; bodies?:
+  readonly string[] } | null` and `decodeMesh?: CaptureMeshDecoder`, with
+  `CaptureMeshDecoder = (data: string) => { positions: Float64Array;
+  triangles: Uint32Array }` declared in `cad-request.ts`. Draw-bit rule
+  (written by `prepareCadCapture`, owned by M20): `interference` absent or
+  `null` writes options 0, budget 0 and the analysed flag clear on every
+  body, which are the bytes of today's committed fixture; any other value
+  writes the analyse bit and the draw bit together (options 3), budget 24,
+  tolerance 0.001, the cell and the analysed flags. There is no request
+  for analysis without the overlay. `DEFAULT_CAD_INTERFERENCE = { cellMm:
+  0.25 }` is exported next to it for both hosts. `decodeCaptureMesh` in
+  `@nodetto/io/nmesh` (M20) is the one decoder both hosts pass
+  (`toTriangleMesh(decodeNmesh(fromInline(data)))` with positions copied
+  to `Float64Array`); both hosts import it from the subpath
+  `@nodetto/io/nmesh` (`packages/io/package.json` maps `./nmesh` to
+  `src/nmesh/index.ts`, which M20 extends). The package root
+  `@nodetto/io` (`packages/io/src/index.ts`, explicit named re-exports) is
+  not edited and does not expose it, so no plan owns a root barrel edit.
+  Desktop code never imports from `apps/cli`. Until M11 `prepareCadCapture` accepts `decodeMesh` and
+  ignores it (meshes stay skipped as today); M11 forwards it to
+  `buildCadCaptureModel` and changes nothing else in the request writer.
+- M14 calls `prepareCadCapture` with `interference:
+  DEFAULT_CAD_INTERFERENCE` and `decodeMesh: decodeCaptureMesh`; its test
+  compares the recorded scene with `prepareCadCapture` called with the
+  same request for the Plate document. M23 regenerates the fixture and
+  asserts in the CLI test and in a new case of the desktop handler test
+  that both hosts' scenes equal that call and the fixture; it adds the
+  same two-host equality for a page whose only body is a `cad.mesh` cube,
+  and checks that `--no-interference` (and `interference: null` on the
+  desktop) leaves options 0 while the default sets options 3. Desktop,
+  Bun CLI and native CLI stay tied to one set of bytes.
+- The picture ignores the draw bit until M23 wires the overlay, so no
+  pixel digest changes before M23.
+- Approximate pairs. The public `approximate` of a pair is the wire
+  pair's `capped`, in text (`, approximate`) and in JSON alike;
+  `uncheckedCount` stays the exact total next to the bounded `unchecked`
+  list. M22's parser and describe tests cover a report with one capped
+  and one complete hit, `cappedCount` 1 and an empty `cappedWithoutHit`.
+  M23's fake-backend CLI test asserts that the text and the JSON mark the
+  same pair, that `uncheckedCount` exceeds a truncated list, and that the
+  exit codes of section 4.2 hold.
+- Superseded render assertions. `crates/capture/tests/render.rs:390-411`
+  (`references_meshes_and_interference_stay_out_of_the_m8_picture`) pins
+  the M8 placeholders that M11 and M18 replace: line 407 (the picture
+  equals the picture without the reference prism and the open triangle)
+  and lines 410-411 (both bodies `Absent`). M23 is authorised to change
+  exactly those three assertions, and no others, in the commit that wires
+  reference styling and the census. The commit message states the old and
+  new expectations. The replacements must be at least as specific: a
+  sample covered only by the reference prism equals the 45% mix of the two
+  single-body renders; the reference body is `Drawn`; the open-mesh body
+  is `Drawn` with `open` true; and `candidates == 0` and empty `pairs` stay
+  asserted (open meshes are excluded from interference). The scene's
+  two-thread render is kept. M23 adds a separate no-overlay regression to
+  `tests/overlay.rs`: a scene with the draw bit set and no interfering pair
+  renders the same as with the bit clear. The cross-worker and
+  encoded-image determinism tests of `render.rs` stay unchanged. The
+  digest constant changes only as the M17 rule allows.
+- `packages/core/src/capture/index.ts` gets its single new line from M22
+  in wave 1, not from M23, because M14 imports the text functions through
+  `@nodetto/core` in wave 2; no other plan edits it.
+
+Rollout rules for every remaining plan: each plan builds into its own
+`CARGO_TARGET_DIR=target/capture-<mNN>` (the native binary is then
+`target/capture-<mNN>/release/nodetto-cli`); only M23 and M16 run native
+parity tests, and they build the binary in the same command; a timing
+test may be retried up to three attempts under machine load and is then
+run alone before a failure is reported; no existing test or deadline is
+relaxed.
+
+M16 gates. `mise run test-cli` hardcodes `$PWD/target/release/nodetto-cli`
+(`mise.toml:50-59`), which is the wrong binary under an isolated target.
+M16 therefore runs the same stages explicitly and does not edit
+`mise.toml`. The stages are three independent gates, each run to its
+end whatever the others return, so a failure in one cannot stop the
+parity run:
+
+1. Workspace: `env CARGO_TERM_QUIET=true
+   CARGO_TARGET_DIR="$PWD/target/capture-m16" mise run verify`; if Bun
+   discovery stalls or runs out of memory on the ignored `tmp/` and
+   `target/` folders, the intake fallback replaces it: scoped `bun test`
+   over `apps` and `packages`, plus `CARGO_TERM_QUIET=true
+   CARGO_TARGET_DIR=target/capture-m16 cargo test --workspace`.
+2. Shared native contracts: `env CARGO_TERM_QUIET=true
+   CARGO_TARGET_DIR="$PWD/target/capture-m16" cargo test -p
+   nodetto-native`.
+3. CLI and parity, with build before parity and one binary: `env
+   CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m16" sh -c
+   'cargo test -p nodetto-cli && cargo build --release -p nodetto-cli &&
+   NODETTO_CLI_TEST_BINARY="$CARGO_TARGET_DIR/release/nodetto-cli" bun
+   test apps/cli/src'`.
+
+Each gate's command, final exit status and complete log path go under
+`tmp/capture/m16/`. Gate 3 must show that the native parity tests ran
+against that binary (non-zero parity test count in its log, no skip for a
+missing binary). M16 is accepted only when all three gates exit 0 and
+gate 3 has that evidence. A nonzero result, including the Foundation
+atomic-write denials recorded at M10 (`tmp/capture/m10/workspace-verify.log`
+and `native-tests.log`, both exit 101), stays a failure: it may be
+retried, with each attempt logged, until a passing run supersedes it.
+Otherwise M16 stays unaccepted and the failure is reported as a blocker
+with its log. It is never counted as passing.
+
 ## 9. Licensing and distribution
 
 | Dependency | Licence | Distributed in | Note |
@@ -1040,7 +1258,7 @@ only the steps whose tools cover its tile.
 | Native capture of the reference CAD page, default options, start to file | under 5,000 ms enforced; about 1 s expected (0.65 s start + render) | M9 native test, value recorded in `tmp/capture/m09/` |
 | Render of the reference scene in the crate, one thread | under 2,000 ms | M8 crate test |
 | Interference analysis of one 200 mm pair at cell 0.25 mm, one thread | under 500 ms | M10 crate test |
-| Interference analysis in total | at most 24 million weighted level-0 rays and as many refinement rays by construction (a weighted ray folds at most 8 steps; about 2 to 5 s on one thread at the limit); pairs run on the render threads | M10 crate tests of the budget rule, including a 300 mm pair with a 600-hole plate under 2,000 ms |
+| Interference analysis in total | at most 24 million weighted level-0 rays and as many refinement rays by construction (a weighted ray folds at most 8 steps; about 2 to 5 s on one thread at the limit); pairs run on the render threads; setup bounded by three tool views per tool (section 6.6 step 6) | M10 crate tests of the budget rule, including a 300 mm pair with a 600-hole plate under 2,000 ms and 200 bodies that share one 20,000-point loop (19,900 pairs) under 5,000 ms, both release only |
 | Body sampling (section 6.7) | the same budget again, only for suspect bodies; none in a fitted view of a sound model | M18 crate test |
 | Native capture of a CAD page with 1,000 elements in 50 bodies | under 10,000 ms | M12 native test |
 | Native 2D capture | the class of `export` today (0.66 s for a small page) | M3 native test with the existing 10,000 ms class |
@@ -1109,6 +1327,7 @@ suggests a smaller `--size`. Bucket and cell tables are bounded by
 | Bun host, JPG or CAD page | Exit 2, names the native CLI |
 | Scene rejected by the reader, or work limit exceeded | Exit 2 with the reader's message |
 | Candidate pairs do not fit the ray budget | The cell grows and is printed; pairs that still do not fit are listed as not checked; exit 0, or 1 with `--fail-on-interference` |
+| Refinement of a checked pair reaches its cap | The pair ends with `, approximate`; the `refinement capped` line of section 4.2; exit code unchanged |
 | Write fails | Exit 2; a partly written new file is removed |
 
 ## 13. Desktop
@@ -1163,11 +1382,12 @@ watcher (`docs/cli.md:201-203`).
 | Design and plan with evidence | This document; `impl-plans/active/capture-*.md` |
 | One obvious command, defaults, parseable output, MCP, help | M3 (command, help, MCP list), M19 (bounded size), M2 (no silent overwrite, per-user directory), M13 (MCP instructions and inline) |
 | Camera, shaded solids with cut and intersect, time budget | M5 (camera, loop rule), M7 and M8 (pixels of cut, intersect, hidden surfaces, grazing views), M9 (native, budget) |
-| Interference in text and image | M10 (analysis: pin, peg, enclosure and budget cases), M20 (text, options, exit code), M17 (overlay, agreement of text and picture) |
-| A picture that never hides a modelling error | M18 (body states; the first emptying step of every body as an error, also when material is added afterwards), M9 (`frame:` line) |
+| Interference in text and image | M10 (analysis: pin, peg, enclosure, budget and shared-loop cases), M20 (request, options, exit rule), M22 (text), M17 (marking and hatch units), M23 (overlay in the picture, agreement of text and picture, CLI and native tests) |
+| A picture that never hides a modelling error | M18 (census units: the first emptying step of every body as an error, also when material is added afterwards), M23 (picture liveness, body states end to end), M9 (`frame:` line) |
+| Imported meshes, reference bodies, large pages | M11 (mesh units, meshes in the analysis), M12 (tile lists and work estimate units), M23 (pictures, work limit refusal, native budgets) |
 | Determinism | M4, M8, M9 (3D, including Boa against Bun), M3 (2D) |
 | Desktop | M14, M15; section 13 states the 2D difference |
-| Existing export and documents keep working | M3 runs the export tests unmodified; M16 runs `mise run verify` and `mise run test-cli` |
+| Existing export and documents keep working | M3 runs the export tests unmodified; M16 runs three independent gates (workspace verify or the scoped fallback, shared native contracts, CLI tests with parity against its isolated binary), all of which must exit 0 (section 8.5) |
 | Every milestone accepted by review | Progress table in the overview |
 
 ## 16. Risks
@@ -1219,7 +1439,7 @@ watcher (`docs/cli.md:201-203`).
 - [S-13] IJG licence text:
   https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/main/README.ijg
 
-## 18. Changes in revisions 2 and 3
+## 18. Changes in revisions 2, 3 and 4
 
 | Finding | Change | Sections |
 | --- | --- | --- |
@@ -1238,3 +1458,8 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R2-01 (revision 3) | The emptied-body rule is applied per step: liveness for every step in the picture pass, confirmed by the lattice for suspect bodies; the first emptying step is an error also when a later feature adds material | 4.2, 6.7, 12, 15 |
 | CAP-R2-02 (revision 3) | Budget in weighted rays (steps count), a global refinement budget, a bounded candidate table, a budget and an early exit for body sampling, bounds on the marking pass | 6.6, 6.7, 10.2, 11, 12 |
 | CAP-R2-03 (revision 3) | A body behind only reference bodies is drawn; the help names `--no-interference` for an unobstructed picture; the `[not sampled]` note is listed | 4.2, 6.6, 6.7 |
+| CAP-R4-01 (revision 4, M10 review of `be8fa5d` against the reference implementation `6280745`, `19c1dbf`) | Changes that `be8fa5d` made to this document are ratified, because each keeps a promise of the analysis that the revision 3 wording broke: small-loop cells are reserved on all three axes before boundary cells (otherwise a pin found on X can be lost on Y and Z once the allowance runs out); a centre hit survives when every sub-ray of its cell misses; a ray in a cap or side plane that two prisms share belongs to one of them by a world-coordinate rule (touching tilted parts are not interference); capped pairs, including those without a hit, and the weighted budget are reported. Their text form is now fixed (4.2, 12) | 4.2, 6.3, 6.6, 12 |
+| CAP-R4-02 (revision 4, M10 review) | The ray budget did not bound the analysis: `be8fa5d` builds a prism view per candidate, axis and tool, and keeps a full level-0 record per cell. Tool views are built once per tool and axis and shared; level 0 is streamed through a three-row window, so no ray is cast twice and every cast is charged; public lattice and interference functions are total on any input, and the minimum-grid result of `plan` stays valid. New release test: 200 bodies sharing a 20,000-point loop | 6.6 step 6, 10.2 |
+| CAP-DR4-01..06 (revision 4, design review round 1) | Ray accounting and box commit after the leaf choice, with exact-allowance and smaller-box regressions (01); the minimum-grid marker kept separate from invalid input (02); request shape, decoder and draw-bit rule complete in wave 1, two-host mesh-only parity in M23 (03); narrow M23 authorisation for the three superseded M8 placeholder assertions in `tests/render.rs`, with replacements that are at least as specific (04); M16 builds and tests one isolated binary instead of `mise run test-cli` (05); per-pair `approximate` and the exact `uncheckedCount` in public JSON (06); round 2: both hosts import the decoder from `@nodetto/io/nmesh` (03), and M16 runs three independent gates that must all pass, with positive parity evidence (07) | 4.2, 6.6, 8.5, 15 |
+| CAP-R4-03 (revision 4) | The fixture's Plate and Block overlap is 590.721 mm3 (one whole, two half and a quarter hole); 637.362 mm3 belongs to the spike scene. The M20 native expectation uses the fixture value | 4.2 |
+| CAP-R4-04 (revision 4) | The serialized chain M20, M17, M18, M11, M12 is replaced by two waves, the wiring milestone M23 and the closing milestone M16; a `tool_view` seam lets meshes enter analysis and census without shared edits; the text functions move to M22; the App wiring moves from M15 to M14 | 8.1, 8.5 |

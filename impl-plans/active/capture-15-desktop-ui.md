@@ -1,8 +1,19 @@
 # M15 capture-15-desktop-ui
 
-- dependsOn: M14 (`captureCadImage`, `ExportBackend.captureSolid`)
-- Design: section 13
-- writePaths: `packages/ui-solid/src/ExportDialog.tsx`,
+- Stage: wave 1 (revision 4). dependsOn: none. The dialog defines its own
+  prop types from existing `@nodetto/core` types (`CaptureCameraRequest`,
+  `CaptureTheme`); it does not need M14. The `App.tsx` wiring moved to M14
+  (design 8.5), so this plan does not edit `apps/desktop/src/App.tsx`.
+- Design: sections 13, 8.5
+- Intent: the Export dialog entry "3D view image", the Current view
+  conversion, and JPG for 2D artwork, usable in light and dark themes with
+  existing classes and tokens only.
+- Non-goals: no backend, no handler, no `App.tsx`, no new colour tokens, no
+  change to STL defaults or PNG output.
+- Same-dir rule: edit only the files below; read each fresh before editing
+  and log `git hash-object` before and after in Progress.
+- writePaths (also `impl-plans/active/capture-15-desktop-ui.md`,
+  `tmp/capture/m15`): `packages/ui-solid/src/ExportDialog.tsx`,
   `packages/ui-solid/src/CadImageExportSection.tsx` (new),
   `packages/ui-solid/src/cad/capture-camera.ts` (new) and its test,
   `packages/ui-solid/src/Canvas.tsx` (one optional prop and its call),
@@ -15,8 +26,7 @@
   `packages/ui-solid/src/cad/capture-image.test.ts` (new: launches the
   DOM file the way `packages/ui-solid/src/cad/mesh-io.test.ts` launches
   `cad-mesh.dom.tsx`),
-  `packages/ui-solid/src/raster-export.test.ts` (new cases only),
-  `apps/desktop/src/App.tsx` (wiring)
+  `packages/ui-solid/src/raster-export.test.ts` (new cases only)
 - Pre-authorised: `packages/ui-solid/src/export-dialog-document.test.ts:8-20`
   inserts `"image3d"` after `"pdf"` in the Artwork ids. Nothing else in
   that assertion changes. `packages/ui-solid/src/test-dom/cad-mesh.dom.tsx`
@@ -69,10 +79,10 @@ export async function rasterizeSvg(svg: string, scale: number, signal?: AbortSig
   the model is visible. The section states `Orthographic projection`
   under the select.
 - `NodettoCanvas` calls `onCadCameraChange(id, camera)` where it stores
-  the camera today (`packages/ui-solid/src/Canvas.tsx:185`). `App.tsx`
-  keeps the last camera per page in a plain map, passes
-  `cadCurrentView`, `captureCadImage={exportHandlers.captureCadImage}`
-  (only when `exportBackend.captureSolid` exists) and `canvasMode`.
+  the camera today (`packages/ui-solid/src/Canvas.tsx:185`). The App side
+  (a per-page camera map, `cadCurrentView`, `captureCadImage`,
+  `canvasMode`) is M14's job; export the prop types from
+  `packages/ui-solid/src/index.ts` so M14 can type it.
 - 2D JPG: `ExportFormat` becomes `"svg" | "png" | "jpg" | "pdf"`; the
   format select of `AssetExportSection` offers `JPG`; it rasterizes with
   `output: { type: "image/jpeg", quality: 0.9 }`, forces an opaque
@@ -109,12 +119,15 @@ export async function rasterizeSvg(svg: string, scale: number, signal?: AbortSig
   writes for the same view, format, size and theme.
 - 2D artwork can be saved as JPG; PNG export is unchanged.
 
+- Dark theme: the DOM test renders the section once with the dark canvas
+  mode and asserts it uses only existing dialog classes (no inline colour).
+
 ## Verification (each must exit 0)
 
-1. `sh -c 'bun run typecheck && bun run lint:ts && bun test packages/ui-solid/src/export-dialog-document.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts packages/ui-solid/src/cad/capture-camera.test.ts packages/ui-solid/src/raster-export.test.ts packages/ui-solid/src/raster-lifecycle.test.ts'`
+1. `sh -c 'bun run typecheck && bunx biome check packages/ui-solid/src && bun test packages/ui-solid/src/export-dialog-document.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts packages/ui-solid/src/cad/capture-camera.test.ts packages/ui-solid/src/raster-export.test.ts packages/ui-solid/src/raster-lifecycle.test.ts'`
 2. `sh -c 'bun test packages/ui-solid/src/cad/capture-image.test.ts packages/ui-solid/src/cad/mesh-io.test.ts apps/desktop/src/styles/theme-tokens.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
 3. `sh -c 'bun --cwd=apps/desktop run build && bun test packages/ui-solid/src/export-dialog-document.test.ts'`
 
 ## Progress
 
-Pending.
+Pending (revision 4: wave 1, without `App.tsx`).
