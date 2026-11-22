@@ -11,6 +11,7 @@ import {
   extrudeCommands,
   extrudeIntent,
   lineCommands,
+  pcbReferenceCommands,
   rectangleCommands,
   sketchCommands,
   sketchFrameOf,
@@ -19,6 +20,7 @@ import { baseFrame, faceFrame } from "./frames.ts";
 import { buildLoops } from "./loops.ts";
 import { CAD_TEST_PAGE, plateElements, sketch } from "./testing/documents.ts";
 import { extrudeFaceCases } from "./testing/extrude-faces.ts";
+import { boardReference, PCB_TEST_PAGE, testBoard } from "./testing/pcb.ts";
 import { faceName, parseFaceName } from "./tool-solid.ts";
 
 const page = CAD_TEST_PAGE.id;
@@ -148,6 +150,7 @@ test("every builder reaches the page content rule even for a non-CAD target", ()
     rectangleCommands(freeform, sketch, [0, 0], [1, 1], source),
     circleCommands(freeform, sketch, [0, 0], 1, source),
     arcCommands(freeform, sketch, [0, 0], [1, 1], [2, 0], source),
+    pcbReferenceCommands(freeform, "board", "PCB board", source),
     extrudeCommands(
       freeform,
       sketch,
@@ -171,6 +174,43 @@ test("every builder reaches the page content rule even for a non-CAD target", ()
     }
   }
   expect(store.listElements()).toEqual([]);
+});
+
+test("a PCB reference appends to the CAD history and leaves the board on its page", () => {
+  const board = testBoard();
+  const store = new Store(document([board], [CAD_TEST_PAGE, PCB_TEST_PAGE]));
+  const commands = pcbReferenceCommands(
+    page,
+    board.id,
+    "PCB board",
+    ids(),
+    "a1",
+  );
+  expect(commands).toHaveLength(1);
+  applyCommands(store, commands);
+  expect(store.get("feature-1")).toMatchObject({
+    type: "cad.pcb",
+    page,
+    index: "a1a1",
+    semantic: { name: "PCB board", board: board.id },
+  });
+  expect(store.get(board.id)).toEqual(board);
+  expect(hasErrors(validateDocument(store.getSnapshot()))).toBe(false);
+});
+
+test("a drag keeps the selected cut or add when the sketch lies on a PCB cap", () => {
+  const reference = boardReference();
+  for (const role of ["start", "end"] as const) {
+    const owner = sketch("pocket", "a1", {
+      face: { feature: reference.id, role },
+    });
+    for (const op of ["cut", "add"] as const) {
+      for (const distance of [-9, 9]) {
+        expect(extrudeIntent([reference, owner], owner, distance, op)).toBe(op);
+      }
+    }
+    expect(extrudeIntent([reference, owner], owner, 9)).toBe("new");
+  }
 });
 
 test("base extrudes default to a new body and preserve an explicit operation", () => {

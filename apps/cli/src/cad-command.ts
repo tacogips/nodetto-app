@@ -1,4 +1,8 @@
-import { checkCadPage, compareFractional } from "@nodetto/core";
+import {
+  checkCadPage,
+  collectCadInput,
+  compareFractional,
+} from "@nodetto/core";
 import { CAD_PAGE_KIND, type Element } from "@nodetto/ir";
 import {
   type CommandIo,
@@ -45,7 +49,11 @@ export function cadCommand(
   for (const element of document.elements)
     byPage.get(element.page)?.push(element);
   const reports = pages.map(({ id }) => {
-    const report = checkCadPage(byPage.get(id) ?? [], id);
+    const local = byPage.get(id) ?? [];
+    const input = local.some(({ type }) => type === "cad.pcb")
+      ? collectCadInput(document, id, 0).elements
+      : local;
+    const report = checkCadPage(input, id);
     return {
       ...report,
       errors: [...report.errors].sort((a, b) => compareFractional(a.id, b.id)),

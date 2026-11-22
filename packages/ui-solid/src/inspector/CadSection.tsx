@@ -15,8 +15,10 @@ import {
   Switch,
 } from "solid-js";
 import { createEditorSignals } from "../adapter.ts";
+import { pcbBoardChoices, pcbBoardOptions } from "../cad/pcb-insert.ts";
 import { useCadStatus } from "../cad/status-store.ts";
 import {
+  setCadBoard,
   setCadFlag,
   setCadNumber,
   setCadOperation,
@@ -98,26 +100,40 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
       .sort(compareCadHistoryOrder);
   });
   const status = () => statusFor(current().id);
+  const board = () => {
+    const id = semantic().board;
+    return typeof id === "string" ? id : "";
+  };
+  const boardOptions = createMemo(() => {
+    if (type() !== "cad.pcb") return [];
+    signals.rev();
+    return pcbBoardOptions(pcbBoardChoices(props.editor.getSnapshot()));
+  });
+  const selectedBoard = () =>
+    boardOptions().some(({ value }) => value === board()) ? board() : "";
 
   const number = (
     label: string,
     read: () => unknown,
     update: (text: string) => Command | { error: string },
+    placeholder?: string,
   ) => (
     <Field label={label}>
       <TextInput
         label={label}
         value={String(read() ?? "")}
         disabled={readOnly()}
+        placeholder={placeholder}
         onCommit={(value) => edit(update(value))}
       />
     </Field>
   );
-  const length = (label: string, field: string) =>
+  const length = (label: string, field: string, placeholder?: string) =>
     number(
       label,
       field === "offset" ? offset : () => semantic()[field],
       (value) => setCadNumber(current(), field, value),
+      placeholder,
     );
   const point = (field: "a" | "b" | "m" | "c", label: string) => (
     <For each={[0, 1] as const}>
@@ -213,7 +229,33 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
           {length("Radius (mm)", "r")}
           {flag("construction", "Construction")}
         </Match>
-        <Match when={type() === "cad.pcb" || type() === "cad.mesh"}>
+        <Match when={type() === "cad.pcb"}>
+          <Field label="PCB board">
+            <SelectInput
+              label="PCB board"
+              value={selectedBoard()}
+              options={
+                selectedBoard()
+                  ? boardOptions()
+                  : [
+                      {
+                        value: "",
+                        label: board() ? "Board unavailable" : "Choose a board",
+                      },
+                      ...boardOptions(),
+                    ]
+              }
+              disabled={readOnly() || boardOptions().length === 0}
+              onCommit={(value) => {
+                if (boardOptions().some((option) => option.value === value))
+                  edit(setCadBoard(current(), value));
+              }}
+            />
+          </Field>
+          {length("Thickness (mm)", "thickness", "Use board thickness")}
+          {flag("suppressed", "Suppressed")}
+        </Match>
+        <Match when={type() === "cad.mesh"}>
           {flag("suppressed", "Suppressed")}
         </Match>
       </Switch>
@@ -228,7 +270,10 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
             <output aria-label="CAD status">
               {(() => {
                 const value = message();
-                return value.ok ? "OK" : value.code;
+                if (value.ok) return "OK";
+                return value.code === "cad.pcb.openOutline" && value.detail
+                  ? `${value.code} (graphic ${value.detail})`
+                  : value.code;
               })()}
             </output>
           </Field>

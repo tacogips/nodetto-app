@@ -27,6 +27,7 @@ export interface PcbOutline {
 
 type OutlineError = {
   error: "cad.pcb.noBoard" | "cad.pcb.noOutline" | "cad.pcb.openOutline";
+  at?: ElementId;
 };
 
 export function isPcbOutlineGraphic(element: Element): boolean {
@@ -109,11 +110,11 @@ export function pcbBoardOutline(
         "semantic",
       ).length !== 0
     )
-      return { error: "cad.pcb.openOutline" };
+      return { error: "cad.pcb.openOutline", at: id };
     const { shape } = semantic as PcbGraphicSemantic;
     if (shape.kind === "text") continue;
     const path = pathFor(id, shape);
-    if (!path) return { error: "cad.pcb.openOutline" };
+    if (!path) return { error: "cad.pcb.openOutline", at: id };
     paths.push(path);
     const bounds = shapeBounds(shape, 0);
     minX = Math.min(minX, bounds.minX);
@@ -133,7 +134,11 @@ export function pcbBoardOutline(
       }),
     })),
   );
-  if ("error" in profile) return { error: "cad.pcb.openOutline" };
+  if ("error" in profile)
+    return {
+      error: "cad.pcb.openOutline",
+      ...(profile.at === undefined ? {} : { at: profile.at }),
+    };
   const { thickness } = board.semantic;
   return {
     loops: profile.loops,

@@ -6,6 +6,11 @@ import {
 } from "@nodetto/core";
 import { render } from "solid-js/web";
 import { plateWithHoles } from "../../../core/src/cad/testing/documents.ts";
+import {
+  boardReference,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../../../core/src/cad/testing/pcb.ts";
 import { NodettoCanvas } from "../Canvas.tsx";
 import { Inspector } from "../Inspector.tsx";
 import { Layers } from "../Layers.tsx";
@@ -225,6 +230,64 @@ for (const theme of ["light", "dark"] as const) {
   rowName("Relief").click();
   assert.equal(root.querySelector('output[aria-label="CAD status"]'), null);
   assert.equal(root.querySelector(".nodetto-layer-cad-status"), null);
+
+  const secondPage = {
+    ...PCB_TEST_PAGE,
+    id: "expansion",
+    name: "Expansion board",
+    order: "A",
+  };
+  const secondBoard = {
+    ...testBoard(2),
+    id: "expansion-board",
+    page: secondPage.id,
+  };
+  const reference = {
+    ...boardReference(),
+    semantic: { name: "", board: "board" },
+  };
+  editor.apply([
+    { type: "createPage", page: PCB_TEST_PAGE },
+    { type: "createPage", page: secondPage },
+    { type: "createElement", element: testBoard() },
+    { type: "createElement", element: secondBoard },
+    { type: "createElement", element: reference },
+  ]);
+  rowName("PCB board").click();
+  const boards = find<HTMLSelectElement>('select[aria-label="PCB board"]');
+  const thickness = input("Thickness (mm)");
+  assert.equal(boards.value, "board");
+  assert.deepEqual(
+    [...boards.options].map(({ textContent }) => textContent),
+    ["Circuit", "Expansion board"],
+  );
+  const beforeBoardEdit = editor.history.undoSize;
+  change(boards, secondBoard.id);
+  assert.equal(editor.history.undoSize, beforeBoardEdit + 1);
+  assert.equal(boards.value, secondBoard.id);
+  assert.deepEqual(editor.store.get(reference.id)?.semantic, {
+    name: "",
+    board: secondBoard.id,
+  });
+  change(thickness, "0");
+  assert.equal(thickness.value, "");
+  assert.match(root.textContent ?? "", /thickness greater than 0/);
+  change(thickness, "2.5");
+  assert.equal(thickness.value, "2.5");
+  change(thickness, "");
+  assert.deepEqual(editor.store.get(reference.id)?.semantic, {
+    name: "",
+    board: secondBoard.id,
+  });
+  assert.equal(editor.history.undoSize, beforeBoardEdit + 3);
+  assert.ok(editor.undo());
+  assert.equal(thickness.value, "2.5");
+  editor.apply([{ type: "deletePage", id: secondPage.id }]);
+  assert.equal(boards.value, "");
+  assert.equal(boards.selectedOptions[0]?.textContent, "Choose a board");
+  assert.equal(boards.disabled, false);
+  change(boards, "board");
+  assert.equal(boards.value, "board");
   dispose();
   root.remove();
   console.log(`ok ${theme}`);

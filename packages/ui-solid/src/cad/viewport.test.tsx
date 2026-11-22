@@ -36,4 +36,6 @@ test("CAD sketch and extrude tools commit atomically in light and dark", () => {
   expect(output).toContain("sketch ok dark");
   expect(output).toContain("extrude ok light");
   expect(output).toContain("extrude ok dark");
+  expect(output).toContain("pcb ok light");
+  expect(output).toContain("pcb ok dark");
 });

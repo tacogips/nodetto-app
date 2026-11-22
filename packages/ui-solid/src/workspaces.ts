@@ -21,6 +21,7 @@ export const CAD_CREATION_TOOLS = [
   { tool: Tool.CadArc, label: "Arc" },
   { tool: Tool.CadCircle, label: "Circle" },
   { tool: Tool.CadExtrude, label: "Extrude" },
+  { tool: Tool.CadPcb, label: "PCB board" },
 ] as const;
 
 export const WORKSPACES = [

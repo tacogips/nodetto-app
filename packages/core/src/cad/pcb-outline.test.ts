@@ -86,11 +86,12 @@ test("reports missing boards, missing outlines and dangling or malformed edges",
   ).toEqual({ error: "cad.pcb.noOutline" });
   expect(pcbBoardOutline([board, line], board.id)).toEqual({
     error: "cad.pcb.openOutline",
+    at: line.id,
   });
   expect(
     pcbBoardOutline(
       [board, { ...line, semantic: { layer: "Edge.Cuts" } }],
       board.id,
     ),
-  ).toEqual({ error: "cad.pcb.openOutline" });
+  ).toEqual({ error: "cad.pcb.openOutline", at: line.id });
 });

@@ -47,6 +47,7 @@ export const TOOLBAR_ICONS = {
   cadArc: "spline",
   cadCircle: "circle",
   cadExtrude: "box",
+  cadPcb: "circuit-board",
 } as const;
 
 export type ToolbarIconKey = keyof typeof TOOLBAR_ICONS;

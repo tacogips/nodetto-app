@@ -333,7 +333,7 @@ checks these forms in non-test TypeScript under `packages/*/src` and
 | B. Requires 2D content or has a guard in M2 | Core paths are `group.ts`, `frame-selection.ts`, `boolean-operations.ts`, `editor/components.ts`, `editor/connections.ts`, `editor/sequence.ts`, `editor/bpmn.ts`, `bpmn/containment.ts`, `screen-transition.ts`. | These helpers return without editing for a CAD-only page or selection. |
 | C. Canvas interaction | UI paths are `interaction/creation.ts`, `interaction/connectors.ts` and `cad/mesh-io.ts`. The CAD viewport also calls the command builders in core `cad/authoring.ts`. | M22 checks the page kind for 2D placements and connectors. The CAD viewport checks `canCreateOn` before applying sketch or STL import commands. The command layer enforces rule R in both cases. |
 | D. Resource carriers | Core paths are `color-tokens.ts`, `number-tokens.ts`, `text-styles.ts`, `page-guides.ts`, `comments.ts`. UI paths are `inspector/slide-transition-edits.ts`. | Rule R permits these elements. Comment pins and guides are absent from the 3D viewport in the slice. Comments stay listed in the comments panel. |
-| E. Fixtures, inverse commands and clipboard planning | CLI paths are `__fixtures__/bpmn-layered.ts`, `__fixtures__/connector-arrange.ts`, `__fixtures__/dense-relations.ts`, `__fixtures__/obstacle-routing-batch.ts`, `__fixtures__/sequence-self-timing.ts`, `__fixtures__/text-layout.ts`. Desktop paths are `file/session-test-helpers.ts`. Core paths are `commands.ts`, `clipboard.ts`. UI paths are `interaction-test-helpers.ts`, `test-dom/text-editor.dom.tsx`. | The list includes test-support files that lack a `.test.ts` or `.test.tsx` suffix. |
+| E. Fixtures, inverse commands and clipboard planning | CLI paths are `__fixtures__/bpmn-layered.ts`, `__fixtures__/connector-arrange.ts`, `__fixtures__/dense-relations.ts`, `__fixtures__/obstacle-routing-batch.ts`, `__fixtures__/sequence-self-timing.ts`, `__fixtures__/text-layout.ts`. Desktop paths are `file/session-test-helpers.ts`. Core paths are `commands.ts`, `clipboard.ts`. UI paths are `interaction-test-helpers.ts`, `test-dom/cad-inspector.dom.tsx`, `test-dom/cad-sketch.dom.tsx`, `test-dom/text-editor.dom.tsx`. | The list includes test-support files that lack a `.test.ts` or `.test.tsx` suffix. |
 
 Collaboration repair (never deletes). A conforming client cannot violate R
 or K, but a client of the current release can (fact 13): it can change the
@@ -558,7 +558,9 @@ the CLI needs (section 10).
   boolean). The default extrude of a sketch on a face points outward
   (`distance = 10 * faceOutwardSign`) with `op: "add"`; while dragging,
   `distance * faceOutwardSign > 0` means add and `< 0` means cut into the
-  body. Commit: one `updateSemantic` (or `createElement`) at pointer up,
+  body. On a PCB reference cap, the default points outward with `op: "new"`,
+  and dragging preserves the current operation. Commit: one `updateSemantic`
+  (or `createElement`) at pointer up,
   hence one history entry, one changed JSONL line and one collaboration
   update. Camera moves only redraw GPU buffers.
 - A watchdog terminates and restarts the worker when a request exceeds 20 s
@@ -851,8 +853,9 @@ page and produces a reference body.
 
 - Outline: a new pure function `pcbBoardOutline(document, boardId)` chains
   the `Edge.Cuts` graphics (line, arc, circle, rect, polygon) of the board's
-  page into closed loops with a 1 micrometre end point tolerance, the first
-  code that does so (fact 9). Inner loops are cut-outs.
+  page into closed loops by snapping open-path endpoints to the same
+  1 micrometre grid before joining them (fact 9). Endpoints on opposite
+  sides of a cell boundary can stay separate. Inner loops are cut-outs.
 - Placement: X = x - minX, Y = maxY - y over the outline bounds, the mapping
   the Gerber export already uses (`packages/core/src/pcb-board/export.ts:328`),
   Z from 0 to `thickness` (`cad.pcb.thickness`, else board `thickness`, else
