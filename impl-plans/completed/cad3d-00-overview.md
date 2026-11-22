@@ -142,11 +142,11 @@ milestone that breaks it, not in M18.
 | M13 | accepted |
 | M20 | accepted |
 | M14 | accepted |
-| M21 | implemented |
+| M21 | accepted |
 | M15 | accepted |
 | M16 | accepted |
 | M17 | accepted |
-| M18 | pending |
+| M18 | implemented |
 
 M1 added the CAD IR and document content rule, registered shape defaults,
 advertised CAD types through the CLI, and added the canonical CAD fixture.
@@ -733,6 +733,12 @@ and passed check and lint. Bun reported 4,505 passed, 77 skipped and three
 existing Chromium startup permission failures. The separate Rust workspace
 run passed 73 of 91 tests, with 18 macOS file-replacement permission failures
 under the same worktree write restriction. Logs are under `tmp/cad3d/m21/`.
+
+M18 adds kernel-free construction views, CAD user and CLI documentation,
+native export and validation parity, and final browser and system WKWebView
+checks. It also addresses extrusion drag cancellation, PCB picker lifecycle
+and keyboard handling, and readback-based GPU frame timing. The operational
+evidence and deviations are in the M18 plan.
 
 ## Completion
 

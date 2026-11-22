@@ -100,6 +100,7 @@ export function CadViewport(props: CadViewportProps) {
   let root!: HTMLDivElement;
   let canvas!: HTMLCanvasElement;
   let fileInput!: HTMLInputElement;
+  let boardMenu: HTMLDivElement | undefined;
   const pageId = props.pageId ?? props.editor.currentPageId;
   const statusStore = cadStatusStoreFor(props.editor);
   const [revision, setRevision] = createSignal(props.editor.revision);
@@ -269,15 +270,28 @@ export function CadViewport(props: CadViewportProps) {
     if (boardPicker() && boardOptions().length === 0) closeBoardPicker(false);
   });
 
-  function boardMenuKey(
-    event: KeyboardEvent & { currentTarget: HTMLDivElement },
-  ): void {
-    if (event.key === "Escape") {
+  createEffect(
+    on([selection, revision], () => setBoardNotice(undefined), { defer: true }),
+  );
+
+  function dismissBoardPicker(event: PointerEvent): void {
+    if (
+      !boardPicker() ||
+      (boardMenu && event.composedPath().includes(boardMenu))
+    )
+      return;
+    if (event.target === canvas) {
       event.preventDefault();
       event.stopPropagation();
       closeBoardPicker();
-      return;
+    } else {
+      closeBoardPicker(false);
     }
+  }
+
+  function boardMenuKey(
+    event: KeyboardEvent & { currentTarget: HTMLDivElement },
+  ): void {
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -377,6 +391,7 @@ export function CadViewport(props: CadViewportProps) {
       setRenderer((props.createRenderer ?? createWebgl2Renderer)(canvas));
     initialize();
     root.focus();
+    if (tool() === Tool.CadPcb) closeBoardPicker(false);
     const unsubscribe = props.editor.subscribe(() =>
       setRevision(props.editor.revision),
     );
@@ -398,6 +413,7 @@ export function CadViewport(props: CadViewportProps) {
     canvas.addEventListener("webglcontextlost", lost);
     canvas.addEventListener("webglcontextrestored", initialize);
     window.addEventListener("resize", measure);
+    document.addEventListener("pointerdown", dismissBoardPicker, true);
     const observer =
       typeof ResizeObserver === "undefined"
         ? undefined
@@ -409,6 +425,8 @@ export function CadViewport(props: CadViewportProps) {
       registerImportPicker?.(undefined);
       unsubscribe();
       unsubscribeSelection();
+      document.removeEventListener("pointerdown", dismissBoardPicker, true);
+      if (tool() === Tool.CadPcb) closeBoardPicker(false);
       window.removeEventListener("resize", measure);
       canvas.removeEventListener("webglcontextlost", lost);
       canvas.removeEventListener("webglcontextrestored", initialize);
@@ -746,6 +764,16 @@ export function CadViewport(props: CadViewportProps) {
 
   function keyDown(event: KeyboardEvent): void {
     if (
+      boardPicker() &&
+      ["Escape", "Backspace", "Delete"].includes(event.key)
+    ) {
+      if (isComposing(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") closeBoardPicker();
+      return;
+    }
+    if (
       event.key === "Escape" &&
       !isComposing(event) &&
       !event.ctrlKey &&
@@ -807,10 +835,7 @@ export function CadViewport(props: CadViewportProps) {
         ref={canvas}
         class="nodetto-cad-surface"
         aria-label="3D CAD viewport"
-        onPointerDown={(event) => {
-          if (boardPicker()) closeBoardPicker();
-          else pointerDown(event);
-        }}
+        onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
@@ -821,6 +846,7 @@ export function CadViewport(props: CadViewportProps) {
       <Show when={boardPicker()}>
         {(picker) => (
           <div
+            ref={boardMenu}
             class="nodetto-context-menu"
             role="menu"
             aria-label="Choose a PCB board"

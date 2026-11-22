@@ -1,2 +1,4 @@
 [test]
+# Ignored worktree scratch can contain standalone reproduction test files.
+pathIgnorePatterns = ["tmp/**"]
 preload = ["./packages/ui-solid/src/bun-test-jsx-preload.ts"]

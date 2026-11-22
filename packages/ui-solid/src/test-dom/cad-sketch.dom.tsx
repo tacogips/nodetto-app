@@ -404,6 +404,9 @@ for (const mode of ["light", "dark"] as const) {
   assert.ok(
     preview && preview.indices.length > 0 && preview.positions.includes(2),
   );
+  editor.renamePage("free", "Unrelated drawing edited during the drag");
+  assert.match(viewport.textContent ?? "", /-3 mm/);
+  assert.equal(evaluations, beforeEvaluation);
   pointer("pointerup", inward);
   assert.equal(evaluations, beforeEvaluation + 1);
   assert.equal(meshOverlay, null);
@@ -436,12 +439,24 @@ for (const mode of ["light", "dark"] as const) {
   pointer("pointermove", tip);
   assert.ok(meshOverlay);
   pressEscape();
+  assert.match(viewport.textContent ?? "", /drag cancelled/);
   pointer("pointerup", tip);
   assert.equal(meshOverlay, null);
   assert.equal(editor.getSnapshot(), beforeCancel);
   assert.equal(selectedId(), faceExtrude);
   click(inward);
   assert.equal(editor.getSnapshot(), beforeCancel);
+
+  pointer("pointerdown", inward);
+  pointer("pointermove", tip);
+  editor.apply([
+    { type: "updateVisual", id: faceExtrude, visual: { locked: true } },
+  ]);
+  const locked = editor.getSnapshot();
+  assert.match(viewport.textContent ?? "", /drag cancelled/);
+  pointer("pointerup", tip);
+  assert.equal(meshOverlay, null);
+  assert.equal(editor.getSnapshot(), locked);
 
   editor.selection.set([baseExtrude]);
   const baseHandle = lineOverlay as Float32Array | null;
@@ -592,6 +607,14 @@ for (const mode of ["light", "dark"] as const) {
     ["Circuit", "Expansion board"],
   );
   assert.equal(document.activeElement, buttons[0]);
+  const beforeKeys = editor.getSnapshot();
+  for (const key of ["Delete", "Backspace"]) {
+    buttons[0]?.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
+  }
+  assert.equal(editor.getSnapshot(), beforeKeys);
+  assert.ok(selectedId() && editor.store.has(selectedId() ?? ""));
   buttons[0]?.dispatchEvent(
     new KeyboardEvent("keydown", {
       key: "End",
@@ -620,6 +643,27 @@ for (const mode of ["light", "dark"] as const) {
   assert.equal(viewport.querySelector('[role="menu"]'), null);
   assert.equal(editor.history.undoSize, beforeChoice + 1);
 
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  host.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  assert.equal(tool(), Tool.Select);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  pressEscape();
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  editor.setCurrentPage("free");
+  assert.equal(tool(), Tool.Select);
+  setTool(Tool.CadPcb);
+  editor.setCurrentPage("cad");
+  await nextFrame();
+  assert.equal(tool(), Tool.Select);
+  const remounted = host.querySelector(".nodetto-cad-viewport");
+  assert.ok(remounted);
+  assert.equal(remounted.querySelector('[role="menu"]'), null);
+
   editor.setReadOnly(true);
   setTool(Tool.CadPcb);
   assert.equal(tool(), Tool.Select);
@@ -630,9 +674,16 @@ for (const mode of ["light", "dark"] as const) {
     { type: "deletePage", id: secondPage.id },
   ]);
   const boardless = editor.getSnapshot();
+  editor.selection.set([baseExtrude]);
   setTool(Tool.CadPcb);
   assert.equal(editor.getSnapshot(), boardless);
-  assert.match(viewport.textContent ?? "", /no PCB page with a board/);
+  assert.match(remounted.textContent ?? "", /no PCB page with a board/);
+  editor.selection.clear();
+  assert.doesNotMatch(remounted.textContent ?? "", /no PCB page with a board/);
+  setTool(Tool.CadPcb);
+  assert.match(remounted.textContent ?? "", /no PCB page with a board/);
+  editor.renamePage("free", "Renamed drawing");
+  assert.doesNotMatch(remounted.textContent ?? "", /no PCB page with a board/);
 
   editor.setCurrentPage("free");
   const beforeFreeform = editor.getSnapshot();

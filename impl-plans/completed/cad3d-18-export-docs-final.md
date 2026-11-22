@@ -127,3 +127,41 @@ export function cadPageSvgBody(wireframe: CadWireframe, options: { stroke: strin
 7. `sh -c 'bun --cwd=apps/desktop run check:cad-wkwebview && bun test apps/desktop/src/cad/csp.test.ts'`
    (macOS with a window server; this is the platform of the desktop
    release build)
+
+## Progress
+
+Implemented for adversarial review. Construction views reuse the structural
+CAD traversal, fit an explicit viewport or a content frame capped at the
+standard slide size, and show mesh bounding boxes. The NMESH codec and its
+existing tests moved into the independent `@nodetto/nmesh` workspace package.
+The existing IO entry point re-exports the same codec. This keeps the
+core's IO isolation test and the public import path intact.
+
+The viewport changes cover IR11-03 and IR21-01 through IR21-03. A drag
+survives an unrelated document edit and reports cancellation if its
+feature or frame becomes incompatible. The PCB menu protects the current
+selection, clears stale notices and returns to Select on dismissal or
+when the viewport mounts or unmounts. IR19-01 now times a blocking GPU
+readback. The native tests cover PCB references, arcs and maximum inline
+mesh validation (IR3-02). The geometry traversal avoids unnecessary
+intersection work for adjacent edges and indexed tessellation appends
+leave the existing CAD deadlines and output unchanged.
+
+Deviations and host constraints. The Swift check drives real WebGL2 and
+the production-CSP worker with a test-only timer because the off-screen
+window receives no compositor frames. Chrome measures real frame times.
+The repository's Bun discovery excludes ignored scratch under `tmp/`;
+the verification commands use explicit paths for scoped tests. Automatic
+mise installation is disabled and caches stay in the worktree. The
+macOS console was locked, so packaged drag-and-drop and file-dialog
+checks need an unlocked run. WebKitGTK and macOS 12 were not tested.
+Evidence is under `tmp/cad3d/m18/`.
+
+The seven automated verification commands exited 0. Clean-dist CI passed
+4,516 Bun tests and 91 Rust tests. The separate CLI suite passed 560 Bun
+tests and 25 Rust tests with every parity test enabled. Hardware Chrome
+measured 74.9 ms from edit to display and a 2.6 ms maximum for the
+200,000-triangle frame. The system WKWebView reported WebKit
+21624.2.5.11.8 and passed all 15 assertions. The unsigned macOS package
+contains the release CLI sidecar, which exported both PNG and PDF for the
+bracket fixture. The packaged host probe recorded the locked console.

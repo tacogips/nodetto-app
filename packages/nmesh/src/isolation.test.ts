@@ -5,7 +5,7 @@ import { preProcessFile } from "typescript";
 test("each mesh format keeps its production imports and exports inside its own directory", () => {
   for (const root of [
     new URL("./", import.meta.url),
-    new URL("../stl/", import.meta.url),
+    new URL("../../io/src/stl/", import.meta.url),
   ]) {
     const sources = readdirSync(root).filter(
       (name) => name.endsWith(".ts") && !name.endsWith(".test.ts"),

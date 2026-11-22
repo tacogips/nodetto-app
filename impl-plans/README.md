@@ -59,6 +59,13 @@ s861 and s863 must not be dispatched again.
 
 ## Completed
 
+### 3D CAD pages
+
+The 22 CAD milestones and their [overview](completed/cad3d-00-overview.md)
+are archived here. [M18](completed/cad3d-18-export-docs-final.md) records the
+final checks and the remaining packaged host verification. See the
+[design](../design-docs/specs/design-cad3d.md) and [user guide](../docs/cad3d.md).
+
 ### iPhone app design
 
 Precise layers, iOS kit, layout, prototyping, lint and comparison are implemented

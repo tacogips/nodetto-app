@@ -59,6 +59,27 @@ type Drag = ExtrudeDrag & {
   readonly moved: boolean;
 };
 
+function acceptsDrag(
+  current: SelectedExtrude,
+  start: SelectedExtrude,
+): boolean {
+  const a = current.semantic;
+  const b = start.semantic;
+  const frame = current.preview.frame;
+  const original = start.preview.frame;
+  return (
+    current.element.id === start.element.id &&
+    a.sketch === b.sketch &&
+    a.distance === b.distance &&
+    a.symmetric === b.symmetric &&
+    a.op === b.op &&
+    current.positiveOp === start.positiveOp &&
+    (["o", "u", "v", "n"] as const).every((axis) =>
+      frame[axis].every((value, i) => value === original[axis][i]),
+    )
+  );
+}
+
 function selectionOf(editor: Editor, ids: ReadonlySet<ElementId>) {
   if (ids.size !== 1) return undefined;
   for (const id of ids) return editor.store.get(id);
@@ -222,15 +243,26 @@ export function createExtrudeAuthoring(options: {
   createEffect(
     on(options.selection, () => setNotice(undefined), { defer: true }),
   );
-  createEffect(() => {
+  const dragFeature = createMemo(() => {
     const stroke = drag();
-    if (stroke && active() !== stroke.feature) setDrag(undefined);
+    const feature = active();
+    return stroke && feature && acceptsDrag(feature, stroke.feature)
+      ? feature
+      : undefined;
+  });
+  function cancelDrag(): void {
+    setDrag(undefined);
+    setNotice("Extrude drag cancelled.");
+  }
+  createEffect(() => {
+    if (drag() && !dragFeature()) cancelDrag();
   });
 
   const mesh = createMemo(() => {
     const stroke = drag();
-    return stroke?.moved && stroke.feature === active()
-      ? stroke.feature.preview.mesh(stroke.distance)
+    const feature = dragFeature();
+    return stroke?.moved && feature
+      ? feature.preview.mesh(stroke.distance)
       : null;
   });
 
@@ -240,7 +272,7 @@ export function createExtrudeAuthoring(options: {
     const { frame } = feature.preview;
     const stroke = drag();
     const distance =
-      stroke?.feature === feature ? stroke.distance : feature.semantic.distance;
+      stroke && dragFeature() ? stroke.distance : feature.semantic.distance;
     const { symmetric } = feature.semantic;
     const tip = extrudeTip(frame, distance, symmetric);
     const length = Math.min(
@@ -333,23 +365,26 @@ export function createExtrudeAuthoring(options: {
     if (!current || current.pointerId !== pointerId) return false;
     if (commit) move(pointerId, point);
     const stroke = drag();
+    const feature = dragFeature();
     const preview = mesh();
-    setDrag(undefined);
     if (
       !commit ||
       !stroke ||
       !point ||
-      stroke.feature !== active() ||
-      stroke.distance === stroke.startDistance ||
+      !feature ||
       editor.readOnly ||
       editor.currentPageId !== pageId
-    )
+    ) {
+      cancelDrag();
       return true;
+    }
+    setDrag(undefined);
+    if (stroke.distance === stroke.startDistance) return true;
     if (preview && "error" in preview) {
       setNotice(`Extrude distance could not be applied (${preview.error}).`);
       return true;
     }
-    const { element, semantic, positiveOp } = stroke.feature;
+    const { element, semantic, positiveOp } = feature;
     const op =
       positiveOp === "add" || positiveOp === "cut"
         ? stroke.distance > 0 === (positiveOp === "add")
@@ -376,7 +411,7 @@ export function createExtrudeAuthoring(options: {
 
   function cancel(): boolean {
     if (!drag()) return false;
-    setDrag(undefined);
+    cancelDrag();
     return true;
   }
 

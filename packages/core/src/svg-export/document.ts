@@ -27,6 +27,7 @@ import {
   breadboardLabelBounds,
   breadboardNotation,
 } from "../breadboard/notation.ts";
+import { cadPageWireframe } from "../cad/wireframe.ts";
 import { intersectClip, isRasterMaskSource } from "../clipping.ts";
 import { effectsBounds, layerEffects } from "../effects.ts";
 import { compareFractional } from "../fractional.ts";
@@ -54,6 +55,7 @@ import { useCaseNodeLabelBox } from "../shapes/usecase.ts";
 import { umlComponentPaintBounds } from "../shapes/umlComponent.ts";
 import { PCB_BOARD_COLOR } from "../pcb-board/view.ts";
 import type { Store } from "../store.ts";
+import { renderCadPageSvg } from "./cad.ts";
 import { markerDefs, renderConnector } from "./connectors.ts";
 import { fmt, tag, text, wrap } from "./markup.ts";
 import { renderNotationPrimitive } from "./notation.ts";
@@ -588,6 +590,11 @@ export function renderPageSvg(
   pageId: PageId,
   options: SvgExportOptions = {},
 ): string | null {
+  if (store.getPage(pageId)?.kind === "cad3d")
+    return renderCadPageSvg(
+      cadPageWireframe(store.listElements(), pageId),
+      options,
+    );
   const elements = store.getPageElements(pageId);
   const context = createShapeContext(store, registry, 1);
   if (!options.prototypeView)

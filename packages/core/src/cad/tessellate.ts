@@ -7,7 +7,7 @@ export const CAD_MAX_BISECTION_DEPTH = 6;
 function appendPoint(out: number[], x: number, y: number): void {
   const snappedX = roundNm(x);
   const snappedY = roundNm(y);
-  if (out.at(-2) !== snappedX || out.at(-1) !== snappedY) {
+  if (out[out.length - 2] !== snappedX || out[out.length - 1] !== snappedY) {
     out.push(snappedX, snappedY);
   }
 }

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@nodetto/ir": "workspace:*",
+    "@nodetto/nmesh": "workspace:*",
     "polygon-clipping": "0.15.7"
   },
   "devDependencies": {
