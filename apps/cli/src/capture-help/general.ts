@@ -2,19 +2,18 @@ import type { CaptureHelpPart } from "../capture-help.ts";
 
 export const general: CaptureHelpPart = {
   usage: [
-    "[--page <query> | --page-number <n>] [--output <file>] [--format png] [--force]",
+    "[--page <query> | --page-number <n>] [--output <file>] [--force]",
     "[--size <W>x<H>] [--scale <n>] [--theme light|dark] [--element <id>]",
     "[--padding <n>] [--background <#rrggbb>] [--font-dir <dir>] [--json] [--inline]",
   ],
-  body: `Capture a page as a PNG for a quick look. Open the reported path with an
-image-capable file reader to see the picture.
+  body: `Capture a page as an image. Open the reported path with an image-capable
+file reader to see the picture.
 
   --page         Select a page by full ID, short ID or name.
   --page-number  Select by the number from nodetto-cli pages. Default: first page.
-  --output      Write a .png file in an existing directory. The default is a
-                 digest-named file in the private per-user nodetto-capture
-                 directory under the system temporary directory.
-  --format      Image format (png in this build).
+  --output      Write a .png, .jpg or .jpeg file in an existing directory.
+                 The default is a digest-named file in the private per-user
+                 nodetto-capture directory under the system temporary directory.
   --force       Replace an existing regular file at --output. Without this flag
                  different bytes are refused. Identical bytes succeed without
                  rewriting the file. Default captures never replace a file.

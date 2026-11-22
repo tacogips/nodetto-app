@@ -173,8 +173,8 @@ found there.
 | M1 | accepted |
 | M2 | accepted |
 | M19 | accepted |
-| M3 | implemented |
-| M4 | pending |
+| M3 | accepted |
+| M4 | implemented |
 | M5 | pending |
 | M6 | pending |
 | M7 | pending |

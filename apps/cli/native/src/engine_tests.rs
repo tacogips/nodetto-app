@@ -346,3 +346,22 @@ fn capture_command_renders_a_png_and_reports_its_path() {
     assert!(result.stdout.lines().any(|line| line == "size: 110x110"));
     assert_eq!(&png[16..24], &[0, 0, 0, 110, 0, 0, 0, 110]);
 }
+
+#[test]
+fn capture_encode_transcodes_the_native_png_and_checks_options() {
+    let result = evaluate(
+        r##"(() => {
+        const png = native.png('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="3"/>', 1, undefined, false);
+        const jpg = native.captureEncode(png, "jpg", 90, "#ffffff");
+        const invalid = [["svg", 90, "#ffffff"], ["jpg", 90.5, "#ffffff"], ["jpg", 256, "#ffffff"], ["jpg", 90, "#+12345"]];
+        return [jpg instanceof Uint8Array, Array.from(jpg.slice(0, 2)), Array.from(jpg.slice(-2)),
+            invalid.every(options => {
+                try { native.captureEncode(png, ...options); return false; }
+                catch (error) { return error instanceof Error; }
+            })];
+    })()"##,
+        Input::Mcp(None),
+        None,
+    );
+    assert_eq!(result, json!([true, [255, 216], [255, 217], true]));
+}

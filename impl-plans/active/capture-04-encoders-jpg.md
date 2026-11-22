@@ -126,4 +126,18 @@ returns the encoded bytes. New options: `--format png|jpg`, `--quality
 
 ## Progress
 
-Pending.
+Implemented, pending implementation review. The native CLI writes baseline
+4:4:4 JPGs for 2D pages and preserves the existing PNG bytes. The capture
+crate exposes independent RGB encoders and a bounded PNG transcoder.
+
+- Help also updates `capture-help/general.ts` to remove the interim PNG-only
+  wording and list all output extensions. The JPG part owns format and quality.
+- The test-only decoder disables its optional Rayon dependency. The PNG
+  transcoder rejects animated input because it encodes a single still capture.
+- CAP-M3-01: focused regression tests pin `--size`, fractional viewBox scaling
+  and the 40-character filename stem. Each test fails with its corresponding
+  mutation. Evidence is in `tmp/capture/m04/mutations.log`.
+- CAP-M3-02: the existing-output refusal limits `--force` to regular files
+  and tells the caller to choose another `--output` or omit it.
+- Verification logs: `tmp/capture/m04/v1.log` through `v5.log`. Resolved
+  dependency licences are recorded in `tmp/capture/m04/cargo-metadata.log`.

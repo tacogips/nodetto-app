@@ -33,6 +33,7 @@ const CAPTURE_OPTIONS = new Set([
   "--page-number",
   "--output",
   "--format",
+  "--quality",
   "--size",
   "--scale",
   "--theme",
@@ -45,6 +46,8 @@ const CAPTURE_FLAGS = new Set(["--force", "--json", "--inline"]);
 const OUTPUT_ADVICE =
   "Pass --output <file> (Mac App Store build: inside the authorized folder).";
 
+type CaptureFormat = "png" | "jpg";
+
 export interface CaptureBackend {
   rasterize(
     svg: string,
@@ -52,6 +55,12 @@ export interface CaptureBackend {
     fontDir: string | undefined,
     fallback?: boolean,
   ): Promise<Uint8Array>;
+  transcode?(
+    png: Uint8Array,
+    format: "jpg",
+    quality: number,
+    background: string,
+  ): Uint8Array;
 }
 
 function describe(cause: unknown): string {
@@ -105,15 +114,16 @@ function writeCapture(
   capture: NonNullable<CommandIo["capture"]>,
   documentPath: string,
   pageId: string,
-  png: Uint8Array,
+  image: Uint8Array,
+  format: CaptureFormat,
   output: string | undefined,
   force: boolean,
 ): string {
   if (output !== undefined) {
     const absolute = capture.absolute(output);
-    if (capture.write(output, png, force) === "exists") {
+    if (capture.write(output, image, force) === "exists") {
       throw new Error(
-        `${output} exists with different content; pass --force to replace it, or omit --output.`,
+        `${output} exists and does not match the capture. For a regular file, pass --force to replace it. Otherwise, choose another --output or omit it.`,
       );
     }
     return absolute;
@@ -128,10 +138,10 @@ function writeCapture(
         ?.replace(/\.[^.]+$/, "")
         .replace(/[^A-Za-z0-9._-]/g, "_")
         .slice(0, 40) || "document";
-    const prefix = `${dir}/${stem}-${shortPageId(pageId)}-${capture.digest(png).slice(0, 12)}`;
+    const prefix = `${dir}/${stem}-${shortPageId(pageId)}-${capture.digest(image).slice(0, 12)}`;
     for (let attempt = 1; attempt <= 99; attempt++) {
-      const path = `${prefix}${attempt === 1 ? "" : `-${attempt}`}.png`;
-      if (capture.write(path, png, false) !== "exists")
+      const path = `${prefix}${attempt === 1 ? "" : `-${attempt}`}.${format}`;
+      if (capture.write(path, image, false) !== "exists")
         return capture.absolute(path);
     }
     throw new Error(`No unused capture name is available in ${dir}.`);
@@ -159,13 +169,32 @@ export async function captureCommand(
   if (pageNumber !== undefined && !/^[1-9][0-9]*$/.test(pageNumber))
     return usageError("--page-number must be a positive whole number.");
   const output = options.get("--output");
-  const format = options.get("--format");
-  if (format === "jpg" || (output !== undefined && /\.jpe?g$/i.test(output)))
-    return usageError("JPG capture is not available in this build.");
-  if (format !== undefined && format !== "png")
-    return usageError("--format must be png.");
-  if (output !== undefined && !/\.png$/i.test(output))
-    return usageError("--output must end in .png.");
+  const requestedFormat = options.get("--format");
+  if (
+    requestedFormat !== undefined &&
+    requestedFormat !== "png" &&
+    requestedFormat !== "jpg"
+  )
+    return usageError("--format must be png or jpg.");
+  let outputFormat: CaptureFormat | undefined;
+  if (output !== undefined) {
+    if (/\.png$/i.test(output)) outputFormat = "png";
+    else if (/\.jpe?g$/i.test(output)) outputFormat = "jpg";
+    else return usageError("--output must end in .png, .jpg, or .jpeg.");
+    if (requestedFormat !== undefined && requestedFormat !== outputFormat)
+      return usageError("--format must match the --output extension.");
+  }
+  const format = requestedFormat ?? outputFormat ?? "png";
+  const requestedQuality = options.get("--quality");
+  const quality = Number(requestedQuality ?? "90");
+  if (requestedQuality !== undefined) {
+    if (format !== "jpg") return usageError("--quality requires JPG capture.");
+    if (!/^\d+$/.test(requestedQuality) || quality < 1 || quality > 100)
+      return usageError("--quality must be an integer from 1 to 100.");
+  }
+  const transcode = format === "jpg" ? backend.transcode : undefined;
+  if (format === "jpg" && !transcode)
+    return usageError("JPG capture needs the native nodetto-cli.");
 
   const theme = options.get("--theme") ?? "light";
   if (theme !== "light" && theme !== "dark")
@@ -278,11 +307,13 @@ export async function captureCommand(
       coverage?.needsFallback === true,
     );
     const { width, height } = pngSize(png);
+    const image = transcode ? transcode(png, "jpg", quality, background) : png;
     const path = writeCapture(
       io.capture,
       documentPath,
       page.id,
-      png,
+      image,
+      format,
       output,
       flags.has("--force"),
     );
@@ -292,10 +323,10 @@ export async function captureCommand(
       return ok(
         `${JSON.stringify({
           path,
-          format: "png",
+          format,
           width,
           height,
-          bytes: png.byteLength,
+          bytes: image.byteLength,
           page: {
             number,
             count,
@@ -308,7 +339,7 @@ export async function captureCommand(
       );
     }
     return ok(
-      `path: ${path}\nformat: png\nsize: ${width}x${height}\nbytes: ${png.byteLength}\npage: ${number}/${count} ${JSON.stringify(page.name)} (${page.kind}, id ${page.id})\n`,
+      `path: ${path}\nformat: ${format}\nsize: ${width}x${height}\nbytes: ${image.byteLength}\npage: ${number}/${count} ${JSON.stringify(page.name)} (${page.kind}, id ${page.id})\n`,
       warnings,
     );
   } catch (cause) {

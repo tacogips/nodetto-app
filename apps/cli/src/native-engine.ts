@@ -25,6 +25,12 @@ declare const native: {
     replace: boolean,
   ): "written" | "identical" | "exists";
   digest(bytes: Uint8Array): string;
+  captureEncode(
+    png: Uint8Array,
+    format: "jpg",
+    quality: number,
+    background: string,
+  ): Uint8Array;
   ensureDir(path: string): void;
   pdfPages(pngs: Uint8Array, spec: string): Uint8Array;
   exists(path: string): boolean;
@@ -141,7 +147,10 @@ Object.assign(globalThis, {
               ),
           })
         : command === "capture" && !help
-          ? await captureCommand(io, rest, { rasterize })
+          ? await captureCommand(io, rest, {
+              rasterize,
+              transcode: native.captureEncode,
+            })
           : command === "compare" && !help
             ? await compareCommand(io, rest, { rasterize })
             : command === "open" && !help

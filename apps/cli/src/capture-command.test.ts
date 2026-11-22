@@ -198,6 +198,19 @@ test("capture reuses a digest name and tries deterministic suffixes without repl
   expect(files.size).toBe(99);
 });
 
+test("capture truncates the default filename stem to 40 characters", async () => {
+  const { editor, files, run } = harness(
+    new Editor(),
+    "1234567890123456789012345678901234567890extra.jsonl",
+  );
+  addRect(editor);
+  expect((await run()).exitCode).toBe(0);
+  const id = shortPageId(editor.getSnapshot().pages[0]?.id ?? "");
+  expect([...files.keys()]).toEqual([
+    `${defaultDir}/1234567890123456789012345678901234567890-${id}-${digest.slice(0, 12)}.png`,
+  ]);
+});
+
 test("capture replaces a differing explicit output only with --force", async () => {
   const { editor, files, run } = harness();
   addRect(editor);
@@ -206,6 +219,8 @@ test("capture replaces a differing explicit output only with --force", async () 
   const refused = await run("--output", "art.png");
   expect(refused.exitCode).toBe(2);
   expect(refused.stderr).toContain("pass --force");
+  expect(refused.stderr).toContain("For a regular file, pass --force");
+  expect(refused.stderr).toContain("choose another --output or omit it.");
   expect(files.get("art.png")).toBe(original);
   expect((await run("--output", "art.png", "--force")).exitCode).toBe(0);
   expect(files.get("art.png")).toEqual(png);
@@ -216,9 +231,25 @@ test.each([
   [["--page-number", "1.5"], "positive whole number"],
   [["--output", ""], "--output requires a value"],
   [["--output", "art.gif"], "--output must end in .png"],
-  [["--output", "art.JPEG"], "JPG capture is not available in this build."],
-  [["--format", "jpg"], "JPG capture is not available in this build."],
-  [["--format", "svg"], "--format must be png"],
+  [["--output", "art.JPEG"], "JPG capture needs the native nodetto-cli."],
+  [["--format", "jpg"], "JPG capture needs the native nodetto-cli."],
+  [["--format", "svg"], "--format must be png or jpg."],
+  [
+    ["--format", "png", "--output", "art.jpg"],
+    "--format must match the --output extension.",
+  ],
+  [
+    ["--format", "jpg", "--output", "art.png"],
+    "--format must match the --output extension.",
+  ],
+  [["--quality", "90"], "--quality requires JPG capture."],
+  ...["0", "101", "1.5", "NaN", "1e2"].map(
+    (quality) =>
+      [
+        ["--format", "jpg", "--quality", quality],
+        "--quality must be an integer from 1 to 100.",
+      ] as const,
+  ),
   [["--size", "400"], "--size must be"],
 ] as const)(
   "capture rejects %j with help before rendering",
@@ -232,6 +263,56 @@ test.each([
     expect(calls).toEqual([]);
   },
 );
+
+test("capture encodes JPG by explicit format or output extension and reports the written bytes", async () => {
+  const { editor, files, io, backend, run } = harness();
+  addRect(editor);
+  const jpg = Uint8Array.of(0xff, 0xd8, 0, 0xff, 0xd9);
+  const calls: Parameters<NonNullable<CaptureBackend["transcode"]>>[] = [];
+  const digested: Uint8Array[] = [];
+  if (!io.capture) throw new Error("capture IO missing");
+  io.capture.digest = (bytes) => {
+    digested.push(bytes);
+    return digest;
+  };
+  backend.transcode = (...args) => {
+    calls.push(args);
+    return jpg;
+  };
+  const inferred = await run("--output", "art.JPEG", "--theme", "dark");
+  expect(inferred.exitCode).toBe(0);
+  expect(inferred.stdout).toStartWith(
+    "path: /workspace/art.JPEG\nformat: jpg\nsize: 11x13\nbytes: 5\n",
+  );
+  expect(files.get("art.JPEG")).toBe(jpg);
+  const named = await run(
+    "--format",
+    "jpg",
+    "--quality",
+    "37",
+    "--background",
+    "#a1b2c3",
+    "--json",
+  );
+  expect(named.exitCode).toBe(0);
+  const id = shortPageId(editor.getSnapshot().pages[0]?.id ?? "");
+  const path = `${defaultDir}/Project_drawings-${id}-${digest.slice(0, 12)}.jpg`;
+  expect(JSON.parse(named.stdout)).toMatchObject({
+    path,
+    format: "jpg",
+    width: 11,
+    height: 13,
+    bytes: jpg.length,
+  });
+  expect(files.get(path)).toBe(jpg);
+  expect(digested).toEqual([jpg]);
+  expect((await run("--output", "art.png")).exitCode).toBe(0);
+  expect(files.get("art.png")).toBe(png);
+  expect(calls).toEqual([
+    [png, "jpg", 90, CAPTURE_THEMES.dark.background],
+    [png, "jpg", 37, "#a1b2c3"],
+  ]);
+});
 
 test("capture distinguishes an empty page, an unsupported CAD page, and a host without capture IO", async () => {
   const { editor, io, run, calls, backend } = harness();
@@ -296,11 +377,23 @@ test("capture paints the canvas theme or explicit background and passes glyph fa
   expect(result.stderr).toContain("warning: glyph-missing page ");
   expect(calls[0]?.[0]).toContain(`fill="${CAPTURE_THEMES.dark.background}"`);
   expect(calls[0]?.[0]).toMatch(/^<svg\s[^>]*width="130" height="130"/);
+  expect(calls[0]?.[0]).toContain(
+    `viewBox="-16 -16 ${130 / 0.981} ${130 / 0.981}"`,
+  );
   expect(calls[0]?.slice(1)).toEqual([1, "fonts", true]);
   expect(
     (await run("--theme", "dark", "--background", "#a1b2c3")).exitCode,
   ).toBe(0);
   expect(calls[1]?.[0]).toContain('fill="#a1b2c3"');
+});
+
+test("capture --size limits the pixel frame while keeping the artwork viewport", async () => {
+  const { editor, run, calls } = harness();
+  addRect(editor, 3000, 2000);
+  const result = await run("--size", "600x600", "--padding", "0");
+  expect(result.exitCode).toBe(0);
+  expect(calls[0]?.[0]).toMatch(/^<svg\s[^>]*width="600" height="400"/);
+  expect(calls[0]?.[0]).toContain('viewBox="0 0 3000 2000"');
 });
 
 test("capture gives exit 2 and fit guidance when the minimum scale cannot fit a page", async () => {
@@ -348,6 +441,10 @@ test("capture is discoverable in the overview and explains every option", () => 
   const [usage = "", ...body] = CAPTURE_HELP.split("\n\n");
   for (const option of usage.matchAll(/--[a-z-]+/g))
     expect(body.join("\n")).toMatch(new RegExp(`^  ${option[0]}\\s`, "m"));
+  expect(CAPTURE_HELP).toContain("--quality");
+  expect(CAPTURE_HELP).toContain(
+    "This software is based in part on the work of the Independent JPEG Group.",
+  );
 });
 
 test("Bun capture writes deterministic PNGs and reports the encoded size at fractional scales", async () => {

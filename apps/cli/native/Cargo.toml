@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 nodetto-native = { path = "../../../crates/native" }
+nodetto-capture = { path = "../../../crates/capture" }
 unicode-segmentation = "1.13"
 base64 = "0.22"
 miniz_oxide = "0.9"

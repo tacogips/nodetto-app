@@ -128,3 +128,17 @@ Manifold's optional tooling dependencies are installed by the package
 manager and excluded from the kernel distribution.
 [`licence-inventory.json`](packages/cad-kernel/licence-inventory.json) lists the
 resolved packages and records installation status on macOS arm64.
+
+## jpeg-encoder
+
+The native CLI links [jpeg-encoder 0.7.1](https://crates.io/crates/jpeg-encoder/0.7.1)
+for JPG capture. The desktop and Mac App Store builds will use the same
+encoder when desktop capture is integrated. The licence is
+`(MIT OR Apache-2.0) AND IJG`. See [LICENSE-MIT](crates/capture/licenses/LICENSE-MIT),
+[LICENSE-APACHE](crates/capture/licenses/LICENSE-APACHE), and
+[LICENSE-IJG](crates/capture/licenses/LICENSE-IJG).
+
+This software is based in part on the work of the Independent JPEG Group.
+
+The capture crate also uses [png 0.18](https://crates.io/crates/png/0.18.1)
+(`MIT OR Apache-2.0`) for PNG encoding and decoding.

@@ -1,3 +1,6 @@
 [workspace]
-members = ["apps/desktop/src-tauri", "apps/cli/native", "crates/native"]
+members = ["apps/desktop/src-tauri", "apps/cli/native", "crates/native", "crates/capture"]
 resolver = "2"
+
+[profile.dev.package.nodetto-capture]
+opt-level = 2

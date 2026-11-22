@@ -7,6 +7,7 @@ use boa_engine::{
     object::builtins::{JsArray, JsPromise, JsUint8Array},
     Context, JsArgs, JsNativeError, JsResult, JsValue, NativeFunction, Source,
 };
+use nodetto_capture::{transcode_png, ImageFormat};
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::PathBuf, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
@@ -124,6 +125,33 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             Ok(js_string!(files::write_capture(&path, &data, replace).map_err(host_error)?).into())
         }
         "digest" => Ok(js_string!(files::digest(&bytes(args.get_or_undefined(0), ctx)?)).into()),
+        "captureEncode" => {
+            let format = match string(args, 1, ctx)?.as_str() {
+                "png" => ImageFormat::Png,
+                "jpg" => {
+                    let quality = args.get_or_undefined(2).to_number(ctx)?;
+                    if !(1.0..=100.0).contains(&quality) || quality.fract() != 0.0 {
+                        return Err(host_error("JPG quality must be an integer from 1 to 100."));
+                    }
+                    ImageFormat::Jpeg {
+                        quality: quality as u8,
+                    }
+                }
+                _ => return Err(host_error("Capture format must be png or jpg.")),
+            };
+            let background = string(args, 3, ctx)?;
+            let rgb = background
+                .strip_prefix('#')
+                .filter(|hex| hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()))
+                .and_then(|hex| u32::from_str_radix(hex, 16).ok())
+                .ok_or_else(|| host_error("Capture background must be a six-digit hex color."))?;
+            let [_, red, green, blue] = rgb.to_be_bytes();
+            let png = bytes(args.get_or_undefined(0), ctx)?;
+            byte_value(
+                transcode_png(&png, format, [red, green, blue]).map_err(host_error)?,
+                ctx,
+            )
+        }
         "ensureDir" => {
             std::fs::create_dir_all(string(args, 0, ctx)?).map_err(host_error)?;
             Ok(JsValue::undefined())
@@ -256,7 +284,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
         globalThis.native = Object.fromEntries([
           'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','open','png','pdf','pdfPages','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random',
-          'captureDir','captureAbsolute','writeCapture','digest'
+          'captureDir','captureAbsolute','writeCapture','digest','captureEncode'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };
         globalThis.TextDecoder = class { decode(bytes = []) { return native.decodeUtf8(new Uint8Array(bytes)); } };

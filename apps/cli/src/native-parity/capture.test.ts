@@ -1,5 +1,12 @@
 import { expect } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { Editor } from "@nodetto/core";
@@ -72,6 +79,72 @@ nativeTest(
       const fresh = run(rustCli, ["--output", "fresh.png"]);
       expect(fresh.exitCode).toBe(0);
       expect(readFileSync(join(cwd, "fresh.png"))).toEqual(bytes);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  10_000,
+);
+
+nativeTest(
+  "native captures deterministic JPG files while Bun explains the native requirement",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-capture-jpg-"));
+    try {
+      const editor = new Editor();
+      editor.createElement("shape.geo", {
+        semantic: { geo: "rect", label: "" },
+        visual: { x: 0, y: 0, width: 120, height: 75 },
+      });
+      writeFileSync(
+        join(cwd, "panel.jsonl"),
+        serializeDocument(editor.getSnapshot()),
+      );
+      const run = (executable: string[], output: string) =>
+        Bun.spawnSync(
+          [
+            ...executable,
+            "capture",
+            "panel.jsonl",
+            "--output",
+            output,
+            "--padding",
+            "0",
+            "--quality",
+            "85",
+            "--json",
+          ],
+          { cwd },
+        );
+      for (const output of ["first.jpg", "second.jpeg"]) {
+        const native = run([binary as string], output);
+        expect(native.stderr.toString()).toBe("");
+        expect(native.exitCode).toBe(0);
+        const path = join(cwd, output);
+        const bytes = readFileSync(path);
+        expect([...bytes.subarray(0, 2)]).toEqual([0xff, 0xd8]);
+        expect([...bytes.subarray(-2)]).toEqual([0xff, 0xd9]);
+        const metadata = JSON.parse(native.stdout.toString()) as {
+          path: string;
+        };
+        expect(metadata).toMatchObject({
+          format: "jpg",
+          width: 120,
+          height: 75,
+          bytes: bytes.length,
+        });
+        expect(isAbsolute(metadata.path)).toBe(true);
+        expect(realpathSync(metadata.path)).toBe(realpathSync(path));
+      }
+      expect(readFileSync(join(cwd, "first.jpg"))).toEqual(
+        readFileSync(join(cwd, "second.jpeg")),
+      );
+      const bun = run([process.execPath, cliEntry], "bun.jpg");
+      expect(bun.exitCode).toBe(2);
+      expect(bun.stderr.toString()).toContain(
+        "JPG capture needs the native nodetto-cli.",
+      );
+      expect(existsSync(join(cwd, "bun.jpg"))).toBe(false);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
