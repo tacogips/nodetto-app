@@ -143,7 +143,7 @@ milestone that breaks it, not in M18.
 | M20 | implemented |
 | M14 | pending |
 | M21 | pending |
-| M15 | pending |
+| M15 | implemented |
 | M16 | pending |
 | M17 | pending |
 | M18 | pending |
@@ -628,6 +628,23 @@ three Chrome startup failures under the worktree write restriction. The
 Rust workspace passed 73 of 91 tests, with 18 macOS file-write permission
 failures under the same restriction. Logs are under
 `tmp/cad3d/m20-link-rework/`.
+
+M15 reconciles CAD page content after remote changes without losing records
+or references. All ten two-peer scenarios pass, including independent
+repairs of the same legacy edit and the sketch-delete race. In that race,
+the extrusion keeps its concurrently edited distance and reports
+`cad.reference.missing` after its sketch reference is detached.
+
+M15 deviations: the command layer applies repair delete/create pairs as
+page-only updates. This preserves references during the move and lets
+the existing Yjs differ publish only the changed page field. Legacy or tied
+page order keys use the existing deterministic normalization before inserting
+a recovery tab. If the standard recovery ID belongs to a page of a different
+kind, the repair picks the first compatible or available numbered suffix.
+
+The three milestone checks, repository TypeScript lint and typecheck, and
+the core CAD and command regression suite passed. Verification logs are
+under `tmp/cad3d/m15/`.
 
 ## Completion
 

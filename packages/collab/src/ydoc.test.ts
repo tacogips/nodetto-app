@@ -367,3 +367,56 @@ test("page connector routing survives collaboration and invalid values are dropp
     }).connectorRouting,
   ).toBeUndefined();
 });
+
+test("CAD face planes and extrusion body lists round-trip through a Y.Doc", () => {
+  const document: Document = {
+    schemaVersion: 1,
+    id: "clamp",
+    title: "Clamp",
+    pages: [{ id: "model", name: "Clamp", kind: "cad3d", order: "E" }],
+    elements: [
+      {
+        id: "blank",
+        page: "model",
+        type: "cad.extrude",
+        index: "G",
+        semantic: { name: "Blank", sketch: "profile", distance: 6, op: "new" },
+        visual: {},
+      },
+      {
+        id: "groove",
+        page: "model",
+        type: "cad.extrude",
+        index: "M",
+        semantic: {
+          name: "Groove",
+          sketch: "slot",
+          distance: -2,
+          op: "cut",
+          bodies: ["blank"],
+        },
+        visual: {},
+      },
+      {
+        id: "profile",
+        page: "model",
+        type: "cad.sketch",
+        index: "C",
+        semantic: { name: "Profile", plane: { base: "xy", offset: 4 } },
+        visual: {},
+      },
+      {
+        id: "slot",
+        page: "model",
+        type: "cad.sketch",
+        index: "J",
+        semantic: {
+          name: "Slot",
+          plane: { face: { feature: "blank", role: "end" } },
+        },
+        visual: {},
+      },
+    ],
+  };
+  expect(roundTrip(document)).toEqual(document);
+});
