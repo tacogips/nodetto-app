@@ -64,28 +64,25 @@ function fileDrop(
   );
 }
 
-function textDrop(target: Element, allowed = false) {
+function textDrop(target: Element) {
   const url = "https://example.invalid/reference";
   const values = {
     "text/uri-list": url,
-    "text/plain": allowed ? "diagram text" : url,
+    "text/plain": url,
   };
   for (const [type, value] of Object.entries(values)) {
     const transfer = new window.DataTransfer();
     transfer.setData(type, value);
     transfer.dropEffect = "copy";
-    const label = `${type} on ${target.tagName}.${target.className}`;
+    const control = target.getAttribute("type") ?? "";
+    const label = `${type} on ${target.tagName}[${control}].${target.className}`;
     assert.equal(
       drag(target, "dragover", transfer).defaultPrevented,
-      !allowed,
+      true,
       label,
     );
-    assert.equal(transfer.dropEffect, allowed ? "copy" : "none", label);
-    assert.equal(
-      drag(target, "drop", transfer).defaultPrevented,
-      !allowed,
-      label,
-    );
+    assert.equal(transfer.dropEffect, "none", label);
+    assert.equal(drag(target, "drop", transfer).defaultPrevented, true, label);
   }
 }
 
@@ -161,19 +158,32 @@ for (const theme of ["light", "dark"] as const) {
     }
     const textInput = host.querySelector('input[placeholder="Search shapes"]');
     assert.ok(textInput);
-    textDrop(textInput, true);
-    fileDrop(textInput, stl, "none");
 
     const fields = document.createElement("div");
     fields.innerHTML =
       '<textarea></textarea><div contenteditable=""><span class="editable-child">Draft</span><span class="non-editable-child" contenteditable="false">Label</span></div>';
     host.append(fields);
+    for (const type of [
+      "checkbox",
+      "color",
+      "range",
+      "radio",
+      "button",
+      "date",
+    ]) {
+      const input = document.createElement("input");
+      input.type = type;
+      fields.append(input);
+      textDrop(input);
+    }
+    textDrop(textInput);
+    fileDrop(textInput, stl, "none");
     const textarea = fields.querySelector("textarea");
     const editableChild = fields.querySelector(".editable-child");
     const nonEditableChild = fields.querySelector(".non-editable-child");
     assert.ok(textarea && editableChild && nonEditableChild);
-    textDrop(textarea, true);
-    textDrop(editableChild, true);
+    textDrop(textarea);
+    textDrop(editableChild);
     textDrop(nonEditableChild);
     fileDrop(editableChild, stl, "none");
     fields.remove();

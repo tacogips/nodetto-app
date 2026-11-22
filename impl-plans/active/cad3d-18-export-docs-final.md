@@ -65,11 +65,12 @@ export function cadPageSvgBody(wireframe: CadWireframe, options: { stroke: strin
   processes in the foreground and returns the Swift exit code.
 - In the packaged desktop webview, drop a valid STL onto the CAD viewport
   and verify that one undo removes the mesh. Drop a file, a browser link,
-  and plain text containing a URL outside a text field, including on the
-  palette and an open Export dialog. Verify that the app stays on the
-  current document with unsaved edits intact. Verify that external text
-  can still be dropped into a text field. Also exercise the STL picker and
-  save dialog and import a raster image by dropping it onto a 2D canvas.
+  and plain text containing a URL on the palette, an open Export dialog,
+  an inspector colour swatch and switch, and an editable text field.
+  Verify that the app stays on the current document with unsaved edits
+  intact and that the text field's value stays unchanged. Also exercise
+  the STL picker and save dialog and import a raster image by dropping it
+  onto a 2D canvas.
   Record the host, each outcome, and whether WebKitGTK was checked alongside
   the WKWebView report.
 - Native mesh validation deadline: a generated document with four
