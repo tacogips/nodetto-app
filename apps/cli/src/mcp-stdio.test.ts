@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
+import { Buffer } from "node:buffer";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { parseDocument } from "@nodetto/io";
 import type { CommandResult } from "./commands.ts";
 import { COMMAND_HELP } from "./help.ts";
@@ -25,6 +27,55 @@ const launches = [
     : []),
 ];
 for (const launch of launches) {
+  test(`MCP stdio ${launch.name} returns the PNG written by capture --inline`, async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-mcp-capture-"));
+    const document = "capture drawing.jsonl";
+    const output = join(cwd, "captured page.png");
+    const client = new Client({ name: "stdio-capture-test", version: "1" });
+    try {
+      writeFileSync(
+        join(cwd, document),
+        [
+          '{"kind":"document","schemaVersion":1,"id":"drawing","title":"Fixture drawing"}',
+          '{"kind":"page","id":"sheet","name":"Layout","pageKind":"freeform"}',
+          '{"kind":"element","id":"tile","page":"sheet","index":"a0","type":"node.generic","semantic":{"label":"Tile"},"visual":{"x":20,"y":20,"width":100,"height":60}}',
+          "",
+        ].join("\n"),
+      );
+      await client.connect(
+        new StdioClientTransport({
+          command: launch.command,
+          args: launch.args,
+          cwd,
+          stderr: "pipe",
+        }),
+      );
+      expect(client.getInstructions()).toContain("nodetto_capture");
+      const response = CallToolResultSchema.parse(
+        await client.callTool({
+          name: "nodetto_capture",
+          arguments: { args: [document, "--inline", "--output", output] },
+        }),
+      );
+      expect(response.isError).toBe(false);
+      expect(response.structuredContent?.stdout).toEqual(
+        expect.stringContaining(`path: ${output}\n`),
+      );
+      expect(response.content).toHaveLength(2);
+      const [first, image] = response.content;
+      if (first?.type !== "text" || image?.type !== "image") {
+        throw new Error("Expected text followed by an image");
+      }
+      expect(JSON.parse(first.text)).toEqual(response.structuredContent);
+      expect(image.mimeType).toBe("image/png");
+      const bytes = readFileSync(output);
+      expect([...bytes.subarray(0, 4)]).toEqual([137, 80, 78, 71]);
+      expect(Buffer.from(image.data, "base64")).toEqual(bytes);
+    } finally {
+      await client.close();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }, 10000);
   test(`MCP stdio ${launch.name}: real client, filesystem, renders and orderly shutdown`, async () => {
     const cwd = mkdtempSync(join(tmpdir(), "nodetto-mcp-"));
     const path = "document with spaces.jsonl";

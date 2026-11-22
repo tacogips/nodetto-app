@@ -91,6 +91,7 @@ configuration: {"command":"nodetto-cli","args":["mcp"]}.
 Every document command has a nodetto_<command> tool. nodetto_cli accepts any
 CLI command, including help and --version. Pass argument tokens in args and
 supply stdin for edit --ops -. Results contain exitCode, stdout and stderr.
+Use nodetto_capture to look at a page.
 Paths resolve from the server's working directory; absolute paths are advised.
 The native CLI accepts --cwd <folder> before any command, including mcp, to
 select the project directory explicitly (useful for the sandboxed Store build).
