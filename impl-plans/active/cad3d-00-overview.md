@@ -143,7 +143,7 @@ milestone that breaks it, not in M18.
 | M20 | implemented |
 | M14 | pending |
 | M21 | pending |
-| M15 | pending |
+| M15 | accepted |
 | M16 | pending |
 | M17 | pending |
 | M18 | pending |
@@ -647,6 +647,35 @@ worktree write restriction. The Rust workspace run passed 73 of 91 tests
 with 18 macOS file-write permission failures under the same restriction.
 The packaged webview check remains in M18. Logs are under
 `tmp/cad3d/m20-drop-rework/`.
+
+M15 reconciles CAD page content after remote changes without losing records
+or references. All ten two-peer scenarios pass, including independent
+repairs of the same legacy edit and the sketch-delete race. In that race,
+the extrusion keeps its concurrently edited distance and reports
+`cad.reference.missing` after its sketch reference is detached.
+
+M15 deviations: `packages/core/src/commands.ts` is outside the M15
+writePaths. It applies marked repair delete/create pairs as page-only
+updates, preserving references and concurrent field edits. The existing Yjs
+differ publishes only the changed page field. Marked commands stay in
+memory and out of undo history. Legacy or tied page order keys use the
+existing deterministic normalization before inserting a recovery tab. The
+repair applies kind restores before choosing relocation destinations. If the
+standard recovery ID still belongs to a page of a different kind after the
+restores, the repair picks the first compatible or available numbered suffix.
+M18 should update design section 4 to describe the page-only move, which
+preserves references without a semantic restore and keeps concurrent edits
+to other element fields.
+
+M15 review corrections cover both tab orders of a recovery page that also
+needs a kind restore, remote apply and attach on the same legacy state, and
+reconciliation of derived text sizing alongside a CAD content repair. All
+three M15 checks passed with 171, 12, and 11 tests, and repository
+TypeScript lint and typecheck passed. The full repository Bun suite passed
+4,434 tests with 74 skipped. Both new derived reconciliation tests fail
+when the repair append is removed in memory. Logs are under
+`tmp/cad3d/m15/rework/`. The parallel run on `feat/cad3d-m15-collab` accepted M15 in its second
+review round, and the branch was merged into `feat/cad3d-pages`.
 
 ## Completion
 

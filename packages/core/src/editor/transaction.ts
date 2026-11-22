@@ -3,8 +3,10 @@
 // carries) a batch implies. `Editor.apply` runs both as one history entry.
 
 import {
+  CAD_PAGE_KIND,
   type ElementId,
   type FrameSemantic,
+  isCadTypeName,
   UmlComponentType,
 } from "@nodetto/ir";
 import { planAspectRatios } from "../aspect-ratio.ts";
@@ -16,6 +18,7 @@ import {
   planBpmnTranslations,
 } from "../bpmn/containment.ts";
 import { planBreadboardTranslations } from "../breadboard/board-carry.ts";
+import { planContentRepair } from "../cad/content-repair.ts";
 import { planColorTokens } from "../color-tokens.ts";
 import { applyCommands, type Command } from "../commands.ts";
 import { planConstraints } from "../constraints.ts";
@@ -240,30 +243,28 @@ export function planDerivedCommands(input: DerivedPlanInput): Command[] {
 }
 
 /**
- * Derived colors/layout recomputed from merged state, or `null` when the
- * document has nothing derived to recompute.
+ * Derived colors/layout and page content repaired from merged state.
  */
 export function planReconciliation(
   store: Store,
   registry: ShapeUtilRegistry,
 ): Command[] | null {
-  if (
-    !store
-      .getSnapshot()
-      .elements.some(
-        (element) =>
-          element.type === UmlComponentType.Port ||
-          element.visual.colorTokens ||
-          element.visual.numberTokens ||
-          element.visual.textStyle ||
-          element.visual.aspectRatio !== undefined ||
-          element.visual.textResize === "auto-width" ||
-          element.visual.textResize === "auto-height" ||
-          (element.type === "frame" &&
-            (element.semantic as FrameSemantic).layout),
-      )
-  )
-    return null;
+  const elements = store.listElements();
+  const hasCad =
+    store.listPages().some((page) => page.kind === CAD_PAGE_KIND) ||
+    elements.some((element) => isCadTypeName(element.type));
+  const hasDerived = elements.some(
+    (element) =>
+      element.type === UmlComponentType.Port ||
+      element.visual.colorTokens ||
+      element.visual.numberTokens ||
+      element.visual.textStyle ||
+      element.visual.aspectRatio !== undefined ||
+      element.visual.textResize === "auto-width" ||
+      element.visual.textResize === "auto-height" ||
+      (element.type === "frame" && (element.semantic as FrameSemantic).layout),
+  );
+  if (!hasDerived) return hasCad ? planContentRepair(store) : null;
   const before = new Store(store.getSnapshot());
   const draft = new Store(before.getSnapshot());
   const commands = planTextStyles(draft, registry);
@@ -282,5 +283,6 @@ export function planReconciliation(
   commands.push(...planFrameTranslations(before, draft, registry));
   commands.push(...planConstraints(before, draft, registry));
   commands.push(...planUmlPorts(before, draft));
+  if (hasCad) commands.push(...planContentRepair(draft));
   return commands;
 }

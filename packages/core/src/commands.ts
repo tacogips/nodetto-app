@@ -46,7 +46,14 @@ import {
   referencesOf,
 } from "./references.ts";
 import type { Store } from "./store.ts";
-import { isFractionalKey } from "./fractional.ts";
+import { compareFractional, isFractionalKey } from "./fractional.ts";
+
+/**
+ * Internal marker for a delete immediately followed by same-id relocations.
+ * Keep marked commands in memory and out of history. Serialization drops the
+ * marker, and applyCommands' undo list is inapplicable to a repair batch.
+ */
+const RELOCATE_ELEMENTS = Symbol("relocate-elements");
 
 function validPageRouting(value: unknown): boolean {
   return (
@@ -81,7 +88,11 @@ export type Command =
       readonly document: { readonly slideSize?: SlideSize | null };
     }
   | { readonly type: "createElement"; readonly element: Element }
-  | { readonly type: "deleteElements"; readonly ids: readonly ElementId[] }
+  | {
+      readonly type: "deleteElements";
+      readonly ids: readonly ElementId[];
+      readonly [RELOCATE_ELEMENTS]?: true;
+    }
   | {
       readonly type: "updateVisual";
       readonly id: ElementId;
@@ -151,6 +162,24 @@ export class CommandError extends Error {
     this.name = "CommandError";
     this.issues = issues;
   }
+}
+
+/** Pair same-id deletes and creates for page-only reconciliation moves. */
+export function planElementRelocations(
+  elements: readonly Element[],
+  page: PageId,
+): Command[] {
+  const ordered = [...elements].sort((a, b) => compareFractional(a.id, b.id));
+  const commands: Command[] = [
+    {
+      type: "deleteElements",
+      ids: ordered.map(({ id }) => id),
+      [RELOCATE_ELEMENTS]: true,
+    },
+  ];
+  for (const element of ordered)
+    commands.push({ type: "createElement", element: { ...element, page } });
+  return commands;
 }
 
 /** A CAD kind change is allowed only to restore a page holding CAD content. */
@@ -553,6 +582,8 @@ export function applyCommands(
   const created = new Set<ElementId>();
   const updated = new Set<ElementId>();
   const removed = new Set<ElementId>();
+  const relocated = new Set<ElementId>();
+  const semanticChanges = new Set<ElementId>();
   const createdPages = new Set<PageId>();
   const updatedPages = new Set<PageId>();
   const removedPages = new Set<PageId>();
@@ -561,9 +592,10 @@ export function applyCommands(
   function* workingPageElements(pageId: PageId): Iterable<Element> {
     for (const { id } of store.getPageElements(pageId)) {
       const element = working.get(id);
-      if (element?.page === pageId && !created.has(id)) yield element;
+      if (element?.page === pageId && !created.has(id) && !relocated.has(id))
+        yield element;
     }
-    for (const id of created) {
+    for (const id of new Set([...created, ...relocated])) {
       const element = working.get(id);
       if (element?.page === pageId) yield element;
     }
@@ -641,7 +673,9 @@ export function applyCommands(
     return element as Element;
   };
 
-  for (const command of commands) {
+  let nextCommand = 0;
+  for (const [index, command] of commands.entries()) {
+    if (index < nextCommand) continue;
     switch (command.type) {
       case "createElement": {
         const issues = validateNewElement(working, pages, command.element);
@@ -658,6 +692,7 @@ export function applyCommands(
         if (contentIssue) fail([contentIssue], contentIssue.message);
         working.set(command.element.id, command.element);
         markCreate(command.element.id);
+        semanticChanges.add(command.element.id);
         undo.unshift({
           type: "deleteElements",
           ids: [command.element.id],
@@ -665,7 +700,36 @@ export function applyCommands(
         break;
       }
       case "deleteElements": {
-        undo.unshift(...removeElements(command.ids));
+        if (!command[RELOCATE_ELEMENTS]) {
+          undo.unshift(...removeElements(command.ids));
+          break;
+        }
+        // IDs survive the batch, so deletion policies do not apply. Resolve
+        // the new page from the matching create and retain the entire record.
+        const restore: Command[] = [command];
+        nextCommand = index + 1;
+        for (const id of command.ids) {
+          const create = commands[nextCommand++];
+          if (create?.type !== "createElement" || create.element.id !== id) {
+            const message = `Relocation requires a matching create for ${id}`;
+            throw new CommandError(
+              [error("command.relocation", "deleteElements.ids", message)],
+              message,
+            );
+          }
+          const previous = mustGet(id, "relocateElements");
+          const destination = mustGetPage(
+            create.element.page,
+            "relocateElements",
+          );
+          const issue = pageContentIssue(destination, previous.type);
+          if (issue) fail([issue], issue.message);
+          working.set(id, { ...previous, page: destination.id });
+          relocated.add(id);
+          markUpdate(id);
+          restore.push({ type: "createElement", element: previous });
+        }
+        undo.unshift(...restore);
         break;
       }
       case "updateVisual": {
@@ -723,6 +787,7 @@ export function applyCommands(
         }
         working.set(command.id, { ...previous, semantic: command.semantic });
         markUpdate(command.id);
+        semanticChanges.add(command.id);
         undo.unshift({
           type: "updateSemantic",
           id: command.id,
@@ -1099,15 +1164,6 @@ export function applyCommands(
   }
 
   // Validate against the completed batch so forward references work atomically.
-  const semanticChanges = new Set(
-    commands.flatMap((command) =>
-      command.type === "createElement"
-        ? [command.element.id]
-        : command.type === "updateSemantic"
-          ? [command.id]
-          : [],
-    ),
-  );
   const converted = new Set(
     commands.flatMap((command) =>
       command.type === "convertElement" ? [command.id] : [],
