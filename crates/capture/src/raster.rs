@@ -3,6 +3,7 @@
 use std::ops::RangeInclusive;
 use std::thread;
 
+use crate::interference;
 use crate::interval::{combine, Boundary, Intervals, MERGE_EPS};
 use crate::prism::PrismView;
 use crate::report::{BodyReport, BodyState, Report};
@@ -268,12 +269,12 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
     } else {
         threads
     }
-    .min(MAX_THREADS)
-    .min(bands);
-    let visibility = if threads == 1 {
+    .min(MAX_THREADS);
+    let picture_threads = threads.min(bands);
+    let visibility = if picture_threads == 1 {
         raster.bands(0, &mut output)
     } else {
-        let rows_per_worker = bands.div_ceil(threads) * BAND_ROWS;
+        let rows_per_worker = bands.div_ceil(picture_threads) * BAND_ROWS;
         let raster = &raster;
         thread::scope(|scope| {
             let mut workers = Vec::new();
@@ -313,14 +314,21 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
             open: false,
         })
         .collect();
+    drop(raster);
+    let (analysis, pairs) = if scene.analyse {
+        let (analysis, pairs) = interference::analyse_scene(scene, threads)?;
+        (Some(analysis), pairs)
+    } else {
+        (None, Vec::new())
+    };
     Ok((
         output,
         Report {
             width,
             height,
             bodies,
-            analysis: None,
-            pairs: Vec::new(),
+            analysis,
+            pairs,
         },
     ))
 }

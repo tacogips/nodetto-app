@@ -361,15 +361,18 @@ CAD pages.
   the picture only)`. When pairs could not be checked: `interference: 0
   found, 12 of 40 candidate pairs not checked (cell 4 mm)`, then lines
   `not checked: <a> x <b>` (the first twenty, then a count) and the hint
-  to narrow with `--interference-bodies`. With `--no-interference`:
-  `interference: not checked`.
+  to narrow with `--interference-bodies`. Report how many checked pairs
+  reached a refinement cap, including checked pairs where no hit was
+  sampled. The displayed cell still describes level 0 for those pairs.
+  With `--no-interference`: `interference: not checked`.
 
 `--json` prints the same data as one object with the keys `path`,
 `format`, `width`, `height`, `bytes`, `page` (`number`, `count`, `id`,
 `name`, `kind`), and for CAD pages `camera` (`view`, `direction`, `up`,
 `right`, `centre`, `mmPerPixel`), `frame`, `bodies` (`id`, `name`,
 `state`), `errors`, `interference` (`cellMm`, `candidates`, `checked`,
-`unchecked` as id pairs, `pairs` with `a`, `b`, names, `volumeMm3`,
+`unchecked` as id pairs, `cappedCount`, `cappedWithoutHit` as id pairs,
+`budget` in weighted rays, and `pairs` with `a`, `b`, names, `volumeMm3`,
 `min`, `max`, `source`). Warnings (document load, missing glyphs) go to
 stderr as today.
 
@@ -756,9 +759,11 @@ Analysis (independent of the camera):
    weighted rays). A ray of a candidate weighs `max(1, ceil(steps / 8))`,
    where `steps` counts the steps of the two bodies that survive the
    filter of step 3, so a pair with a 600-hole plate is sampled more
-   coarsely instead of taking longer. If even the minimum lattice (768
-   rays per candidate) does not fit, the candidates that fit are checked
-   in history order and the rest are reported by name as not checked.
+   coarsely instead of taking longer. The weight is an upper bound for
+   rays that skip more steps inside the candidate box. Report the
+   weighted ray budget in the analysis JSON. If the minimum lattice
+   (768 rays per candidate) does not fit, check the candidates that fit
+   in history order and report the rest by name.
    There is no fixed pair limit. Candidates are enumerated without
    storing more than can be checked plus the 256 that are listed; the
    rest are only counted.
@@ -767,7 +772,10 @@ Analysis (independent of the camera):
    unions and differences whose tool box meets `P` and every
    intersection (an intersection whose tool is elsewhere empties the
    body there). A ray hits when the two bodies' intervals overlap
-   by more than the tolerance.
+   by more than the tolerance. For a volume ray in a prism cap or side
+   plane, choose the same side in world coordinates even if the sketch
+   frames point in opposite directions. Surface shading retains its
+   original boundary rule.
 4. Refinement. A level-0 cell is replaced by `m x m` sub-rays when
    - its hit state differs from one of its four neighbours (`m = 8`): the
      boundary of the region, for the volume; or
@@ -778,14 +786,17 @@ Analysis (independent of the camera):
      sampled at one eighth of its size or finer. This is what finds a pin
      that is added, a pin that a ring-shaped cut leaves standing, and a
      peg of the other body.
-   At most 2,000,000 refinement rays per candidate and axis, in row
-   order, and in total at most the budget again, weighted the same way
-   and shared out beforehand in proportion to each candidate's level-0
-   work, so the result does not depend on thread scheduling; when a cap
-   stops refinement the pair is marked `capped` (its volume is then
-   approximate; detection by level 0 is not affected). The whole analysis therefore costs at most twice the
-   budget. Within a ray, a union or difference step whose tool's
-   projected box does not contain the ray is skipped.
+   Reserve small-loop cells in X, Y, Z order before using any allowance
+   for boundary-only cells. Sample cells in row order within each
+   priority. A candidate can use at most 2,000,000 refinement rays per
+   axis. The analysis budget also caps weighted refinement rays in
+   total. Each candidate receives an allowance in proportion to its
+   level-0 work before the threads run. Unrefined cells keep their centre
+   sample. When every sub-ray in a refined cell misses, preserve a hit
+   from its centre. A truncated pair is marked `capped`, and the report
+   counts it even if it produced no hit. The whole analysis costs at
+   most twice the budget. Within a ray, skip a union or difference step
+   when its projected box does not contain the ray.
 5. Result. A pair interferes when any axis has a hit. Its volume on an
    axis is the sum over leaf cells of overlap length times leaf area; the
    reported volume is the mean of the axes that hit; the box is the union
@@ -796,10 +807,11 @@ cell side used on any checked pair (`cell 0.25 mm`; larger when the
 budget forced it or a box is wider than 1024 cells). An interference is
 always found when, seen along X, Y or Z, it contains an axis-aligned
 square of side `c` over which the overlap is longer than the tolerance. Below that
-size it is found when it involves a sketch loop smaller than four cells
-(step 4), and otherwise it can be missed: a sliver between large faces
-that is thinner than `c` in two directions. The help and `docs/capture.md`
-state this in the same words.
+size, refinement samples around sketch loops smaller than four cells
+(step 4). A capped pair may miss such an overlap. A sliver between large
+faces thinner than `c` in two directions can also be missed. Report the
+cell rounded up to 0.001 mm so it remains an upper bound. The help and
+`docs/capture.md` state these limits.
 
 Spike (`tmp/capture/spike/r2.log`, one thread, cell 0.25 mm unless noted):
 

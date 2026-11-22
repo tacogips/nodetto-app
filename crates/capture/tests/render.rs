@@ -346,9 +346,11 @@ fn reports_and_encoded_images_are_deterministic_across_workers() {
         assert_eq!(first.image, second.image);
         assert_eq!(first.report, one.1.to_json());
         let expected = format!(
-            "{{\"width\":{},\"height\":{},\"bodies\":[{body},{body},{body}],\"analysis\":null,\"pairs\":[]}}",
+            "{{\"width\":{},\"height\":{},\"bodies\":[{body},{body},{body}],\"analysis\":{analysis},\"pairs\":[{pair}]}}",
             one.1.width, one.1.height,
             body = r#"{"state":"drawn","emptiedByStep":-1,"open":false}"#,
+            analysis = r#"{"cell":0.250,"candidates":1,"checked":1,"unchecked":[],"uncheckedCount":0,"cappedCount":0,"budget":24000000,"cappedWithoutHit":[]}"#,
+            pair = r#"{"a":0,"b":1,"volume":590.404,"min":[85.000,45.000,2.000],"max":[100.000,60.000,5.000],"source":"analysis","capped":false}"#,
         );
         assert_eq!(first.report, expected);
     }
@@ -399,10 +401,12 @@ fn references_meshes_and_interference_stay_out_of_the_m8_picture() {
     scene.bodies.push(reference);
     scene.bodies.push(body(&[(Op::Union, 2)]));
     scene.analyse = true;
+    scene.budget_million_rays = 1;
     scene.draw_interference = true;
     let (actual, report) = render_rgb(&scene, 2).unwrap();
     assert_eq!(baseline, actual);
-    assert!(report.analysis.is_none() && report.pairs.is_empty());
+    assert_eq!(report.analysis.unwrap().candidates, 0);
+    assert!(report.pairs.is_empty());
     assert_eq!(report.bodies[1].state, BodyState::Absent);
     assert_eq!(report.bodies[2].state, BodyState::Absent);
 }

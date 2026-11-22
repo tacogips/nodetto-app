@@ -96,13 +96,14 @@ pub struct PrismView {
     dy: f64,
     dz: f64,
     projected_length_sq: f64,
+    c_increases: bool,
     parallel: bool,
     bounds: ([f64; 3], [f64; 3]),
     edges: Vec<Edge>,
     buckets: Buckets,
 }
 
-fn orthonormal([u, v, n]: [[f64; 3]; 3]) -> bool {
+pub(crate) fn orthonormal([u, v, n]: [[f64; 3]; 3]) -> bool {
     const TOLERANCE: f64 = 1e-9;
     [u, v, n]
         .into_iter()
@@ -110,6 +111,15 @@ fn orthonormal([u, v, n]: [[f64; 3]; 3]) -> bool {
         && [(u, v), (u, n), (v, n)]
             .into_iter()
             .all(|(a, b)| dot(a, b).abs() <= TOLERANCE)
+}
+
+// Choose a common infinitesimal world direction ordered by X, Y, Z.
+fn increases_in_world(gradient: [f64; 3]) -> bool {
+    let scale = gradient.into_iter().map(f64::abs).fold(0.0, f64::max);
+    gradient
+        .into_iter()
+        .find(|value| value.abs() > 1e-12 * scale)
+        .is_some_and(|value| value > 0.0)
 }
 
 impl PrismView {
@@ -173,6 +183,9 @@ impl PrismView {
             dy,
             dz,
             projected_length_sq: dx * dx + dy * dy,
+            c_increases: increases_in_world(std::array::from_fn(|i| {
+                dx * prism.v[i] - dy * prism.u[i]
+            })),
             parallel,
             bounds,
             edges,
@@ -188,7 +201,7 @@ impl PrismView {
         self.buckets.average_occupancy
     }
 
-    fn slab(&self, z: f64) -> Option<[Boundary; 2]> {
+    fn slab<const FACETS: bool>(&self, z: f64, offset: [f64; 3]) -> Option<[Boundary; 2]> {
         let [start, end] = self.span;
         if !z.is_finite() {
             return None;
@@ -199,9 +212,25 @@ impl PrismView {
             face,
         };
         if self.dz.abs() <= 1e-12 {
-            return (start.min(end)..=start.max(end))
-                .contains(&z)
-                .then(|| [boundary(f64::NEG_INFINITY, 0), boundary(f64::INFINITY, 1)]);
+            let (lo, hi) = (start.min(end), start.max(end));
+            let inside = if FACETS {
+                (lo..=hi).contains(&z)
+            } else {
+                // Resolve coplanar volume rays consistently even if adjoining
+                // prisms use opposite normals. Shading retains its closed slab.
+                let normal = self.basis[2];
+                let error = 8.0
+                    * f64::EPSILON
+                    * (dot(normal.map(f64::abs), offset.map(f64::abs)) + lo.abs().max(hi.abs()));
+                let near_lo = (z - lo).abs();
+                let near_hi = (z - hi).abs();
+                if near_lo.min(near_hi) <= error {
+                    (near_lo <= near_hi) == increases_in_world(normal)
+                } else {
+                    (lo..hi).contains(&z)
+                }
+            };
+            return inside.then(|| [boundary(f64::NEG_INFINITY, 0), boundary(f64::INFINITY, 1)]);
         }
         let a = boundary((start - z) / self.dz, 0);
         let b = boundary((end - z) / self.dz, 1);
@@ -253,20 +282,48 @@ impl PrismView {
         out.clear();
         let offset = std::array::from_fn(|axis| ray.origin[axis] - self.origin[axis]);
         let [x, y, z] = self.basis.map(|axis| dot(offset, axis));
-        let Some([near, far]) = self.slab(z) else {
+        let Some([near, far]) = self.slab::<FACETS>(z, offset) else {
             return;
         };
         let c = self.dx * y - self.dy * x;
         let mut inside = false;
+        // Resolve crossings on a shared side using the same infinitesimal
+        // world direction as the cap test, even in reversed sketch frames.
+        let error = if FACETS {
+            0.0
+        } else {
+            8.0 * f64::EPSILON * offset.into_iter().map(f64::abs).sum::<f64>()
+        };
+        let c_error = (self.dx.abs() + self.dy.abs()) * error;
+        let after_ray = |end: f64| {
+            if !FACETS && (end - c).abs() <= c_error {
+                !self.c_increases
+            } else {
+                end > c
+            }
+        };
         for &index in self.buckets.at(c) {
             let edge = &self.edges[index];
-            if (edge.ca > c) == (edge.cb > c) {
+            if after_ray(edge.ca) == after_ray(edge.cb) {
                 continue;
             }
             let fraction = (c - edge.ca) / (edge.cb - edge.ca);
+            let fraction = if FACETS {
+                fraction
+            } else {
+                fraction.clamp(0.0, 1.0)
+            };
             let qx = edge.a[0] + fraction * (edge.b[0] - edge.a[0]);
             if self.parallel {
-                inside ^= qx > x;
+                let side = if !FACETS && (qx - x).abs() <= error {
+                    let rise = edge.b[1] - edge.a[1];
+                    let slope = (edge.b[0] - edge.a[0]) / rise;
+                    let [u, v, _] = self.basis;
+                    increases_in_world(std::array::from_fn(|i| slope * v[i] - u[i]))
+                } else {
+                    qx > x
+                };
+                inside ^= side;
                 continue;
             }
             let qy = edge.a[1] + fraction * (edge.b[1] - edge.a[1]);

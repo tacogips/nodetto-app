@@ -6,10 +6,12 @@
   `crates/capture/src/interference.rs` (new),
   `crates/capture/src/report.rs` (JSON of `analysis` and `pairs`),
   `crates/capture/src/lib.rs`, `crates/capture/tests/interference.rs`
-  (new)
-- Pre-authorised: none. The picture does not change in this milestone,
-  so the committed pixel digest in `crates/capture/tests/render.rs` is
-  not touched.
+  (new), `crates/capture/src/raster.rs` (call the analysis),
+  `crates/capture/src/prism.rs` (cap ownership for volume rays),
+  `crates/capture/tests/render.rs` (report assertions),
+  `impl-plans/active/capture-00-overview.md`,
+  `design-docs/specs/design-ai-capture.md`
+- The committed pixel digest remains the M8 digest.
 
 ## Contract
 
@@ -63,11 +65,12 @@ pub fn analyse_pair(scene: &Scene, candidate: &Candidate, cell: f64, refinement:
   box of a small loop (a loop of any step tool of the requested bodies
   whose projected box is narrower than four cells in a lattice direction)
   gets `m x m` with `m = clamp(ceil(8 * max(cell_a / side_a, cell_b /
-  side_b)), 8, 64)`; the larger `m` wins. Refined cells are visited in
-  row order until 2,000,000 refinement rays for this candidate and axis
-  or until the candidate's refinement allowance is used up; then
-  `capped` is set and the remaining cells keep their centre ray. The
-  allowance is fixed before the pairs run, so results do not depend on
+  side_b)), 8, 64)`; the larger `m` wins. Reserve small-loop cells across
+  all axes before boundary-only cells, then visit by row within each
+  priority and axis. The 2,000,000-ray axis cap and the pair allowance
+  bound refinement. If either truncates work, set `capped`. Unrefined
+  cells retain their centre ray. A centre hit survives when all its sub-rays
+  miss. The allowance is fixed before the pairs run, so results do not depend on
   thread scheduling: the analysis budget again, shared out in proportion
   to each checked candidate's level-0 work (`allowance = floor(budget *
   work / total work)`, which is at least the candidate's own level-0
@@ -84,15 +87,17 @@ pub fn analyse_pair(scene: &Scene, candidate: &Candidate, cell: f64, refinement:
   candidate order), `Report.pairs`, and `Report.analysis` with
   `candidates`, `checked`, `cell` (the largest cell used on any checked
   candidate; the target cell when there is none), `unchecked_count` and
-  the first 256 unchecked pairs. The picture is not changed here.
+  the first 256 unchecked pairs. Report the weighted budget, the number
+  of capped candidates and every capped candidate without a hit.
+  The picture is not changed here.
 - Only `+ - * /`, comparisons and `sqrt`; lattice coordinates are
   computed as `min + (i + 0.5) * side / n`, never accumulated.
 
 ## Tests (`tests/interference.rs`, scenes built in code; exact volumes computed in the test from the polygons)
 
-- Fixture pair Plate and Block: one pair, volume within 1% of 637.362,
-  box within 0.25 mm of (85,45,2)..(100,60,5); Puck interferes with
-  nothing; the reported cell is 0.25.
+- Fixture pair Plate and Block: one pair, volume within 1% of its analytical
+  polygonal volume, box within 0.25 mm of (85,45,2)..(100,60,5).
+  Puck interferes with nothing. The reported cell is 0.25.
 - The reviewer's case: plate 200 x 200 x 5 with an added pin of diameter
   1.5 and height 10 at the centre, cover 200 x 200 x 5 on top: one pair,
   volume within 3% of the 64-sided pin's 8.822 mm3; the same with the pin
@@ -148,4 +153,42 @@ pub fn analyse_pair(scene: &Scene, candidate: &Candidate, cell: f64, refinement:
 
 ## Progress
 
-Pending.
+Implemented, awaiting review.
+
+- The renderer runs three-axis prism analysis when the scene enables
+  it. Reports preserve candidate order across workers and keep capped
+  candidates without hits. The crate reports the weighted budget and
+  the cap count. M20 will surface these fields and the qualified
+  guarantee in CLI output and help.
+- CAP-M7-02: volume rays use world-coordinate boundary ownership in
+  shared cap and side planes. Tests exercise opposite sketch frames
+  and a lattice ray in a shared plane. M17 still needs the overlay
+  contact test. CAP-M6-02: analysis is gated on the analyse bit, with a
+  regression for a draw bit set alone.
+- CAP-R3-01 and CAP-R3-02: small-loop work has priority across axes.
+  The analysis JSON preserves capped misses and exposes the weighted
+  ray budget. CAP-M8-02: serialization supplies a numeric zero for a
+  non-finite field. The wire cell rounds up to the displayed precision.
+- The planned Plate and Block value of 637.362 mm3 counted only one
+  hole. Their shared box covers one whole hole, two half holes and a
+  quarter hole. The polygonal volume is 590.721 mm3, and the measured
+  590.404 mm3 is within the original 1% tolerance.
+- The render test updates the expected report and still pins the M8
+  pixel digest. M9 added different tests at the end of that file, so
+  the shared path has disjoint edits and neither milestone needs the
+  other's changes. The overview records the shared path.
+- All three milestone gates passed. Debug tests passed with 61 and 28
+  tests in gates 1 and 3, respectively. Gate 2 passed 15 release tests.
+  The one-worker release cases took 86 ms for the pin, 82 ms for the
+  2,000-box page and 390 ms for the 600-hole plate. Logs are in
+  `tmp/capture/m10/`.
+
+- Workspace typecheck, formatting and lint passed. The full Bun suite
+  passed with 4,682 passes and 82 skips across 738 files. The later
+  desktop test phase of `mise run verify` hit the same 17 Foundation
+  atomic-write denials recorded in M9 under the worktree-only write
+  guard. All 29 native CLI tests passed. The supplemental native
+  file-contract suite hit the Foundation atomic-write denial recorded
+  in M3. See `tmp/capture/m10/workspace-verify.log` and
+  `tmp/capture/m10/native-tests.log`. The rebuilt release CLI passed
+  all five capture parity tests in `tmp/capture/m10/native-parity.log`.

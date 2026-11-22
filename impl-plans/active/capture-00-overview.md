@@ -79,14 +79,14 @@ Every sharing pair is ordered by `dependsOn`.
 | `packages/core/src/capture/describe.ts` and its test | M20, M18 |
 | `Cargo.toml`, `Cargo.lock` | M4, M14 |
 | `crates/capture/src/lib.rs` | M4, M6, M7, M8, M10, M17, M18, M11, M12 |
-| `crates/capture/src/raster.rs` | M8, M17, M18, M11, M12 |
+| `crates/capture/src/raster.rs` | M8, M10, M17, M18, M11, M12 |
 | `crates/capture/src/shade.rs` | M8, M17, M11 |
 | `crates/capture/src/report.rs` | M8, M10, M18 |
 | `crates/capture/src/interference.rs` | M10, M17, M11 |
 | `crates/capture/src/lattice.rs` | M10, M18, M11 |
 | `crates/capture/tests/scene.rs` | M6, M9 |
 | `crates/capture/tests/intervals.rs` | M7, M9 |
-| `crates/capture/tests/render.rs` | M8, M9, M17 |
+| `crates/capture/tests/render.rs` | M8, M9, M10, M17 |
 
 M13 writes only `apps/cli/src/mcp.ts`, `mcp-image.ts`, their tests,
 `apps/cli/native/src/mcp.rs`, `apps/cli/src/help.ts` (the `mcp` page) and

@@ -2,7 +2,9 @@
 
 pub mod encode;
 mod flatten;
+pub mod interference;
 pub mod interval;
+pub mod lattice;
 pub mod prism;
 mod raster;
 pub mod report;
