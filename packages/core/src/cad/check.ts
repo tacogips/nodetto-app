@@ -26,17 +26,31 @@ function includeTool(
   max: MutableVec3,
 ): void {
   for (const axis of AXES) {
-    for (const { points } of loops) {
-      for (let i = 0; i < points.length; i += 2) {
-        const x = coordinate(points, i);
-        const y = coordinate(points, i + 1);
-        const base = o[axis] + u[axis] * x + v[axis] * y;
-        const start = base + n[axis] * t0;
-        const end = base + n[axis] * t1;
-        min[axis] = Math.min(min[axis], start, end);
-        max[axis] = Math.max(max[axis], start, end);
+    const origin = o[axis];
+    const alongX = u[axis];
+    const alongY = v[axis];
+    let lower = origin;
+    let upper = origin;
+    // On a constant axis all profile vertices have the same projection.
+    if (alongX !== 0 || alongY !== 0) {
+      lower = Number.POSITIVE_INFINITY;
+      upper = Number.NEGATIVE_INFINITY;
+      for (const { points } of loops) {
+        for (let i = 0; i < points.length; i += 2) {
+          const base =
+            origin +
+            alongX * coordinate(points, i) +
+            alongY * coordinate(points, i + 1);
+          if (base < lower) lower = base;
+          if (base > upper) upper = base;
+        }
       }
     }
+    // The same endpoint offsets apply to every vertex on this axis.
+    const start = n[axis] * t0;
+    const end = n[axis] * t1;
+    min[axis] = Math.min(min[axis], lower + Math.min(start, end));
+    max[axis] = Math.max(max[axis], upper + Math.max(start, end));
   }
 }
 
@@ -68,11 +82,10 @@ export function checkCadPage(
       .get(id)
       ?.find((ref) => !status.get(ref)?.ok);
     const targets = history.targets.get(id) ?? [];
-    const missing = failed ?? targets.find((target) => !bodies.has(target));
-    if (missing !== undefined) {
+    if (failed !== undefined) {
       const code =
-        targets.includes(missing) &&
-        history.byId.get(missing)?.type === "cad.mesh"
+        targets.includes(failed) &&
+        history.byId.get(failed)?.type === "cad.mesh"
           ? "cad.body.missing"
           : "cad.reference.failed";
       status.set(id, cadFailure(code));
@@ -82,18 +95,28 @@ export function checkCadPage(
       const frame = geometry.sketch(feature.semantic.plane);
       if ("ok" in frame) status.set(id, frame);
       else geometry.frames.set(id, frame);
-    } else if (!feature.semantic.suppressed) {
-      if (feature.type === "cad.mesh") {
-        bodies.add(id);
-        continue;
-      }
-      const tool = geometry.extrude(feature.semantic);
-      if ("ok" in tool) status.set(id, tool);
-      else {
-        geometry.extrudes.set(id, tool);
-        if (feature.semantic.op === "new") bodies.add(id);
-        includeTool(tool, min, max);
-      }
+      continue;
+    }
+    if (feature.semantic.suppressed) continue;
+    if (feature.type === "cad.mesh") {
+      bodies.add(id);
+      continue;
+    }
+    for (const target of targets) {
+      if (bodies.has(target)) continue;
+      const code =
+        history.byId.get(target)?.type === "cad.mesh"
+          ? "cad.body.missing"
+          : "cad.reference.failed";
+      status.set(id, cadFailure(code));
+    }
+    if (!status.get(id)?.ok) continue;
+    const tool = geometry.extrude(feature.semantic);
+    if ("ok" in tool) status.set(id, tool);
+    else {
+      geometry.extrudes.set(id, tool);
+      if (feature.semantic.op === "new") bodies.add(id);
+      includeTool(tool, min, max);
     }
   }
 

@@ -1,4 +1,4 @@
-import { checkCadPage } from "@nodetto/core";
+import { checkCadPage, compareFractional } from "@nodetto/core";
 import { CAD_PAGE_KIND, type Element } from "@nodetto/ir";
 import {
   type CommandIo,
@@ -44,7 +44,13 @@ export function cadCommand(
   const byPage = new Map(pages.map(({ id }) => [id, [] as Element[]]));
   for (const element of document.elements)
     byPage.get(element.page)?.push(element);
-  const reports = pages.map(({ id }) => checkCadPage(byPage.get(id) ?? [], id));
+  const reports = pages.map(({ id }) => {
+    const report = checkCadPage(byPage.get(id) ?? [], id);
+    return {
+      ...report,
+      errors: [...report.errors].sort((a, b) => compareFractional(a.id, b.id)),
+    };
+  });
   const hasErrors = reports.some(({ errors }) => errors.length > 0);
   const exitCode = hasErrors ? EXIT_DRIFT : EXIT_OK;
   if (parsed.flags.has("--json"))

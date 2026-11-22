@@ -78,6 +78,38 @@ test("cad check reports invalid profiles with exit 1 and supports selecting a cl
   expect(run("--page", "spare").exitCode).toBe(0);
 });
 
+test("cad check sorts diagnostics by element ID regardless of JSONL record order", () => {
+  const keep = ["bracket-bottom", "bracket-extrude"];
+  const [header, ...records] = serializeDocument({
+    ...document,
+    elements: document.elements.filter(({ id }) => keep.includes(id)),
+  })
+    .trimEnd()
+    .split("\n");
+  const pages = records.filter((record) => record.includes('"kind":"page"'));
+  const elements = records.filter((record) =>
+    record.includes('"kind":"element"'),
+  );
+  const run = (rows: readonly string[], ...args: string[]) =>
+    runCli(
+      ["cad", "check", "broken.jsonl", "--page", "bracket", ...args],
+      { ...io, readText: () => [header, ...pages, ...rows, ""].join("\n") },
+      "test",
+    );
+  const reversed = elements.slice().reverse();
+  const text = run(reversed);
+  expect(text).toEqual(run(elements));
+  expect(text.exitCode).toBe(1);
+  expect(text.stdout).toContain(
+    "bracket-b cad.reference.missing\nbracket-e cad.reference.missing\n",
+  );
+  const json = run(reversed, "--json");
+  expect(json).toEqual(run(elements, "--json"));
+  expect(JSON.parse(json.stdout)[0].errors).toEqual(
+    keep.map((id) => ({ id, code: "cad.reference.missing" })),
+  );
+});
+
 test("cad check exits 2 for bad arguments, an invalid file or no CAD page", () => {
   for (const args of [
     ["cad"],
@@ -124,9 +156,14 @@ test("types and help advertise CAD authoring and check", () => {
   expect(entries.every(({ pageKinds }) => pageKinds.join() === "cad3d")).toBe(
     true,
   );
-  expect(runCli(["cad", "--help"], io, "test").stdout).toContain(
+  const help = runCli(["cad", "--help"], io, "test").stdout;
+  for (const text of [
     "Exit codes: 0 clean, 1 CAD errors, 2 usage",
-  );
+    "cad.order.forward      A feature depends on a later feature.",
+    "cad.profile.open       Profile edges do not form closed loops.",
+    "cad.mesh.invalid       An imported mesh has invalid fields.",
+  ])
+    expect(help).toContain(text);
 });
 
 test("MCP cad check returns the CLI report and edit enforces the CAD boundary", async () => {

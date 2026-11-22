@@ -63,17 +63,20 @@ nativeTest(
 );
 
 nativeTest(
-  "native validate and cad check each finish within 10 seconds for 10,000 CAD elements",
+  "native validate and cad check each finish within 10 seconds for 10,000 CAD elements including extrusions",
   () => {
     if (!binary) throw new Error("Expected the native CLI binary");
     mkdirSync(scratch, { recursive: true });
     const cwd = mkdtempSync(join(scratch, "large-"));
     try {
-      const doc = generateCadDocument({ features: 500, entitiesPerSketch: 19 });
+      const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
       expect(doc.elements).toHaveLength(10_000);
+      expect(
+        doc.elements.filter(({ type }) => type === "cad.extrude"),
+      ).toHaveLength(500);
       const file = join(cwd, "large.jsonl");
       writeFileSync(file, serializeDocument(doc));
-      for (const args of [["validate"], ["cad", "check"]]) {
+      for (const args of [["validate"], ["cad", "check", "--json"]]) {
         const started = performance.now();
         const result = Bun.spawnSync([binary, ...args, file], { cwd });
         const elapsed = performance.now() - started;
@@ -82,6 +85,17 @@ nativeTest(
         );
         expect(result.stderr.toString()).toBe("");
         expect(result.exitCode).toBe(0);
+        if (args[0] === "cad") {
+          expect(JSON.parse(result.stdout.toString())).toEqual([
+            {
+              pageId: doc.pages[0]?.id,
+              features: 1_000,
+              entities: 9_000,
+              errors: [],
+              bounds: { min: [-3, -3, 0], max: [30, 3, 4] },
+            },
+          ]);
+        }
         expect(elapsed).toBeLessThan(10_000);
       }
     } finally {

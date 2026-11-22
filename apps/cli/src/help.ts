@@ -897,6 +897,23 @@ Text lists each page's counts and each error's short element ID and code.
 CAD elements belong on cad3d pages. CAD pages also accept document
 resources. The app regenerates solid geometry.
 
+CAD status codes:
+  cad.reference.missing  A required reference is missing or invalid.
+  cad.reference.failed   A required feature failed or is unavailable.
+  cad.order.forward      A feature depends on a later feature.
+  cad.cycle              Features depend on one another in a cycle.
+  cad.feature.invalid    A sketch or extrusion has invalid fields.
+  cad.profile.invalid    A sketch entity or extrusion profile is invalid.
+  cad.profile.open       Profile edges do not form closed loops.
+  cad.profile.branch     More than two profile edges meet at a vertex.
+  cad.profile.intersect  Profile edges cross, touch or overlap unexpectedly.
+  cad.profile.empty      No usable closed profile was selected.
+  cad.plane.notPlanar    A sketch references a curved face.
+  cad.body.missing       A boolean has no available target body.
+  cad.body.reference     A boolean's target list is invalid.
+  cad.limit              CAD geometry or record counts exceed limits.
+  cad.mesh.invalid       An imported mesh has invalid fields.
+
 Exit codes: 0 clean, 1 CAD errors, 2 usage, invalid input or no CAD page.`,
 
   drawio: `Usage: nodetto-cli drawio import <file.drawio> [--output <doc.jsonl>] [--strict]

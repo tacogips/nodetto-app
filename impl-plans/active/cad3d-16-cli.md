@@ -76,9 +76,11 @@ export function generateCadDocument(options: { features: number; entitiesPerSket
 - `native-parity/cad.test.ts` (runs when `NODETTO_CLI_TEST_BINARY` is
   set, like the other parity files): byte parity of `cad check`,
   `validate` and one `edit` batch between Bun and the binary;
-  `generateCadDocument({features: 500, entitiesPerSketch: 19})` (10,000
-  records) passes `validate` and `cad check` natively in under 10,000 ms
-  each; the built engine bundle contains no `WebAssembly` identifier.
+  `generateCadDocument({features: 500, entitiesPerSketch: 18})` emits
+  10,000 records: 500 sketches, each with an eight-edge profile, ten
+  circular holes and one extrusion. Native `validate` and `cad check` each
+  finish in under 10,000 ms, and `cad check` reports zero errors and the
+  swept bounds. The built engine bundle contains no `WebAssembly` identifier.
 
 ## Acceptance criteria
 
@@ -106,10 +108,24 @@ overlaps, whose existing PCB paths permit those modes. The CLI filters CAD
 pages before lint selection so app-mode and font-coverage checks also skip
 them. The existing `types` catalogue already included CAD.
 
-All four milestone checks passed. The 20,000-element Bun case includes
-100 extrusion tools and took 46.1 ms in the primary check. The native
-10,000-element case has 500 sketches with 19 circles each. Native
-`validate` took 4.05 s and `cad check` took 4.23 s. The release engine had no
-`WebAssembly` identifier and matched Bun output and saved edit bytes.
-Repository TypeScript lint and typecheck, 190 related regressions, and five
-MCP stdio tests passed. Logs are under `tmp/cad3d/m16/`.
+The review revision aligns the diagnostic pass with the evaluator's
+dependency and suppression order and compares both results on suppressed
+and failed inputs. CAD help documents the status codes. CLI diagnostics
+are sorted by full element ID, and kind-lock errors use page-specific text.
+
+The generator now assigns distinct increasing fractional keys and uses
+one extrusion per sketch. The Bun and native budget tests both run profile
+construction, including circular tessellation and nesting, on every
+sketch. Swept bounds reduce the projected vertices before applying the
+constant start and end offsets for each axis. The 20,000-record Bun check
+took 96.9 ms. On the mixed 10,000-record fixture, native `validate` took
+4.78 s and `cad check` took 8.43 s, with zero errors and verified bounds.
+
+Circle-heavy performance remains open. On an isolated release retry, 500
+sketches with 18 circles and one extrusion each took 11.25 s for native
+`cad check` and 4.21 s for `validate`. The review's 10,000-record case
+with one sketch, 9,998 circles and one extrusion took 85.76 s for
+`cad check` and 3.32 s for `validate`. Section 14's general 10 s target
+needs work in the shared loop builder or an explicit design decision.
+The deadline remains 10,000 ms. Revision logs are under
+`tmp/cad3d/m16/revision/`.

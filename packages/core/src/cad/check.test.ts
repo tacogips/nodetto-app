@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
 import type { Element } from "@nodetto/ir";
+import { isFractionalKey } from "../fractional.ts";
 import { isElementIdFormat } from "../ids.ts";
 import { checkCadPage } from "./check.ts";
+import { createCadMemo, evaluateCadPage, releaseCadMemo } from "./evaluate.ts";
 import {
   CAD_TEST_PAGE,
   bossOnFace,
@@ -12,6 +14,7 @@ import {
   sketch,
 } from "./testing/documents.ts";
 import { generateCadDocument } from "./testing/generate.ts";
+import { RecordingKernel } from "./testing/recording-kernel.ts";
 
 const report = (elements: readonly Element[]) =>
   checkCadPage(elements, CAD_TEST_PAGE.id);
@@ -198,6 +201,46 @@ test("extent limits apply after transforming the tool and suppressed bodies are 
   });
 });
 
+test.each([
+  ["suppressed cut, suppressed body", true, true, false, []],
+  ["active cut, suppressed body", false, true, false, ["cut"]],
+  ["suppressed cut, failed body", true, false, true, ["body", "cut"]],
+] as const)(
+  "check and evaluator agree for a %s",
+  (_label, suppressed, suppressBody, failBody, failedIds) => {
+    const elements = [
+      sketch("base", "a1"),
+      ...rectangle("base", 0, 0, 4, 4),
+      ...(failBody ? [sketch("empty", "a2")] : []),
+      extrude("body", "a3", {
+        sketch: failBody ? "empty" : "base",
+        distance: 2,
+        op: "new",
+        suppressed: suppressBody,
+      }),
+      extrude("cut", "a4", {
+        sketch: "base",
+        distance: -2,
+        op: "cut",
+        bodies: ["body"],
+        suppressed,
+      }),
+    ];
+    const kernel = new RecordingKernel();
+    const memo = createCadMemo(kernel);
+    try {
+      const { status } = evaluateCadPage(elements, kernel, memo);
+      const errors = [...status].flatMap(([id, result]) =>
+        result.ok ? [] : [{ id, code: result.code }],
+      );
+      expect(errors.map(({ id }) => id)).toEqual([...failedIds]);
+      expect(report(elements).errors).toEqual(errors);
+    } finally {
+      releaseCadMemo(memo);
+    }
+  },
+);
+
 test("CAD document generator is repeatable and uses unique production-format IDs", () => {
   const options = { features: 4, entitiesPerSketch: 19 };
   const doc = generateCadDocument(options);
@@ -207,31 +250,35 @@ test("CAD document generator is repeatable and uses unique production-format IDs
     ...doc.pages.map(({ id }) => id),
     ...doc.elements.map(({ id }) => id),
   ];
-  expect(doc.elements).toHaveLength(80);
+  expect(doc.elements).toHaveLength(84);
   expect(new Set(ids).size).toBe(ids.length);
   expect(ids.every(isElementIdFormat)).toBe(true);
+  expect(doc.elements.filter(({ type }) => type === "cad.line")).toHaveLength(
+    32,
+  );
+  expect(doc.elements.filter(({ type }) => type === "cad.circle")).toHaveLength(
+    44,
+  );
+  expect(
+    doc.elements.filter(({ type }) => type === "cad.extrude"),
+  ).toHaveLength(4);
+  const indexes = doc.elements.map(({ index }) => index);
+  expect(indexes.every(isFractionalKey)).toBe(true);
+  expect([...new Set(indexes)].sort()).toEqual(indexes);
 });
 
 test("check handles 20,000 CAD elements in under one second", () => {
-  const doc = generateCadDocument({ features: 995, entitiesPerSketch: 19 });
+  const doc = generateCadDocument({ features: 1_000, entitiesPerSketch: 18 });
   const page = doc.pages[0];
   if (!page) throw new Error("Expected the generated CAD page");
-  const tools = doc.elements
-    .filter(({ type }) => type === "cad.sketch")
-    .slice(0, 100)
-    .map(({ id }) => ({
-      ...extrude(`tool-${id}`, "a3", { sketch: id, distance: 4, op: "new" }),
-      page: page.id,
-    }));
-  const elements = [...doc.elements, ...tools];
-  expect(elements).toHaveLength(20_000);
+  expect(doc.elements).toHaveLength(20_000);
   const start = performance.now();
-  const result = checkCadPage(elements, page.id);
+  const result = checkCadPage(doc.elements, page.id);
   const elapsed = performance.now() - start;
   console.log(`CAD check, 20,000 elements: ${elapsed.toFixed(1)} ms`);
   expect(result).toMatchObject({
-    features: 1095,
-    entities: 18_905,
+    features: 2_000,
+    entities: 18_000,
     errors: [],
   });
   expect(elapsed).toBeLessThan(1000);

@@ -67,6 +67,11 @@ test.each([
     ]);
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain(code);
+    if (code === "page.kindLocked") {
+      expect(result.stderr).toContain("page.kind: CAD page kind is locked");
+      expect(result.stderr).not.toContain("invalid element");
+      expect(result.stderr).not.toContain("nodetto-cli types");
+    }
     expect(file.writes).toBe(0);
     expect(file.text).toBe(source);
   },
