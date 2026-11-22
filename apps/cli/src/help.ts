@@ -39,7 +39,6 @@ MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
   nodetto-cli authorize [folder]  Grant project-folder access for the Store CLI
 Global --quiet suppresses warning lines.
-
 Run "nodetto-cli help <command>" or "nodetto-cli <command> --help" for details.
 AI loop: inspect -> shapes/types -> edit --snapshot -> export (look at the PNG)
 -> diff <snapshot> <doc> later; the app shows and merges the edits live.`;
