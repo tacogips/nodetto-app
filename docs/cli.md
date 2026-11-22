@@ -100,6 +100,29 @@ nodetto-cli export board.jsonl --format svg --output board.svg
 See [KiCad PCB boards](pcb/kicad-pcb.md) for supported content, editing and
 export details.
 
+## 3D CAD
+
+```bash
+nodetto-cli cad check bracket.jsonl
+nodetto-cli cad check bracket.jsonl --page "Angle bracket" --json
+nodetto-cli types --kind cad3d
+nodetto-cli help edit
+```
+
+`cad check` checks every CAD page by default. Select one with its page ID,
+short ID or name. The text output lists feature, sketch entity and error
+counts by page. JSON includes full IDs and bounds in millimetres for the
+extrusion tools, including cuts. Bounds are `null` if there are no valid
+tools. The app regenerates the solid model. The check exits 0 for a clean
+report, 1 for CAD errors, and 2 for invalid input, usage or a file with no
+CAD pages.
+
+Use `edit` with `add-page` and kind `cad3d`, then `add` sketch entities and
+features. The edit help includes a working batch. CAD elements require a
+CAD page, and CAD pages hold CAD elements and document resources. Editing
+across that boundary reports `page.contentKind`. Changing an existing
+page to or from the CAD kind reports `page.kindLocked`.
+
 ## Drawing with AI agents and live co-editing
 
 `nodetto-cli` also lets an AI agent (or any script) draw, check its work as an
@@ -289,7 +312,7 @@ The desktop bundle includes the same native MCP server.
 The server exposes `nodetto_inspect`, `nodetto_types`, `nodetto_edit`,
 `nodetto_arrange`, `nodetto_export`, `nodetto_diff`, `nodetto_validate`,
 `nodetto_format`, `nodetto_ddl`, `nodetto_lint`, `nodetto_bpmn`, and
-`nodetto_open`, and `nodetto_authorize`. Each takes an `args` array containing the arguments after its
+`nodetto_open`, `nodetto_cad`, and `nodetto_authorize`. Each takes an `args` array containing the arguments after its
 command name. All options work exactly as in the terminal. `nodetto_help`
 accepts `[]` for the overview or `["edit"]` for detailed command help;
 `nodetto_cli` accepts the complete CLI argument array, including a command
@@ -331,6 +354,7 @@ Stdout carries only MCP messages; disconnecting the client stops the server.
 | sequence | Excluded: participant and message order define geometry | Excluded, same reason | No |
 | breadboard | Excluded: physical holes and electrical wires | Excluded, same reason | No; crossings are physical |
 | pcb | Excluded: physical footprints and tracks | Excluded, same reason | No |
+| cad3d | Excluded: parametric 3D geometry | Excluded, same reason | No |
 
 On BPMN pages columns are global; `--frames` and `--direction TB` exit 2 because pools are horizontal. Nested lanes may get full boxes rewritten and keep their order. Layered refuses to write if lane heights cannot fill the pool, if sub-process contents cannot remain clear of sub-processes in other lanes, or if collapsed pool contents cannot fit the planned width and clear sub-processes in other pools. When lanes are nested at most one level, it moves units and changes pool boxes and lane heights but keeps lane positions. A lane can end outside its pool when the pool box does not change, and sub-process or collapsed pool contents can change parent or offset.
 

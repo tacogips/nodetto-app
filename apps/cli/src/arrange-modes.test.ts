@@ -134,7 +134,7 @@ test("route and layered accept BPMN; both exclude sequence", () => {
     expect(run(fixture(kind), "--mode", "route").exitCode).toBe(0);
   const bpmn = run(fixture("bpmn"), "--mode", "layered");
   expect(bpmn.exitCode).toBe(0);
-  for (const kind of ["sequence", "breadboard", "pcb"] as const) {
+  for (const kind of ["sequence", "breadboard", "pcb", "cad3d"] as const) {
     for (const mode of ["layered", "route"]) {
       const result = run(fixture(kind), "--mode", mode);
       expect(result.exitCode).toBe(2);

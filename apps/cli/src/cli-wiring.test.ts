@@ -169,7 +169,7 @@ test("arrange modes validate options and converge through CLI", () => {
     run(memoryIo({ doc: state("erd") }), "arrange", "doc", "--mode", "layered")
       .exitCode,
   ).toBe(0);
-  for (const kind of ["sequence", "breadboard", "pcb"] as const)
+  for (const kind of ["sequence", "breadboard", "pcb", "cad3d"] as const)
     for (const mode of ["route", "layered"]) {
       const result = run(
         memoryIo({ doc: state(kind) }),

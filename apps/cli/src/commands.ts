@@ -29,6 +29,7 @@ import {
   type BpmnImportReport,
 } from "@nodetto/io";
 import {
+  CAD_PAGE_KIND,
   isDatabaseObjectType,
   resolvePageQuery,
   shortPageId,
@@ -63,6 +64,7 @@ import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
 import { gerberCommand } from "./gerber-command.ts";
 import { pcbCommand } from "./pcb-command.ts";
+import { cadCommand } from "./cad-command.ts";
 import { tableCommand } from "./table-command.ts";
 import { MIN_PREFIX, shortIds, type Resolution } from "./ids.ts";
 import { glyphMissingMessage, glyphRowsByPage } from "./glyph-coverage.ts";
@@ -330,7 +332,10 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
   }
 
   let appEditor = new Editor({ document });
-  const pages = document.pages.filter(
+  const lintableDocumentPages = document.pages.filter(
+    ({ kind }) => kind !== CAD_PAGE_KIND,
+  );
+  const pages = lintableDocumentPages.filter(
     (page) =>
       page.kind === "bpmn" ||
       page.kind === "breadboard" ||
@@ -350,8 +355,9 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       .map((page) => page.id),
   );
   const lintableIds = new Set(pages.map((page) => page.id));
-  const glyphRows = glyphRowsByPage(document, (text) =>
-    io.fontCoverage?.(text, parsed.options.get("--font-dir")),
+  const glyphRows = glyphRowsByPage(
+    { ...document, pages: lintableDocumentPages },
+    (text) => io.fontCoverage?.(text, parsed.options.get("--font-dir")),
   );
   const query = parsed.options.get("--page");
   let selectedPages: readonly Page[];
@@ -364,7 +370,7 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
       const fallback = selectPage(
         document,
         query,
-        document.pages,
+        lintableDocumentPages,
         LINT_NO_PAGES_MESSAGE,
       );
       if (typeof fallback === "string" || !glyphRows.get(fallback.id)?.length)
@@ -373,7 +379,7 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     }
     selectedPages = [selected];
   } else {
-    selectedPages = document.pages.filter(
+    selectedPages = lintableDocumentPages.filter(
       (page) => lintableIds.has(page.id) || glyphRows.get(page.id)?.length,
     );
   }
@@ -937,6 +943,8 @@ function arrangeCommand(io: CommandIo, args: readonly string[]): CommandResult {
     page = loaded.document.pages[0] as Page;
   else page = "The document has several pages; choose one with --page.";
   if (typeof page === "string") return fail(page);
+  if (page.kind === CAD_PAGE_KIND)
+    return fail(`Mode ${mode} does not support the ${page.kind} page kind.`);
   const editor = new Editor({ document: loaded.document });
   const { commands, placed } = planArrangement(
     editor.store,
@@ -1096,6 +1104,8 @@ function dispatchCli(
       return gerberCommand(io, rest);
     case "pcb":
       return pcbCommand(io, rest);
+    case "cad":
+      return cadCommand(io, rest);
     case "diff":
       return diffCommand(io, rest);
     case "edit":

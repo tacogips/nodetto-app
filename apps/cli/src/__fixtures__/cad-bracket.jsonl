@@ -1,0 +1,13 @@
+{"kind":"document","schemaVersion":1,"id":"bracket-document","title":"Angle bracket"}
+{"kind":"page","id":"bracket","name":"Angle bracket","pageKind":"cad3d"}
+{"kind":"page","id":"spare","name":"Spare model","pageKind":"cad3d"}
+{"kind":"page","id":"notes","name":"Assembly notes","pageKind":"freeform"}
+{"kind":"element","id":"brief","page":"notes","type":"shape.geo","index":"a1","semantic":{"geo":"rect"},"visual":{"x":10,"y":20,"width":80,"height":40}}
+{"kind":"element","id":"bracket-bottom","page":"bracket","type":"cad.line","index":"a2","semantic":{"sketch":"bracket-sketch","a":[0,0],"b":[18,0]}}
+{"kind":"element","id":"bracket-extrude","page":"bracket","type":"cad.extrude","index":"a8","semantic":{"name":"Bracket","sketch":"bracket-sketch","distance":12,"op":"new"}}
+{"kind":"element","id":"bracket-inner","page":"bracket","type":"cad.line","index":"a4","semantic":{"sketch":"bracket-sketch","a":[18,4],"b":[5,4]}}
+{"kind":"element","id":"bracket-left","page":"bracket","type":"cad.line","index":"a7","semantic":{"sketch":"bracket-sketch","a":[0,14],"b":[0,0]}}
+{"kind":"element","id":"bracket-rise","page":"bracket","type":"cad.line","index":"a5","semantic":{"sketch":"bracket-sketch","a":[5,4],"b":[5,14]}}
+{"kind":"element","id":"bracket-right","page":"bracket","type":"cad.line","index":"a3","semantic":{"sketch":"bracket-sketch","a":[18,0],"b":[18,4]}}
+{"kind":"element","id":"bracket-sketch","page":"bracket","type":"cad.sketch","index":"a1","semantic":{"name":"Section","plane":{"base":"yz","offset":2}}}
+{"kind":"element","id":"bracket-top","page":"bracket","type":"cad.line","index":"a6","semantic":{"sketch":"bracket-sketch","a":[5,14],"b":[0,14]}}

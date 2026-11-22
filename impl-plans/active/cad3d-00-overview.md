@@ -144,8 +144,8 @@ milestone that breaks it, not in M18.
 | M14 | implemented |
 | M21 | pending |
 | M15 | accepted |
-| M16 | pending |
-| M17 | pending |
+| M16 | accepted |
+| M17 | accepted |
 | M18 | pending |
 
 M1 added the CAD IR and document content rule, registered shape defaults,
@@ -709,3 +709,7 @@ file-write permission errors under the same restriction. Logs are under
 All twenty-two milestones accepted by the adversarial implementation
 review, the plan files moved to `impl-plans/completed/`, and the cloud
 follow-up of design section 15 handed over as a list.
+
+The parallel run on `feat/cad3d-m16-cli` accepted M16 and M17 at `d4eeeb5`,
+and the branch was merged into `feat/cad3d-pages`. Its open escalation
+`X-CAD-CHECK-BUDGET` (native `cad check` budget test headroom) carries over.

@@ -98,3 +98,20 @@ section 7.2 if it differs from the estimates there.
 1. `sh -c 'bun run typecheck && bun test packages/io/src/jsonl/cad-format.test.ts packages/core/src/cad/merge.test.ts apps/cli/src/cad-merge-git.test.ts'`
 2. `sh -c 'bunx biome check packages/io/src/jsonl/cad-format.test.ts packages/core/src/cad/merge.test.ts apps/cli/src/cad-merge-git.test.ts apps/desktop/scripts/cad-format-bench.ts && bun test packages/io/src/jsonl/cad-format.test.ts'`
 3. `sh -c 'mkdir -p tmp/cad3d/m17; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/cad3d/m17/strict.log 2>&1; ! grep -E "^packages/(core|ir)/src/" tmp/cad3d/m17/strict.log | grep -vqE "\.test\.tsx?\(" && bun test packages/core/src/cad/merge.test.ts'`
+
+## Progress
+
+Implemented. Format tests cover lossless and canonical JSONL, forward
+compatibility, record churn, size and speed. Merge tests cover field edits,
+conflicts, delete/reference integrity, distinct additions and history ties.
+The Git tests exercise the real CLI driver and plain Git. Measurements for
+1,000, 10,000 and 20,000 CAD records are in design section 7.2 and
+`tmp/cad3d/m17/format.json`.
+
+The one-line reorder test applies the core `reorder` command with a
+fractional key for a single feature. The general CLI `edit` operation
+`order` can rewrite sibling indices. Moving the bracket fixture's extrusion
+to the back rewrote seven sibling records and left the extrusion's key
+unchanged (`tmp/cad3d/m17/cli-order.log`). Plain Git merged two separated CAD
+record edits in the test. Use the structured driver for field-level merging
+when overlapping text hunks would conflict.

@@ -17,9 +17,14 @@ import { type JsonObject, OperationError } from "./operation-input.ts";
 import type { BatchResult, EditWarning, PageChangeCounts } from "./types.ts";
 
 export function issueLine(
-  issue: Pick<ValidationIssue, "path" | "message">,
+  issue: Pick<ValidationIssue, "path" | "message"> &
+    Partial<Pick<ValidationIssue, "code">>,
 ): string {
-  return `${issue.path ? `${issue.path}: ` : ""}${issue.message}`;
+  const code =
+    issue.code === "page.contentKind" || issue.code === "page.kindLocked"
+      ? `${issue.code}: `
+      : "";
+  return `${code}${issue.path ? `${issue.path}: ` : ""}${issue.message}`;
 }
 
 export function unknownFieldKey(
@@ -141,9 +146,14 @@ export function applyBatch(
       } catch (cause) {
         if (cause instanceof OperationError) throw cause;
         if (cause instanceof CommandError) {
-          const details = cause.issues
-            .filter((issue) => issue.severity === "error")
-            .map(issueLine);
+          const issues = cause.issues.filter(
+            (issue) => issue.severity === "error",
+          );
+          const kindLock = issues.find(
+            ({ code }) => code === "page.kindLocked",
+          );
+          if (kindLock) throw new OperationError(index, issueLine(kindLock));
+          const details = issues.map(issueLine);
           throw new OperationError(
             index,
             details.length

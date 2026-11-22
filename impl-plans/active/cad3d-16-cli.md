@@ -76,9 +76,11 @@ export function generateCadDocument(options: { features: number; entitiesPerSket
 - `native-parity/cad.test.ts` (runs when `NODETTO_CLI_TEST_BINARY` is
   set, like the other parity files): byte parity of `cad check`,
   `validate` and one `edit` batch between Bun and the binary;
-  `generateCadDocument({features: 500, entitiesPerSketch: 19})` (10,000
-  records) passes `validate` and `cad check` natively in under 10,000 ms
-  each; the built engine bundle contains no `WebAssembly` identifier.
+  `generateCadDocument({features: 500, entitiesPerSketch: 18})` emits
+  10,000 records: 500 sketches, each with an eight-edge profile, ten
+  circular holes and one extrusion. Native `validate` and `cad check` each
+  finish in under 10,000 ms, and `cad check` reports zero errors and the
+  swept bounds. The built engine bundle contains no `WebAssembly` identifier.
 
 ## Acceptance criteria
 
@@ -86,7 +88,54 @@ export function generateCadDocument(options: { features: number; entitiesPerSket
 
 ## Verification (each must exit 0)
 
-1. `sh -c 'bun run typecheck && bun test apps/cli/src/cad-command.test.ts apps/cli/src/cad-enforcement.test.ts apps/cli/src/mcp.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/cli-wiring.test.ts packages/core/src/cad/check.test.ts'`
+1. `sh -c 'bun run typecheck && bun test apps/cli/src/ai-commands.test.ts apps/cli/src/cad-command.test.ts apps/cli/src/cad-enforcement.test.ts apps/cli/src/mcp.test.ts apps/cli/src/arrange-modes.test.ts apps/cli/src/cli-wiring.test.ts packages/core/src/cad/check.test.ts'`
 2. `sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/cad.test.ts'`
 3. `sh -c 'bunx biome check apps/cli/src/cad-command.ts packages/core/src/cad && bun test apps/cli/src/cad-command.test.ts'`
 4. `sh -c 'mkdir -p tmp/cad3d/m16; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/cad3d/m16/strict.log 2>&1; ! grep -E "^packages/(core|ir)/src/" tmp/cad3d/m16/strict.log | grep -vqE "\.test\.tsx?\(" && bun test packages/core/src/cad/check.test.ts'`
+
+## Progress
+
+Implemented and awaiting review. The check uses the same history analysis
+as `analyzeCadPage` and reuses kernel-free profile and frame preparation.
+The added history and bounds passes are iterative. The existing history sort
+and profile intersection sweep retain their own complexity.
+
+The CLI had no operation for changing an existing page kind. M16 added
+`set-page-kind` through the shared `updatePage` command and exposed both CAD
+page rule codes in edit errors. The existing layered and route allowlists
+already excluded CAD pages. M16 explicitly excludes CAD from Tidy and
+overlaps, whose existing PCB paths permit those modes. The CLI filters CAD
+pages before lint selection so app-mode and font-coverage checks also skip
+them. The existing `types` catalogue already included CAD.
+
+The review revision aligns the diagnostic pass with the evaluator's
+dependency and suppression order and compares both results on suppressed
+and failed inputs. CAD help documents the status codes. CLI diagnostics
+are sorted by full element ID, and kind-lock errors use page-specific text.
+The top-level help keeps `cad check` within the existing 38-text-line limit.
+Verification command 1 now includes the existing AI commands help test.
+
+The generator now assigns distinct increasing fractional keys and uses
+one extrusion per sketch. The Bun and native budget tests both run profile
+construction, including circular tessellation and nesting, on every
+sketch. Swept bounds reduce the projected vertices before applying the
+constant start and end offsets for each axis. The 20,000-record Bun check
+took 96.9 ms. On the mixed 10,000-record fixture, native `validate` took
+4.78 s and `cad check` took 8.43 s, with zero errors and verified bounds.
+The help revision's release recheck measured 4.67 s for `validate` and
+9.80 s for `cad check` on the same fixture.
+
+Circle-heavy performance remains open as escalation `X-CAD-CHECK-BUDGET`.
+Round 2 measured the mixed fixture at 8.43–9.80 s across ten runs and
+10.62 s under concurrent load. Other 10,000-record native `cad check`
+measurements were 11.4–12.0 s for 500 sketches with 18 circles each,
+13.1–14.3 s for 151 plates with eight lines and 56 holes, and 16.2–17.7 s
+for 40 plates with 240 holes. The previous implementation's isolated run of
+the 500-sketch circle profile took 11.25 s for `cad check` and 4.21 s for
+`validate`. The earlier case with a single sketch, 9,998 circles and one
+extrusion took 85.76 s for `cad check` and 3.32 s for `validate`. Section
+14's general 10 s target needs work in the shared loop builder or an
+explicit design decision. The deadline remains 10,000 ms. Timing evidence
+is in `tmp/cad3d/m16/review2/perf/`, `tmp/cad3d/m16/review/perf-native.log`
+and `tmp/cad3d/m16/revision/`. Current verification logs are in
+`tmp/cad3d/m16/revision-2/`.
