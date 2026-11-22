@@ -16,6 +16,14 @@ declare const native: {
   readBytes(path: string): Uint8Array;
   listDir(path: string): string;
   writeBytes(path: string, data: Uint8Array): void;
+  captureDir(): string;
+  captureAbsolute(path: string): string;
+  writeCapture(
+    path: string,
+    bytes: Uint8Array,
+    replace: boolean,
+  ): "written" | "identical" | "exists";
+  digest(bytes: Uint8Array): string;
   ensureDir(path: string): void;
   pdfPages(pngs: Uint8Array, spec: string): Uint8Array;
   exists(path: string): boolean;
@@ -49,6 +57,13 @@ const io = {
     native.writeBytes(native.path(path), new TextEncoder().encode(text)),
   writeBytes: (path: string, bytes: Uint8Array) =>
     native.writeBytes(native.path(path), bytes),
+  capture: {
+    dir: native.captureDir,
+    absolute: native.captureAbsolute,
+    write: (path: string, bytes: Uint8Array, replace: boolean) =>
+      native.writeCapture(native.path(path), bytes, replace),
+    digest: native.digest,
+  },
   ensureDir: async (path: string) => native.ensureDir(native.path(path)),
   exists: (path: string) => native.exists(native.path(path)),
   listDir: (path: string) =>

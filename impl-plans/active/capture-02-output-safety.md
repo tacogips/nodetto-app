@@ -137,4 +137,8 @@ Native host operations (names added to the list in `engine.rs`):
 
 ## Progress
 
-Pending.
+Implemented. Both CLI hosts expose the capture I/O operations. The Bun
+atomic writer now shares its final-entry writer with capture so capture
+can preserve permissions and replace atomically without resolving an
+output symlink. This also touches `apps/cli/src/write-atomic.ts`. Bun
+uses the effective uid to match the native directory owner check.

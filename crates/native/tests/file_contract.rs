@@ -106,3 +106,106 @@ fn attachments_are_document_relative_bounded_and_regular_files() {
         assert!(attachments::read(&document, "escape/private").is_err());
     }
 }
+
+#[test]
+fn capture_writes_exclusively_and_only_replaces_regular_files() {
+    use nodetto_native::fs::{replace_regular, write_new, NewFile};
+
+    let folder = tempfile::tempdir().unwrap();
+    let image = folder.path().join("image.png");
+    let before = [0, 128, 255];
+    let after = [0, 129, 255];
+
+    assert_eq!(write_new(&image, &before).unwrap(), NewFile::Written);
+    assert_eq!(fs::read(&image).unwrap(), before);
+    assert_eq!(write_new(&image, &before).unwrap(), NewFile::Identical);
+    assert_eq!(write_new(&image, &after).unwrap(), NewFile::Exists);
+    assert_eq!(write_new(&image, b"shorter data").unwrap(), NewFile::Exists);
+    assert_eq!(fs::read(&image).unwrap(), before);
+    assert_eq!(write_new(folder.path(), b"").unwrap(), NewFile::Exists);
+    assert!(replace_regular(folder.path(), b"").is_err());
+
+    replace_regular(&image, &after).unwrap();
+    assert_eq!(fs::read(&image).unwrap(), after);
+    let missing = folder.path().join("new.png");
+    replace_regular(&missing, &before).unwrap();
+    assert_eq!(fs::read(&missing).unwrap(), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn capture_writes_refuse_links_and_unwritable_destinations() {
+    use nodetto_native::fs::{current_owner, replace_regular, write_new, NewFile};
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    let folder = tempfile::tempdir().unwrap();
+    let target = folder.path().join("target.png");
+    let missing = folder.path().join("missing.png");
+    fs::write(&target, b"original").unwrap();
+    for (name, destination) in [("link.png", &target), ("dangling.png", &missing)] {
+        let link = folder.path().join(name);
+        symlink(destination, &link).unwrap();
+        assert_eq!(write_new(&link, b"original").unwrap(), NewFile::Exists);
+        let error = replace_regular(&link, b"changed").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(error.to_string(), "the output path is a symbolic link");
+        assert_eq!(fs::read_link(&link).unwrap(), *destination);
+    }
+    assert_eq!(fs::read(&target).unwrap(), b"original");
+    assert!(!missing.exists());
+
+    // An effective uid of zero can bypass directory mode bits.
+    if current_owner(folder.path()).unwrap() != Some(0) {
+        let readonly = folder.path().join("readonly");
+        fs::create_dir(&readonly).unwrap();
+        fs::set_permissions(&readonly, fs::Permissions::from_mode(0o500)).unwrap();
+        let image = readonly.join("image.png");
+        let result = write_new(&image, b"capture");
+        fs::set_permissions(&readonly, fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(fs::read_dir(&readonly).unwrap().count(), 0);
+    }
+}
+
+#[test]
+fn private_capture_directory_requires_a_real_directory() {
+    use nodetto_native::fs::{current_owner, private_dir};
+
+    let folder = tempfile::tempdir().unwrap();
+    let owner = current_owner(folder.path()).unwrap();
+    let directory = folder.path().join("captures");
+    private_dir(&directory, owner).unwrap();
+    private_dir(&directory, owner).unwrap();
+    let file = folder.path().join("file");
+    fs::write(&file, b"ordinary file").unwrap();
+    assert_eq!(
+        private_dir(&file, owner).unwrap_err().to_string(),
+        "it is not a directory",
+    );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{symlink, MetadataExt, PermissionsExt};
+
+        let metadata = directory.metadata().unwrap();
+        assert_eq!(owner, Some(metadata.uid()));
+        assert_eq!(metadata.mode() & 0o777, 0o700);
+        let link = folder.path().join("link");
+        symlink(&directory, &link).unwrap();
+        assert_eq!(
+            private_dir(&link, owner).unwrap_err().to_string(),
+            "it is not a directory",
+        );
+        assert_eq!(
+            private_dir(&directory, Some(metadata.uid() ^ 1))
+                .unwrap_err()
+                .to_string(),
+            "it belongs to another user",
+        );
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o777)).unwrap();
+        assert_eq!(
+            private_dir(&directory, owner).unwrap_err().to_string(),
+            "it is writable by other users",
+        );
+    }
+}

@@ -5,6 +5,7 @@ import type { CommandIo } from "./commands.ts";
 import { readLocalAttachment } from "./attachments.ts";
 import { openDesktopDocument } from "./open-desktop.ts";
 import { writeFileAtomic } from "./write-atomic.ts";
+import { captureIo } from "./capture-io.ts";
 
 /** Shared filesystem and desktop access for terminal and MCP commands. */
 export function localIo(): CommandIo {
@@ -17,6 +18,7 @@ export function localIo(): CommandIo {
     readStdin: () => readFileSync(0, "utf8"),
     writeText: writeFileAtomic,
     writeBytes: writeFileAtomic,
+    capture: captureIo,
     ensureDir: async (path) => {
       await mkdir(path, { recursive: true });
     },

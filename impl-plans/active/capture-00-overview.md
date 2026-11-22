@@ -171,7 +171,7 @@ found there.
 | Milestone | Status |
 | --- | --- |
 | M1 | implemented |
-| M2 | pending |
+| M2 | implemented |
 | M19 | pending |
 | M3 | pending |
 | M4 | pending |

@@ -32,6 +32,15 @@ export function writeFileAtomic(path: string, text: string | Uint8Array): void {
     // A new file, or a dangling symlink whose target does not exist yet.
     target = danglingTarget(path) ?? path;
   }
+  writeEntryAtomic(target, text, mode);
+}
+
+/** Atomically replace the named entry without resolving its final component. */
+export function writeEntryAtomic(
+  target: string,
+  text: string | Uint8Array,
+  mode: number | null,
+): void {
   const temporary = join(
     dirname(target),
     `.${basename(target)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`,

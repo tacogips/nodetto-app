@@ -110,6 +110,19 @@ export interface CommandIo {
   readStdin?(): string;
   /** Binary output (PNG, PDF); required only by commands that write bytes. */
   writeBytes?(path: string, bytes: Uint8Array): void;
+  readonly capture?: {
+    /** Per-user private capture directory, created on first use. */
+    dir(): string;
+    absolute(path: string): string;
+    /** Create exclusively, or atomically replace a regular file. */
+    write(
+      path: string,
+      bytes: Uint8Array,
+      replace: boolean,
+    ): "written" | "identical" | "exists";
+    /** 64-bit FNV-1a as 16 lowercase hexadecimal digits. */
+    digest(bytes: Uint8Array): string;
+  };
   /** Create a directory and its parents, if needed. */
   ensureDir?(path: string): Promise<void>;
   exists?(path: string): boolean;

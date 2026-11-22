@@ -11,6 +11,54 @@ fn evaluate(source: &str, input: Input, directory: Option<std::path::PathBuf>) -
 }
 
 #[test]
+fn capture_host_operations_resolve_paths_and_report_writes() {
+    let folder = tempfile::tempdir().unwrap();
+    assert_eq!(
+        evaluate(
+            r#"(() => {
+      const path = native.path('a.png');
+      const source = Uint8Array.of(99, 97, 98, 99, 99);
+      const bytes = source.subarray(1, 4);
+      const other = Uint8Array.of(97, 98, 100);
+      return [
+        native.writeCapture(path, bytes, false),
+        native.writeCapture(path, bytes, false),
+        native.writeCapture(path, other, false),
+        native.writeCapture(path, other, true),
+        native.digest(bytes)
+      ];
+    })()"#,
+            Input::Mcp(None),
+            Some(folder.path().into()),
+        ),
+        json!([
+            "written",
+            "identical",
+            "exists",
+            "written",
+            "e71fa2190541574b"
+        ]),
+    );
+    let image = folder.path().join("a.png");
+    assert_eq!(std::fs::read(&image).unwrap(), b"abd");
+    let result = evaluate(
+        "[native.captureDir(), native.captureAbsolute('a.png')]",
+        Input::Mcp(None),
+        Some(folder.path().into()),
+    );
+    let capture = std::path::Path::new(result[0].as_str().unwrap());
+    assert!(capture.is_dir());
+    assert!(capture
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .starts_with("nodetto-capture"));
+    let absolute = std::path::Path::new(result[1].as_str().unwrap());
+    assert!(absolute.is_absolute());
+    assert_eq!(absolute, image);
+}
+
+#[test]
 fn unicode_encoding_and_graphemes_preserve_diagram_labels() {
     assert_eq!(
         evaluate(

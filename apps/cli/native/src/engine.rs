@@ -79,13 +79,19 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
     let operation = string(args, 0, ctx)?;
     let args = args.get(1..).unwrap_or_default();
     match operation.as_str() {
-        "path" => {
+        "path" | "captureAbsolute" => {
             let path = string(args, 0, ctx)?;
             let directory = &ctx
                 .get_data::<HostState>()
                 .expect("host state installed")
                 .directory;
-            Ok(js_string!(directory.join(path).to_string_lossy().as_ref()).into())
+            let path = directory.join(path);
+            let path = if operation == "captureAbsolute" {
+                std::path::absolute(path).map_err(host_error)?
+            } else {
+                path
+            };
+            Ok(js_string!(path.to_string_lossy().as_ref()).into())
         }
         "readText" => Ok(js_string!(
             std::fs::read_to_string(string(args, 0, ctx)?).map_err(host_error)?
@@ -106,6 +112,18 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             files::write_atomic(&path, &data).map_err(host_error)?;
             Ok(JsValue::undefined())
         }
+        "captureDir" => Ok(js_string!(files::capture_dir()
+            .map_err(host_error)?
+            .to_string_lossy()
+            .as_ref())
+        .into()),
+        "writeCapture" => {
+            let path = string(args, 0, ctx)?;
+            let data = bytes(args.get_or_undefined(1), ctx)?;
+            let replace = args.get_or_undefined(2).to_boolean();
+            Ok(js_string!(files::write_capture(&path, &data, replace).map_err(host_error)?).into())
+        }
+        "digest" => Ok(js_string!(files::digest(&bytes(args.get_or_undefined(0), ctx)?)).into()),
         "ensureDir" => {
             std::fs::create_dir_all(string(args, 0, ctx)?).map_err(host_error)?;
             Ok(JsValue::undefined())
@@ -237,7 +255,8 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
     ctx.eval(Source::from_bytes(r#"
         globalThis.native = Object.fromEntries([
           'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','open','png','pdf','pdfPages','fontCoverage',
-          'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random'
+          'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random',
+          'captureDir','captureAbsolute','writeCapture','digest'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };
         globalThis.TextDecoder = class { decode(bytes = []) { return native.decodeUtf8(new Uint8Array(bytes)); } };
