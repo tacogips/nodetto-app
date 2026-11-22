@@ -120,4 +120,21 @@ impl PrismView {
 
 ## Progress
 
-Pending.
+Implemented. Adversarial review is pending.
+
+- Both milestone commands passed with 29 and 11 tests. Logs are in
+  `tmp/capture/m07/v1-final.log` and `v2-final.log`.
+- Workspace formatting, check, and Clippy passed
+  (`tmp/capture/m07/repository-static.log`). The supplemental workspace
+  test stopped after 49 passes and 17 Foundation write denials in
+  unchanged desktop tests under the worktree-only write guard
+  (`tmp/capture/m07/repository-rust.log`).
+- Biome and TypeScript passed. The final unfiltered Bun run passed
+  with 4,634 passes and 79 skips across 735 files
+  (`tmp/capture/m07/repository-bun-settled.log`).
+- Fixture correction: the boss ring extends to 13 mm (the 5 mm plate
+  plus the 8 mm add), so the test expects `[0, 13]` through the ring.
+- CAP-M6-02 (M7 portion): a parsed prism with a degenerate or
+  non-orthonormal frame contributes no intervals. Face IDs are opaque,
+  including `u32::MAX`. Camera handedness remains for M8, and analysis
+  flag consistency remains for M10 and M17.

@@ -176,8 +176,8 @@ found there.
 | M3 | accepted |
 | M4 | accepted |
 | M5 | accepted |
-| M6 | implemented |
-| M7 | pending |
+| M6 | accepted |
+| M7 | implemented |
 | M8 | pending |
 | M9 | pending |
 | M10 | pending |
