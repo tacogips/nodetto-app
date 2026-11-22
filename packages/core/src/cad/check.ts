@@ -59,7 +59,11 @@ export function checkCadPage(
   pageId: PageId,
 ): CadCheckReport {
   const page = elements.filter((element) => element.page === pageId);
-  const history = scanCadPage(page);
+  const pcb = elements.filter(
+    ({ page, type }) =>
+      page !== pageId && (type === "pcb.board" || type === "pcb.graphic"),
+  );
+  const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
   const geometry = createCadGeometry(history);
   const status = new Map(history.status);
   const bodies = new Set<ElementId>();
@@ -100,6 +104,12 @@ export function checkCadPage(
     if (feature.semantic.suppressed) continue;
     if (feature.type === "cad.mesh") {
       bodies.add(id);
+      continue;
+    }
+    if (feature.type === "cad.pcb") {
+      const outline = geometry.pcb(feature.semantic);
+      if ("ok" in outline) status.set(id, outline);
+      else geometry.extrudes.set(id, outline);
       continue;
     }
     for (const target of targets) {

@@ -1,0 +1,56 @@
+diff --git a/packages/core/src/cad/check.ts b/packages/core/src/cad/check.ts
+index f82ddba..2e1d63b 100644
+--- a/packages/core/src/cad/check.ts
++++ b/packages/core/src/cad/check.ts
+@@ -59,7 +59,11 @@ export function checkCadPage(
+   pageId: PageId,
+ ): CadCheckReport {
+   const page = elements.filter((element) => element.page === pageId);
+-  const history = scanCadPage(page);
++  const pcb = elements.filter(
++    ({ page, type }) =>
++      page !== pageId && (type === "pcb.board" || type === "pcb.graphic"),
++  );
++  const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
+   const geometry = createCadGeometry(history);
+   const status = new Map(history.status);
+   const bodies = new Set<ElementId>();
+@@ -102,6 +106,12 @@ export function checkCadPage(
+       bodies.add(id);
+       continue;
+     }
++    if (feature.type === "cad.pcb") {
++      const outline = geometry.pcb(feature.semantic);
++      if ("ok" in outline) status.set(id, outline);
++      else geometry.extrudes.set(id, outline);
++      continue;
++    }
+     for (const target of targets) {
+       if (bodies.has(target)) continue;
+       const code =
+diff --git a/packages/io/src/jsonl/cad-format.test.ts b/packages/io/src/jsonl/cad-format.test.ts
+index 7172355..cf0af10 100644
+--- a/packages/io/src/jsonl/cad-format.test.ts
++++ b/packages/io/src/jsonl/cad-format.test.ts
+@@ -106,6 +106,7 @@ test("moving a CAD feature with one fractional key rewrites only its line", () =
+     "mesh-sample",
+     "sketch-top",
+     "cut",
++    "board-reference",
+   ]);
+   expect(lineChanges(fixture, after)).toEqual({
+     before: ["element:mesh-sample"],
+@@ -188,7 +189,12 @@ test("an unknown CAD element and an unknown extrude field survive intact", () =>
+     '"distance":6,"op":"new"}',
+     '"distance":6,"op":"new","futureMode":{"wall":2}}',
+   );
+-  const text = `${fixtureWithUnknownField}${unknown}\n`;
++  // CAD page records precede the foreign PCB page records in canonical order.
++  const firstPcbRecord = fixtureWithUnknownField.indexOf(
++    '{"kind":"element","id":"controller",',
++  );
++  expect(firstPcbRecord).toBeGreaterThan(0);
++  const text = `${fixtureWithUnknownField.slice(0, firstPcbRecord)}${unknown}\n${fixtureWithUnknownField.slice(firstPcbRecord)}`;
+   const result = parseDocumentResult(text);
+   expect(result.issues.map(({ code, severity }) => [code, severity])).toEqual([
+     ["semantic.unknownField", "warning"],

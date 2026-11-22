@@ -106,6 +106,7 @@ test("moving a CAD feature with one fractional key rewrites only its line", () =
     "mesh-sample",
     "sketch-top",
     "cut",
+    "board-reference",
   ]);
   expect(lineChanges(fixture, after)).toEqual({
     before: ["element:mesh-sample"],
@@ -188,7 +189,12 @@ test("an unknown CAD element and an unknown extrude field survive intact", () =>
     '"distance":6,"op":"new"}',
     '"distance":6,"op":"new","futureMode":{"wall":2}}',
   );
-  const text = `${fixtureWithUnknownField}${unknown}\n`;
+  // CAD page records precede the foreign PCB page records in canonical order.
+  const firstPcbRecord = fixtureWithUnknownField.indexOf(
+    '{"kind":"element","id":"controller",',
+  );
+  expect(firstPcbRecord).toBeGreaterThan(0);
+  const text = `${fixtureWithUnknownField.slice(0, firstPcbRecord)}${unknown}\n${fixtureWithUnknownField.slice(firstPcbRecord)}`;
   const result = parseDocumentResult(text);
   expect(result.issues.map(({ code, severity }) => [code, severity])).toEqual([
     ["semantic.unknownField", "warning"],
