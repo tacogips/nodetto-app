@@ -3,6 +3,7 @@ import {
   connectorEndpointIssues,
   erdEndpointColumnIds,
   getElementTypeDefinition,
+  isCadTypeName,
   isKnownElementType,
   isPlainObject,
   type Element,
@@ -97,6 +98,11 @@ export function convertElements(
       `Unknown element type "${type}". Run "nodetto-cli types".`,
     );
   const targets = selectedWhere(batch, operation, index, "convert");
+  if (
+    isCadTypeName(type) ||
+    targets.some((element) => isCadTypeName(element.type))
+  )
+    throw new OperationError(index, "CAD elements cannot be converted.");
   const referrers = new Map<string, Element[]>();
   for (const element of batch.editor.store.listElements()) {
     for (const reference of referencesOf(element)) {

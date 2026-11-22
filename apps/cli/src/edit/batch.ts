@@ -34,6 +34,7 @@ import {
   addPage,
   movePage,
   renamePage,
+  setPageKind,
   setPageMode,
   setPageFlow,
   setPageRouting,
@@ -334,6 +335,9 @@ export class Batch {
       case "rename-page":
         renamePage(this, operation, index);
         return;
+      case "set-page-kind":
+        setPageKind(this, operation, index);
+        return;
       case "set-page-mode":
         setPageMode(this, operation, index);
         return;
@@ -404,7 +408,7 @@ export class Batch {
       default:
         throw new OperationError(
           index,
-          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-mode, set-page-routing, delete-page, add, set-cells, connect, convert, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
+          `Unknown op "${String(op)}". Use add-page, move-page, rename-page, set-page-kind, set-page-mode, set-page-routing, delete-page, add, set-cells, connect, convert, update, append, remove-item, move, delete, select, scale, replace-text, group, ungroup or order.${orderOpHint(op) ?? ""}`,
         );
     }
   }

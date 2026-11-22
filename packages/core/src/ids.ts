@@ -22,9 +22,9 @@ function encodeTime(milliseconds: number): string {
   return out;
 }
 
-function encodeRandom(): string {
+function encodeRandom(fillRandom: (bytes: Uint8Array) => void): string {
   const bytes = new Uint8Array(RANDOM_LENGTH);
-  crypto.getRandomValues(bytes);
+  fillRandom(bytes);
   let out = "";
   for (const byte of bytes) {
     // One character per byte, so only 5 of the 8 bits are used. That still
@@ -34,9 +34,13 @@ function encodeRandom(): string {
   return out;
 }
 
-/** A fresh ULID-format identifier. */
-export function newElementId(now: number = Date.now()): string {
-  return encodeTime(now) + encodeRandom();
+/** A fresh ULID-format identifier. Fixtures can supply deterministic entropy. */
+export function newElementId(
+  now: number = Date.now(),
+  fillRandom: (bytes: Uint8Array) => void = (bytes) =>
+    crypto.getRandomValues(bytes),
+): string {
+  return encodeTime(now) + encodeRandom(fillRandom);
 }
 
 /** True for strings shaped like {@link newElementId} output. */

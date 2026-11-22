@@ -112,6 +112,7 @@ export const OPERATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ],
   "move-page": ["op", "id", "before", "after", "order"],
   "rename-page": ["op", "id", "name"],
+  "set-page-kind": ["op", "id", "kind"],
   "set-page-mode": ["op", "id", "mode"],
   "set-page-routing": ["op", "id", "routing", "routingAvoidObstacles"],
   "delete-page": ["op", "id"],

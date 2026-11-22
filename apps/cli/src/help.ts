@@ -33,6 +33,7 @@ Convert and check
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
   nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
   nodetto-cli pcb import|gerber   KiCad board to a PCB page, Gerber and drill export
+  nodetto-cli cad check <doc>     Check 3D CAD history, profiles and tool bounds
   nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
@@ -138,7 +139,7 @@ changes it.
 
   --format  text (default) or json (an array of page summaries).
   --kind    Only pages of this kind (freeform, erd, uml, sequence, state,
-            flowchart, architecture, bpmn, breadboard or pcb). Original
+            flowchart, architecture, bpmn, breadboard, pcb or cad3d). Original
             display numbers are retained.
 
 Short IDs are stable 11-character URL-safe aliases derived from stored page
@@ -224,6 +225,23 @@ ${EXIT_CODES}`,
 
 Use set-page-flow to set vertical or horizontal page-frame flow. text.code add
 normalizes language aliases to canonical IDs and rejects unknown languages.
+
+3D CAD operations
+  Use add-page with kind cad3d. CAD elements require a cad3d page. CAD pages
+  accept CAD elements and document resources. Violations report page.contentKind.
+  set-page-kind takes an id and kind. Transitions to or from cad3d report
+  page.kindLocked. Use update for CAD parameters and cad check for history.
+
+Example CAD batch:
+[
+  {"op":"add-page","name":"Mount","kind":"cad3d","ref":"mount"},
+  {"op":"add","page":"@mount","type":"cad.sketch","ref":"outline","semantic":{"name":"Footprint","plane":{"base":"xy"}}},
+  {"op":"add","page":"@mount","type":"cad.line","semantic":{"sketch":"@outline","a":[0,0],"b":[24,0]}},
+  {"op":"add","page":"@mount","type":"cad.line","semantic":{"sketch":"@outline","a":[24,0],"b":[24,16]}},
+  {"op":"add","page":"@mount","type":"cad.line","semantic":{"sketch":"@outline","a":[24,16],"b":[0,16]}},
+  {"op":"add","page":"@mount","type":"cad.line","semantic":{"sketch":"@outline","a":[0,16],"b":[0,0]}},
+  {"op":"add","page":"@mount","type":"cad.extrude","semantic":{"name":"Mount","sketch":"@outline","distance":4,"op":"new"}}
+]
 
 Apply a batch of operations through the editor's command layer, so the result is
 exactly what the app would produce. The batch is all-or-nothing: an invalid
@@ -664,6 +682,7 @@ bpmn                              pools and lanes as rows / yes / yes
 sequence                          excluded: participant and message order define geometry
 breadboard                        excluded: physical holes and electrical wires
 pcb                               excluded: physical footprints and tracks
+cad3d                             excluded: parametric 3D geometry
 ERD column ends get no ports and are not spread. On bpmn, columns are global;
 --frames and --direction TB exit 2 because pools are horizontal. Nested lanes
 may get full boxes rewritten and retain order. Layered refuses to write when
@@ -733,11 +752,11 @@ node-overlap and image-missing rules cover diagram pages and attachments.
 ERD frame-straddle warns when a table crosses a frame edge, naming both;
 this warning does not change the exit code.
 Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages from a
-nodetto document or BPMN XML.
+nodetto document or BPMN XML. Use cad check for 3D CAD pages.
 Text output is empty when clean; --format json always prints a report. A
 .bpmnlintrc in the working directory is used when --config is not given and a
 BPMN page is linted. --font-dir adds fonts for glyph coverage. glyph-missing
-is a warning naming the element and code points on any page kind where coverage
+is a warning naming the element and code points on diagram pages where coverage
 can be determined. A document with no lintable page and no missing glyph keeps
 the existing error.
 
@@ -868,6 +887,17 @@ Examples:
   nodetto-cli pcb gerber board.jsonl --output board.zip
 
 ${EXIT_CODES}`,
+
+  cad: `Usage: nodetto-cli cad check <file> [--page <short-id|id|name>] [--json]
+
+Check feature order, references, sketch profiles and coordinate limits on
+every 3D CAD page. Use --page to check a single CAD page. --json returns an
+array of page reports with full element IDs and swept tool bounds in mm.
+Text lists each page's counts and each error's short element ID and code.
+CAD elements belong on cad3d pages. CAD pages also accept document
+resources. The app regenerates solid geometry.
+
+Exit codes: 0 clean, 1 CAD errors, 2 usage, invalid input or no CAD page.`,
 
   drawio: `Usage: nodetto-cli drawio import <file.drawio> [--output <doc.jsonl>] [--strict]
 

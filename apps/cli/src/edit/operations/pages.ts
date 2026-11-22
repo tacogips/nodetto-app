@@ -166,6 +166,19 @@ export function setPageMode(
   return;
 }
 
+export function setPageKind(
+  batch: Batch,
+  operation: JsonObject,
+  index: number,
+): void {
+  const page = batch.page(operation["id"], index);
+  const kind = requireText(operation["kind"], "kind", index);
+  if (!isPageKind(kind))
+    throw new OperationError(index, `Unknown page kind "${kind}".`);
+  if (kind !== page.kind)
+    batch.editor.apply([{ type: "updatePage", id: page.id, page: { kind } }]);
+}
+
 export function setPageFlow(
   batch: Batch,
   operation: JsonObject,

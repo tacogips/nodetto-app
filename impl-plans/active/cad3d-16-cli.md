@@ -90,3 +90,26 @@ export function generateCadDocument(options: { features: number; entitiesPerSket
 2. `sh -c 'CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/cad.test.ts'`
 3. `sh -c 'bunx biome check apps/cli/src/cad-command.ts packages/core/src/cad && bun test apps/cli/src/cad-command.test.ts'`
 4. `sh -c 'mkdir -p tmp/cad3d/m16; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/cad3d/m16/strict.log 2>&1; ! grep -E "^packages/(core|ir)/src/" tmp/cad3d/m16/strict.log | grep -vqE "\.test\.tsx?\(" && bun test packages/core/src/cad/check.test.ts'`
+
+## Progress
+
+Implemented and awaiting review. The check uses the same history analysis
+as `analyzeCadPage` and reuses kernel-free profile and frame preparation.
+The added history and bounds passes are iterative. The existing history sort
+and profile intersection sweep retain their own complexity.
+
+The CLI had no operation for changing an existing page kind. M16 added
+`set-page-kind` through the shared `updatePage` command and exposed both CAD
+page rule codes in edit errors. The existing layered and route allowlists
+already excluded CAD pages. M16 explicitly excludes CAD from Tidy and
+overlaps, whose existing PCB paths permit those modes. The CLI filters CAD
+pages before lint selection so app-mode and font-coverage checks also skip
+them. The existing `types` catalogue already included CAD.
+
+All four milestone checks passed. The 20,000-element Bun case includes
+100 extrusion tools and took 46.1 ms in the primary check. The native
+10,000-element case has 500 sketches with 19 circles each. Native
+`validate` took 4.05 s and `cad check` took 4.23 s. The release engine had no
+`WebAssembly` identifier and matched Bun output and saved edit bytes.
+Repository TypeScript lint and typecheck, 190 related regressions, and five
+MCP stdio tests passed. Logs are under `tmp/cad3d/m16/`.
