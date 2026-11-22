@@ -100,4 +100,4 @@ pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPa
 
 ## Progress
 
-Pending (revision 4).
+Implemented overlay units and view-pair sampling, including the 0.05 mm pin, stretch-box, deterministic merge, exclusion and limit regressions. Final shared-tree gates pass: rustfmt and clippy, 8 unit tests, and 31 integration tests (7 release-only tests ignored). Formal review and M23 picture wiring remain downstream.

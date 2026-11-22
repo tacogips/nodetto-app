@@ -107,4 +107,4 @@ No CLI wiring, no option parsing (M20), no Rust changes, no `capture-help/cad.ts
 
 ## Progress
 
-Pending.
+Implemented the report contract, descriptions, exports, help, and focused regression tests. Both required verification commands pass on the shared tree: 167 tests in the main gate and 3 in the strict core gate. Formal review and acceptance remain downstream.

@@ -105,7 +105,15 @@ readonly captureCadImage: (options: { camera: CaptureCameraRequest; format: "png
 1. `sh -c 'mkdir -p tmp/capture/m14 && rustfmt --edition 2021 --check apps/desktop/src-tauri/src/capture.rs apps/desktop/src-tauri/src/lib.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m14 cargo clippy -p app --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m14 cargo test -p app capture > tmp/capture/m14/app-test.log 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m14/app-test.log; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m14/app-test.log'`
    (the desktop package is `app`, `apps/desktop/src-tauri/Cargo.toml:2`)
 2. `sh -c 'bun run typecheck && bunx biome check apps/desktop/src/file/backend.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts apps/desktop/src/App.tsx && bun test apps/desktop/src/shell/export-handlers.test.ts packages/core/src/capture'`
-3. `sh -c 'bun --cwd=apps/desktop run build && bun test packages/ui-solid/src/cad/capture-image.test.ts apps/desktop/src/styles/theme-tokens.test.ts'`
+3. `sh -c 'bun --cwd=apps/desktop run build --outDir ../../target/capture-m14/dist && bun test packages/ui-solid/src/cad/capture-image.test.ts apps/desktop/src/styles/theme-tokens.test.ts'`
+
+## Amendment 2026-11-23 (integration-paths-outside-writePaths, round 1)
+
+Gate 3 had the defect that blocked M15 (INT-M15-VERIFY3-ARTIFACT-ROOT).
+A default `vite build` writes `apps/desktop/dist`, which is outside the
+artifact root `target`. The build output now goes to
+`target/capture-m14/dist`. The build and the tests are unchanged. No
+other change to this plan.
 
 ## Progress
 

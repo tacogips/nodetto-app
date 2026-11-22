@@ -107,4 +107,4 @@ ignored here (M11 consumes it). No printing of reports (M22, M23).
 
 ## Progress
 
-Pending (revision 4).
+Implemented the request contract, interference selection and pure CLI options, plus the NMESH capture decoder and regression tests. The legacy fixture remains byte-identical. On the moving shared tree, verification commands 1, 2 and 3 passed with 114, 13 and 63 tests respectively; complete logs are under `tmp/capture-s868/capture-20-interference-cli/`. Formal review and downstream M11/M23 wiring remain pending.

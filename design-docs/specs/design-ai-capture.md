@@ -1086,7 +1086,7 @@ M22 and M23 (21 is skipped so it is not confused with cad3d M21).
 | Wave 1 | M15 desktop dialog | the M15 files except `apps/desktop/src/App.tsx` | crate public API, existing core types |
 | Wave 2 | M17 overlay | `overlay.rs` (marking table, eight-nearest rule, 4,096 limit, hatch colour, view-pair boxes), `interference.rs` (`add_view_pairs`) | M10 |
 | Wave 2 | M18 census | `census.rs`, `lattice.rs` (one-body mode with per-step liveness and early exit), `capture-help/cad.ts` (body notes and the two M11 sentences on meshes and reference bodies) | M10 |
-| Wave 2 | M11 meshes | `mesh.rs`, `tool_view.rs` (mesh arm), `scene.ts` and test (decoder option of `buildCadCaptureModel`), `cad-request.ts` and test (forward `decodeMesh` to the model builder; nothing else) | M10, M20 |
+| Wave 2 | M11 meshes | `mesh.rs`, `tool_view.rs` (mesh arm), `scene.ts` and test (decoder option of `buildCadCaptureModel`), `cad-request.ts` and test (forward `decodeMesh` to the model builder; nothing else), `lattice.rs` and `interference.rs` (tool-bounds call sites only, CAP-R4-05) | M10, M20, after M17 and M18 |
 | Wave 2 | M12 tiles | `tiles.rs` (lists, `work`, `WORK_LIMIT`) | M10 |
 | Wave 2 | M14 desktop backend | the M14 files plus `apps/desktop/src/App.tsx` (the M15 wiring) | M15, M20, M22, crate public API |
 | Wiring | M23 | crate `lib.rs`, `raster.rs`, `shade.rs`, `report.rs`; `tests/render.rs` (the digest constant and the superseded assertions named below, nothing else); new `tests/overlay.rs`, `census.rs`, `mesh.rs`, `scale.rs`; `capture-command.ts`, `capture-cad.ts` and tests; `__fixtures__/capture-plate-default.ncs1`; `native-parity/capture.test.ts`; `apps/desktop/src/shell/export-handlers.test.ts` (new cases only: fixture equality and mesh-only parity) | M17, M18, M11, M12, M14, M20, M22 |
@@ -1100,7 +1100,9 @@ Contracts that make the waves possible:
   small-loop boxes (none for a mesh) and whether the tool is a solid.
   `lattice` and `interference` evaluate tools only through it, so meshes
   enter the analysis and the census when M11 lands without M11 editing
-  those files; candidates skip a body whose creating tool is not a solid
+  those files (deviation CAP-R4-05: M10 still took the tool bounds of the
+  pair code from the small-loop boxes, so M11 routes those call sites to
+  `tool_view::tool_bounds`); candidates skip a body whose creating tool is not a solid
   (an open mesh). Until M11 the mesh arm keeps today's behaviour (no
   intervals, not a solid). M23 routes the picture pass through it.
 - Wave 2 modules are complete units with their own unit tests
@@ -1463,3 +1465,4 @@ watcher (`docs/cli.md:201-203`).
 | CAP-DR4-01..06 (revision 4, design review round 1) | Ray accounting and box commit after the leaf choice, with exact-allowance and smaller-box regressions (01); the minimum-grid marker kept separate from invalid input (02); request shape, decoder and draw-bit rule complete in wave 1, two-host mesh-only parity in M23 (03); narrow M23 authorisation for the three superseded M8 placeholder assertions in `tests/render.rs`, with replacements that are at least as specific (04); M16 builds and tests one isolated binary instead of `mise run test-cli` (05); per-pair `approximate` and the exact `uncheckedCount` in public JSON (06); round 2: both hosts import the decoder from `@nodetto/io/nmesh` (03), and M16 runs three independent gates that must all pass, with positive parity evidence (07) | 4.2, 6.6, 8.5, 15 |
 | CAP-R4-03 (revision 4) | The fixture's Plate and Block overlap is 590.721 mm3 (one whole, two half and a quarter hole); 637.362 mm3 belongs to the spike scene. The M20 native expectation uses the fixture value | 4.2 |
 | CAP-R4-04 (revision 4) | The serialized chain M20, M17, M18, M11, M12 is replaced by two waves, the wiring milestone M23 and the closing milestone M16; a `tool_view` seam lets meshes enter analysis and census without shared edits; the text functions move to M22; the App wiring moves from M15 to M14 | 8.1, 8.5 |
+| CAP-R4-05 (revision 4, checkpoint amendment after wave 2) | Deviation from 8.5: M10 moved per-tool bounds into `tool_view`, but the candidate, pair and view-pair code (`interference.rs` and `lattice::sample_axis`) still took tool bounds from the small-loop boxes. Those boxes are empty for a mesh, so a closed mesh could never become a candidate. M11 adds `lattice::scene_tool_bounds` over `tool_view::tool_bounds` and uses it at those call sites only. Prism results do not change, because a prism's `tool_view` bounds are the union of its loop boxes. M11 edits `lattice.rs` and `interference.rs` after M17 and M18. The M15 and M14 desktop build gates now write their output under `target/` instead of `apps/desktop/dist` | 8.5 |

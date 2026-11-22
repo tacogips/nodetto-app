@@ -120,4 +120,6 @@ order, the M8 pixel digest, the CLI or any TypeScript. No mesh support
 - Before revision 4: implemented at `be8fa5d` (68 passed, 2 ignored,
   `tmp/capture/m10/v1-committed.log`; 15 release tests,
   `tmp/capture/m10/interference.txt`). Review findings: design 18 CAP-R4-01/02.
-- Revision 4 repair: pending.
+- Revision 4 repair: in progress. Shared lazy tool views, streamed sampling and input guards implemented; exact allowance, leaf footprint, centre witness, invalid input, wide-box guarantee, 1,302 candidates and release timing regressions added. Scoped format, clippy and debug tests passed (72 passed, 7 ignored); release interference passed (22 tests, 200-body case 199 ms); render gate passed (14 passed, 2 ignored). Formal review and acceptance remain downstream.
+
+- M10-TI-01: invalid-target coverage now uses a real candidate and a valid-target control. Fresh verification passed: `tmp/capture-s868/capture-10-interference/ti-01-gate-1.log`, `ti-01-gate-2.log`, and `ti-01-gate-3.log`; independent review remains pending.

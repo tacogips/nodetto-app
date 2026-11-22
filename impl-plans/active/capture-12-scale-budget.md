@@ -86,4 +86,4 @@ pub fn work_error(work: u64) -> CaptureError;        // the message below
 
 ## Progress
 
-Pending (revision 4).
+Implemented tile lists, ordered step indices, saturating work estimation and the exact limit error. Unit and release gates passed on the shared tree; the 20,000-tool build took 321 ms. Format and clippy passed after a transient sibling mesh edit settled. Logs: `tmp/capture-s868/capture-12-scale-budget/gate1-final.log`, `gate2.log`, `gate3.log`. Formal review and M23 integration remain downstream.

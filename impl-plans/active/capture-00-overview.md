@@ -48,8 +48,8 @@ Files written in more than one stage, in stage order:
 | `crates/capture/src/lib.rs` | M10 (module lines), M23 |
 | `crates/capture/src/raster.rs`, `report.rs` | M10 (only if the repair needs it), M23 |
 | `crates/capture/src/shade.rs` | M23 |
-| `crates/capture/src/lattice.rs` | M10, M18 |
-| `crates/capture/src/interference.rs` | M10, M17 |
+| `crates/capture/src/lattice.rs` | M10, M18, M11 (tool-bounds call sites only, CAP-R4-05) |
+| `crates/capture/src/interference.rs` | M10, M17, M11 (tool-bounds call sites only, CAP-R4-05) |
 | `crates/capture/src/tool_view.rs` | M10 (new), M11, M23 (picture-family constructor only if needed) |
 | `crates/capture/src/overlay.rs`, `census.rs`, `mesh.rs`, `tiles.rs` | M10 (empty stub), then M17, M18, M11, M12 |
 | `crates/capture/tests/render.rs` | M10 (report assertions), M23 (digest and the three authorised assertions) |

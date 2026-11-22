@@ -107,4 +107,20 @@ pub fn sample_body_axis(request: &LatticeRequest, axis: usize, liveness: &mut Li
 
 ## Progress
 
-Pending (revision 4).
+Implemented liveness, suspect detection, the budgeted resolver, one-body
+sampler and CAD help. Synthetic tests cover emptying, refill, intersection,
+sound and absent bodies, the thin pin, concurrent calls, invalid inputs,
+budget exhaustion and the suspect limit. Current verification logs are in
+`tmp/capture-s868/capture-18-body-census/`; results are on a shared tree.
+Formal review and integration remain pending.
+M18-TI-01: moved the pin between coarse ray centres and asserted that
+sampling exceeds the 10,000-ray coarse pass; review rerun pending.
+M18-AR-01: one-body setup now uses only distinct step tools; the 50-body
+regression compares results with 5,000 unrelated tools. Evidence is in
+`tmp/capture-s868/capture-18-body-census/ar01-gate*.log` and
+`tmp/capture-s868/capture-18-body-census/ar01-pair-check.log`.
+M18-TI-02: replaced the referenced Option's into_iter with iter. The prior
+`ar01-gate1.log` exited 101 despite the earlier reported success. Fresh
+verification evidence is recorded in `ti02-gate1.log`, `ti02-gate2.log`,
+`ti02-gate3.log`, and `ti02-pair-check.log` in the same evidence directory;
+review remains pending.

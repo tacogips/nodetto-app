@@ -126,8 +126,39 @@ export async function rasterizeSvg(svg: string, scale: number, signal?: AbortSig
 
 1. `sh -c 'bun run typecheck && bunx biome check packages/ui-solid/src && bun test packages/ui-solid/src/export-dialog-document.test.ts packages/ui-solid/src/export-dialog-artboards.test.ts packages/ui-solid/src/cad/capture-camera.test.ts packages/ui-solid/src/raster-export.test.ts packages/ui-solid/src/raster-lifecycle.test.ts'`
 2. `sh -c 'bun test packages/ui-solid/src/cad/capture-image.test.ts packages/ui-solid/src/cad/mesh-io.test.ts apps/desktop/src/styles/theme-tokens.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
-3. `sh -c 'bun --cwd=apps/desktop run build && bun test packages/ui-solid/src/export-dialog-document.test.ts'`
+3. `sh -c 'bun --cwd=apps/desktop run build --outDir ../../target/capture-m15/dist && bun test packages/ui-solid/src/export-dialog-document.test.ts'`
+
+## Amendment 2026-11-23 (integration-paths-outside-writePaths, round 1)
+
+Finding INT-M15-VERIFY3-ARTIFACT-ROOT (mid). The old gate 3 ran
+`vite build` with its default output, `apps/desktop/dist`. That path is
+outside the artifact root `target` and outside writePaths, so the worker
+rightly refused to run it. Gate 3 now passes `--outDir
+../../target/capture-m15/dist`, relative to `apps/desktop`, and keeps
+both the build and the document test. `apps/desktop/dist` is not added to
+artifactRoots. M15 sources need no edit unless review finds a defect.
+Rerun gates 1 to 3 and keep complete logs ending in `exit=0` under
+`tmp/capture-s868/capture-15-desktop-ui/`.
+
+The manifest `impl-plans/active/capture-s868-dispatch.json` appears in
+this plan's writePaths only so that the plan author's amendment has an
+owner. The M15 worker must not edit it.
 
 ## Progress
 
-Pending (revision 4: wave 1, without `App.tsx`).
+Implementation in progress (revision 4; App wiring remains M14). CAD image controls, camera reporting and conversion, and JPEG artwork encoding are implemented. On redispatch the exact shared-tree gates 1 and 2 passed (19 and 26 tests; `gate1-redispatch.log`, `gate2-redispatch.log`); the earlier sibling typecheck failure is resolved. The desktop build and document tests previously passed with output redirected to `target/capture-m15/dist` (2 tests). The exact build remains blocked because it writes `apps/desktop/dist` outside the declared artifact root; a checkpoint amendment or command amendment is required. Formal reviews and integration remain downstream.
+
+Per-file initial and final git blob hashes (empty blob means a new file):
+  - `packages/ui-solid/src/Canvas.tsx`: `eaf0074a1608e25742399d922e88d5257a692667` -> `a7a8e06b4ec440971c140a6991d59d13beaeb5f0`
+  - `packages/ui-solid/src/ExportDialog.tsx`: `7de2463ebb6da75f6e3b5dcdadeda26e5ac05150` -> `9da6e6fb24f65614266699ba7e5d38f91dec87c7`
+  - `packages/ui-solid/src/cad/camera3d.ts`: `1ea0bfb84b17f17ea11a510760e64d6980658e54` -> `4c70f632198fad5472b5d551eef82231c0e79285`
+  - `packages/ui-solid/src/cad/capture-camera.ts`: `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` -> `5f9bce372d18232d4ff9012ce98ad54a0dfb39ef`
+  - `packages/ui-solid/src/cad/capture-camera.test.ts`: `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` -> `3d916bff675289cfff73f46e1b7839d9df4fa7e1`
+  - `packages/ui-solid/src/cad/capture-image.test.ts`: `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` -> `719b021e82235c1427ac1da58fa24c6a2e5a6442`
+  - `packages/ui-solid/src/CadImageExportSection.tsx`: `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` -> `0692c80b318d1c8d7cac5d003cc659dade845729`
+  - `packages/ui-solid/src/test-dom/cad-image.dom.tsx`: `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` -> `ecfbc1477ea33d3dee395ae6bfeed39d4addcbe3`
+  - `packages/ui-solid/src/export-dialog-document.test.ts`: `ab62bf7b55d19a0ab5a8c1714adb6576b6c3aef5` -> `29627247b4e3d49705232e0c5d5a9f76354983b2`
+  - `packages/ui-solid/src/index.ts`: `c3d38d2160e208b94790ae12e3d98bbdb3c80a16` -> `8de9dc3eec0122b3051d07cc6fd7d873162d2e93`
+  - `packages/ui-solid/src/inspector/AssetExportSection.tsx`: `de1507c087e0403c8f7dcc8729901f5cdaf28b3a` -> `e0082a045f476d718470f3c78c2f11914ce6bf1b`
+  - `packages/ui-solid/src/raster-export.ts`: `e7ae65c8aa40ed6c45eb9d27178652776b5febd6` -> `3bcae7c99530c2ed9bc929cd1f51d050bdfa5dd0`
+  - `packages/ui-solid/src/raster-export.test.ts`: `b7a6dbac7ec702e2c3f33fadaba0fc3b82dc8544` -> `525d78b67d3de7160e15128daad6d4b3979bce72`
