@@ -1,9 +1,17 @@
+import { Buffer } from "node:buffer";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { runCliAsync } from "./cli.ts";
 import { type CommandIo, type CommandResult, fail } from "./commands.ts";
 import { COMMAND_HELP, OVERVIEW } from "./help.ts";
+import {
+  capturedImage,
+  MCP_INLINE_MAX_BYTES,
+  wantsInlineImage,
+} from "./mcp-image.ts";
 
 const inputSchema = {
   args: z
@@ -24,17 +32,54 @@ const outputSchema = {
   stderr: z.string(),
 };
 
+function inlineContent(
+  image: NonNullable<ReturnType<typeof capturedImage>>,
+  readBytes: (path: string) => Uint8Array | number | undefined,
+): ContentBlock {
+  try {
+    const data = readBytes(image.path);
+    if (data === undefined)
+      throw new Error("This host cannot read image files.");
+    const size = typeof data === "number" ? data : data.byteLength;
+    if (typeof data === "number" || size > MCP_INLINE_MAX_BYTES) {
+      return {
+        type: "text",
+        text: `Image not inlined: ${size} bytes exceed ${MCP_INLINE_MAX_BYTES}. Open the path instead, or capture with a smaller --size or --format jpg.`,
+      };
+    }
+    return {
+      type: "image",
+      data: Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString(
+        "base64",
+      ),
+      mimeType: image.mimeType,
+    };
+  } catch (cause) {
+    return {
+      type: "text",
+      text: `Image not inlined: ${cause instanceof Error ? cause.message : String(cause)}`,
+    };
+  }
+}
+
 /** Use the CLI itself so new options and operations are available immediately. */
-export function createMcpServer(io: CommandIo, version: string): McpServer {
+export function createMcpServer(
+  io: CommandIo,
+  version: string,
+  readInlineBytes = (path: string): Uint8Array | number | undefined =>
+    io.readBytes?.(path),
+): McpServer {
   const server = new McpServer(
     { name: "nodetto-cli", version },
     {
       instructions:
-        "Use nodetto_help for CLI usage. Tools operate on local files with the server process's permissions; relative paths use its working directory. Pass each argument as a separate array item. Results preserve CLI stdout, stderr and exitCode (including check/drift and strict warnings). Use stdin for edit --ops -. Export writes binary files through --output.",
+        "Use nodetto_help for CLI usage. Tools operate on local files with the server process's permissions; relative paths use its working directory. Pass each argument as a separate array item. Results preserve CLI stdout, stderr and exitCode (including check/drift and strict warnings). Use stdin for edit --ops -. Export writes binary files through --output. To look at a page, call nodetto_capture: it writes a PNG or JPG and returns its path; add --inline to also receive the image in the result.",
     },
   );
   const execute = async (args: string[], stdin?: string) => {
     let result: CommandResult;
+    let writtenPath: string | undefined;
+    const capture = wantsInlineImage(args) ? io.capture : undefined;
     try {
       if (
         args[0] === "mcp" &&
@@ -49,6 +94,16 @@ export function createMcpServer(io: CommandIo, version: string): McpServer {
           args,
           {
             ...io,
+            ...(capture && {
+              capture: {
+                ...capture,
+                write(path, bytes, replace) {
+                  const status = capture.write(path, bytes, replace);
+                  if (status !== "exists") writtenPath = capture.absolute(path);
+                  return status;
+                },
+              },
+            }),
             readStdin: () => {
               if (stdin === undefined)
                 throw new Error(
@@ -66,10 +121,25 @@ export function createMcpServer(io: CommandIo, version: string): McpServer {
       );
     }
     const structuredContent = { ...result };
+    const content: ContentBlock[] = [
+      { type: "text", text: JSON.stringify(structuredContent) },
+    ];
+    if (
+      writtenPath !== undefined &&
+      (result.exitCode === 0 || result.exitCode === 1)
+    ) {
+      const image = capturedImage(result.stdout);
+      if (image?.path === writtenPath) {
+        content.push(inlineContent(image, readInlineBytes));
+      } else {
+        content.push({
+          type: "text",
+          text: "Image not inlined: could not read the written path from capture output. Try --json.",
+        });
+      }
+    }
     return {
-      content: [
-        { type: "text" as const, text: JSON.stringify(structuredContent) },
-      ],
+      content,
       structuredContent,
       isError: result.exitCode !== 0,
     };
@@ -111,6 +181,36 @@ export function createMcpServer(io: CommandIo, version: string): McpServer {
   return server;
 }
 
+/** Bound filesystem reads even if the capture changes before it is inlined. */
+function readLocalInlineBytes(path: string): Uint8Array | number {
+  const file = openSync(
+    path,
+    constants.O_RDONLY |
+      (constants.O_NOFOLLOW ?? 0) |
+      (constants.O_NONBLOCK ?? 0),
+  );
+  try {
+    const entry = fstatSync(file);
+    if (!entry.isFile()) throw new Error("The capture is not a regular file.");
+    if (entry.size > MCP_INLINE_MAX_BYTES) return entry.size;
+    const bytes = Buffer.allocUnsafe(entry.size);
+    let length = 0;
+    while (length < bytes.length) {
+      const read = readSync(file, bytes, length, bytes.length - length, null);
+      if (read === 0) break;
+      length += read;
+    }
+    if (fstatSync(file).size !== entry.size || length !== entry.size) {
+      throw new Error("The capture size changed while reading it.");
+    }
+    return bytes;
+  } finally {
+    closeSync(file);
+  }
+}
+
 export async function serveMcp(io: CommandIo, version: string): Promise<void> {
-  await createMcpServer(io, version).connect(new StdioServerTransport());
+  await createMcpServer(io, version, readLocalInlineBytes).connect(
+    new StdioServerTransport(),
+  );
 }

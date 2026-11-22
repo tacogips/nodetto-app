@@ -98,4 +98,18 @@ Rust: two private functions with the same behaviour in `mcp.rs`.
 
 ## Progress
 
-Pending.
+Implemented, pending implementation review. Both MCP servers advertise
+`nodetto_capture` and append an image or a readback note after the original
+text content when requested. The tests cover both argument forms, text and
+JSON reports, and the image bytes sent through source and native stdio.
+
+Readback follows the design's 1 MiB read limit. The local servers inspect
+the open file and bound the read instead of loading the entire file before
+checking its size. The TypeScript in-memory server uses `CommandIo.readBytes`.
+The TypeScript server checks the reported path against the capture write.
+The native server checks the requested output file or the default capture
+directory. For filenames containing line breaks, use `--json` to supply an
+unambiguous path.
+
+Verification logs are in `tmp/capture/m13/` as `typescript.log`, `rust.log`
+and `native-stdio.log`.

@@ -1,13 +1,16 @@
 import { expect, test } from "bun:test";
+import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Editor } from "@nodetto/core";
 import { parseDocument, serializeDocument } from "@nodetto/io";
 import { runCliAsync } from "./cli.ts";
 import type { CommandIo, CommandResult } from "./commands.ts";
 import { COMMAND_HELP } from "./help.ts";
 import { createMcpServer } from "./mcp.ts";
+import { MCP_INLINE_MAX_BYTES } from "./mcp-image.ts";
 
 const doc = [
   '{"kind":"document","schemaVersion":1,"id":"doc","title":"Shop"}',
@@ -336,6 +339,106 @@ test("MCP preserves edit contention exit code 4 without writing", async () => {
     expect(output(result).exitCode).toBe(4);
     expect(result.isError).toBe(true);
     expect(memory.files.get("doc.jsonl")).toBe(doc);
+  } finally {
+    await session.close();
+  }
+});
+
+test("MCP capture appends opt-in images and read notes while preserving the CLI result", async () => {
+  const direct = memoryIo();
+  const remote = memoryIo();
+  const reads: string[] = [];
+  for (const memory of [direct, remote]) {
+    Object.assign(memory.io, {
+      capture: {
+        dir: () => "/mock",
+        absolute: (path) => path,
+        digest: () => "0000000000000000",
+        write(path, bytes) {
+          memory.bytes.set(path, bytes);
+          return "written";
+        },
+      } satisfies NonNullable<CommandIo["capture"]>,
+    });
+  }
+  remote.io.readBytes = (path) => {
+    reads.push(path);
+    if (path === "/mock/large.png")
+      return new Uint8Array(MCP_INLINE_MAX_BYTES + 1);
+    const bytes = remote.bytes.get(path);
+    if (!bytes || path === "/mock/unreadable.png")
+      throw new Error("Permission denied");
+    return bytes;
+  };
+  const session = await connect(remote.io);
+  try {
+    expect(session.client.getInstructions()).toContain("nodetto_capture");
+    const notes = {
+      large: "1048577 bytes exceed 1048576",
+      unreadable: "Permission denied",
+      ambiguous: "Try --json",
+    };
+    const scenarios: {
+      path: string;
+      options: string[];
+      mode: "plain" | "image" | keyof typeof notes;
+    }[] = [
+      { path: "/mock/plain.png", options: [], mode: "plain" },
+      { path: "/mock/plan view.png", options: ["--inline"], mode: "image" },
+      {
+        path: "/mock/json.png",
+        options: ["--inline", "--json"],
+        mode: "image",
+      },
+      { path: "/mock/large.png", options: ["--inline"], mode: "large" },
+      {
+        path: "/mock/unreadable.png",
+        options: ["--inline"],
+        mode: "unreadable",
+      },
+      {
+        path: "/mock/plan view.png\nother.png",
+        options: ["--inline"],
+        mode: "ambiguous",
+      },
+    ];
+    for (const { path, options, mode } of scenarios) {
+      const args = ["doc.jsonl", "--output", path, ...options];
+      const expected = await runCliAsync(
+        ["capture", ...args],
+        direct.io,
+        "test",
+      );
+      const genericTool = options.includes("--json");
+      const response = CallToolResultSchema.parse(
+        await session.client.callTool({
+          name: genericTool ? "nodetto_cli" : "nodetto_capture",
+          arguments: { args: genericTool ? ["capture", ...args] : args },
+        }),
+      );
+      expect(expected.exitCode).toBe(0);
+      expect(response.structuredContent).toEqual({ ...expected });
+      expect(response.isError).toBe(false);
+      const [first, extra] = response.content;
+      expect(first).toEqual({ type: "text", text: JSON.stringify(expected) });
+      expect(response.content).toHaveLength(mode === "plain" ? 1 : 2);
+      if (mode === "image") {
+        if (extra?.type !== "image") throw new Error("Expected an image");
+        expect(extra.mimeType).toBe("image/png");
+        expect(new Uint8Array(Buffer.from(extra.data, "base64"))).toEqual(
+          direct.bytes.get(path)!,
+        );
+      } else if (mode !== "plain") {
+        if (extra?.type !== "text") throw new Error("Expected an inline note");
+        expect(extra.text).toContain(notes[mode]);
+      }
+    }
+    expect(reads).toEqual([
+      "/mock/plan view.png",
+      "/mock/json.png",
+      "/mock/large.png",
+      "/mock/unreadable.png",
+    ]);
   } finally {
     await session.close();
   }

@@ -186,7 +186,7 @@ found there.
 | M18 | pending |
 | M11 | pending |
 | M12 | pending |
-| M13 | pending |
+| M13 | implemented |
 | M14 | pending |
 | M15 | pending |
 | M16 | pending |
