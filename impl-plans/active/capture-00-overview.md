@@ -186,7 +186,11 @@ found there.
 | M18 | pending |
 | M11 | pending |
 | M12 | pending |
-| M13 | implemented |
+| M13 | accepted |
 | M14 | pending |
 | M15 | pending |
 | M16 | pending |
+
+M5 and M13 were implemented and accepted by parallel runs on
+`feat/ai-capture-m5` and `feat/ai-capture-m13` and merged into
+`feat/ai-capture`.
