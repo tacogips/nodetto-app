@@ -9,6 +9,13 @@ import {
 } from "./engine.ts";
 import { CAD_TEST_PAGE, plateElements } from "./testing/documents.ts";
 
+import {
+  boardReference,
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "./testing/pcb.ts";
+
 function setup() {
   const posts: CadEngineRequest[] = [];
   const timers = new Set<() => void>();
@@ -170,4 +177,45 @@ test("collectCadInput selects only the requested CAD page", () => {
   });
   expect(collectCadInput(doc, drawing.id, 43).elements).toEqual([]);
   expect(collectCadInput(doc, "missing", 44).elements).toEqual([]);
+});
+
+test("collectCadInput includes only linked boards on PCB pages and visible Edge.Cuts, once", () => {
+  const board = testBoard();
+  const reference = boardReference();
+  const second = { ...reference, id: "other-reference" };
+  const top = edge("top", { kind: "line", start: [5, 5], end: [10, 5] });
+  const otherPcb = { ...PCB_TEST_PAGE, id: "other-board-page" };
+  const drawing = { id: "drawing", kind: "freeform", name: "Drawing" } as const;
+  const otherReference = {
+    ...reference,
+    id: "drawing-reference",
+    semantic: { ...reference.semantic, board: "not-on-pcb" },
+  };
+  const doc = document(
+    [
+      reference,
+      board,
+      second,
+      top,
+      { ...top, id: "hidden", visual: { hidden: true } },
+      { ...top, id: "track", type: "pcb.track" },
+      {
+        ...top,
+        id: "silkscreen",
+        semantic: { ...top.semantic, layer: "F.SilkS" },
+      },
+      { ...top, id: "other-edge", page: otherPcb.id },
+      { ...board, id: "unlinked-board", page: otherPcb.id },
+      { ...board, id: "not-on-pcb", page: drawing.id },
+      otherReference,
+    ],
+    [CAD_TEST_PAGE, PCB_TEST_PAGE, otherPcb, drawing],
+  );
+  expect(collectCadInput(doc, CAD_TEST_PAGE.id, 1).elements).toEqual([
+    reference,
+    second,
+    otherReference,
+    board,
+    top,
+  ]);
 });

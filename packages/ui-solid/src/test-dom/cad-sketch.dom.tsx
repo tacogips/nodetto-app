@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   type CadDisplayBody,
   type CadEngine,
+  collectCadInput,
   Editor,
   sketchFrameOf,
   sketchParentOf,
@@ -11,6 +12,12 @@ import {
 import { type CadXY, hasErrors, validateDocument } from "@nodetto/ir";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
+import {
+  boardReference,
+  edge as pcbEdge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../../../core/src/cad/testing/pcb.ts";
 import { plateWithHoles } from "../../../core/src/cad/testing/documents.ts";
 import { type Camera3d, viewProjection } from "../cad/camera3d.ts";
 import type { CadRenderer } from "../cad/renderer.ts";
@@ -39,12 +46,23 @@ for (const mode of ["light", "dark"] as const) {
   const editor = new Editor({
     document: {
       ...doc,
-      pages: [...doc.pages, { id: "free", kind: "freeform", name: "Drawing" }],
+      pages: [
+        ...doc.pages,
+        { id: "free", kind: "freeform", name: "Drawing" },
+        PCB_TEST_PAGE,
+      ],
+      elements: [
+        ...doc.elements,
+        boardReference(),
+        testBoard(5),
+        pcbEdge("board-rim", { kind: "rect", start: [0, 0], end: [100, 60] }),
+      ],
     },
   });
   editor.setCurrentPage("cad");
   const [tool, setTool] = createSignal<ToolKind>(Tool.Select);
   let faceName = "ex1:end";
+  let displayBoard = false;
   const body: CadDisplayBody = {
     id: "ex1",
     positions: new Float32Array([0, 0, 5, 100, 0, 5, 100, 60, 5, 0, 60, 5]),
@@ -56,11 +74,21 @@ for (const mode of ["light", "dark"] as const) {
   };
   let evaluations = 0;
   const engine: CadEngine = {
-    evaluate: async ({ revision }) => {
+    evaluate: async ({ revision, elements }) => {
+      assert.ok(elements.some(({ id }) => id === "board-rim"));
       evaluations++;
       return {
         revision,
-        bodies: [{ ...body, faceNames: [faceName] }],
+        bodies: [
+          displayBoard
+            ? {
+                ...body,
+                id: "board-reference",
+                reference: true,
+                faceNames: [faceName],
+              }
+            : { ...body, faceNames: [faceName] },
+        ],
         status: [],
       };
     },
@@ -403,6 +431,54 @@ for (const mode of ["light", "dark"] as const) {
     op: "new",
   });
   assert.equal(hasErrors(validateDocument(editor.getSnapshot())), false);
+
+  faceName = "board-reference:end";
+  displayBoard = true;
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: "board",
+      semantic: { ...testBoard(5).semantic, generator: "dom" },
+    },
+  ]);
+  await nextFrame();
+  click([73, 42, 5]);
+  assert.equal(selectedId(), "board-reference");
+  const boardSketch = begin();
+  assert.ok(boardSketch);
+  assert.deepEqual(editor.store.get(boardSketch)?.semantic, {
+    name: "Sketch 3",
+    plane: { face: { feature: "board-reference", role: "end" } },
+  });
+  assert.deepEqual(
+    sketchFrameOf(
+      collectCadInput(editor.getSnapshot(), "cad", 0).elements,
+      boardSketch,
+    )?.o,
+    [0, 0, 5],
+  );
+  editor.apply([
+    { type: "updateSemantic", id: "board", semantic: testBoard(6).semantic },
+  ]);
+  await nextFrame();
+  setTool(Tool.CadRect);
+  await nextFrame();
+  assert.ok(
+    gridOverlay &&
+      (gridOverlay as Float32Array).every(
+        (value, i) => i % 3 !== 2 || value === 6,
+      ),
+  );
+  setTool(Tool.CadExtrude);
+  const boardExtrude = selectedId();
+  assert.ok(boardExtrude);
+  assert.equal(editor.store.get(boardExtrude)?.type, "cad.extrude");
+  assert.deepEqual(editor.store.get(boardExtrude)?.semantic, {
+    sketch: boardSketch,
+    name: "Extrude 3",
+    distance: 10,
+    op: "new",
+  });
 
   editor.setCurrentPage("free");
   const beforeFreeform = editor.getSnapshot();

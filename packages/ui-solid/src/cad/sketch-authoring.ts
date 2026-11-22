@@ -92,6 +92,7 @@ export function createSketchAuthoring(options: {
   readonly selectTool: () => void;
   readonly focus: () => void;
   readonly picked: Accessor<CadPick | null>;
+  readonly geometryElements: Accessor<readonly Element[]>;
   readonly camera: Accessor<Camera3d>;
   readonly changeCamera: (camera: Camera3d) => void;
   readonly size: Accessor<ViewportSize>;
@@ -105,7 +106,9 @@ export function createSketchAuthoring(options: {
     options.revision();
     return editor.store.getPageElements(pageId);
   });
-  const frameOf = createMemo(() => sketchFrameLookup(elements()));
+  const frameOf = createMemo(() =>
+    sketchFrameLookup(options.geometryElements()),
+  );
   const sketchId = createMemo(() => {
     options.revision();
     const ids = selection();
@@ -250,7 +253,10 @@ export function createSketchAuthoring(options: {
     );
     const command = commands[0];
     if (command?.type !== "createElement") return;
-    const frame = sketchFrameOf([...current, command.element], id);
+    const frame = sketchFrameOf(
+      [...options.geometryElements(), command.element],
+      id,
+    );
     if (!frame) {
       setNotice("The selected face no longer defines a sketch plane.");
       return;

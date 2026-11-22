@@ -201,8 +201,12 @@ export function defaultExtrude(
   if (face) {
     const body = faceBody(elements, face);
     const outward = body === null ? 0 : faceOutwardSign(elements, face);
-    if (body !== null && outward !== 0)
-      return { op: "add", bodies: [body], distance: 10 * outward };
+    if (body !== null && outward !== 0) {
+      const distance = 10 * outward;
+      return elements.some(({ id, type }) => id === body && type === "cad.pcb")
+        ? { op: "new", bodies: [], distance }
+        : { op: "add", bodies: [body], distance };
+    }
   }
   return { op: "new", bodies: [], distance: 10 };
 }

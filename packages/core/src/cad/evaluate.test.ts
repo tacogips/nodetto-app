@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { type Element, isPlainObject } from "@nodetto/ir";
 import {
   contentKey,
+  defaultExtrude,
+  faceOutwardSign,
   createCadMemo,
   evaluateCadPage,
   releaseCadMemo,
@@ -17,6 +19,8 @@ import {
   sketch,
 } from "./testing/documents.ts";
 import { RecordingKernel } from "./testing/recording-kernel.ts";
+
+import { boardReference, edge, testBoard } from "./testing/pcb.ts";
 
 function updateSemantic(
   element: Element,
@@ -802,4 +806,129 @@ test("a replay failure is attributed to its feature and independent bodies survi
   expect(evaluateCadPage(revised, kernel, memo).status.get("layer-1")).toEqual({
     ok: true,
   });
+});
+
+test("live PCB changes rebuild the reference body without invalidating unrelated solids", () => {
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  try {
+    const board = testBoard(1.2);
+    const outline = edge("rim", { kind: "rect", start: [0, 0], end: [80, 50] });
+    const track = { ...outline, id: "track", type: "pcb.track" };
+    const reference = boardReference();
+    const plate = plateElements();
+    const result = evaluateCadPage(
+      [reference, board, outline, track, ...plate],
+      kernel,
+      memo,
+    );
+    expect(result.bodies).toMatchObject([
+      { id: reference.id, reference: true },
+      { id: "ex1", reference: false },
+    ]);
+    expect(result.status.has(board.id)).toBe(false);
+    expect(kernel.calls.find(({ kind }) => kind === "solid")).toMatchObject({
+      mesh: {
+        faceNames: [
+          "board-reference:start",
+          "board-reference:end",
+          "board-reference:side:rim",
+        ],
+      },
+    });
+    const original = result.bodies.find(({ reference }) => reference);
+    kernel.calls.length = 0;
+    const unrelated = evaluateCadPage(
+      [
+        reference,
+        board,
+        outline,
+        updateSemantic(track, { width: 2 }),
+        ...plate,
+      ],
+      kernel,
+      memo,
+    );
+    expect(unrelated.bodies).toEqual(result.bodies);
+    expect(kernel.calls).toEqual([]);
+    const changed = updateSemantic(outline, {
+      shape: { ...outline.semantic.shape, end: [90, 50] },
+    });
+    const edited = evaluateCadPage(
+      [reference, board, changed, track, ...plate],
+      kernel,
+      memo,
+    );
+    expect(edited.bodies.find(({ reference }) => reference)?.key).not.toBe(
+      original?.key,
+    );
+    expect(edited.bodies.find(({ id }) => id === "ex1")).toEqual(
+      result.bodies.find(({ id }) => id === "ex1"),
+    );
+    expect(kernel.calls.map(({ kind }) => kind)).toEqual(["solid", "measure"]);
+  } finally {
+    releaseCadMemo(memo);
+  }
+});
+
+test("PCB thickness precedence, cap directions and reference target protection", () => {
+  const kernel = new RecordingKernel();
+  const memo = createCadMemo(kernel);
+  const board = testBoard(1.2);
+  const reference = boardReference(2);
+  const outline = edge("rim", { kind: "rect", start: [0, 0], end: [80, 50] });
+  const start = { feature: reference.id, role: "start" } as const;
+  const end = { feature: reference.id, role: "end" } as const;
+  const base = sketch("base", "a1", { face: start });
+  const features = [
+    reference,
+    board,
+    outline,
+    base,
+    ...rectangle("base", 1, 1, 3, 4),
+    extrude("cut", "a2", {
+      sketch: "base",
+      distance: -1,
+      op: "cut",
+      bodies: [reference.id],
+    }),
+  ];
+  try {
+    const result = evaluateCadPage(features, kernel, memo);
+    expect(result.status.get("base")).toEqual({ ok: true });
+    expect(result.status.get("cut")).toEqual({
+      ok: false,
+      code: "cad.body.reference",
+      detail: reference.id,
+    });
+    expect(kernel.calls.map(({ kind }) => kind)).toEqual(["solid", "measure"]);
+    const solid = kernel.calls.find(({ kind }) => kind === "solid");
+    if (solid?.kind !== "solid") throw new Error("Missing PCB prism");
+    expect(
+      Math.max(...solid.mesh.positions.filter((_, i) => i % 3 === 2)),
+    ).toBe(2);
+    expect(faceOutwardSign(features, start)).toBe(-1);
+    expect(faceOutwardSign(features, end)).toBe(1);
+    expect(defaultExtrude(features, "base")).toEqual({
+      op: "new",
+      bodies: [],
+      distance: -10,
+    });
+    const missing = evaluateCadPage([reference], kernel, memo);
+    expect(missing.bodies).toEqual([]);
+    expect(missing.status.get(reference.id)).toMatchObject({
+      code: "cad.reference.missing",
+    });
+    const suppressed = evaluateCadPage(
+      [updateSemantic(reference, { suppressed: true }), ...features.slice(1)],
+      kernel,
+      memo,
+    );
+    expect(suppressed.bodies).toEqual([]);
+    expect(suppressed.status.get("base")).toMatchObject({
+      code: "cad.reference.failed",
+    });
+  } finally {
+    releaseCadMemo(memo);
+  }
 });

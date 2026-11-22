@@ -1,6 +1,8 @@
 {"kind":"document","schemaVersion":1,"id":"cad3d-fixture","title":"Plate with a mounting hole"}
 {"kind":"page","id":"part","name":"Plate","pageKind":"cad3d"}
+{"kind":"page","id":"pcb-circuit","name":"Controller","pageKind":"pcb"}
 {"kind":"element","id":"arc-rim","page":"part","type":"cad.arc","index":"a3","semantic":{"sketch":"sketch-base","a":[40,0],"m":[50,10],"b":[40,20]}}
+{"kind":"element","id":"board-reference","page":"part","type":"cad.pcb","index":"aB","semantic":{"name":"Controller board","board":"controller"}}
 {"kind":"element","id":"circle-bore","page":"part","type":"cad.circle","index":"a7","semantic":{"sketch":"sketch-top","c":[30,10],"r":2.125001}}
 {"kind":"element","id":"cut","page":"part","type":"cad.extrude","index":"a8","semantic":{"name":"Bore","sketch":"sketch-top","loops":["circle-bore"],"distance":-6,"op":"cut","bodies":["plate"]}}
 {"kind":"element","id":"line-bottom","page":"part","type":"cad.line","index":"a1","semantic":{"sketch":"sketch-base","a":[0,0],"b":[40,0]}}
@@ -11,3 +13,12 @@
 {"kind":"element","id":"sketch-base","page":"part","type":"cad.sketch","index":"a0","semantic":{"name":"Outline","plane":{"base":"xy"}}}
 {"kind":"element","id":"sketch-top","page":"part","type":"cad.sketch","index":"a6","semantic":{"name":"Mounting hole","plane":{"face":{"feature":"plate","role":"end"}}}}
 {"kind":"element","id":"token-tone","page":"part","type":"design.token","index":"a9","semantic":{"name":"Plate tone","kind":"color","value":"#537083"}}
+{"kind":"element","id":"controller","page":"pcb-circuit","type":"pcb.board","index":"a0","semantic":{"format":"kicad_pcb","source":"controller.kicad_pcb","version":1,"generator":"fixture","thickness":1.6,"maskExpansion":0,"layers":[{"id":44,"name":"Edge.Cuts","type":"user"}],"nets":[]}}
+{"kind":"element","id":"controller-arc-ne","page":"pcb-circuit","type":"pcb.graphic","index":"a2","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"arc","start":[85,20],"mid":[88.535534,21.464466],"end":[90,25]}}}
+{"kind":"element","id":"controller-arc-nw","page":"pcb-circuit","type":"pcb.graphic","index":"a8","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"arc","start":[10,25],"mid":[11.464466,21.464466],"end":[15,20]}}}
+{"kind":"element","id":"controller-arc-se","page":"pcb-circuit","type":"pcb.graphic","index":"a4","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"arc","start":[90,65],"mid":[88.535534,68.535534],"end":[85,70]}}}
+{"kind":"element","id":"controller-arc-sw","page":"pcb-circuit","type":"pcb.graphic","index":"a6","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"arc","start":[15,70],"mid":[11.464466,68.535534],"end":[10,65]}}}
+{"kind":"element","id":"controller-line-e","page":"pcb-circuit","type":"pcb.graphic","index":"a3","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"line","start":[90,25],"end":[90,65]}}}
+{"kind":"element","id":"controller-line-n","page":"pcb-circuit","type":"pcb.graphic","index":"a1","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"line","start":[15,20],"end":[85,20]}}}
+{"kind":"element","id":"controller-line-s","page":"pcb-circuit","type":"pcb.graphic","index":"a5","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"line","start":[85,70],"end":[15,70]}}}
+{"kind":"element","id":"controller-line-w","page":"pcb-circuit","type":"pcb.graphic","index":"a7","semantic":{"layer":"Edge.Cuts","width":0.05,"fill":false,"shape":{"kind":"line","start":[10,65],"end":[10,25]}}}

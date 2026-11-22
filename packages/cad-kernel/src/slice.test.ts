@@ -6,6 +6,10 @@ import {
   Store,
   applyCommands,
   circleCommands,
+  collectCadInput,
+  faceOutwardSign,
+  releaseCadMemo,
+  tessellateArc,
   createCadMemo,
   defaultExtrude,
   Editor,
@@ -30,6 +34,7 @@ import {
 } from "../../core/src/cad/testing/documents.ts";
 import { extrudeFaceCases } from "../../core/src/cad/testing/extrude-faces.ts";
 import { createManifoldKernel } from "./index.ts";
+import { createWorkerHost } from "./worker-host.ts";
 
 function roundTrip(document: Document): Document {
   return parseDocument(serializeDocument(document));
@@ -416,4 +421,81 @@ test("the 60-hole reference plate regenerates within 2 seconds", async () => {
     kernel.measure(onlyBody(result)).volume,
     30_000 - 60 * 5 * circleArea(3),
   );
+});
+
+test("the rounded PCB is a live worker reference and supplies the enclosure pocket plane", async () => {
+  const source = await Bun.file(
+    new URL("../../io/src/__fixtures__/cad3d.jsonl", import.meta.url),
+  ).text();
+  const fixture = parseDocument(source);
+  const face = { feature: "board-reference", role: "start" } as const;
+  const model = roundTrip({
+    ...fixture,
+    elements: [
+      ...fixture.elements.filter(
+        ({ page, id }) => page !== "part" || id === "board-reference",
+      ),
+      ...[
+        sketch("enclosure-sketch", "aC", { base: "xy", offset: -3 }),
+        ...rectangle("enclosure-sketch", -5, -5, 90, 60),
+        extrude("enclosure", "aD", {
+          sketch: "enclosure-sketch",
+          distance: 3,
+          op: "new",
+        }),
+        sketch("pocket-sketch", "aE", { face }),
+        ...rectangle("pocket-sketch", 4, 4, 80, 40),
+      ].map((element) => ({ ...element, page: "part" })),
+    ],
+  });
+  const direction = faceOutwardSign(model.elements, face);
+  expect(direction).toBe(-1);
+  const pocket = {
+    ...extrude("pocket", "aF", {
+      sketch: "pocket-sketch",
+      distance: 2 * direction,
+      op: "cut",
+      bodies: ["enclosure"],
+    }),
+    page: "part",
+  };
+  const input = collectCadInput(
+    { ...model, elements: [...model.elements, pocket] },
+    "part",
+    1,
+  );
+  const kernel = await createManifoldKernel();
+  const memo = createCadMemo(kernel);
+  try {
+    const result = evaluateCadPage(input.elements, kernel, memo);
+    expect([...result.status.values()].filter(({ ok }) => !ok)).toEqual([]);
+    const board = result.bodies.find(({ reference }) => reference);
+    const enclosure = result.bodies.find(({ id }) => id === "enclosure");
+    if (!board || !enclosure) throw new Error("Missing board or enclosure");
+    const arc = tessellateArc([0, 0], [3.535534, 1.464466], [5, 5]);
+    if (!arc) throw new Error("Missing corner arc");
+    // Translate the corner center to the origin and sum the triangle fan.
+    let fan = 0;
+    for (let i = 0; i < arc.length - 2; i += 2)
+      fan += arc[i] * (arc[i + 3] - 5) - (arc[i + 1] - 5) * arc[i + 2];
+    const boardVolume = (80 * 50 - 4 * (25 - fan / 2)) * 1.6;
+    expectVolume(kernel.measure(board.handle).volume, boardVolume);
+    expectVolume(
+      kernel.measure(enclosure.handle).volume,
+      90 * 60 * 3 - 80 * 40 * 2,
+    );
+    const worker = createWorkerHost(Promise.resolve(kernel));
+    await worker({ id: 1, input }, (reply) => {
+      expect(reply).toMatchObject({
+        result: {
+          bodies: [
+            { id: "board-reference", reference: true },
+            { id: "enclosure", reference: false },
+          ],
+        },
+      });
+    });
+  } finally {
+    releaseCadMemo(memo);
+  }
 });

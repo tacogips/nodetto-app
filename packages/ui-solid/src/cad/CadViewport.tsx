@@ -127,6 +127,10 @@ export function CadViewport(props: CadViewportProps) {
       }
     | undefined;
   const tool = () => props.tool ?? Tool.Select;
+  const collected = createMemo(() =>
+    collectCadInput(props.editor.getSnapshot(), pageId, revision()),
+  );
+  const geometryElements = () => collected().elements;
   const sketch = createSketchAuthoring({
     editor: props.editor,
     pageId,
@@ -136,6 +140,7 @@ export function CadViewport(props: CadViewportProps) {
     selectTool: () => props.onToolChange?.(Tool.Select),
     focus: () => root.focus(),
     picked,
+    geometryElements,
     camera,
     changeCamera,
     size,
@@ -149,6 +154,7 @@ export function CadViewport(props: CadViewportProps) {
     tool,
     selectTool: () => props.onToolChange?.(Tool.Select),
     focus: () => root.focus(),
+    geometryElements,
     camera,
     changeCamera,
     size,
@@ -290,14 +296,10 @@ export function CadViewport(props: CadViewportProps) {
     // The editor snapshot contains plain IR records. Compare the collected
     // records so neither unrelated pages nor shared carriers trigger CAD work,
     // and any foreign records collected by the engine participate too.
-    const collected = collectCadInput(
-      props.editor.getSnapshot(),
-      pageId,
-      version,
-    );
+    const source = collected();
     const input = {
-      ...collected,
-      elements: collected.elements.filter(
+      ...source,
+      elements: source.elements.filter(
         ({ page, type }) => page !== pageId || isCadTypeName(type),
       ),
     };

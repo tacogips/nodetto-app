@@ -129,3 +129,17 @@ test("pasting a sketch entity skips a reference to an element of the wrong type"
   expect(editor.copySelection()).toBe(true);
   expect(editor.paste()).toEqual([]);
 });
+
+test("duplicating a CAD page keeps the external PCB board link", () => {
+  const editor = plateEditor();
+  const page = editor.duplicatePage("part");
+  if (!page) throw new Error("Expected a duplicate CAD page");
+  const reference = editor.store
+    .getPageElements(page)
+    .find(({ type }) => type === "cad.pcb");
+  expect(reference?.semantic).toEqual({
+    name: "Controller board",
+    board: "controller",
+  });
+  expectValid(editor);
+});

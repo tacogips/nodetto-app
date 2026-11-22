@@ -459,6 +459,7 @@ export {
   type CadFaceRef,
   type CadLineSemantic,
   type CadMeshSemantic,
+  type CadPcbSemantic,
   type CadPlane,
   type CadSketchSemantic,
   type CadXY,

@@ -92,6 +92,7 @@ describe("registry contents", () => {
         "cad.circle",
         "cad.extrude",
         "cad.mesh",
+        "cad.pcb",
       ].sort(),
     );
   });

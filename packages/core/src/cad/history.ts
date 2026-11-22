@@ -4,6 +4,7 @@ import {
   type CadFaceRef,
   type CadLineSemantic,
   type CadMeshSemantic,
+  type CadPcbSemantic,
   type CadSketchSemantic,
   type Element,
   type ElementId,
@@ -21,6 +22,7 @@ import {
   sideOutwardSign,
 } from "./frames.ts";
 import { buildLoops, type CadLoop } from "./loops.ts";
+import { pcbBoardOutline } from "./pcb-outline.ts";
 import { coordinate } from "./vec.ts";
 
 export type CadStatus =
@@ -46,9 +48,12 @@ export function cadFailure(code: string, detail?: string): Failure {
 type CadFeature =
   | (Element<CadSketchSemantic> & { readonly type: "cad.sketch" })
   | (Element<CadExtrudeSemantic> & { readonly type: "cad.extrude" })
-  | (Element<CadMeshSemantic> & { readonly type: "cad.mesh" });
+  | (Element<CadMeshSemantic> & { readonly type: "cad.mesh" })
+  | (Element<CadPcbSemantic> & { readonly type: "cad.pcb" });
 
 interface HistoryDetails extends CadHistory {
+  readonly pcbElements: readonly Element[];
+  readonly boards: ReadonlyMap<ElementId, Element>;
   readonly byId: ReadonlyMap<ElementId, Element>;
   readonly typed: ReadonlyMap<ElementId, CadFeature>;
   readonly dependencies: ReadonlyMap<ElementId, readonly ElementId[]>;
@@ -60,7 +65,12 @@ export function isSketchEntity(type: string): boolean {
 }
 
 function isFeatureType(type: string): boolean {
-  return type === "cad.sketch" || type === "cad.extrude" || type === "cad.mesh";
+  return (
+    type === "cad.sketch" ||
+    type === "cad.extrude" ||
+    type === "cad.mesh" ||
+    type === "cad.pcb"
+  );
 }
 
 export function compareCadHistoryOrder(left: Element, right: Element): number {
@@ -171,7 +181,7 @@ function faceDependencies(
   refs: ElementId[],
 ): CadStatus {
   const source = localElement(history.byId, feature, face.feature);
-  if (source?.type !== "cad.extrude") {
+  if (source?.type !== "cad.extrude" && source?.type !== "cad.pcb") {
     return cadFailure(
       "cad.reference.missing",
       face.feature ?? "plane.face.feature",
@@ -179,6 +189,8 @@ function faceDependencies(
   }
   refs.push(source.id);
   if (face.role !== "side") return cadOk;
+  if (source.type === "cad.pcb")
+    return cadFailure("cad.plane.notPlanar", source.id);
   const entity = localElement(history.byId, feature, face.entity);
   if (!entity || !isSketchEntity(entity.type))
     return cadFailure(
@@ -218,6 +230,7 @@ function extrudeDependencies(
   if (op !== "new") {
     for (const id of named) {
       const body = localElement(history.byId, feature, id);
+      if (body?.type === "cad.pcb") return cadFailure("cad.body.reference", id);
       if (
         body?.type !== "cad.mesh" &&
         (body?.type !== "cad.extrude" ||
@@ -254,9 +267,28 @@ function extrudeDependencies(
   return cadOk;
 }
 
+function pcbReferenceStatus(
+  history: Pick<HistoryDetails, "boards">,
+  item: Extract<CadFeature, { type: "cad.pcb" }>,
+): CadStatus {
+  const { board } = item.semantic;
+  const source = board === undefined ? undefined : history.boards.get(board);
+  return source && source.page !== item.page && isPlainObject(source.semantic)
+    ? cadOk
+    : cadFailure("cad.reference.missing", board ?? "board");
+}
+
 export function scanCadPage(elements: readonly Element[]): HistoryDetails {
   const cad = elements.filter(({ type }) => isCadTypeName(type));
   const byId = new Map(cad.map((element) => [element.id, element]));
+  const pcbElements = elements.filter(
+    ({ type }) => type === "pcb.board" || type === "pcb.graphic",
+  );
+  const boards = new Map(
+    pcbElements
+      .filter(({ type }) => type === "pcb.board")
+      .map((element) => [element.id, element]),
+  );
   const features = cad
     .filter(({ type }) => isFeatureType(type))
     .sort(compareCadHistoryOrder);
@@ -312,6 +344,8 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
     entitiesOf: (id: ElementId) => entities.get(id) ?? [],
     status,
     byId,
+    pcbElements,
+    boards,
     typed,
     dependencies,
     targets,
@@ -323,11 +357,13 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
     const structural =
       item.type === "cad.extrude"
         ? extrudeDependencies(history, item, ranks, refs, targets)
-        : item.type === "cad.sketch" &&
-            "face" in item.semantic.plane &&
-            item.semantic.plane.face !== undefined
-          ? faceDependencies(history, item, item.semantic.plane.face, refs)
-          : cadOk;
+        : item.type === "cad.pcb"
+          ? pcbReferenceStatus(history, item)
+          : item.type === "cad.sketch" &&
+              "face" in item.semantic.plane &&
+              item.semantic.plane.face !== undefined
+            ? faceDependencies(history, item, item.semantic.plane.face, refs)
+            : cadOk;
     dependencies.set(item.id, refs);
     const ownRank = ranks.get(item.id) ?? -1;
     const later = refs.find((id) => (ranks.get(id) ?? -1) >= ownRank);
@@ -354,6 +390,7 @@ export function faceBody(
   if (face.feature === undefined) return null;
   const history = scanCadPage(elements);
   const feature = history.typed.get(face.feature);
+  if (feature?.type === "cad.pcb" && face.role !== "side") return feature.id;
   if (feature?.type !== "cad.extrude") return null;
   return feature.semantic.op === "new"
     ? feature.id
@@ -423,6 +460,21 @@ export function createCadGeometry(history: HistoryDetails) {
         line.semantic as CadLineSemantic,
       );
     },
+    pcb(semantic: CadPcbSemantic): ExtrudeGeometry | Failure {
+      const outline = pcbBoardOutline(
+        history.pcbElements,
+        semantic.board ?? "",
+      );
+      if ("error" in outline) return cadFailure(outline.error);
+      const frame = baseFrame("xy");
+      const span = { t0: 0, t1: semantic.thickness ?? outline.thickness };
+      if (!withinExtent(outline.loops, frame, span))
+        return cadFailure(
+          "cad.limit",
+          "Board vertices must lie within 10000 mm of the origin along each axis",
+        );
+      return { frame, span, loops: outline.loops };
+    },
     extrude(semantic: CadExtrudeSemantic): ExtrudeGeometry | Failure {
       const sketch = semantic.sketch;
       const frame = sketch === undefined ? undefined : frames.get(sketch);
@@ -469,6 +521,10 @@ function geometryFor(history: HistoryDetails, feature: ElementId) {
       geometry.frames.set(id, frame);
     } else if (item?.type === "cad.extrude" && !item.semantic.suppressed) {
       const tool = geometry.extrude(item.semantic);
+      if ("ok" in tool) return null;
+      geometry.extrudes.set(id, tool);
+    } else if (item?.type === "cad.pcb" && !item.semantic.suppressed) {
+      const tool = geometry.pcb(item.semantic);
       if ("ok" in tool) return null;
       geometry.extrudes.set(id, tool);
     } else if (item?.type !== "cad.mesh" || item.semantic.suppressed) {
@@ -526,6 +582,10 @@ export function faceOutwardSign(
   if (face.feature === undefined) return 0;
   const history = scanCadPage(elements);
   const source = history.typed.get(face.feature);
+  if (source?.type === "cad.pcb") {
+    if (face.role === "side" || !geometryFor(history, source.id)) return 0;
+    return face.role === "start" ? -1 : 1;
+  }
   if (source?.type !== "cad.extrude") return 0;
 
   const tool = geometryFor(history, source.id)?.extrudes.get(source.id);

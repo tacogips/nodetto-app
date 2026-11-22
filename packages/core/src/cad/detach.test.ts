@@ -18,6 +18,12 @@ const cut = {
 
 test.each([
   {
+    target: "controller",
+    survivor: "board-reference",
+    detached: { name: "Controller board" },
+    removed: ["controller"],
+  },
+  {
     target: "sketch-top",
     survivor: "cut",
     detached: {
@@ -85,3 +91,29 @@ test.each([
     expect(editor.getSnapshot()).toEqual(original);
   },
 );
+
+test("deleting a PCB page detaches live CAD references and is undoable", () => {
+  const editor = makeEditor({ document: parseDocument(plateSource) });
+  const original = editor.getSnapshot();
+  expect(editor.deletePage("pcb-circuit")).toBe(true);
+  const detached = { name: "Controller board" };
+  expect(editor.store.get("board-reference")?.semantic).toEqual(detached);
+  const snapshot = editor.getSnapshot();
+  expect(hasErrors(validateDocument(snapshot))).toBe(false);
+  expect(parseDocument(serializeDocument(snapshot))).toEqual(snapshot);
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: "board-reference",
+      semantic: { ...detached, thickness: 2 },
+    },
+  ]);
+  expect(editor.store.get("board-reference")?.semantic).toEqual({
+    ...detached,
+    thickness: 2,
+  });
+  expect(editor.undo()).toBe(true);
+  expect(editor.store.get("board-reference")?.semantic).toEqual(detached);
+  expect(editor.undo()).toBe(true);
+  expect(editor.getSnapshot()).toEqual(original);
+});

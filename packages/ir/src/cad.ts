@@ -11,6 +11,7 @@ export const CAD_ELEMENT_TYPES = [
   "cad.circle",
   "cad.extrude",
   "cad.mesh",
+  "cad.pcb",
 ] as const;
 
 export type CadElementType = (typeof CAD_ELEMENT_TYPES)[number];
@@ -78,6 +79,13 @@ export interface CadExtrudeSemantic {
 export interface CadMeshSemantic {
   name: string;
   data: string;
+  suppressed?: boolean;
+}
+
+export interface CadPcbSemantic {
+  name: string;
+  board?: ElementId;
+  thickness?: number;
   suppressed?: boolean;
 }
 

@@ -280,13 +280,17 @@ function counterClockwise(profile: Profile, depth: number): CadLoop {
   };
 }
 
+export interface CadProfilePath {
+  readonly id: ElementId;
+  readonly points: readonly number[];
+  readonly closed?: boolean;
+}
+
 export function buildLoops(
   entities: readonly Element[],
   pick?: readonly ElementId[],
 ): { loops: readonly CadLoop[] } | Failure {
-  const byPoint = new Map<string, ChainEdge[]>();
-  const chainEdges: ChainEdge[] = [];
-  const outlines: Outline[] = [];
+  const paths: CadProfilePath[] = [];
   const ordered = entities
     .slice()
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -295,30 +299,56 @@ export function buildLoops(
     if (type === "cad.circle") {
       const circle = semantic as CadCircleSemantic;
       if (circle.construction) continue;
-      const points = tessellateCircle(circle.c, circle.r);
-      const count = points.length / 2;
-      outlines.push({
-        points,
-        members: [id],
-        sources: Array<ElementId>(count).fill(id),
-        reversed: Array<boolean>(count).fill(false),
+      paths.push({
+        id,
+        points: tessellateCircle(circle.c, circle.r),
+        closed: true,
       });
     } else if (type === "cad.line" || type === "cad.arc") {
       const { a, b, construction } = semantic as CadLineSemantic;
       if (construction) continue;
-      const start = endpoint(a);
-      const end = endpoint(b);
       const points =
         type === "cad.arc"
           ? tessellateArc(a, (semantic as CadArcSemantic).m, b)
           : [a[0], a[1], b[0], b[1]];
-      if (start === end || points === null)
-        return { error: "cad.profile.empty", at: id };
-      const edge = { id, a: start, b: end, points };
-      indexEdge(byPoint, start, edge);
-      indexEdge(byPoint, end, edge);
-      chainEdges.push(edge);
+      if (points === null) return { error: "cad.profile.empty", at: id };
+      paths.push({ id, points });
     }
+  }
+  return buildProfileLoops(paths, pick);
+}
+
+// Paths arrive in deterministic order with open endpoints already normalized
+// to the source format's joining grid.
+export function buildProfileLoops(
+  paths: readonly CadProfilePath[],
+  pick?: readonly ElementId[],
+): { loops: readonly CadLoop[] } | Failure {
+  const byPoint = new Map<string, ChainEdge[]>();
+  const chainEdges: ChainEdge[] = [];
+  const outlines: Outline[] = [];
+  for (const { id, points, closed } of paths) {
+    if (closed) {
+      const count = points.length / 2;
+      if (count > MAX_LOOP_VERTICES) return { error: "cad.limit", at: id };
+      outlines.push({
+        points: [...points],
+        members: [id],
+        sources: Array<ElementId>(count).fill(id),
+        reversed: Array<boolean>(count).fill(false),
+      });
+      continue;
+    }
+    const a = endpoint([coordinate(points, 0), coordinate(points, 1)]);
+    const b = endpoint([
+      coordinate(points, points.length - 2),
+      coordinate(points, points.length - 1),
+    ]);
+    if (a === b) return { error: "cad.profile.empty", at: id };
+    const edge = { id, a, b, points };
+    indexEdge(byPoint, a, edge);
+    indexEdge(byPoint, b, edge);
+    chainEdges.push(edge);
   }
 
   let open: ChainEdge | undefined;

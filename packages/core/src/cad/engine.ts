@@ -7,6 +7,7 @@ import {
 } from "@nodetto/ir";
 import type { CadDisplayBody } from "./display.ts";
 import type { CadStatus } from "./history.ts";
+import { isPcbOutlineGraphic } from "./pcb-outline.ts";
 
 export interface CadEngineInput {
   readonly revision: number;
@@ -66,15 +67,35 @@ export function collectCadInput(
   pageId: PageId,
   revision: number,
 ): CadEngineInput {
-  return {
-    revision,
-    pageId,
-    elements: document.pages.some(
-      (page) => page.id === pageId && page.kind === "cad3d",
-    )
-      ? document.elements.filter((element) => element.page === pageId)
-      : [],
-  };
+  if (
+    !document.pages.some((page) => page.id === pageId && page.kind === "cad3d")
+  )
+    return { revision, pageId, elements: [] };
+
+  const local = document.elements.filter((element) => element.page === pageId);
+  const boardIds = new Set(
+    local.flatMap(({ type, semantic }) =>
+      type === "cad.pcb" &&
+      isPlainObject(semantic) &&
+      typeof semantic["board"] === "string"
+        ? [semantic["board"]]
+        : [],
+    ),
+  );
+  if (boardIds.size === 0) return { revision, pageId, elements: local };
+
+  const pcbPages = new Set(
+    document.pages.filter(({ kind }) => kind === "pcb").map(({ id }) => id),
+  );
+  const boards = document.elements.filter(
+    ({ id, type, page }) =>
+      type === "pcb.board" && boardIds.has(id) && pcbPages.has(page),
+  );
+  const linkedPages = new Set(boards.map(({ page }) => page));
+  const graphics = document.elements.filter(
+    (element) => linkedPages.has(element.page) && isPcbOutlineGraphic(element),
+  );
+  return { revision, pageId, elements: [...local, ...boards, ...graphics] };
 }
 
 function isStatus(value: unknown): value is CadStatus {

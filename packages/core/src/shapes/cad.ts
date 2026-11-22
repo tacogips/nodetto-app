@@ -11,6 +11,7 @@ const defaults: { [Type in CadElementType]: () => SemanticByType[Type] } = {
   "cad.arc": () => ({ a: [0, 0], m: [5, 5], b: [10, 0] }),
   "cad.circle": () => ({ c: [0, 0], r: 5 }),
   "cad.extrude": () => ({ name: "Extrude", distance: 10, op: "new" }),
+  "cad.pcb": () => ({ name: "PCB Board" }),
   "cad.mesh": () => ({
     name: "Mesh",
     data: "nmesh1:Tk1TSAEAAwAEBAEABAAAAAAA0A8A0A/PD9APzw8AAAAAAwEABAEDAwECP/0Vww==",

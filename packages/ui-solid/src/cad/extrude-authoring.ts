@@ -72,6 +72,7 @@ export function createExtrudeAuthoring(options: {
   tool: Accessor<ToolKind>;
   selectTool: () => void;
   focus: () => void;
+  geometryElements: Accessor<readonly Element[]>;
   camera: Accessor<Camera3d>;
   changeCamera: (camera: Camera3d) => void;
   size: Accessor<ViewportSize>;
@@ -103,7 +104,7 @@ export function createExtrudeAuthoring(options: {
     if (semantic.suppressed || semantic.sketch === undefined) return;
     const sketch = editor.store.get(semantic.sketch);
     if (!sketch) return;
-    const elements = editor.store.getPageElements(pageId);
+    const elements = options.geometryElements();
     const preview = prepareExtrudePreview(elements, semantic, element.id);
     if ("error" in preview) return;
     const positiveOp =
@@ -147,7 +148,7 @@ export function createExtrudeAuthoring(options: {
     );
     let number = 1;
     while (names.has(`Extrude ${number}`)) number++;
-    const params = defaultExtrude(elements, sketch.id);
+    const params = defaultExtrude(options.geometryElements(), sketch.id);
     const { id, commands } = extrudeCommands(
       pageId,
       sketch,

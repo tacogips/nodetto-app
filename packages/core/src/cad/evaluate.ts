@@ -10,6 +10,7 @@ import {
 import type { CadKernel, KernelHandle, ToolMesh } from "./kernel.ts";
 import { canonicalCadJson, contentKey } from "./keys.ts";
 import type { CadLoop } from "./loops.ts";
+import { pcbOutlineGraphics } from "./pcb-outline.ts";
 import {
   CAD_CHORD_TOLERANCE_MM,
   CAD_MAX_BISECTION_DEPTH,
@@ -56,7 +57,7 @@ type BodyState = {
   readonly key: string;
 } & (
   | { readonly op: "mesh"; readonly decode: () => ToolMesh }
-  | { readonly op: "new"; readonly tool: ToolState }
+  | { readonly op: "new"; readonly tool: ToolState; readonly reference?: true }
   | {
       readonly op: "add" | "cut" | "intersect";
       readonly tool: ToolState;
@@ -536,6 +537,64 @@ function evaluateHistory(
       continue;
     }
 
+    if (item.type === "cad.pcb") {
+      const { board, suppressed } = item.semantic;
+      if (suppressed) continue;
+      const pcb = geometry.pcb(item.semantic);
+      if ("ok" in pcb) {
+        status.set(id, pcb);
+        continue;
+      }
+      const source =
+        board === undefined ? undefined : history.boards.get(board);
+      if (!source) {
+        status.set(id, cadFailure("cad.reference.missing", board));
+        continue;
+      }
+      const graphics = pcbOutlineGraphics(history.pcbElements, source.page);
+      const contextKey = contentKey([
+        "pcb prism",
+        id,
+        state.kernel.id,
+        canonicalCadJson(pcb.span),
+        String(CAD_CHORD_TOLERANCE_MM),
+        String(CAD_MAX_BISECTION_DEPTH),
+      ]);
+      const tool = {
+        id,
+        contextKey,
+        geometry: pcb,
+        key: contentKey([
+          "pcb tool",
+          contextKey,
+          canonicalCadJson(item.semantic),
+          canonicalCadJson(graphics.map(({ id, semantic }) => [id, semantic])),
+          canonicalCadJson(
+            source.semantic &&
+              typeof source.semantic === "object" &&
+              "thickness" in source.semantic
+              ? source.semantic.thickness
+              : null,
+          ) ?? "",
+        ]),
+      };
+      const key = contentKey(["body", tool.key]);
+      const body: BodyState = { id, key, op: "new", tool, reference: true };
+      try {
+        if (replayFailure?.featureId === id) throw replayFailure;
+        if (replayFailure || !state.successful.has(key))
+          materializeBody(state, body);
+        bodies.set(id, body);
+        successful.add(key);
+        geometry.extrudes.set(id, pcb);
+      } catch (error) {
+        if (!(error instanceof BodyBuildFailure) || error.featureId !== id)
+          throw error;
+        status.set(id, error.status);
+      }
+      continue;
+    }
+
     const {
       sketch,
       op,
@@ -634,7 +693,7 @@ function evaluateHistory(
       id: body.id,
       key: body.key,
       handle: solid.handle,
-      reference: false,
+      reference: body.op === "new" && body.reference === true,
     };
   });
   finish(state, visible);

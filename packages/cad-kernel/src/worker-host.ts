@@ -121,7 +121,8 @@ export function createWorkerHost(
       const state = await ready;
       if (!state) throw new Error("CAD kernel initialization failed");
       const pageElements = elements.filter(
-        (element) => element.page === pageId,
+        ({ page, type }) =>
+          page === pageId || type === "pcb.board" || type === "pcb.graphic",
       );
       // The interactive cache can change mesh order. Export from a fresh
       // evaluation and use kernel coordinates before viewport rounding.

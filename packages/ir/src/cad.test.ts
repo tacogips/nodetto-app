@@ -48,7 +48,9 @@ test("registers all CAD shapes as nodes with the expected reference policies", (
     expect(entry.category).toBe("node");
     expect(entry.keepsExternalReferences).toBe(true);
     expect(entry.onReferenceDeleted).toBe(
-      type === "cad.sketch" || type === "cad.extrude" ? "detach" : "cascade",
+      type === "cad.sketch" || type === "cad.extrude" || type === "cad.pcb"
+        ? "detach"
+        : "cascade",
     );
   }
 });
@@ -161,4 +163,33 @@ test("enumerates nested face and indexed extrude references in declaration order
     { field: "loops[1]", id: "hole-b" },
     { field: "bodies[0]", id: "plate" },
   ]);
+});
+
+test("checks PCB board links and optional thickness on the 1 nm grid", () => {
+  const entry = definition("cad.pcb");
+  expect(entry.validateSemantic({ name: "Detached" }, "semantic")).toEqual([]);
+  const semantic = {
+    name: "Controller",
+    board: "b1",
+    thickness: 1.500001,
+    suppressed: false,
+  };
+  expect(entry.validateSemantic(semantic, "semantic")).toEqual([]);
+  expect(entry.references(semantic)).toEqual([{ field: "board", id: "b1" }]);
+  for (const fields of [
+    { board: "" },
+    { board: 5 },
+    { thickness: 0 },
+    { thickness: -1 },
+    { thickness: 100.000001 },
+    { thickness: 1.5000005 },
+    { suppressed: 1 },
+  ]) {
+    expect(
+      entry.validateSemantic({ ...semantic, ...fields }, "semantic"),
+    ).toHaveLength(1);
+  }
+  expect(
+    entry.validateSemantic({ ...semantic, thickness: 100 }, "semantic"),
+  ).toEqual([]);
 });

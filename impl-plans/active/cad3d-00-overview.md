@@ -140,8 +140,8 @@ milestone that breaks it, not in M18.
 | M11 | accepted |
 | M12 | accepted |
 | M13 | accepted |
-| M20 | implemented |
-| M14 | pending |
+| M20 | accepted |
+| M14 | implemented |
 | M21 | pending |
 | M15 | accepted |
 | M16 | pending |
@@ -676,6 +676,33 @@ TypeScript lint and typecheck passed. The full repository Bun suite passed
 when the repair append is removed in memory. Logs are under
 `tmp/cad3d/m15/rework/`. The parallel run on `feat/cad3d-m15-collab` accepted M15 in its second
 review round, and the branch was merged into `feat/cad3d-pages`.
+
+M14 links a CAD feature to a PCB board and builds a live reference solid
+from its visible Edge.Cuts. The rounded-board fixture round-trips
+byte-for-byte. The real kernel verifies the board volume and an enclosure
+pocket cut from its start face. Cap sketches track the board thickness,
+Boolean targets cannot modify the reference, and page copies retain the
+link. Deleting the board or its page detaches the link and is undoable.
+
+M14 deviations: the IR barrel and semantic map expose the registered type,
+the existing loop implementation shares chaining and nesting with PCB
+outlines, and the layer test includes the new fixture row. The worker host
+forwards the foreign PCB records selected by collectCadInput and still
+filters foreign CAD elements. The viewport shares the collected input
+with its authoring controllers so cap sketches work in the normal editor.
+Extruding from a PCB cap starts a new body in the outward direction.
+The dedicated PCB insertion tool and inspector controls remain in M21.
+
+All three M14 checks passed with 581, 5, and 7 tests, and workspace check
+and lint passed. Equivalent explicit Bun paths avoided recursive discovery
+through ignored worktree artifacts in the two single-file checks. The CAD
+viewport regression passed in both canvas themes, and the production bundle
+audit found one worker chunk and one WASM asset. The full verification task
+stalled in Bun discovery. The scoped repository run passed 4,452 tests with
+74 skipped and three Chrome startup failures under the worktree write
+restriction. The Rust workspace passed 73 of 91 tests with 18 macOS
+file-write permission errors under the same restriction. Logs are under
+`tmp/cad3d/m14/`.
 
 ## Completion
 

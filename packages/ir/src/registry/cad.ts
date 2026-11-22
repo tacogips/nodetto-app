@@ -266,6 +266,36 @@ const MESH: ElementTypeDefinition = {
   },
 };
 
+const PCB: ElementTypeDefinition = {
+  ...CAD_SHAPE,
+  type: "cad.pcb",
+  onReferenceDeleted: "detach",
+  keyOrder: { keys: ["name", "board", "thickness", "suppressed"] },
+  references: (semantic) => refFields(semantic, ["board"]),
+  validateSemantic(semantic, path) {
+    const out: ValidationIssue[] = [];
+    if (!checkObject(out, semantic, path)) return out;
+    const { name, board, thickness, suppressed } = semantic;
+    checkString(out, name, `${path}.name`, { allowEmpty: true });
+    checkString(out, board, `${path}.board`, OPTIONAL);
+    checkBoolean(out, suppressed, `${path}.suppressed`, OPTIONAL);
+    if (
+      thickness !== undefined &&
+      checkLength(out, thickness, `${path}.thickness`) &&
+      (thickness <= 0 || thickness > 100)
+    ) {
+      out.push(
+        error(
+          "cad.pcb.thickness",
+          `${path}.thickness`,
+          "expected a thickness greater than 0 and at most 100 mm",
+        ),
+      );
+    }
+    return out;
+  },
+};
+
 export const CAD_DEFINITIONS: readonly ElementTypeDefinition[] = [
   SKETCH,
   LINE,
@@ -273,4 +303,5 @@ export const CAD_DEFINITIONS: readonly ElementTypeDefinition[] = [
   CIRCLE,
   EXTRUDE,
   MESH,
+  PCB,
 ];
