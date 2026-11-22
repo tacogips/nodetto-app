@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
 import {
   chmodSync,
   lstatSync,
@@ -12,7 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { captureDirectory, captureIo } from "./capture-io.ts";
 import { localIo } from "./local-io.ts";
 
@@ -87,6 +88,28 @@ test.skipIf(process.geteuid === undefined || process.geteuid() === 0)(
   },
 );
 
+test("capture removes a partly written file and returns the write error", () => {
+  const image = join(folder, "image.png");
+  const failure = new Error("injected write failure");
+  const write = spyOn(fs, "writeFileSync").mockImplementation((descriptor) => {
+    expect(typeof descriptor).toBe("number");
+    if (typeof descriptor !== "number")
+      throw new Error("expected a descriptor");
+    fs.writeSync(descriptor, "cap");
+    expect(readFileSync(image, "utf8")).toBe("cap");
+    throw failure;
+  });
+  try {
+    expect(() => captureIo.write(image, Buffer.from("capture"), false)).toThrow(
+      failure,
+    );
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(readdirSync(folder)).toEqual([]);
+  } finally {
+    write.mockRestore();
+  }
+});
+
 test("capture directory has a per-user name and is reused", () => {
   const owner = process.geteuid?.();
   const directory = captureDirectory(folder);
@@ -146,7 +169,37 @@ test("Bun command IO exposes absolute paths and the native digest vector", () =>
   const io = localIo().capture;
   expect(io).toBe(captureIo);
   expect(io?.absolute("a.png")).toBe(join(process.cwd(), "a.png"));
+  const relative = ["nested", "..", ".", "a.png"].join(sep);
+  const expected =
+    process.platform === "win32"
+      ? join(process.cwd(), "a.png")
+      : `${join(process.cwd(), "nested")}/../a.png`;
+  expect(io?.absolute(relative)).toBe(expected);
   expect(io?.digest(Uint8Array.of(99, 97, 98, 99, 99).subarray(1, 4))).toBe(
     "e71fa2190541574b",
   );
 });
+
+test.skipIf(process.platform === "win32")(
+  "capture preserves parent traversal after a directory symlink",
+  () => {
+    const physical = join(folder, "physical");
+    const nested = join(physical, "nested");
+    const output = join(physical, "output");
+    mkdirSync(nested, { recursive: true });
+    mkdirSync(output);
+    symlinkSync(nested, join(folder, "shortcut"));
+    const image = `${folder}/shortcut/../output/image.png`;
+    const printed = captureIo.absolute(image);
+    expect(printed).toBe(image);
+    expect(captureIo.write(image, Buffer.from("capture"), false)).toBe(
+      "written",
+    );
+    expect(readFileSync(printed, "utf8")).toBe("capture");
+    expect(captureIo.write(image, Buffer.from("updated"), true)).toBe(
+      "written",
+    );
+    expect(readFileSync(join(output, "image.png"), "utf8")).toBe("updated");
+    expect(readdirSync(output)).toEqual(["image.png"]);
+  },
+);

@@ -59,6 +59,24 @@ fn capture_host_operations_resolve_paths_and_report_writes() {
 }
 
 #[test]
+fn capture_absolute_uses_native_parent_traversal() {
+    let folder = tempfile::tempdir().unwrap();
+    let expected = if cfg!(windows) {
+        folder.path().join("a.png")
+    } else {
+        folder.path().join("nested").join("..").join("a.png")
+    };
+    assert_eq!(
+        evaluate(
+            "native.captureAbsolute('nested/.././a.png')",
+            Input::Mcp(None),
+            Some(folder.path().into()),
+        ),
+        json!(expected.to_str().unwrap()),
+    );
+}
+
+#[test]
 fn unicode_encoding_and_graphemes_preserve_diagram_labels() {
     assert_eq!(
         evaluate(

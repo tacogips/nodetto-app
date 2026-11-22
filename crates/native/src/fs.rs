@@ -14,7 +14,14 @@ pub enum NewFile {
 /// Create a file exclusively. Compare an existing regular file without
 /// opening a link or overwriting anything.
 pub fn write_new(path: impl AsRef<Path>, bytes: &[u8]) -> io::Result<NewFile> {
-    let path = path.as_ref();
+    write_new_with(path.as_ref(), bytes, |file| file.write_all(bytes))
+}
+
+fn write_new_with(
+    path: &Path,
+    bytes: &[u8],
+    write_contents: impl FnOnce(&mut fs::File) -> io::Result<()>,
+) -> io::Result<NewFile> {
     let mut file = match fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -30,7 +37,7 @@ pub fn write_new(path: impl AsRef<Path>, bytes: &[u8]) -> io::Result<NewFile> {
         }
         Err(error) => return Err(error),
     };
-    let result = file.write_all(bytes).and_then(|()| file.sync_all());
+    let result = write_contents(&mut file).and_then(|()| file.sync_all());
     drop(file);
     if let Err(error) = result {
         let _ = fs::remove_file(path);
@@ -55,7 +62,10 @@ fn existing_matches(path: &Path, bytes: &[u8]) -> io::Result<bool> {
         use std::os::unix::fs::OpenOptionsExt;
         options.custom_flags(0x100 | 0x4);
     }
-    #[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[cfg(all(
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    ))]
     {
         use std::os::unix::fs::OpenOptionsExt;
         #[cfg(target_arch = "x86_64")]
@@ -237,3 +247,26 @@ pub fn write_selected_file_atomic(path: impl AsRef<Path>, contents: &[u8]) -> io
 
 #[cfg(not(target_os = "macos"))]
 pub use write_atomic as write_selected_file_atomic;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_new_removes_a_partly_written_file_on_error() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("image.png");
+        let error = write_new_with(&path, b"capture", |file| {
+            file.write_all(b"cap")?;
+            assert_eq!(file.metadata()?.len(), 3);
+            Err(io::Error::other("injected write failure"))
+        })
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "injected write failure");
+        assert_eq!(
+            path.symlink_metadata().unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+    }
+}

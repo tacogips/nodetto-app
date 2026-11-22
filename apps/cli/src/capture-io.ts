@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import type { CommandIo } from "./commands.ts";
 import { writeEntryAtomic } from "./write-atomic.ts";
 
@@ -154,9 +154,26 @@ function digest(bytes: Uint8Array): string {
   return hash.toString(16).padStart(16, "0");
 }
 
+function absolutePath(path: string): string {
+  if (process.platform === "win32") return resolve(path);
+
+  const cwd = process.cwd();
+  const absolute = isAbsolute(path)
+    ? path
+    : `${cwd.endsWith("/") ? cwd : `${cwd}/`}${path}`;
+  const root =
+    absolute.startsWith("//") && !absolute.startsWith("///") ? "//" : "/";
+  // Keep ".." so the filesystem resolves it after following any symlinks.
+  const components = absolute
+    .split("/")
+    .filter((part) => part !== "" && part !== ".");
+  const suffix = absolute.endsWith("/") && components.length > 0 ? "/" : "";
+  return `${root}${components.join("/")}${suffix}`;
+}
+
 export const captureIo: CaptureIo = {
   dir: captureDirectory,
-  absolute: (path) => resolve(path),
+  absolute: absolutePath,
   write: writeCapture,
   digest,
 };

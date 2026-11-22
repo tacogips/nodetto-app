@@ -1,6 +1,6 @@
 use std::{
     fs, io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -8,22 +8,32 @@ use nodetto_native::fs::{current_owner, private_dir, replace_regular, write_new,
 pub use nodetto_native::{attachments::read as attachment, fs::write_atomic};
 
 pub fn capture_dir() -> io::Result<PathBuf> {
-    let parent = std::env::temp_dir();
-    let cannot_use = |path: &std::path::Path, error: io::Error| {
+    capture_dir_in(&std::env::temp_dir())
+}
+
+fn capture_dir_in(parent: &Path) -> io::Result<PathBuf> {
+    let owner = current_owner(parent).map_err(|error| {
         io::Error::new(
             error.kind(),
             format!(
-                "Cannot use the capture directory {}: {error}.",
-                path.display()
+                "Cannot use the temporary directory {}: {error}.",
+                parent.display()
             ),
         )
-    };
-    let owner = current_owner(&parent).map_err(|error| cannot_use(&parent, error))?;
+    })?;
     let directory = parent.join(match owner {
         Some(uid) => format!("nodetto-capture-{uid}"),
         None => "nodetto-capture".to_owned(),
     });
-    private_dir(&directory, owner).map_err(|error| cannot_use(&directory, error))?;
+    private_dir(&directory, owner).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "Cannot use the capture directory {}: {error}.",
+                directory.display()
+            ),
+        )
+    })?;
     Ok(directory)
 }
 
@@ -103,4 +113,22 @@ pub fn open_document(path: &str, app: Option<String>, link: Option<String>) -> i
         .spawn()?;
     }
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capture_owner_probe_error_names_the_temporary_directory() {
+        let folder = tempfile::tempdir().unwrap();
+        let missing_parent = folder.path().join("missing");
+        let error = capture_dir_in(&missing_parent).unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert!(error.to_string().starts_with(&format!(
+            "Cannot use the temporary directory {}: ",
+            missing_parent.display()
+        )));
+    }
 }

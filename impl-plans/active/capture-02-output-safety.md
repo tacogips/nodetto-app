@@ -142,3 +142,14 @@ atomic writer now shares its final-entry writer with capture so capture
 can preserve permissions and replace atomically without resolving an
 output symlink. This also touches `apps/cli/src/write-atomic.ts`. Bun
 uses the effective uid to match the native directory owner check.
+
+Round 2 rework completed. Formatted the workspace. Bun now preserves
+parent traversal on Unix as the native host does. Atomic replacement
+preserves the parent path when naming its sibling temp file.
+Windows keeps the host's own full-path resolution. The native
+owner-probe error identifies the temporary directory. M3 should account
+for the Store authorization hint appended by `host_error` when a
+capture directory error contains `Permission denied` or
+`Operation not permitted`, and add the documented `--output` guidance.
+Both hosts now test that a failure after a partial write removes the
+new file and returns the original error.

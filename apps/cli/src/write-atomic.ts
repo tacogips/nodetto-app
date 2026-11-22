@@ -41,10 +41,13 @@ export function writeEntryAtomic(
   text: string | Uint8Array,
   mode: number | null,
 ): void {
-  const temporary = join(
-    dirname(target),
-    `.${basename(target)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`,
-  );
+  const parent = dirname(target);
+  const name = `.${basename(target)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  // Keep parent traversal intact so both entries use the same directory.
+  const temporary =
+    process.platform === "win32"
+      ? join(parent, name)
+      : `${parent.endsWith("/") ? parent : `${parent}/`}${name}`;
   const descriptor = openSync(temporary, "wx", mode ?? 0o666);
   try {
     try {
@@ -71,7 +74,7 @@ export function writeEntryAtomic(
   }
   try {
     // Persist the rename itself; not every platform allows syncing a directory.
-    const directory = openSync(dirname(target), "r");
+    const directory = openSync(parent, "r");
     try {
       fsyncSync(directory);
     } finally {
