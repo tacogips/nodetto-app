@@ -2,7 +2,7 @@ import { applyQuiet, extractQuiet } from "./warnings.ts";
 // Build-time entry point for the shared diagram engine embedded in the Rust
 // executable. It imports no Node/Bun APIs; OS operations belong to Rust.
 import { runCli } from "./commands.ts";
-import { captureCommand } from "./capture-command.ts";
+import { type CaptureBackend, captureCommand } from "./capture-command.ts";
 import { exportCommand } from "./export-command.ts";
 import { compareCommand } from "./compare-command.ts";
 import { openCommand } from "./open-command.ts";
@@ -25,6 +25,11 @@ declare const native: {
     replace: boolean,
   ): "written" | "identical" | "exists";
   digest(bytes: Uint8Array): string;
+  captureSolid(
+    scene: Uint8Array,
+    format: "png" | "jpg",
+    quality: number,
+  ): Uint8Array;
   captureEncode(
     png: Uint8Array,
     format: "jpg",
@@ -104,6 +109,27 @@ async function rasterize(
   );
 }
 
+const renderSolid: NonNullable<CaptureBackend["renderSolid"]> = (
+  scene,
+  format,
+  quality,
+) => {
+  const packet = native.captureSolid(scene, format, quality);
+  if (packet.byteLength < 4) throw new Error("Truncated solid capture packet.");
+  const view = new DataView(
+    packet.buffer,
+    packet.byteOffset,
+    packet.byteLength,
+  );
+  const imageOffset = 4 + view.getUint32(0, true);
+  if (imageOffset >= packet.byteLength)
+    throw new Error("Truncated solid capture packet.");
+  return {
+    report: new TextDecoder().decode(packet.subarray(4, imageOffset)),
+    image: packet.subarray(imageOffset),
+  };
+};
+
 // JSON at this boundary keeps interpreter handles local to each Rust invocation.
 Object.assign(globalThis, {
   nodettoHelp: JSON.stringify({ overview: OVERVIEW, commands: COMMAND_HELP }),
@@ -150,6 +176,7 @@ Object.assign(globalThis, {
           ? await captureCommand(io, rest, {
               rasterize,
               transcode: native.captureEncode,
+              renderSolid,
             })
           : command === "compare" && !help
             ? await compareCommand(io, rest, { rasterize })

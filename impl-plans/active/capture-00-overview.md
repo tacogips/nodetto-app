@@ -74,6 +74,7 @@ Every sharing pair is ordered by `dependsOn`.
 | `apps/cli/src/capture-help/inline.ts` | M3 (empty part), M13 |
 | `packages/core/src/capture/index.ts` | M19, M5, M6, M9, M20 |
 | `packages/core/src/capture/scene.ts` and its test | M5, M11 |
+| `packages/core/src/capture/scene-binary.test.ts` | M6, M9 |
 | `packages/core/src/capture/cad-request.ts` and its test | M9, M20, M17, M11 |
 | `packages/core/src/capture/describe.ts` and its test | M20, M18 |
 | `Cargo.toml`, `Cargo.lock` | M4, M14 |
@@ -83,14 +84,17 @@ Every sharing pair is ordered by `dependsOn`.
 | `crates/capture/src/report.rs` | M8, M10, M18 |
 | `crates/capture/src/interference.rs` | M10, M17, M11 |
 | `crates/capture/src/lattice.rs` | M10, M18, M11 |
-| `crates/capture/tests/render.rs` | M8, M17 |
+| `crates/capture/tests/scene.rs` | M6, M9 |
+| `crates/capture/tests/intervals.rs` | M7, M9 |
+| `crates/capture/tests/render.rs` | M8, M9, M17 |
 
 M13 writes only `apps/cli/src/mcp.ts`, `mcp-image.ts`, their tests,
 `apps/cli/native/src/mcp.rs`, `apps/cli/src/help.ts` (the `mcp` page) and
 `apps/cli/src/capture-help/inline.ts`; no milestone after M3 other than
 M13 writes any of them. M14 and M15 write only desktop and `ui-solid`
 files plus `Cargo.lock`; M12 writes only crate files and the native
-parity test. M9 writes no crate file and M10 only crate files.
+parity test. M9 touches only tests in the capture crate. The M9 and M10
+write paths are disjoint.
 
 ## Rules for every implementer
 
@@ -178,8 +182,8 @@ found there.
 | M5 | accepted |
 | M6 | accepted |
 | M7 | accepted |
-| M8 | implemented |
-| M9 | pending |
+| M8 | accepted |
+| M9 | implemented |
 | M10 | pending |
 | M20 | pending |
 | M17 | pending |

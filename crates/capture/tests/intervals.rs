@@ -315,3 +315,77 @@ fn overlap_reports_first_last_and_total_of_qualified_stretches() {
     assert_eq!(overlap(&b, &a, 0.0), Some((0.5, 9.5, 5.0)));
     assert_eq!(overlap(&a, &b, 3.0), None);
 }
+
+#[test]
+fn near_axial_projection_threshold_changes_whether_a_ray_can_enter_through_a_side() {
+    let origin = [10.0 - 1.5e-9, 21.0, 30.0];
+    let at = |dx| {
+        cast(
+            &PrismView::new(
+                &rectangle(),
+                17,
+                &RayFamily {
+                    forward: [dx, 0.0, 1.0],
+                },
+            ),
+            origin,
+        )
+    };
+    assert!(at(0.5e-9).is_empty());
+    let above = at(2e-9);
+    assert_eq!(above.len(), 2);
+    assert_eq!(above[0], boundary(2.0, 17, 0));
+    assert_eq!(above[1], boundary(5.0, 17, 1));
+}
+
+#[test]
+fn near_planar_slab_threshold_changes_whether_a_ray_can_enter_through_a_cap() {
+    let origin = [10.0, 21.0, 32.0 - 1.5e-12];
+    let at = |dz| {
+        cast(
+            &PrismView::new(
+                &rectangle(),
+                17,
+                &RayFamily {
+                    forward: [1.0, 0.0, dz],
+                },
+            ),
+            origin,
+        )
+    };
+    assert!(at(0.5e-12).is_empty());
+    let above = at(2e-12);
+    assert_eq!(above.len(), 2);
+    assert!((0.7..0.8).contains(&above[0].s));
+    assert_eq!(above[0].face, 0);
+    assert_eq!(above[1], boundary(4.0, 17, 3));
+}
+
+#[test]
+fn near_unit_prism_frames_must_meet_the_frame_tolerance() {
+    for (epsilon, solid) in [(0.5e-9, true), (2e-9, false)] {
+        let mut prism = rectangle();
+        prism.v[1] += epsilon;
+        let view = PrismView::new(&prism, 1, &RayFamily { forward: Z });
+        let intervals = cast(&view, [12.0, 21.0, 28.0]);
+        if solid {
+            assert_eq!(depths(&intervals), [4.0, 7.0]);
+        } else {
+            assert!(intervals.is_empty());
+        }
+    }
+}
+
+#[test]
+fn average_occupancy_counts_only_nonempty_buckets() {
+    let mut prism = rectangle();
+    let mut second = rectangle().loops.pop().unwrap();
+    for point in second.points.as_chunks_mut::<2>().0 {
+        point[1] += 1_000.0;
+    }
+    prism.loops.push(second);
+    let view = PrismView::new(&prism, 17, &RayFamily { forward: X });
+    assert_eq!(view.average_occupancy(), 4.0);
+    assert!(cast(&view, [10.0, 500.0, 34.0]).is_empty());
+    assert_eq!(depths(&cast(&view, [10.0, 1021.0, 34.0])), [0.0, 4.0]);
+}

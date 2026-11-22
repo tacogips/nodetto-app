@@ -7,7 +7,7 @@ use boa_engine::{
     object::builtins::{JsArray, JsPromise, JsUint8Array},
     Context, JsArgs, JsNativeError, JsResult, JsValue, NativeFunction, Source,
 };
-use nodetto_capture::{transcode_png, ImageFormat};
+use nodetto_capture::{render_scene, transcode_png, ImageFormat};
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::PathBuf, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
@@ -74,6 +74,22 @@ fn byte_value(bytes: Vec<u8>, ctx: &mut Context) -> JsResult<JsValue> {
     Ok(JsUint8Array::from_iter(bytes, ctx)?.into())
 }
 
+fn capture_format(args: &[JsValue], ctx: &mut Context) -> JsResult<ImageFormat> {
+    match string(args, 1, ctx)?.as_str() {
+        "png" => Ok(ImageFormat::Png),
+        "jpg" => {
+            let quality = args.get_or_undefined(2).to_number(ctx)?;
+            if !(1.0..=100.0).contains(&quality) || quality.fract() != 0.0 {
+                return Err(host_error("JPG quality must be an integer from 1 to 100."));
+            }
+            Ok(ImageFormat::Jpeg {
+                quality: quality as u8,
+            })
+        }
+        _ => Err(host_error("Capture format must be png or jpg.")),
+    }
+}
+
 // Context-owned Rust data avoids unsafe native closures or global mutable state.
 // No JavaScript object is retained outside Boa's garbage-collected handles.
 fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
@@ -125,20 +141,20 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             Ok(js_string!(files::write_capture(&path, &data, replace).map_err(host_error)?).into())
         }
         "digest" => Ok(js_string!(files::digest(&bytes(args.get_or_undefined(0), ctx)?)).into()),
-        "captureEncode" => {
-            let format = match string(args, 1, ctx)?.as_str() {
-                "png" => ImageFormat::Png,
-                "jpg" => {
-                    let quality = args.get_or_undefined(2).to_number(ctx)?;
-                    if !(1.0..=100.0).contains(&quality) || quality.fract() != 0.0 {
-                        return Err(host_error("JPG quality must be an integer from 1 to 100."));
-                    }
-                    ImageFormat::Jpeg {
-                        quality: quality as u8,
-                    }
-                }
-                _ => return Err(host_error("Capture format must be png or jpg.")),
-            };
+        "captureSolid" | "captureEncode" => {
+            let format = capture_format(args, ctx)?;
+            let input = bytes(args.get_or_undefined(0), ctx)?;
+            if operation == "captureSolid" {
+                let nodetto_capture::CaptureOutput { image, report } =
+                    render_scene(&input, format, 0).map_err(host_error)?;
+                let length = u32::try_from(report.len()).map_err(host_error)?;
+                let mut packet = Vec::with_capacity(4 + report.len() + image.len());
+                packet.extend_from_slice(&length.to_le_bytes());
+                packet.extend_from_slice(report.as_bytes());
+                packet.extend(image);
+                return byte_value(packet, ctx);
+            }
+
             let background = string(args, 3, ctx)?;
             let rgb = background
                 .strip_prefix('#')
@@ -146,9 +162,8 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
                 .and_then(|hex| u32::from_str_radix(hex, 16).ok())
                 .ok_or_else(|| host_error("Capture background must be a six-digit hex color."))?;
             let [_, red, green, blue] = rgb.to_be_bytes();
-            let png = bytes(args.get_or_undefined(0), ctx)?;
             byte_value(
-                transcode_png(&png, format, [red, green, blue]).map_err(host_error)?,
+                transcode_png(&input, format, [red, green, blue]).map_err(host_error)?,
                 ctx,
             )
         }
@@ -284,7 +299,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
         globalThis.native = Object.fromEntries([
           'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','open','png','pdf','pdfPages','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random',
-          'captureDir','captureAbsolute','writeCapture','digest','captureEncode'
+          'captureDir','captureAbsolute','writeCapture','digest','captureEncode','captureSolid'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };
         globalThis.TextDecoder = class { decode(bytes = []) { return native.decodeUtf8(new Uint8Array(bytes)); } };

@@ -1,6 +1,7 @@
 import { expect } from "bun:test";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -9,8 +10,10 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
+import { inflateSync } from "node:zlib";
 import { Editor } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
+import { captureSelectedLoopsDocument } from "../../../../packages/core/src/capture/testing/selected-loops.ts";
 import { binary, cliEntry, nativeTest } from "./harness.ts";
 
 nativeTest(
@@ -150,4 +153,269 @@ nativeTest(
     }
   },
   10_000,
+);
+
+const plateFixture = join(
+  import.meta.dir,
+  "../__fixtures__/capture-plate.jsonl",
+);
+const m09Evidence = join(import.meta.dir, "../../../../tmp/capture/m09");
+
+interface CadPictureMetadata {
+  camera: {
+    right: readonly number[];
+    up: readonly number[];
+    centre: readonly number[];
+    mmPerPixel: number;
+  };
+  width: number;
+  height: number;
+}
+
+function runCad(
+  cwd: string,
+  document: string,
+  args: string[] = [],
+  output = "cad.png",
+) {
+  const result = Bun.spawnSync(
+    [
+      binary as string,
+      "capture",
+      document,
+      "--output",
+      output,
+      "--force",
+      ...args,
+    ],
+    { cwd },
+  );
+  expect(result.stderr.toString()).toBe("");
+  expect(result.exitCode).toBe(0);
+  return {
+    bytes: readFileSync(join(cwd, output)),
+    stdout: result.stdout.toString(),
+  };
+}
+
+function decodeCadPng(image: Buffer) {
+  expect(image.subarray(0, 8)).toEqual(
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  expect(image.toString("ascii", 12, 16)).toBe("IHDR");
+  expect([...image.subarray(24, 29)]).toEqual([8, 2, 0, 0, 0]);
+  const width = image.readUInt32BE(16);
+  const height = image.readUInt32BE(20);
+  const compressed: Buffer[] = [];
+  for (let offset = 8; offset + 12 <= image.length; ) {
+    const length = image.readUInt32BE(offset);
+    if (image.toString("ascii", offset + 4, offset + 8) === "IDAT")
+      compressed.push(image.subarray(offset + 8, offset + 8 + length));
+    offset += length + 12;
+  }
+  const scanlines = inflateSync(Buffer.concat(compressed));
+  const stride = width * 3;
+  const pixels = new Uint8Array(height * stride);
+  expect(scanlines.length).toBe((stride + 1) * height);
+  for (let y = 0; y < height; y++) {
+    const row = y * stride;
+    const input = y * (stride + 1);
+    const filter = scanlines.readUInt8(input);
+    if (filter > 4) throw new Error(`Unknown PNG filter ${filter}`);
+    for (let x = 0; x < stride; x++) {
+      const index = row + x;
+      const left = x < 3 ? 0 : (pixels[index - 3] ?? 0);
+      const up = pixels[index - stride] ?? 0;
+      const diagonal = x < 3 ? 0 : (pixels[index - stride - 3] ?? 0);
+      const pl = Math.abs(up - diagonal);
+      const pu = Math.abs(left - diagonal);
+      const pd = Math.abs(left + up - 2 * diagonal);
+      const paeth = pl <= pu && pl <= pd ? left : pu <= pd ? up : diagonal;
+      const prediction = [0, left, up, (left + up) >> 1, paeth][filter] ?? 0;
+      pixels[index] = scanlines.readUInt8(input + 1 + x) + prediction;
+    }
+  }
+  return {
+    width,
+    height,
+    at(x: number, y: number) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThan(width);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThan(height);
+      const i = (y * width + x) * 3;
+      return [...pixels.subarray(i, i + 3)];
+    },
+  };
+}
+
+function cadPixels(result: ReturnType<typeof runCad>) {
+  const { camera, width, height } = JSON.parse(
+    result.stdout,
+  ) as CadPictureMetadata;
+  const picture = decodeCadPng(result.bytes);
+  expect([picture.width, picture.height]).toEqual([width, height]);
+  return {
+    ...picture,
+    world(point: readonly [number, number, number]) {
+      const dot = (axis: readonly number[]) =>
+        point.reduce(
+          (sum, value, i) =>
+            sum + (value - (camera.centre[i] ?? 0)) * (axis[i] ?? 0),
+          0,
+        );
+      return picture.at(
+        Math.floor(width / 2 + dot(camera.right) / camera.mmPerPixel),
+        Math.floor(height / 2 - dot(camera.up) / camera.mmPerPixel),
+      );
+    },
+  };
+}
+
+nativeTest(
+  "CAD capture is deterministic, discoverable, and within the native budget",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-capture-"));
+    try {
+      const timings: number[] = [];
+      let previous: Buffer | undefined;
+      for (let i = 0; i < 3; i++) {
+        const start = performance.now();
+        const result = runCad(cwd, plateFixture, [], `plate-${i}.png`);
+        timings.push(Math.round(performance.now() - start));
+        if (previous) expect(result.bytes).toEqual(previous);
+        expect(isAbsolute(result.stdout.split("\n")[0]?.slice(6) ?? "")).toBe(
+          true,
+        );
+        expect(result.stdout).toContain("\nsize: 1024x768\n");
+        expect(result.stdout).toContain(
+          "\nframe: complete\nbodies: 3 (Plate, Block, Puck)\nerrors: 0\n",
+        );
+        expect(result.stdout).toMatch(
+          /\ncamera: view=iso direction=-0\.57735,-0\.57735,-0\.57735 up=.+ centre=.+ scale=.+ mm\/px\n/,
+        );
+        previous = result.bytes;
+      }
+      mkdirSync(m09Evidence, { recursive: true });
+      writeFileSync(
+        join(m09Evidence, "timing.json"),
+        `${JSON.stringify({ milliseconds: timings })}\n`,
+      );
+      for (const elapsed of timings) expect(elapsed).toBeLessThan(5000);
+      const defaultOutput = Bun.spawnSync(
+        [binary as string, "capture", plateFixture],
+        { cwd, env: { ...process.env, TMPDIR: cwd, TEMP: cwd, TMP: cwd } },
+      );
+      expect(defaultOutput.exitCode).toBe(0);
+      expect(defaultOutput.stderr.toString()).toBe("");
+      const defaultPath =
+        defaultOutput.stdout
+          .toString()
+          .split("\n")[0]
+          ?.slice("path: ".length) ?? "";
+      expect(isAbsolute(defaultPath)).toBe(true);
+      expect(basename(dirname(defaultPath))).toStartWith("nodetto-capture");
+      if (!previous) throw new Error("Missing reference capture");
+
+      expect(readFileSync(defaultPath)).toEqual(previous);
+
+      const bun = Bun.spawnSync(
+        [
+          process.execPath,
+          cliEntry,
+          "capture",
+          plateFixture,
+          "--output",
+          "bun.png",
+        ],
+        { cwd },
+      );
+      expect(bun.exitCode).toBe(2);
+      expect(bun.stderr.toString()).toContain(
+        "3D CAD capture needs the native nodetto-cli.",
+      );
+      expect(existsSync(join(cwd, "bun.png"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "named, directional, and eye-based cameras agree for equivalent requests",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-camera-"));
+    try {
+      const render = (...args: string[]) =>
+        runCad(cwd, plateFixture, ["--size", "240x180", ...args]).bytes;
+      const iso = render();
+      const top = render("--view", "top");
+      const front = render("--view", "front");
+      expect(iso.equals(top)).toBe(false);
+      expect(iso.equals(front)).toBe(false);
+      expect(top.equals(front)).toBe(false);
+      expect(iso.equals(render("--direction", "-1,-1,-1"))).toBe(true);
+      expect(render("--direction", "0,0,1")).toEqual(
+        render("--view", "bottom"),
+      );
+      expect(render("--eye", "1,1,1", "--target", "0,0,0")).toEqual(
+        render("--direction", "-1,-1,-1", "--target", "0,0,0"),
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "CAD captures show through holes, grazing faces, and normalized selected loops",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-pixels-"));
+    try {
+      const background = [0xf6, 0xf4, 0xee];
+      const top = cadPixels(
+        runCad(cwd, plateFixture, ["--view", "top", "--json"]),
+      );
+      expect(top.world([5, 5, 5])).toEqual(background);
+      expect(top.world([10, 10, 5])).not.toEqual(background);
+
+      const grazing = cadPixels(
+        runCad(cwd, plateFixture, ["--direction", "0,1,-0.15", "--json"]),
+      );
+      const face = grazing.world([35, 30, 5]);
+      expect(face).not.toEqual(background);
+      const samples = Array.from({ length: 120 }, (_, i) =>
+        grazing.world([32 + (i % 20) * 0.5, 28 + Math.floor(i / 20) * 0.5, 5]),
+      );
+      expect(
+        samples.filter((sample) => sample.join() === face.join()).length,
+      ).toBeGreaterThan(108);
+
+      const loopsPath = join(cwd, "loops.jsonl");
+      writeFileSync(
+        loopsPath,
+        serializeDocument(captureSelectedLoopsDocument()),
+      );
+      const loops = cadPixels(
+        runCad(cwd, loopsPath, ["--view", "top", "--json"]),
+      );
+      expect(loops.world([30, 20, 4])).not.toEqual(background);
+      expect(loops.world([42, 20, 4])).toEqual(background);
+      expect(loops.world([110, 20, 4])).not.toEqual(background);
+      expect(loops.world([117, 20, 4])).not.toEqual(background);
+
+      const dark = cadPixels(
+        runCad(cwd, plateFixture, ["--theme", "dark", "--json"]),
+      );
+      expect(dark.at(0, 0)).toEqual([0x15, 0x19, 0x1b]);
+      const jpg = runCad(cwd, plateFixture, ["--format", "jpg"], "cad.jpg");
+      expect([...jpg.bytes.subarray(0, 2)]).toEqual([255, 216]);
+      expect([...jpg.bytes.subarray(-2)]).toEqual([255, 217]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
 );

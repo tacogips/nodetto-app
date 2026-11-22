@@ -365,3 +365,88 @@ fn capture_encode_transcodes_the_native_png_and_checks_options() {
     );
     assert_eq!(result, json!([true, [255, 216], [255, 217], true]));
 }
+
+#[test]
+fn solid_capture_runs_through_boa_and_matches_bun_scene_bytes() {
+    const SCENE: &[u8] = include_bytes!("../../src/__fixtures__/capture-plate-default.ncs1");
+    let folder = tempfile::tempdir().unwrap();
+    let fixture = folder.path().join("capture-plate.jsonl");
+    std::fs::write(
+        &fixture,
+        include_str!("../../src/__fixtures__/capture-plate.jsonl"),
+    )
+    .unwrap();
+    let mut ctx = context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+    ctx.eval(Source::from_bytes(
+        r#"{
+            const captureSolid = native.captureSolid;
+            native.captureSolid = (scene, format, quality) => {
+                globalThis.observedCaptureScene = scene;
+                return captureSolid(scene, format, quality);
+            };
+        }"#,
+    ))
+    .unwrap();
+    let result = execute(
+        &mut ctx,
+        ["capture", "capture-plate.jsonl", "--output", "plate.png"]
+            .map(str::to_owned)
+            .to_vec(),
+    )
+    .unwrap();
+    assert_eq!(result.exit_code, 0, "{}", result.stderr);
+    assert!(result.stdout.contains("\nbodies: 3 (Plate, Block, Puck)\n"));
+    assert!(result.stdout.contains("\nsize: 1024x768\n"));
+
+    let observed = ctx
+        .global_object()
+        .get(js_string!("observedCaptureScene"), &mut ctx)
+        .unwrap();
+    assert!(bytes(&observed, &mut ctx).unwrap() == SCENE);
+
+    let image = std::fs::read(folder.path().join("plate.png")).unwrap();
+    let expected = render_scene(SCENE, ImageFormat::Png, 0).unwrap();
+    assert_eq!(image, expected.image);
+    assert_eq!(&image[..8], b"\x89PNG\r\n\x1a\n");
+    assert_eq!(&image[12..26], b"IHDR\0\0\x04\0\0\0\x03\0\x08\x02");
+
+    let jpg = execute(
+        &mut ctx,
+        ["capture", "capture-plate.jsonl", "--output", "plate.jpg"]
+            .map(str::to_owned)
+            .to_vec(),
+    )
+    .unwrap();
+    assert_eq!(jpg.exit_code, 0, "{}", jpg.stderr);
+    assert!(std::fs::read(folder.path().join("plate.jpg"))
+        .unwrap()
+        .starts_with(&[0xff, 0xd8]));
+}
+
+#[test]
+fn capture_encode_preserves_png_and_composites_the_host_rgb_in_order() {
+    let result = evaluate(
+        r##"(() => {
+        const png = native.png('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="3"/>', 1, undefined, false);
+        return [
+            Array.from(png),
+            Array.from(native.captureEncode(png, "png", 90, "#a1b2c3")),
+            Array.from(native.captureEncode(png, "jpg", 90, "#a1b2c3"))
+        ];
+    })()"##,
+        Input::Mcp(None),
+        None,
+    );
+    let row = |index: usize| serde_json::from_value::<Vec<u8>>(result[index].clone()).unwrap();
+    let png = row(0);
+    assert_eq!(row(1), png);
+    let format = ImageFormat::Jpeg { quality: 90 };
+    assert_eq!(
+        row(2),
+        transcode_png(&png, format, [0xa1, 0xb2, 0xc3]).unwrap()
+    );
+    assert_ne!(
+        row(2),
+        transcode_png(&png, format, [0xc3, 0xb2, 0xa1]).unwrap()
+    );
+}

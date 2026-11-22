@@ -491,3 +491,67 @@ fn large_raster_spans_many_bands_at_maximum_sampling() {
         );
     }
 }
+
+#[test]
+fn a_shallow_corner_draws_an_edge_only_for_distinct_face_ids() {
+    let mut wedge = box_prism([0.0, 0.0, -4.0], 10.0, 5.0, 8.0);
+    let Tool::Prism(prism) = &mut wedge else {
+        panic!("expected a prism");
+    };
+    // Both visible faces slope by arctan(1/5) from a plane perpendicular
+    // to the view. The normal-to-normal angle is about 22.6 degrees.
+    prism.loops[0].points = vec![-5.0, 1.0, 0.0, 0.0, 5.0, 1.0, 5.0, 5.0, -5.0, 5.0];
+    prism.loops[0].faces = vec![2, 3, 4, 5, 6];
+
+    let mut scene = small(vec![wedge], vec![body(&[(Op::Union, 0)])]);
+    scene.camera = camera([0.0, 1.0, 0.0], [0.0; 3], 0.125);
+    let (distinct, _) = render_rgb(&scene, 1).unwrap();
+
+    let Tool::Prism(prism) = &mut scene.tools[0] else {
+        panic!("expected a prism");
+    };
+    prism.loops[0].faces[1] = 2;
+    let (shared, _) = render_rgb(&scene, 1).unwrap();
+    assert_eq!(pixel(&distinct, scene.width, (47, 48)), scene.colours.edge);
+    assert_ne!(pixel(&shared, scene.width, (47, 48)), scene.colours.edge);
+    for x in [46, 48] {
+        assert_eq!(
+            pixel(&distinct, scene.width, (x, 48)),
+            pixel(&shared, scene.width, (x, 48))
+        );
+    }
+}
+
+#[test]
+fn report_serializes_interim_and_future_body_state_words() {
+    use nodetto_capture::report::{BodyReport, Report};
+    let report = Report {
+        width: 64,
+        height: 64,
+        bodies: [
+            BodyState::Hidden,
+            BodyState::Absent,
+            BodyState::Empty,
+            BodyState::Unknown,
+        ]
+        .map(|state| BodyReport {
+            state,
+            emptied_by_step: -1,
+            open: false,
+        })
+        .to_vec(),
+        analysis: None,
+        pairs: Vec::new(),
+    };
+    assert_eq!(
+        report.to_json(),
+        concat!(
+            r#"{"width":64,"height":64,"bodies":["#,
+            r#"{"state":"hidden","emptiedByStep":-1,"open":false},"#,
+            r#"{"state":"absent","emptiedByStep":-1,"open":false},"#,
+            r#"{"state":"empty","emptiedByStep":-1,"open":false},"#,
+            r#"{"state":"unknown","emptiedByStep":-1,"open":false}],"#,
+            r#""analysis":null,"pairs":[]}"#,
+        ),
+    );
+}

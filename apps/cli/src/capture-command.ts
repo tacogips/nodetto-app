@@ -1,5 +1,6 @@
 import {
   CAPTURE_THEMES,
+  CaptureInputError,
   Editor,
   captureRasterPlan,
   snapSvgFrameToPixels,
@@ -13,6 +14,13 @@ import {
   resolvePageQuery,
   shortPageId,
 } from "@nodetto/ir";
+import {
+  ARTWORK_OPTIONS,
+  CAMERA_OPTIONS,
+  cadCameraOptions,
+  cadInputMessage,
+  renderCadCapture,
+} from "./capture-cad.ts";
 import { CAPTURE_HELP } from "./capture-help.ts";
 import {
   type CommandIo,
@@ -35,12 +43,9 @@ const CAPTURE_OPTIONS = new Set([
   "--format",
   "--quality",
   "--size",
-  "--scale",
   "--theme",
-  "--element",
-  "--padding",
-  "--background",
-  "--font-dir",
+  ...ARTWORK_OPTIONS,
+  ...CAMERA_OPTIONS,
 ]);
 const CAPTURE_FLAGS = new Set(["--force", "--json", "--inline"]);
 const OUTPUT_ADVICE =
@@ -55,6 +60,11 @@ export interface CaptureBackend {
     fontDir: string | undefined,
     fallback?: boolean,
   ): Promise<Uint8Array>;
+  renderSolid?(
+    scene: Uint8Array,
+    format: CaptureFormat,
+    quality: number,
+  ): { image: Uint8Array; report: string };
   transcode?(
     png: Uint8Array,
     format: "jpg",
@@ -192,60 +202,76 @@ export async function captureCommand(
     if (!/^\d+$/.test(requestedQuality) || quality < 1 || quality > 100)
       return usageError("--quality must be an integer from 1 to 100.");
   }
-  const transcode = format === "jpg" ? backend.transcode : undefined;
-  if (format === "jpg" && !transcode)
-    return usageError("JPG capture needs the native nodetto-cli.");
-
   const theme = options.get("--theme") ?? "light";
   if (theme !== "light" && theme !== "dark")
     return usageError("--theme must be light or dark.");
-  const background =
-    options.get("--background") ?? CAPTURE_THEMES[theme].background;
-  if (!/^#[0-9a-f]{6}$/i.test(background))
-    return usageError("--background must be a six-digit hex color (#rrggbb).");
-  const padding = Number(options.get("--padding") ?? "16");
-  if (!Number.isFinite(padding) || padding < 0 || padding > 256)
-    return usageError("--padding must be a number between 0 and 256.");
   const size = options.get("--size");
-  const box = size === undefined ? undefined : /^(\d+)x(\d+)$/i.exec(size);
-  if (box === null)
+  const box = /^(\d+)x(\d+)$/i.exec(size ?? "") ?? undefined;
+  if (size !== undefined && box === undefined)
     return usageError("--size must be W x H in pixels (for example 1024x768).");
-  const requestedScale = options.get("--scale");
-  const fontDir = options.get("--font-dir");
 
   const loaded = loadDocument(io, documentPath);
   if (typeof loaded === "string") return fail(loaded);
   const { document } = loaded;
   const pages = [...document.pages].sort(comparePageOrder);
-  const elementQuery = options.get("--element");
-  let target: (typeof document.elements)[number] | undefined;
-  if (elementQuery !== undefined) {
-    const resolved = resolveId(
-      elementQuery,
-      document.elements.map(({ id }) => id),
-    );
-    if (!resolved.ok) return usageError(resolved.message);
-    target = document.elements.find(({ id }) => id === resolved.id);
-  }
-
-  const query = pageQuery ?? target?.page;
   const resolved =
     pageNumber !== undefined
       ? pageAtNumber(pages, Number(pageNumber))
-      : query !== undefined
-        ? resolvePageQuery(pages, query)
+      : pageQuery !== undefined
+        ? resolvePageQuery(pages, pageQuery)
         : undefined;
   if (resolved && !resolved.ok) return usageError(resolved.message);
-  const page = resolved?.page ?? pages[0];
+
+  const elementQuery = options.get("--element");
+  let target: (typeof document.elements)[number] | undefined;
+  if (elementQuery !== undefined && resolved?.page.kind !== "cad3d") {
+    const element = resolveId(
+      elementQuery,
+      document.elements.map(({ id }) => id),
+    );
+    if (!element.ok)
+      return usageError(
+        !resolved && pages[0]?.kind === "cad3d"
+          ? "--element cannot be used on a cad3d page."
+          : element.message,
+      );
+    target = document.elements.find(({ id }) => id === element.id);
+  }
+  const page =
+    resolved?.page ??
+    (target ? pages.find(({ id }) => id === target.page) : pages[0]);
   if (!page) return fail("The document has no pages.");
+  const isCad = page.kind === "cad3d";
+  const foreign = (isCad ? ARTWORK_OPTIONS : CAMERA_OPTIONS).find((option) =>
+    options.has(option),
+  );
+  if (foreign)
+    return usageError(`${foreign} cannot be used on a ${page.kind} page.`);
   if (target && target.page !== page.id)
     return usageError("--element does not belong to the selected page.");
-  if (page.kind === "cad3d")
-    return fail("3D CAD capture is not available in this build.");
   if (!io.capture) return fail("This host cannot write captures.");
 
   let warnings = loaded.warnings;
-  try {
+
+  const renderArtwork = async (
+    page: (typeof pages)[number],
+    theme: "light" | "dark",
+  ) => {
+    const transcode =
+      format === "jpg" ? backend.transcode?.bind(backend) : undefined;
+    if (format === "jpg" && !transcode)
+      return usageError("JPG capture needs the native nodetto-cli.");
+    const background =
+      options.get("--background") ?? CAPTURE_THEMES[theme].background;
+    if (!/^#[0-9a-f]{6}$/i.test(background))
+      return usageError(
+        "--background must be a six-digit hex color (#rrggbb).",
+      );
+    const padding = Number(options.get("--padding") ?? "16");
+    if (!Number.isFinite(padding) || padding < 0 || padding > 256)
+      return usageError("--padding must be a number between 0 and 256.");
+    const requestedScale = options.get("--scale");
+    const fontDir = options.get("--font-dir");
     const editor = new Editor({ document });
     editor.setCurrentPage(page.id);
     const resolveAsset = (source: string): string => {
@@ -308,6 +334,33 @@ export async function captureCommand(
     );
     const { width, height } = pngSize(png);
     const image = transcode ? transcode(png, "jpg", quality, background) : png;
+    return { image, width, height };
+  };
+
+  try {
+    let cad: ReturnType<typeof renderCadCapture> | undefined;
+    if (isCad) {
+      const width = Number(box?.[1] ?? "1024");
+      const height = Number(box?.[2] ?? "768");
+      if (width < 64 || width > 2048 || height < 64 || height > 2048)
+        return usageError(
+          "--size on a cad3d page must be 64 to 2048 pixels per side.",
+        );
+      const camera = cadCameraOptions(options);
+      if (!backend.renderSolid)
+        return fail(`${warnings}3D CAD capture needs the native nodetto-cli.`);
+      cad = renderCadCapture(
+        document.elements,
+        page,
+        { camera, width, height, theme },
+        backend.renderSolid.bind(backend),
+        format,
+        quality,
+      );
+    }
+    const rendered = cad ?? (await renderArtwork(page, theme));
+    if ("exitCode" in rendered) return rendered;
+    const { image, width, height } = rendered;
     const path = writeCapture(
       io.capture,
       documentPath,
@@ -334,15 +387,20 @@ export async function captureCommand(
             name: page.name,
             kind: page.kind,
           },
+          ...cad?.metadata,
         })}\n`,
         warnings,
       );
     }
     return ok(
-      `path: ${path}\nformat: ${format}\nsize: ${width}x${height}\nbytes: ${image.byteLength}\npage: ${number}/${count} ${JSON.stringify(page.name)} (${page.kind}, id ${page.id})\n`,
+      `path: ${path}\nformat: ${format}\nsize: ${width}x${height}\nbytes: ${image.byteLength}\npage: ${number}/${count} ${JSON.stringify(page.name)} (${page.kind}, id ${page.id})\n${cad ? `${cad.lines.join("\n")}\n` : ""}`,
       warnings,
     );
   } catch (cause) {
+    if (cause instanceof CaptureInputError) {
+      const message = `${warnings}${cadInputMessage(cause, page, document.elements)}`;
+      return cause.errors ? fail(message) : usageError(message);
+    }
     return fail(`${warnings}Cannot capture: ${describe(cause)}`);
   }
 }

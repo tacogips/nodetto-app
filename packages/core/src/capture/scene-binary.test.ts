@@ -359,3 +359,73 @@ test("selected loops fixture encodes a disc and slab after normalisation", () =>
     }),
   );
 });
+
+test("checks the other side of writer option bounds and accepts uppercase hex", () => {
+  for (const [overrides, message] of [
+    [{ width: 2049 }, "width"],
+    [{ height: 63 }, "height"],
+    [{ camera: { ...options.camera, mmPerPixel: 1e7 + 1 } }, "camera scale"],
+    [{ referenceOpacity: -0.01 }, "reference opacity"],
+    [{ interference: { ...analysis, budgetMillionRays: 257 } }, "budget"],
+    [{ interference: { ...analysis, toleranceMm: 0.5e-6 } }, "tolerance"],
+    [{ interference: { ...analysis, cellMm: 10.01 } }, "target cell"],
+    [{ interference: { ...analysis, bodies: [-1] } }, "body index"],
+  ] satisfies readonly [Partial<CaptureSceneOptions>, string][]) {
+    expect(() =>
+      writeCaptureScene(model, { ...options, ...overrides }),
+    ).toThrow(message);
+  }
+  for (const supersample of [0, 4]) {
+    // A forged input at the boundary can bypass the static 1 | 2 | 3 type.
+    expect(() =>
+      writeCaptureScene(model, {
+        ...options,
+        supersample: supersample as CaptureSceneOptions["supersample"],
+      }),
+    ).toThrow("supersample");
+  }
+  const colours = { ...options.colours, body: "#A1B2C3" };
+  const bytes = writeCaptureScene(model, { ...options, colours });
+  expect([...bytes.subarray(163, 166)]).toEqual([0xa1, 0xb2, 0xc3]);
+});
+
+test("rejects bypassed mesh triangle and vertex bounds and invalid frame reals", () => {
+  const mesh: CaptureMeshTool = {
+    kind: "mesh",
+    feature: "bounds",
+    positions: new Float64Array(9),
+    triangles: new Uint32Array(2_000_001 * 3),
+  };
+  expect(() =>
+    writeCaptureScene({ tools: [mesh], bodies: [] }, options),
+  ).toThrow("triangle count");
+  expect(() =>
+    writeCaptureScene(
+      {
+        tools: [
+          {
+            ...mesh,
+            positions: new Float64Array(10),
+            triangles: new Uint32Array(3),
+          },
+        ],
+        bodies: [],
+      },
+      options,
+    ),
+  ).toThrow("vertex count");
+  for (const value of [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1e7 - 1,
+    1e7 + 1,
+  ]) {
+    const tool: CaptureTool = {
+      ...triangle,
+      frame: { ...triangle.frame, o: [value, 0, 0] },
+    };
+    expect(() =>
+      writeCaptureScene({ ...model, tools: [tool] }, options),
+    ).toThrow("coordinate");
+  }
+});

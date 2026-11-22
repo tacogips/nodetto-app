@@ -312,3 +312,55 @@ fn rejects_64_truncations_and_survives_2000_single_byte_changes() {
         bytes[position] = PLATE[position];
     }
 }
+
+#[test]
+fn checks_each_camera_axis_and_pair_on_both_sides_of_the_tolerance() {
+    let header = SELECTED_LOOPS;
+    for offset in [40, 72, 104, 48, 56, 80] {
+        // The fixture's camera is axis-aligned. The first three changes vary
+        // one length; the others introduce a dot product of the same size.
+        let original = f64::from_le_bytes(header[offset..offset + 8].try_into().unwrap());
+        for (delta, valid) in [(0.5e-9, true), (2e-9, false)] {
+            let mut bytes = header.to_vec();
+            put(&mut bytes, offset, &(original + delta).to_le_bytes());
+            if valid {
+                assert!(parse_scene(&bytes).is_ok(), "offset {offset}");
+            } else {
+                reject(parse_scene(&bytes), "orthonormal");
+            }
+        }
+    }
+}
+
+#[test]
+fn option_one_analyses_without_drawing() {
+    let mut bytes = PLATE.to_vec();
+    put(&mut bytes, 28, &1_u32.to_le_bytes());
+    let scene = parse_scene(&bytes).unwrap();
+    assert!(scene.analyse);
+    assert!(!scene.draw_interference);
+}
+
+#[test]
+fn prism_point_limit_accumulates_across_tools_and_loops() {
+    let mut bytes = SELECTED_LOOPS[..FIRST_TOOL].to_vec();
+    put(&mut bytes, 20, &2_u32.to_le_bytes());
+    put(&mut bytes, 24, &0_u32.to_le_bytes());
+
+    for (loops, final_counts) in [(100_u32, &[][..]), (99, &[19_998, 4][..])] {
+        let tool = bytes.len();
+        bytes.extend_from_slice(&SELECTED_LOOPS[FIRST_TOOL..FIRST_LOOP]);
+        put(
+            &mut bytes,
+            tool + 4,
+            &(loops + final_counts.len() as u32).to_le_bytes(),
+        );
+        for count in
+            std::iter::repeat_n(20_000_u32, loops as usize).chain(final_counts.iter().copied())
+        {
+            bytes.extend_from_slice(&count.to_le_bytes());
+            bytes.resize(bytes.len() + 4 + count as usize * 20, 0);
+        }
+    }
+    reject(parse_scene(&bytes), "too many scene points");
+}

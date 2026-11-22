@@ -149,4 +149,35 @@ the image bytes. New options: `--view`, `--direction`, `--eye`,
 
 ## Progress
 
-Pending.
+Implemented, round 1. Native CLI CAD capture supports orthographic camera
+options, PNG and JPG, and camera, frame, body and error metadata. The
+shared request receives the whole document, including external PCB page
+elements. Output writes use the existing capture writer. The Bun CLI
+reports the native requirement.
+
+- Write-path deviation for CAP-M6-01, CAP-M7-03 and CAP-M8-01:
+  added regressions to `scene-binary.test.ts` and the crate's
+  `tests/{scene,intervals,render}.rs`. These paths remain disjoint from
+  M10. M9 covers CAP-M8-01's output formats, state words and shallow
+  edge. Its chord cases are due in M11. The shared-cap case is due in
+  M10 and rechecked in M17.
+- The Boa test observes the exact NCS1 view passed to the real host and
+  compares those bytes as well as the PNG with the Bun fixture. Its
+  additional encoder test checks PNG passthrough and distinct RGB
+  channels for JPG (CAP-M4-01).
+- Passed all four plan commands with 199, 12, 29 and 5 tests.
+  The default 1024x768 reference capture took 746, 664 and 670 ms
+  end to end (limit 5,000 ms). Logs: `tmp/capture/m09/v[1-4]-complete.log`,
+  `strict.log` and `timing.json` in the same directory.
+- Capture crate tests passed (52 passed, two release-only cases ignored).
+  Eleven isolated mutations were caught by the new threshold,
+  occupancy, face ID and state-word tests. Logs: `rust-crate.log`
+  and `mutations.log`.
+- Inspected native 1024x768 light and dark Plate images. The holes,
+  pocket, boss, clipped puck and foreground block are visible.
+  Evidence: `tmp/capture/m09/preview-complete.log` and the two PNGs.
+- Workspace check, lint and the unfiltered Bun suite passed (4,682
+  passed, 82 skipped, 738 files). The workspace Rust test pass stopped
+  at the same 17 unchanged desktop Foundation atomic-write permission
+  failures seen under the worktree-only guard in M8. Logs:
+  `tmp/capture/m09/repository-verify-complete.log`.

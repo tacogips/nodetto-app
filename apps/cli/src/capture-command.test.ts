@@ -323,7 +323,7 @@ test("capture distinguishes an empty page, an unsupported CAD page, and a host w
   const unsupported = await run("--page", cad);
   expect(unsupported.exitCode).toBe(2);
   expect(unsupported.stderr).toContain(
-    "3D CAD capture is not available in this build.",
+    "3D CAD capture needs the native nodetto-cli.",
   );
   const unavailable = await captureCommand(
     { ...io, capture: undefined },
@@ -332,6 +332,23 @@ test("capture distinguishes an empty page, an unsupported CAD page, and a host w
   );
   expect(unavailable.exitCode).toBe(2);
   expect(unavailable.stderr).toContain("This host cannot write captures.");
+  expect(calls).toEqual([]);
+});
+
+test("capture rejects CAD options on 2D pages and never rasterizes CAD pages", async () => {
+  const { editor, run, calls, backend } = harness();
+  addRect(editor);
+  const misuse = await run("--direction", "0,0,-1");
+  expect(misuse.stderr).toContain(
+    "--direction cannot be used on a freeform page.",
+  );
+  const cad = editor.createPage({ name: "Sketch", kind: "cad3d" });
+  backend.renderSolid = () => {
+    throw new Error("No body should reach the renderer");
+  };
+  const sketch = await run("--page", cad);
+  expect(sketch.exitCode).toBe(2);
+  expect(sketch.stderr).toContain('Page "Sketch" has no solid body yet');
   expect(calls).toEqual([]);
 });
 
