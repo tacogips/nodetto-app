@@ -174,9 +174,9 @@ found there.
 | M2 | accepted |
 | M19 | accepted |
 | M3 | accepted |
-| M4 | implemented |
+| M4 | accepted |
 | M5 | accepted |
-| M6 | pending |
+| M6 | implemented |
 | M7 | pending |
 | M8 | pending |
 | M9 | pending |

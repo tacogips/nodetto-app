@@ -23,6 +23,30 @@ fn png_round_trips_rgb_pixels_and_is_deterministic() {
     assert_eq!(transcode_png(&png, ImageFormat::Png, [0; 3]).unwrap(), png);
 }
 
+fn huffman_tables(jpg: &[u8]) -> Vec<&[u8]> {
+    let mut offset = 2;
+    let mut tables = Vec::new();
+    while jpg[offset + 1] != 0xda {
+        assert_eq!(jpg[offset], 0xff);
+        let length = u16::from_be_bytes([jpg[offset + 2], jpg[offset + 3]]) as usize;
+        if jpg[offset + 1] == 0xc4 {
+            tables.push(&jpg[offset + 4..offset + 2 + length]);
+        }
+        offset += 2 + length;
+    }
+    tables
+}
+
+#[test]
+fn jpeg_uses_fixed_huffman_tables_across_pictures() {
+    let constant = jpeg_rgb8(&[22; 3 * 8 * 8], 8, 8, 100).unwrap();
+    let gradient = std::array::from_fn::<_, { 3 * 12 * 8 }, _>(|i| (i % 256) as u8);
+    let gradient = jpeg_rgb8(&gradient, 12, 8, 60).unwrap();
+    let tables = huffman_tables(&constant);
+    assert_eq!(tables.len(), 4);
+    assert_eq!(tables, huffman_tables(&gradient));
+}
+
 #[test]
 fn jpeg_round_trips_a_small_gradient_with_lines_and_is_deterministic() {
     let (width, height) = (64, 48);
@@ -103,6 +127,10 @@ fn png_transcode_composites_alpha_and_passes_rgb_through() {
     let mut writer = encoder.write_header().unwrap();
     writer.write_image_data(&rgba).unwrap();
     writer.finish().unwrap();
+    assert_eq!(
+        transcode_png(&png, ImageFormat::Png, background).unwrap(),
+        png
+    );
     let expected = jpeg_rgb8(&rgb, width, height, 100).unwrap();
     assert_eq!(transcode_png(&png, format, background).unwrap(), expected);
     let opaque = png_rgb8(&rgb, width, height).unwrap();
@@ -132,4 +160,21 @@ fn png_transcode_rejects_truncation_unsupported_color_and_oversize() {
         let error = transcode_png(&png, format, [0; 3]).unwrap_err();
         assert!(error.to_string().contains(message), "{error}");
     }
+}
+
+#[test]
+fn png_transcode_rejects_an_animated_png() {
+    let mut animated = Vec::new();
+    let mut encoder = png::Encoder::new(&mut animated, 1, 1);
+    encoder.set_color(ColorType::Rgb);
+    encoder.set_animated(2, 0).unwrap();
+    let mut writer = encoder.write_header().unwrap();
+    writer.write_image_data(&[10, 20, 30]).unwrap();
+    writer.write_image_data(&[40, 50, 60]).unwrap();
+    writer.finish().unwrap();
+    let error = transcode_png(&animated, ImageFormat::Jpeg { quality: 90 }, [0; 3]).unwrap_err();
+    assert!(
+        error.to_string().contains("must be a still image"),
+        "{error}"
+    );
 }

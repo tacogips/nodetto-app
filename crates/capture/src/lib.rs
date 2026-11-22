@@ -2,6 +2,7 @@
 
 pub mod encode;
 mod flatten;
+pub mod scene;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImageFormat {

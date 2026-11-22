@@ -129,4 +129,23 @@ pub fn parse_scene(bytes: &[u8]) -> Result<Scene, CaptureError>;
 
 ## Progress
 
-Pending.
+Implemented. Adversarial review is pending.
+
+- All four verification commands passed with 78, 6, 17, and 6 tests.
+  See `tmp/capture/m06/v1-final.log` through `v4-final.log` and
+  `strict.log`. The unfiltered Bun suite passed with 4,634 passes and
+  79 skips across 735 files. Workspace check, Clippy, and both formatting
+  checks passed.
+- The writer and reader agree on the Plate and selected-loop fixtures.
+  The reader rejects invalid headers, padding, counts, indices, and
+  camera data. Tests exercise 64 truncations and 2,000 byte changes.
+- Write-path deviation for CAP-M4-01: added tests in `flatten.rs` and
+  `tests/encode.rs` for exact alpha rounding, fixed Huffman tables,
+  animated PNG rejection, and byte-identical RGBA PNG passthrough.
+  All four corresponding mutations fail their targeted tests
+  (`tmp/capture/m06/encoder-mutations.log`). The native host colour
+  order and PNG branch remain for the M9 engine tests.
+- Supplemental workspace Rust tests stopped after 49 passes and 17
+  Foundation file-write denials in existing desktop tests under the
+  worktree-only write guard. See `tmp/capture/m06/repository-rust.log`.
+  The capture crate's 17 tests all passed independently.

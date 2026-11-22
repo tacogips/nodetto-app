@@ -59,3 +59,22 @@ pub(crate) fn png_to_rgb8(
     }
     Ok((pixels, width, height))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alpha_compositing_rounds_before_encoding() {
+        let mut png = Vec::new();
+        let mut encoder = png::Encoder::new(&mut png, 1, 1);
+        encoder.set_color(ColorType::Rgba);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&[200, 100, 20, 128]).unwrap();
+        writer.finish().unwrap();
+        assert_eq!(
+            png_to_rgb8(&png, [10, 30, 90]).unwrap(),
+            (vec![105, 65, 55], 1, 1)
+        );
+    }
+}
