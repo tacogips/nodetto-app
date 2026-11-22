@@ -2,6 +2,7 @@
 // page with every option, exit code and an example, printed by
 // `nodetto-cli help <command>` or `nodetto-cli <command> --help`.
 
+import { CAPTURE_HELP } from "./capture-help.ts";
 import { TABLE_HELP } from "./table-help.ts";
 
 export const OVERVIEW = `nodetto-cli - read, draw, check and convert nodetto documents (.jsonl)
@@ -21,6 +22,7 @@ Draw and edit
   nodetto-cli table create|set     Spreadsheet tables from CSV/TSV or JSON; edit cells
   nodetto-cli arrange <doc>       Arrange one page: tidy, overlaps, layered or route
 Render
+  nodetto-cli capture <doc>       PNG/JPG picture of a page for a quick look
   nodetto-cli export <doc>        Export a page or selected artwork
   nodetto-cli compare <actual> <reference>  Compare PNGs side by side
 Convert and check
@@ -38,10 +40,8 @@ Convert and check
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
   nodetto-cli authorize [folder]  Grant project-folder access for the Store CLI
-Global --quiet suppresses warning lines.
-Run "nodetto-cli help <command>" or "nodetto-cli <command> --help" for details.
-AI loop: inspect -> shapes/types -> edit --snapshot -> export (look at the PNG)
--> diff <snapshot> <doc> later; the app shows and merges the edits live.`;
+Global --quiet suppresses warning lines. Run "nodetto-cli help <command>" or "nodetto-cli <command> --help" for details.
+AI loop: inspect -> shapes/types -> edit --snapshot -> capture (look at the picture) -> diff <snapshot> <doc> later; the app shows and merges the edits live.`;
 
 const EXIT_CODES = `Exit codes: 0 success, 1 out of date (--check), 2 usage or input error,
 3 warnings with --strict.`;
@@ -517,6 +517,8 @@ Example:
   0 added, 1 changed, 0 removed.
 
 ${EXIT_CODES}`,
+
+  capture: CAPTURE_HELP,
 
   export: `Usage: nodetto-cli export <doc.jsonl> --format <format> [--page <short-id|id|name>]
                           [--element <id>] [--output <file>] [--font-dir <dir>] [--padding <n>]

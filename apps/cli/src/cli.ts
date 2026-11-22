@@ -8,6 +8,8 @@ import { exportCommand } from "./export-command.ts";
 import { bundleCommand } from "./bundle-command.ts";
 import { compareCommand } from "./compare-command.ts";
 import { rasterize } from "./raster-backend.ts";
+import { captureBackend } from "./capture-backend.ts";
+import { captureCommand } from "./capture-command.ts";
 
 const ASYNC_COMMANDS: Readonly<
   Record<
@@ -16,6 +18,7 @@ const ASYNC_COMMANDS: Readonly<
   >
 > = {
   export: exportCommand,
+  capture: (io, args) => captureCommand(io, args, captureBackend),
   bundle: bundleCommand,
   compare: (io, args) => compareCommand(io, args, { rasterize }),
   open: openCommand,

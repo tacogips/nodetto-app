@@ -1138,6 +1138,7 @@ function dispatchCli(
     case "open":
     case "compare":
     case "export":
+    case "capture":
     case "bundle":
       return fail(`${command} is asynchronous; call runCliAsync from cli.ts.`);
     case "--version":

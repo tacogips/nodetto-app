@@ -305,3 +305,44 @@ fn ensure_dir_creates_nested_directories_idempotently() {
     );
     assert!(folder.path().join("a/b/c").is_dir());
 }
+
+#[test]
+fn capture_command_renders_a_png_and_reports_its_path() {
+    let folder = tempfile::tempdir().unwrap();
+    std::fs::write(
+        folder.path().join("drawing.jsonl"),
+        concat!(
+            "{\"kind\":\"document\",\"schemaVersion\":1,\"id\":\"doc\",\"title\":\"Drawing\"}\n",
+            "{\"kind\":\"page\",\"id\":\"p1\",\"name\":\"Draft\",\"pageKind\":\"freeform\"}\n",
+            "{\"kind\":\"element\",\"id\":\"rect\",\"page\":\"p1\",\"type\":\"shape.geo\",\"index\":\"a0\",\"semantic\":{\"geo\":\"rect\",\"label\":\"\"},\"visual\":{\"x\":0,\"y\":0,\"width\":100,\"height\":100}}\n",
+        ),
+    )
+    .unwrap();
+    let result = run(
+        [
+            "--cwd",
+            folder.path().to_str().unwrap(),
+            "capture",
+            "drawing.jsonl",
+            "--output",
+            "drawing.png",
+            "--padding",
+            "0",
+            "--scale",
+            "1.1",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        Input::Mcp(None),
+    );
+    assert_eq!(result.exit_code, 0, "{}", result.stderr);
+    let output = folder.path().join("drawing.png");
+    assert_eq!(
+        result.stdout.lines().next(),
+        Some(format!("path: {}", output.display()).as_str()),
+    );
+    let png = std::fs::read(output).unwrap();
+    assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert!(result.stdout.lines().any(|line| line == "size: 110x110"));
+    assert_eq!(&png[16..24], &[0, 0, 0, 110, 0, 0, 0, 110]);
+}

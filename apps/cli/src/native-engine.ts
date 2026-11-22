@@ -2,6 +2,7 @@ import { applyQuiet, extractQuiet } from "./warnings.ts";
 // Build-time entry point for the shared diagram engine embedded in the Rust
 // executable. It imports no Node/Bun APIs; OS operations belong to Rust.
 import { runCli } from "./commands.ts";
+import { captureCommand } from "./capture-command.ts";
 import { exportCommand } from "./export-command.ts";
 import { compareCommand } from "./compare-command.ts";
 import { openCommand } from "./open-command.ts";
@@ -81,6 +82,22 @@ const io = {
   },
 };
 
+async function rasterize(
+  svg: string,
+  scale: number,
+  fontDir: string | undefined,
+  fallback = false,
+): Promise<Uint8Array> {
+  return new Uint8Array(
+    native.png(
+      svg,
+      scale,
+      fontDir === undefined ? undefined : native.path(fontDir),
+      fallback,
+    ),
+  );
+}
+
 // JSON at this boundary keeps interpreter handles local to each Rust invocation.
 Object.assign(globalThis, {
   nodettoHelp: JSON.stringify({ overview: OVERVIEW, commands: COMMAND_HELP }),
@@ -92,15 +109,7 @@ Object.assign(globalThis, {
     const result =
       command === "export" && !help
         ? await exportCommand(io, rest, {
-            rasterize: async (svg, scale, fontDir, fallback) =>
-              new Uint8Array(
-                native.png(
-                  svg,
-                  scale,
-                  fontDir === undefined ? undefined : native.path(fontDir),
-                  fallback ?? false,
-                ),
-              ),
+            rasterize,
             pagesToPdf: async (pages) => {
               const pngs = new Uint8Array(
                 pages.reduce((sum, page) => sum + page.png.length, 0),
@@ -131,23 +140,15 @@ Object.assign(globalThis, {
                 ),
               ),
           })
-        : command === "compare" && !help
-          ? await compareCommand(io, rest, {
-              rasterize: async (svg, scale, fontDir, fallback) =>
-                new Uint8Array(
-                  native.png(
-                    svg,
-                    scale,
-                    fontDir === undefined ? undefined : native.path(fontDir),
-                    fallback ?? false,
-                  ),
-                ),
-            })
-          : command === "open" && !help
-            ? await openCommand(io, rest)
-            : command === "bundle" && !help
-              ? await bundleCommand(io, rest)
-              : runCli(args, io, version);
+        : command === "capture" && !help
+          ? await captureCommand(io, rest, { rasterize })
+          : command === "compare" && !help
+            ? await compareCommand(io, rest, { rasterize })
+            : command === "open" && !help
+              ? await openCommand(io, rest)
+              : command === "bundle" && !help
+                ? await bundleCommand(io, rest)
+                : runCli(args, io, version);
     return JSON.stringify(
       extracted.quiet ? applyQuiet(command ?? "", result) : result,
     );

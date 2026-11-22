@@ -138,4 +138,19 @@ light|dark] [--element <id>] [--padding <n>] [--background <#rrggbb>]
 
 ## Progress
 
-Pending.
+Implemented, pending implementation review. Both CLI hosts render PNG and
+register the capture help through their existing MCP tool registries.
+
+- Deviation: bake integral output dimensions into the snapped SVG root and
+  apply density through its viewBox, then rasterize at unit zoom. The
+  native zoom rule allocates 1569 x 701 for a 12247 x 5468 viewport whose
+  fit is 1568 x 700. Single-precision rounding can also cross the
+  default area cap (19780 x 14187). Export keeps its existing raster path.
+- CAP-M19-01: report dimensions from the encoded PNG header. Both hosts
+  have regression coverage for 100 x 100 at scale 1.1 and the default
+  3000 x 3296 fit, plus the two native rounding cases above.
+- CAP-M19-02: the command test reaches the height-only side limit at
+  100 x 8193, scale 1, and checks that no rasterization takes place.
+- CAP-M19-03: exit 2 retains the minimum-scale fit guidance. Help names
+  --scale, --size and --element. Design section 5 remains an M16 follow-up.
+- Verification logs: `tmp/capture/m03/v1.log` to `v4.log`.

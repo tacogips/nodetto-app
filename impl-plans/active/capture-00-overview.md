@@ -172,8 +172,8 @@ found there.
 | --- | --- |
 | M1 | accepted |
 | M2 | accepted |
-| M19 | implemented |
-| M3 | pending |
+| M19 | accepted |
+| M3 | implemented |
 | M4 | pending |
 | M5 | pending |
 | M6 | pending |

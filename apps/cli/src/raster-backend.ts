@@ -14,7 +14,7 @@ import {
 
 import { FALLBACK_FONT_FILES, FONT_FILES } from "./render-profile.ts";
 
-function fontOptions(fontDir: string | undefined, fallback: boolean) {
+export function fontOptions(fontDir: string | undefined, fallback: boolean) {
   const files = FONT_FILES.filter((path) => existsSync(path));
   const dirs = fontDir === undefined ? [] : [fontDir];
   if (!files.length && !dirs.length) return { loadSystemFonts: true };
