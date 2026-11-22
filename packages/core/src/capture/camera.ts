@@ -153,7 +153,11 @@ export function captureCamera(
     : defaultUp;
   const parallelUp =
     "Capture up must not be parallel to the viewing direction.";
-  let right = unit(cross3(forward, requestedUp), parallelUp);
+  const across = cross3(forward, requestedUp);
+  // Compare the squared sine of the angle so decimal multiples are rejected.
+  if (request.up && dot(across, across) < 1e-18)
+    throw new RangeError(parallelUp);
+  let right = unit(across, parallelUp);
   let up = cross3(right, forward);
   // Normalising a tiny cross product can amplify roundoff along forward.
   if (Math.abs(dot(right, forward)) > Number.EPSILON) {

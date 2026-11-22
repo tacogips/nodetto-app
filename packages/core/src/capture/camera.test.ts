@@ -83,6 +83,13 @@ test("direction and eye agree, and an omitted eye target defaults to the bounds 
   );
 });
 
+test("an explicit direction takes precedence over eye", () => {
+  const direction: Vec3 = [1, 2, -3];
+  expect(captureCamera({ direction, eye: [50, 30, 2.5] }, plate, size)).toEqual(
+    captureCamera({ direction }, plate, size),
+  );
+});
+
 test("a direction tilted from Z uses Z-up and an explicit up can roll the image", () => {
   const tilted = captureCamera({ direction: [1e-6, 0, -1] }, plate, size);
   expectVector(tilted.right, [0, -1, 0]);
@@ -93,7 +100,7 @@ test("a direction tilted from Z uses Z-up and an explicit up can roll the image"
 
 test("a nearly parallel explicit up still gives an orthonormal basis", () => {
   const { forward, right, up } = captureCamera(
-    { direction: [3, 7, 11], up: [3 + 1e-12, 7 - 1e-12, 11 + 1e-12] },
+    { direction: [3, 7, 11], up: [3 + 1e-6, 7 - 1e-6, 11 + 1e-6] },
     plate,
     size,
   );
@@ -109,6 +116,8 @@ const invalid: readonly [CaptureCameraRequest, RegExp][] = [
   [{ up: [0, 0, 0] }, /up/],
   [{ up: [0, 0, 5], view: "top" }, /parallel/],
   [{ direction: [1, 2, 3], up: [5, 10, 15] }, /parallel/],
+  [{ direction: [0.1, 0.2, 0.3], up: [0.3, 0.6, 0.9] }, /parallel/],
+  [{ direction: [0.3, 0.1, 0.7], up: [-0.9, -0.3, -2.1] }, /parallel/],
   [{ target: [0, Number.NaN, 0] }, /target/],
   [{ zoom: 0.009 }, /zoom/],
   [{ zoom: 1001 }, /zoom/],
@@ -161,6 +170,32 @@ test("supports a fixed view height, a degenerate fit, and a half-pixel frame mar
   expect(captureFrame(camera, [inside], small)).toBe("complete");
   expect(captureFrame(camera, [inside, outside], small)).toBe("cropped");
 });
+
+test.each([
+  ["left", [-3.25, 0], [-3.26, 0]],
+  ["right", [3.25, 0], [3.26, 0]],
+  ["bottom", [0, -2.25], [0, -2.26]],
+  ["top", [0, 2.25], [0, 2.26]],
+] as const)(
+  "allows exactly half a pixel past the %s edge of a non-square frame",
+  (_edge, atLimit, pastLimit) => {
+    const picture = { width: 12, height: 8 };
+    const camera = captureCamera(
+      { view: "top", target: [0, 0, 0], viewHeight: 4 },
+      plate,
+      picture,
+    );
+    function frameReaching([x, y]: readonly [number, number]) {
+      const box: Bounds3 = {
+        min: [Math.min(0, x), Math.min(0, y), 0],
+        max: [Math.max(0, x), Math.max(0, y), 1],
+      };
+      return captureFrame(camera, [box], picture);
+    }
+    expect(frameReaching(atLimit)).toBe("complete");
+    expect(frameReaching(pastLimit)).toBe("cropped");
+  },
+);
 
 test("fits the union of the projected body boxes when they are supplied", () => {
   const low: Bounds3 = { min: [-52, -52, 0], max: [-48, -48, 1] };

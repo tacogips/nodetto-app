@@ -149,7 +149,8 @@ export function normaliseToolLoops(loops: readonly CadLoop[]): readonly CadLoop[
 
 ## Progress
 
-Implemented. The adversarial implementation review is pending.
+Implemented with round 1 corrections. The next adversarial implementation
+review is pending.
 
 - The three M5 verification commands passed. Logs are in
   `tmp/capture/m05/` as `verify-typecheck.log`, `verify-strict.log` with
@@ -163,3 +164,25 @@ Implemented. The adversarial implementation review is pending.
   box for the three-argument call in this plan.
 - Scene errors include sketch entity errors as well as feature errors.
   This matches the full `checkCadPage` report in the acceptance criterion.
+
+### Review round 1 corrections
+
+- M5-R1-F1: The lattice covers a selected depth-2 island inside another
+  selected loop's bounding box and outside its polygon. Both loops remain
+  in the capture tool region.
+- M5-R1-F2: A non-square frame test checks each edge independently at
+  exactly half a pixel and slightly beyond it.
+- M5-R1-F3: An explicit `up` is rejected as parallel when the cross-product
+  length of the two unit vectors is below `1e-9`. Decimal parallel and
+  antiparallel inputs now produce the usage error. A near-parallel input
+  above the threshold still produces an orthonormal basis.
+- M5-R1-F4 and M5-R1-F5: Tests cover error ordering under reversed input,
+  sketch frame failures, failed mesh targets and direction precedence.
+- All three milestone commands passed, with 85, 72 and 59 tests
+  respectively. The 20,000-element scene built in 87.4 to 96.5 ms.
+  The regression tests detected all 11 targeted mutations.
+  See `tmp/capture/m05/remediation/` for the verification logs, strict
+  diagnostics and mutation summary.
+- Repository `mise run verify` passed with 4,613 Bun tests and 99 Rust
+  tests passing. Bun reported the usual 78 skips. See
+  `tmp/capture/m05/remediation/verify-repository.log`.

@@ -144,7 +144,7 @@ test("sweeps visible creation tools along a side plane and unions distinct body 
 });
 
 test("propagates failed features, includes bad sketch entities, and omits suppressed geometry", () => {
-  const model = modelOf([
+  const elements = [
     ...plateElements(),
     sketch("bad-plane", "a3", {
       face: { feature: "ex1", role: "side", entity: "stray" },
@@ -174,17 +174,23 @@ test("propagates failed features, includes bad sketch entities, and omits suppre
       op: "cut",
       bodies: ["quiet-body"],
     }),
+    sketch("quiet-face", "a8", {
+      face: { feature: "quiet-body", role: "end" },
+    }),
     circle("stray", "gone", [0, 0], 1),
-  ]);
+  ];
+  const model = modelOf(elements);
   expect(model.tools).toHaveLength(1);
   expect(model.bodies[0]?.steps).toEqual([{ op: "union", tool: 0 }]);
   expect(model.sketches).toBe(1);
   expect(model.errors).toEqual([
     { id: "bad-plane", code: "cad.reference.missing" },
     { id: "failed-cut", code: "cad.reference.failed" },
+    { id: "quiet-face", code: "cad.reference.failed" },
     { id: "quiet-target", code: "cad.reference.failed" },
     { id: "stray", code: "cad.reference.missing" },
   ]);
+  expect(modelOf([...elements].reverse()).errors).toEqual(model.errors);
 });
 
 test("hidden creators stay available to feature references and do not contribute capture bounds", () => {
@@ -269,6 +275,26 @@ test("counts successful sketches without solids and tracks meshes accepted by ca
     bodies: [],
     bounds: null,
   });
+});
+
+test("reports a failed mesh dependency as a missing target body", () => {
+  const model = modelOf([
+    ...plateElements(),
+    cadElement("broken-shell", "cad.mesh", "a3", {
+      name: "Broken shell",
+      data: "not-an-nmesh-payload",
+    }),
+    extrude("shell-cut", "a4", {
+      sketch: "base",
+      distance: 2,
+      op: "cut",
+      bodies: ["broken-shell"],
+    }),
+  ]);
+  expect(model.errors).toEqual([
+    { id: "broken-shell", code: "cad.mesh.invalid" },
+    { id: "shell-cut", code: "cad.body.missing" },
+  ]);
 });
 
 function selectedLoops(entities: readonly Element[], pick?: readonly string[]) {
@@ -383,6 +409,19 @@ test("finds the containing ancestor among two disjoint islands inside a hole", (
       selectedLoops(entities, [hole.id, left.id, right.id, inner.id]),
     ),
   ).toHaveLength(3);
+});
+
+test("keeps an island inside another loop's bounding box but outside its polygon", () => {
+  const disc = circle("disc", "profile", [0, 0], 40);
+  const corner = rectangle("profile", 32, 32, 7, 7);
+  const pocket = circle("pocket", "profile", [35.5, 35.5], 2.5);
+  const inset = circle("inset", "profile", [35.5, 35.5], 1.25);
+  const selected = selectedLoops(
+    [disc, ...corner, pocket, inset],
+    [disc.id, inset.id],
+  );
+  expect(selected.map(({ depth }) => depth)).toEqual([0, 2]);
+  expect(compareRegions(selected)).toEqual(selected);
 });
 
 test("builds 20,000 CAD elements in under 1,000 ms", () => {
