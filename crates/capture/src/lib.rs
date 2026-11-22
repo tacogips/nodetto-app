@@ -4,8 +4,13 @@ pub mod encode;
 mod flatten;
 pub mod interval;
 pub mod prism;
+mod raster;
+pub mod report;
 pub mod scene;
+mod shade;
 pub mod view;
+
+pub use raster::render_rgb;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImageFormat {
@@ -23,6 +28,31 @@ impl std::fmt::Display for CaptureError {
 }
 
 impl std::error::Error for CaptureError {}
+
+pub struct CaptureOutput {
+    pub image: Vec<u8>,
+    pub report: String,
+}
+
+/// Render and encode NCS1. Zero threads uses available parallelism, capped at eight.
+pub fn render_scene(
+    scene: &[u8],
+    format: ImageFormat,
+    threads: usize,
+) -> Result<CaptureOutput, CaptureError> {
+    let scene = scene::parse_scene(scene)?;
+    let (rgb, report) = render_rgb(&scene, threads)?;
+    let (width, height) = (report.width, report.height);
+    let image = match format {
+        ImageFormat::Png => encode::png_rgb8(&rgb, width, height),
+        ImageFormat::Jpeg { quality } => encode::jpeg_rgb8(&rgb, width, height, quality),
+    }
+    .map_err(CaptureError)?;
+    Ok(CaptureOutput {
+        image,
+        report: report.to_json(),
+    })
+}
 
 /// Preserve PNG bytes or composite an 8-bit RGB/RGBA PNG onto a background and encode it as JPEG.
 pub fn transcode_png(

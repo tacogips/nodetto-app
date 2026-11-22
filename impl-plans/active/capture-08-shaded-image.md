@@ -134,4 +134,28 @@ impl Report { pub fn to_json(&self) -> String }
 
 ## Progress
 
-Pending.
+Implemented, awaiting review. Shaded orthographic prism renders now produce
+row-major RGB or PNG/JPG, with a deterministic body report. The Plate RGB
+digest is `29c64b3e156d0941`; worker counts 0, 1, 2 and 5 agree.
+
+- CAP-M7-01: for neighbours in the same body, a change in tool or face id
+  does not draw an edge if the normals agree within 1e-9 and each tangent
+  plane contains the chord within 1e-7 mm. This preserves depth and interval
+  provenance. The rotated decimal trim matches the untrimmed plate byte for
+  byte. Document the edge rule in design 6.5 by M16.
+- CAP-M6-02: an orthonormal left-handed camera mirrors the view. The renderer
+  uses bounded facet indices to recover normals and compares the original
+  face ids as opaque values. `prism.rs` and `view.rs` are additional write
+  paths for facet access and the vector cross product. Analysis flags remain
+  for M10 and M17.
+- A worker advances through each 32-row band with a rolling window of one
+  output row's samples plus one neighbour. This uses at most 24,576 hit slots
+  per worker at 2048 pixels and 3x sampling. It repeats the halo at the start
+  of the next band. Workers cap at eight, including explicit requests.
+- The three grazing views use the original fixture for edge coverage. A thin
+  copy tests background through a hole at the lowest angle, where the
+  original 5 mm plate's walls occlude the through-holes. A directly lit face
+  was checked in both palettes. The isometric previews are in `tmp/capture/m08/`.
+- The pre-commit release check rendered the fixture on one thread in 277 ms.
+  Verification logs are `tmp/capture/m08/v1.log`, `v2.log`, `render.txt` and
+  `v3.log` in the same directory.

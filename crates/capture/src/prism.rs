@@ -210,6 +210,45 @@ impl PrismView {
 
     /// Replace the ray's intervals in `out`, using reusable crossing storage.
     pub fn intervals(&self, ray: &Ray, scratch: &mut Vec<Boundary>, out: &mut Intervals) {
+        self.cast::<false>(ray, scratch, out);
+    }
+
+    /// Retain the actual facet for shading when several edges share a face id.
+    pub(crate) fn surface_intervals(
+        &self,
+        ray: &Ray,
+        scratch: &mut Vec<Boundary>,
+        out: &mut Intervals,
+    ) {
+        self.cast::<true>(ray, scratch, out);
+    }
+
+    pub(crate) fn surface(&self, index: u32) -> Option<(u32, [f64; 3])> {
+        let [u, v, n] = self.basis;
+        if index < 2 {
+            return Some((index, n));
+        }
+        let edge = self.edges.get((index - 2) as usize)?;
+        let x = edge.b[1] - edge.a[1];
+        let y = edge.a[0] - edge.b[0];
+        let scale = x.abs().max(y.abs());
+        if scale == 0.0 {
+            return None;
+        }
+        let (x, y) = (x / scale, y / scale);
+        let length = (x * x + y * y).sqrt();
+        Some((
+            edge.face,
+            std::array::from_fn(|axis| (u[axis] * x + v[axis] * y) / length),
+        ))
+    }
+
+    fn cast<const FACETS: bool>(
+        &self,
+        ray: &Ray,
+        scratch: &mut Vec<Boundary>,
+        out: &mut Intervals,
+    ) {
         scratch.clear();
         out.clear();
         let offset = std::array::from_fn(|axis| ray.origin[axis] - self.origin[axis]);
@@ -238,7 +277,7 @@ impl PrismView {
                 scratch.push(Boundary {
                     s,
                     tool: index as u32,
-                    face: edge.face,
+                    face: if FACETS { index as u32 + 2 } else { edge.face },
                 });
             }
         }
