@@ -149,4 +149,17 @@ export function normaliseToolLoops(loops: readonly CadLoop[]): readonly CadLoop[
 
 ## Progress
 
-Pending.
+Implemented. The adversarial implementation review is pending.
+
+- The three M5 verification commands passed. Logs are in
+  `tmp/capture/m05/` as `verify-typecheck.log`, `verify-strict.log` with
+  `strict.log`, and `verify-lint.log`. The 20,000-element scene built in
+  160.5 to 488.1 ms across those runs, within the 1,000 ms budget.
+- Repository `mise run verify` passed with 4,604 Bun tests and 99 Rust
+  tests passing. The standard Bun run reported 78 skips.
+  See `tmp/capture/m05/verify-repository.log`.
+- Design section 6.2 fits the projected body boxes. The camera accepts
+  those boxes as an optional fourth argument and uses the combined model
+  box for the three-argument call in this plan.
+- Scene errors include sketch entity errors as well as feature errors.
+  This matches the full `checkCadPage` report in the acceptance criterion.
