@@ -145,7 +145,7 @@ milestone that breaks it, not in M18.
 | M21 | pending |
 | M15 | pending |
 | M16 | implemented |
-| M17 | pending |
+| M17 | implemented |
 | M18 | pending |
 
 M1 added the CAD IR and document content rule, registered shape defaults,

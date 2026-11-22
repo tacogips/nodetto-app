@@ -681,6 +681,20 @@ tests in M1 and M17:
   native CLI in under 10 s, the existing deadline class
   (`apps/cli/src/native-parity/documents.test.ts:247`).
 
+M17 measured the generated mix of 1 sketch, 8 lines, 10 circles and
+1 extrude per group using Bun 1.4.4 on macOS arm64. Byte totals include
+the document and page lines, and parse and serialization both include
+schema validation. The 10,000-record fixture averaged 194.20 bytes per
+CAD record.
+
+| CAD records | JSONL bytes | Gzip bytes | Parse + validate (ms) | Serialize (ms) |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 193,271 | 21,495 | 4.93 | 8.84 |
+| 10,000 | 1,941,973 | 212,409 | 17.92 | 33.78 |
+| 20,000 | 3,883,975 | 424,640 | 28.54 | 50.73 |
+
+Run `bun --cwd=apps/desktop run bench:cad-format` to repeat the measurement.
+
 ### 7.3 NMESH version 1 (byte level)
 
 A self-contained, canonical, integer-only triangle container. Little endian;
