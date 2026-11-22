@@ -170,9 +170,9 @@ found there.
 
 | Milestone | Status |
 | --- | --- |
-| M1 | implemented |
-| M2 | implemented |
-| M19 | pending |
+| M1 | accepted |
+| M2 | accepted |
+| M19 | implemented |
 | M3 | pending |
 | M4 | pending |
 | M5 | pending |

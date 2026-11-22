@@ -74,4 +74,17 @@ export const CAPTURE_THEMES: Readonly<Record<CaptureTheme,
 
 ## Progress
 
-Pending.
+Implemented. Added the 2D raster planner and the two canvas palettes to the
+core barrel. The fit rule rounds down another thousandth when whole-pixel
+rounding would exceed the box or area bound. A fit that cannot meet its
+bound at 0.01 fails with the same option guidance as an oversized raster.
+These boundary cases preserve the documented default size and token limits.
+Removed the two scratch mise symlinks identified by CAP-M2-05 before
+verification. The existing desktop token test is unchanged.
+
+All three milestone commands passed. The full Bun run passed with 4,523
+tests and 77 skips across 728 files after the CAD picking deadline passed
+in isolation. Workspace Rust check, desktop format check and clippy
+passed. The optional Rust test runs hit the worktree-only write guard in
+unchanged macOS Foundation atomic-write tests. Logs are in
+`tmp/capture/m19/`.
