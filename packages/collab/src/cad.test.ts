@@ -19,7 +19,13 @@ import {
   WIRE,
   Wire,
 } from "./binding-test-helpers.ts";
-import { ELEMENTS_KEY, elementToY, PAGES_KEY, ydocToIr } from "./ydoc.ts";
+import {
+  ELEMENTS_KEY,
+  elementToY,
+  PAGES_KEY,
+  pageToY,
+  ydocToIr,
+} from "./ydoc.ts";
 
 const model = {
   id: "valve",
@@ -213,17 +219,22 @@ function setKind(doc: Y.Doc, id: string, kind: Page["kind"]): void {
   page.set("kind", kind);
 }
 
-function expectLegacyRepair(
-  edit: (doc: Y.Doc) => void,
-  expectedPages: readonly Page[],
-  expectedElements: readonly Element[],
-): void {
+function legacyUpdate(edit: (doc: Y.Doc) => void): Uint8Array {
   const legacy = new Y.Doc();
   Y.applyUpdate(legacy, Y.encodeStateAsUpdate(a.doc));
   const clock = Y.encodeStateVector(legacy);
   legacy.transact(() => edit(legacy));
   const update = Y.encodeStateAsUpdate(legacy, clock);
   legacy.destroy();
+  return update;
+}
+
+function expectLegacyRepair(
+  edit: (doc: Y.Doc) => void,
+  expectedPages: readonly Page[],
+  expectedElements: readonly Element[],
+): void {
+  const update = legacyUpdate(edit);
 
   // Each peer sees only the legacy transaction before producing its repair.
   // Delay both repairs on the wire until both peers have published one.
@@ -274,6 +285,78 @@ test("independent repairs restore the kind of an old client's mislabeled CAD pag
     (doc) => setKind(doc, model.id, "freeform"),
     input.pages,
     input.elements,
+  );
+});
+
+test("remote apply and attach converge when the recovery page itself needs repair", () => {
+  const occupied: Page = {
+    id: "valve-shapes",
+    kind: "freeform",
+    name: "Spare rim",
+    order: "I",
+  };
+  const spareSketch = { ...base, id: "spare-rim-profile", page: occupied.id };
+  const update = legacyUpdate((doc) => {
+    doc.getMap(PAGES_KEY).set(occupied.id, pageToY(occupied));
+    elementMap(doc).set(spareSketch.id, elementToY(spareSketch));
+    elementMap(doc).set(shape.id, elementToY(shape));
+  });
+
+  // The second peer opens the unresolved room before receiving the first
+  // peer's repair, so attach has to reconcile the same legacy state itself.
+  b.binding.detach();
+  Y.applyUpdate(b.doc, update, WIRE);
+  expect(() => Y.applyUpdate(a.doc, update, WIRE)).not.toThrow();
+  expect(() => b.binding.attach()).not.toThrow();
+  converge();
+
+  const destination = `${occupied.id}-2`;
+  expect(a.editor.store.getPage(occupied.id)).toEqual({
+    ...occupied,
+    kind: "cad3d",
+  });
+  expect(a.editor.store.getPage(destination)?.kind).toBe("freeform");
+  expect(a.editor.store.size).toBe(input.elements.length + 2);
+  for (const record of input.elements)
+    expect(elementIn(a, record.id)).toEqual(record);
+  expect(elementIn(a, spareSketch.id)).toEqual(spareSketch);
+  expect(elementIn(a, shape.id)).toEqual({ ...shape, page: destination });
+  for (const side of [a, b]) {
+    expect(side.editor.canUndo()).toBe(false);
+    expect(side.binding.canUndo()).toBe(false);
+  }
+});
+
+test("independent repairs reconcile derived text and CAD content in one update", () => {
+  const recovery = {
+    id: "valve-shapes",
+    kind: "freeform",
+    name: "Valve shapes",
+    order: "I",
+  } satisfies Page;
+  const note: Element = {
+    ...drawingShape,
+    id: "seat-note",
+    type: "text.note",
+    semantic: { text: "Seat" },
+    visual: {
+      width: 1,
+      height: 1,
+      textResize: "auto-width",
+      style: { fontSize: 20, lineHeight: 1.5 },
+    },
+  };
+  expectLegacyRepair(
+    (doc) => {
+      elementMap(doc).set(shape.id, elementToY(shape));
+      elementMap(doc).set(note.id, elementToY(note));
+    },
+    [model, recovery, drawing],
+    [
+      ...input.elements,
+      { ...shape, page: recovery.id },
+      { ...note, visual: { ...note.visual, width: 60, height: 42 } },
+    ],
   );
 });
 

@@ -181,6 +181,73 @@ test("uses a deterministic alternate when an existing recovery page refuses the 
   expect(store.getPage(`${id}-2`)?.kind).toBe("freeform");
 });
 
+test.each(["8", "B"])(
+  "moves shapes away from a recovery page restored to CAD at order %s",
+  (order) => {
+    const id = recoveredShapesPageId(cadPage.id);
+    const occupied: Page = { ...drawing, id, order };
+    const recoveredSketch = { ...sketch, page: id };
+    const destination = `${id}-2`;
+    const store = repair(
+      [cadPage, occupied, drawing],
+      [recoveredSketch, box],
+      [recoveredSketch, { ...box, page: destination }],
+    );
+    expect(store.getPage(id)).toEqual({ ...occupied, kind: "cad3d" });
+    expect(store.getPage(destination)?.kind).toBe("freeform");
+  },
+);
+
+test("reuses a CAD recovery page after restoring its kind", () => {
+  const id = recoveredCadPageId(cadPage.id);
+  const occupied: Page = { ...drawing, id, order: "B" };
+  const recoveredSketch = { ...sketch, id: "spare-profile", page: id };
+  const store = repair(
+    [mislabeled, occupied],
+    [sketch, box, recoveredSketch],
+    [{ ...sketch, page: id }, box, recoveredSketch],
+  );
+  expect(store.listPages()).toEqual([
+    mislabeled,
+    { ...occupied, kind: "cad3d" },
+  ]);
+});
+
+test("reconciles auto-sized text and CAD page content without undo history", () => {
+  const note = element({
+    id: "size-note",
+    page: cadPage.id,
+    type: "text.note",
+    semantic: { text: "Rim" },
+    visual: {
+      width: 1,
+      height: 1,
+      textResize: "auto-width",
+      style: { fontSize: 20, lineHeight: 1.5 },
+    },
+  });
+  const editor = makeEditor({
+    document: document([sketch, circle, note], [cadPage, drawing]),
+  });
+
+  editor.reconcileDerivedState();
+
+  expect(editor.store.size).toBe(3);
+  expect(editor.store.get(sketch.id)).toEqual(sketch);
+  expect(editor.store.get(circle.id)).toEqual(circle);
+  expect(editor.store.get(note.id)).toEqual({
+    ...note,
+    page: recoveredShapesPageId(cadPage.id),
+    visual: { ...note.visual, width: 49, height: 42 },
+  });
+  expect(
+    validateDocument(editor.getSnapshot()).filter(
+      ({ severity }) => severity === "error",
+    ),
+  ).toEqual([]);
+  expect(editor.canUndo()).toBe(false);
+});
+
 test("a relocation missing a matching create fails without changing the store", () => {
   const store = new Store(document([box, group, comment], [cadPage, drawing]));
   const before = store.getSnapshot();

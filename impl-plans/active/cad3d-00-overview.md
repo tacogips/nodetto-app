@@ -635,16 +635,27 @@ repairs of the same legacy edit and the sketch-delete race. In that race,
 the extrusion keeps its concurrently edited distance and reports
 `cad.reference.missing` after its sketch reference is detached.
 
-M15 deviations: the command layer applies repair delete/create pairs as
-page-only updates. This preserves references during the move and lets
-the existing Yjs differ publish only the changed page field. Legacy or tied
-page order keys use the existing deterministic normalization before inserting
-a recovery tab. If the standard recovery ID belongs to a page of a different
-kind, the repair picks the first compatible or available numbered suffix.
+M15 deviations: `packages/core/src/commands.ts` is outside the M15
+writePaths. It applies marked repair delete/create pairs as page-only
+updates, preserving references and concurrent field edits. The existing Yjs
+differ publishes only the changed page field. Marked commands stay in
+memory and out of undo history. Legacy or tied page order keys use the
+existing deterministic normalization before inserting a recovery tab. The
+repair applies kind restores before choosing relocation destinations. If the
+standard recovery ID still belongs to a page of a different kind after the
+restores, the repair picks the first compatible or available numbered suffix.
+M18 should update design section 4 to describe the page-only move, which
+preserves references without a semantic restore and keeps concurrent edits
+to other element fields.
 
-The three milestone checks, repository TypeScript lint and typecheck, and
-the core CAD and command regression suite passed. Verification logs are
-under `tmp/cad3d/m15/`.
+M15 review corrections cover both tab orders of a recovery page that also
+needs a kind restore, remote apply and attach on the same legacy state, and
+reconciliation of derived text sizing alongside a CAD content repair. All
+three M15 checks passed with 171, 12, and 11 tests, and repository
+TypeScript lint and typecheck passed. The full repository Bun suite passed
+4,434 tests with 74 skipped. Both new derived reconciliation tests fail
+when the repair append is removed in memory. Logs are under
+`tmp/cad3d/m15/rework/`. The milestone is implemented and ready for re-review.
 
 ## Completion
 

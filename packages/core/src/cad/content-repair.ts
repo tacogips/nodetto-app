@@ -25,7 +25,6 @@ export function planContentRepair(
   store: Pick<Store, "listPages" | "listElements">,
 ): Command[] {
   const pages = [...store.listPages()].sort(comparePageOrder);
-  const pagesById = new Map(pages.map((page) => [page.id, page]));
   const contents = new Map<PageId, { cad: Element[]; shapes: Element[] }>();
   for (const element of store.listElements()) {
     const cad = isCadTypeName(element.type);
@@ -39,6 +38,25 @@ export function planContentRepair(
   }
 
   const commands: Command[] = [];
+  // A recovery page can itself need repair. Restore kinds before any move
+  // uses an existing page as a destination.
+  for (const [index, page] of pages.entries()) {
+    const content = contents.get(page.id);
+    if (
+      page.kind === CAD_PAGE_KIND ||
+      !content?.cad.length ||
+      content.shapes.length
+    )
+      continue;
+    pages[index] = { ...page, kind: CAD_PAGE_KIND };
+    commands.push({
+      type: "updatePage",
+      id: page.id,
+      page: { kind: CAD_PAGE_KIND },
+    });
+  }
+
+  const pagesById = new Map(pages.map((page) => [page.id, page]));
   const orders = new Map(pages.map((page) => [page.id, page.order]));
   let ordersReady = false;
   const midpoint = () => 0.5;
@@ -49,14 +67,6 @@ export function planContentRepair(
     const isCadPage = page.kind === CAD_PAGE_KIND;
     const moved = isCadPage ? content.shapes : content.cad;
     if (!moved.length) continue;
-    if (!isCadPage && !content.shapes.length) {
-      commands.push({
-        type: "updatePage",
-        id: page.id,
-        page: { kind: CAD_PAGE_KIND },
-      });
-      continue;
-    }
 
     const preferredId = isCadPage
       ? recoveredShapesPageId(page.id)

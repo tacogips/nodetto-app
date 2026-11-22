@@ -48,7 +48,11 @@ import {
 import type { Store } from "./store.ts";
 import { compareFractional, isFractionalKey } from "./fractional.ts";
 
-/** Internal marker for a delete immediately followed by same-id relocations. */
+/**
+ * Internal marker for a delete immediately followed by same-id relocations.
+ * Keep marked commands in memory and out of history. Serialization drops the
+ * marker, and applyCommands' undo list is inapplicable to a repair batch.
+ */
 const RELOCATE_ELEMENTS = Symbol("relocate-elements");
 
 function validPageRouting(value: unknown): boolean {
