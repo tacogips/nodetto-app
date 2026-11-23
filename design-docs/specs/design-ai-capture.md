@@ -1,10 +1,11 @@
 # AI capture: PNG and JPG pictures of any page, with 3D CAD camera and interference
 
-Status: design revision 4, base commit `ebcac57`, branch `feat/ai-capture`
+Status: design revision 5, base commit `ebcac57`, branch `feat/ai-capture`
 (revision 4 checked against `be8fa5d`; amended after `e883b4b` for the
-remaining M23 and M16, CAP-R4-07 to CAP-R4-10). Section 18 lists what revisions 2,
-3 and 4 changed and why; section 8.5 gives the completion order of the
-remaining milestones.
+remaining M23 and M16, CAP-R4-07 to CAP-R4-10; revision 5 checked against
+the M23 checkpoint `e43016d`, CAP-R5-01 to CAP-R5-04). Section 18 lists what
+revisions 2 to 5 changed and why; section 8.5 gives the completion order of
+the remaining milestones.
 Implementation plan: `impl-plans/active/capture-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[S-n]` are external sources listed in section 17. Measurements
@@ -655,7 +656,13 @@ the contract between the crate and `packages/core/src/capture/report.ts`
 (revision 4 fixes them as written by `be8fa5d`); the picture-pass state
 `absent` exists only before the census of section 6.7 resolves it (until
 M23 wires the census, the text prints it as `[not in the picture]`, the
-M9 note).
+M9 note). Once M23 wires the census, no reported body has the state
+`absent`: the census turns every picture-absent solid body into `outside`
+(the lattice finds material at the end), `empty` (none at the end) or
+`unknown` (census budget or body limit exhausted), and an open-source
+body that is on no sample ray is `outside` from the picture alone
+(CAP-R5-01). `BodyState::Absent` stays an internal picture-pass value;
+the wire names and the parser do not change.
 
 ### 6.4 Ray intervals
 
@@ -1119,7 +1126,7 @@ M22 and M23 (21 is skipped so it is not confused with cad3d M21).
 | Wave 2 | M11 meshes | `mesh.rs`, `tool_view.rs` (mesh arm), `scene.ts` and test (decoder option of `buildCadCaptureModel`), `cad-request.ts` and test (forward `decodeMesh` to the model builder; nothing else), `lattice.rs` and `interference.rs` (tool-bounds call sites only, CAP-R4-05) | M10, M20, after M17 and M18 |
 | Wave 2 | M12 tiles | `tiles.rs` (lists, `work`, `WORK_LIMIT`) | M10 |
 | Wave 2 | M14 desktop backend | the M14 files plus `apps/desktop/src/App.tsx` (the M15 wiring) | M15, M20, M22, crate public API |
-| Wiring | M23 | crate `lib.rs`, `raster.rs`, `shade.rs`, `report.rs`; `tool_view.rs` (picture-family constructor and facet dispatch); `mesh.rs` (additive facet-normal seam only, CAP-R4-06); `tiles.rs` (admission before allocation, tile-major layout, per-tile body accessor; public `build`, `steps`, `work` and the M12 unit tests unchanged, CAP-R4-08); `tests/render.rs` (the digest constant and the superseded assertions named below, nothing else); new `tests/overlay.rs`, `census.rs`, `mesh.rs`, `scale.rs`; `capture-command.ts`, `capture-cad.ts` and tests; `__fixtures__/capture-plate-default.ncs1`; `native-parity/capture.test.ts`; `apps/desktop/src/shell/export-handlers.ts` (the optional `interference` option of `captureCadImage` only, CAP-R4-07); `apps/desktop/src/shell/export-handlers.test.ts` (new cases only: fixture equality, mesh-only parity, options 0 and 3); evidence root `tmp/capture` | M17, M18, M11, M12, M14, M20, M22 |
+| Wiring | M23 | crate `lib.rs`, `raster.rs`, `shade.rs`, `report.rs`; `tool_view.rs` (picture-family constructor and facet dispatch); `mesh.rs` (additive facet-normal seam only, CAP-R4-06); `tiles.rs` (admission before allocation, tile-major layout, per-tile body accessor; public `build`, `steps`, `work` and the M12 unit tests unchanged, CAP-R4-08); `tests/render.rs` (the digest constant and the superseded assertions named below, nothing else); `tests/overlay.rs`, `census.rs`, `mesh.rs`, `scale.rs` and additive helpers in `tests/support/mod.rs`; `capture-command.ts`, `capture-cad.ts` and tests; `__fixtures__/capture-plate-default.ncs1`, new `__fixtures__/capture-plate-no-interference.ncs1` and `packages/core/src/capture/cad-request.test.ts` (fixture expectations only, CAP-R5-02); `native-parity/capture.test.ts`; `apps/desktop/src/shell/export-handlers.ts` (the optional `interference` option of `captureCadImage` only, CAP-R4-07); `apps/desktop/src/shell/export-handlers.test.ts` (new cases only: fixture equality, mesh-only parity, options 0 and 3); evidence root `tmp/capture` | M17, M18, M11, M12, M14, M20, M22 |
 | Closing | M16 | docs, design measured values, progress table; evidence root `tmp` (its gates run every repository test, and existing tests write `tmp/capture`, `tmp/cad3d`) | M23 |
 
 Contracts that make the waves possible:
@@ -1185,6 +1192,34 @@ Contracts that make the waves possible:
   callback type stays assignable.
 - The picture ignores the draw bit until M23 wires the overlay, so no
   pixel digest changes before M23.
+- Option bits and fixtures after M23 (CAP-R5-02, ratifying the session 883
+  amendment). In the crate the two bits of 6.3 act separately: the draw
+  bit alone controls marking and hatching; the analyse bit alone controls
+  `analysis`, `picture_only` and `add_view_pairs`, and report pairs exist
+  only when it is set. A draw-only scene (options 2) is hatched, reports
+  `analysis: None` and no pairs, and its picture equals the same scene with
+  both bits set (`tests/interference.rs:217-241`, unedited). The core never
+  writes options 2 (the draw-bit rule above), so the promise of 6.6 that
+  no stripe exists without a text line holds for every scene a host
+  produces. The committed `capture-plate-default.ncs1` holds the options 3
+  bytes of `prepareCadCapture` with `DEFAULT_CAD_INTERFERENCE`, which
+  `apps/cli/native/src/engine_tests.rs:369-405` compares with the CLI
+  default unedited. The options 0 bytes (no or `null` interference) are
+  pinned by the new `capture-plate-no-interference.ncs1`, a byte copy of the
+  pre-M23 fixture, which the M20 test in `cad-request.test.ts` uses for its
+  `run()`, `run(null)` and decoder-only equalities, plus one new equality of
+  `run(DEFAULT_CAD_INTERFERENCE)` with the default fixture. No assertion is
+  weakened.
+- One wiring plan (CAP-R5-04). At `e43016d` the CLI registration,
+  printing, exit codes, desktop option and both fixtures are present
+  (their test inventory is still checked against the M23 plan); the main
+  remaining work is in `crates/capture` (admission and tile-major lists, the
+  picture pass, liveness spans, scan allowance, reference mix and hatch)
+  and the tests that pin it, with native parity on top of both. The crate
+  work all meets in `raster.rs`, and the native parity test needs the
+  crate and the CLI together, so no part is independent. M23 stays one plan,
+  followed by M16; its plan text refers to this section instead of
+  restating it.
 - Approximate pairs. The public `approximate` of a pair is the wire
   pair's `capped`, in text (`, approximate`) and in JSON alike;
   `uncheckedCount` stays the exact total next to the bounded `unchecked`
@@ -1198,7 +1233,8 @@ Contracts that make the waves possible:
   the M8 placeholders that M11 and M18 replace: line 407 (the picture
   equals the picture without the reference prism and the open triangle)
   and lines 410-411 (both bodies `Absent`). M23 is authorised to change
-  exactly those three assertions, and no others, in the commit that wires
+  exactly those three assertions, and otherwise only the one of
+  CAP-R5-01 below, in the commit that wires
   reference styling and the census. The commit message states the old and
   new expectations. The replacements must be at least as specific: a
   sample covered only by the reference prism equals the 45% mix of the two
@@ -1209,7 +1245,39 @@ Contracts that make the waves possible:
   `tests/overlay.rs`: a scene with the draw bit set and no interfering pair
   renders the same as with the bit clear. The cross-worker and
   encoded-image determinism tests of `render.rs` stay unchanged. The
-  digest constant changes only as the M17 rule allows.
+  digest constant changes only under the confirmation rule below.
+- Second superseded assertion (CAP-R5-01).
+  `nearest_face_wins_and_hidden_is_distinct_from_absent`
+  (`crates/capture/tests/render.rs:162-178`) expects the last two bodies
+  `[.., Absent, Absent]`, an M8 placeholder for the same reason as above:
+  `absent` is a pre-census value (6.3) and section 6.7 lists only
+  `drawn`, `hidden`, `outside`, `empty` and `unknown` as reported states.
+  The wired census returns `[.., Outside, Empty]`, which is right, so the
+  test changes and the code does not. Body 5 (a cube at x = 600 mm, out of
+  view, solid at the end) is `outside` with `emptiedByStep` -1; body 6
+  (union of the visible block, then an intersection with that disjoint
+  cube) is `empty` with `emptiedByStep` 1. M23 replaces only that
+  `assert_eq!` with the six states `[Drawn, Drawn, Drawn, Hidden, Outside,
+  Empty]` plus those two `emptied_by_step` values, keeps the test name, the
+  three-thread render and the shading assertions after it, and states the
+  old and new expectations in the commit message.
+- Digest confirmation rule (CAP-R5-03). The digest test renders
+  `crates/capture/tests/fixtures/plate-iso.ncs1`: 7 tools, 3 bodies
+  (Plate, Block, Puck), no reference and no mesh body, options 3 and
+  budget 24, so the M23 hatch changes its pixels and the old constant
+  `0x29c6_4b3e_156d_0941` must go. It is replaced only after these
+  assertions, added by M23 to `tests/overlay.rs`, pass on the same tree:
+  (1) the fixture with the draw bit cleared renders to the old digest
+  `0x29c6_4b3e_156d_0941` (`support::digest`), so the tile-major layout,
+  the `tool_view` picture path, the census and the reference mix changed no
+  pixel of a scene without reference or mesh bodies; (2) the pixels that
+  differ between the bit-set and bit-clear renders are not empty, and each
+  lies inside the pixel projection of the box of a reported pair widened by
+  2 pixels (outline and 2 x 2 downsampling); (3) the differing pixels include
+  the interference colour and the body colour of the theme (the two hatch
+  colours). The new constant is the value the test prints; the commit
+  message states old and new values. If (1) fails, the picture pass is
+  wrong and the constant is not touched.
 - M23 acceptance additions (CAP-R4-08, CAP-R4-09, CAP-R4-10). These come on top of
   the M23 plan's tests, and no existing assertion or deadline changes.
   - `tests/mesh.rs`:
@@ -1647,7 +1715,7 @@ watcher (`docs/cli.md:201-203`).
 - [S-13] IJG licence text:
   https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/main/README.ijg
 
-## 18. Changes in revisions 2, 3 and 4
+## 18. Changes in revisions 2 to 5
 
 | Finding | Change | Sections |
 | --- | --- | --- |
@@ -1677,3 +1745,7 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R4-08 (revision 4, M23; ownership amendment of the accepted M12 `tiles.rs`) | The 10.2 promise that memory and work are bounded did not hold for the M12 tile lists, for three reasons. (1) `TileLists::build` allocates every list entry before `work` can refuse the scene: about 737 million entries for 20,000 intersection steps at 2048 x 2048 with supersample 3. (2) It keeps a dense offsets array per body: 5.9 GB for 20,000 one-tile bodies whose work, 20,480,000, is admitted. (3) The picture visits every body on every sample, a cost `work` does not count. M23 now owns `tiles.rs` for: admission before allocation (exact `work`, plus an entry limit of 4,194,304), a tile-major layout with no per-body dense array, and a per-tile body accessor. The picture visits only listed bodies. Public `build`, `steps`, `work`, their results and the M12 unit tests do not change | 10.2, 8.5 |
 | CAP-R4-09 (revision 4, M23) | Rules the wiring needs were open or contradictory. (a) The census budget was "the size of the analysis budget", which is 0 when interference is off. `--no-interference` would then turn every suspect body into `unknown` and drop the `cad.result.empty (sampled)` error that section 12 promises unconditionally. The census now uses the default 24 million rays in that case. (b) The `e883b4b` picture classified a body as open if any step used an open mesh, while the analysis used the first step. A solid with a later open operand lost its solid pixels. An open source mesh with a later cut became a census subject and could get a false sampled-empty error. One first-tool classification now drives picture, report, census and analysis. A later open operand follows the existing empty-operand semantics of the lattice (union and difference unchanged, intersection empties). Open-source bodies stay out of the census through the picture record, so `census.rs` and `lattice.rs` are not edited. (c) The closure classification ran inside the sample loop. It now runs once per tool in picture setup | 6.7, 8.5 |
 | CAP-R4-10 (revision 4, M23) | Two picture costs were outside both admission limits. (1) A listed step marked liveness up to the next listed step on every sample (`raster.rs:162-167`, `census.rs:21-25`). One visible prism followed by a million off-view differences writes about 1.9e13 flags at 2048 x 2048 with supersample 3. (2) Every `combine` call rescans the accumulated boundaries (`interval.rs:17-48`), so 20,000 disjoint unions at 64 x 64 read about 1.6e12 boundaries. Liveness is now recorded as the greatest end per starting step and turned into the unchanged `Liveness` record once per body. Picture boundary reads are charged before each combine call and checked inside the fold, in chunks of 2^20, against a deterministic allowance of 16,000,000,000. A fixed refusal message is used, and at most `allowance + workers x 2^20` reads run, whatever the row cost (a check only at row end would let one admitted row run about 2.9e11 reads first). Only `raster.rs` changes. `census.rs`, `lattice.rs`, `interference.rs`, `interval.rs`, the work estimate, the entry limit, the scene bytes and the Boolean results of admitted scenes do not | 10.2, 8.5 |
+| CAP-R5-01 (revision 5, M23 checkpoint `e43016d`) | `render.rs:162-178` expected `[.., Absent, Absent]` while the wired census returns `[.., Outside, Empty]`. 6.3 and 6.7 already say `absent` is a pre-census value and list only `drawn`, `hidden`, `outside`, `empty`, `unknown` as reported states, so the census is right and the assertion is a second M8 placeholder. The narrow 8.5 authorisation is extended to that one `assert_eq!`, replaced by the six final states plus `emptiedByStep` -1 (outside body) and 1 (emptied body). No code changes for it | 6.3, 8.5 |
+| CAP-R5-02 (revision 5) | The session 883 amendment is ratified in the design: the crate's draw and analyse bits act separately (options 2 is hatched, reports no pairs, and is never written by the core); the options 0 bytes move to the new `capture-plate-no-interference.ncs1`, `capture-plate-default.ncs1` holds the options 3 bytes, and M23 owns the fixture expectations of `cad-request.test.ts`. `engine_tests.rs` and `tests/interference.rs` stay unedited | 6.3, 6.6, 8.5 |
+| CAP-R5-03 (revision 5) | "The digest changes only as the M17 rule allows" named no rule. The digest of `plate-iso.ncs1` (options 3) is replaced only after `tests/overlay.rs` shows that the bit-clear render keeps the old digest `0x29c6_4b3e_156d_0941`, that every changed pixel lies in a reported pair's projected box widened by 2 pixels, and that both hatch colours appear | 8.5 |
+| CAP-R5-04 (revision 5) | The remaining M23 work all meets in `raster.rs`, and native parity needs both crate and CLI, so M23 is not split; one wiring plan, then M16 | 8.5 |

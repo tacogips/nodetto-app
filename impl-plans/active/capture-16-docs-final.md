@@ -1,13 +1,14 @@
-# M16 capture-16-docs-final (revision 5, session 883)
+# M16 capture-16-docs-final (revision 6, session 884)
 
-- Stage: wave 2 of dispatch `capture-s883`. dependsOn: capture-23-wiring
+- Stage: wave 2 of dispatch `capture-s884`. dependsOn: capture-23-wiring
   (which closes every other milestone).
 - Artifact roots: `target` and `tmp` (design 8.5: the gates run every
   repository test, and existing tests write `tmp/capture`, `tmp/cad3d`).
-  `impl-plans/active/capture-s883-dispatch.json` is owned only nominally,
+  `impl-plans/active/capture-s884-dispatch.json` is owned only nominally,
   so that plan-author amendments have an owner; the worker must not edit
   it.
-- Design: sections 2.2, 4, 8.5 ("M16 gates"), 9, 10.2, 14, 15.
+- Design (revision 5): sections 2.2, 4, 8.5 ("M16 gates"), 9, 10.2, 14,
+  15, and section 18.
 - writePaths: `docs/capture.md` (new), `docs/cli.md` (one section
   `## Capturing page images` appended at the end, and one `capture` line
   above the three `export ... --format png` lines of the AI section near
@@ -16,7 +17,7 @@
   in section 10, a short "Deviations" list),
   `impl-plans/active/capture-00-overview.md` (progress table only),
   `impl-plans/active/capture-16-docs-final.md`, `impl-plans/README.md`
-  (index entry), `impl-plans/active/capture-s883-dispatch.json` (nominal
+  (index entry), `impl-plans/active/capture-s884-dispatch.json` (nominal
   only), `tmp`, `target`. Gate logs go to `tmp/capture/m16/`.
 - Pre-authorised: none. `README.md` is not edited (cad3d M18 edits it).
   Plans are not moved; archiving is the workflow's job.
@@ -64,9 +65,11 @@ behaviour. Do not describe cad3d M18 or M21 features beyond the one
 - Design: status `implemented (slice)`. Add a "Measured" table from
   `tmp/capture/m10r/` and `m23/` (`release.txt`, `native-parity.txt`,
   `timing.json`) and the earlier `m08/` and `m09/` logs, giving machine,
-  date, value and budget for each row. Add a short "Deviations" list that
-  points to the section 18 rows of revision 4, CAP-R4-01 to CAP-R4-10.
-  Change nothing else in the design.
+  date, value and budget for each row; every value is measured on this
+  machine from those logs, never copied from the design's spike tables.
+  Add a short "Deviations" list that points to the section 18 rows
+  CAP-R4-01 to CAP-R4-10 and CAP-R5-01 to CAP-R5-04. Change nothing else
+  in the design.
 - Overview progress table: set every row (M1 to M23, M16) to `accepted`
   only when all three gates below have passed. M10, M20, M22, M15, M17,
   M18, M11, M12 and M14 were accepted by per-plan review at `e883b4b`.
@@ -121,6 +124,8 @@ gate has a passing run, and a remaining failure is reported as a blocker.
 
 ## Progress
 
-Pending (revision 5). Workers append entries: date, command, exit status,
+Pending (revision 6). Read each owned file fresh before editing and
+record `git hash-object` before and after; a hash that differs from the
+last recorded value is drift: stop and record it. Workers append entries: date, command, exit status,
 full log path under `tmp/capture/m16/`, retries, and `git hash-object` of
 each owned file before and after.
