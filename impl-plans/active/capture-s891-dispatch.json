@@ -1,0 +1,138 @@
+{
+  "taskId": "capture-s891",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "44b0568c4a5602b53991271318ab550f9b280af6",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md"
+  ],
+  "evidenceRoot": "tmp/capture-s891",
+  "reviewContext": {
+    "issueReference": "No GitHub issue. opus-terra session 891, continuing session 889, milestone M16 on feat/ai-capture (impl-plans/active/capture-16-docs-final.md). Design revision 7, CAP-R7-01 to CAP-R7-06.",
+    "userProblem": "Finish the nodetto AI capture feature on feat/ai-capture. M16a is accepted (session 889). M16b budgets are committed at 44b0568, but verification 3 sent its test output to /dev/null, so its evidence log holds only exit=0. M16c has to copy the measured budgets into the docs, run the targeted gates and publish every milestone as accepted, while stating plainly that full repository verification is deferred and NOT yet run.",
+    "requiredOutcomes": [
+      "M16b repair: rerun repaired verification 3 once into a new complete log under target/capture-m16/ (1 pass, 0 fail, exit=0) and record it in the M16b Progress. Measurements, logs and the design 10.3 values stay unchanged.",
+      "M16c: docs/capture.md ## Measured budgets equals the design 10.3 table. Preliminary G1 to G3 pass. On the candidate, G1, G2 and G3F pass with new logs under target/capture-m16/gates/. The design header and the overview Progress mark every milestone accepted, with visible 'deferred and NOT yet run' text, and the Evidence roots row is exactly the CAP-R7-06 line.",
+      "Publication only by the workflow integration commit, after per-plan review approves the hashed candidate."
+    ],
+    "nonGoals": [
+      "Redoing accepted milestones M1-M15, M17-M20, M22, M23a-M23f or M16a.",
+      "Re-measuring budgets or changing any test, deadline, budget, fixture, help or source file.",
+      "mise run verify, browser/Chromium/Vite tests, the whole native parity suite, cargo test --workspace, cargo test -p nodetto-native (deferred and NOT yet run).",
+      "cad3d M21 and M18; cad3d design or plan edits; README.md, impl-plans/README.md, mise.toml edits; plan archiving.",
+      "Any write under the repository tmp/; any server, auth, secret or deployment content."
+    ],
+    "constraints": [
+      "Workers edit only their writePaths and only the Progress section of their own plan file. No git state changes (no commit, stash, branch or worktree); never push.",
+      "English only, no emojis; cargo with CARGO_TERM_QUIET=true and CARGO_TARGET_DIR=target/capture-m16.",
+      "artifactRoots exactly [\"target\"]; native-parity/capture.test.ts and mcp-stdio.test.ts are excluded and deferred.",
+      "Every gate attempt writes a new mktemp log, prints log=<path> and ends with the exit status of the whole gate (CAP-R7-05). No log is overwritten; target/capture-m16/gate-3.log stays as history.",
+      "CLI unit tests run with UPDATE_CAPTURE_FIXTURES=0; tracked fixtures unchanged.",
+      "Timing tests: up to three attempts, then the case alone; every attempt logged.",
+      "Read each owned file fresh before every edit and record git hash-object before and after it; drift is recorded and stops the work, never overwritten."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "CAP-R7-01: M16 reduced scope; targeted gates only; full verification deferred and NOT yet run.", "rationale": "Owner decision 2026-11-23."},
+      {"decision": "CAP-R7-04: M16 stays pending until its deliverables, gates and review complete; then every row accepted with the deferral sentence.", "rationale": "No acceptance claim before evidence."},
+      {"decision": "CAP-R7-05: new complete log per gate attempt, exit status written after all assertions.", "rationale": "Review findings M16B-01 and M16C-02."},
+      {"decision": "CAP-R7-06: publish only the reviewed, hashed candidate via the integration commit. A preliminary failure restores nothing; a candidate failure or rejection restores from that attempt's own snapshot. Exact status check.", "rationale": "Review finding M16C-01 (rounds 1 and 2)."}
+    ],
+    "intentionalTradeoffs": [
+      "Full repository verification is deferred and NOT yet run; it runs after the merge with feat/cad3d-pages, outside this workflow.",
+      "status-check.sh lives under target/ (artifact root). Its source of truth is the fenced block in capture-16c-finalize.md, and the review checks that the two are byte-equal.",
+      "M16c depends on M16b only through acceptance order (CAP-R7-04 needs M16b accepted before M16 is marked); they share no file except the target artifact root, in disjoint subpaths."
+    ],
+    "supportedEdgeCases": [
+      "Timing test flake under machine load: up to three logged attempts, then the case alone, every attempt logged.",
+      "Preliminary gate failure: nothing is restored and both live hashes stay unchanged.",
+      "Candidate gate failure or review rejection: design and overview restored from that attempt's own mktemp snapshot with matching hashes; M16 stays pending.",
+      "Owned-file drift detected by git hash-object: recorded and work stops, never overwritten."
+    ],
+    "outOfScopeEdgeCases": [
+      "Failures only visible in mise run verify, browser tests, the whole native parity suite or after the merge with feat/cad3d-pages (deferred and NOT yet run).",
+      "Re-measuring budgets on another machine; tests that write under tmp/ (native-parity/capture.test.ts, mcp-stdio.test.ts are excluded and deferred)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/capture-00-overview.md",
+      "impl-plans/active/capture-16-docs-final.md",
+      "impl-plans/active/capture-16b-budgets.md",
+      "impl-plans/active/capture-16c-finalize.md",
+      "impl-plans/active/capture-s889-dispatch.json",
+      "docs/capture.md"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "capture-16a-help-docs", "planPath": "impl-plans/active/capture-16a-help-docs.md", "commit": "44b0568c4a5602b53991271318ab550f9b280af6", "provides": "M16a help exit-code and desktop lines, docs/capture.md, docs/cli.md section, capture-docs.test.ts (accepted in session 889)."}
+  ],
+  "acceptedDependenciesNote": "M1-M15, M17-M20 and M22 are accepted in capture-s885-dispatch.json and M23a-M23f in capture-s889-dispatch.json; they are not repeated here. capture-s889-dispatch.json stays unchanged as history.",
+  "waves": [
+    ["capture-16b-budgets"],
+    ["capture-16c-finalize"]
+  ],
+  "plans": [
+    {
+      "planId": "capture-16b-budgets",
+      "planPath": "impl-plans/active/capture-16b-budgets.md",
+      "progressPath": "impl-plans/active/capture-16b-budgets.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/capture-16b-budgets.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "impl-plans/active/capture-16b-budgets.md", "intendedEdit": "Append to Progress only: date, repaired verification 3 command, printed log path, exit status, pass/fail counts, attempts."},
+        {"path": "target", "intendedEdit": "New logs target/capture-m16/gate-3-review.* only; existing measurement logs, images and gate-3.log are untouched."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Repaired verification 3 exits 0 and its printed log under target/capture-m16/gate-3-review.* contains the selected Bun test output with 1 pass and 0 fail, and ends with exit=0.",
+        "M16b Progress records that command, log path, exit status, counts and attempts; target/capture-m16/gate-3.log, crate-release.log, bun-scene.log, native-*.txt, machine.txt and the design 10.3 table are unchanged.",
+        "No source, test, fixture, deadline, budget or design edit; nothing written under tmp/."
+      ],
+      "verification": [
+        "sh -c 'd=target/capture-m16; mkdir -p \"$d\" || exit 1; log=$(mktemp \"$d/gate-3-review.XXXXXX\") || exit 1; echo \"log=$log\"; (bun test packages/core/src/capture/scene.test.ts -t \"builds 20,000 CAD elements in under 1,000 ms\" || exit 1; grep -Eq \"^ *1 pass$\" \"$log\" && grep -Eq \"^ *0 fail$\" \"$log\" || exit 1; for n in plate-png plate-jpg led-2d; do test \"$(grep -c \"^real \" \"$d/native-$n.txt\")\" -eq 3 || exit 1; done; test -s \"$d/machine.txt\" && git diff --check -- design-docs/specs/design-ai-capture.md && ! grep -q \"M16 fills the measured table here\" design-docs/specs/design-ai-capture.md) > \"$log\" 2>&1; s=$?; echo \"exit=$s\" >> \"$log\" || exit 1; exit $s'"
+      ]
+    },
+    {
+      "planId": "capture-16c-finalize",
+      "planPath": "impl-plans/active/capture-16c-finalize.md",
+      "progressPath": "impl-plans/active/capture-16c-finalize.md",
+      "wave": 2,
+      "dependsOn": ["capture-16b-budgets"],
+      "writePaths": [
+        "impl-plans/active/capture-16c-finalize.md",
+        "docs/capture.md",
+        "design-docs/specs/design-ai-capture.md",
+        "impl-plans/active/capture-00-overview.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "docs/capture.md", "intendedEdit": "Under ## Measured budgets only: replace the placeholder with the 10.3 machine line, the 10.3 table lines byte-for-byte and one method sentence; heading kept."},
+        {"path": "design-docs/specs/design-ai-capture.md", "intendedEdit": "Candidate phase only: replace the header Implementation status paragraph with the exact CAP-R7-04 sentence from the plan, keeping the deferral and Accepted-meaning sentences verbatim; no other line."},
+        {"path": "impl-plans/active/capture-00-overview.md", "intendedEdit": "Candidate phase only: all 27 Progress rows exactly accepted, one visible deferral paragraph under the table, Evidence roots row replaced by the exact CAP-R7-06 line; no other line."},
+        {"path": "impl-plans/active/capture-16c-finalize.md", "intendedEdit": "Progress section only (hashes, snapshot paths, every gate attempt, review decision)."},
+        {"path": "target", "intendedEdit": "target/capture-m16/gates/: status-check.sh copied verbatim from the plan, per-attempt mktemp logs, candidate-<n>.* snapshot directories; Cargo output in target/capture-m16."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "The '| ' lines of docs/capture.md ## Measured budgets are byte-equal to those of design 10.3 (G1 cmp) and the heading is unchanged.",
+        "Preliminary G1, G2, G3 and candidate G1, G2, G3F exit 0, each with its own new log under target/capture-m16/gates/ that shows a positive pass count, 0 failures and last line exit=0; apps/cli/src/__fixtures__ unchanged.",
+        "status-check.sh (byte-equal to the plan block) exits 0 on the candidate: header says 'implemented (slice); every milestone accepted' and 'deferred and NOT yet run' with no pending and no HTML comment; 27 Progress rows each exactly once and accepted; visible deferral prose after the table; Evidence roots row exactly '| Evidence roots | M23 `tmp/capture` and `target`; M16 `target` (CAP-R4-07, CAP-R7-01) |'.",
+        "Progress records the pre-phase hashes, the snapshot path and hashes per candidate attempt, the candidate hashes of docs/capture.md, the design and the overview, and every gate attempt. A preliminary failure leaves both live hashes unchanged; a candidate failure or rejection restores both records from that attempt's snapshot with matching hashes, and M16 stays pending.",
+        "The worker makes no commit; publication is the integration commit after review approval with the candidate hashes unchanged."
+      ],
+      "verification": [
+        "sh -c 'd=target/capture-m16/gates; mkdir -p \"$d\" || exit 1; log=$(mktemp \"$d/g1-help-docs.XXXXXX\") || exit 1; echo \"log=$log\"; (bun run typecheck && bunx biome check apps/cli/src/capture-help.ts apps/cli/src/capture-docs.test.ts && bun test apps/cli/src/capture-docs.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/table-docs.test.ts || exit 1; grep -Eq \"^ *[1-9][0-9]* pass$\" \"$log\" && grep -Eq \"^ *0 fail$\" \"$log\" || exit 1; awk \"/^### 10.3/{f=1;next} /^## /{f=0} f && /^\\\\| /\" design-docs/specs/design-ai-capture.md > \"$log.design\" && awk \"/^## Measured budgets\\$/{f=1;next} /^## /{f=0} f && /^\\\\| /\" docs/capture.md > \"$log.docs\" && test -s \"$log.design\" && cmp \"$log.design\" \"$log.docs\") > \"$log\" 2>&1; s=$?; echo \"exit=$s\" >> \"$log\" || exit 1; exit $s'",
+        "sh -c 'd=target/capture-m16/gates; mkdir -p \"$d\" || exit 1; log=$(mktemp \"$d/g2-crate.XXXXXX\") || exit 1; echo \"log=$log\"; (CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m16 cargo test -p nodetto-capture || exit 1; grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" \"$log\" && ! grep -q \"test result: FAILED\" \"$log\") > \"$log\" 2>&1; s=$?; echo \"exit=$s\" >> \"$log\" || exit 1; exit $s'",
+        "F=1 sh -c 'd=target/capture-m16/gates; mkdir -p \"$d\" || exit 1; log=$(mktemp \"$d/g3${F:+f}-cli-unit.XXXXXX\") || exit 1; echo \"log=$log\"; (UPDATE_CAPTURE_FIXTURES=0 bun test apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-io.test.ts apps/cli/src/capture-interference-options.test.ts apps/cli/src/mcp-image.test.ts || exit 1; grep -Eq \"^ *[1-9][0-9]* pass$\" \"$log\" && grep -Eq \"^ *0 fail$\" \"$log\" && git diff --exit-code -- apps/cli/src/__fixtures__ && git diff --check || exit 1; test -z \"${F:-}\" || sh target/capture-m16/gates/status-check.sh design-docs/specs/design-ai-capture.md impl-plans/active/capture-00-overview.md) > \"$log\" 2>&1; s=$?; echo \"exit=$s\" >> \"$log\" || exit 1; exit $s'"
+      ]
+    }
+  ]
+}

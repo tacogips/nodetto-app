@@ -6,7 +6,7 @@ remaining M23 and M16, CAP-R4-07 to CAP-R4-10; revision 5 checked against
 the M23 checkpoint `e43016d`, CAP-R5-01 to CAP-R5-04; revision 6 checked
 against the M23 checkpoint `94c780d`, CAP-R6-01 to CAP-R6-07, splits the
 remaining M23 work into sub-plans M23a to M23f; revision 7, session 889,
-checked against `ac31a91`, CAP-R7-01 to CAP-R7-04, reduces the closing
+checked against `ac31a91`, CAP-R7-01 to CAP-R7-06, reduces the closing
 milestone M16). Section 18 lists what revisions 2 to 7 changed and why;
 section 8.5 gives the completion order of the remaining milestones.
 
@@ -1663,6 +1663,54 @@ revision 4 rollout rules. It is a decision, not an open question.
   variant). Gates name test files explicitly; no gate runs a directory.
 - Artifacts: only under `target/` (`target/capture-m16/` for build output,
   measurement logs and measured images). Nothing is written under `tmp/`.
+- Gate evidence (revision 7, CAP-R7-05). Every gate attempt, whether first
+  run, retry, isolated comparison or final run, writes a new log file
+  (`mktemp` under `target/capture-m16/` for M16b, under
+  `target/capture-m16/gates/` for M16c). The wrapper prints the path. No
+  log is ever truncated or overwritten, and earlier logs, including the
+  session 889 `target/capture-m16/gate-3.log`, are kept as history. The
+  log holds both output streams of the test run and of every later
+  assertion. The last line is `exit=<status>`, where the status is that
+  of the whole gate after all assertions. If the log cannot be written,
+  the gate fails. A gate passes only if its own log shows a positive pass
+  count, zero failures and `exit=0`. No output is sent to `/dev/null`.
+- Publication (revision 7, CAP-R7-06). M16c works in four phases.
+  (1) Preliminary: copy the budget table into `docs/capture.md`, then run
+  G1 to G3 without any status edit. (2) Candidate: write the two status
+  edits of CAP-R7-04 (header paragraph; overview Progress section and
+  evidence-roots row) and record `git hash-object` of `docs/capture.md`,
+  the design and the overview as the candidate identity. Run final G1 to
+  G3 on that exact candidate. Final G3 also runs the status check below.
+  (3) Review: the independent per-plan review examines the same hashes.
+  (4) Publish: the workflow's integration step, the only actor that
+  changes git state, commits the candidate after the review approves it
+  and the files still match the recorded hashes. A worker never commits.
+  A preliminary gate failure is recorded as a blocker and nothing is
+  restored: no status edit exists yet, and the live hashes of the design
+  and the overview must equal those recorded at the start of phase 1.
+  Each candidate attempt first copies the design and the overview to its
+  own new `mktemp -d` directory, `target/capture-m16/gates/candidate-<n>.*`,
+  and records that path and the hashes. If a candidate gate fails or the
+  review rejects that candidate, the M16c worker copies both files back
+  from that attempt's directory only (a working-tree write only) and
+  checks the hashes recorded for that attempt. Both records then read
+  pending again. The failing log or the review decision is kept and
+  recorded as a blocker. If the integration step
+  cannot commit a reviewed candidate as is, the M16c plan records the
+  ownership amendment needed before dispatch, and M16 stays pending.
+  The status check fails unless all of the following hold:
+  - The header paragraph (from `Implementation status` to
+    `Implementation plan:`) contains `implemented (slice); every
+    milestone accepted` and `deferred and NOT yet run`. It contains
+    neither `pending` nor an HTML comment.
+  - The overview `## Progress` section contains no HTML comment and has
+    exactly 27 milestone rows: M1 to M15, M17 to M20, M22, M23a to M23f
+    and M16, each exactly once and each with status exactly `accepted`.
+  - The prose after the table in that section contains
+    `deferred and NOT yet run`.
+  - The single `Evidence roots` row is exactly ``| Evidence roots | M23
+    `tmp/capture` and `target`; M16 `target` (CAP-R4-07, CAP-R7-01) |``,
+    so M16 has `target` alone and the M23 allocation is unchanged.
 - `docs/capture.md` (new) covers, in the user's words: purpose and the
   one-line form; every option of the help usage block with its default;
   stdout and `--json` forms (4.1, 4.2, including `approximate`,
@@ -2124,3 +2172,5 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R7-02 (revision 7) | The help's exit-code line omitted exit 1 of 4.2; it now lists 0, 1 and 2 as 4.2 defines them. One help line points to the desktop Export dialog and `docs/capture.md`. Help text only; no option or behaviour changes | 4.4 |
 | CAP-R7-03 (revision 7) | Measured values come from logs M16 writes under `target/capture-m16/` with a recorded method (10.3): machine record, release crate timings, release native CLI timings and sizes, and the Bun 20,000-element scene build (`bun-scene.log`). Rows owned by the deferred native parity suite are not re-measured and may cite the earlier accepted logs, labelled as such | 10.3 |
 | CAP-R7-04 (revision 7) | Until M16 is complete, the header and the overview record M1 to M15, M17 to M20, M22 and M23a to M23f as accepted and M16 as pending. Only after the M16 deliverables, its three targeted gates and its per-plan review are complete does M16 mark every milestone row of the overview progress table `accepted`, M16 included, and change the header status to "implemented (slice); every milestone accepted". Both final records keep the sentence that full repository verification is deferred and NOT yet run. If a gate fails, M16 stays pending and the failure is reported as a blocker. The overview evidence-roots row for M16 changes from `tmp` and `target` to `target`. No Completed entry in `impl-plans/README.md`, because that index means "passed final verification" | header, 8.5, 15 |
+| CAP-R7-05 (revision 7, session 891 design review M16B-01, M16C-02) | Each gate attempt gets a new, complete log whose last line is the status of the whole gate after all of its assertions. Nothing is truncated or sent to `/dev/null`. The session 889 M16b verification 3 sent its test output to `/dev/null`, so `target/capture-m16/gate-3.log` holds only `exit=0`. That log stays as history, and the repaired check is rerun into a new log. Measurements and 10.3 values are unchanged | 8.5 |
+| CAP-R7-06 (revision 7, session 891 design review M16C-01) | The accepted status is published only by the integration commit, after final G1 to G3 and the per-plan review have passed on the exact candidate, identified by file hashes. A preliminary gate failure restores nothing, because no status edit exists yet. A failed candidate gate or a rejection puts both records back to pending, using only that candidate attempt's own snapshot (`target/capture-m16/gates/candidate-<n>.*`) and the hashes recorded for it. The status check asserts the required content of the owned sections (no HTML comments, deferral text in the prose after the Progress table, an exact Evidence roots row), not just a match anywhere in the file (review rounds 1 and 2 of M16C-01). This replaces the session 889 trade-off "16c marks M16 accepted before its own Step-6 review"; `capture-s889-dispatch.json` stays as history | 8.5 |

@@ -1,7 +1,9 @@
-# M16b capture-16b-budgets (session 889)
+# M16b capture-16b-budgets (session 889, repair in session 891)
 
-- Stage: wave 1 of dispatch `capture-s889`, parallel with M16a.
-  dependsOn: none.
+- Stage: wave 1 of dispatch `capture-s889`, parallel with M16a. Session
+  891: wave 1 of dispatch `capture-s891`, dependsOn none. The repair
+  writes only this plan (Progress) and `target/capture-m16/`. It does not
+  edit the design.
 - Design: `design-docs/specs/design-ai-capture.md` revision 7, sections
   10.2 (budgets), 10.3 (method, CAP-R7-03), 8.5 ("M16 reduced scope").
 - writePaths: `design-docs/specs/design-ai-capture.md` (section 10.3 table
@@ -86,6 +88,9 @@ is allowed). No edit of the design outside the 10.3 table placeholder.
 - Design 10.3 holds the filled table with method, machine line and log
   paths; no other design line changed (`git diff` shows only 10.3).
 - Nothing under `tmp/` is created or modified.
+- Session 891: repaired verification 3 has a new complete log under
+  `target/capture-m16/` that shows `1 pass`, `0 fail` and a last line
+  `exit=0`. That path is recorded in Progress (CAP-R7-05).
 
 ## Verification (each must exit 0 and run at least one test)
 
@@ -97,7 +102,14 @@ Step 3 native measurement command (run once, then retries per step 5):
 
 1. `sh -c 'mkdir -p target/capture-m16 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m16 cargo test -p nodetto-capture --release -- --nocapture --test-threads=1 > target/capture-m16/crate-release.log 2>&1; s=$?; echo "exit=$s" >> target/capture-m16/crate-release.log; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" target/capture-m16/crate-release.log && ! grep -Eq "test result: FAILED" target/capture-m16/crate-release.log'`
 2. `sh -c 'mkdir -p target/capture-m16 && bun test packages/core/src/capture/scene.test.ts -t "builds 20,000 CAD elements in under 1,000 ms" > target/capture-m16/bun-scene.log 2>&1; s=$?; echo "exit=$s" >> target/capture-m16/bun-scene.log; test $s -eq 0 && grep -Eq "^ *1 pass$" target/capture-m16/bun-scene.log && grep -q "CAD capture scene, 20,000 elements:" target/capture-m16/bun-scene.log'`
-3. `sh -c 'bun test packages/core/src/capture/scene.test.ts -t "builds 20,000 CAD elements in under 1,000 ms" > /dev/null 2>&1 && for n in plate-png plate-jpg led-2d; do test $(grep -c "^real" target/capture-m16/native-$n.txt) -eq 3 || exit 1; done && test -s target/capture-m16/machine.txt && git diff --check -- design-docs/specs/design-ai-capture.md && ! grep -q "M16 fills the measured table here" design-docs/specs/design-ai-capture.md'`
+3. (Repaired in session 891, design CAP-R7-05 and review M16B-01. Each
+   run writes a new log and prints its path.)
+   `sh -c 'd=target/capture-m16; mkdir -p "$d" || exit 1; log=$(mktemp "$d/gate-3-review.XXXXXX") || exit 1; echo "log=$log"; (bun test packages/core/src/capture/scene.test.ts -t "builds 20,000 CAD elements in under 1,000 ms" || exit 1; grep -Eq "^ *1 pass$" "$log" && grep -Eq "^ *0 fail$" "$log" || exit 1; for n in plate-png plate-jpg led-2d; do test "$(grep -c "^real " "$d/native-$n.txt")" -eq 3 || exit 1; done; test -s "$d/machine.txt" && git diff --check -- design-docs/specs/design-ai-capture.md && ! grep -q "M16 fills the measured table here" design-docs/specs/design-ai-capture.md) > "$log" 2>&1; s=$?; echo "exit=$s" >> "$log" || exit 1; exit $s'`
+
+Session 891 reruns command 3 only. Commands 1 and 2 and step 3 are the
+measurement runs behind section 10.3. They are not rerun, so their logs
+and `target/capture-m16/gate-3.log` (session 889, exit line only) stay
+as history. Any later rerun of any command needs a new log path.
 
 ## Progress
 
@@ -120,3 +132,14 @@ Design hash before: `4069e0f74444d9aa0b5dc4343627e013637b2c0d`; after:
   `target/capture-m16/design-edit-intent.txt` and `plan-edit-intent.txt`.
   No test, fixture, deadline, or budget was changed. Full repository
   verification remains deferred and NOT yet run, per CAP-R7-01.
+
+2026-11-23, session 891 design review M16B-01 (mid): `gate-3.log` holds
+only `exit=0`, because verification 3 sent its test output to
+`/dev/null`. Verification 3 is now repaired as CAP-R7-05 requires. The
+author could not run it in the design step, so it is pending. Next
+action, as the M16b repair task: run repaired verification 3 once (timing
+retries follow step 5, each with a new log), then append here the date,
+the command, the exit status, the printed log path, the pass and fail
+counts and the attempts. Keep every existing log and the 10.3 values. M16b
+stays unaccepted until that entry shows `exit=0` with `1 pass` and
+`0 fail` and the review approves.
