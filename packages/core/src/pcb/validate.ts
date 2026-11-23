@@ -1,3 +1,4 @@
+import { splitLines } from "./lines.ts";
 export interface FabricationOutline {
   readonly width: number;
   readonly height: number;
@@ -31,7 +32,7 @@ function lineErrors(text: string): { lines: string[]; errors: string[] } {
   const errors: string[] = [];
   if (text.includes("\r")) errors.push("file: carriage return is not allowed");
   if (!text.endsWith("\n")) errors.push("file: final newline is required");
-  const lines = text.split("\n");
+  const lines = splitLines(text);
   if (text.endsWith("\n")) lines.pop();
   for (const [index, line] of lines.entries()) {
     if (line === "")
@@ -398,7 +399,7 @@ function parseGerberGeometry(text: string): {
 } {
   const apertures = new Map<number, Aperture>();
   const operations: { line: number; code: number; at: Point }[] = [];
-  for (const [index, line] of text.split("\n").entries()) {
+  for (const [index, line] of splitLines(text).entries()) {
     const definition =
       /^%ADD(?<code>\d+)(?<template>C,\d+\.\d+|R,\d+\.\d+X\d+\.\d+)\*%$/.exec(
         line,

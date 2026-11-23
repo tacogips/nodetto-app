@@ -223,7 +223,7 @@ test("types and help advertise CAD authoring and check", () => {
     "Exit codes: 0 clean, 1 CAD errors, 2 usage",
     "cad.order.forward      A feature depends on a later feature.",
     "cad.profile.open       Profile edges do not form closed loops.",
-    "cad.mesh.invalid       An imported mesh has invalid fields.",
+    "cad.mesh.invalid       An imported mesh has invalid fields or data.",
   ])
     expect(help).toContain(text);
 });

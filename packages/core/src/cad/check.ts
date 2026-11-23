@@ -1,4 +1,5 @@
 import type { Element, ElementId, PageId } from "@nodetto/ir";
+import { decodeNmesh, fromInline, NmeshError } from "@nodetto/nmesh";
 import {
   cadFailure,
   createCadGeometry,
@@ -68,21 +69,40 @@ export function checkCadPage(
     Number.NEGATIVE_INFINITY,
     Number.NEGATIVE_INFINITY,
   ];
-  const report = visitCadConstruction(elements, pageId, (feature, tool) => {
-    if (feature.type === "cad.extrude") includeTool(tool, min, max);
-  });
+  const report = visitCadConstruction(
+    elements,
+    pageId,
+    (feature, tool) => {
+      if (feature.type === "cad.extrude") includeTool(tool, min, max);
+    },
+    (_, data) => meshDecodes(data),
+  );
   return {
     ...report,
     bounds: min[0] === Number.POSITIVE_INFINITY ? null : { min, max },
   };
 }
 
-/** Resolve each tool in history order, without triangulation or a kernel. */
+/** A payload that passes the field check can still be corrupt inside. */
+function meshDecodes(data: string): boolean {
+  try {
+    const { positions, triangles } = decodeNmesh(fromInline(data));
+    return positions.length > 0 && triangles.length > 0;
+  } catch (error) {
+    if (!(error instanceof NmeshError)) throw error;
+    return false;
+  }
+}
+
+/**
+ * Resolve each tool in history order, without triangulation or a kernel.
+ * A mesh callback that returns false fails the mesh as `cad.mesh.invalid`.
+ */
 export function visitCadConstruction(
   elements: readonly Element[],
   pageId: PageId,
   onTool: (element: Element, geometry: ExtrudeGeometry) => void,
-  onMesh?: (element: Element, data: string) => void,
+  onMesh?: (element: Element, data: string) => boolean,
 ): Omit<CadCheckReport, "bounds"> {
   const page = elements.filter((element) => element.page === pageId);
   const pcb = elements.filter(
@@ -119,8 +139,9 @@ export function visitCadConstruction(
     }
     if (feature.semantic.suppressed) continue;
     if (feature.type === "cad.mesh") {
-      bodies.add(id);
-      onMesh?.(feature, feature.semantic.data);
+      if (onMesh?.(feature, feature.semantic.data) === false)
+        status.set(id, cadFailure("cad.mesh.invalid"));
+      else bodies.add(id);
       continue;
     }
     if (feature.type === "cad.pcb") {

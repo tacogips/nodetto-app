@@ -201,6 +201,13 @@ impl PrismView {
         self.buckets.average_occupancy
     }
 
+    /// Edges one ray tests: the length of the bucket the ray falls in.
+    pub(crate) fn scan_cost(&self, ray: &Ray) -> usize {
+        let offset: [f64; 3] = std::array::from_fn(|axis| ray.origin[axis] - self.origin[axis]);
+        let [x, y, _] = self.basis.map(|axis| dot(offset, axis));
+        self.buckets.at(self.dx * y - self.dy * x).len()
+    }
+
     fn slab<const FACETS: bool>(&self, z: f64, offset: [f64; 3]) -> Option<[Boundary; 2]> {
         let [start, end] = self.span;
         if !z.is_finite() {

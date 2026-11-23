@@ -118,6 +118,7 @@ export function cadPageWireframe(
           if (end && !(i & axis)) add(start, end);
         }
       }
+      return true;
     },
   );
   return {

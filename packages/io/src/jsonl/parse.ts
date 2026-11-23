@@ -1,7 +1,7 @@
 // JSONL parsing: newline-delimited JSON -> IR document.
 // See the product design (nodetto-cloud repo), section 6.
 
-import { splitLines } from "./lines.ts";
+import { splitLines } from "@nodetto/ir";
 import {
   type Document,
   type DocumentSnapshot,

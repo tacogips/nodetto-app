@@ -5,6 +5,7 @@ test("only capture arguments with the inline flag request an image", () => {
   for (const args of [
     ["capture", "drawing.jsonl", "--inline"],
     ["capture", "--inline", "--json", "drawing.jsonl"],
+    ["--quiet", "capture", "drawing.jsonl", "--inline"],
   ]) {
     expect(wantsInlineImage(args)).toBe(true);
   }
@@ -14,6 +15,8 @@ test("only capture arguments with the inline flag request an image", () => {
     ["capture", "drawing.jsonl"],
     ["capture", "--inline=true"],
     ["capture", "--", "--inline"],
+    ["--quiet", "export", "--inline"],
+    ["--", "capture", "--inline"],
   ]) {
     expect(wantsInlineImage(args)).toBe(false);
   }

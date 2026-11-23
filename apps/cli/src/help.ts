@@ -915,7 +915,7 @@ CAD status codes:
   cad.body.missing       A boolean has no available target body.
   cad.body.reference     A boolean's target list is invalid.
   cad.limit              CAD geometry or record counts exceed limits.
-  cad.mesh.invalid       An imported mesh has invalid fields.
+  cad.mesh.invalid       An imported mesh has invalid fields or data.
 
 Exit codes: 0 clean, 1 CAD errors, 2 usage, invalid input or no CAD page.`,
 

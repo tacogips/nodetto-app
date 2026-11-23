@@ -1,12 +1,15 @@
 export const MCP_INLINE_MAX_BYTES = 1_048_576;
 
-/** Both MCP tool forms are normalized to CLI tokens before this check. */
+/**
+ * Both MCP tool forms are normalized to CLI tokens before this check.
+ * `--quiet` is accepted before the command, as the CLI itself accepts it.
+ */
 export function wantsInlineImage(args: readonly string[]): boolean {
   const end = args.indexOf("--");
-  return (
-    args[0] === "capture" &&
-    args.slice(1, end === -1 ? undefined : end).includes("--inline")
-  );
+  const tokens = args
+    .slice(0, end === -1 ? undefined : end)
+    .filter((arg) => arg !== "--quiet");
+  return tokens[0] === "capture" && tokens.includes("--inline", 1);
 }
 
 /** Extract the path and media type from a successful capture's stdout. */

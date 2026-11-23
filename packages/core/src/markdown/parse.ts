@@ -1,3 +1,4 @@
+import { splitLines } from "@nodetto/ir";
 import type { MdBlock, MdInline } from "./ast.ts";
 import { parseInline } from "./inline.ts";
 
@@ -68,7 +69,7 @@ function startsBlock(line: string): boolean {
   );
 }
 export function parseMarkdown(source: string): MdBlock[] {
-  const lines = source.replace(/\r\n?/g, "\n").split("\n");
+  const lines = splitLines(source.replace(/\r\n?/g, "\n"));
   const blocks: MdBlock[] = [];
   let i = 0;
   while (i < lines.length) {

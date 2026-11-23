@@ -210,18 +210,28 @@ impl MeshView {
             listings,
         }
     }
-    fn hits_impl<const FACETS: bool>(&self, ray: &Ray, scratch: &mut Vec<Boundary>) {
-        scratch.clear();
+    /// The triangles one ray tests: the bin the ray falls in.
+    fn bin(&self, ray: &Ray) -> Option<([f64; 2], &[usize])> {
         let q = [
             dot(ray.origin, self.basis[0]),
             dot(ray.origin, self.basis[1]),
         ];
         if (0..2).any(|i| !q[i].is_finite() || q[i] < self.lo[i] || q[i] > self.hi[i]) {
-            return;
+            return None;
         }
         let bin = index(q[1], self.lo[1], self.hi[1], self.side) * self.side
             + index(q[0], self.lo[0], self.hi[0], self.side);
-        for &i in &self.bins[bin] {
+        Some((q, &self.bins[bin]))
+    }
+    pub(crate) fn scan_cost(&self, ray: &Ray) -> usize {
+        self.bin(ray).map_or(0, |(_, bin)| bin.len())
+    }
+    fn hits_impl<const FACETS: bool>(&self, ray: &Ray, scratch: &mut Vec<Boundary>) {
+        scratch.clear();
+        let Some((q, bin)) = self.bin(ray) else {
+            return;
+        };
+        for &i in bin {
             let t = self.triangles[i];
             let area = edge(t.q[0], t.q[1], t.q[2]);
             if area == 0.0 || !area.is_finite() {

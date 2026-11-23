@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { splitLines } from "./lines.ts";
+import { splitLines } from "./split-lines.ts";
 
 test("splitLines matches split on documents of every boundary shape", () => {
   const long = "x".repeat(40_000);

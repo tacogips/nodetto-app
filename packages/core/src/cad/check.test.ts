@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Element } from "@nodetto/ir";
+import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import { isFractionalKey } from "../fractional.ts";
 import { isElementIdFormat } from "../ids.ts";
 import { checkCadPage } from "./check.ts";
@@ -282,4 +283,36 @@ test("check handles 20,000 CAD elements in under one second", () => {
     errors: [],
   });
   expect(elapsed).toBeLessThan(1000);
+});
+
+test("check decodes imported meshes and fails a corrupt payload and its dependents", () => {
+  const data = toInline(
+    encodeNmesh(
+      canonicalize({
+        positions: new Float64Array([0, 0, 0, 4, 0, 0, 0, 6, 0, 0, 0, 3]),
+        triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+      }),
+    ),
+  );
+  const mesh = (id: string, order: string, payload: string) =>
+    cadElement(id, "cad.mesh", order, { name: "Imported", data: payload });
+  const cut = (id: string, order: string, body: string) =>
+    extrude(id, order, {
+      sketch: "base",
+      distance: 1,
+      op: "cut",
+      bodies: [body],
+    });
+  expect(
+    report([
+      ...plateElements(),
+      mesh("sound", "b1", data),
+      cut("sound-cut", "b2", "sound"),
+      mesh("corrupt", "b3", "nmesh1:AAAA"),
+      cut("corrupt-cut", "b4", "corrupt"),
+    ]).errors,
+  ).toEqual([
+    { id: "corrupt", code: "cad.mesh.invalid" },
+    { id: "corrupt-cut", code: "cad.body.missing" },
+  ]);
 });

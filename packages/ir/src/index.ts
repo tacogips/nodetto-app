@@ -468,3 +468,4 @@ export {
   isOnCadGrid,
 } from "./cad.ts";
 export { pageAcceptsElementType } from "./page-content.ts";
+export { splitLines } from "./split-lines.ts";

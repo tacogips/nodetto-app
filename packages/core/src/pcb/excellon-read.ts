@@ -1,3 +1,4 @@
+import { splitLines } from "./lines.ts";
 // Excellon drill reader: holes and slots in millimetres, y pointing up.
 
 import type { PcbPoint } from "./model.ts";
@@ -110,8 +111,7 @@ export function readExcellon(text: string): DrillImage {
     return true;
   };
 
-  // A string separator: regular-expression splits are slow in some engines.
-  for (const rawLine of text.split("\n")) {
+  for (const rawLine of splitLines(text)) {
     const line = rawLine.trim();
     if (line === "") continue;
     if (line.startsWith(";")) {

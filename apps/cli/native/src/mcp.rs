@@ -13,13 +13,24 @@ use std::{
 
 const MCP_INLINE_MAX_BYTES: u64 = 1_048_576;
 
+/// The capture tokens of a tool call and its `--cwd` folder, when the call
+/// is a capture. The global options are the ones the engine itself accepts
+/// before a command: a leading `--cwd <dir>` and `--quiet` before `--`.
+fn capture_call(args: &[String]) -> Option<(Option<&Path>, Vec<&str>)> {
+    let (directory, rest) = match args {
+        [flag, directory, rest @ ..] if flag == "--cwd" => (Some(Path::new(directory)), rest),
+        rest => (None, rest),
+    };
+    let mut tokens = rest
+        .iter()
+        .map(String::as_str)
+        .take_while(|arg| *arg != "--")
+        .filter(|arg| *arg != "--quiet");
+    (tokens.next()? == "capture").then(|| (directory, tokens.collect()))
+}
+
 fn wants_inline_image(args: &[String]) -> bool {
-    args.first().is_some_and(|arg| arg == "capture")
-        && args
-            .iter()
-            .skip(1)
-            .take_while(|arg| *arg != "--")
-            .any(|arg| arg == "--inline")
+    capture_call(args).is_some_and(|(_, tokens)| tokens.contains(&"--inline"))
 }
 
 fn captured_image(stdout: &str) -> Option<(Cow<'_, str>, &'static str)> {
@@ -43,14 +54,18 @@ fn captured_image(stdout: &str) -> Option<(Cow<'_, str>, &'static str)> {
 /// A text path can be truncated by an embedded newline. Check it against
 /// the explicit output or the private default directory before opening it.
 fn capture_path_matches(path: &Path, args: &[String]) -> io::Result<bool> {
-    let mut tokens = args.iter().skip(1).take_while(|arg| *arg != "--");
+    let Some((directory, tokens)) = capture_call(args) else {
+        return Ok(false);
+    };
+    let mut tokens = tokens.into_iter();
     while let Some(arg) = tokens.next() {
         let explicit = if arg == "--output" {
-            tokens.next().map(String::as_str)
+            tokens.next()
         } else {
             arg.strip_prefix("--output=")
         };
         if let Some(output) = explicit {
+            let output = directory.map_or_else(|| output.into(), |folder| folder.join(output));
             return Ok(path == std::path::absolute(output)?);
         }
     }
@@ -276,6 +291,9 @@ mod tests {
         for args in [
             &["capture", "drawing.jsonl", "--inline"][..],
             &["capture", "--inline", "--json", "drawing.jsonl"],
+            &["--quiet", "capture", "drawing.jsonl", "--inline"],
+            &["--cwd", "project", "capture", "drawing.jsonl", "--inline"],
+            &["--cwd", "project", "--quiet", "capture", "--inline"],
         ] {
             assert!(wants_inline_image(&tokens(args)));
         }
@@ -285,9 +303,24 @@ mod tests {
             &["capture", "drawing.jsonl"],
             &["capture", "--inline=true"],
             &["capture", "--", "--inline"],
+            &["--cwd", "capture", "--inline"],
+            &["--quiet", "export", "--inline"],
         ] {
             assert!(!wants_inline_image(&tokens(args)));
         }
+    }
+
+    #[test]
+    fn explicit_output_is_matched_inside_the_cwd_folder() {
+        let folder = std::path::absolute("project").unwrap();
+        let call = tokens(&[
+            "--cwd", "project", "--quiet", "capture", "--output", "a.png",
+        ]);
+        assert!(capture_path_matches(&folder.join("a.png"), &call).unwrap());
+        assert!(!capture_path_matches(&folder.join("b.png"), &call).unwrap());
+        let plain = tokens(&["capture", "--output=a.png"]);
+        assert!(capture_path_matches(&std::path::absolute("a.png").unwrap(), &plain).unwrap());
+        assert!(!capture_path_matches(&folder.join("a.png"), &plain).unwrap());
     }
 
     #[test]

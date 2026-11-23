@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import type { CadXY, Element, PageId } from "@nodetto/ir";
 import { checkCadPage } from "../cad/check.ts";
 import { buildLoops, type CadLoop } from "../cad/loops.ts";
@@ -252,7 +253,14 @@ test("counts successful sketches without solids and tracks meshes accepted by ca
   const model = modelOf([
     cadElement("mesh", "cad.mesh", "a0", {
       name: "Imported prism",
-      data: "nmesh1:UExBVEU=",
+      data: toInline(
+        encodeNmesh(
+          canonicalize({
+            positions: new Float64Array([0, 0, 0, 4, 0, 0, 0, 6, 0, 0, 0, 3]),
+            triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+          }),
+        ),
+      ),
     }),
     sketch("profile", "a1"),
     { ...sketch("foreign", "a1"), page: "other" },

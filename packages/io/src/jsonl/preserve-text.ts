@@ -1,5 +1,5 @@
 import { type Document, isPlainObject } from "@nodetto/ir";
-import { splitLines } from "./lines.ts";
+import { splitLines } from "@nodetto/ir";
 import { setField } from "./objects.ts";
 import { parseDocumentResult } from "./parse.ts";
 import { serializeDocument, unknownLine } from "./serialize.ts";

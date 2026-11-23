@@ -65,6 +65,19 @@ impl WorkerBudget<'_> {
         self.reads += count;
         true
     }
+
+    /// Charge the edges or triangles a ray tests beyond the weight its
+    /// tool was admitted with. Admission averages a tool's buckets, so a
+    /// view zoomed onto one dense bucket would otherwise scan it for every
+    /// sample without limit.
+    fn scan(&mut self, tested: usize, admitted: u64) -> bool {
+        let surplus = (tested as u64).saturating_sub(admitted);
+        if surplus == 0 {
+            return true;
+        }
+        self.pending += surplus;
+        self.pending < CHUNK || self.flush()
+    }
 }
 
 impl Drop for WorkerBudget<'_> {
@@ -143,6 +156,7 @@ struct RayScratch {
 struct Raster<'a> {
     scene: &'a Scene,
     tools: Vec<Option<ProjectedPrism>>,
+    weights: Vec<u64>,
     solid_tools: Vec<bool>,
     open_bodies: Vec<bool>,
     tiles: TileLists,
@@ -191,6 +205,10 @@ impl Raster<'_> {
                     .and_then(|step| self.tools.get(step.tool as usize).and_then(Option::as_ref))
                     .filter(|tool| tool.rect.contains(position))
                 {
+                    let admitted = self.weights[body.steps[0].tool as usize];
+                    if !budget.scan(projected.view.scan_cost(&ray), admitted) {
+                        return Sample::default();
+                    }
                     if let Some(hit) = projected.view.first_surface_hit(&ray) {
                         *present = true;
                         if translucent.is_none_or(|(_, old)| hit.s < old.s - MERGE_EPS) {
@@ -211,6 +229,10 @@ impl Raster<'_> {
                         .unwrap_or(false)
                         && tool.rect.contains(position)
                 }) {
+                    let admitted = self.weights[step.tool as usize];
+                    if !budget.scan(prism.view.scan_cost(&ray), admitted) {
+                        return Sample::default();
+                    }
                     prism
                         .view
                         .surface_intervals(&ray, &mut scratch.crossings, &mut scratch.tool);
@@ -591,6 +613,7 @@ fn render_with(
         let raster = Raster {
             scene,
             tools,
+            weights,
             solid_tools,
             open_bodies,
             tiles,
@@ -1323,6 +1346,47 @@ mod tests {
             &(0..n).map(|i| (Op::Union, i as u32)).collect::<Vec<_>>(),
         ));
         s
+    }
+
+    /// A profile whose 4,000 zigzag edges all lie in one 0.2 mm band.
+    fn dense_band_scene(mm_per_pixel: f64, centre: [f64; 3]) -> Scene {
+        const TEETH: usize = 4_000;
+        let length = TEETH as f64 * 0.01;
+        let mut points = Vec::with_capacity(TEETH * 2 + 4);
+        for tooth in 0..TEETH {
+            points.extend([tooth as f64 * 0.01, (tooth % 2) as f64 * 0.2]);
+        }
+        points.extend([length, -50.0, 0.0, -50.0]);
+        let mut s = base();
+        s.width = 256;
+        s.height = 256;
+        s.camera.mm_per_pixel = mm_per_pixel;
+        s.camera.centre = centre;
+        s.tools.push(Tool::Prism(Prism {
+            o: [0.0; 3],
+            u: [1.0, 0.0, 0.0],
+            v: [0.0, 1.0, 0.0],
+            n: [0.0, 0.0, 1.0],
+            t0: 0.0,
+            t1: 1.0,
+            loops: vec![Loop {
+                faces: (0..points.len() as u32 / 2).collect(),
+                points,
+            }],
+        }));
+        s.bodies.push(body(&[(Op::Union, 0)]));
+        s
+    }
+
+    #[test]
+    fn a_view_zoomed_onto_a_dense_bucket_is_refused_by_the_scan_budget() {
+        let fitted = dense_band_scene(0.25, [20.0, -25.0, 0.0]);
+        let zoomed = dense_band_scene(0.2 / 256.0, [20.0, 0.1, 0.0]);
+        for threads in [1, 2, 5] {
+            assert!(render_with(&fitted, threads, 50_000_000).0.is_ok());
+            let error = render_with(&zoomed, threads, 50_000_000).0.unwrap_err();
+            assert!(error.0.contains("too heavy"), "{}", error.0);
+        }
     }
 
     #[test]

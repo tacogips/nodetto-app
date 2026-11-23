@@ -41,6 +41,13 @@ impl ToolView {
             Self::Mesh(view) => view.surface_intervals(ray, scratch, out),
         }
     }
+    /// Edges or triangles one ray tests in this view.
+    pub(crate) fn scan_cost(&self, ray: &Ray) -> usize {
+        match self {
+            Self::Prism(view) => view.scan_cost(ray),
+            Self::Mesh(view) => view.scan_cost(ray),
+        }
+    }
     pub(crate) fn surface(&self, facet: u32) -> Option<(u32, [f64; 3])> {
         match self {
             Self::Prism(view) => view.surface(facet),
