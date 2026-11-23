@@ -184,6 +184,7 @@ const classifiedEmitters = {
   "packages/core/src/clipboard.ts": "E",
   "packages/core/src/commands.ts": "E",
   "packages/ui-solid/src/interaction-test-helpers.ts": "E",
+  "packages/ui-solid/src/test-dom/cad-image.dom.tsx": "E",
   "packages/ui-solid/src/test-dom/cad-inspector.dom.tsx": "E",
   "packages/ui-solid/src/test-dom/cad-sketch.dom.tsx": "E",
   "packages/ui-solid/src/test-dom/text-editor.dom.tsx": "E",
