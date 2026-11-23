@@ -4,7 +4,7 @@ Status: design revision 5, base commit `ebcac57`, branch `feat/ai-capture`
 (revision 4 checked against `be8fa5d`; amended after `e883b4b` for the
 remaining M23 and M16, CAP-R4-07 to CAP-R4-10; revision 5 checked against
 the M23 checkpoint `e43016d`, CAP-R5-01 to CAP-R5-04; revision 6 checked
-against the M23 checkpoint `94c780d`, CAP-R6-01 to CAP-R6-05, splits the
+against the M23 checkpoint `94c780d`, CAP-R6-01 to CAP-R6-06, splits the
 remaining M23 work into sub-plans M23a to M23f). Section 18 lists what
 revisions 2 to 6 changed and why; section 8.5 gives the completion order of
 the remaining milestones.
@@ -1260,7 +1260,12 @@ Contracts that make the waves possible:
   `assert_eq!` with the six states `[Drawn, Drawn, Drawn, Hidden, Outside,
   Empty]` plus those two `emptied_by_step` values, keeps the test name, the
   three-thread render and the shading assertions after it, and states the
-  old and new expectations in the commit message.
+  old and new expectations in the commit message. The fixture scene has
+  `draw_interference` set, so after M23 the shading sample `[90, 45, 6.5]`
+  lies in the interference hatch behind the Block face, which is correct
+  per 6.6. M23d therefore also inserts `scene.draw_interference = false;`
+  before the single-thread shading render. The shading assertion and its
+  sample point are unchanged (CAP-R6-06).
 - Digest confirmation rule (CAP-R5-03). The digest test renders
   `crates/capture/tests/fixtures/plate-iso.ncs1`: 7 tools, 3 bodies
   (Plate, Block, Puck), no reference and no mesh body, options 3 and
@@ -1924,4 +1929,5 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R6-03 (revision 6) | M23f collects the host-side cases that need no crate change. The CLI fake-backend cases (`capture-cad.test.ts`, `capture-command.test.ts`) and the two desktop cases (fixture-file equality and mesh-only parity) compare fake reports or scene bytes from TypeScript `prepareCadCapture`, and no sub-plan changes that function or the fixtures. The desktop option itself already exists (CAP-R4-07). So M23f has no `dependsOn` and runs no cargo command. M23e depends on M23f, because M23e may edit `capture-cad.ts`, which M23f's tests pin. M16 depends on M23e | 8.5 |
 | CAP-R6-04 (revision 6) | The all-steps reference comparisons of the acceptance additions had no reference to compare against: `render_rgb` always reads `TileLists`. M23a adds a private `#[cfg(test)]` all-steps renderer in `raster.rs`. It uses the existing stages and no tile selection, with liveness marked per sample, and it is not public and not a runtime option. M23a places the five comparisons (Plate, 600-hole plate, 20 x 15 grid, 50 bodies with intersects, emptied-and-refilled plate) in the `raster.rs` test module, and M23b reruns them after changing the traversal (design review CAP-DR6-02) | 8.5 |
 | CAP-R6-05 (revision 6, design review round 2) | Two required assertions could not be made inside their test boundaries. (a) Change (d) of the M23 plan authorized only the text line of the cropped-frame CLI test, while its fake report and JSON expectation still used `absent`. M23f now updates the fake state, the text and the JSON together to `outside`; production code and fixtures are unchanged (CAP-DR6-04). (b) The CAP-R4-10 census regression asserted equal liveness from an integration test that cannot observe it. M23b's crate-private render entry also returns the merged liveness passed to `census::resolve`, and the private `raster.rs` tests compare it across 1, 2 and 5 threads and against the reference path. `tests/census.rs` keeps the RGB, report and emptying-step checks (CAP-DR6-05) | 8.5 |
+| CAP-R6-06 (revision 6, M23d checkpoint amendment round 1) | The shading assertion kept in `nearest_face_wins_and_hidden_is_distinct_from_absent` samples a pixel that the wired picture now hatches, because `support::scene` sets the draw bit and 6.6 hatches interference behind a nearer face. The authorization is extended by one statement: clear `draw_interference` before the single-thread shading render. The assertion, its sample point and the CAP-R5-01 states on the three-thread render (draw bit still set) are unchanged, and hatch coverage stays in `tests/overlay.rs` | 8.5 |
 | CAP-R5-04 (revision 5) | The remaining M23 work all meets in `raster.rs`, and native parity needs both crate and CLI, so M23 is not split; one wiring plan, then M16 | 8.5 |

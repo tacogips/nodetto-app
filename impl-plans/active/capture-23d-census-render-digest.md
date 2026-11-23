@@ -52,7 +52,69 @@ Any production defect: stop and record (scope amendment). Do not edit
 1. Gate 1: `env CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23d" sh -c 'cargo fmt -p nodetto-capture -- --check && cargo clippy -p nodetto-capture --all-targets -- -D warnings && cargo test -p nodetto-capture'`
 2. Gate 2: `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23d cargo test --release -p nodetto-capture -- --nocapture > tmp/capture/m23/release.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/release.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m23/release.txt && ! grep -Eq " [1-9][0-9]* failed" tmp/capture/m23/release.txt'`
 
+## Amendment 2026-11-23 (blocked-wave-scope-or-contract, round 1)
+
+Blocker: the retained shading assertion of
+`nearest_face_wins_and_hidden_is_distinct_from_absent` (`render.rs:181-185`)
+samples `[90, 45, 6.5]`. That point is now inside the interference hatch
+(`[51, 92, 103]`), so it no longer shows the block shade
+(`[195, 194, 190]`). `support::scene` sets `analyse` and
+`draw_interference` true (`tests/support/mod.rs:91-92`), and the wired
+picture hatches interference behind a nearer face. That behavior is
+correct: design 6.6 and CAP-R5-02 say the draw bit alone controls hatching,
+and M23c's "hatch also behind the Block face" test passes. The assertion
+tests nearest-face shading, an M8 property, not the overlay.
+
+Decision (CAP-R6-06, recorded in design 8.5 and section 18). For this test
+only, change the following and nothing else:
+
+- Insert exactly one statement, `scene.draw_interference = false;`, after
+  the camera assignment at `render.rs:181` and before the single-thread
+  `render_rgb` at `:182`.
+- Keep these unchanged: the camera line, the `block_shade` computation, the
+  `assert_ne!`, the `assert_eq!` on the sampled pixel and its sample point,
+  the three-thread render and the CAP-R5-01 state assertions above them.
+- Do not move the sample point. Do not weaken or delete the assertion. Do
+  not touch production code, `tests/support/mod.rs` or any other test.
+
+Hatch coverage stays in `tests/overlay.rs` (M23c). The first, three-thread
+render keeps the draw bit set, so the CAP-R5-01 states are still checked on
+the wired scene.
+
+Resume state: keep the already-applied census additions, the three
+superseded assertions, the CAP-R5-01 assertion and the digest replacement
+(`0x29c6_4b3e_156d_0941` -> `0x093f_f8ec_cdac_365b`). Read each file fresh,
+record `git hash-object` before and after the new edit, then run
+verification 1 and 2. Commit messages state:
+
+- the old and new digest;
+- the old and new CAP-R5-01 states;
+- the three replaced assertions;
+- this inserted line (CAP-R6-06).
+
+Acceptance additions:
+
+- `render.rs` differs from the pre-amendment tree only by that one inserted
+  statement inside the test.
+- `cargo test -p nodetto-capture --test render` passes all tests, including
+  `nearest_face_wins_and_hidden_is_distinct_from_absent`.
+
 ## Progress
 
-Pending. Hashes before and after, logs under `tmp/capture/m23d/`, drift
-stops the run; timing tests up to 3 attempts, then alone.
+Implementation in progress; blocked on a narrow scope amendment. M23c's
+CAP-R5-03 overlay suite passed on this tree (8 tests). The old digest
+`0x29c6_4b3e_156d_0941` produced `0x093f_f8ec_cdac_365b`; the test
+constant was updated. Census additions and the authorized render assertions
+are present. Focused tests: census 5 passed; render 13 passed, 1 failed,
+2 ignored. The retained shading assertion in
+`nearest_face_wins_and_hidden_is_distinct_from_absent` samples interference
+hatch `[51, 92, 103]`, not the block shade `[195, 194, 190]`.
+Design 8.5 authorizes changing only the state assertion and emptying indices
+in this test and requires the shading assertion kept. Request an amendment
+authorizing the draw-interference bit to be cleared before the second render,
+or another approved correction preserving the shading assertion. Do not
+change production code within this plan. Full gates remain pending. Evidence,
+per-edit snapshots, intentions, hashes and logs are in
+`tmp/capture-s885/capture-23d-census-render-digest/`. Commit and review are
+later workflow steps; commit messages must state old and new expectations and
+digest.

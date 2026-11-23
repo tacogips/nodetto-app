@@ -36,7 +36,8 @@
       {"decision": "CAP-R6-02: no command runs zero tests; scale listed only in release; full crate test only from M23d.", "rationale": "Three render.rs tests fail until M23d; scale tests are release-only."},
       {"decision": "CAP-R6-04: private cfg(test) all-steps reference renderer in raster.rs (M23a), rerun in M23b.", "rationale": "render_rgb always reads TileLists; equality needs an independent reference."},
       {"decision": "CAP-R6-05: M23f updates the cropped-frame fake state, text and JSON together to outside; M23b's crate-private entry returns merged liveness (and the census stats it already computes) for private tests.", "rationale": "Both assertions were unobservable inside their original test boundaries."},
-      {"decision": "CAP-R5-01 and CAP-R5-03 unchanged.", "rationale": "absent is pre-census; digest only after the overlay proof."}
+      {"decision": "CAP-R5-01 and CAP-R5-03 unchanged.", "rationale": "absent is pre-census; digest only after the overlay proof."},
+      {"decision": "Amendment 2026-11-23 round 1: CAP-R6-06 authorizes inserting exactly `scene.draw_interference = false;` before the single-thread shading render in nearest_face_wins_and_hidden_is_distinct_from_absent (crates/capture/tests/render.rs); shading assertion, sample point and CAP-R5-01 states unchanged.", "rationale": "Blocked plan capture-23d-census-render-digest: the retained shading sample [90,45,6.5] lies in the correctly wired 6.6 interference hatch because support::scene sets draw_interference; design 8.5 and section 18 (CAP-R6-06) and the capture-23d plan amendment resolve the gap without production, support or other test edits. Accepted: capture-23a, 23f, 23b, 23c."}
     ],
     "intentionalTradeoffs": [
       "Zero-census-ray assertions live in M23b's private raster tests (stats.census.rays) because Report has no ray count; integration tests assert states.",
@@ -244,7 +245,7 @@
       "sharedPaths": [],
       "sharedPathNotes": [
         {"path": "crates/capture/tests/census.rs", "intendedEdit": "Census list of capture-23-wiring.md and the two design 8.5 census additions; M23b cases kept."},
-        {"path": "crates/capture/tests/render.rs", "intendedEdit": "Pre-authorized only: the three design 8.5 assertions at :390-411, the CAP-R5-01 assertion at :162-178, then the digest constant under CAP-R5-03; commit messages state old and new values."},
+        {"path": "crates/capture/tests/render.rs", "intendedEdit": "Pre-authorized only: the three design 8.5 assertions at :390-411, the CAP-R5-01 assertion at :162-178, then the digest constant under CAP-R5-03 (0x29c6_4b3e_156d_0941 -> 0x093f_f8ec_cdac_365b, already applied); amendment round 1 (CAP-R6-06): insert exactly `scene.draw_interference = false;` before the single-thread shading render at :182 in nearest_face_wins_and_hidden_is_distinct_from_absent, shading assertion and sample point unchanged; commit messages state old and new values."},
         {"path": "target/capture-m23d", "intendedEdit": "Cargo build output."},
         {"path": "tmp/capture/m23d", "intendedEdit": "Logs."},
         {"path": "tmp/capture/m23", "intendedEdit": "Gate 2 file release.txt."}
@@ -252,7 +253,7 @@
       "artifactRoots": ["target/capture-m23d", "tmp/capture/m23d", "tmp/capture/m23"],
       "acceptanceCriteria": [
         "Census cases pass (emptied, refilled, sound, hidden in housing, outside, intersect miss, end to end, 1 vs 5 threads, options-0 emptied body with emptied_by_step, open source with later cut has -1).",
-        "render.rs: the three superseded assertions are replaced as design 8.5 specifies; nearest_face_wins_and_hidden_is_distinct_from_absent asserts [Drawn, Drawn, Drawn, Hidden, Outside, Empty] with emptied_by_step -1 and 1; the digest is replaced only after M23c's CAP-R5-03 tests pass, in a commit stating 0x29c6_4b3e_156d_0941 and the new value.",
+        "render.rs: the three superseded assertions are replaced as design 8.5 specifies; nearest_face_wins_and_hidden_is_distinct_from_absent asserts [Drawn, Drawn, Drawn, Hidden, Outside, Empty] with emptied_by_step -1 and 1, and its unchanged shading assertion passes with draw_interference cleared before the single-thread render (CAP-R6-06, the only other change to that test); the digest is replaced only after M23c's CAP-R5-03 tests pass, in a commit stating 0x29c6_4b3e_156d_0941 and the new value.",
         "Gate 1 (full cargo test -p nodetto-capture) and gate 2 (release, tmp/capture/m23/release.txt) exit 0 with positive pass counts."
       ],
       "verification": [
