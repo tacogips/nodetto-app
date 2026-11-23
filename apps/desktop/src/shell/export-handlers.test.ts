@@ -4,10 +4,13 @@ import {
   type CadEngine,
   type CadEngineInput,
   createCadEngineClient,
+  DEFAULT_CAD_INTERFERENCE,
   Editor,
   extractPdfText,
+  prepareCadCapture,
 } from "@nodetto/core";
 import { stlToInlineMesh } from "@nodetto/io/cad-mesh";
+import { decodeCaptureMesh } from "@nodetto/io/nmesh";
 import { readStl, writeBinaryStl } from "@nodetto/io/stl";
 import { createWorkerHost } from "../../../../packages/cad-kernel/src/worker-host.ts";
 import type { ExportBackend } from "../file/backend.ts";
@@ -216,4 +219,167 @@ test("real CAD client saves a closed import and refuses a page with only an open
   expect(writes).toHaveLength(2);
   expect(writes.at(-1)?.bytes).toEqual(writes[0].bytes);
   expect(errors.at(-1)).toContain("STL saved. 2 features have issues");
+});
+
+test("CAD image capture saves PNG and JPG and reports interference and empty bodies", async () => {
+  const editor = new Editor();
+  const page = editor.createPage({ kind: "cad3d", name: "Capture plate" });
+  const data = stlToInlineMesh(writeBinaryStl([openTriangle]));
+  editor.createElement("cad.mesh", { semantic: { name: "First", data } });
+  editor.createElement("cad.mesh", { semantic: { name: "Second", data } });
+  const requests: { scene: Uint8Array; format: string; quality: number }[] = [];
+  const writes: { path: string; bytes: Uint8Array }[] = [];
+  const picks: [string, string][] = [];
+  const notes: (string | null)[] = [];
+  const image = Uint8Array.of(1, 2, 3);
+  const report = JSON.stringify({
+    width: 1024,
+    height: 768,
+    bodies: [
+      { state: "empty", emptiedByStep: 0, open: false },
+      { state: "drawn", emptiedByStep: -1, open: false },
+    ],
+    analysis: {
+      cell: 0.25,
+      candidates: 1,
+      checked: 1,
+      unchecked: [],
+      uncheckedCount: 0,
+      cappedCount: 1,
+      budget: 24000000,
+      cappedWithoutHit: [],
+    },
+    pairs: [
+      {
+        a: 0,
+        b: 1,
+        volume: 1,
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+        source: "analysis",
+        capped: true,
+      },
+    ],
+  });
+  const backend: ExportBackend = {
+    available: true,
+    async pickExportPath(name, extension) {
+      picks.push([name, extension]);
+      return `/out/${name}`;
+    },
+    async writeBytes(path, bytes) {
+      writes.push({ path, bytes });
+    },
+    async writeText() {
+      throw new Error("unexpected writeText");
+    },
+    async captureSolid(scene, format, quality) {
+      requests.push({ scene, format, quality });
+      return { image, report };
+    },
+  };
+  const handlers = createExportHandlers(
+    { editor, exportBackend: backend },
+    (note) => notes.push(note),
+  );
+  const options = {
+    camera: { view: "iso" as const },
+    width: 1024,
+    height: 768,
+    theme: "light" as const,
+    format: "png" as const,
+  };
+  await handlers.captureCadImage(options);
+  const expected = prepareCadCapture(editor.getSnapshot().elements, page, {
+    ...options,
+    interference: DEFAULT_CAD_INTERFERENCE,
+    decodeMesh: decodeCaptureMesh,
+  });
+  expect(requests[0].scene).toEqual(expected.scene);
+  expect(requests[0]).toMatchObject({ format: "png", quality: 90 });
+  expect(picks[0]).toEqual(["Capture plate.png", "png"]);
+  expect(writes[0]).toEqual({ path: "/out/Capture plate.png", bytes: image });
+  expect(notes.at(-1)).toContain("Image saved.");
+  expect(notes.at(-1)).toContain("First x Second");
+  expect(notes.at(-1)).toContain(", approximate");
+  expect(notes.at(-1)).toContain("leaves no material");
+  await handlers.captureCadImage({ ...options, theme: "dark", format: "jpg" });
+  expect(requests[1].scene).not.toEqual(requests[0].scene);
+  expect(requests[1]).toMatchObject({ format: "jpg", quality: 90 });
+  expect(picks[1]).toEqual(["Capture plate.jpg", "jpg"]);
+  expect(writes[1]).toEqual({ path: "/out/Capture plate.jpg", bytes: image });
+});
+
+test("CAD capture errors and cancelled save never write", async () => {
+  const editor = new Editor();
+  editor.createPage({ kind: "cad3d", name: "Empty" });
+  const writes: Uint8Array[] = [];
+  const notes: (string | null)[] = [];
+  let renders = 0;
+  const backend: ExportBackend = {
+    available: true,
+    pickExportPath: async () => null,
+    writeBytes: async (_path, bytes) => {
+      writes.push(bytes);
+    },
+    writeText: async () => {},
+    captureSolid: async () => {
+      renders++;
+      return {
+        image: Uint8Array.of(1),
+        report: JSON.stringify({
+          width: 1,
+          height: 1,
+          bodies: [],
+          analysis: null,
+          pairs: [],
+        }),
+      };
+    },
+  };
+  const options = {
+    camera: { view: "iso" as const },
+    width: 1024,
+    height: 768,
+    theme: "light" as const,
+    format: "png" as const,
+  };
+  const handlers = createExportHandlers(
+    { editor, exportBackend: backend },
+    (note) => notes.push(note),
+  );
+  await handlers.captureCadImage(options);
+  expect(notes.at(-1)).toContain("could not capture:");
+  expect(renders).toBe(0);
+  editor.createElement("cad.mesh", {
+    semantic: {
+      name: "Mesh",
+      data: stlToInlineMesh(writeBinaryStl([openTriangle])),
+    },
+  });
+  await handlers.captureCadImage(options);
+  expect(renders).toBe(1);
+  expect(writes).toEqual([]);
+  const unavailable = createExportHandlers(
+    { editor, exportBackend: { ...backend, captureSolid: undefined } },
+    (note) => notes.push(note),
+  );
+  await unavailable.captureCadImage(options);
+  expect(notes.at(-1)).toContain("could not capture:");
+  expect(writes).toEqual([]);
+  const failing = createExportHandlers(
+    {
+      editor,
+      exportBackend: {
+        ...backend,
+        captureSolid: async () => {
+          throw new Error("render failed");
+        },
+      },
+    },
+    (note) => notes.push(note),
+  );
+  await failing.captureCadImage(options);
+  expect(notes.at(-1)).toContain("render failed");
+  expect(writes).toEqual([]);
 });

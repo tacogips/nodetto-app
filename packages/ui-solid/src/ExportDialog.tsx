@@ -1,3 +1,6 @@
+import type { CaptureCameraRequest, CaptureTheme } from "@nodetto/core";
+import type { Camera3d } from "./cad/camera3d.ts";
+import { CadImageExportSection } from "./CadImageExportSection.tsx";
 import {
   HtmlExportSection,
   type SaveHtmlBundle,
@@ -56,6 +59,7 @@ const Code = lazy(() =>
 );
 type Format =
   | ExportFormat
+  | "image3d"
   | "mermaid"
   | "d2"
   | "drawio"
@@ -75,6 +79,15 @@ type Format =
 
 export interface ExportDialogProps {
   readonly editor: Editor;
+  readonly captureCadImage?: (options: {
+    camera: CaptureCameraRequest;
+    format: "png" | "jpg";
+    theme: CaptureTheme;
+    width: number;
+    height: number;
+  }) => Promise<void>;
+  readonly cadCurrentView?: () => Camera3d | undefined;
+  readonly canvasMode?: "light" | "dark";
   readonly saveArtwork?: SaveArtwork;
   readonly saveHtmlBundle?: SaveHtmlBundle;
   readonly exportDocumentPdf?: (
@@ -102,7 +115,7 @@ export const EXPORT_FORMAT_GROUPS: readonly {
     label: "Document",
     ids: ["document-pdf", "document-markdown", "document-bundle"],
   },
-  { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
+  { label: "Artwork", ids: ["svg", "png", "pdf", "image3d", "artboards"] },
   {
     label: "Diagram source",
     ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
@@ -179,6 +192,12 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       { id: "svg", label: "SVG", enabled: true },
       { id: "png", label: "PNG", enabled: true },
       { id: "pdf", label: "PDF", enabled: true },
+      {
+        id: "image3d",
+        label: "3D view image (PNG/JPG)...",
+        enabled:
+          page()?.kind === "cad3d" && props.captureCadImage !== undefined,
+      },
       ...documentExportFormats(props),
       {
         id: "mermaid",
@@ -243,6 +262,9 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
       "One .nodetto file with the document and every image it uses. Opening it asks where to extract the JSONL and its artifacts/ folder.",
     svg: "Scalable vector artwork for editing and sharing.",
     png: "A raster image with adjustable resolution and background.",
+    jpg: "An opaque raster image.",
+    image3d:
+      "An orthographic picture rendered from the model with interference marked.",
     pdf: "A document sized to your artwork or a printed page.",
     mermaid: "Editable Mermaid source for ER, UML and sequence diagrams.",
     d2: "Editable D2 diagram source.",
@@ -411,6 +433,9 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
           </select>
         </label>
         <p id="nodetto-export-description">{descriptions[active()]}</p>
+        <Show when={page()?.kind === "cad3d" && !props.captureCadImage}>
+          <p>Available in the desktop app.</p>
+        </Show>
       </div>
       <div class="nodetto-export-panel" id="nodetto-export-panel">
         <Suspense fallback={<p role="status">Loading…</p>}>
@@ -423,6 +448,15 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                   save={props.saveArtwork}
                   hasSelection={signals.selection().size > 0}
                   id={selected()?.type === "frame" ? selected()?.id : undefined}
+                />
+              )}
+            </Match>
+            <Match when={active() === "image3d" && props.captureCadImage}>
+              {(capture) => (
+                <CadImageExportSection
+                  captureCadImage={capture()}
+                  cadCurrentView={props.cadCurrentView}
+                  canvasMode={props.canvasMode}
                 />
               )}
             </Match>

@@ -15,6 +15,9 @@ const analysis = {
   checked: 2,
   unchecked: [[0, 1]],
   uncheckedCount: 1,
+  cappedCount: 1,
+  budget: 1000,
+  cappedWithoutHit: [[0, 1]],
 } as const;
 const pair = {
   a: 0,
@@ -41,6 +44,9 @@ test("reads interim and final Rust report shapes", () => {
 
 test.each([
   { ...report, analysis: undefined },
+  { ...report, analysis: { ...analysis, cappedCount: undefined } },
+  { ...report, analysis: { ...analysis, budget: undefined } },
+  { ...report, analysis: { ...analysis, cappedWithoutHit: undefined } },
   { ...report, bodies: [null] },
   { ...report, bodies: [{ ...body, state: "occluded" }] },
   { ...report, bodies: [{ ...body, open: "false" }] },

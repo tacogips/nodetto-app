@@ -21,6 +21,11 @@ import {
   cadInputMessage,
   renderCadCapture,
 } from "./capture-cad.ts";
+import {
+  CAPTURE_INTERFERENCE_FLAGS,
+  CAPTURE_INTERFERENCE_VALUE_OPTIONS,
+  parseInterferenceOptions,
+} from "./capture-interference-options.ts";
 import { CAPTURE_HELP } from "./capture-help.ts";
 import {
   type CommandIo,
@@ -46,8 +51,14 @@ const CAPTURE_OPTIONS = new Set([
   "--theme",
   ...ARTWORK_OPTIONS,
   ...CAMERA_OPTIONS,
+  ...CAPTURE_INTERFERENCE_VALUE_OPTIONS,
 ]);
-const CAPTURE_FLAGS = new Set(["--force", "--json", "--inline"]);
+const CAPTURE_FLAGS = new Set([
+  "--force",
+  "--json",
+  "--inline",
+  ...CAPTURE_INTERFERENCE_FLAGS,
+]);
 const OUTPUT_ADVICE =
   "Pass --output <file> (Mac App Store build: inside the authorized folder).";
 
@@ -247,6 +258,14 @@ export async function captureCommand(
   );
   if (foreign)
     return usageError(`${foreign} cannot be used on a ${page.kind} page.`);
+  if (!isCad) {
+    const option = [
+      ...CAPTURE_INTERFERENCE_VALUE_OPTIONS,
+      ...CAPTURE_INTERFERENCE_FLAGS,
+    ].find((name) => options.has(name) || flags.has(name));
+    if (option)
+      return usageError(`${option} cannot be used on a ${page.kind} page.`);
+  }
   if (target && target.page !== page.id)
     return usageError("--element does not belong to the selected page.");
   if (!io.capture) return fail("This host cannot write captures.");
@@ -347,19 +366,29 @@ export async function captureCommand(
           "--size on a cad3d page must be 64 to 2048 pixels per side.",
         );
       const camera = cadCameraOptions(options);
+      const interferenceOptions = parseInterferenceOptions(options, flags);
+      if ("error" in interferenceOptions)
+        return usageError(interferenceOptions.error);
       if (!backend.renderSolid)
         return fail(`${warnings}3D CAD capture needs the native nodetto-cli.`);
       cad = renderCadCapture(
         document.elements,
         page,
-        { camera, width, height, theme },
+        {
+          camera,
+          width,
+          height,
+          theme,
+          interference: interferenceOptions.interference,
+        },
         backend.renderSolid.bind(backend),
         format,
         quality,
+        interferenceOptions.failOnInterference,
       );
     }
     const rendered = cad ?? (await renderArtwork(page, theme));
-    if ("exitCode" in rendered) return rendered;
+    if (!("image" in rendered)) return rendered;
     const { image, width, height } = rendered;
     const path = writeCapture(
       io.capture,
@@ -373,7 +402,7 @@ export async function captureCommand(
     const number = pages.indexOf(page) + 1;
     const count = pages.length;
     if (flags.has("--json")) {
-      return ok(
+      const result = ok(
         `${JSON.stringify({
           path,
           format,
@@ -391,11 +420,13 @@ export async function captureCommand(
         })}\n`,
         warnings,
       );
+      return { ...result, exitCode: cad?.exitCode ?? result.exitCode };
     }
-    return ok(
+    const result = ok(
       `path: ${path}\nformat: ${format}\nsize: ${width}x${height}\nbytes: ${image.byteLength}\npage: ${number}/${count} ${JSON.stringify(page.name)} (${page.kind}, id ${page.id})\n${cad ? `${cad.lines.join("\n")}\n` : ""}`,
       warnings,
     );
+    return { ...result, exitCode: cad?.exitCode ?? result.exitCode };
   } catch (cause) {
     if (cause instanceof CaptureInputError) {
       const message = `${warnings}${cadInputMessage(cause, page, document.elements)}`;

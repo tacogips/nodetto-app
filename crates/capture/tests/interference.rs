@@ -85,10 +85,26 @@ fn fixture_reports_only_plate_and_block_and_crop_does_not_change_analysis() {
     scene.height = 64;
     scene.supersample = 1;
     let (analysis, pairs) = run(&scene, 1);
-    assert_eq!(analysis.checked, 1);
-    assert_eq!(analysis.cell, 0.25);
+    assert_eq!(
+        analysis,
+        Analysis {
+            cell: 0.25,
+            candidates: 1,
+            checked: 1,
+            unchecked: vec![],
+            unchecked_count: 0,
+            capped_count: 0,
+            capped_without_hit: vec![],
+            budget: 24_000_000
+        }
+    );
     assert_eq!(pairs.len(), 1);
     let pair = &pairs[0];
+    assert_eq!((pair.volume * 1000.0).round() / 1000.0, 590.404);
+    assert_eq!(
+        (pair.min, pair.max),
+        ([85.0, 45.0, 2.0], [100.0, 60.0, 5.0])
+    );
     assert_eq!((pair.a, pair.b), (0, 1));
     // The overlap includes one full hole, two half holes and a quarter
     // hole. Each 32-gon is symmetric about the edges that clip it.
@@ -457,7 +473,12 @@ fn candidate_table_bounds_and_unchecked_order() {
             .map(|b| (0, b))
             .collect::<Vec<_>>()
     );
+    assert!(analysis.cell.is_finite());
     assert_eq!(pairs.len(), checked as usize);
+    assert!(pairs
+        .iter()
+        .enumerate()
+        .all(|(i, pair)| (pair.a, pair.b) == (0, i as u32 + 1)));
     assert_eq!(
         (pairs.last().unwrap().a, pairs.last().unwrap().b),
         (0, checked)
@@ -575,26 +596,181 @@ fn cap_without_a_hit_is_retained_in_the_report_and_json() {
         .contains(r#""cappedCount":66,"budget":1000000,"cappedWithoutHit":[[0,1]"#));
 }
 
-#[cfg(not(debug_assertions))]
-#[test]
-fn release_timing_budgets() {
-    use std::time::Instant;
+fn timing_case(label: &str, scene: Scene, budget: u128) {
+    let start = std::time::Instant::now();
+    let (analysis, pairs) = run(&scene, 1);
+    let elapsed = start.elapsed().as_millis();
+    println!(
+        "{label}: {elapsed} ms, {} of {} candidates checked, {} hits",
+        analysis.checked,
+        analysis.candidates,
+        pairs.len()
+    );
+    assert!(!pairs.is_empty());
+    assert!(elapsed < budget, "{label} exceeded {budget} ms");
+}
 
-    for (label, scene, budget) in [
-        ("pin", pin_scene(false), 500),
-        ("2000-boxes", overlapping(2000, 2.0, 1), 2000),
-        ("600-holes", peg_scene(600), 2000),
-    ] {
-        let start = Instant::now();
-        let (analysis, pairs) = run(&scene, 1);
-        let elapsed = start.elapsed().as_millis();
-        println!(
-            "{label}: {elapsed} ms, {} of {} candidates checked, {} hits",
-            analysis.checked,
-            analysis.candidates,
-            pairs.len()
-        );
-        assert!(!pairs.is_empty());
-        assert!(elapsed < budget, "{label} exceeded {budget} ms");
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn release_pin_budget() {
+    timing_case("pin", pin_scene(false), 500);
+}
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn release_many_boxes_budget() {
+    timing_case("2000-boxes", overlapping(2000, 2.0, 1), 2000);
+}
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn release_many_holes_budget() {
+    timing_case("600-holes", peg_scene(600), 2000);
+}
+
+#[test]
+fn invalid_lattice_inputs_return_without_sampling() {
+    let scene = overlapping(2, 2.0, 1);
+    let candidate = Candidate {
+        a: 0,
+        b: 1,
+        min: [0.0; 3],
+        max: [2.0; 3],
+        weight: 1,
+    };
+    for target in [f64::NAN, 0.0, -1.0, f64::INFINITY] {
+        assert_eq!(plan(&[candidate], 1, target, u64::MAX).1, 0);
     }
+    assert_eq!(plan(&[candidate], 1, 1.0, u64::MAX).1, 1);
+    let request = LatticeRequest {
+        scene: &scene,
+        bodies: (0, Some(1)),
+        min: [0.0; 3],
+        max: [2.0; 3],
+        cell: 1.0,
+        tolerance: 0.001,
+    };
+    assert_eq!(sample_axis(&request, 3).rays, 0);
+    for cell in [f64::NAN, 0.0, -1.0] {
+        let bad = LatticeRequest { cell, ..request };
+        assert_eq!(sample_axis(&bad, 0).rays, 0);
+    }
+    for min in [[f64::NAN, 0.0, 0.0], [3.0, 0.0, 0.0], [2.0, 0.0, 0.0]] {
+        let bad = LatticeRequest { min, ..request };
+        assert_eq!(sample_axis(&bad, 0).rays, 0);
+    }
+    assert!(
+        sample_axis(
+            &LatticeRequest {
+                cell: f64::INFINITY,
+                ..request
+            },
+            0
+        )
+        .rays
+            >= 256
+    );
+}
+
+#[test]
+fn refined_hit_box_uses_only_retained_leaves() {
+    let scene = scene(
+        vec![box_prism([0.4, 0.4, 0.0], 0.2, 0.2, 1.0)],
+        vec![analysed(&[(Op::Union, 0)])],
+    );
+    let request = LatticeRequest {
+        scene: &scene,
+        bodies: (0, None),
+        min: [0.0; 3],
+        max: [16.0, 16.0, 1.0],
+        cell: 1.0,
+        tolerance: 0.001,
+    };
+    let result = sample_axis(&request, 2);
+    assert!(result.hit);
+    assert!(result.min[0] > 0.0 && result.max[0] < 1.0);
+    assert!(result.min[1] > 0.0 && result.max[1] < 1.0);
+}
+
+#[test]
+fn centre_witness_survives_missed_subrays() {
+    let scene = scene(
+        vec![box_prism([0.4999, 0.4999, 0.0], 0.0002, 0.0002, 1.0)],
+        vec![analysed(&[(Op::Union, 0)])],
+    );
+    let request = LatticeRequest {
+        scene: &scene,
+        bodies: (0, None),
+        min: [0.0; 3],
+        max: [16.0, 16.0, 1.0],
+        cell: 1.0,
+        tolerance: 0.001,
+    };
+    let result = sample_axis(&request, 2);
+    assert!(result.hit);
+    assert_eq!((result.min[0], result.max[0]), (0.0, 1.0));
+}
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn shared_complex_tool_setup_stays_bounded() {
+    let Tool::Prism(mut prism) = box_prism([0.0; 3], 2.0, 2.0, 2.0) else {
+        unreachable!()
+    };
+    prism.loops = vec![circle([1.0, 1.0], 1.0, 20_000)];
+    let mut scene = scene(
+        vec![Tool::Prism(prism)],
+        (0..200).map(|_| analysed(&[(Op::Union, 0)])).collect(),
+    );
+    scene.budget_million_rays = 1;
+    let start = std::time::Instant::now();
+    let (analysis, pairs) = run(&scene, 1);
+    let elapsed = start.elapsed().as_millis();
+    println!(
+        "200 bodies: {elapsed} ms, {} candidates, {} hits",
+        analysis.candidates,
+        pairs.len()
+    );
+    assert_eq!(analysis.candidates, 19_900);
+    assert!(!pairs.is_empty());
+    assert!(elapsed < 5_000);
+}
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn wide_lattice_finds_seeded_corners_and_thin_z_overlap() {
+    let pair = Candidate {
+        a: 0,
+        b: 1,
+        min: [0.0; 3],
+        max: [100.0, 100.0, 20.0],
+        weight: 1,
+    };
+    let mut random = Random(9381);
+    for _ in 0..200 {
+        let y = 20.0 + f64::from(random.next(60_000)) / 1000.0;
+        let Tool::Prism(mut triangle) = box_prism([97.6, y, 9.0], 1.0, 1.0, 0.2) else {
+            unreachable!()
+        };
+        triangle.loops = vec![Loop {
+            points: vec![0.0, 0.0, 70.0, -70.0, 70.0, 70.0],
+            faces: vec![2; 3],
+        }];
+        let scene = two(
+            box_prism([0.0; 3], 100.0, 100.0, 20.0),
+            Tool::Prism(triangle),
+        );
+        assert!(analyse_pair(&scene, &pair, 1.0, 0).0.is_some(), "y={y}");
+    }
+    let scene = scene(
+        vec![
+            box_prism([0.0; 3], 100.0, 100.0, 0.127),
+            box_prism([0.0, 0.0, 1.0], 100.0, 100.0, 19.0),
+            box_prism([13.31, 24.62, 0.125], 1.0, 1.0, 1.0),
+        ],
+        vec![
+            analysed(&[(Op::Union, 0)]),
+            analysed(&[(Op::Union, 1), (Op::Union, 2)]),
+        ],
+    );
+    let result = analyse_pair(&scene, &pair, 1.0, 0).0.unwrap();
+    assert!((result.volume - 0.002).abs() < 1e-10);
 }

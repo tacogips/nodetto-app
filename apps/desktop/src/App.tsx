@@ -35,6 +35,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ExportDialog,
+  type Camera3d,
   CopyShapesDialog,
   effectiveShowSlideArea,
   Icon,
@@ -220,6 +221,7 @@ export function App(props: AppProps): JSX.Element {
 
   // Editor chrome state (design editor-ux 3.3, 3.5, 3.6, 4).
   const preferences = loadEditorPreferences(preferenceStorage());
+  const cadCameras = new Map<PageId, Camera3d>();
   const [theme, setTheme] = createSignal(preferences.theme);
   const [canvasBackground, setCanvasBackground] = createSignal(
     preferences.canvasBackground,
@@ -748,6 +750,13 @@ export function App(props: AppProps): JSX.Element {
           exportGerber={exportHandlers.exportGerber}
           exportPcb={exportHandlers.exportPcbGerber}
           exportStl={exportHandlers.exportStl}
+          cadCurrentView={() => cadCameras.get(props.editor.currentPageId)}
+          captureCadImage={
+            props.exportBackend.captureSolid
+              ? exportHandlers.captureCadImage
+              : undefined
+          }
+          canvasMode={resolveCanvasMode(canvasBackground(), resolvedTheme())}
           error={exportError()}
           onClose={() => setExportRequest(0)}
         />
@@ -979,6 +988,9 @@ export function App(props: AppProps): JSX.Element {
           >
             <NodettoCanvas
               cadEngine={cadEngine()}
+              onCadCameraChange={(pageId, camera) => {
+                cadCameras.set(pageId, camera);
+              }}
               onCadImportPicker={(open) => {
                 openCadImport = open;
               }}

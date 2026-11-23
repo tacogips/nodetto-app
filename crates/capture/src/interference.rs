@@ -5,6 +5,7 @@ use std::thread;
 use crate::lattice::{self, Bounds, LatticeRequest};
 use crate::report::{Analysis, PairReport};
 use crate::scene::{Op, Scene};
+use crate::tool_view::ViewCache;
 use crate::CaptureError;
 
 const MIN_RAYS: u64 = 3 * 16 * 16;
@@ -27,8 +28,7 @@ impl Candidate {
 
 /// The first `keep` candidates in body order and the number of all candidates.
 pub fn candidates(scene: &Scene, boxes: &[Bounds], keep: usize) -> (Vec<Candidate>, u64) {
-    let loops = lattice::tool_loops(scene);
-    collect_candidates(scene, boxes, &lattice::tool_bounds(&loops), keep)
+    collect_candidates(scene, boxes, &lattice::scene_tool_bounds(scene), keep)
 }
 
 fn collect_candidates(
@@ -42,7 +42,15 @@ fn collect_candidates(
         .iter()
         .zip(boxes)
         .enumerate()
-        .filter(|&(_, (body, &bounds))| body.analysed && lattice::valid_bounds(bounds))
+        .filter(|&(_, (body, &bounds))| {
+            body.analysed
+                && lattice::valid_bounds(bounds)
+                && body
+                    .steps
+                    .first()
+                    .and_then(|step| scene.tools.get(step.tool as usize))
+                    .is_some_and(crate::tool_view::is_solid)
+        })
         .map(|(i, (_, &bounds))| (i, bounds))
         .collect::<Vec<_>>();
     let mut stored = Vec::new();
@@ -78,6 +86,9 @@ fn collect_candidates(
 /// Select one cell size for all checked pairs. An infinite nominal cell means
 /// every side uses the minimum count of 16.
 pub fn plan(candidates: &[Candidate], total: u64, target_cell: f64, budget: u64) -> (f64, usize) {
+    if !target_cell.is_finite() || target_cell <= 0.0 {
+        return (target_cell, 0);
+    }
     let mut used = 0;
     let minimum_fits = candidates
         .iter()
@@ -122,8 +133,9 @@ pub fn analyse_pair(
     refinement: u64,
 ) -> (Option<PairReport>, f64) {
     let loops = lattice::tool_loops(scene);
-    let tools = lattice::tool_bounds(&loops);
-    let result = sample(scene, candidate, cell, refinement, &loops, &tools);
+    let tools = lattice::scene_tool_bounds(scene);
+    let cache = ViewCache::new(scene.tools.len());
+    let result = sample(scene, candidate, cell, refinement, &loops, &tools, &cache);
     (result.report, result.cell)
 }
 
@@ -134,6 +146,7 @@ fn sample(
     refinement: u64,
     loops: &[Vec<Bounds>],
     tools: &[Bounds],
+    cache: &ViewCache,
 ) -> PairSample {
     let request = LatticeRequest {
         scene,
@@ -143,7 +156,13 @@ fn sample(
         cell,
         tolerance: scene.tolerance,
     };
-    let axes = lattice::sample_pair(&request, loops, tools, refinement / pair.weight);
+    let axes = lattice::sample_pair(
+        &request,
+        loops,
+        tools,
+        refinement / pair.weight.max(1),
+        cache,
+    );
     let cell = axes.iter().map(|sample| sample.cell).fold(0.0, f64::max);
     let capped = axes.iter().any(|sample| sample.capped);
     let mut extent = lattice::empty_bounds();
@@ -183,7 +202,7 @@ pub(crate) fn analyse_scene(
 ) -> Result<(Analysis, Vec<PairReport>), CaptureError> {
     let budget = u64::from(scene.budget_million_rays) * 1_000_000;
     let loops = lattice::tool_loops(scene);
-    let tools = lattice::tool_bounds(&loops);
+    let tools = lattice::scene_tool_bounds(scene);
     let boxes = scene
         .bodies
         .iter()
@@ -207,12 +226,13 @@ pub(crate) fn analyse_scene(
         .iter()
         .map(|pair| pair.work(cell))
         .sum();
+    let cache = ViewCache::new(scene.tools.len());
     let cast_pairs = |pairs: &[Candidate]| {
         pairs
             .iter()
             .map(|pair| {
                 let allowance = allocate(budget, pair.work(cell), work);
-                sample(scene, pair, cell, allowance, &loops, &tools)
+                sample(scene, pair, cell, allowance, &loops, &tools, &cache)
             })
             .collect::<Vec<_>>()
     };
@@ -284,10 +304,31 @@ mod tests {
     use crate::scene::parse_scene;
 
     #[test]
+    fn exact_refinement_allowance_counts_only_cast_rays() {
+        let scene = parse_scene(include_bytes!("../tests/fixtures/plate-iso.ncs1")).unwrap();
+        let loops = lattice::tool_loops(&scene);
+        let tools = lattice::scene_tool_bounds(&scene);
+        let cache = ViewCache::new(scene.tools.len());
+        let pair = Candidate {
+            a: 0,
+            b: 1,
+            min: [85.0, 45.0, 2.0],
+            max: [100.0, 60.0, 5.0],
+            weight: 1,
+        };
+        let sample = sample(&scene, &pair, 1.0, 128, &loops, &tools, &cache);
+        assert_eq!(
+            sample.rays,
+            lattice::level0_rays(pair.min, pair.max, 1.0) + 128
+        );
+        assert!(sample.capped);
+    }
+
+    #[test]
     fn weighted_refinement_spends_no_more_than_its_proportional_allowances() {
         let scene = parse_scene(include_bytes!("../tests/fixtures/plate-iso.ncs1")).unwrap();
         let loops = lattice::tool_loops(&scene);
-        let tools = lattice::tool_bounds(&loops);
+        let tools = lattice::scene_tool_bounds(&scene);
         let candidates = [
             Candidate {
                 a: 0,
@@ -306,17 +347,160 @@ mod tests {
         ];
         let (budget, cell) = (4_001, 1.0);
         let work: u64 = candidates.iter().map(|pair| pair.work(cell)).sum();
+        let cache = ViewCache::new(scene.tools.len());
         let mut used = 0;
         let mut capped = false;
         for pair in &candidates {
             let level0 = pair.work(cell);
             let allowance = allocate(budget, level0, work);
-            let sample = sample(&scene, pair, cell, allowance, &loops, &tools);
+            let sample = sample(&scene, pair, cell, allowance, &loops, &tools, &cache);
             let refined = sample.rays * pair.weight - level0;
             assert!(refined <= allowance);
             used += refined;
             capped |= sample.capped;
         }
         assert!(capped && used > 0 && used <= budget);
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewPair {
+    pub a: u32,
+    pub b: u32,
+    pub min: [f64; 3],
+    pub max: [f64; 3],
+}
+
+pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPair], cell: f64) {
+    for view in seen {
+        let min = view.min.map(|v| v - cell);
+        let max = view.max.map(|v| v + cell);
+        let side = (0..3).map(|i| max[i] - min[i]).fold(0.0, f64::max);
+        let candidate = Candidate {
+            a: view.a,
+            b: view.b,
+            min,
+            max,
+            weight: 1,
+        };
+        let (report, _) = analyse_pair(scene, &candidate, cell.min(side / 16.0), 0);
+        let mut report = report.unwrap_or(PairReport {
+            a: view.a,
+            b: view.b,
+            volume: 0.0,
+            min: view.min,
+            max: view.max,
+            from_view: true,
+            capped: false,
+        });
+        report.from_view = true;
+        pairs.push(report);
+    }
+    pairs.sort_by_key(|p| (p.a, p.b));
+}
+
+#[cfg(test)]
+mod view_tests {
+    use super::*;
+    #[test]
+    fn view_pairs_preserve_reports_and_fallback() {
+        let scene =
+            crate::scene::parse_scene(include_bytes!("../tests/fixtures/plate-iso.ncs1")).unwrap();
+        let original = PairReport {
+            a: 1,
+            b: 2,
+            volume: 42.0,
+            min: [0.0; 3],
+            max: [1.0; 3],
+            from_view: false,
+            capped: false,
+        };
+        let mut hit = Vec::new();
+        add_view_pairs(
+            &scene,
+            &mut hit,
+            &[ViewPair {
+                a: 0,
+                b: 1,
+                min: [85.0, 45.0, 2.0],
+                max: [100.0, 60.0, 5.0],
+            }],
+            1.0,
+        );
+        assert!(hit[0].from_view && hit[0].volume > 0.0);
+        let mut pairs = vec![original];
+        let seen = [ViewPair {
+            a: 0,
+            b: 1,
+            min: [1000.0; 3],
+            max: [1001.0; 3],
+        }];
+        add_view_pairs(&scene, &mut pairs, &seen, 0.25);
+        assert_eq!(
+            (pairs[0].a, pairs[0].b, pairs[0].volume, pairs[0].from_view),
+            (0, 1, 0.0, true)
+        );
+        assert_eq!(pairs[0].min, seen[0].min);
+        assert_eq!(
+            (pairs[1].a, pairs[1].b, pairs[1].volume, pairs[1].from_view),
+            (1, 2, 42.0, false)
+        );
+    }
+}
+
+#[cfg(test)]
+mod pin_view_test {
+    use super::*;
+    use crate::scene::{Body, Loop, Op, Prism, Step, Tool};
+    fn prism(origin: [f64; 3], width: f64, height: f64) -> Tool {
+        Tool::Prism(Prism {
+            o: origin,
+            u: [1.0, 0.0, 0.0],
+            v: [0.0, 1.0, 0.0],
+            n: [0.0, 0.0, 1.0],
+            t0: 0.0,
+            t1: height,
+            loops: vec![Loop {
+                points: vec![0.0, 0.0, width, 0.0, width, width, 0.0, width],
+                faces: vec![2; 4],
+            }],
+        })
+    }
+    #[test]
+    fn view_box_finds_thin_pin_in_plate() {
+        let mut scene =
+            crate::scene::parse_scene(include_bytes!("../tests/fixtures/plate-iso.ncs1")).unwrap();
+        scene.tools = vec![
+            prism([0.0, 0.0, 0.0], 4.0, 1.0),
+            prism([2.0, 2.0, 0.0], 0.05, 1.0),
+        ];
+        scene.bodies = (0..2)
+            .map(|tool| Body {
+                reference: false,
+                analysed: true,
+                steps: vec![Step {
+                    op: Op::Union,
+                    tool,
+                }],
+            })
+            .collect();
+        let mut pairs = vec![];
+        add_view_pairs(
+            &scene,
+            &mut pairs,
+            &[ViewPair {
+                a: 0,
+                b: 1,
+                min: [2.0, 2.0, 0.0],
+                max: [2.05, 2.05, 1.0],
+            }],
+            0.05,
+        );
+        assert_eq!(pairs.len(), 1);
+        assert!(
+            pairs[0].from_view && pairs[0].volume > 0.0,
+            "{:?}",
+            pairs[0]
+        );
     }
 }

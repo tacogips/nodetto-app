@@ -76,3 +76,35 @@ fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
         a[0] * b[1] - a[1] * b[0],
     ]
 }
+
+#[allow(dead_code)]
+pub fn scene(tools: Vec<Tool>, bodies: Vec<Body>) -> nodetto_capture::scene::Scene {
+    let mut scene =
+        nodetto_capture::scene::parse_scene(include_bytes!("../fixtures/selected-loops-top.ncs1"))
+            .unwrap();
+    scene.width = 96;
+    scene.height = 96;
+    scene.supersample = 1;
+    scene.camera = camera([0.0, 0.0, -1.0], [0.0; 3], 0.25);
+    scene.tools = tools;
+    scene.bodies = bodies;
+    scene.analyse = true;
+    scene.draw_interference = true;
+    scene.target_cell = 0.25;
+    scene.budget_million_rays = 24;
+    scene
+}
+
+#[allow(dead_code)]
+pub fn cube_mesh() -> Tool {
+    Tool::Mesh(nodetto_capture::scene::Mesh {
+        positions: vec![
+            -4.0, -4.0, 0.0, 4.0, -4.0, 0.0, 4.0, 4.0, 0.0, -4.0, 4.0, 0.0, -4.0, -4.0, 4.0, 4.0,
+            -4.0, 4.0, 4.0, 4.0, 4.0, -4.0, 4.0, 4.0,
+        ],
+        triangles: vec![
+            0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7,
+            6, 3, 0, 4, 3, 4, 7,
+        ],
+    })
+}

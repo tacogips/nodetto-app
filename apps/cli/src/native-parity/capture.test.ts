@@ -419,3 +419,91 @@ nativeTest(
   },
   30_000,
 );
+
+nativeTest(
+  "CAD interference is reported consistently across views and capture options",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-interference-"));
+    try {
+      let expectedLines: string[] | undefined;
+      for (const view of ["top", "front", "iso"]) {
+        const result = runCad(cwd, plateFixture, [
+          "--view",
+          view,
+          "--size",
+          "320x240",
+        ]);
+        const lines = result.stdout
+          .split("\n")
+          .filter(
+            (line) =>
+              line.startsWith("interference:") ||
+              line.startsWith("  Plate x Block:"),
+          );
+        expect(lines[0]).toBe(
+          "interference: 1 (1 candidate pair checked, cell 0.25 mm)",
+        );
+        const volume = Number(/volume ([0-9.]+) mm3/.exec(lines[1] ?? "")?.[1]);
+        expect(Math.abs(volume - 590.721) / 590.721).toBeLessThan(0.01);
+        if (expectedLines) expect(lines).toEqual(expectedLines);
+        expectedLines = lines;
+      }
+      const enabled = runCad(cwd, plateFixture, [
+        "--view",
+        "top",
+        "--size",
+        "320x240",
+      ]);
+      const repeated = runCad(cwd, plateFixture, [
+        "--view",
+        "top",
+        "--size",
+        "320x240",
+      ]);
+      expect(repeated.bytes).toEqual(enabled.bytes);
+      const disabled = runCad(cwd, plateFixture, [
+        "--view",
+        "top",
+        "--size",
+        "320x240",
+        "--no-interference",
+      ]);
+      expect(disabled.stdout).toContain("interference: not checked");
+      expect(disabled.bytes.equals(enabled.bytes)).toBe(false);
+      expect(
+        runCad(cwd, plateFixture, [
+          "--interference-cell",
+          "1",
+          "--size",
+          "320x240",
+        ]).stdout,
+      ).toContain("cell 1 mm");
+      expect(
+        runCad(cwd, plateFixture, [
+          "--interference-bodies",
+          "Plate,Puck",
+          "--size",
+          "320x240",
+        ]).stdout,
+      ).toContain("interference: 0");
+      const failure = Bun.spawnSync(
+        [
+          binary as string,
+          "capture",
+          plateFixture,
+          "--size",
+          "320x240",
+          "--output",
+          "fail.png",
+          "--fail-on-interference",
+        ],
+        { cwd },
+      );
+      expect(failure.exitCode).toBe(1);
+      expect(existsSync(join(cwd, "fail.png"))).toBe(true);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);

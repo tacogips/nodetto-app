@@ -195,3 +195,52 @@ test("raster background and padding settings are bounded without changing artboa
     ).toThrow("background");
   expect(editor.getSnapshot()).toEqual(before);
 });
+
+test("raster encoding selects PNG by default and JPEG quality when requested", async () => {
+  const saved = [
+    [globalThis, "Image"],
+    [globalThis, "document"],
+    [URL, "createObjectURL"],
+    [URL, "revokeObjectURL"],
+  ].map(([target, key]) => ({
+    target: target as object,
+    key: key as string,
+    descriptor: Object.getOwnPropertyDescriptor(target, key as string),
+  }));
+  const calls: [string, number | undefined][] = [];
+  const canvas = {
+    width: 0,
+    height: 0,
+    getContext: () => ({ drawImage: () => {} }),
+    toBlob: (
+      callback: (blob: Blob) => void,
+      type: string,
+      quality?: number,
+    ) => {
+      calls.push([type, quality]);
+      callback(new Blob(["image"], { type }));
+    },
+  };
+  const set = (target: object, key: string, value: unknown) =>
+    Object.defineProperty(target, key, { configurable: true, value });
+  set(globalThis, "Image", function ImageDouble() {
+    return { src: "", decode: async () => {} };
+  });
+  set(globalThis, "document", { createElement: () => canvas });
+  set(URL, "createObjectURL", () => "blob:test");
+  set(URL, "revokeObjectURL", () => {});
+  try {
+    const svg = '<svg viewBox="0 0 10 20"></svg>';
+    await rasterizeSvg(svg, 1);
+    await rasterizeSvg(svg, 1, undefined, { type: "image/jpeg", quality: 0.9 });
+    expect(calls).toEqual([
+      ["image/png", undefined],
+      ["image/jpeg", 0.9],
+    ]);
+  } finally {
+    for (const { target, key, descriptor } of saved) {
+      if (descriptor) Object.defineProperty(target, key, descriptor);
+      else Reflect.deleteProperty(target, key);
+    }
+  }
+});

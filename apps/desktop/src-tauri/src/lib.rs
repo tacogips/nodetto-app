@@ -6,6 +6,7 @@
 // parses or interprets JSONL.
 
 mod attachments;
+mod capture;
 mod cli_install;
 mod close;
 mod dialogs;
@@ -44,6 +45,7 @@ pub fn run() {
         .manage(watch::WatchState::default())
         .manage(launch::LaunchState::from_args(std::env::args()))
         .invoke_handler(tauri::generate_handler![
+            capture::capture_solid,
             file_menu::take_file_menu_actions,
             close::enable_close_guard,
             close::finish_document_close,

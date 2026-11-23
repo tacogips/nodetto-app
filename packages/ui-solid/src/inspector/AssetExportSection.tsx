@@ -28,7 +28,7 @@ import {
 } from "../pdf-export.ts";
 import { NumberInput } from "../NumberInput.tsx";
 
-export type ExportFormat = "svg" | "png" | "pdf";
+export type ExportFormat = "svg" | "png" | "jpg" | "pdf";
 export type SaveArtwork = (
   name: string,
   blob: Blob,
@@ -43,7 +43,8 @@ export function AssetExportSection(props: {
   save?: SaveArtwork;
 }): JSX.Element {
   const signals = createEditorSignals(props.editor);
-  const format = () => props.format;
+  const [rasterFormat, setRasterFormat] = createSignal<"png" | "jpg">("png");
+  const format = () => (props.format === "png" ? rasterFormat() : props.format);
   const [scale, setScale] = createSignal(2);
   const [preferredScope, setPreferredScope] = createSignal("auto");
   const scope = () =>
@@ -78,7 +79,13 @@ export function AssetExportSection(props: {
       wholePage: scope() === "page",
       padding: padding(),
       background:
-        format() === "pdf" ? background() : transparent() ? null : background(),
+        format() === "jpg" && transparent()
+          ? "#ffffff"
+          : format() === "pdf" || format() === "jpg"
+            ? background()
+            : transparent()
+              ? null
+              : background(),
     });
   const preview = createMemo(() => {
     signals.rev();
@@ -91,7 +98,7 @@ export function AssetExportSection(props: {
           error: "",
         };
       const pixels = rasterDimensions(data.width, data.height, scale());
-      if (format() === "png")
+      if (format() === "png" || format() === "jpg")
         return {
           label: `${pixels.width} × ${pixels.height} pixels`,
           error: "",
@@ -143,7 +150,12 @@ export function AssetExportSection(props: {
       if (kind === "svg")
         blob = new Blob([data.svg], { type: "image/svg+xml" });
       else {
-        const png = await rasterizeSvg(data.svg, density, signal);
+        const png = await rasterizeSvg(
+          data.svg,
+          density,
+          signal,
+          kind === "jpg" ? { type: "image/jpeg", quality: 0.9 } : undefined,
+        );
         blob =
           kind === "pdf"
             ? await pngToPdf(
@@ -224,6 +236,21 @@ export function AssetExportSection(props: {
             <option value="page">Current page</option>
           </select>
         </label>
+        <Show when={props.format === "png"}>
+          <label>
+            Image format
+            <select
+              aria-label="Artwork image format"
+              value={rasterFormat()}
+              onChange={(e) =>
+                setRasterFormat(e.currentTarget.value === "jpg" ? "jpg" : "png")
+              }
+            >
+              <option value="png">PNG</option>
+              <option value="jpg">JPG</option>
+            </select>
+          </label>
+        </Show>
         <Show when={scope() !== "artboard"}>
           <div>
             Artwork padding (canvas units)
@@ -244,6 +271,9 @@ export function AssetExportSection(props: {
             />
             Transparent background
           </label>
+        </Show>
+        <Show when={format() === "jpg" && transparent()}>
+          <p>JPG uses an opaque background.</p>
         </Show>
         <Show when={format() === "pdf" || !transparent()}>
           <label>

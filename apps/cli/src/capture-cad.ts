@@ -2,13 +2,17 @@ import {
   type CadCaptureRequest,
   type CaptureCameraRequest,
   CaptureInputError,
+  describeBodies,
+  describeInterference,
   type CaptureView,
   parseSolidReport,
   prepareCadCapture,
 } from "@nodetto/core";
 import type { Element, Page } from "@nodetto/ir";
+import { decodeCaptureMesh } from "@nodetto/io/nmesh";
 import type { CaptureBackend } from "./capture-command.ts";
 import { shortIds } from "./ids.ts";
+import { interferenceExitCode } from "./capture-interference-options.ts";
 
 export const CAMERA_OPTIONS = [
   "--view",
@@ -104,15 +108,6 @@ function errorLines(
   return errors.map(({ id, code }) => `  ${ids.get(id) ?? id} ${code}`);
 }
 
-const STATE_NOTE = {
-  drawn: "",
-  hidden: " [hidden behind other bodies]",
-  absent: " [not in the picture]",
-  outside: " [outside the picture]",
-  empty: " [no material]",
-  unknown: " [not sampled]",
-};
-
 function textVector(values: readonly number[]): string {
   return values.map((value) => Number(value.toFixed(5))).join(",");
 }
@@ -124,12 +119,12 @@ export function renderCadCapture(
   renderSolid: NonNullable<CaptureBackend["renderSolid"]>,
   format: "png" | "jpg",
   quality: number,
+  failOnInterference = false,
 ) {
-  const { scene, model, camera, frame } = prepareCadCapture(
-    elements,
-    page.id,
-    request,
-  );
+  const { scene, model, camera, frame } = prepareCadCapture(elements, page.id, {
+    ...request,
+    decodeMesh: decodeCaptureMesh,
+  });
   const rendered = renderSolid(scene, format, quality);
   const report = parseSolidReport(rendered.report);
   if (
@@ -140,32 +135,43 @@ export function renderCadCapture(
     throw new Error(
       "The solid capture report does not match the requested scene.",
     );
-  const bodies = report.bodies.map(({ state }, index) => {
+  const bodies = report.bodies.map((bodyReport, index) => {
     const body = model.bodies[index];
     if (!body) throw new Error("Missing body in the solid capture scene.");
-    return { id: body.id, name: body.name, state };
+    return { id: body.id, name: body.name, ...bodyReport };
   });
-  const names = bodies
-    .slice(0, 8)
-    .map(({ name, state }) => name + STATE_NOTE[state]);
-  if (bodies.length > 8) names.push("...");
+  const describedBodies = describeBodies(report, model);
+  const interference = describeInterference(report, model.bodies);
+  const sampledErrors = describedBodies.errors.map(({ id, code, text }) => ({
+    id,
+    code,
+    text,
+    sampled: true as const,
+  }));
+  const ids = shortIds(elements.map(({ id }) => id));
   const { view, forward: direction, right, up, centre, mmPerPixel } = camera;
   return {
     width: report.width,
     height: report.height,
     image: rendered.image,
+    exitCode: interferenceExitCode(report, failOnInterference),
     metadata: {
       camera: { view, direction, up, right, centre, mmPerPixel },
       frame,
       bodies,
-      errors: model.errors,
+      errors: [...model.errors, ...sampledErrors],
+      interference: interference.json,
     },
     lines: [
       `camera: view=${view} direction=${textVector(direction)} up=${textVector(up)} centre=${textVector(centre)} scale=${Number(mmPerPixel.toPrecision(4))} mm/px`,
       `frame: ${frame}`,
-      `bodies: ${bodies.length} (${names.join(", ")})`,
-      `errors: ${model.errors.length}`,
+      describedBodies.line,
+      `errors: ${model.errors.length + sampledErrors.length}`,
       ...errorLines(elements, model.errors),
+      ...sampledErrors.map(
+        ({ id, code, text }) => `  ${ids.get(id) ?? id} ${code} ${text}`,
+      ),
+      ...interference.lines,
     ],
   };
 }

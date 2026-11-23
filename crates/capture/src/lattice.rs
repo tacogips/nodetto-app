@@ -1,11 +1,11 @@
 //! Camera-independent sampling of one or two folded prism bodies.
 
 use crate::interval::{combine, overlap, Boundary, Intervals};
-use crate::prism::PrismView;
-use crate::scene::{Op, Scene, Step, Tool};
-use crate::view::{Ray, RayFamily};
+use crate::scene::{Op, Scene, Step};
+use crate::tool_view::{ToolView, ViewCache};
+use crate::view::Ray;
 
-pub(crate) type Bounds = ([f64; 3], [f64; 3]);
+pub type Bounds = ([f64; 3], [f64; 3]);
 
 const AXIS_REFINEMENT_LIMIT: u64 = 2_000_000;
 const SMALL_LOOP_CELLS: f64 = 4.0;
@@ -36,38 +36,7 @@ pub(crate) fn tool_loops(scene: &Scene) -> Vec<Vec<Bounds>> {
     scene
         .tools
         .iter()
-        .map(|tool| {
-            let Tool::Prism(prism) = tool else {
-                return Vec::new();
-            };
-            if !crate::prism::orthonormal([prism.u, prism.v, prism.n]) || prism.t0 == prism.t1 {
-                return Vec::new();
-            }
-            prism
-                .loops
-                .iter()
-                .filter_map(|profile| {
-                    let (points, remainder) = profile.points.as_chunks::<2>();
-                    if !remainder.is_empty()
-                        || points.len() < 3
-                        || points.len() != profile.faces.len()
-                    {
-                        return None;
-                    }
-                    let mut bounds = empty_bounds();
-                    for &[x, y] in points {
-                        for axis in 0..3 {
-                            let base = prism.o[axis] + prism.u[axis] * x + prism.v[axis] * y;
-                            let a = base + prism.n[axis] * prism.t0;
-                            let b = base + prism.n[axis] * prism.t1;
-                            bounds.0[axis] = bounds.0[axis].min(a.min(b));
-                            bounds.1[axis] = bounds.1[axis].max(a.max(b));
-                        }
-                    }
-                    valid_bounds(bounds).then_some(bounds)
-                })
-                .collect()
-        })
+        .map(crate::tool_view::tool_loops)
         .collect()
 }
 
@@ -86,16 +55,11 @@ pub(crate) fn extend((min, max): &mut Bounds, (lo, hi): Bounds) {
     }
 }
 
-pub(crate) fn tool_bounds(loops: &[Vec<Bounds>]) -> Vec<Bounds> {
-    loops
+pub(crate) fn scene_tool_bounds(scene: &Scene) -> Vec<Bounds> {
+    scene
+        .tools
         .iter()
-        .map(|loops| {
-            let mut bounds = empty_bounds();
-            for &bounds_of_loop in loops {
-                extend(&mut bounds, bounds_of_loop);
-            }
-            bounds
-        })
+        .map(|tool| crate::tool_view::tool_bounds(tool).unwrap_or_else(empty_bounds))
         .collect()
 }
 
@@ -107,7 +71,7 @@ pub(crate) fn active_step(step: &Step, tools: &[Bounds], (min, max): Bounds) -> 
 }
 
 fn side_count(extent: f64, cell: f64) -> usize {
-    (extent / cell).ceil().clamp(16.0, 1024.0) as usize
+    ((extent / cell).ceil() as usize).clamp(16, 1024)
 }
 
 /// Sum of the level-0 lattice sizes along the three world axes.
@@ -191,16 +155,19 @@ struct Scratch {
     bodies: [Intervals; 2],
 }
 
-struct AxisFold {
-    prisms: Vec<(PrismView, Bounds)>,
+struct AxisFold<'a> {
+    prisms: Vec<(&'a ToolView, Bounds)>,
     steps: [Vec<(Op, Option<usize>)>; 2],
 }
 
-impl AxisFold {
-    fn new(request: &LatticeRequest, grid: Grid, steps: &[Vec<Step>; 2], tools: &[Bounds]) -> Self {
-        let mut forward = [0.0; 3];
-        forward[grid.axis] = 1.0;
-        let family = RayFamily { forward };
+impl<'a> AxisFold<'a> {
+    fn new(
+        request: &LatticeRequest,
+        grid: Grid,
+        steps: &[Vec<Step>; 2],
+        tools: &[Bounds],
+        cache: &'a ViewCache,
+    ) -> Self {
         let mut prisms = Vec::new();
         // Most pairs use only a small subset of the scene's tools.
         let mut indices = std::collections::HashMap::new();
@@ -210,14 +177,12 @@ impl AxisFold {
                 .map(|step| {
                     let tool = step.tool as usize;
                     let index = indices.entry(tool).or_insert_with(|| {
-                        let Tool::Prism(prism) = request.scene.tools.get(tool)? else {
-                            return None;
-                        };
+                        let source = request.scene.tools.get(tool)?;
                         if !valid_bounds(tools[tool]) {
                             return None;
                         }
                         let index = prisms.len();
-                        prisms.push((PrismView::new(prism, step.tool, &family), tools[tool]));
+                        prisms.push((cache.get(source, tool, grid.axis), tools[tool]));
                         Some(index)
                     });
                     (step.op, *index)
@@ -336,7 +301,7 @@ impl Accumulator {
 struct AxisSampler<'a, 's> {
     request: &'a LatticeRequest<'s>,
     grid: Grid,
-    fold: AxisFold,
+    fold: AxisFold<'a>,
     scratch: Scratch,
 }
 
@@ -362,54 +327,64 @@ impl AxisSampler<'_, '_> {
     fn sample(mut self, small: &[u8], small_rays: u64, boundary_left: &mut u64) -> AxisSample {
         let grid = self.grid;
         let [width, height] = grid.size;
-        let base = (0..height)
-            .flat_map(|y| (0..width).map(move |x| [x, y]))
-            .map(|cell| self.cast(cell, [0, 0], 1).1)
-            .collect::<Vec<_>>();
+        let mut rows = [Vec::new(), Vec::new(), Vec::new()];
+        for (y, row) in rows.iter_mut().enumerate().take(height.min(2)) {
+            *row = (0..width).map(|x| self.cast([x, y], [0, 0], 1).1).collect();
+        }
+        let mut rays = (width * height) as u64;
         let mut result = Accumulator::new();
         let mut small_left = small_rays;
         let mut axis_left = AXIS_REFINEMENT_LIMIT - small_rays;
         let mut capped = false;
-        for (index, &coarse) in base.iter().enumerate() {
-            let [x, y] = [index % width, index / width];
-            let boundary = (x > 0 && base[index - 1].hit() != coarse.hit())
-                || (x + 1 < width && base[index + 1].hit() != coarse.hit())
-                || (y > 0 && base[index - width].hit() != coarse.hit())
-                || (y + 1 < height && base[index + width].hit() != coarse.hit());
-            let marked = small.get(index).copied().unwrap_or(0);
-            let divisions = marked.max(if boundary { BOUNDARY_DIVISIONS } else { 0 });
-            let cost = u64::from(divisions) * u64::from(divisions);
-            if cost == 0 {
-                result.add(grid, self.corner([x, y]), grid.side, coarse);
-                continue;
+        for y in 0..height {
+            if y + 1 < height && y > 0 {
+                rows[(y + 1) % 3] = (0..width)
+                    .map(|x| self.cast([x, y + 1], [0, 0], 1).1)
+                    .collect();
             }
-            let refine = if marked != 0 {
-                spend_prefix(&mut small_left, cost)
-            } else if cost <= axis_left && cost <= *boundary_left {
-                axis_left -= cost;
-                *boundary_left -= cost;
-                true
-            } else {
-                false
-            };
-            if !refine {
-                capped = true;
-                result.add(grid, self.corner([x, y]), grid.side, coarse);
-                continue;
-            }
-            let side = grid.side.map(|side| side / f64::from(divisions));
-            let mut refined_hit = false;
-            for sy in 0..usize::from(divisions) {
-                for sx in 0..usize::from(divisions) {
-                    let (corner, stretch) = self.cast([x, y], [sx, sy], divisions);
-                    refined_hit |= stretch.hit();
-                    result.add(grid, corner, side, stretch);
+            for x in 0..width {
+                let index = y * width + x;
+                let coarse = rows[y % 3][x];
+                let boundary = (x > 0 && rows[y % 3][x - 1].hit() != coarse.hit())
+                    || (x + 1 < width && rows[y % 3][x + 1].hit() != coarse.hit())
+                    || (y > 0 && rows[(y - 1) % 3][x].hit() != coarse.hit())
+                    || (y + 1 < height && rows[(y + 1) % 3][x].hit() != coarse.hit());
+                let marked = small.get(index).copied().unwrap_or(0);
+                let divisions = marked.max(if boundary { BOUNDARY_DIVISIONS } else { 0 });
+                let cost = u64::from(divisions) * u64::from(divisions);
+                if cost == 0 {
+                    result.add(grid, self.corner([x, y]), grid.side, coarse);
+                    continue;
                 }
-            }
-            // An even subgrid does not revisit the centre. Keep the only
-            // witness when all replacement rays miss a real coarse hit.
-            if !refined_hit {
-                result.add(grid, self.corner([x, y]), grid.side, coarse);
+                let refine = if marked != 0 {
+                    spend_prefix(&mut small_left, cost)
+                } else if cost <= axis_left && cost <= *boundary_left {
+                    axis_left -= cost;
+                    *boundary_left -= cost;
+                    true
+                } else {
+                    false
+                };
+                if !refine {
+                    capped = true;
+                    result.add(grid, self.corner([x, y]), grid.side, coarse);
+                    continue;
+                }
+                rays += cost;
+                let side = grid.side.map(|side| side / f64::from(divisions));
+                let mut refined_hit = false;
+                for sy in 0..usize::from(divisions) {
+                    for sx in 0..usize::from(divisions) {
+                        let (corner, stretch) = self.cast([x, y], [sx, sy], divisions);
+                        refined_hit |= stretch.hit();
+                        result.add(grid, corner, side, stretch);
+                    }
+                }
+                // An even subgrid does not revisit the centre. Keep the only
+                // witness when all replacement rays miss a real coarse hit.
+                if !refined_hit {
+                    result.add(grid, self.corner([x, y]), grid.side, coarse);
+                }
             }
         }
         debug_assert_eq!(small_left, 0);
@@ -425,7 +400,7 @@ impl AxisSampler<'_, '_> {
             min,
             max,
             cell: grid.side[0].max(grid.side[1]),
-            rays: base.len() as u64 + AXIS_REFINEMENT_LIMIT - axis_left,
+            rays,
             capped,
         }
     }
@@ -455,6 +430,7 @@ fn sample_axes<const N: usize>(
     loops: &[Vec<Bounds>],
     tools: &[Bounds],
     mut refinement_left: u64,
+    cache: &ViewCache,
 ) -> [AxisSample; N] {
     let steps = [Some(request.bodies.0), request.bodies.1].map(|body| {
         body.and_then(|body| request.scene.bodies.get(body as usize))
@@ -501,18 +477,51 @@ fn sample_axes<const N: usize>(
         AxisSampler {
             request,
             grid,
-            fold: AxisFold::new(request, grid, &steps, tools),
+            fold: AxisFold::new(request, grid, &steps, tools, cache),
             scratch: Scratch::default(),
         }
         .sample(&small[i], small_rays[i], &mut refinement_left)
     })
 }
 
+fn valid_request(request: &LatticeRequest) -> bool {
+    !request.cell.is_nan()
+        && request.cell > 0.0
+        && (0..3).all(|i| {
+            request.min[i].is_finite()
+                && request.max[i].is_finite()
+                && request.min[i] < request.max[i]
+        })
+}
+
+fn empty_sample(request: &LatticeRequest) -> AxisSample {
+    AxisSample {
+        hit: false,
+        volume: 0.0,
+        min: request.min,
+        max: request.min,
+        cell: 0.0,
+        rays: 0,
+        capped: false,
+    }
+}
+
 /// Sample one world axis with the per-axis refinement cap.
 pub fn sample_axis(request: &LatticeRequest, axis: usize) -> AxisSample {
+    if axis > 2 || !valid_request(request) {
+        return empty_sample(request);
+    }
     let loops = tool_loops(request.scene);
-    let tools = tool_bounds(&loops);
-    let [result] = sample_axes(request, [axis], &loops, &tools, AXIS_REFINEMENT_LIMIT);
+    let tools = scene_tool_bounds(request.scene);
+    let cache = ViewCache::new(request.scene.tools.len());
+    let [result] = sample_axes(
+        request,
+        [axis],
+        &loops,
+        &tools,
+        AXIS_REFINEMENT_LIMIT,
+        &cache,
+    );
     result
 }
 
@@ -521,6 +530,196 @@ pub(crate) fn sample_pair(
     loops: &[Vec<Bounds>],
     tools: &[Bounds],
     refinement: u64,
+    cache: &ViewCache,
 ) -> [AxisSample; 3] {
-    sample_axes(request, [0, 1, 2], loops, tools, refinement)
+    if !valid_request(request) {
+        return std::array::from_fn(|_| empty_sample(request));
+    }
+    sample_axes(request, [0, 1, 2], loops, tools, refinement, cache)
+}
+
+/// Sample one body and retain a material witness for every original step.
+/// `budget_left` counts actual rays; the caller converts weighted allowance.
+pub fn sample_body_axis(
+    request: &LatticeRequest,
+    axis: usize,
+    liveness: &mut crate::census::Liveness,
+    budget_left: &mut u64,
+) -> AxisSample {
+    if axis > 2
+        || request.bodies.1.is_some()
+        || !request.cell.is_finite()
+        || !valid_request(request)
+        || !(0..3).all(|i| (request.max[i] - request.min[i]).is_finite())
+    {
+        return empty_sample(request);
+    }
+    let Some(body) = request.scene.bodies.get(request.bodies.0 as usize) else {
+        return empty_sample(request);
+    };
+    let grid = Grid::new(request, axis);
+    let mut ids: Vec<_> = body.steps.iter().map(|step| step.tool).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let slots: Vec<_> = ids
+        .iter()
+        .map(|&id| {
+            let tool = request.scene.tools.get(id as usize);
+            let bounds = tool
+                .filter(|tool| crate::tool_view::is_solid(tool))
+                .and_then(crate::tool_view::tool_bounds);
+            (tool, bounds, std::sync::OnceLock::<ToolView>::new())
+        })
+        .collect();
+    let step_slots: Vec<_> = body
+        .steps
+        .iter()
+        .map(|step| ids.binary_search(&step.tool).ok())
+        .collect();
+    let loops: Vec<_> = slots
+        .iter()
+        .flat_map(|(tool, _, _)| {
+            tool.iter()
+                .flat_map(|tool| crate::tool_view::tool_loops(tool))
+        })
+        .collect();
+    let small = grid.small_loops(request, loops.into_iter());
+    let mut forward = [0.0; 3];
+    forward[axis] = 1.0;
+    let family = crate::view::RayFamily { forward };
+    let mut scratch = Scratch::default();
+    let mut rays = 0u64;
+    let mut any_hit = false;
+    let mut cast = |x: usize, y: usize, sx: usize, sy: usize, divisions: usize| {
+        let mut origin = [0.0; 3];
+        for (i, axis) in grid.plane.into_iter().enumerate() {
+            let (cell, sub) = if i == 0 { (x, sx) } else { (y, sy) };
+            origin[axis] = request.min[axis]
+                + (cell as f64 + (sub as f64 + 0.5) / divisions as f64) * grid.side[i];
+        }
+        let ray = Ray { origin };
+        scratch.bodies[0].clear();
+        for (i, step) in body.steps.iter().enumerate() {
+            let index = step.tool as usize;
+            let view = step_slots[i]
+                .and_then(|slot| slots.get(slot))
+                .and_then(|(tool, bounds, cache)| {
+                    tool.zip(*bounds)
+                        .map(|(tool, bounds)| (tool, bounds, cache))
+                })
+                .and_then(|(tool, (lo, hi), cache)| {
+                    let [a, b] = grid.plane;
+                    (lo[a] <= origin[a]
+                        && origin[a] <= hi[a]
+                        && lo[b] <= origin[b]
+                        && origin[b] <= hi[b])
+                        .then(|| cache.get_or_init(|| ToolView::new(tool, index as u32, &family)))
+                });
+            if let Some(view) = view {
+                view.intervals(&ray, &mut scratch.crossings, &mut scratch.tool);
+                combine(
+                    &scratch.bodies[0],
+                    &scratch.tool,
+                    step.op,
+                    &mut scratch.next,
+                );
+                std::mem::swap(&mut scratch.bodies[0], &mut scratch.next);
+            } else if step.op == Op::Intersection {
+                scratch.bodies[0].clear();
+            }
+            let material = scratch.bodies[0]
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .any(|[near, far]| {
+                    far.s.min(request.max[axis]) - near.s.max(request.min[axis]) > 0.0
+                });
+            if material {
+                liveness.mark(i, i + 1);
+            }
+        }
+        let hit = scratch.bodies[0]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .any(|[near, far]| far.s.min(request.max[axis]) - near.s.max(request.min[axis]) > 0.0);
+        any_hit |= hit;
+        (
+            hit,
+            liveness
+                .alive_after
+                .iter()
+                .take(body.steps.len())
+                .all(|&alive| alive)
+                && liveness.alive_after.len() >= body.steps.len(),
+        )
+    };
+    let [width, height] = grid.size;
+    let mut coarse = vec![false; width * height];
+    let mut exhausted = false;
+    let mut complete = false;
+    'coarse: for y in 0..height {
+        for x in 0..width {
+            if *budget_left == 0 {
+                exhausted = true;
+                break 'coarse;
+            }
+            *budget_left -= 1;
+            rays += 1;
+            let (hit, done) = cast(x, y, 0, 0, 1);
+            coarse[y * width + x] = hit;
+            if done {
+                complete = true;
+                break 'coarse;
+            }
+        }
+    }
+    if !exhausted && !complete {
+        let mut refined = 0u64;
+        'refine: for small_pass in [true, false] {
+            for y in 0..height {
+                for x in 0..width {
+                    let hit = coarse[y * width + x];
+                    let boundary = (x > 0 && coarse[y * width + x - 1] != hit)
+                        || (x + 1 < width && coarse[y * width + x + 1] != hit)
+                        || (y > 0 && coarse[(y - 1) * width + x] != hit)
+                        || (y + 1 < height && coarse[(y + 1) * width + x] != hit);
+                    let marked = small.get(y * width + x).copied().unwrap_or(0);
+                    let n = usize::from(if small_pass {
+                        marked
+                    } else if marked == 0 && boundary {
+                        BOUNDARY_DIVISIONS
+                    } else {
+                        0
+                    });
+                    if n == 0 {
+                        continue;
+                    }
+                    for sy in 0..n {
+                        for sx in 0..n {
+                            if *budget_left == 0 || refined == AXIS_REFINEMENT_LIMIT {
+                                exhausted = true;
+                                break 'refine;
+                            }
+                            *budget_left -= 1;
+                            rays += 1;
+                            refined += 1;
+                            if cast(x, y, sx, sy, n).1 {
+                                break 'refine;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    AxisSample {
+        hit: any_hit,
+        volume: 0.0,
+        min: request.min,
+        max: request.max,
+        cell: grid.side[0].max(grid.side[1]),
+        rays,
+        capped: exhausted,
+    }
 }

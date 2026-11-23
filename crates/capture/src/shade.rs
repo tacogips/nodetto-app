@@ -34,6 +34,14 @@ pub(crate) fn lit_colour(body: [u8; 3], normal: [f64; 3], light: [f64; 3]) -> [u
     body.map(|channel| (f64::from(channel) * factor).round() as u8)
 }
 
+pub(crate) fn reference_mix(behind: [u8; 3], shade: [u8; 3], opacity: u8) -> [u8; 3] {
+    std::array::from_fn(|i| {
+        let a = u32::from(behind[i]);
+        let b = u32::from(shade[i]);
+        ((a * (255 - u32::from(opacity)) + b * u32::from(opacity) + 127) / 255) as u8
+    })
+}
+
 pub(crate) fn is_edge(
     a: Option<Hit>,
     b: Option<Hit>,

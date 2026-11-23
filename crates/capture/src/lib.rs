@@ -1,15 +1,20 @@
 #![forbid(unsafe_code)]
 
+pub mod census;
 pub mod encode;
 mod flatten;
 pub mod interference;
 pub mod interval;
 pub mod lattice;
+pub mod mesh;
+pub mod overlay;
 pub mod prism;
 mod raster;
 pub mod report;
 pub mod scene;
 mod shade;
+pub mod tiles;
+pub mod tool_view;
 pub mod view;
 
 pub use raster::render_rgb;

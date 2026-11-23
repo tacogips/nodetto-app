@@ -159,9 +159,10 @@ square roots only)
 
 ## Progress
 
-Partial implementation: mesh views, solid classification and decoder-backed
-model construction are present. The four listed gates passed on the shared
-tree; logs are in `tmp/capture-s868/capture-11-mesh-reference/`.
-Blocked: `lattice.rs` derives active tool bounds from loop bounds, while mesh
-loop bounds must remain empty. Mesh analysis and its cube-box and open-candidate
-regressions require an authorized repair to `lattice.rs` before completion.
+Implementation complete on the shared tree. Mesh views and decoder-backed model
+construction are present. INT-MESH-BOUNDS-SEAM is repaired through
+`scene_tool_bounds`; a cube/box volume regression and open-mesh candidate
+regression pass. All five amended gates passed; complete logs are in
+`tmp/capture-s868/capture-11-mesh-reference/redispatch-gate1.log` through
+`redispatch-gate5.log` and detailed redirected test output is in
+`tmp/capture/m11/`. Formal review and downstream wiring remain pending.

@@ -167,11 +167,23 @@ export interface ExportBackend {
   /** Writes text atomically, like `writeDocument`, for any file type. */
   writeText(path: string, contents: string): Promise<void>;
   writeBytes(path: string, contents: Uint8Array): Promise<void>;
+  captureSolid?(
+    scene: Uint8Array,
+    format: "png" | "jpg",
+    quality: number,
+  ): Promise<{ image: Uint8Array; report: string }>;
 }
 
 export function createTauriExportBackend(): ExportBackend {
   return {
     available: true,
+    captureSolid: async (scene, format, quality) => {
+      const result = await invoke<{ image: number[]; report: string }>(
+        "capture_solid",
+        { scene: Array.from(scene), format, quality },
+      );
+      return { image: new Uint8Array(result.image), report: result.report };
+    },
     pickExportPath: (defaultName: string, extension: string) =>
       invoke<string | null>("pick_export_path", { defaultName, extension }),
     writeBytes: (path, contents) =>

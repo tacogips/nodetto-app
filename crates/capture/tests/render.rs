@@ -405,7 +405,19 @@ fn references_meshes_and_interference_stay_out_of_the_m8_picture() {
     scene.draw_interference = true;
     let (actual, report) = render_rgb(&scene, 2).unwrap();
     assert_eq!(baseline, actual);
-    assert_eq!(report.analysis.unwrap().candidates, 0);
+    assert_eq!(
+        report.analysis.unwrap(),
+        nodetto_capture::report::Analysis {
+            cell: scene.target_cell,
+            candidates: 0,
+            checked: 0,
+            unchecked: vec![],
+            unchecked_count: 0,
+            capped_count: 0,
+            capped_without_hit: vec![],
+            budget: 1_000_000
+        }
+    );
     assert!(report.pairs.is_empty());
     assert_eq!(report.bodies[1].state, BodyState::Absent);
     assert_eq!(report.bodies[2].state, BodyState::Absent);

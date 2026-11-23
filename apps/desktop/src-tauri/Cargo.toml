@@ -16,6 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+nodetto-capture = { path = "../../../crates/capture" }
 nodetto-native = { path = "../../../crates/native" }
 notify = "8"
 serde = { version = "1", features = ["derive"] }

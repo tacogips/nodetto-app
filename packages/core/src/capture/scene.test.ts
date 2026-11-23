@@ -297,6 +297,51 @@ test("reports a failed mesh dependency as a missing target body", () => {
   ]);
 });
 
+test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh", () => {
+  const mesh = cadElement("mesh", "cad.mesh", "a0", {
+    name: "Imported",
+    data: "nmesh1:UExBVEU=",
+  });
+  const elements = [
+    mesh,
+    sketch("profile", "a1"),
+    ...rectangle("profile", 0, 0, 1, 1),
+    extrude("cut", "a2", {
+      sketch: "profile",
+      distance: 1,
+      op: "cut",
+      bodies: ["mesh"],
+    }),
+  ];
+  const positions = new Float64Array([0, 0, 0, 2, 0, 0, 0, 2, 2]);
+  const triangles = new Uint32Array([0, 1, 2]);
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    decodeMesh: () => ({ positions, triangles }),
+  });
+  expect(model.tools[0]).toMatchObject({
+    kind: "mesh",
+    feature: "mesh",
+    positions,
+    triangles,
+  });
+  expect(model.bodies[0]).toMatchObject({
+    id: "mesh",
+    bounds: { min: [0, 0, 0], max: [2, 2, 2] },
+    steps: [
+      { op: "union", tool: 0 },
+      { op: "difference", tool: 1 },
+    ],
+  });
+  expect(model.skipped).toEqual([]);
+  const failed = buildCadCaptureModel([mesh], CAD_TEST_PAGE.id, {
+    decodeMesh: () => {
+      throw new Error("bad");
+    },
+  });
+  expect(failed.errors).toEqual([{ id: "mesh", code: "cad.mesh.invalid" }]);
+  expect(failed.bodies).toEqual([]);
+});
+
 function selectedLoops(entities: readonly Element[], pick?: readonly string[]) {
   const profile = buildLoops(entities, pick);
   if ("error" in profile) throw new Error(profile.error);

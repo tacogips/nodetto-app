@@ -10,7 +10,7 @@ test("export format groups retain their labels and order", () => {
       label: "Document",
       ids: ["document-pdf", "document-markdown", "document-bundle"],
     },
-    { label: "Artwork", ids: ["svg", "png", "pdf", "artboards"] },
+    { label: "Artwork", ids: ["svg", "png", "pdf", "image3d", "artboards"] },
     {
       label: "Diagram source",
       ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],

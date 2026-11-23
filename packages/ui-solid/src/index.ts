@@ -158,3 +158,6 @@ export { SnippetTextEditor } from "./snippet/SnippetTextEditor.tsx";
 
 export { pagesToPdf } from "./pdf-export.ts";
 export { rasterizeSvg } from "./raster-export.ts";
+
+export type { ExportDialogProps } from "./ExportDialog.tsx";
+export type { Camera3d } from "./cad/camera3d.ts";

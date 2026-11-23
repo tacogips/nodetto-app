@@ -10,6 +10,8 @@ import type { CadLoop } from "../cad/loops.ts";
 import { coordinate } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
 import type { Bounds3 } from "./camera.ts";
+import type { CaptureMeshDecoder } from "./cad-request.ts";
+import type { CaptureMeshTool } from "./scene-binary.ts";
 
 export interface CaptureTool {
   readonly kind: "prism";
@@ -37,7 +39,7 @@ export interface CaptureBody {
 }
 
 export interface CadCaptureModel {
-  readonly tools: readonly CaptureTool[];
+  readonly tools: readonly (CaptureTool | CaptureMeshTool)[];
   readonly bodies: readonly CaptureBody[];
   readonly errors: readonly { id: ElementId; code: string }[];
   readonly bounds: Bounds3 | null;
@@ -191,6 +193,16 @@ function makeTool(feature: ElementId, geometry: ExtrudeGeometry): CaptureTool {
 export function buildCadCaptureModel(
   elements: readonly Element[],
   pageId: PageId,
+): Omit<CadCaptureModel, "tools"> & { readonly tools: readonly CaptureTool[] };
+export function buildCadCaptureModel(
+  elements: readonly Element[],
+  pageId: PageId,
+  options: { readonly decodeMesh?: CaptureMeshDecoder },
+): CadCaptureModel;
+export function buildCadCaptureModel(
+  elements: readonly Element[],
+  pageId: PageId,
+  options?: { readonly decodeMesh?: CaptureMeshDecoder },
 ): CadCaptureModel {
   const page: Element[] = [];
   const pcb: Element[] = [];
@@ -202,7 +214,7 @@ export function buildCadCaptureModel(
   const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
   const geometry = createCadGeometry(history);
   const status = new Map(history.status);
-  const tools: CaptureTool[] = [];
+  const tools: (CaptureTool | CaptureMeshTool)[] = [];
   const bodies: BuildingBody[] = [];
   // A null body is valid for cad check but has no geometry in this capture.
   const targetsById = new Map<ElementId, BuildingBody | null>();
@@ -239,8 +251,48 @@ export function buildCadCaptureModel(
     }
     if (feature.semantic.suppressed) continue;
     if (feature.type === "cad.mesh") {
-      targetsById.set(id, null);
-      skipped.push({ id, reason: "mesh" });
+      if (!options?.decodeMesh) {
+        targetsById.set(id, null);
+        skipped.push({ id, reason: "mesh" });
+        continue;
+      }
+      try {
+        const decoded = options.decodeMesh(feature.semantic.data);
+        const positions = new Float64Array(decoded.positions);
+        const triangles = new Uint32Array(decoded.triangles);
+        const min: MutableVec3 = [
+          Number.POSITIVE_INFINITY,
+          Number.POSITIVE_INFINITY,
+          Number.POSITIVE_INFINITY,
+        ];
+        const max: MutableVec3 = [
+          Number.NEGATIVE_INFINITY,
+          Number.NEGATIVE_INFINITY,
+          Number.NEGATIVE_INFINITY,
+        ];
+        for (let i = 0; i < positions.length; i += 3) {
+          for (const axis of AXES) {
+            const value = coordinate(positions, i + axis);
+            min[axis] = Math.min(min[axis], value);
+            max[axis] = Math.max(max[axis], value);
+          }
+        }
+        const toolIndex = tools.length;
+        tools.push({ kind: "mesh", feature: id, positions, triangles });
+        const body: BuildingBody | null = feature.visual.hidden
+          ? null
+          : {
+              id,
+              name: feature.semantic.name,
+              reference: false,
+              steps: [{ op: "union", tool: toolIndex }],
+              bounds: { min, max },
+            };
+        if (body) bodies.push(body);
+        targetsById.set(id, body);
+      } catch {
+        status.set(id, cadFailure("cad.mesh.invalid"));
+      }
       continue;
     }
     for (const target of targets) {

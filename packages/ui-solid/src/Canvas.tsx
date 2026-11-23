@@ -96,6 +96,7 @@ const LOW_DETAIL_ZOOM = 0.25;
 export interface NodettoCanvasProps {
   readonly editor: Editor;
   readonly cadEngine?: CadEngine;
+  readonly onCadCameraChange?: (pageId: PageId, camera: Camera3d) => void;
   readonly createCadRenderer?: CadViewportProps["createRenderer"];
   readonly onCadImportPicker?: CadViewportProps["onImportPicker"];
   readonly tool: ToolKind;
@@ -182,7 +183,10 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
           onImportPicker={props.onCadImportPicker}
           createRenderer={props.createCadRenderer}
           initialCamera={cameras.get(id)}
-          onCameraChange={(camera) => cameras.set(id, camera)}
+          onCameraChange={(camera) => {
+            cameras.set(id, camera);
+            props.onCadCameraChange?.(id, camera);
+          }}
           onViewportResize={props.onViewportResize}
         />
       )}

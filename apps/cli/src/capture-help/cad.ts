@@ -24,6 +24,12 @@ The artwork options --element, --padding, --background, --scale and
 The camera line reports centre in model coordinates and scale in mm/px.
 The frame is cropped when a body box extends outside the picture.
 The errors count lists failed features skipped in the capture.
+Body notes identify hidden, outside, empty and unknown bodies, and bodies
+whose capture differs from the app. A cad.result.empty (sampled) error
+marks a feature the app rejects; the picture applies it, so they differ.
+Imported closed meshes take part like solids; open meshes are drawn
+translucent and labelled [open mesh, not checked]. PCB reference bodies
+are drawn at 45% over what is behind and take part in interference.
 
 Example:
   nodetto-cli capture plate.jsonl --view top --size 1024x768 --output plate-top.png`,

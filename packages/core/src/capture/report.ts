@@ -18,6 +18,9 @@ interface SolidAnalysisReport {
   readonly checked: number;
   readonly unchecked: readonly (readonly [number, number])[];
   readonly uncheckedCount: number;
+  readonly cappedCount: number;
+  readonly budget: number;
+  readonly cappedWithoutHit: readonly (readonly [number, number])[];
 }
 
 interface SolidPairReport {
@@ -82,7 +85,16 @@ function analysis(value: unknown): value is SolidAnalysisReport | null {
           pair.length === 2 &&
           pair.every((index) => integer(index)),
       ) &&
-      integer(value.uncheckedCount))
+      integer(value.uncheckedCount) &&
+      integer(value.cappedCount) &&
+      integer(value.budget) &&
+      Array.isArray(value.cappedWithoutHit) &&
+      value.cappedWithoutHit.every(
+        (pair) =>
+          Array.isArray(pair) &&
+          pair.length === 2 &&
+          pair.every((index) => integer(index)),
+      ))
   );
 }
 

@@ -84,6 +84,7 @@ export async function rasterizeSvg(
   svg: string,
   scale: number,
   signal?: AbortSignal,
+  output?: { type: "image/png" | "image/jpeg"; quality?: number },
 ): Promise<Blob> {
   const viewport = svgRasterDimensions(svg);
   const size = rasterDimensions(viewport.width, viewport.height, scale);
@@ -110,7 +111,8 @@ export async function rasterizeSvg(
               blob
                 ? resolve(blob)
                 : reject(new Error("This browser could not encode the PNG.")),
-            "image/png",
+            output?.type ?? "image/png",
+            output?.quality,
           ),
         ),
       signal,

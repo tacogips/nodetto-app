@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CAD_TEST_PAGE, sketch } from "../cad/testing/documents.ts";
+import { CAD_TEST_PAGE, cadElement, sketch } from "../cad/testing/documents.ts";
 import { boardReference, edge, testBoard } from "../cad/testing/pcb.ts";
 import { CaptureInputError, prepareCadCapture } from "./cad-request.ts";
 import { type CaptureCameraRequest, captureCamera } from "./camera.ts";
@@ -7,6 +7,37 @@ import { capturePlateDocument } from "./testing/plate.ts";
 
 const size = { width: 320, height: 240, theme: "dark" } as const;
 const plate = capturePlateDocument();
+
+test("serializes a decoded mesh-only page", () => {
+  const mesh = cadElement("mesh", "cad.mesh", "a0", {
+    name: "Mesh",
+    data: "nmesh1:UExBVEU=",
+  });
+  const request = { ...size, camera: { view: "iso" } } as const;
+  expect(() => prepareCadCapture([mesh], CAD_TEST_PAGE.id, request)).toThrow(
+    CaptureInputError,
+  );
+  const result = prepareCadCapture([mesh], CAD_TEST_PAGE.id, {
+    ...request,
+    decodeMesh: () => ({
+      positions: new Float64Array([
+        0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
+      ]),
+      triangles: new Uint32Array([
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5,
+        2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+      ]),
+    }),
+  });
+  expect(result.model.tools).toHaveLength(1);
+  expect(result.model.tools[0]?.kind).toBe("mesh");
+  const view = new DataView(
+    result.scene.buffer,
+    result.scene.byteOffset,
+    result.scene.byteLength,
+  );
+  expect(view.getUint32(176, true)).toBe(1);
+});
 
 test.each([
   { view: "iso" },
@@ -101,4 +132,74 @@ test("prepares CAD capture using the outline on a separate PCB page", () => {
     },
   ]);
   expect(result.frame).toBe("complete");
+});
+
+test("interference request preserves default fixture and selects bodies", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { DEFAULT_CAD_INTERFERENCE } = await import("./cad-request.ts");
+  const request = {
+    width: 1024,
+    height: 768,
+    theme: "light",
+    camera: { view: "iso" },
+  } as const;
+  const run = (
+    interference?: import("./cad-request.ts").CadCaptureInterference | null,
+  ) =>
+    prepareCadCapture(plate.elements, CAD_TEST_PAGE.id, {
+      ...request,
+      interference,
+    });
+  const fixture = new Uint8Array(
+    readFileSync(
+      new URL(
+        "../../../../apps/cli/src/__fixtures__/capture-plate-default.ncs1",
+        import.meta.url,
+      ),
+    ),
+  );
+  expect(run().scene).toEqual(fixture);
+  expect(run(null).scene).toEqual(fixture);
+  expect(
+    prepareCadCapture(plate.elements, CAD_TEST_PAGE.id, {
+      ...request,
+      decodeMesh: () => {
+        throw new Error("not called");
+      },
+    }).scene,
+  ).toEqual(fixture);
+  expect(Object.isFrozen(DEFAULT_CAD_INTERFERENCE)).toBe(true);
+  const all = run(DEFAULT_CAD_INTERFERENCE);
+  const view = new DataView(
+    all.scene.buffer,
+    all.scene.byteOffset,
+    all.scene.byteLength,
+  );
+  expect(view.getUint32(28, true)).toBe(3);
+  expect(view.getUint32(32, true)).toBe(24);
+  expect(view.getFloat64(144, true)).toBe(0.001);
+  expect(view.getFloat64(152, true)).toBe(0.25);
+  const bodyBytes = all.model.bodies.reduce(
+    (sum, body) => sum + 8 + body.steps.length * 8,
+    0,
+  );
+  const flags = (scene: Uint8Array) => {
+    const data = new DataView(scene.buffer, scene.byteOffset, scene.byteLength);
+    let offset = scene.length - bodyBytes;
+    return all.model.bodies.map((body) => {
+      const flag = data.getUint32(offset, true);
+      offset += 8 + body.steps.length * 8;
+      return flag & 2;
+    });
+  };
+  expect(flags(all.scene)).toEqual(all.model.bodies.map(() => 2));
+  expect(flags(run({ cellMm: 1, bodies: ["Plate", "blo"] }).scene)).toEqual([
+    2, 2, 0,
+  ]);
+  for (const bodies of [["missing"], ["p"], ["Plate"], ["Plate", "plate"]]) {
+    expect(() => run({ cellMm: 1, bodies })).toThrow(CaptureInputError);
+    expect(() => run({ cellMm: 1, bodies })).toThrow("Plate, Block, Puck");
+  }
+  for (const cellMm of [0.009, 11, Number.NaN, Number.POSITIVE_INFINITY])
+    expect(() => run({ cellMm })).toThrow(CaptureInputError);
 });

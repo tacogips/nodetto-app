@@ -7,6 +7,8 @@ import {
   sketch,
 } from "../../../packages/core/src/cad/testing/documents.ts";
 import { serializeDocument } from "@nodetto/io";
+import { decodeCaptureMesh } from "@nodetto/io/nmesh";
+import { DEFAULT_CAD_INTERFERENCE, prepareCadCapture } from "@nodetto/core";
 import { captureCommand, type CaptureBackend } from "./capture-command.ts";
 import { cadCommand } from "./cad-command.ts";
 import type { CommandIo } from "./commands.ts";
@@ -70,6 +72,11 @@ function harness(doc = plate) {
 }
 
 test.each([
+  [["--interference-cell", "0"], "--interference-cell must be"],
+  [
+    ["--no-interference", "--fail-on-interference"],
+    "--no-interference cannot be",
+  ],
   [["--view", "top", "--direction", "0,0,1"], "--view cannot be combined"],
   [["--view", "top", "--eye", "0,0,1"], "--view cannot be combined"],
   [["--direction", "0,0,1", "--eye", "0,0,1"], "--direction and --eye"],
@@ -132,7 +139,7 @@ test("reports cropped frame, body states and cad check errors in text and JSON",
   const check = cadCommand(io, ["check", "capture-plate.jsonl"]);
   const issue = check.stdout.trim().split("\n").at(-1);
   expect(issue).toContain("cad.");
-  expect(stdout).toEndWith(`  ${issue}\n`);
+  expect(stdout).toContain(`  ${issue}\ninterference: not checked\n`);
   expect(files.get("zoom.png")).toBe(image);
   const result = await run(
     "--zoom",
@@ -203,6 +210,76 @@ test("the default CLI request matches the committed Plate document and NCS1 byte
   }
   expect(readFileSync(location(".jsonl"), "utf8")).toBe(jsonl);
   expect(scene).toEqual(
+    prepareCadCapture(plate.elements, plate.pages[0]!.id, {
+      camera: {},
+      width: 1024,
+      height: 768,
+      theme: "light",
+      interference: DEFAULT_CAD_INTERFERENCE,
+      decodeMesh: decodeCaptureMesh,
+    }).scene,
+  );
+  expect(scene).toEqual(
     new Uint8Array(readFileSync(location("-default.ncs1"))),
   );
+});
+
+test("interference reports and failure exit retain the written image", async () => {
+  const { io, backend, files } = harness();
+  backend.renderSolid = (scene) => {
+    const view = new DataView(scene.buffer, scene.byteOffset, scene.byteLength);
+    return {
+      image,
+      report: JSON.stringify({
+        width: view.getUint32(8, true),
+        height: view.getUint32(12, true),
+        bodies: ["drawn", "hidden", "outside"].map((state) => ({
+          state,
+          open: false,
+          emptiedByStep: -1,
+        })),
+        analysis: {
+          cell: 0.25,
+          candidates: 1,
+          checked: 1,
+          unchecked: [],
+          uncheckedCount: 0,
+          cappedCount: 1,
+          cappedWithoutHit: [],
+          budget: 24,
+        },
+        pairs: [
+          {
+            a: 0,
+            b: 1,
+            volume: 590.721,
+            min: [0, 0, 0],
+            max: [1, 1, 1],
+            source: "analysis",
+            capped: true,
+          },
+        ],
+      }),
+    };
+  };
+  const text = await captureCommand(
+    io,
+    ["capture-plate.jsonl", "--output", "report.png", "--fail-on-interference"],
+    backend,
+  );
+  expect(text.exitCode).toBe(1);
+  expect(text.stdout).toContain("Plate x Block: volume 590.7 mm3");
+  expect(text.stdout).toContain("approximate");
+  expect(files.get("report.png")).toBe(image);
+  const json = await captureCommand(
+    io,
+    ["capture-plate.jsonl", "--json"],
+    backend,
+  );
+  expect(json.exitCode).toBe(0);
+  expect(JSON.parse(json.stdout).interference.pairs[0]).toMatchObject({
+    aName: "Plate",
+    bName: "Block",
+    approximate: true,
+  });
 });

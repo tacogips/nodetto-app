@@ -146,7 +146,7 @@ owner. The M15 worker must not edit it.
 
 ## Progress
 
-Implementation in progress (revision 4; App wiring remains M14). CAD image controls, camera reporting and conversion, and JPEG artwork encoding are implemented. On redispatch the exact shared-tree gates 1 and 2 passed (19 and 26 tests; `gate1-redispatch.log`, `gate2-redispatch.log`); the earlier sibling typecheck failure is resolved. The desktop build and document tests previously passed with output redirected to `target/capture-m15/dist` (2 tests). The exact build remains blocked because it writes `apps/desktop/dist` outside the declared artifact root; a checkpoint amendment or command amendment is required. Formal reviews and integration remain downstream.
+Implementation complete for revision 4; App wiring remains M14. CAD image controls, camera reporting and conversion, and JPEG artwork encoding are implemented. The amended shared-tree verification gates passed: 19, 26 and 2 tests respectively, with complete logs `tmp/capture-s868/capture-15-desktop-ui/amended-gate1.log` through `amended-gate3.log`. Gate 3 builds under `target/capture-m15/dist`. Formal reviews and integration remain downstream.
 
 Per-file initial and final git blob hashes (empty blob means a new file):
   - `packages/ui-solid/src/Canvas.tsx`: `eaf0074a1608e25742399d922e88d5257a692667` -> `a7a8e06b4ec440971c140a6991d59d13beaeb5f0`

@@ -5,6 +5,13 @@
 
 import { decodeRasterDataUrl } from "@nodetto/ir";
 import {
+  DEFAULT_CAD_INTERFERENCE,
+  prepareCadCapture,
+  parseSolidReport,
+  describeInterference,
+  describeBodies,
+  type CaptureCameraRequest,
+  type CaptureTheme,
   DOCUMENT_BUNDLE_EXTENSION,
   documentPdfPlan,
   encodeDocumentBundle,
@@ -23,6 +30,7 @@ import {
   exportPcbPage,
   toBreadboardNetlist,
 } from "@nodetto/core";
+import { decodeCaptureMesh } from "@nodetto/io/nmesh";
 import { pagesToPdf, rasterizeSvg } from "@nodetto/ui-solid";
 import type { ExportBackend } from "../file/backend.ts";
 
@@ -59,6 +67,13 @@ export interface ExportHandlers {
   readonly exportGerber: () => Promise<void>;
   readonly exportPcbGerber: () => Promise<void>;
   readonly exportStl: () => Promise<void>;
+  readonly captureCadImage: (options: {
+    camera: CaptureCameraRequest;
+    format: "png" | "jpg";
+    theme: CaptureTheme;
+    width: number;
+    height: number;
+  }) => Promise<void>;
 }
 
 /** Hand `blob` to the browser as a download named `name`. */
@@ -227,6 +242,53 @@ export function createExportHandlers(
     } catch (error) {
       setExportError(
         `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
+  const captureCadImage: ExportHandlers["captureCadImage"] = async (
+    options,
+  ) => {
+    setExportError(null);
+    try {
+      const page = source.editor.store.getPage(source.editor.currentPageId);
+      if (page?.kind !== "cad3d")
+        throw new Error("The current page is not a 3D CAD page.");
+      const capture = source.exportBackend.captureSolid;
+      if (!capture) throw new Error("Capture is available in the desktop app.");
+      const prepared = prepareCadCapture(
+        source.editor.getSnapshot().elements,
+        page.id,
+        {
+          camera: options.camera,
+          width: options.width,
+          height: options.height,
+          theme: options.theme,
+          interference: DEFAULT_CAD_INTERFERENCE,
+          decodeMesh: decodeCaptureMesh,
+        },
+      );
+      const result = await capture(prepared.scene, options.format, 90);
+      const report = parseSolidReport(result.report);
+      const path = await source.exportBackend.pickExportPath(
+        `${exportBaseName(page.name)}.${options.format}`,
+        options.format,
+      );
+      if (path === null) return;
+      await source.exportBackend.writeBytes(path, result.image);
+      const errors = describeBodies(report, prepared.model).errors;
+      const failed = prepared.model.errors.length;
+      setExportError(
+        [
+          "Image saved.",
+          ...describeInterference(report, prepared.model.bodies).lines,
+          ...errors.map((error) => `${error.id}: ${error.code} ${error.text}`),
+          ...(failed > 0 ? [`${failed} features failed.`] : []),
+        ].join("\n"),
+      );
+    } catch (error) {
+      setExportError(
+        `could not capture: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   };
@@ -417,5 +479,6 @@ export function createExportHandlers(
     exportGerber,
     exportPcbGerber,
     exportStl,
+    captureCadImage,
   };
 }

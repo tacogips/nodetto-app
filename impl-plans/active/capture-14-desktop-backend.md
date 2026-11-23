@@ -117,4 +117,4 @@ other change to this plan.
 
 ## Progress
 
-Pending (revision 4).
+Implemented: native capture command and backend, CAD image export with report text and cancellation handling, and per-page camera/dialog wiring. Added Rust and desktop handler regression tests. All three gates passed on the shared tree: Rust clippy and 2 capture tests, TypeScript checks and 120 tests, and desktop build and 14 tests. Logs are in tmp/capture-s868/capture-14-desktop-backend/. Cargo.lock SHA-256: 53a20526d3be9f7b48a223a4e52780e11a4f7699083398badc16a8bfe0cf2f47. Formal review and M23 integration remain downstream.

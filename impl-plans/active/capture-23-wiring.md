@@ -213,7 +213,18 @@ New unit tests in `mesh.rs` `#[cfg(test)]`:
 
 ## Progress
 
-Blocked before implementation: the mesh picture-hit API does not expose the
-hit triangle normal required by design 6.5. `mesh.rs` is outside M23's
-writePaths. Resume after a checkpoint amendment authorizes a minimal mesh
-picture-hit normal seam and its tests. No M23 verification has run.
+Partial implementation: picture tile work accounting, liveness and census wiring,
+mesh facet-normal seam, initial picture overlay/reference integration, CLI wiring,
+and initial integration tests are present. The Rust library focused test passed
+(30 passed, 2 ignored; `tmp/capture-s868/capture-23-wiring/focused-03.log`).
+The implementation and requested integration coverage are incomplete; the
+picture pipeline needs further correctness review and all four plan gates remain.
+
+Blocked on two scope/contract gaps: the required native parity test writes
+`tmp/capture/m09/timing.json`, outside the authorized artifact and evidence
+roots; and the requested desktop `interference: null` case needs an option not
+exposed by `apps/desktop/src/shell/export-handlers.ts`, outside M23 writePaths.
+Amend ownership/output scope and clarify the desktop contract before continuing.
+The new 20,000-intersection integration test also needs safe revision before
+running: its tile-list allocation may be excessive. Formal reviews and final
+workflow tasks remain downstream.
