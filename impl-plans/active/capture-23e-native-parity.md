@@ -52,7 +52,61 @@ Timing tests: up to 3 attempts, then alone, all logged.
 3. Gate 4: `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23e" cargo test -p nodetto-cli && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23e" cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/capture-m23e/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts > tmp/capture/m23/native-parity.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/native-parity.txt; test $s -eq 0 && grep -Eq "^ *[1-9][0-9]* pass$" tmp/capture/m23/native-parity.txt && ! grep -Eq "^ *[1-9][0-9]* skip$" tmp/capture/m23/native-parity.txt'`
    (anchored to bun's summary lines)
 
+## Amendment 2026-11-23 (blocked-wave-scope-or-contract, round 2)
+
+Blocker: in the existing test "CAD interference is reported consistently
+across views and capture options", the assertion at
+`native-parity/capture.test.ts:495` expects `cell 1 mm` for
+`--interference-cell 1`. The native engine prints `cell 0.938 mm`. See
+`tmp/capture-s885/capture-23e-native-parity/gate4-final.log`, where the
+received line is `interference: 1 (1 candidate pair checked, cell 0.938
+mm)` and the box is `85,45,2 .. 100,60,5.008`.
+
+Decision (CAP-R6-07, recorded in design 8.5 and section 18). The engine is
+right and the expectation is wrong, so no engine edit is made.
+
+- Design 6.6 step 2 uses `n = clamp(ceil(extent / c), 16, 1024)` rays per
+  side. The printed guarantee is the largest level-0 cell side used,
+  rounded up to 0.001 mm (6.6, "Guarantee").
+- The Plate x Block candidate box spans 15 mm. With c = 1, n = max(15, 16)
+  = 16, so the cell side is 15 / 16 = 0.9375 mm, printed as 0.938 mm.
+- The default c = 0.25 gives n = 60 and exactly 0.25 mm, which agrees with
+  the `cell 0.25 mm` assertion at `:459`.
+
+Authorized change, exactly one, inside that existing block:
+
+- The expected string at `:495` becomes `"cell 0.938 mm"`.
+
+Everything else in `:438-520` stays byte-identical:
+
+- the `--interference-cell 1` run and its arguments;
+- the 0.25 mm and 590.721 assertions;
+- the `--no-interference`, `Plate,Puck` and `--fail-on-interference`
+  assertions.
+
+No edits to `crates/capture`, including `interference.rs`, nor to
+`capture-cad.ts` for this blocker, nor to fixtures or `engine_tests.rs`.
+If any other assertion of that block then fails, stop and record it. This
+is the last amendment round.
+
+Resume: keep the already-added native cases and their logs, read the test
+file fresh, and record `git hash-object` before and after this one-line
+edit. Then rerun gates 1, 3 and 4. Gate 4 must show a positive pass count,
+no skip and `exit=0` in `tmp/capture/m23/native-parity.txt`. The commit
+message states the old expectation (`cell 1 mm`) and the new one
+(`cell 0.938 mm`), citing CAP-R6-07.
+
 ## Progress
 
-Pending. Hashes before and after, logs under `tmp/capture/m23e/`, drift
-stops the run.
+2026-11-23: Added native hatch, empty/refilled body, mesh, PCB, separated
+and pin, 1,000-element and stacked candidate cases. The timing was
+1,343.94 ms; the M9 test passed unchanged. Gate 1 passed (121 tests),
+and gate 3 passed (204 tests). Gate 4 remains blocked: 29 CLI tests
+passed, then parity ran 10 tests (9 passed, 1 failed). The existing,
+explicitly protected interference test expects `cell 1 mm`, but the
+engine reports `cell 0.938 mm` for that request. The test and engine
+must be reconciled against design 6.6 through an authorized scope
+amendment; neither was changed. Gate 4 must be rerun after resolution.
+Complete logs, per-edit intentions, and hashes are under
+`tmp/capture-s885/capture-23e-native-parity/`. Formal reviews and commits
+remain downstream.
