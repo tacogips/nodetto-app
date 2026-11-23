@@ -80,7 +80,7 @@ Files written in more than one stage, in stage order:
 | `apps/desktop/src/shell/export-handlers.ts` | M14, M23 (optional `interference` option only, CAP-R4-07) |
 | `apps/desktop/src/shell/export-handlers.test.ts` | M14, M23 (new cases only) |
 | `design-docs/specs/design-ai-capture.md`, this overview's progress table | M16 |
-| Evidence roots | M23 `tmp/capture` and `target`; M16 `tmp` and `target` (CAP-R4-07) |
+| Evidence roots | M23 `tmp/capture` and `target`; M16 `target` (CAP-R4-07, CAP-R7-01) |
 
 M23 sub-plan ownership (session 885, CAP-R6-01; each row is the only
 writer of its files in its wave):
@@ -157,19 +157,21 @@ M16c); M16c edits only the Progress section and the evidence-roots row.
 | M8 | accepted |
 | M9 | accepted |
 | M13 | accepted |
-| M10 | implemented at `be8fa5d`, repair pending |
-| M20 | pending |
-| M22 | pending |
-| M15 | pending |
-| M17 | pending |
-| M18 | pending |
-| M11 | pending |
-| M12 | pending |
-| M14 | pending |
-| M23a | pending |
-| M23f | pending |
-| M23b | pending |
-| M23c | pending |
-| M23d | pending |
-| M23e | pending |
-| M16 | pending |
+| M10 | accepted |
+| M20 | accepted |
+| M22 | accepted |
+| M15 | accepted |
+| M17 | accepted |
+| M18 | accepted |
+| M11 | accepted |
+| M12 | accepted |
+| M14 | accepted |
+| M23a | accepted |
+| M23f | accepted |
+| M23b | accepted |
+| M23c | accepted |
+| M23d | accepted |
+| M23e | accepted |
+| M16 | accepted |
+
+Accepted means per-plan review plus targeted gates. Full repository verification (`mise run verify`, browser tests, the whole native parity suite) is deferred and NOT yet run; it runs after the workflow on the tree merged with `feat/cad3d-pages` (design CAP-R7-01).

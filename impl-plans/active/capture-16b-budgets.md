@@ -143,3 +143,11 @@ the command, the exit status, the printed log path, the pass and fail
 counts and the attempts. Keep every existing log and the 10.3 values. M16b
 stays unaccepted until that entry shows `exit=0` with `1 pass` and
 `0 fail` and the review approves.
+
+
+2026-11-23, session 891 repair: verification 3 ran on the first attempt
+with exit 0, 1 pass and 0 fail; complete log
+`target/capture-m16/gate-3-review.p3cUUy` ends with `exit=0`. The exact
+command was verification 3 above. No retries were needed. The historical
+measurement logs and design 10.3 values were not edited. Independent
+review remains pending.

@@ -10,12 +10,7 @@ checked against `ac31a91`, CAP-R7-01 to CAP-R7-06, reduces the closing
 milestone M16). Section 18 lists what revisions 2 to 7 changed and why;
 section 8.5 gives the completion order of the remaining milestones.
 
-Implementation status (revision 7): milestones M1 to M15, M17 to M20,
-M22 and M23a to M23f are accepted by their per-plan reviews. M16 is
-pending: its deliverables, its targeted gates (section 8.5, "M16 reduced
-scope") and its per-plan review have not yet run. When all three are
-complete, M16 replaces this paragraph with "implemented (slice); every
-milestone accepted" and keeps the next sentence (CAP-R7-04). Full
+Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
 native parity suite) is deferred and NOT yet run; it runs outside the
 workflow on the tree merged with `feat/cad3d-pages` (CAP-R7-01).

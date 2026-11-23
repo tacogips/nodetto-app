@@ -147,3 +147,9 @@ recorded value is drift: stop and record it. For every gate attempt,
 append the date, phase, command, printed log path, exit status, pass and
 fail counts and the attempt number. Also record the pre-candidate and
 candidate hashes and the review decision.
+
+2026-11-23: Preliminary phase: design `0c1b7430bf66b1e967e5f1d9f84c8d5690892ee0`, overview `86eba94eb95a0ca199c3edb2e1d42461d99a3c91`; docs before `3649646f1ac222b8226cdce439dbbc8dbb38e09c`, after `c8356cc0f4300315cc338872a07ad18b901ad564`; status checker `8eeadbeaf2644d2179b7424b0c5844a660c09ac3`. G1 verification 1 attempt 1: `target/capture-m16/gates/g1-help-docs.ygaWyV`, 60 pass, 0 fail, exit=0. G2 verification 2 attempt 1: `target/capture-m16/gates/g2-crate.N3ZSJW`, 121 pass, 0 fail, exit=0. G3 verification 3 attempt 1: `target/capture-m16/gates/g3-cli-unit.O3807T`, 81 pass, 0 fail, exit=0. Commands are the exact verification commands above.
+
+Candidate attempt 1 snapshot: `target/capture-m16/gates/candidate-1.zy3k20il`; design `0c1b7430bf66b1e967e5f1d9f84c8d5690892ee0`, overview `86eba94eb95a0ca199c3edb2e1d42461d99a3c91`. Candidate hashes: docs `c8356cc0f4300315cc338872a07ad18b901ad564`, design `363b8326acc7f98a59e11cabbd5a3c3cb7dfc546`, overview `0af23ab7b52b6d8856a2db343edac99c664b90e5`. The intermediate overview hash `b7df3b4574ac5c31c01ed6f2dcc6a22a58ba9b1a` preceded the Evidence roots and deferral edit. Review pending.
+
+2026-11-23: Candidate attempt 1, exact verification commands above: G1 attempt 1 `target/capture-m16/gates/g1-help-docs.rG2Uqj`, 60 pass, 0 fail, exit=0; G2 attempt 1 `target/capture-m16/gates/g2-crate.KYuEvz`, 121 pass, 0 fail, exit=0; G3F attempt 1 (`F=1`) `target/capture-m16/gates/g3f-cli-unit.NfQuTQ`, 81 pass, 0 fail, exit=0, status-check ok. Independent review and integration publication remain pending.

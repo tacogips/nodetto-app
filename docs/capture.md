@@ -136,7 +136,22 @@ edit the document and capture again to check the result.
 
 ## Measured budgets
 
-Values are recorded by M16 from `target/capture-m16/`; see design section 10.3.
+Machine: Apple M4, 10 cores, macOS 26.5.2, 2026-11-23; Rust 1.98.1, Bun 1.4.4. Load and full machine details: `target/capture-m16/machine.txt`.
+
+| Budget | Budget value | Measured | Runs | Log path |
+| --- | --- | --- | --- | --- |
+| Native capture of reference CAD page | under 5,000 ms | median 840 ms / max 850 ms | 3 after warm-up | `target/capture-m16/native-plate-png.txt` |
+| Reference scene render, one thread | under 2,000 ms | 313.27 ms | 1 | `target/capture-m16/crate-release.log` |
+| Interference, one 200 mm pair | under 500 ms | 40 ms | 1 | `target/capture-m16/crate-release.log` |
+| Interference analysis in total | 24 million weighted rays; 600-hole pair under 2,000 ms; shared loop under 5,000 ms | 600 holes 448 ms; 2,000 boxes 111 ms; 200 bodies/shared loop 161 ms; budget-rule tests passed | 1 each | `target/capture-m16/crate-release.log` |
+| Body sampling | same budget for suspect bodies; none in a fitted view of a sound model | no timing printed; census tests passed | 1 suite | `target/capture-m16/crate-release.log` |
+| Native CAD capture, 1,000 elements in 50 bodies | under 10,000 ms | earlier evidence, M23e, 2026-11-23: 1,060 ms | 1 | `tmp/capture/m23/timing.json` |
+| Native 2D capture | 10,000 ms class | median 740 ms / max 740 ms | 3 after warm-up | `target/capture-m16/native-led-2d.txt` |
+| Scene build, 20,000 elements in Bun | under 1,000 ms | 97.0 ms | 1 | `target/capture-m16/bun-scene.log` |
+| Reference CAD PNG size | 1,048,576 bytes | 35,138 bytes | 3 after warm-up | `target/capture-m16/native-plate-png.txt` |
+| Reference CAD JPG size | 1,048,576 bytes | 62,948 bytes | 3 after warm-up | `target/capture-m16/native-plate-jpg.txt` |
+
+Method: crate release tests with printed timings, three timed native runs after a warm-up, and the Bun scene test.
 
 ## Licences
 
