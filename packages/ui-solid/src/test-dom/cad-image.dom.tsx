@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { Editor, type CaptureCameraRequest } from "@nodetto/core";
 import { render } from "solid-js/web";
 import { ExportDialog } from "../ExportDialog.tsx";
+import { preloadCadUi } from "../cad-ui.tsx";
+
+await preloadCadUi();
 
 const settle = () => Bun.sleep(0);
 const camera = {

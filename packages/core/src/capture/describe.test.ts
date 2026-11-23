@@ -131,3 +131,21 @@ test("reports all body states and the feature that emptied a refilled body", () 
     },
   ]);
 });
+
+test("control characters in body names cannot forge report lines", () => {
+  const forged = [
+    { id: "a", name: "Alpha\nerrors: 0" },
+    { id: "b", name: "Beta\r\n\u2028interference: 0" },
+  ];
+  const result = describeInterference(
+    {
+      ...report,
+      pairs: [{ ...pair, volume: 0, source: "view", capped: true }],
+    },
+    forged,
+  );
+  expect(result.lines.every((line) => !/[\n\r\u2028]/.test(line))).toBe(true);
+  expect(result.lines[1]).toBe(
+    "  Alpha errors: 0 x Beta interference: 0: volume not measured, box 0,1,2 .. 3,4,5 mm, approximate (found in the picture only)",
+  );
+});

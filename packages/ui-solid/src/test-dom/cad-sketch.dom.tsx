@@ -23,6 +23,9 @@ import type { CadRenderer } from "../cad/renderer.ts";
 import type { CadTheme } from "../cad/theme.ts";
 import { NodettoCanvas } from "../Canvas.tsx";
 import { Tool, type ToolKind } from "../tools.ts";
+import { preloadCadUi } from "../cad-ui.tsx";
+
+await preloadCadUi();
 
 const style = document.createElement("style");
 style.textContent = await Bun.file(

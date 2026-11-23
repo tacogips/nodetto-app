@@ -897,7 +897,8 @@ every 3D CAD page. Use --page to check a single CAD page. --json returns an
 array of page reports with full element IDs and swept tool bounds in mm.
 Text lists each page's counts and each error's short element ID and code.
 CAD elements belong on cad3d pages. CAD pages also accept document
-resources. The app regenerates solid geometry.
+resources. The app regenerates solid geometry. For a shaded picture of
+the solids with overlapping bodies marked, see: nodetto-cli help capture
 
 CAD status codes:
   cad.reference.missing  A required reference is missing or invalid.

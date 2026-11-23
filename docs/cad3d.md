@@ -45,6 +45,8 @@ board detaches the reference, and Undo restores the link.
   meshes with bounding boxes. The path includes the cap outlines and the
   joins between sketch entities. To exchange the final Boolean geometry,
   use STL. The CLI can export the construction view without a 3D kernel.
+- `nodetto-cli capture` renders a shaded picture of the solids from a chosen
+  view and reports overlapping bodies; see [Capture](capture.md).
 
 ## Files, Git and collaboration
 

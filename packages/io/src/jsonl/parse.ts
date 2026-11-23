@@ -1,6 +1,7 @@
 // JSONL parsing: newline-delimited JSON -> IR document.
 // See the product design (nodetto-cloud repo), section 6.
 
+import { splitLines } from "./lines.ts";
 import {
   type Document,
   type DocumentSnapshot,
@@ -161,7 +162,7 @@ function collect(text: string, keepSourceLines = false): Collected {
   // CR left at a line end is JSON whitespace. Split on a string: the native
   // CLI's interpreter splits on a regular expression in quadratic time.
   const body = text.startsWith(BOM) ? text.slice(1) : text;
-  const lines = body.split("\n");
+  const lines = splitLines(body);
 
   for (const [i, raw] of lines.entries()) {
     const lineNumber = i + 1;

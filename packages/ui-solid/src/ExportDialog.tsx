@@ -1,6 +1,6 @@
 import type { CaptureCameraRequest, CaptureTheme } from "@nodetto/core";
 import type { Camera3d } from "./cad/camera3d.ts";
-import { CadImageExportSection } from "./CadImageExportSection.tsx";
+import { CadImageExportSection } from "./cad-ui.tsx";
 import {
   HtmlExportSection,
   type SaveHtmlBundle,

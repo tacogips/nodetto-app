@@ -44,6 +44,8 @@ export class CaptureInputError extends Error {
     message: string,
     // Present for the no-body case, including when no features failed.
     readonly errors?: CadCaptureModel["errors"],
+    // The document exceeds a capture limit; the options are not at fault.
+    readonly limit = false,
   ) {
     super(message);
     this.name = "CaptureInputError";
@@ -120,7 +122,8 @@ export function prepareCadCapture(
     });
     return { scene, model, camera, frame };
   } catch (error) {
-    if (error instanceof RangeError) throw new CaptureInputError(error.message);
+    if (error instanceof RangeError)
+      throw new CaptureInputError(error.message, undefined, true);
     throw error;
   }
 }

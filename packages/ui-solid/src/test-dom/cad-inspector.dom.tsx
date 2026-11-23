@@ -15,6 +15,9 @@ import { NodettoCanvas } from "../Canvas.tsx";
 import { Inspector } from "../Inspector.tsx";
 import { Layers } from "../Layers.tsx";
 import { Tool } from "../tools.ts";
+import { preloadCadUi } from "../cad-ui.tsx";
+
+await preloadCadUi();
 
 globalThis.getComputedStyle = window.getComputedStyle.bind(window);
 

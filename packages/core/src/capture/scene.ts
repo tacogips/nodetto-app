@@ -260,6 +260,12 @@ export function buildCadCaptureModel(
         const decoded = options.decodeMesh(feature.semantic.data);
         const positions = new Float64Array(decoded.positions);
         const triangles = new Uint32Array(decoded.triangles);
+        // An empty mesh has no bounds; as a body it would make the whole
+        // page impossible to frame. The app rejects it as well.
+        if (triangles.length === 0 || positions.length === 0) {
+          status.set(id, cadFailure("cad.mesh.invalid"));
+          continue;
+        }
         const min: MutableVec3 = [
           Number.POSITIVE_INFINITY,
           Number.POSITIVE_INFINITY,
@@ -339,11 +345,12 @@ export function buildCadCaptureModel(
       op: op === "add" ? "union" : op === "cut" ? "difference" : "intersection",
       tool: toolIndex,
     };
+    const added = step.op === "union" ? sweepBounds(tool) : undefined;
     for (const target of targets) {
       const body = targetsById.get(target);
       if (!body) continue;
       body.steps.push(step);
-      if (step.op === "union") includeBounds(body.bounds, sweepBounds(tool));
+      if (added) includeBounds(body.bounds, added);
     }
   }
 

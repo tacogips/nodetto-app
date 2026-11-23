@@ -126,7 +126,9 @@ page to or from the CAD kind reports `page.kindLocked`.
 
 Whole-page SVG, PNG and PDF export uses an isometric construction view of the
 swept features and PCB outlines, with bounding boxes for imported meshes.
-Use the desktop app to export the finished solid as STL.
+Use `capture` for a shaded picture of the solids from a chosen view, with
+overlapping bodies marked: see [Capture](capture.md). Use the desktop app to
+export the finished solid as STL.
 See [3D CAD pages](cad3d.md).
 
 ## Drawing with AI agents and live co-editing

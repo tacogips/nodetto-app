@@ -171,8 +171,8 @@ export function AssetExportSection(props: {
       if (signal.aborted) throw new Error("Export cancelled.");
       if (disposed) return;
       const name =
-        kind === "png"
-          ? assetFileName(data.name, density)
+        kind === "png" || kind === "jpg"
+          ? assetFileName(data.name, density, kind)
           : `${exportFileStem(data.name)}.${kind}`;
       if (props.save) {
         setSaving(true);

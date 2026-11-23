@@ -1,4 +1,5 @@
 import { type Document, isPlainObject } from "@nodetto/ir";
+import { splitLines } from "./lines.ts";
 import { setField } from "./objects.ts";
 import { parseDocumentResult } from "./parse.ts";
 import { serializeDocument, unknownLine } from "./serialize.ts";
@@ -24,7 +25,7 @@ function recordKey(record: Record<string, unknown>): string | undefined {
 function entries(text: string): Entry[] | undefined {
   const counts = new Map<string, number>();
   const result: Entry[] = [];
-  for (const line of text.split("\n")) {
+  for (const line of splitLines(text)) {
     if (!line.trim()) continue;
     let record: unknown;
     try {
@@ -99,7 +100,7 @@ export function serializeDocumentPreservingText(
     if (!rawEntries) return canonical;
     let cursor = 0;
     const output: { key?: string; line: string }[] = [];
-    const bodyLines = body.split("\n");
+    const bodyLines = splitLines(body);
     if (baseText.endsWith("\n")) bodyLines.pop();
     for (const line of bodyLines) {
       if (!line.trim()) {

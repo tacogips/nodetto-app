@@ -74,7 +74,7 @@ rejects but the picture applies, even with `--no-interference`.
 Closed imported meshes participate like solids; open meshes are translucent
 and marked not checked. Reference bodies are drawn at 45% over what is behind
 and participate in interference. 2D artwork options do not apply to CAD.
-After the merge with the CAD branch, `export` produces a CAD wireframe while `capture` renders shaded solids.
+`export` draws a CAD page as a construction wireframe; `capture` renders the shaded solids.
 
 ```bash
 nodetto-cli capture plate.jsonl --view iso --output plate.png

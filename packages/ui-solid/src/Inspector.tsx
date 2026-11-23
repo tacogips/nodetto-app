@@ -32,7 +32,7 @@ import { BatchRenameSection } from "./inspector/BatchRenameSection.tsx";
 import { ReplaceNoteTextSection } from "./inspector/ReplaceNoteTextSection.tsx";
 import { BpmnSection } from "./inspector/BpmnSection.tsx";
 import { BreadboardSection } from "./inspector/BreadboardSection.tsx";
-import { CadSection } from "./inspector/CadSection.tsx";
+import { CadSection } from "./cad-ui.tsx";
 import { PcbSection } from "./inspector/PcbSection.tsx";
 import {
   type Element,

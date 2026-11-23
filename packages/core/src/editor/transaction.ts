@@ -249,21 +249,24 @@ export function planReconciliation(
   store: Store,
   registry: ShapeUtilRegistry,
 ): Command[] | null {
-  const elements = store.listElements();
-  const hasCad =
-    store.listPages().some((page) => page.kind === CAD_PAGE_KIND) ||
-    elements.some((element) => isCadTypeName(element.type));
-  const hasDerived = elements.some(
-    (element) =>
+  // One pass: this runs after every remote transaction.
+  let hasCad = false;
+  let hasDerived = false;
+  for (const element of store.listElements()) {
+    hasCad ||= isCadTypeName(element.type);
+    hasDerived ||=
       element.type === UmlComponentType.Port ||
-      element.visual.colorTokens ||
-      element.visual.numberTokens ||
-      element.visual.textStyle ||
+      Boolean(element.visual.colorTokens) ||
+      Boolean(element.visual.numberTokens) ||
+      Boolean(element.visual.textStyle) ||
       element.visual.aspectRatio !== undefined ||
       element.visual.textResize === "auto-width" ||
       element.visual.textResize === "auto-height" ||
-      (element.type === "frame" && (element.semantic as FrameSemantic).layout),
-  );
+      (element.type === "frame" &&
+        Boolean((element.semantic as FrameSemantic).layout));
+    if (hasCad && hasDerived) break;
+  }
+  hasCad ||= store.listPages().some((page) => page.kind === CAD_PAGE_KIND);
   if (!hasDerived) return hasCad ? planContentRepair(store) : null;
   const before = new Store(store.getSnapshot());
   const draft = new Store(before.getSnapshot());

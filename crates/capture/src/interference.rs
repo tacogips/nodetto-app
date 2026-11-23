@@ -371,27 +371,52 @@ pub struct ViewPair {
     pub max: [f64; 3],
 }
 
+/// Picture-only pairs whose volume is sampled. Each one costs a full
+/// lattice outside the analysis ray budget, so the rest are reported from
+/// the picture alone (volume 0, capped) instead of holding the caller for
+/// minutes on a page with hundreds of mutually overlapping bodies.
+pub const VIEW_PAIR_SAMPLES: usize = 64;
+
 pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPair], cell: f64) {
-    for view in seen {
-        let min = view.min.map(|v| v - cell);
-        let max = view.max.map(|v| v + cell);
-        let side = (0..3).map(|i| max[i] - min[i]).fold(0.0, f64::max);
-        let candidate = Candidate {
-            a: view.a,
-            b: view.b,
-            min,
-            max,
-            weight: 1,
+    if seen.is_empty() {
+        return;
+    }
+    let loops = lattice::tool_loops(scene);
+    let tools = lattice::scene_tool_bounds(scene);
+    let cache = ViewCache::new(scene.tools.len());
+    for (index, view) in seen.iter().enumerate() {
+        let sampled = if index < VIEW_PAIR_SAMPLES {
+            let min = view.min.map(|v| v - cell);
+            let max = view.max.map(|v| v + cell);
+            let side = (0..3).map(|i| max[i] - min[i]).fold(0.0, f64::max);
+            let candidate = Candidate {
+                a: view.a,
+                b: view.b,
+                min,
+                max,
+                weight: 1,
+            };
+            sample(
+                scene,
+                &candidate,
+                cell.min(side / 16.0),
+                0,
+                &loops,
+                &tools,
+                &cache,
+            )
+            .report
+        } else {
+            None
         };
-        let (report, _) = analyse_pair(scene, &candidate, cell.min(side / 16.0), 0);
-        let mut report = report.unwrap_or(PairReport {
+        let mut report = sampled.unwrap_or(PairReport {
             a: view.a,
             b: view.b,
             volume: 0.0,
             min: view.min,
             max: view.max,
             from_view: true,
-            capped: false,
+            capped: index >= VIEW_PAIR_SAMPLES,
         });
         report.from_view = true;
         pairs.push(report);
@@ -445,6 +470,29 @@ mod view_tests {
             (pairs[1].a, pairs[1].b, pairs[1].volume, pairs[1].from_view),
             (1, 2, 42.0, false)
         );
+    }
+
+    #[test]
+    fn view_pairs_beyond_the_sample_limit_are_reported_unmeasured() {
+        let scene =
+            crate::scene::parse_scene(include_bytes!("../tests/fixtures/plate-iso.ncs1")).unwrap();
+        let overlap = ViewPair {
+            a: 0,
+            b: 1,
+            min: [85.0, 45.0, 2.0],
+            max: [100.0, 60.0, 5.0],
+        };
+        let seen = vec![overlap.clone(); VIEW_PAIR_SAMPLES + 2];
+        let mut pairs = Vec::new();
+        add_view_pairs(&scene, &mut pairs, &seen, 1.0);
+        assert_eq!(pairs.len(), seen.len());
+        assert!(pairs.iter().all(|pair| pair.from_view));
+        let measured = pairs.iter().filter(|pair| pair.volume > 0.0).count();
+        assert_eq!(measured, VIEW_PAIR_SAMPLES);
+        assert!(pairs
+            .iter()
+            .filter(|pair| pair.volume == 0.0)
+            .all(|pair| pair.capped && pair.min == overlap.min));
     }
 }
 

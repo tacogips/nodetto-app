@@ -340,6 +340,16 @@ test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh",
   });
   expect(failed.errors).toEqual([{ id: "mesh", code: "cad.mesh.invalid" }]);
   expect(failed.bodies).toEqual([]);
+  // A mesh without triangles has no bounds and must not become a body.
+  const empty = buildCadCaptureModel([mesh], CAD_TEST_PAGE.id, {
+    decodeMesh: () => ({
+      positions: new Float64Array(0),
+      triangles: new Uint32Array(0),
+    }),
+  });
+  expect(empty.errors).toEqual([{ id: "mesh", code: "cad.mesh.invalid" }]);
+  expect(empty.bodies).toEqual([]);
+  expect(empty.tools).toEqual([]);
 });
 
 function selectedLoops(entities: readonly Element[], pick?: readonly string[]) {

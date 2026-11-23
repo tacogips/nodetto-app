@@ -7,10 +7,10 @@ import {
 import { isPlainObject } from "@nodetto/ir";
 import type { CanvasMode, CadRenderer } from "@nodetto/ui-solid";
 import {
-  createWebgl2Renderer,
   NodettoCanvas,
   Tool,
   type ToolKind,
+  preloadCadUi,
 } from "@nodetto/ui-solid";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
@@ -30,11 +30,13 @@ import {
   CAD_THEME_TOKENS,
   parseCssColor,
 } from "../../../../packages/ui-solid/src/cad/theme.ts";
+import { createWebgl2Renderer } from "../../../../packages/ui-solid/src/cad/renderer.ts";
 import { getCadEngine } from "../../src/cad/engine.ts";
 import "../../src/styles/base.css";
 import "../../src/styles/canvas.css";
 
 const mountStart = performance.now();
+await preloadCadUi();
 const plate = plateWithHoles(60);
 const secondPage = { ...PCB_TEST_PAGE, id: "interface-pcb", name: "Interface" };
 const outline = edge("rim", { kind: "rect", start: [0, 0], end: [20, 10] });

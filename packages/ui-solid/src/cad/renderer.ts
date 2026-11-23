@@ -24,6 +24,8 @@ export interface CadRenderer {
     readonly renderer: string;
   };
   dispose(): void;
+  /** Give the WebGL context back at once when the canvas is removed. */
+  releaseContext?(): void;
 }
 
 const VERTEX = `#version 300 es
@@ -393,6 +395,9 @@ export function createWebgl2Renderer(
       release(grid);
       gl.deleteProgram(faces.id);
       gl.deleteProgram(lines.id);
+    },
+    releaseContext() {
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     },
   };
 }

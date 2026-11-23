@@ -8,6 +8,9 @@ import { Inspector } from "../Inspector.tsx";
 import { Layers } from "../Layers.tsx";
 import { ShapePalette } from "../ShapePalette.tsx";
 import { Tool } from "../tools.ts";
+import { preloadCadUi } from "../cad-ui.tsx";
+
+await preloadCadUi();
 
 Object.assign(globalThis, {
   FileReader: window.FileReader,

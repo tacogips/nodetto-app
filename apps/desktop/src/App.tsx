@@ -75,6 +75,7 @@ import {
   createSignal,
   type JSX,
   onCleanup,
+  untrack,
   onMount,
   Show,
 } from "solid-js";
@@ -123,6 +124,9 @@ import "./square-chrome.css";
 import "./pane.css";
 
 export { exportBaseName } from "./shell/export-handlers.ts";
+
+/** How long the CAD kernel worker outlives the last visit to a CAD page. */
+const CAD_ENGINE_IDLE_MS = 60_000;
 
 export interface AppProps {
   readonly editor: Editor;
@@ -222,6 +226,14 @@ export function App(props: AppProps): JSX.Element {
   // Editor chrome state (design editor-ux 3.3, 3.5, 3.6, 4).
   const preferences = loadEditorPreferences(preferenceStorage());
   const cadCameras = new Map<PageId, Camera3d>();
+  let cadCamerasRevision = props.editor.documentOpenRevision;
+  onCleanup(
+    props.editor.subscribe(() => {
+      if (cadCamerasRevision === props.editor.documentOpenRevision) return;
+      cadCamerasRevision = props.editor.documentOpenRevision;
+      cadCameras.clear();
+    }),
+  );
   const [theme, setTheme] = createSignal(preferences.theme);
   const [canvasBackground, setCanvasBackground] = createSignal(
     preferences.canvasBackground,
@@ -398,15 +410,27 @@ export function App(props: AppProps): JSX.Element {
   let openCadImport: (() => void) | undefined;
   const [cadEngine, setCadEngine] =
     createSignal<ReturnType<typeof getCadEngine>>();
+  // Keep the kernel worker for a while after leaving a CAD page: going back
+  // and forth between a board and its enclosure must not restart the worker
+  // and rebuild the whole history each time.
+  let cadEngineIdle: ReturnType<typeof setTimeout> | undefined;
+  const releaseCadEngine = (): void => {
+    clearTimeout(cadEngineIdle);
+    cadEngineIdle = undefined;
+    const engine = untrack(cadEngine);
+    setCadEngine(undefined);
+    engine?.dispose();
+  };
   createEffect(() => {
-    if (!cadPageActive()) return;
-    const engine = getCadEngine();
-    setCadEngine(engine);
-    onCleanup(() => {
-      setCadEngine(undefined);
-      engine.dispose();
-    });
+    if (cadPageActive()) {
+      clearTimeout(cadEngineIdle);
+      cadEngineIdle = undefined;
+      if (!untrack(cadEngine)) setCadEngine(getCadEngine());
+    } else if (untrack(cadEngine) && cadEngineIdle === undefined) {
+      cadEngineIdle = setTimeout(releaseCadEngine, CAD_ENGINE_IDLE_MS);
+    }
   });
+  onCleanup(releaseCadEngine);
   let wasViewer = false;
   createEffect(() => {
     const viewer = cloud()?.role === "viewer";

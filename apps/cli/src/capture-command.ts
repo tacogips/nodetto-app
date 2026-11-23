@@ -430,7 +430,7 @@ export async function captureCommand(
   } catch (cause) {
     if (cause instanceof CaptureInputError) {
       const message = `${warnings}${cadInputMessage(cause, page, document.elements)}`;
-      return cause.errors ? fail(message) : usageError(message);
+      return cause.errors || cause.limit ? fail(message) : usageError(message);
     }
     return fail(`${warnings}Cannot capture: ${describe(cause)}`);
   }

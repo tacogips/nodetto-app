@@ -17,6 +17,9 @@ import type { CadTheme } from "../cad/theme.ts";
 import { NodettoCanvas, type NodettoCanvasProps } from "../Canvas.tsx";
 import { Layers } from "../Layers.tsx";
 import { Tool } from "../tools.ts";
+import { preloadCadUi } from "../cad-ui.tsx";
+
+await preloadCadUi();
 
 globalThis.getComputedStyle = window.getComputedStyle.bind(window);
 

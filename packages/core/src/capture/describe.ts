@@ -28,6 +28,15 @@ const decimal = (n: number) => String(Number(n.toFixed(3)));
 const vector = (v: Vec3) => v.map(decimal).join(",");
 const volume = (n: number) => String(Number(n.toPrecision(4)));
 
+/**
+ * Names come from the document. A line break inside one could forge a
+ * report line such as `errors: 0` in the text an agent reads.
+ */
+function plain(name: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
+  return name.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, " ");
+}
+
 export function describeInterference(
   report: SolidReport,
   bodies: readonly { readonly id: string; readonly name: string }[],
@@ -70,10 +79,12 @@ export function describeInterference(
   ];
   for (const p of pairs)
     lines.push(
-      `  ${p.aName} x ${p.bName}: ${p.volumeMm3 < 0.001 ? "volume under 0.001" : `volume ${volume(p.volumeMm3)}`} mm3, box ${vector(p.min)} .. ${vector(p.max)} mm${p.approximate ? ", approximate" : ""}${p.source === "view" ? " (found in the picture only)" : ""}`,
+      `  ${plain(p.aName)} x ${plain(p.bName)}: ${p.source === "view" && p.approximate && p.volumeMm3 === 0 ? "volume not measured," : `${p.volumeMm3 < 0.001 ? "volume under 0.001" : `volume ${volume(p.volumeMm3)}`} mm3,`} box ${vector(p.min)} .. ${vector(p.max)} mm${p.approximate ? ", approximate" : ""}${p.source === "view" ? " (found in the picture only)" : ""}`,
     );
   for (const [a, b] of analysis.unchecked.slice(0, 20))
-    lines.push(`  not checked: ${body(a).name} x ${body(b).name}`);
+    lines.push(
+      `  not checked: ${plain(body(a).name)} x ${plain(body(b).name)}`,
+    );
   if (analysis.uncheckedCount > 20)
     lines.push(
       `  ... and ${analysis.uncheckedCount - 20} more; narrow with --interference-bodies`,
@@ -122,7 +133,7 @@ export function describeBodies(
   const errors: { id: string; code: string; text: string }[] = [];
   const names = model.bodies.map((body, i) => {
     const state = report.bodies[i];
-    if (!state) return body.name;
+    if (!state) return plain(body.name);
     if (state.emptiedByStep !== -1) {
       const step = body.steps[state.emptiedByStep];
       const tool = step && model.tools[step.tool];
@@ -130,11 +141,11 @@ export function describeBodies(
         errors.push({
           id: tool.feature,
           code: "cad.result.empty",
-          text: `(sampled): leaves no material in "${body.name}"; the app rejects this feature and keeps the body, this picture applies it`,
+          text: `(sampled): leaves no material in "${plain(body.name)}"; the app rejects this feature and keeps the body, this picture applies it`,
         });
     }
     return (
-      body.name +
+      plain(body.name) +
       notes[state.state] +
       ((state.state === "drawn" ||
         state.state === "hidden" ||

@@ -21,7 +21,8 @@ Curved surfaces are approximated by facets.
 
 Interference is striped and visible through other bodies; the hatch replaces
 shading. Use --no-interference for an unobstructed view. A pair found only
-in the picture is marked (found in the picture only). A refinement capped line
+in the picture is marked (found in the picture only); beyond the first 64 such
+pairs the volume is not measured. A refinement capped line
 reports checked pairs whose sub-cell parts may be missed. If candidates are
 not checked, narrow with --interference-bodies to finish the check.`,
 };

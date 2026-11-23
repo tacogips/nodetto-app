@@ -110,7 +110,7 @@ export async function rasterizeSvg(
             (blob) =>
               blob
                 ? resolve(blob)
-                : reject(new Error("This browser could not encode the PNG.")),
+                : reject(new Error("This browser could not encode the image.")),
             output?.type ?? "image/png",
             output?.quality,
           ),
@@ -139,6 +139,10 @@ export function exportFileStem(name: string): string {
   return base || "artboard";
 }
 
-export function assetFileName(name: string, scale: number): string {
-  return `${exportFileStem(name)}@${scale}x.png`;
+export function assetFileName(
+  name: string,
+  scale: number,
+  extension: "png" | "jpg" = "png",
+): string {
+  return `${exportFileStem(name)}@${scale}x.${extension}`;
 }

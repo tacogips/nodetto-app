@@ -431,7 +431,10 @@ export function CadViewport(props: CadViewportProps) {
       canvas.removeEventListener("webglcontextlost", lost);
       canvas.removeEventListener("webglcontextrestored", initialize);
       observer?.disconnect();
-      renderer()?.dispose();
+      // Browsers cap live WebGL contexts; do not wait for garbage collection.
+      const current = renderer();
+      current?.dispose();
+      current?.releaseContext?.();
     });
   });
 
