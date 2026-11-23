@@ -1,0 +1,173 @@
+{
+  "taskId": "capture-s889",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "ac31a9196d31ba16a18989786dde68b6077a038c",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md"
+  ],
+  "evidenceRoot": "tmp/capture-s889",
+  "reviewContext": {
+    "issueReference": "No GitHub issue. Session 889 workflowInput, milestone M16, impl-plans/active/capture-16-docs-final.md (revision 8). Design revision 7, CAP-R7-01 to CAP-R7-04.",
+    "userProblem": "Finish the nodetto AI capture feature on feat/ai-capture. Only M16 remains, with scope reduced by the owner on 2026-11-23: docs and help so an agent finds capture unprompted, measured budgets with method under target/capture-m16/, and the design and progress table marked accepted with full repository verification deferred and NOT yet run.",
+    "requiredOutcomes": [
+      "M16a: help exit-code line (0, 1, 2) and desktop/docs line; docs/capture.md; docs/cli.md section and AI line; capture-docs.test.ts.",
+      "M16b: measurements under target/capture-m16/ and the design 10.3 table.",
+      "M16c: measured values in docs/capture.md; three targeted gates exit 0; design header and overview Progress mark every milestone accepted with the deferral sentence."
+    ],
+    "nonGoals": [
+      "Redoing accepted milestones M1-M15, M17-M20, M22, M23a-M23f.",
+      "mise run verify, browser/Chromium/Vite tests, the whole native parity suite, cargo test --workspace, cargo test -p nodetto-native (deferred and NOT yet run).",
+      "cad3d M21 and M18; cad3d design or plan edits; README.md, impl-plans/README.md, mise.toml edits.",
+      "Any write under the repository tmp/; any server, auth, secret or deployment content."
+    ],
+    "constraints": [
+      "Workers edit only their writePaths; progress goes to their own plan file. No git state changes, no stash, branches or worktrees; never push.",
+      "English only, no emojis, strict TypeScript; cargo with CARGO_TERM_QUIET=true and CARGO_TARGET_DIR=target/capture-m16.",
+      "artifactRoots exactly [\"target\"]; native-parity/capture.test.ts and mcp-stdio.test.ts excluded and deferred.",
+      "CLI unit tests run with UPDATE_CAPTURE_FIXTURES=0; tracked fixtures unchanged.",
+      "No test, deadline or budget relaxed; timing tests up to three attempts, then alone, all logged.",
+      "Per-edit fresh reads and git hash-object before and after each owned file; drift is recorded, not overwritten."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "CAP-R7-01: M16 reduced scope; targeted gates only; full verification deferred and NOT yet run.", "rationale": "Owner decision 2026-11-23; supersedes the revision 4 M16 gate list and tmp root."},
+      {"decision": "CAP-R7-02: help changes limited to the exit-code line and one desktop/docs line.", "rationale": "capture-help.ts omitted exit 1 of design 4.2; the desktop dialog was not mentioned."},
+      {"decision": "CAP-R7-03: measured values only from target/capture-m16 logs, including the Bun 20,000-element scene test.", "rationale": "Measured budgets with method, without writing under tmp/."},
+      {"decision": "CAP-R7-04: M16 stays pending until M16a-M16c and gates complete; then every row accepted with the deferral sentence.", "rationale": "No acceptance claim before evidence."}
+    ],
+    "intentionalTradeoffs": [
+      "Full repository verification (mise run verify, browser tests, whole native parity suite) is deferred and NOT yet run; it runs after the merge with feat/cad3d-pages, outside this workflow.",
+      "16a and 16b share the artifact root target in wave 1 because workflowInput fixes artifactRoots to [\"target\"]; they write disjoint subdirectories (target/capture-m16a, target/capture-m16). Pre-stated bounded fix if dispatch rejects: add capture-16a-help-docs to 16b dependsOn.",
+      "16b timing runs share the machine with 16a in wave 1; bounded by up to three attempts, then the case alone, all logged, with uptime load in machine.txt.",
+      "16c marks M16 accepted before its own Step-6 review; a rejection reverts the marking, and verification 3 blocks it unless G1-G3 pass.",
+      "The manifest evidenceRoot tmp/capture-s889 is dispatcher-owned and untracked; no plan writes under tmp/, plan evidence lives under target/capture-m16 and target/capture-m16a."
+    ],
+    "supportedEdgeCases": [
+      "Capture help and docs for 2D pages, 3D CAD camera options, interference text and hatched overlay, exit codes 0/1/2, MCP --inline images and the desktop Export dialog.",
+      "Timing budgets that miss under load are retried up to three times and then measured in isolation before a blocker is reported.",
+      "Native-parity budget rows not rerun in this run are labelled as earlier evidence with their source file."
+    ],
+    "outOfScopeEdgeCases": [
+      "Tests that write under tmp/ (native-parity/capture.test.ts, mcp-stdio.test.ts) are excluded from gates and deferred to the full verification.",
+      "Browser, Chromium and Vite tests; cargo test --workspace; cad3d M21 PCB board tool and M18 wireframe export."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/capture-00-overview.md",
+      "impl-plans/active/capture-16-docs-final.md",
+      "impl-plans/active/capture-16a-help-docs.md",
+      "impl-plans/active/capture-16b-budgets.md",
+      "impl-plans/active/capture-16c-finalize.md",
+      "impl-plans/active/capture-s885-dispatch.json"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "capture-23a-tile-admission", "planPath": "impl-plans/active/capture-23a-tile-admission.md", "commit": "ac31a9196d31ba16a18989786dde68b6077a038c", "provides": "M23a tile admission and storage."},
+    {"planId": "capture-23f-host-cases", "planPath": "impl-plans/active/capture-23f-host-cases.md", "commit": "ac31a9196d31ba16a18989786dde68b6077a038c", "provides": "M23f host cases."},
+    {"planId": "capture-23b-tile-visit-allowance", "planPath": "impl-plans/active/capture-23b-tile-visit-allowance.md", "commit": "ac31a9196d31ba16a18989786dde68b6077a038c", "provides": "M23b per-tile visit and scan allowance."},
+    {"planId": "capture-23c-picture-acceptance", "planPath": "impl-plans/active/capture-23c-picture-acceptance.md", "commit": "ac31a9196d31ba16a18989786dde68b6077a038c", "provides": "M23c overlay and mesh acceptance."},
+    {"planId": "capture-23d-census-render-digest", "planPath": "impl-plans/active/capture-23d-census-render-digest.md", "commit": "ac31a9196d31ba16a18989786dde68b6077a038c", "provides": "M23d census tests, render assertions, digest."},
+    {"planId": "capture-23e-native-parity", "planPath": "impl-plans/active/capture-23e-native-parity.md", "commit": "ac31a9196d31ba16a18989786dde68b6077a038c", "provides": "M23e native parity."}
+  ],
+  "acceptedDependenciesNote": "M1-M15, M17-M20 and M22 are listed as accepted in capture-s885-dispatch.json acceptedDependencies and are not repeated here.",
+  "waves": [
+    ["capture-16a-help-docs", "capture-16b-budgets"],
+    ["capture-16c-finalize"]
+  ],
+  "plans": [
+    {
+      "planId": "capture-16a-help-docs",
+      "planPath": "impl-plans/active/capture-16a-help-docs.md",
+      "progressPath": "impl-plans/active/capture-16a-help-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/capture-16a-help-docs.md",
+        "apps/cli/src/capture-help.ts",
+        "apps/cli/src/capture-docs.test.ts",
+        "docs/capture.md",
+        "docs/cli.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "apps/cli/src/capture-help.ts", "intendedEdit": "Replace the last CAPTURE_HELP entry with the design 4.2 exit-code line (0, 1, 2) and add one line on the desktop Export dialog and docs/capture.md; usage block and parts unchanged."},
+        {"path": "docs/cli.md", "intendedEdit": "One capture line above the export --page Flow --format png line (line 141) and one appended section ## Capturing page images at the end with a link to capture.md; nothing else."},
+        {"path": "target", "intendedEdit": "Logs under target/capture-m16a/ only."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "CAPTURE_HELP ends with the design 4.2 exit-code line (0, 1 with --fail-on-interference, 2) and one line naming the desktop Export dialog and docs/capture.md; usage block and part files unchanged.",
+        "docs/capture.md covers every help option, 2D pages, 3D camera options, interference text and hatched overlay, exit codes and refusals, determinism, MCP --inline, the desktop Export dialog, a ## Measured budgets placeholder and the IJG sentence; docs/cli.md has the AI-section capture line and the appended section linking capture.md.",
+        "capture-docs.test.ts passes and executes at least 4 fenced nodetto-cli capture lines with exit 0 and no usage error; existing help and CLI unit tests pass unedited; apps/cli/src/__fixtures__ unchanged."
+      ],
+      "verification": [
+        "sh -c 'mkdir -p target/capture-m16a && (bun run typecheck && bunx biome check apps/cli/src/capture-help.ts apps/cli/src/capture-docs.test.ts && bun test apps/cli/src/capture-docs.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/table-docs.test.ts) > target/capture-m16a/help-docs.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16a/help-docs.log; test $s -eq 0 && grep -Eq \"^ *[1-9][0-9]* pass$\" target/capture-m16a/help-docs.log && grep -Eq \"^ *0 fail$\" target/capture-m16a/help-docs.log'",
+        "sh -c 'mkdir -p target/capture-m16a && UPDATE_CAPTURE_FIXTURES=0 bun test apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-io.test.ts apps/cli/src/capture-interference-options.test.ts apps/cli/src/mcp-image.test.ts > target/capture-m16a/cli-unit.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16a/cli-unit.log; test $s -eq 0 && grep -Eq \"^ *[1-9][0-9]* pass$\" target/capture-m16a/cli-unit.log && git diff --exit-code -- apps/cli/src/__fixtures__'"
+      ]
+    },
+    {
+      "planId": "capture-16b-budgets",
+      "planPath": "impl-plans/active/capture-16b-budgets.md",
+      "progressPath": "impl-plans/active/capture-16b-budgets.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/capture-16b-budgets.md",
+        "design-docs/specs/design-ai-capture.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "design-docs/specs/design-ai-capture.md", "intendedEdit": "Replace only the line <!-- M16 fills the measured table here. --> in section 10.3 with the machine/date line and the measured table; no other line."},
+        {"path": "target", "intendedEdit": "Cargo build output and measurement logs and images under target/capture-m16/."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "target/capture-m16/ holds machine.txt, crate-release.log (release tests, test result ok, positive passed count), native-plate-png.txt, native-plate-jpg.txt and native-led-2d.txt (three timed runs each after a warm-up) and bun-scene.log (one pass with the printed elapsed time).",
+        "Design 10.3 holds a table with one row per 10.2 budget plus PNG/JPG bytes against 1,048,576, giving budget, measured value, runs and log path; deferred native-parity rows are labelled earlier evidence with their source file; no other design line changed.",
+        "No deadline, test or fixture changed; nothing written under tmp/."
+      ],
+      "verification": [
+        "sh -c 'mkdir -p target/capture-m16 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m16 cargo test -p nodetto-capture --release -- --nocapture --test-threads=1 > target/capture-m16/crate-release.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16/crate-release.log; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" target/capture-m16/crate-release.log && ! grep -Eq \"test result: FAILED\" target/capture-m16/crate-release.log'",
+        "sh -c 'mkdir -p target/capture-m16 && bun test packages/core/src/capture/scene.test.ts -t \"builds 20,000 CAD elements in under 1,000 ms\" > target/capture-m16/bun-scene.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16/bun-scene.log; test $s -eq 0 && grep -Eq \"^ *1 pass$\" target/capture-m16/bun-scene.log && grep -q \"CAD capture scene, 20,000 elements:\" target/capture-m16/bun-scene.log'",
+        "sh -c 'bun test packages/core/src/capture/scene.test.ts -t \"builds 20,000 CAD elements in under 1,000 ms\" > /dev/null 2>&1 && for n in plate-png plate-jpg led-2d; do test $(grep -c \"^real\" target/capture-m16/native-$n.txt) -eq 3 || exit 1; done && test -s target/capture-m16/machine.txt && git diff --check -- design-docs/specs/design-ai-capture.md && ! grep -q \"M16 fills the measured table here\" design-docs/specs/design-ai-capture.md'"
+      ]
+    },
+    {
+      "planId": "capture-16c-finalize",
+      "planPath": "impl-plans/active/capture-16c-finalize.md",
+      "progressPath": "impl-plans/active/capture-16c-finalize.md",
+      "wave": 2,
+      "dependsOn": ["capture-16a-help-docs", "capture-16b-budgets"],
+      "writePaths": [
+        "impl-plans/active/capture-16c-finalize.md",
+        "docs/capture.md",
+        "design-docs/specs/design-ai-capture.md",
+        "impl-plans/active/capture-00-overview.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "docs/capture.md", "intendedEdit": "Replace the placeholder sentence under ## Measured budgets with the design 10.3 values, machine/date line and method sentence; heading kept."},
+        {"path": "design-docs/specs/design-ai-capture.md", "intendedEdit": "Only after G1-G3 pass: replace the header Implementation status paragraph with implemented (slice), every milestone accepted, keeping the deferred-and-NOT-yet-run and Accepted-meaning sentences verbatim."},
+        {"path": "impl-plans/active/capture-00-overview.md", "intendedEdit": "Only after G1-G3 pass: every Progress row accepted (M16 included), one deferral paragraph under the table, evidence-roots row M16 target only; no other line."},
+        {"path": "target", "intendedEdit": "Gate logs under target/capture-m16/gates/ and Cargo output in target/capture-m16."}
+      ],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "docs/capture.md ## Measured budgets equals the design 10.3 values with method and machine line.",
+        "G1 (typecheck, biome, help/docs tests), G2 (cargo test -p nodetto-capture) and G3 (capture CLI unit tests with UPDATE_CAPTURE_FIXTURES=0) exit 0 with positive pass counts and complete logs under target/capture-m16/gates/; fixtures unchanged.",
+        "The design header and overview Progress table mark every milestone including M16 accepted and both contain 'deferred and NOT yet run'; the overview evidence-roots row gives M16 target only; if any gate fails M16 stays pending and a blocker is reported."
+      ],
+      "verification": [
+        "sh -c 'mkdir -p target/capture-m16/gates && (bun run typecheck && bunx biome check apps/cli/src/capture-help.ts apps/cli/src/capture-docs.test.ts && bun test apps/cli/src/capture-docs.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/table-docs.test.ts) > target/capture-m16/gates/g1-help-docs.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16/gates/g1-help-docs.log; test $s -eq 0 && grep -Eq \"^ *[1-9][0-9]* pass$\" target/capture-m16/gates/g1-help-docs.log && grep -Eq \"^ *0 fail$\" target/capture-m16/gates/g1-help-docs.log'",
+        "sh -c 'mkdir -p target/capture-m16/gates && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m16 cargo test -p nodetto-capture > target/capture-m16/gates/g2-crate.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16/gates/g2-crate.log; test $s -eq 0 && grep -Eq \"test result: ok\\. [1-9][0-9]* passed\" target/capture-m16/gates/g2-crate.log'",
+        "sh -c 'mkdir -p target/capture-m16/gates && UPDATE_CAPTURE_FIXTURES=0 bun test apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-io.test.ts apps/cli/src/capture-interference-options.test.ts apps/cli/src/mcp-image.test.ts > target/capture-m16/gates/g3-cli-unit.log 2>&1; s=$?; echo \"exit=$s\" >> target/capture-m16/gates/g3-cli-unit.log; test $s -eq 0 && grep -Eq \"^ *[1-9][0-9]* pass$\" target/capture-m16/gates/g3-cli-unit.log && git diff --exit-code -- apps/cli/src/__fixtures__ && grep -q \"deferred and NOT yet run\" design-docs/specs/design-ai-capture.md && grep -q \"deferred and NOT yet run\" impl-plans/active/capture-00-overview.md && ! grep -Eq \"^\\| M[0-9]+[a-f]? \\| (pending|implemented)\" impl-plans/active/capture-00-overview.md'"
+      ]
+    }
+  ]
+}

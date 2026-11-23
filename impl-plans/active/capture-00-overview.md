@@ -41,7 +41,13 @@ it is not confused with cad3d M21.
 | Wiring | M23c | capture-23c-picture-acceptance | Overlay (CAP-R5-03) and mesh acceptance tests | M23b |
 | Wiring | M23d | capture-23d-census-render-digest | Census tests, render.rs assertions, digest | M23c |
 | Wiring | M23e | capture-23e-native-parity | Native parity list, gates 1, 3, 4 | M23d, M23f |
-| Closing | M16 | capture-16-docs-final | Docs, measured budgets, progress table, final gates | M23e |
+| Closing | M16a | capture-16a-help-docs | Help exit-code and desktop lines, `docs/capture.md`, `docs/cli.md` section, docs test | - (M23a-M23f accepted) |
+| Closing | M16b | capture-16b-budgets | Measurements under `target/capture-m16/`, design 10.3 table | - (M23a-M23f accepted) |
+| Closing | M16c | capture-16c-finalize | Measured values in docs, three targeted gates, design header and progress table accepted with the deferral sentence | M16a, M16b |
+
+M16 (`capture-16-docs-final.md`, revision 8) is split into M16a to M16c
+(design revision 7, CAP-R7-01 to CAP-R7-04). Full repository verification
+is deferred and NOT yet run; M16 is accepted when M16a to M16c are.
 
 M23 (`capture-23-wiring.md`) is split into M23a to M23f (design 8.5 "M23
 split", CAP-R6-01); that file stays the shared reference for traps and
@@ -91,7 +97,8 @@ writer of its files in its wave):
 Each sub-plan also writes its own plan file (Progress only). Session 885
 dispatch: `capture-s885-dispatch.json`. The s868, s883 and s884 manifests
 must not be dispatched again. The plan author edited these tables before
-dispatch; M16 edits only the progress table.
+dispatch. Session 889 dispatch: `capture-s889-dispatch.json` (M16a, M16b,
+M16c); M16c edits only the Progress section and the evidence-roots row.
 
 ## Rules for every implementer
 

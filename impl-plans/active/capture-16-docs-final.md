@@ -1,129 +1,59 @@
-# M16 capture-16-docs-final (revision 7, session 885)
+# M16 capture-16-docs-final (revision 8, session 889)
 
-- Stage: wave 6 of dispatch `capture-s885`. dependsOn:
-  capture-23e-native-parity (the last link of M23a to M23f; M23f is
-  reached through it).
-- Artifact roots: `target` and `tmp` (design 8.5: the gates run every
-  repository test, and existing tests write `tmp/capture`, `tmp/cad3d`).
-- Design (revision 6): sections 2.2, 4, 8.5 ("M16 gates", "M23 split"),
-  9, 10.2, 14, 15, and section 18.
-- writePaths: `docs/capture.md` (new), `docs/cli.md` (one section
-  `## Capturing page images` appended at the end, and one `capture` line
-  above the three `export ... --format png` lines of the AI section near
-  `:141-143`), `apps/cli/src/capture-docs.test.ts` (new),
-  `design-docs/specs/design-ai-capture.md` (status line, a "Measured" table
-  in section 10, a short "Deviations" list),
-  `impl-plans/active/capture-00-overview.md` (progress table only),
-  `impl-plans/active/capture-16-docs-final.md`, `impl-plans/README.md`
-  (index entry), `tmp`, `target`. Gate logs go to `tmp/capture/m16/`.
-- Pre-authorised: none. `README.md` is not edited (cad3d M18 edits it).
-  Plans are not moved; archiving is the workflow's job.
+Parent reference only; not dispatched. Revision 8 follows design revision
+7 (CAP-R7-01 to CAP-R7-04, owner decision of 2026-11-23) and supersedes
+revision 7 of this file (three repository-wide gates, the `tmp` evidence
+root, the `impl-plans/README.md` Completed entry and the Measured table
+from `tmp/capture` logs).
 
-## Intent
+## Split (dispatch `capture-s889`)
 
-An agent finds `capture` unprompted and knows its options, outputs,
-guarantees and limits; measured budgets are recorded; the final tree
-passes every gate with positive parity evidence.
+| Wave | Plan | Scope | dependsOn |
+| --- | --- | --- | --- |
+| 1 | `capture-16a-help-docs.md` | Two help lines in `capture-help.ts`, `docs/capture.md`, `docs/cli.md` section and AI line, `capture-docs.test.ts` | - |
+| 1 | `capture-16b-budgets.md` | Measurements under `target/capture-m16/`, design 10.3 table | - |
+| 2 | `capture-16c-finalize.md` | Measured values into `docs/capture.md`, three targeted gates, design header and overview Progress marked accepted with the deferral sentence | M16a, M16b |
 
-## Non-goals
+M16a and M16b write disjoint files. The design file is written by M16b
+(10.3 only) and then by M16c (header only), in that order.
 
-No source change outside the docs test. No edit of `mise.toml`. No new
-behaviour. Do not describe cad3d M18 or M21 features beyond the one
-`export` versus `capture` sentence of design 8.3.
+## Rules for all three
 
-## Changes
+- Artifact roots exactly `target`; nothing is written under the repository
+  `tmp/`. Native parity (`apps/cli/src/native-parity/capture.test.ts`,
+  writes `tmp/capture/m09` and `tmp/capture/m23`) and
+  `apps/cli/src/mcp-stdio.test.ts` are excluded and deferred to the full
+  verification after the workflow.
+- Deferred and NOT yet run: `mise run verify`, browser/Chromium/Vite tests,
+  the whole native parity suite, `cargo test --workspace`,
+  `cargo test -p nodetto-native`.
+- Every verification command exits 0 and runs at least one test; cargo
+  runs with `CARGO_TERM_QUIET=true` and `CARGO_TARGET_DIR=target/capture-m16`
+  (M16a uses `target/capture-m16a` for its logs and runs no cargo).
+- CLI unit tests run with `UPDATE_CAPTURE_FIXTURES=0`; tracked fixtures
+  stay unchanged.
+- No test, deadline or budget is relaxed; timing tests get up to three
+  attempts, then run alone; every attempt is logged.
+- No `README.md`, `impl-plans/README.md`, `mise.toml`, cad3d design or
+  cad3d plan edit. Plans are not moved; archiving is the workflow's job.
+- Each plan writes progress only to its own plan file, with
+  `git hash-object` before and after each owned file and drift stops.
 
-- `docs/capture.md`: purpose and one-line form; options with defaults;
-  stdout and JSON forms (design 4.1, 4.2, including `approximate`,
-  `uncheckedCount`, the capped line); where default captures go, what is
-  never replaced, `--force`, the Store CLI `--output` note; 2D pages (same
-  drawing as `export`, default bound, fonts, `--theme dark` changes only
-  the background); 3D CAD pages (orthographic camera, view table, `iso`
-  octant note, direction, eye and target, up, zoom, `centre`, `frame`;
-  results of new, add, cut, intersect; reference bodies; meshes; body
-  notes; the sampled `cad.result.empty`; other differences, design 6.7;
-  sketch-only pages); `export` versus `capture` on a CAD page;
-  interference (definition, text form, cell and guarantee in the words of
-  design 6.6, facet note, hatch, the four options, exit code); determinism
-  (design 7); MCP (`nodetto_capture`, `--inline`, size note); desktop
-  (Export dialog entry, Current view, JPG for artwork, webview rasterizer
-  for 2D); an agent loop example; licences (IJG sentence, pointer to
-  `THIRD_PARTY_NOTICES.md`); the cloud follow-up list of design 14.
-  Revision 5 behavior to describe in the user's words:
-  - The three refusal messages (work, tile list entries, picture boundary
-    scans), each exit 2 and suggesting a smaller `--size`.
-  - Open meshes: an open first tool makes the body a surface that is not
-    checked; an open mesh in a later step is an empty operand.
-  - The emptied-body check also runs with `--no-interference` (design 6.7,
-    CAP-R4-09).
-  - The desktop `captureCadImage` has no interference switch.
-- `docs/cli.md`: the appended section, five to ten lines, two examples, a
-  link to `docs/capture.md`.
-- Design: status `implemented (slice)`. Add a "Measured" table from
-  `tmp/capture/m10r/` and `m23/` (`release.txt`, `native-parity.txt`,
-  `timing.json`) and the earlier `m08/` and `m09/` logs, giving machine,
-  date, value and budget for each row; every value is measured on this
-  machine from those logs, never copied from the design's spike tables.
-  Add a short "Deviations" list that points to the section 18 rows
-  CAP-R4-01 to CAP-R4-10, CAP-R5-01 to CAP-R5-04 and CAP-R6-01 to
-  CAP-R6-05. Change nothing else in the design.
-- Overview progress table: set every row (M1 to M22, M23a to M23f, M16)
-  to `accepted` only when all three gates below have passed. M10, M20,
-  M22, M15, M17, M18, M11, M12 and M14 were accepted by per-plan review at
-  `e883b4b`. M23a to M23f are accepted by their reviews in this dispatch;
-  M23 counts as accepted only when all six are. If a gate fails, leave
-  M16 unaccepted and report the failure as a blocker.
-- `impl-plans/README.md`: one Completed entry for the capture plans in the
-  file's existing form.
+## Operative M16 gates (design 8.5)
 
-## Tests
+1. `CARGO_TARGET_DIR=target/capture-m16 sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-help.ts apps/cli/src/capture-docs.test.ts && bun test apps/cli/src/capture-docs.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/cli/src/table-docs.test.ts'`
+2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m16 cargo test -p nodetto-capture`
+3. `UPDATE_CAPTURE_FIXTURES=0 CARGO_TARGET_DIR=target/capture-m16 bun test apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-io.test.ts apps/cli/src/capture-interference-options.test.ts apps/cli/src/mcp-image.test.ts`
 
-- `capture-docs.test.ts`: `docs/capture.md` contains every option of
-  `COMMAND_HELP.capture` (parsed from its usage block), the IJG sentence and
-  `orthographic`, `interference`, `cell`, `approximate`, `wireframe`,
-  `--inline`; every fenced `nodetto-cli capture ...` line in
-  `docs/capture.md` and the new `docs/cli.md` section parses without a
-  usage error through `captureCommand` with a memory I/O and a fake
-  backend (imitate `apps/cli/src/capture-cad.test.ts` fakes);
-  `docs/cli.md` links to `capture.md`.
-- Existing docs tests run unchanged: `apps/cli/src/table-docs.test.ts`,
-  `help-convert-frame.test.ts`, `document-examples.test.ts`,
-  `packages/core/src/bpmn/docs-example.test.ts`.
+M16c runs them on the final tree with logs under `target/capture-m16/gates/`.
 
-## Final gates (design 8.5; run each to its end, record command, exit
-status and complete log path under `tmp/capture/m16/`)
+## Acceptance
 
-1. Workspace: `env CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m16" mise run verify`
-   (if Bun discovery stalls or runs out of memory on ignored `tmp/` and
-   `target/`, the fallback replaces it: `bun test apps packages` and
-   `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m16 cargo test --workspace`).
-2. Shared native contracts: `env CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m16" cargo test -p nodetto-native`.
-3. CLI and parity: `env CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m16" sh -c 'cargo test -p nodetto-cli && cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$CARGO_TARGET_DIR/release/nodetto-cli" bun test apps/cli/src'`;
-   its log must show capture native parity tests passed and none skipped.
-   The manifest command also reruns `apps/cli/src/native-parity/capture.test.ts`
-   alone into `tmp/capture/m16/capture-parity.log` and requires a positive
-   pass count and no skip there. Skips in unrelated suites are allowed.
-
-A nonzero gate (including the Foundation atomic-write denials recorded at
-M10) stays a failure; retries are logged; M16 is not accepted until every
-gate has a passing run, and a remaining failure is reported as a blocker.
-
-## Acceptance criteria
-
-- Docs and help let an agent discover and use `capture`; measured budgets
-  are in the design; all three gates exit 0 with parity evidence; the
-  progress table marks every milestone accepted.
-
-## Verification (each must exit 0)
-
-1. `sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-docs.test.ts && bun test apps/cli/src/capture-docs.test.ts apps/cli/src/table-docs.test.ts apps/cli/src/help-convert-frame.test.ts apps/cli/src/document-examples.test.ts packages/core/src/bpmn/docs-example.test.ts'`
-2. `sh -c 'mkdir -p tmp/capture/m16; bunx tsc --noEmit -p tsconfig.json --noUncheckedIndexedAccess > tmp/capture/m16/strict.log 2>&1; ! grep -E "^packages/(core|ir)/src/" tmp/capture/m16/strict.log | grep -vqE "\.test\.tsx?\(" && bun test packages/core/src/capture'`
-3. Final gates 1, 2 and 3 above.
+M16 is accepted when M16a, M16b and M16c are accepted by their per-plan
+reviews and M16c's gates pass. Until then the design header and the
+overview keep M16 pending (CAP-R7-04).
 
 ## Progress
 
-Pending (revision 7). Read each owned file fresh before editing and
-record `git hash-object` before and after; a hash that differs from the
-last recorded value is drift: stop and record it. Workers append entries: date, command, exit status,
-full log path under `tmp/capture/m16/`, retries, and `git hash-object` of
-each owned file before and after.
+Revision 8 written by the session 889 plan author. Sub-plans record their
+own progress.
