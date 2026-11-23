@@ -51,7 +51,7 @@ Files written in more than one stage, in stage order:
 | `crates/capture/src/lattice.rs` | M10, M18, M11 (tool-bounds call sites only, CAP-R4-05) |
 | `crates/capture/src/interference.rs` | M10, M17, M11 (tool-bounds call sites only, CAP-R4-05) |
 | `crates/capture/src/tool_view.rs` | M10 (new), M11, M23 (picture-family constructor only if needed) |
-| `crates/capture/src/overlay.rs`, `census.rs`, `mesh.rs`, `tiles.rs` | M10 (empty stub), then M17, M18, M11, M12 |
+| `crates/capture/src/overlay.rs`, `census.rs`, `mesh.rs`, `tiles.rs` | M10 (empty stub), then M17, M18, M11, M12; M23 (`mesh.rs` facet seam, CAP-R4-06; `tiles.rs` admission and tile-major layout, CAP-R4-08) |
 | `crates/capture/tests/render.rs` | M10 (report assertions), M23 (digest and the three authorised assertions) |
 | `packages/core/src/capture/cad-request.ts` and test | M20, M11 (forward `decodeMesh` only) |
 | `packages/core/src/capture/scene.ts` and test | M11 |
@@ -61,9 +61,15 @@ Files written in more than one stage, in stage order:
 | `packages/io/src/nmesh/index.ts`, `capture-decoder.ts` | M20 |
 | `apps/cli/src/capture-command.ts`, `capture-cad.ts`, tests, fixture, `native-parity/capture.test.ts` | M23 |
 | `apps/desktop/src/App.tsx` | M14 |
-| `apps/desktop/src/shell/export-handlers.ts` | M14 |
+| `apps/desktop/src/shell/export-handlers.ts` | M14, M23 (optional `interference` option only, CAP-R4-07) |
 | `apps/desktop/src/shell/export-handlers.test.ts` | M14, M23 (new cases only) |
 | `design-docs/specs/design-ai-capture.md`, this overview's progress table | M16 |
+| Evidence roots | M23 `tmp/capture` and `target`; M16 `tmp` and `target` (CAP-R4-07) |
+
+Session 883 dispatch: `capture-s883-dispatch.json` (wave 1
+capture-23-wiring, wave 2 capture-16-docs-final). The s868 manifest must
+not be dispatched again. The plan author edited this ownership table
+before dispatch; M16 edits only the progress table.
 
 ## Rules for every implementer
 

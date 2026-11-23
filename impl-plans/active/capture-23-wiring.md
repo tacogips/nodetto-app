@@ -1,230 +1,247 @@
-# M23 capture-23-wiring (new in revision 4)
+# M23 capture-23-wiring (revision 5, session 883)
 
-- Stage: wiring, after both waves. dependsOn: M17, M18, M11, M12, M14,
-  M20, M22 (and through them M10, M15).
-- Design: sections 4.1, 4.2, 6.5, 6.6 (Picture), 6.7, 7, 8.5 (contracts,
-  superseded assertions), 10.2, 12.
-- writePaths: `crates/capture/src/lib.rs`, `crates/capture/src/raster.rs`,
-  `crates/capture/src/shade.rs`, `crates/capture/src/report.rs`,
-  `crates/capture/src/tool_view.rs` (picture-family constructor and the
-  facet dispatch of the round-2 amendment only),
-  `crates/capture/src/mesh.rs` (additive facet-normal seam of the round-2
-  amendment only),
-  `crates/capture/tests/render.rs`, `crates/capture/tests/support/mod.rs`
-  (new helpers only), `crates/capture/tests/overlay.rs`,
-  `crates/capture/tests/census.rs`, `crates/capture/tests/mesh.rs`,
-  `crates/capture/tests/scale.rs` (four new),
-  `apps/cli/src/capture-command.ts`, `apps/cli/src/capture-command.test.ts`,
-  `apps/cli/src/capture-cad.ts`, `apps/cli/src/capture-cad.test.ts`,
-  `apps/cli/src/__fixtures__/capture-plate-default.ncs1`,
-  `apps/cli/src/native-parity/capture.test.ts`,
-  `apps/desktop/src/shell/export-handlers.test.ts` (new cases only),
-  `impl-plans/active/capture-23-wiring.md`,
-  `impl-plans/active/capture-s868-dispatch.json` (nominal owner only; the
-  worker must not edit it), `tmp/capture/m23`,
-  `tmp/capture-s868/capture-23-wiring`, `target`
-- Pre-authorised, exactly: (a) the pixel digest constant in
-  `tests/render.rs` is replaced (the Plate fixture now has the draw bit and
-  a pair); the commit message states old and new values. (b) In
-  `references_meshes_and_interference_stay_out_of_the_m8_picture`
-  (`tests/render.rs:390-411`) lines 407, 410, 411 are replaced as design
-  8.5 requires (45% mix pixel against the two single-body renders,
-  reference body `Drawn`, open-mesh body `Drawn` with `open` true;
-  `candidates == 0`, empty `pairs` and the two-thread render kept). (c)
-  The fixture is regenerated. (d) The M9 test in `capture-cad.test.ts`
-  that expects `[not in the picture]` for an `absent` body changes to the
-  final-state notes. Nothing else existing is weakened.
-  `apps/cli/native/src/engine_tests.rs` is not edited and must pass.
+- Stage: wave 1 of dispatch `capture-s883`. Accepted dependencies: M10, M20,
+  M22, M17, M18, M11, M12, M14, M15 (landed at `e883b4b`, not redone).
+- Design (read first; the design wins over this plan):
+  `design-docs/specs/design-ai-capture.md` sections 4.1, 4.2, 6.5, 6.6,
+  6.7 (open-mesh rules, census budget), 7, 8.5 (ownership row, contracts,
+  superseded assertions, "M23 acceptance additions"), 10.2 ("Picture
+  admission and tile storage"), 12, and section 18 rows CAP-R4-06 to
+  CAP-R4-10.
+- Partial work from `e883b4b` is present: picture tile accounting,
+  liveness and census calls, the mesh facet seam (CAP-R4-06), first
+  overlay and reference code, CLI wiring and first tests. Before
+  each edit, read the file fresh and compare it with the design. Keep
+  what is correct, fix what contradicts the design, and add what is
+  missing.
+- Pre-authorized changes, exactly: (a) the pixel digest constant in
+  `crates/capture/tests/render.rs` is replaced, and the commit message
+  states the old and new values; (b) the three assertions of
+  `references_meshes_and_interference_stay_out_of_the_m8_picture` are
+  replaced as design 8.5 says; (c) `capture-plate-default.ncs1` is
+  regenerated; (d) the M9 `[not in the picture]` expectation in
+  `capture-cad.test.ts` becomes the final-state note. Nothing else that
+  exists is weakened. `apps/cli/native/src/engine_tests.rs` is not edited
+  and must pass.
 
 ## Intent
 
-Make the units of both waves one working feature: the picture pass
-evaluates tools through `tool_view` with tile lists, records liveness,
-marks interference and hatches it, mixes reference bodies, resolves the
-census; the CLI registers the options and prints the report text.
+Turn the accepted units into one working feature. The picture pass must
+evaluate tools through `tool_view`, admit or refuse the scene before any
+allocation, record liveness and run the census, mark and hatch
+interference so that it agrees with the text, and mix reference bodies at
+45%. The CLI must register the interference options and print the report.
+The desktop handler must accept `interference: null`.
 
 ## Non-goals
 
-No change to analysis rules, unit modules (`overlay.rs`, `census.rs`,
-`tiles.rs`, `lattice.rs`, `interference.rs`; `mesh.rs` except the additive
-seam of the round-2 amendment below), TypeScript core, help parts, desktop
-sources, docs (M16).
+No edits to `census.rs`, `lattice.rs`, `interference.rs`, `interval.rs`,
+`overlay.rs`, `prism.rs`, the TypeScript core, help parts, docs,
+`App.tsx`, `ExportDialog.tsx`, `backend.ts`, `src-tauri`, `mise.toml`,
+`Cargo.toml` or `Cargo.lock`. No new JSON keys and no scene-byte change.
+No new dependency. M16 work (docs, measured table, progress table) is out
+of scope.
 
-## Changes
+## Changes (file, symbol, decision)
 
-1. `raster.rs` (`render_rgb`): build `ToolView`s for the camera family
-   (window = picture) for prisms and meshes; compute each tool's sample
-   rectangle; `TileLists::build`; refuse with `tiles::work_error` when
-   `work(weights) > WORK_LIMIT` before any sample. Per sample fold only
-   `steps(body, tile)`; record `Liveness::mark(j, k)` for listed step `j`
-   with material up to the next listed step `k`. Visit bodies in history
-   order; nearest-body rule with 1e-7 tolerance; open meshes via
-   `first_hit`, never solid. With the draw bit: `overlapping_pairs` over
-   analysed, non-open bodies with material; `stretch_box`; per-band
-   `MarkTable`, merged in band order. After the analysis:
-   `picture_only` (error propagates) then `add_view_pairs` with the target
-   cell. Then `census::resolve` with target cell and budget. Set
-   `BodyReport.open` from `tool_view::is_solid`. Body state per design 6.7
-   (reference bodies and open meshes in front do not hide a solid).
-2. `shade.rs`: `reference_mix(behind, shade, opacity)` = per channel
-   `behind + (shade - behind) * opacity / 255`, rounded deterministically;
-   compositing order: shade, edges, reference mix, hatch (with outline:
-   a marked sample with an unmarked 4-neighbour), then downsample.
-3. `lib.rs`, `report.rs`: only what the wiring needs; JSON keys unchanged.
-4. `capture-command.ts`: accept `CAPTURE_INTERFERENCE_VALUE_OPTIONS` and
-   `CAPTURE_INTERFERENCE_FLAGS` for CAD pages only (option of the other
-   family -> exit 2 as today).
-5. `capture-cad.ts`: `parseInterferenceOptions`; request with
-   `interference` and `decodeMesh: decodeCaptureMesh` (`@nodetto/io/nmesh`);
-   print `describeBodies().line`, `errors:` = model errors + sampled
-   entries (indented, sampled after model ones), then
-   `describeInterference().lines`; `--json` adds `bodies` with `state`,
-   `emptiedByStep`, `open`, sampled errors with `"sampled": true`, and
-   `interference` = `describeInterference().json`; exit code
-   `interferenceExitCode`; backend errors (work limit, too many pairs) exit 2.
+1. `crates/capture/src/tiles.rs` (CAP-R4-08). Add an admission function
+   that runs before any list allocation, for example
+   `pub fn admit(scene, rects, samples_x, samples_y, weights) -> Result<Admission, CaptureError>`
+   with `Admission { work: u64, entries: u64 }`. It uses two 2D
+   difference arrays plus one prefix-sum pass, accumulates in `i128`, and
+   clamps `work` to `u64::MAX`. `work` must equal `TileLists::work` on the
+   built lists. Refuse with `work_error(work)` when work > `WORK_LIMIT`.
+   Refuse when entries > `4_194_304`, with the same message family naming
+   the tile list entries and the limit. Change `TileLists` storage to
+   tile-major (one offsets array of `tiles + 1`, entries grouped per tile
+   by body, then step), and add a per-tile body accessor. `build`, `steps`
+   and `work` keep their signatures and results. Do not edit the M12 unit
+   tests; add new ones only.
+2. `raster.rs`, picture setup. Classify each tool once (`is_solid`), and
+   each body once as open-source (first step's tool not solid) (CAP-R4-09,
+   6.7). Call admission, then `TileLists::build`. Never call
+   `tool_view::is_solid` or `mesh::is_closed` inside `sample`; replace the
+   per-sample `any` scan at `raster.rs:124-129` and the one at `:542-548`.
+3. `raster.rs`, sample. Visit only the bodies listed for the tile, and
+   clear and collect only those. An open-source body draws only its first
+   tool's surface (`first_surface_hit`) as translucent and ignores later
+   steps. A solid body folds every listed step. An open-mesh operand gives
+   empty intervals, so union and difference keep the material and
+   intersection empties it. Use the nearest-body rule (1e-7) and
+   reference bodies in the translucent slot. Mesh hits are shaded through
+   `surface(facet)`, as the prism path does.
+4. `raster.rs`, liveness (CAP-R4-10). Each worker keeps, per body, the
+   greatest exclusive end for each starting step, updated in O(1) for each
+   listed step with material. Merge workers by maximum, then sweep once
+   per body into `census::Liveness` (one `mark` per maximal run).
+   Open-source bodies get an all-live record and state `drawn` / `hidden`
+   / `outside` before `census::resolve`.
+5. `raster.rs`, boundary scans (CAP-R4-10). Before each combine, add
+   `c = |accumulated| + |tool|` to the worker's pending count. When pending
+   >= `CHUNK = 1_048_576`, add it to a shared `AtomicU64` before running
+   the combine. If the total > allowance, skip the combine, set the stop
+   flag and return. Read the stop flag at each flush, and flush the rest
+   at the end of each band. Refuse with exit 2 and the exact message of
+   design 10.2. An internal entry takes `allowance` and returns the
+   executed reads and the number of workers started (used by tests);
+   `render_rgb` and `render_scene` pass `16_000_000_000`.
+6. `raster.rs`, after sampling. If `draw_interference`, run
+   `marks.picture_only(&pairs)?` and then `add_view_pairs` with the target
+   cell. Call `census::resolve` with budget
+   `budget_million_rays * 1_000_000` when `scene.analyse`, else
+   `24_000_000` (CAP-R4-09). `BodyReport.open` comes from the first-tool
+   classification.
+7. `shade.rs`. Add `reference_mix(behind, shade, opacity)` per channel,
+   rounded deterministically. Compositing order: shade, edges, reference
+   mix, hatch (with outline), then downsample. `lib.rs` and `report.rs`:
+   only what the wiring needs; JSON keys and order unchanged.
+8. `tool_view.rs` (picture constructor and facet dispatch only) and
+   `mesh.rs` (CAP-R4-06 seam only): finish them if incomplete. Do not
+   touch `intervals`, `first_hit`, `is_closed`, `mesh_bounds` or the M11
+   tests.
+9. `apps/cli/src/capture-command.ts`: accept
+   `CAPTURE_INTERFERENCE_VALUE_OPTIONS` and `CAPTURE_INTERFERENCE_FLAGS`
+   for CAD pages only; an option of the other page family exits 2.
+   `capture-cad.ts`: call `parseInterferenceOptions`; send `interference`
+   and `decodeMesh: decodeCaptureMesh` (from `@nodetto/io/nmesh`); print
+   `describeBodies().line`, then `errors:` (model errors first, then
+   sampled errors), then `describeInterference().lines`; with `--json`, add
+   `bodies`, the sampled errors and `interference`; exit with
+   `interferenceExitCode`; backend refusals exit 2.
+10. `apps/desktop/src/shell/export-handlers.ts` (CAP-R4-07): the options
+    of `captureCadImage` gain `interference?: CadCaptureInterference |
+    null`. An absent key means `DEFAULT_CAD_INTERFERENCE`; `null` is passed
+    through. No other desktop file changes.
 
-## Tests
+Follow these patterns: `prism.rs:PrismView::surface_intervals` and
+`surface`; `tiles.rs:TileLists::build` (`tiles_for` rectangle rule,
+intersection covers every tile); `capture-cad.test.ts` fakes;
+`export-handlers.test.ts:224-300`.
 
-- `tests/overlay.rs`: Plate fixture overlap pixels are hatch colours or
-  their mixes, also behind the Block face; hole centre in the overlap not
-  marked from `top`; draw bit clear equals the bit-clear picture; Block
-  moved 30 mm -> equal pictures; same colour set on lit top and dark side;
-  100 seeded scenes: marking pairs subset of reported, and every reported
-  pair projecting over > 2 samples marks one; 0.05 mm pin -> `from_view`;
-  40 stacked bodies <= 28 comparisons per sample; 200 sub-cell pairs ->
-  too-many error; 1, 2, 5 threads equal; no-overlay regression (draw bit,
-  no pair -> equals bit clear).
+## Tests (add next to the code; all pre-authorized)
+
+Design 8.5 moves the render-level and native tests of M17, M18, M11 and
+M12 to this plan. Some of them already exist; extend those files to cover
+every case below.
+- `tests/overlay.rs`:
+  - Plate fixture: overlap pixels are hatch colours or mixes of them,
+    also behind the Block face.
+  - The hole centre inside the overlap is not marked from `top`.
+  - With the draw bit clear, the picture equals the bit-clear picture.
+  - Block moved 30 mm: the two pictures are equal.
+  - The lit top and the dark side use the same colour set.
+  - 100 seeded scenes: the marking pairs are a subset of the reported
+    pairs, and every reported pair that projects over more than 2 samples
+    marks at least one sample.
+  - A 0.05 mm pin gives a `from_view` pair.
+  - 40 stacked bodies use <= 28 comparisons per sample.
+  - 200 sub-cell pairs give the too-many-pairs error.
+  - 1, 2 and 5 threads give equal output.
+  - No-overlay regression (design 8.5): draw bit set and no pair gives the
+    same picture as the bit clear.
 - `tests/census.rs`: the M18 cases end to end through `render_rgb`
-  (emptied, refilled, sound model zero census rays, hidden in housing,
-  outside, intersect miss), 1 vs 5 threads equal.
-- `tests/mesh.rs`: prism cut through cube mesh shows background; open
-  mesh drawn mixed, not reported; reference in front -> 45% mix and body
-  behind `Drawn`, behind opaque -> `Hidden`; stepped mesh edge rule; sphere
-  edges only on outline; release: 200,000 triangles at 1024 x 768 < 3,000 ms.
-- `tests/scale.rs`: buffers and reports (with `emptied_by_step`) equal to a
-  test-support all-steps reference path for Plate, 20 x 15 plate grid,
-  600-hole plate, 50 bodies with intersects, emptied-and-refilled plate;
-  zig-zag and 20,000-tool scenes refused < 1,000 ms; release: 600-hole
-  plate < 1,500 ms one thread, printed.
-- `capture-cad.test.ts` (fake backend): option validation and exclusions;
-  text and JSON with a capped and a complete pair (same pair approximate in
-  both), 25 unchecked (`uncheckedCount` 25, twenty listed); exit 1 with a
-  pair, 1 with only unchecked, 0 with only capped, 0 without the flag;
-  emptied, refilled, hidden, outside notes; regenerated fixture equals
-  `prepareCadCapture(Plate, iso, 1024x768, light, DEFAULT_CAD_INTERFERENCE,
-  decodeCaptureMesh)`; a mesh-only page gives the same bytes as that call;
-  `--no-interference` writes options 0, default options 3.
-- `export-handlers.test.ts` new cases: desktop Plate scene equals the
-  committed fixture; mesh-only page scene equals the same
-  `prepareCadCapture` call; `interference: null` writes options 0.
-- `native-parity/capture.test.ts`: `capture-plate.jsonl` prints
-  `interference: 1 (1 candidate pair checked, cell 0.25 mm)` and a `Plate x
-  Block` volume within 1% of 590.721; equal interference lines for `top`,
-  `front`, `iso`; `--fail-on-interference` exits 1 with the file written;
-  Block moved -> `interference: 0`; 1.5 mm pin document -> one pair;
-  `--interference-bodies Plate,Puck` -> 0; `--interference-cell 1` ->
-  `cell 1 mm`; `--no-interference` -> `not checked`; overlap pixels differ
-  from `--no-interference` and contain `#335c67`/`#fffdf8` (dark
-  `#5fb4c7`/`#1f2427`); two runs equal bytes; Plate/Trim/Boss -> `errors: 1`
-  with `cad.result.empty (sampled)`; cube `cad.mesh` with a cut -> exit 0,
-  one body, deterministic; `cad.pcb` board listed; 1,000 elements in 50
-  bodies < 10,000 ms (three runs, `tmp/capture/m23/timing.json`); stacked
-  -> 1,225 candidates checked; M9 budget test still passes.
+  (emptied, refilled, sound model with zero census rays, hidden inside a
+  housing, outside the view, intersect miss), and 1 vs 5 threads equal.
+- `tests/mesh.rs`:
+  - A prism cut through a cube mesh shows the background.
+  - An open mesh is drawn mixed and not reported.
+  - A reference body in front gives the 45% mix, and the body behind it is
+    `Drawn`; a reference behind an opaque body is `Hidden`.
+  - The stepped-mesh edge rule holds, and a sphere has edges only on its
+    outline (real triangle normals).
+  - Release: 200,000 triangles at 1024 x 768 render in under 3,000 ms.
+- `tests/scale.rs`:
+  - Buffers and reports (including `emptied_by_step`) equal a test-support
+    all-steps reference path for: Plate, a 20 x 15 plate grid, a 600-hole
+    plate, 50 bodies with intersects, and an emptied-and-refilled plate.
+  - The zig-zag and 20,000-tool scenes are refused in under 1,000 ms.
+  - Release: the 600-hole plate renders on one thread in under 1,500 ms,
+    and the time is printed.
+- `mesh.rs` unit tests (CAP-R4-06; add only if missing):
+  - Cube, ray along +z through (0.5, 0.5): `surface_intervals` gives the
+    same `s` values and tool as `intervals`; through `surface`, the faces
+    give face id 0 and unit normals (0,0,+-1) (length within 1e-12 of 1).
+  - The same ray through `intervals` gives face id 0 for every face.
+  - An open cube (one triangle missing): `surface_intervals` is empty;
+    `first_surface_hit` has the same `s` as `first_hit`.
+  - `surface(u32::MAX)` and `surface(len)` give `None`.
+  - When the first triangle has an invalid index, facet 0 is the first
+    valid triangle.
+- `capture-cad.test.ts` (fake backend):
+  - Option validation and exclusions.
+  - Text and JSON with one capped and one complete pair mark the same pair
+    `approximate`.
+  - 25 unchecked candidates give `uncheckedCount` 25 with twenty listed.
+  - Exit codes: 1 with a pair, 1 with only unchecked candidates, 0 with
+    only capped pairs, 0 without the flag.
+  - The emptied, refilled, hidden and outside notes.
+  - The regenerated fixture equals the `prepareCadCapture` call of the
+    sharedPathNotes, and a mesh-only page gives the same bytes as that call.
+  - `--no-interference` writes options 0; the default writes options 3.
+- `native-parity/capture.test.ts`:
+  - `capture-plate.jsonl` prints `interference: 1 (1 candidate pair
+    checked, cell 0.25 mm)` and a `Plate x Block` volume within 1% of
+    590.721, with equal lines for `top`, `front` and `iso`.
+  - `--fail-on-interference` exits 1 and the file is written.
+  - Block moved gives `interference: 0`, and the 1.5 mm pin gives one pair.
+  - `--interference-bodies Plate,Puck` gives 0; `--interference-cell 1`
+    gives `cell 1 mm`; `--no-interference` gives `not checked`.
+  - Overlap pixels differ from the `--no-interference` picture and contain
+    `#335c67`/`#fffdf8` (dark `#5fb4c7`/`#1f2427`); two runs give equal
+    bytes.
+  - Plate/Trim/Boss gives `errors: 1` with `cad.result.empty (sampled)`.
+  - A cube `cad.mesh` with a cut exits 0 with one deterministic body.
+  - A `cad.pcb` board is listed.
+  - 1,000 elements in 50 bodies take under 10,000 ms over three runs
+    (`tmp/capture/m23/timing.json`).
+  - The stacked case checks 1,225 candidates.
+  - The M9 budget test still passes.
+- Add every case of design 8.5 "M23 acceptance additions". This includes
+  the open-mesh positions, admission equality with 20,000 one-tile bodies,
+  the entry-limit refusal, the off-tile liveness suffix, the span-record
+  equality, the exact operation count (S counts repeated band rows:
+  53,692,800 reads for 64 x 320 with 50 unions), and the costly-row
+  refusal (1, 2 and 5 started workers, executed reads <= allowance +
+  workers x CHUNK).
+- `export-handlers.test.ts`, new cases only: the Plate scene equals the
+  committed fixture; a mesh-only page equals the same `prepareCadCapture`
+  call; `interference: null` writes options 0; the default writes 3.
+- Keep unchanged: the 20,000-intersection refusal (under 1,000 ms), the
+  200,000-triangle gate (under 3,000 ms), the determinism tests in
+  `render.rs` and the M9 budget test.
+
+## Pitfalls
+
+- Do not:
+  - refuse a scene after allocating its lists;
+  - write a liveness span on every sample;
+  - check the scan total only at row end;
+  - print a partial count in a refusal message;
+  - make a visible open mesh a census subject;
+  - mark a solid body `open` because a later step uses an open mesh.
+- Timing tests may be tried up to 3 times under load, then run alone, with
+  every attempt logged. No deadline is relaxed.
+
+## Acceptance criteria
+
+- Picture, report, census and interference all use the same first-tool
+  classification. Admission and the scan allowance follow design 10.2.
+  Bytes are equal for 1, 2 and 5 threads.
+- The CLI options, text, JSON and exit codes match 4.1, 4.2 and 12. The
+  desktop handler supports `interference: null`.
+- All four verification commands exit 0 with positive pass counts. Native
+  parity is not skipped. `engine_tests.rs` is unedited.
 
 ## Verification (each must exit 0)
 
-1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/raster.rs crates/capture/src/shade.rs crates/capture/src/lib.rs crates/capture/src/report.rs crates/capture/src/tool_view.rs crates/capture/src/mesh.rs crates/capture/tests/*.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test -p nodetto-capture'`
-   This command also runs the new `mesh::tests` facet cases of the round-2
-   amendment and the unchanged M11 `mesh::tests`.
-2. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test --release -p nodetto-capture --test overlay --test census --test mesh --test scale --test render -- --nocapture > tmp/capture/m23/release.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/release.txt; test $s -eq 0 && ! grep -Eq "[1-9][0-9]* failed" tmp/capture/m23/release.txt'`
-3. `sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
+1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/raster.rs crates/capture/src/shade.rs crates/capture/src/lib.rs crates/capture/src/report.rs crates/capture/src/tool_view.rs crates/capture/src/mesh.rs crates/capture/src/tiles.rs crates/capture/tests/*.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test -p nodetto-capture'`
+2. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test --release -p nodetto-capture --lib --test overlay --test census --test mesh --test scale --test render -- --nocapture > tmp/capture/m23/release.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/release.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m23/release.txt && ! grep -Eq "[1-9][0-9]* failed" tmp/capture/m23/release.txt'`
+3. `sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
 4. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo test -p nodetto-cli && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/capture-m23/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts > tmp/capture/m23/native-parity.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/native-parity.txt; test $s -eq 0 && grep -Eq "[1-9][0-9]* pass" tmp/capture/m23/native-parity.txt && ! grep -Eq "[1-9][0-9]* skip" tmp/capture/m23/native-parity.txt'`
-
-## Amendment 2026-11-23 (blocked-wave-scope-or-contract, round 2)
-
-Blocker (wave 6, evidence `crates/capture/src/mesh.rs:213`, `:257`,
-`impl-plans/active/capture-11-mesh-reference.md:108`): `MeshView::hits`
-pushes every boundary with `face: 0`, and no API returns the hit triangle
-or its normal. Design 6.5 shades a mesh sample with the triangle normal,
-and the edge rule needs that normal. Decision: M23 now also owns
-`crates/capture/src/mesh.rs`, for this additive seam only. M11 is accepted
-and no other pending plan writes `mesh.rs` (M16 does not), so the file has
-one writer. Design note: CAP-R4-06. This is not a redesign: 6.5 already
-asks for the triangle normal, and the M11 plan says "normal the
-triangle's".
-
-Contract. Copy the prism facet pattern exactly:
-`crate::prism::PrismView::surface_intervals` (facet-encoded face ids
-through `cast::<true>`) and `PrismView::surface(index) -> Option<(u32,
-[f64; 3])>` (`prism.rs:245-272`). Additions to `MeshView`:
-
-- `pub(crate) fn surface_intervals(&self, ray: &Ray, scratch: &mut
-  Vec<Boundary>, out: &mut Intervals)`. Same result as `intervals`: empty
-  for an open mesh, the pairs of the sorted crossings, an odd last crossing
-  dropped. The difference is that `Boundary.face` is the facet index, which
-  is the position of the hit triangle in `self.triangles`. That is not the
-  source triangle index, because invalid triangles are skipped.
-- `pub(crate) fn first_surface_hit(&self, ray: &Ray) -> Option<Boundary>`.
-  Same result as `first_hit` (nearest crossing, open or closed), with the
-  facet-encoded face.
-- `pub(crate) fn surface(&self, facet: u32) -> Option<(u32, [f64; 3])>`.
-  Returns `(0, unit normal)`. The unit normal is `cross(p1 - p0, p2 - p0)`
-  divided by its `sqrt` length, in the winding order of the stored
-  triangle. Returns `None` when the facet is out of range or the length is
-  zero or not finite. Do not orient the normal toward the viewer here:
-  `raster.rs` already applies `shade::facing`.
-- One way to do it: make the private `hits` generic,
-  `hits::<const FACETS: bool>`, as prism `cast` is. With `FACETS = false`
-  it must give exactly today's boundaries, face 0 included.
-
-In `tool_view.rs`, add the matching `ToolView` dispatch: `surface_intervals`
-and `surface` for both arms (prism arm calls the existing prism methods),
-plus a mesh-only `first_surface_hit` path for open meshes, alongside the
-picture-family constructor. Raster: for a mesh boundary, call `surface` to
-get face id 0 and the normal, then use them in `Hit` as the prism path
-does (`raster.rs:126-139`).
-
-Invariants: `intervals`, `first_hit`, `is_closed`, `mesh_bounds`,
-`MeshView::new` (binning, window, listings) and `average_occupancy` keep
-their behaviour and outputs. Analysis, lattice, interference and census
-keep calling `intervals` with face 0. Existing M11 `mesh::tests` are not
-edited, only new tests are added. Only `+ - * /` and `sqrt`; no panic on
-any index; no new allocation per ray beyond what `first_hit` already does.
-
-Forbidden: renaming or removing the public `MeshView` items; changing
-face ids that analysis sees; storing per-triangle normals in a new
-per-ray allocation; editing `lattice.rs`, `interference.rs`, `census.rs`
-or the M11 tests.
-
-New unit tests in `mesh.rs` `#[cfg(test)]`:
-- cube, ray along +z through (0.5, 0.5): `surface_intervals` gives the same
-  `s` values and tool as `intervals`. Mapped through `surface`, the faces
-  give face id 0 with unit normals `(0,0,+-1)` (length within 1e-12 of 1).
-- the same ray through `intervals`: every face id is 0 (analysis seam
-  unchanged).
-- an open mesh (cube missing one triangle): `surface_intervals` is empty,
-  and `first_surface_hit` has the same `s` as `first_hit`; its facet maps
-  to a unit normal.
-- `surface(u32::MAX)` and `surface(len)` give `None`. A mesh whose first
-  triangle has an invalid index keeps facet indices aligned with the stored
-  triangles: the normal of facet 0 is that of the first valid triangle.
-- `tests/mesh.rs` (already planned): sphere edges only on the outline and
-  the stepped-mesh edge rule now use real triangle normals.
 
 ## Progress
 
-Partial implementation: picture tile work accounting, liveness and census wiring,
-mesh facet-normal seam, initial picture overlay/reference integration, CLI wiring,
-and initial integration tests are present. The Rust library focused test passed
-(30 passed, 2 ignored; `tmp/capture-s868/capture-23-wiring/focused-03.log`).
-The implementation and requested integration coverage are incomplete; the
-picture pipeline needs further correctness review and all four plan gates remain.
-
-Blocked on two scope/contract gaps: the required native parity test writes
-`tmp/capture/m09/timing.json`, outside the authorized artifact and evidence
-roots; and the requested desktop `interference: null` case needs an option not
-exposed by `apps/desktop/src/shell/export-handlers.ts`, outside M23 writePaths.
-Amend ownership/output scope and clarify the desktop contract before continuing.
-The new 20,000-intersection integration test also needs safe revision before
-running: its tile-list allocation may be excessive. Formal reviews and final
-workflow tasks remain downstream.
+Session 868 left a partial implementation, blocked on two scope gaps
+that CAP-R4-07 now resolves. Workers append one entry per run with: date,
+command, exit status, log path, and the `git hash-object` of each owned
+file before and after, plus any drift.

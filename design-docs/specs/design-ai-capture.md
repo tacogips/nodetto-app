@@ -1,7 +1,8 @@
 # AI capture: PNG and JPG pictures of any page, with 3D CAD camera and interference
 
 Status: design revision 4, base commit `ebcac57`, branch `feat/ai-capture`
-(revision 4 checked against `be8fa5d`). Section 18 lists what revisions 2,
+(revision 4 checked against `be8fa5d`; amended after `e883b4b` for the
+remaining M23 and M16, CAP-R4-07 to CAP-R4-10). Section 18 lists what revisions 2,
 3 and 4 changed and why; section 8.5 gives the completion order of the
 remaining milestones.
 Implementation plan: `impl-plans/active/capture-00-overview.md`.
@@ -948,7 +949,12 @@ names `--no-interference` for an unobstructed picture of the same view.
     sampling of a body stops as soon as every step is alive. It has its
     own budget of the same size as the analysis budget and covers at
     most 4,096 bodies, in history order; bodies beyond that are
-    `unknown` and no claim is made about them.
+    `unknown` and no claim is made about them. When the scene does not
+    analyse interference (options 0, budget field 0, as with
+    `--no-interference`), the census budget is the default 24 million
+    weighted rays and the cell is the scene's target cell (0.25 mm), so
+    the check of this section does not depend on the interference
+    options (CAP-R4-09); the scene bytes do not change.
   - Result. The first step of a body after which neither the picture nor
     the lattice has material is reported as an error line with the code
     `cad.result.empty (sampled)` that names the feature and says that the
@@ -968,7 +974,31 @@ names `--no-interference` for an unobstructed picture of the same view.
 - An open mesh has no solid in the app. The reader checks that every edge
   is shared by exactly two triangles; a mesh that fails is drawn as a
   surface with reference styling, steps on it are not applied, it takes no
-  part in interference, and the text says so.
+  part in interference, and the text says so. One classification drives
+  the picture, the report, the census and the analysis (CAP-R4-09): a
+  body is open-source (report key `open` true) exactly when the tool of
+  its first step is not a solid (`tool_view::is_solid`), the rule
+  `interference.rs` already uses for candidates. Otherwise it is solid,
+  whatever tools its later steps use.
+  - An open-source body draws only the surface of its first tool, with
+    reference styling, and ignores all later steps. Its state comes from
+    the picture alone: `drawn`, `hidden`, or `outside` when its surface is
+    on no sample ray. `emptiedByStep` is -1. It is never a census subject,
+    so it never gets a `cad.result.empty (sampled)` error. It takes part
+    in no interference pair, in the analysis or in the overlay. (In M23
+    the picture pass gives such a body a fully live picture record and
+    that state before `census::resolve`, so `census.rs` is not edited.)
+  - A solid body folds every step. An open mesh in a later step is an
+    empty operand, in the picture (`surface_intervals` of an open mesh is
+    empty) as in the lattice (`lattice.rs` gives a non-solid tool no
+    bounds): union and difference leave the material unchanged, and
+    intersection empties it. That emptying is a real empty step. Picture
+    liveness and the census treat it like any other, so the body may get
+    the sampled error.
+  - Each tool is classified once, in picture setup, and the result is
+    shared by every body, band and sample. No closure or topology check
+    runs inside the sample loop (the mesh closure test allocates and sorts
+    every edge).
 - Curved faces are faceted with the tessellation of the core
   (`packages/core/src/cad/tessellate.ts`), as in the app.
 - Kernel limits and failures (`cad.limit` on triangles, `cad.kernel.failed`)
@@ -1089,8 +1119,8 @@ M22 and M23 (21 is skipped so it is not confused with cad3d M21).
 | Wave 2 | M11 meshes | `mesh.rs`, `tool_view.rs` (mesh arm), `scene.ts` and test (decoder option of `buildCadCaptureModel`), `cad-request.ts` and test (forward `decodeMesh` to the model builder; nothing else), `lattice.rs` and `interference.rs` (tool-bounds call sites only, CAP-R4-05) | M10, M20, after M17 and M18 |
 | Wave 2 | M12 tiles | `tiles.rs` (lists, `work`, `WORK_LIMIT`) | M10 |
 | Wave 2 | M14 desktop backend | the M14 files plus `apps/desktop/src/App.tsx` (the M15 wiring) | M15, M20, M22, crate public API |
-| Wiring | M23 | crate `lib.rs`, `raster.rs`, `shade.rs`, `report.rs`; `tool_view.rs` (picture-family constructor and facet dispatch); `mesh.rs` (additive facet-normal seam only, CAP-R4-06); `tests/render.rs` (the digest constant and the superseded assertions named below, nothing else); new `tests/overlay.rs`, `census.rs`, `mesh.rs`, `scale.rs`; `capture-command.ts`, `capture-cad.ts` and tests; `__fixtures__/capture-plate-default.ncs1`; `native-parity/capture.test.ts`; `apps/desktop/src/shell/export-handlers.test.ts` (new cases only: fixture equality and mesh-only parity) | M17, M18, M11, M12, M14, M20, M22 |
-| Closing | M16 | docs, design measured values, progress table | M23 |
+| Wiring | M23 | crate `lib.rs`, `raster.rs`, `shade.rs`, `report.rs`; `tool_view.rs` (picture-family constructor and facet dispatch); `mesh.rs` (additive facet-normal seam only, CAP-R4-06); `tiles.rs` (admission before allocation, tile-major layout, per-tile body accessor; public `build`, `steps`, `work` and the M12 unit tests unchanged, CAP-R4-08); `tests/render.rs` (the digest constant and the superseded assertions named below, nothing else); new `tests/overlay.rs`, `census.rs`, `mesh.rs`, `scale.rs`; `capture-command.ts`, `capture-cad.ts` and tests; `__fixtures__/capture-plate-default.ncs1`; `native-parity/capture.test.ts`; `apps/desktop/src/shell/export-handlers.ts` (the optional `interference` option of `captureCadImage` only, CAP-R4-07); `apps/desktop/src/shell/export-handlers.test.ts` (new cases only: fixture equality, mesh-only parity, options 0 and 3); evidence root `tmp/capture` | M17, M18, M11, M12, M14, M20, M22 |
+| Closing | M16 | docs, design measured values, progress table; evidence root `tmp` (its gates run every repository test, and existing tests write `tmp/capture`, `tmp/cad3d`) | M23 |
 
 Contracts that make the waves possible:
 
@@ -1142,7 +1172,17 @@ Contracts that make the waves possible:
   same two-host equality for a page whose only body is a `cad.mesh` cube,
   and checks that `--no-interference` (and `interference: null` on the
   desktop) leaves options 0 while the default sets options 3. Desktop,
-  Bun CLI and native CLI stay tied to one set of bytes.
+  Bun CLI and native CLI stay tied to one set of bytes. For that case
+  (CAP-R4-07) the options object of the desktop handler
+  `captureCadImage` (`apps/desktop/src/shell/export-handlers.ts`) gains
+  `interference?: CadCaptureInterference | null`: an absent key means
+  `DEFAULT_CAD_INTERFERENCE` (what the Export dialog does today), `null`
+  is passed to `prepareCadCapture` as is. The dialog does not set it and
+  gets no interference control (live desktop interference stays out of
+  scope, 2.3); `ExportDialog.tsx`, `App.tsx`, `backend.ts`, the Tauri
+  `capture.rs` and the `packages/ui-solid` capture modules do not change,
+  because the scene is prepared in TypeScript and the dialog's narrower
+  callback type stays assignable.
 - The picture ignores the draw bit until M23 wires the overlay, so no
   pixel digest changes before M23.
 - Approximate pairs. The public `approximate` of a pair is the wire
@@ -1170,6 +1210,84 @@ Contracts that make the waves possible:
   renders the same as with the bit clear. The cross-worker and
   encoded-image determinism tests of `render.rs` stay unchanged. The
   digest constant changes only as the M17 rule allows.
+- M23 acceptance additions (CAP-R4-08, CAP-R4-09, CAP-R4-10). These come on top of
+  the M23 plan's tests, and no existing assertion or deadline changes.
+  - `tests/mesh.rs`:
+    - Prism, then a difference with a cube mesh missing one triangle:
+      equals the prism-only picture; `open` false; the prism `drawn`.
+    - Prism, then an intersection with that open mesh: the body is
+      `empty` with `emptiedByStep` 1, and picture and census agree.
+    - Open mesh, then a prism difference: equals the open-mesh-only
+      picture; `open` true; `emptiedByStep` -1; no sampled error; no pair.
+    - Open-source mesh outside the picture: `outside`, with no census
+      rays.
+    - `two_hundred_thousand_triangles_fit_render_budget` passes unchanged
+      (200,000 triangles, 1024 x 768, one thread, under 3,000 ms). Source
+      review confirms that no closure check runs per sample.
+  - `tests/census.rs`:
+    - An emptied solid body in a scene with options 0 gets its
+      `emptiedByStep` from the 24-million-ray census.
+    - An open-source body with a later cut, at a positive budget, gets no
+      emptied step.
+  - `tiles.rs` unit tests (new tests only, M12 tests unedited):
+    - The admission `work` equals `TileLists::build(..).work(..)`, and
+      `entries` equals the built entry count, on the M12 scenes and on
+      seeded random rectangles.
+    - 20,000 bodies with one union step each over one full tile, at 6,144
+      x 6,144 samples: work 20,480,000 and 20,000 entries; build finishes
+      in under 1,000 ms (release).
+  - `tests/scale.rs`:
+    - The 20,000-intersection refusal stays as written (under 1,000 ms).
+    - A new entry-limit refusal: a 65 x 2048 picture at supersample 1 has
+      a one-sample-wide edge column, and 70,000 steps covering only that
+      column give about 4.48 million entries at about 143 million work.
+      The render is refused naming the entry limit, in under 1,000 ms.
+    - The 600-hole plate, the 20 x 15 grid and the other all-steps
+      reference comparisons keep equal buffers and reports under the
+      tile-major layout and the per-tile body visit.
+    - Off-tile liveness suffix (release): 1024 x 768 at supersample 2,
+      one prism covering the view, then 200,000 differences that reuse a
+      second prism entirely outside the view. The body is `drawn` with
+      `emptiedByStep` -1 and no census rays. The render takes under
+      5,000 ms (printed); the span-filling path of `e883b4b` would write
+      about 6.3e11 flags (3.1 million samples x 200,000 steps).
+  - `tests/census.rs` (CAP-R4-10): the same history at 64 x 64 with 20,000
+    off-view differences gives equal reports, liveness and buffers for 1,
+    2 and 5 threads. A variant whose last off-view step is an intersection
+    still reports that step as emptying, so the spans omitted from the
+    tile keep the census semantics.
+  - `raster.rs` unit tests (CAP-R4-10; tractable, so no pathological
+    workload runs to the end):
+    - Span record: on seeded random sets of spans, the merged maxima,
+      materialized, equal the `Liveness` built by calling `mark` for every
+      span.
+    - Operation count: N unions of prisms with disjoint depth spans,
+      covering every sample, execute exactly S * N * (N - 1) accumulated
+      plus S * 2N tool boundary reads, as reported by the internal render
+      entry. S counts executed samples, not unique ones. Each band samples
+      its first row again, because the band before it already sampled that
+      row as its lower neighbour for edge detection (`raster.rs:286-309`).
+      So at supersample 1, S = width * (height + bands - 1), for any worker
+      count (worker grouping keeps the band boundaries).
+    - Costly-row refusal: 2,000 disjoint unions cover a 64 x 320 picture
+      at supersample 1 (about 4.0 million reads per sample, about 256
+      million per row; 10 bands, so a request for 5 threads starts 5
+      workers). With a test allowance of 10,000,000, the picture is
+      refused with the fixed message (test allowance shown) for 1, 2 and
+      5 threads. For each run the test asserts that the started worker
+      count is 1, 2 and 5, and that the executed reads are at most
+      `allowance + workers x CHUNK` (at most 15,242,880 for 5 workers),
+      well below a single row. A row-end check would fail this assertion.
+    - Below the allowance, the same 64 x 320 layout with 50 disjoint
+      unions: 10 bands execute 320 + 9 = 329 sample rows, the nine
+      band-boundary rows repeated, so S = 21,056. The full charge is
+      21,056 x 2,550 = 53,692,800 reads, with an allowance of 100,000,000.
+      The test asserts equal buffers and reports, and exactly 53,692,800
+      charged reads, for 1, 2 and 5 actual workers. A full 2,000-union
+      render is never run.
+    - The production allowance is the constant 16,000,000,000. The
+      20,000-step disjoint-union case of the review (about 1.6e12 reads)
+      is above it by arithmetic; it is not executed.
 - `packages/core/src/capture/index.ts` gets its single new line from M22
   in wave 1, not from M23, because M14 imports the text functions through
   `@nodetto/core` in wave 2; no other plan edits it.
@@ -1180,7 +1298,11 @@ Rollout rules for every remaining plan: each plan builds into its own
 parity tests, and they build the binary in the same command; a timing
 test may be retried up to three attempts under machine load and is then
 run alone before a failure is reported; no existing test or deadline is
-relaxed.
+relaxed. Evidence written by tests a plan runs is part of that plan's
+artifact roots: M23's parity gate runs the unchanged M9 budget test,
+which writes `tmp/capture/m09/timing.json`, and its own timing goes to
+`tmp/capture/m23/`, so M23 owns `tmp/capture` (CAP-R4-07); M16's gates
+run every repository test, so M16 owns `tmp`. Both also own `target`.
 
 M16 gates. `mise run test-cli` hardcodes `$PWD/target/release/nodetto-cli`
 (`mise.toml:50-59`), which is the wrong binary under an isolated target.
@@ -1284,7 +1406,91 @@ estimate is the sum over picture tiles of `samples in the tile * sum of
 the weights of the steps listed for it`, where a step's weight is the
 average number of entries in a non-empty edge bucket or mesh cell of its
 tool (at least 1). Above 4e9 the render is refused with a message that
-suggests a smaller `--size`. Bucket and cell tables are bounded by
+suggests a smaller `--size`. Picture admission and tile storage
+(CAP-R4-08):
+
+- Admission runs before any per-tile or per-body list is allocated. One
+  pass adds each step to the tile rectangle it covers (an intersection
+  step covers every tile) in two-dimensional difference arrays shared by
+  all bodies: one for the tool weight, one for the entry count. A single
+  prefix-sum pass then gives two numbers, in time linear in steps plus
+  tiles and memory linear in tiles. `work` is exactly the value of
+  `TileLists::work` on the built lists (the exact sum clamped to
+  `u64::MAX`). `entries` is the number of (body, step, tile) list
+  entries. The scene is refused with exit 2 when `work` > 4e9 (the
+  message above) or when `entries` > 4,194,304, with the same message
+  naming the tile list entries and their limit. A picture whose work is
+  admitted and whose tiles are all full has at most 4e9 / 1,024 =
+  3,906,250 entries, so the entry limit only binds when the work sits in
+  partial edge tiles.
+- Storage is tile-major: one offsets array of `tiles + 1` entries for the
+  whole scene, plus the admitted entries, grouped per tile by body in
+  history order and then by step order. There is no dense array per body.
+  Memory is therefore at most `(tiles + 1) + 4,194,304` entries whatever
+  the body count. The 20,000 one-tile bodies at 2048 x 2048 with
+  supersample 3 (20,480,000 work, admitted) need 20,000 entries, not the
+  5.9 GB of per-body offsets of the M12 layout.
+- A sample visits only the bodies listed for its tile. Per-sample
+  clearing, folding and overlay collection cost grows with the listed
+  entries, never with the total body count, so the admitted work bounds
+  the traversal. Skipping an unlisted body is exact: a body with no listed
+  step, or only a listed intersection step, has no material in that tile.
+- Liveness spans (CAP-R4-10). A listed step j with material marks steps
+  j up to the next listed step k, or to the end of the history. These
+  steps are omitted from the tile, so they cannot remove material there.
+  The span can cover a long history that lies off the tile, so a sample
+  does not write it. Each worker keeps, per body, the greatest exclusive
+  end recorded for each starting step: one comparison per listed step,
+  whatever the span length. When the workers join, the per-step maxima
+  are merged by maximum. One sweep per body then turns them into the
+  existing `Liveness` record, where step i is alive when some start
+  j <= i has an end > i. The census therefore receives exactly the record
+  it receives today, and `census.rs` is not edited. The sweep costs time
+  linear in the step count, once per body and worker.
+- Picture boundary scans (CAP-R4-10). Every combine call in the picture
+  fold reads all boundaries of the accumulated intervals plus the tool's
+  intervals, so a history of disjoint unions costs a time quadratic in
+  its length on every ray. That cost is not in `work`.
+  - Charge: before each combine call of the picture fold, its charge
+    `c = |accumulated| + |tool|` is known, because the tool's intervals
+    are computed first. The call is charged before it runs.
+  - Checks inside the fold: each worker keeps a local pending count. It
+    adds `c` before every combine call. When the pending count reaches
+    `CHUNK = 1,048,576` (2^20), the worker adds it to a shared total and
+    resets it, before that combine runs. If the total now exceeds the
+    allowance of 16,000,000,000 (4 x the work limit; reading a boundary
+    is cheaper than the step evaluation that `work` charges), the worker
+    skips that combine, raises a shared stop flag and returns. Every
+    worker also reads the stop flag at each flush. At the end of its band
+    a worker flushes the rest.
+  - Bound, independent of row width or scene complexity: when a worker
+    flushes, the reads it has run but not yet flushed are below `CHUNK`;
+    a combine whose charge makes the pending count reach `CHUNK` is
+    flushed before it runs. The reads that run before every worker has
+    stopped are therefore at most `allowance + workers x CHUNK`. With 16
+    workers that is 0.1% over 16e9.
+  - Determinism: the scene's full charge is the sum over all combine calls
+    of the complete render, a function of the scene alone. If it exceeds
+    the allowance, the shared total passes the allowance and the render is
+    refused. Otherwise the total never passes it, because only real
+    charges are added before that point. The decision is therefore the
+    same for every worker count. The refusal is exit 2 with the fixed
+    message `The scene is too heavy for this picture size (picture
+    boundary scans over 16000000000). Use a smaller --size.`, which
+    carries no partial count.
+  - Admitted scenes are unaffected: their Boolean results, bytes and
+    `interval.rs` (`combine`) do not change. The check lives in
+    `raster.rs` around its calls to `combine`. An internal render entry
+    takes the allowance as a parameter and reports the executed reads and
+    the number of workers actually started, for tests. `render_rgb` and
+    `render_scene` pass the 16e9 constant.
+- Refused examples allocate no list: 20,000 intersection steps over a
+  2048 x 2048 picture at supersample 3 (36,864 tiles) would otherwise
+  need about 737 million entries.
+
+`TileLists::build`, `steps`, `work` keep their signatures and results, and
+the M12 unit tests pass unedited. Only the internal layout changes, plus
+the additive admission function and a per-tile body accessor. Bucket and cell tables are bounded by
 `4 * entries + 4096` (section 6.4) and the reader bounds the entries
 (section 11), so memory is bounded as well.
 
@@ -1467,3 +1673,7 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R4-04 (revision 4) | The serialized chain M20, M17, M18, M11, M12 is replaced by two waves, the wiring milestone M23 and the closing milestone M16; a `tool_view` seam lets meshes enter analysis and census without shared edits; the text functions move to M22; the App wiring moves from M15 to M14 | 8.1, 8.5 |
 | CAP-R4-05 (revision 4, checkpoint amendment after wave 2) | Deviation from 8.5: M10 moved per-tool bounds into `tool_view`, but the candidate, pair and view-pair code (`interference.rs` and `lattice::sample_axis`) still took tool bounds from the small-loop boxes. Those boxes are empty for a mesh, so a closed mesh could never become a candidate. M11 adds `lattice::scene_tool_bounds` over `tool_view::tool_bounds` and uses it at those call sites only. Prism results do not change, because a prism's `tool_view` bounds are the union of its loop boxes. M11 edits `lattice.rs` and `interference.rs` after M17 and M18. The M15 and M14 desktop build gates now write their output under `target/` instead of `apps/desktop/dist` | 8.5 |
 | CAP-R4-06 (revision 4, checkpoint amendment round 2 after the wiring wave) | Deviation from 8.5 ownership: M11 returns every mesh boundary with face id 0 and exposes no hit triangle, so the picture pass cannot take the triangle normal that 6.5 requires for mesh shading and edges. M23 adds an additive seam in `mesh.rs` that mirrors the prism facet pattern (`PrismView::surface_intervals` and `surface`): a facet-encoded `surface_intervals`, a facet-encoded `first_surface_hit` and `surface(facet)` returning face id 0 and the unit triangle normal. The analysis `intervals`, `first_hit`, `is_closed`, `mesh_bounds` and the binning keep their behaviour, so analysis, census and the M11 tests do not change. The mesh face id seen by the edge rule stays 0 | 6.5, 8.5 |
+| CAP-R4-07 (revision 4, scope decisions for the M23 continuation after `e883b4b`) | Two M23 blockers were scope gaps, not design errors. (a) The required native parity gate runs the unchanged M9 budget test, which writes `tmp/capture/m09/timing.json`; M23 owns the evidence root `tmp/capture`, M16 owns `tmp`. (b) The desktop `interference: null` case that 8.5 already requires needs an input that M14's `captureCadImage` did not expose; the case is kept and M23 adds the optional `interference` option to that handler only, with no dialog control and no change to the backend, Tauri command or `packages/ui-solid` | 8.5 |
+| CAP-R4-08 (revision 4, M23; ownership amendment of the accepted M12 `tiles.rs`) | The 10.2 promise that memory and work are bounded did not hold for the M12 tile lists, for three reasons. (1) `TileLists::build` allocates every list entry before `work` can refuse the scene: about 737 million entries for 20,000 intersection steps at 2048 x 2048 with supersample 3. (2) It keeps a dense offsets array per body: 5.9 GB for 20,000 one-tile bodies whose work, 20,480,000, is admitted. (3) The picture visits every body on every sample, a cost `work` does not count. M23 now owns `tiles.rs` for: admission before allocation (exact `work`, plus an entry limit of 4,194,304), a tile-major layout with no per-body dense array, and a per-tile body accessor. The picture visits only listed bodies. Public `build`, `steps`, `work`, their results and the M12 unit tests do not change | 10.2, 8.5 |
+| CAP-R4-09 (revision 4, M23) | Rules the wiring needs were open or contradictory. (a) The census budget was "the size of the analysis budget", which is 0 when interference is off. `--no-interference` would then turn every suspect body into `unknown` and drop the `cad.result.empty (sampled)` error that section 12 promises unconditionally. The census now uses the default 24 million rays in that case. (b) The `e883b4b` picture classified a body as open if any step used an open mesh, while the analysis used the first step. A solid with a later open operand lost its solid pixels. An open source mesh with a later cut became a census subject and could get a false sampled-empty error. One first-tool classification now drives picture, report, census and analysis. A later open operand follows the existing empty-operand semantics of the lattice (union and difference unchanged, intersection empties). Open-source bodies stay out of the census through the picture record, so `census.rs` and `lattice.rs` are not edited. (c) The closure classification ran inside the sample loop. It now runs once per tool in picture setup | 6.7, 8.5 |
+| CAP-R4-10 (revision 4, M23) | Two picture costs were outside both admission limits. (1) A listed step marked liveness up to the next listed step on every sample (`raster.rs:162-167`, `census.rs:21-25`). One visible prism followed by a million off-view differences writes about 1.9e13 flags at 2048 x 2048 with supersample 3. (2) Every `combine` call rescans the accumulated boundaries (`interval.rs:17-48`), so 20,000 disjoint unions at 64 x 64 read about 1.6e12 boundaries. Liveness is now recorded as the greatest end per starting step and turned into the unchanged `Liveness` record once per body. Picture boundary reads are charged before each combine call and checked inside the fold, in chunks of 2^20, against a deterministic allowance of 16,000,000,000. A fixed refusal message is used, and at most `allowance + workers x 2^20` reads run, whatever the row cost (a check only at row end would let one admitted row run about 2.9e11 reads first). Only `raster.rs` changes. `census.rs`, `lattice.rs`, `interference.rs`, `interval.rs`, the work estimate, the entry limit, the scene bytes and the Boolean results of admitted scenes do not | 10.2, 8.5 |

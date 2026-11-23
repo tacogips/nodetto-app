@@ -1,6 +1,12 @@
-# M16 capture-16-docs-final (revision 4)
+# M16 capture-16-docs-final (revision 5, session 883)
 
-- Stage: closing. dependsOn: M23 (which includes every other milestone).
+- Stage: wave 2 of dispatch `capture-s883`. dependsOn: capture-23-wiring
+  (which closes every other milestone).
+- Artifact roots: `target` and `tmp` (design 8.5: the gates run every
+  repository test, and existing tests write `tmp/capture`, `tmp/cad3d`).
+  `impl-plans/active/capture-s883-dispatch.json` is owned only nominally,
+  so that plan-author amendments have an owner; the worker must not edit
+  it.
 - Design: sections 2.2, 4, 8.5 ("M16 gates"), 9, 10.2, 14, 15.
 - writePaths: `docs/capture.md` (new), `docs/cli.md` (one section
   `## Capturing page images` appended at the end, and one `capture` line
@@ -10,7 +16,8 @@
   in section 10, a short "Deviations" list),
   `impl-plans/active/capture-00-overview.md` (progress table only),
   `impl-plans/active/capture-16-docs-final.md`, `impl-plans/README.md`
-  (index entry), `tmp/capture/m16`, `target`
+  (index entry), `impl-plans/active/capture-s883-dispatch.json` (nominal
+  only), `tmp`, `target`. Gate logs go to `tmp/capture/m16/`.
 - Pre-authorised: none. `README.md` is not edited (cad3d M18 edits it).
   Plans are not moved; archiving is the workflow's job.
 
@@ -44,13 +51,27 @@ behaviour. Do not describe cad3d M18 or M21 features beyond the one
   (Export dialog entry, Current view, JPG for artwork, webview rasterizer
   for 2D); an agent loop example; licences (IJG sentence, pointer to
   `THIRD_PARTY_NOTICES.md`); the cloud follow-up list of design 14.
+  Revision 5 behavior to describe in the user's words:
+  - The three refusal messages (work, tile list entries, picture boundary
+    scans), each exit 2 and suggesting a smaller `--size`.
+  - Open meshes: an open first tool makes the body a surface that is not
+    checked; an open mesh in a later step is an empty operand.
+  - The emptied-body check also runs with `--no-interference` (design 6.7,
+    CAP-R4-09).
+  - The desktop `captureCadImage` has no interference switch.
 - `docs/cli.md`: the appended section, five to ten lines, two examples, a
   link to `docs/capture.md`.
-- Design: status `implemented (slice)`; "Measured" table from
-  `tmp/capture/m10r/`, `m23/` and earlier `m08/`, `m09/` logs (machine,
-  date, value, budget); "Deviations" lists design 18 rows of revision 4.
-- Overview progress table: every milestone `accepted` only when the gates
-  below all passed; otherwise the failing milestone stays as it is.
+- Design: status `implemented (slice)`. Add a "Measured" table from
+  `tmp/capture/m10r/` and `m23/` (`release.txt`, `native-parity.txt`,
+  `timing.json`) and the earlier `m08/` and `m09/` logs, giving machine,
+  date, value and budget for each row. Add a short "Deviations" list that
+  points to the section 18 rows of revision 4, CAP-R4-01 to CAP-R4-10.
+  Change nothing else in the design.
+- Overview progress table: set every row (M1 to M23, M16) to `accepted`
+  only when all three gates below have passed. M10, M20, M22, M15, M17,
+  M18, M11, M12 and M14 were accepted by per-plan review at `e883b4b`.
+  M23 is accepted by its review in this dispatch. If a gate fails, leave
+  M16 unaccepted and report the failure as a blocker.
 - `impl-plans/README.md`: one Completed entry for the capture plans in the
   file's existing form.
 
@@ -78,6 +99,9 @@ status and complete log path under `tmp/capture/m16/`)
 2. Shared native contracts: `env CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m16" cargo test -p nodetto-native`.
 3. CLI and parity: `env CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m16" sh -c 'cargo test -p nodetto-cli && cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$CARGO_TARGET_DIR/release/nodetto-cli" bun test apps/cli/src'`;
    its log must show capture native parity tests passed and none skipped.
+   The manifest command also reruns `apps/cli/src/native-parity/capture.test.ts`
+   alone into `tmp/capture/m16/capture-parity.log` and requires a positive
+   pass count and no skip there. Skips in unrelated suites are allowed.
 
 A nonzero gate (including the Foundation atomic-write denials recorded at
 M10) stays a failure; retries are logged; M16 is not accepted until every
@@ -97,4 +121,6 @@ gate has a passing run, and a remaining failure is reported as a blocker.
 
 ## Progress
 
-Pending (revision 4).
+Pending (revision 5). Workers append entries: date, command, exit status,
+full log path under `tmp/capture/m16/`, retries, and `git hash-object` of
+each owned file before and after.
