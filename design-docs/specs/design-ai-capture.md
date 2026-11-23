@@ -3,8 +3,10 @@
 Status: design revision 5, base commit `ebcac57`, branch `feat/ai-capture`
 (revision 4 checked against `be8fa5d`; amended after `e883b4b` for the
 remaining M23 and M16, CAP-R4-07 to CAP-R4-10; revision 5 checked against
-the M23 checkpoint `e43016d`, CAP-R5-01 to CAP-R5-04). Section 18 lists what
-revisions 2 to 5 changed and why; section 8.5 gives the completion order of
+the M23 checkpoint `e43016d`, CAP-R5-01 to CAP-R5-04; revision 6 checked
+against the M23 checkpoint `94c780d`, CAP-R6-01 to CAP-R6-05, splits the
+remaining M23 work into sub-plans M23a to M23f). Section 18 lists what
+revisions 2 to 6 changed and why; section 8.5 gives the completion order of
 the remaining milestones.
 Implementation plan: `impl-plans/active/capture-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
@@ -1210,16 +1212,14 @@ Contracts that make the waves possible:
   `run()`, `run(null)` and decoder-only equalities, plus one new equality of
   `run(DEFAULT_CAD_INTERFERENCE)` with the default fixture. No assertion is
   weakened.
-- One wiring plan (CAP-R5-04). At `e43016d` the CLI registration,
-  printing, exit codes, desktop option and both fixtures are present
-  (their test inventory is still checked against the M23 plan); the main
-  remaining work is in `crates/capture` (admission and tile-major lists, the
-  picture pass, liveness spans, scan allowance, reference mix and hatch)
-  and the tests that pin it, with native parity on top of both. The crate
-  work all meets in `raster.rs`, and the native parity test needs the
-  crate and the CLI together, so no part is independent. M23 stays one plan,
-  followed by M16; its plan text refers to this section instead of
-  restating it.
+- One wiring plan (CAP-R5-04), superseded by CAP-R6-01. The analysis of
+  CAP-R5-04 still holds: the crate work all meets in `raster.rs`, and
+  native parity needs the crate and the CLI together. That is why the parts
+  are chained, not run in parallel. But three Terra runs (sessions 868, 883,
+  884) each stopped part-way through the single plan, so M23 is now split
+  into the sequential sub-plans of "M23 split" below. Each sub-plan can be
+  finished in one sitting. The ownership row above stays the union of
+  what the sub-plans write.
 - Approximate pairs. The public `approximate` of a pair is the wire
   pair's `capped`, in text (`, approximate`) and in JSON alike;
   `uncheckedCount` stays the exact total next to the bounded `unchecked`
@@ -1360,9 +1360,180 @@ Contracts that make the waves possible:
   in wave 1, not from M23, because M14 imports the text functions through
   `@nodetto/core` in wave 2; no other plan edits it.
 
+M23 split (revision 6, CAP-R6-01 to CAP-R6-05). Elsewhere in this
+document "M23" means the union of M23a to M23f, and every M23 rule above
+applies to the sub-plan that owns the file. State at `94c780d`, to be
+checked again, not trusted. Present: tools classified once in setup, the
+first-tool open-source rule, liveness spans as per-step maxima with a mesh
+regression, the analyse/draw split, CLI options, printing and exit codes,
+both fixtures, and the desktop `interference` option with its `null` and
+default cases (`export-handlers.test.ts:224-318`). Missing:
+`tiles::admit`, the entry limit, tile-major storage and the per-tile body
+accessor (`tiles.rs` still keeps per-body `offsets`, `tiles.rs:17,72-92`);
+the per-tile body visit; the scan allowance and the internal render entry;
+most of the test inventory; the `render.rs` updates; native parity beyond
+the Plate interference block (`native-parity/capture.test.ts:424-509`);
+the CLI fake-backend cases; and the desktop fixture-file and mesh-only
+cases. `raster.rs` has no unit-test module, and no test can reach an
+all-steps render: `render_rgb` always builds and reads `TileLists`
+(`raster.rs:392,454`).
+
+In the table below, the file cap counts every edited file, including the
+sub-plan's own plan file, where it writes its Progress entries.
+Conditional paths count too. Artifact roots (`target`, `tmp/capture`) are
+listed separately and are not edited files. Crate paths are relative to
+`crates/capture/src/`, or to `crates/capture/` when they start with
+`tests/`. CLI paths are relative to `apps/cli/src/`.
+
+| Sub-plan | Writes: at most 4 edited files, plan file included | Work | dependsOn |
+| --- | --- | --- | --- |
+| M23a | `capture-23a-tile-admission.md`; `tiles.rs`; `raster.rs`; `tests/scale.rs` | `tiles.rs`: the admission, entry limit and tile-major storage of 10.2, the per-tile body accessor, and the `tiles.rs` unit tests of the acceptance additions. `steps`, `build` and `work` keep their results, with `steps` served from the tile group. `raster.rs`: the `admit` call before `TileLists::build`, the all-steps reference path (CAP-R6-04), and a new `#[cfg(test)] mod tests` with the five reference comparisons. `tests/scale.rs`: the new entry-limit refusal (release only, under 1,000 ms); the two existing release tests stay unedited | none |
+| M23b | `capture-23b-tile-visit-allowance.md`; `raster.rs`; `tests/scale.rs`; `tests/census.rs` | `raster.rs`: the per-tile body visit through the accessor; liveness spans checked against CAP-R4-10 (O(1) per listed step, one sweep per body); the scan allowance and internal render entry of 10.2, with `render_rgb` and `render_scene` passing 16e9; the four `raster.rs` unit tests of the acceptance additions; the five reference comparisons rerun unedited; the direct liveness comparison of the CAP-R4-10 census regression (CAP-R6-05). `tests/scale.rs`: the off-tile liveness suffix (release). `tests/census.rs`: the 64 x 64 history with 20,000 off-view differences, with equal RGB buffers and equal reports for 1, 2 and 5 threads, and its intersection variant, whose last off-view step is reported as emptying in `emptied_by_step`. Helpers stay private inside these test files; `tests/support/mod.rs` is not edited | M23a (accessor, layout, reference path; `raster.rs` handover) |
+| M23c | `capture-23c-picture-acceptance.md`; `tests/overlay.rs`; `tests/mesh.rs`; `shade.rs` (only to fix a compositing-order defect that a new overlay or mesh test exposes) | The overlay and mesh lists of the M23 plan and of the acceptance additions, including the no-overlay regression and CAP-R5-03 checks (1) to (3) | M23b (finished picture pass) |
+| M23d | `capture-23d-census-render-digest.md`; `tests/census.rs`; `tests/render.rs` | `tests/census.rs`: the census list of the M23 plan (emptied, refilled, sound with zero census rays, hidden in a housing, outside the view, intersect miss, end to end, 1 vs 5 threads), plus the two census acceptance additions (an options-0 emptied body with the 24-million-ray census; an open-source body with a later cut). `tests/render.rs`, in this order: the three superseded assertions, the CAP-R5-01 assertion, and last the digest under CAP-R5-03. Each commit message states the old and new values | M23c (CAP-R5-03 proof on the same tree) |
+| M23e | `capture-23e-native-parity.md`; `native-parity/capture.test.ts`; `capture-cad.ts` (report text only, when native parity exposes a contradiction with 4.2 or 12; gate 3 must stay green) | The rest of the native parity list: hatch colours `#335c67`/`#fffdf8` (dark `#5fb4c7`/`#1f2427`) with two equal runs; `Plate/Trim/Boss` `errors: 1`; cube `cad.mesh` with a cut exits 0; a listed `cad.pcb` board; Block moved gives 0; the 1.5 mm pin gives one pair; 1,000 elements in 50 bodies under 10,000 ms into `tmp/capture/m23/timing.json`; the stacked case with 1,225 candidates; the M9 budget unchanged. Both fixtures are checked, not rewritten | M23d (wired picture, final crate report), M23f (`capture-cad.ts` is pinned by M23f's tests, which gate 3 runs) |
+| M23f | `capture-23f-host-cases.md`; `export-handlers.test.ts` (`apps/desktop/src/shell/`, new cases only); `capture-cad.test.ts`; `capture-command.test.ts` | CLI fake-backend cases of the M23 plan (2D page exits 2; capped and complete pair marked `approximate` in text and JSON alike; 25 unchecked with twenty listed; exit codes 1, 1, 0, 0; emptied, refilled, hidden and outside notes; `--no-interference` writes options 0, the default writes options 3), the pre-authorized change (d) as amended by CAP-R6-05, and the CLI scene equality with both fixtures. Desktop: the Plate scene equals the bytes of `capture-plate-default.ncs1`; a page whose only body is a `cad.mesh` cube equals the `prepareCadCapture` call. The existing `null` and default cases stay as they are. No production file is owned | none (CAP-R6-03) |
+
+M16 depends on M23e, and so transitively on every sub-plan. The overview's
+milestone and ownership tables list M23a to M23f in place of the single
+M23 row. The plan step writes that change, and M16 marks it in the
+progress table. M23 is accepted only when all six sub-plans are accepted.
+The parent plan `capture-23-wiring.md` stays the shared reference for
+traps and tests. No sub-plan edits it.
+
+All-steps reference path (CAP-R6-04). M23a adds a private test-only
+renderer to `raster.rs`, compiled only under `#[cfg(test)]`. It is not
+public, not reachable from `lib.rs`, and not a runtime option. It runs the
+existing render stages (setup, sample fold, shading, edges, reference mix,
+overlay, census, downsample) with no tile selection: every sample folds
+every body and every history step. Liveness is marked per sample with
+`census::Liveness::mark`, the record that the CAP-R4-10 span sweep must
+reproduce. Neither a snapshot nor a second tiled render can stand in for
+it. The comparisons sit in the `raster.rs` test module and assert equal RGB
+buffers and equal `Report`s, including every `emptied_by_step`. They cover:
+
+- Plate (`tests/fixtures/plate-iso.ncs1` through `include_bytes!`)
+- the 600-hole plate
+- the 20 x 15 grid
+- 50 bodies with intersects
+- the emptied-and-refilled plate
+
+Plate and the emptied-and-refilled plate also run at a reduced size in
+debug, so the debug `--lib raster::` run reports a positive count. All
+five run at full size in release. M23b reruns them unedited after changing
+the traversal.
+
+Test-boundary amendments (CAP-R6-05):
+
+- Pre-authorized change (d) of the M23 plan names only the text
+  expectation at `capture-cad.test.ts:137`. The same test's fake report
+  emits the third body as `absent` (line 53), and its JSON expectation is
+  `state: "absent"` (line 171). `describe.ts:114-120` derives the note from
+  the supplied state, and `capture-cad.ts:138-143` carries that state into
+  the JSON. Changing the text alone would therefore fail. For the test
+  "reports cropped frame, body states and cad check errors in text and
+  JSON" only, M23f changes three things together in
+  `capture-cad.test.ts`:
+  - the fake state at line 53 becomes `outside`
+  - the text at line 137 expects `Puck [outside the picture]`
+  - the JSON at line 171 expects `state: "outside"`
+  Every other assertion of that test stays. No production file, parser or
+  fixture file changes. `absent` stays a valid pre-census wire value
+  (6.3), and M22's parser tests for it are not edited.
+- The CAP-R4-10 census regression requires equal liveness. Liveness is
+  internal: `raster.rs:527-571` builds it and passes it to
+  `census::resolve`, and neither `render_rgb` nor `Report`
+  (`report.rs:58-65`) exposes it. M23b's internal render entry (10.2,
+  crate-private) therefore also returns the merged per-body liveness record
+  it passes to `census::resolve`. The private `raster.rs` tests compare
+  that record directly:
+  - between 1, 2 and 5 requested threads;
+  - against the per-sample liveness of the CAP-R6-04 reference path;
+  - on the 64 x 64 off-view history and on its intersection variant.
+  The full 20,000 steps run in release; debug uses 2,000 off-view steps,
+  so the debug filter has a positive count. The `tests/census.rs`
+  integration cases keep the RGB, report and `emptied_by_step` assertions.
+  Liveness is not added to the public API, the report or the scene format.
+  M23b lists both `--lib raster::` and `--test census`, in debug and in
+  release.
+
+Stop rules: if a check needs a production change outside the sub-plan's
+write list, the sub-plan stops, records the evidence and the needed change
+in its Progress section, and is not accepted. It does not widen its write
+list. The scope amendment needed before a repair is then the named
+production file and the failing test. Under CAP-R5-03, if check (1) fails,
+M23c stops and `render.rs` is not touched. If a `shade.rs` fix in M23c
+changes the bit-clear digest, check (1) fails. M23a starts from `raster.rs` hash
+`34480090d85bf0b39552b2ecb686d43da19f17bf`. Each later sub-plan starts
+from the hash its predecessor recorded at acceptance. The progress
+protocol of the M23 plan applies to every sub-plan.
+
+Verification boundary (CAP-R6-02):
+
+- Every listed command must exit 0 and must run at least one test. Format,
+  lint and typecheck steps are joined to a test run with `&&` in one
+  `sh -c` command, so no command runs zero tests. Each test filter or
+  `--test` target must report a positive pass count in the log. A filter
+  that matches nothing fails the check.
+- Release-only tests. Both existing `tests/scale.rs` tests carry
+  `cfg_attr(debug_assertions, ignore = "release only")` (lines 9 and 27).
+  A debug `--test scale` run therefore reports 0 passed and 2 ignored, so
+  `scale` is listed only in release. Every new timing test is release-only
+  in the same way.
+- Before M23d, no plan lists the full `cargo test -p nodetto-capture`, nor
+  `--test render`: three `render.rs` tests are known to fail until M23d.
+  Every command below is prefixed with `env CARGO_TERM_QUIET=true
+  CARGO_TARGET_DIR="$PWD/target/capture-m23<x>"` and wrapped in `sh -c`.
+  Each `cargo test` in it must report a positive pass count.
+  - M23a debug: `cargo fmt -p nodetto-capture -- --check && cargo clippy -p
+    nodetto-capture --all-targets -- -D warnings && cargo test -p
+    nodetto-capture --lib tiles:: && cargo test -p nodetto-capture --lib
+    raster::`.
+  - M23a release: `cargo test --release -p nodetto-capture --lib tiles:: &&
+    cargo test --release -p nodetto-capture --lib raster:: && cargo test
+    --release -p nodetto-capture --test scale -- --nocapture`. This run
+    includes the unchanged 20,000-intersection refusal (under 1,000 ms,
+    now refused by admission) and the 600-hole plate (under 1,500 ms).
+  - M23b: the same format and lint prefix, then debug `--lib raster::`,
+    `--test census`, `--test mesh`, `--test overlay`, `--test interference`.
+    Release: `--lib raster::`, `--test scale -- --nocapture`, `--test
+    census`.
+  - M23c: the same prefix, then `--lib raster::`, `--test overlay`, `--test
+    mesh`, `--test interference`, in debug and in release.
+- Pre-edit evidence is not a verification command. Before any edit, M23a
+  runs debug `cargo test -p nodetto-capture --test scene` (11 passed at
+  `94c780d`) and logs it. A failure there is a pre-existing blocker: record
+  it and stop. The debug `scale` result (0 passed, 2 ignored) is recorded
+  as an observation only. A pre-edit release `--test scale` run is
+  optional diagnostic output and is never counted as a passing gate,
+  because its 20,000-intersection case exercises the pre-admission
+  allocation that M23a removes. The `94c780d` crate log stopped at the
+  failing `render` binary, before `scale` and `scene`
+  (`tmp/capture-s884/capture-23-wiring/cargo-test-current.log`).
+- From M23d on, every Rust-chain plan lists M23 gate 1 (`cargo fmt -p
+  nodetto-capture -- --check && cargo clippy -p nodetto-capture
+  --all-targets -- -D warnings && cargo test -p nodetto-capture`). M23d
+  also lists gate 2 (release crate tests into `tmp/capture/m23/release.txt`).
+  M23e lists gates 1, 3 and 4. Gate 4 builds the release `nodetto-cli` in
+  the same command and runs native parity with
+  `NODETTO_CLI_TEST_BINARY="$CARGO_TARGET_DIR/release/nodetto-cli"` into
+  `tmp/capture/m23/native-parity.txt`. The log must show a positive parity
+  count and no skip.
+- M23f lists `sh -c 'bun run typecheck && bunx biome check
+  --diagnostic-level=warn apps/desktop/src/shell apps/cli/src/capture-cad.test.ts
+  apps/cli/src/capture-command.test.ts && bun test
+  apps/desktop/src/shell/export-handlers.test.ts
+  apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts'`.
+  It runs no cargo command: it touches no Rust, and its cases use a fake
+  backend or compare scene bytes from TypeScript.
+- Build directories are `CARGO_TARGET_DIR=target/capture-m23a` to
+  `target/capture-m23e`. Artifact roots are `target` and `tmp/capture` for
+  every sub-plan. Evidence goes to `tmp/capture/m23<x>/`, and the gate
+  files go to `tmp/capture/m23/`.
+
 Rollout rules for every remaining plan: each plan builds into its own
 `CARGO_TARGET_DIR=target/capture-<mNN>` (the native binary is then
-`target/capture-<mNN>/release/nodetto-cli`); only M23 and M16 run native
+`target/capture-<mNN>/release/nodetto-cli`); only M23e and M16 run native
 parity tests, and they build the binary in the same command; a timing
 test may be retried up to three attempts under machine load and is then
 run alone before a failure is reported; no existing test or deadline is
@@ -1715,7 +1886,7 @@ watcher (`docs/cli.md:201-203`).
 - [S-13] IJG licence text:
   https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/main/README.ijg
 
-## 18. Changes in revisions 2 to 5
+## 18. Changes in revisions 2 to 6
 
 | Finding | Change | Sections |
 | --- | --- | --- |
@@ -1748,4 +1919,9 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R5-01 (revision 5, M23 checkpoint `e43016d`) | `render.rs:162-178` expected `[.., Absent, Absent]` while the wired census returns `[.., Outside, Empty]`. 6.3 and 6.7 already say `absent` is a pre-census value and list only `drawn`, `hidden`, `outside`, `empty`, `unknown` as reported states, so the census is right and the assertion is a second M8 placeholder. The narrow 8.5 authorisation is extended to that one `assert_eq!`, replaced by the six final states plus `emptiedByStep` -1 (outside body) and 1 (emptied body). No code changes for it | 6.3, 8.5 |
 | CAP-R5-02 (revision 5) | The session 883 amendment is ratified in the design: the crate's draw and analyse bits act separately (options 2 is hatched, reports no pairs, and is never written by the core); the options 0 bytes move to the new `capture-plate-no-interference.ncs1`, `capture-plate-default.ncs1` holds the options 3 bytes, and M23 owns the fixture expectations of `cad-request.test.ts`. `engine_tests.rs` and `tests/interference.rs` stay unedited | 6.3, 6.6, 8.5 |
 | CAP-R5-03 (revision 5) | "The digest changes only as the M17 rule allows" named no rule. The digest of `plate-iso.ncs1` (options 3) is replaced only after `tests/overlay.rs` shows that the bit-clear render keeps the old digest `0x29c6_4b3e_156d_0941`, that every changed pixel lies in a reported pair's projected box widened by 2 pixels, and that both hatch colours appear | 8.5 |
+| CAP-R6-01 (revision 6, M23 checkpoint `94c780d`) | CAP-R5-04 ("M23 stays one plan") is superseded. Its dependency analysis still holds, but three Terra runs (sessions 868, 883 and 884) each stopped part-way through the single plan. The remaining M23 work becomes the sub-plans M23a to M23f. Each edits at most four files, counting its own plan file and any conditional production path (design review CAP-DR6-03). They are chained by `dependsOn` where a file handover or a contract exists: tile layout, then picture pass, then CAP-R5-03 proof, then census tests and digest, then native parity. The behaviour, contracts, pre-authorized test changes and acceptance additions of M23 do not change, and every required case has one named owner. Only the dispatch unit changes | 8.5 |
+| CAP-R6-02 (revision 6) | Verification boundary per sub-plan. No command runs zero tests: format, lint and typecheck are joined to a test run. `scale` is listed only in release, because its tests are release-only. Before M23d no plan lists the full crate test or `--test render`. From M23d on, gate 1 is listed; native parity runs only in M23e, against the binary it built. Pre-edit evidence is debug `--test scene`, which is not a gate. The unchanged release `scale` deadlines are a post-edit gate of M23a (design review CAP-DR6-01) | 8.5 |
+| CAP-R6-03 (revision 6) | M23f collects the host-side cases that need no crate change. The CLI fake-backend cases (`capture-cad.test.ts`, `capture-command.test.ts`) and the two desktop cases (fixture-file equality and mesh-only parity) compare fake reports or scene bytes from TypeScript `prepareCadCapture`, and no sub-plan changes that function or the fixtures. The desktop option itself already exists (CAP-R4-07). So M23f has no `dependsOn` and runs no cargo command. M23e depends on M23f, because M23e may edit `capture-cad.ts`, which M23f's tests pin. M16 depends on M23e | 8.5 |
+| CAP-R6-04 (revision 6) | The all-steps reference comparisons of the acceptance additions had no reference to compare against: `render_rgb` always reads `TileLists`. M23a adds a private `#[cfg(test)]` all-steps renderer in `raster.rs`. It uses the existing stages and no tile selection, with liveness marked per sample, and it is not public and not a runtime option. M23a places the five comparisons (Plate, 600-hole plate, 20 x 15 grid, 50 bodies with intersects, emptied-and-refilled plate) in the `raster.rs` test module, and M23b reruns them after changing the traversal (design review CAP-DR6-02) | 8.5 |
+| CAP-R6-05 (revision 6, design review round 2) | Two required assertions could not be made inside their test boundaries. (a) Change (d) of the M23 plan authorized only the text line of the cropped-frame CLI test, while its fake report and JSON expectation still used `absent`. M23f now updates the fake state, the text and the JSON together to `outside`; production code and fixtures are unchanged (CAP-DR6-04). (b) The CAP-R4-10 census regression asserted equal liveness from an integration test that cannot observe it. M23b's crate-private render entry also returns the merged liveness passed to `census::resolve`, and the private `raster.rs` tests compare it across 1, 2 and 5 threads and against the reference path. `tests/census.rs` keeps the RGB, report and emptying-step checks (CAP-DR6-05) | 8.5 |
 | CAP-R5-04 (revision 5) | The remaining M23 work all meets in `raster.rs`, and native parity needs both crate and CLI, so M23 is not split; one wiring plan, then M16 | 8.5 |

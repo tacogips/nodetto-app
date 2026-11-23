@@ -1,5 +1,10 @@
 # M23 capture-23-wiring (revision 6, session 884)
 
+> Session 885: not dispatched again. Split into M23a to M23f
+> (`capture-23a-tile-admission.md` ... `capture-23f-host-cases.md`, design
+> 8.5 "M23 split", CAP-R6-01 to CAP-R6-05). This file stays the shared
+> reference for traps and test intent; sub-plans do not edit it.
+
 - Dispatch `capture-s884`, wave 1, dependsOn none. Accepted and not redone:
   M1-M15, M17-M20, M22 (M10/M11/M12/M14/M15/M17/M18/M20/M22 at `e883b4b`).
 - Design wins over this plan: `design-docs/specs/design-ai-capture.md`

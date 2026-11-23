@@ -35,8 +35,17 @@ it is not confused with cad3d M21.
 | Wave 2 | M11 | capture-11-mesh-reference | `mesh.rs`, `tool_view` mesh arm, model decoder option | M10, M20 |
 | Wave 2 | M12 | capture-12-scale-budget | `tiles.rs` lists, work estimate, `WORK_LIMIT` | M10 |
 | Wave 2 | M14 | capture-14-desktop-backend | Tauri command, backend method, handler, `App.tsx` wiring | M15, M20, M22 |
-| Wiring | M23 | capture-23-wiring | Picture pass, CLI registration and printing, fixture, render, CLI and native tests | M17, M18, M11, M12, M14, M20, M22 |
-| Closing | M16 | capture-16-docs-final | Docs, measured budgets, progress table, final gates | M23 |
+| Wiring | M23a | capture-23a-tile-admission | `tiles.rs` admission, entry limit, tile-major storage; all-steps reference path and comparisons; entry-limit refusal | - (waves 1 and 2 accepted) |
+| Wiring | M23f | capture-23f-host-cases | CLI fake-backend cases, cropped-frame amendment, desktop fixture and mesh-only cases | - (waves 1 and 2 accepted) |
+| Wiring | M23b | capture-23b-tile-visit-allowance | Per-tile visit, liveness spans, scan allowance, internal entry, raster unit tests | M23a |
+| Wiring | M23c | capture-23c-picture-acceptance | Overlay (CAP-R5-03) and mesh acceptance tests | M23b |
+| Wiring | M23d | capture-23d-census-render-digest | Census tests, render.rs assertions, digest | M23c |
+| Wiring | M23e | capture-23e-native-parity | Native parity list, gates 1, 3, 4 | M23d, M23f |
+| Closing | M16 | capture-16-docs-final | Docs, measured budgets, progress table, final gates | M23e |
+
+M23 (`capture-23-wiring.md`) is split into M23a to M23f (design 8.5 "M23
+split", CAP-R6-01); that file stays the shared reference for traps and
+tests and is not dispatched again.
 
 ## Write ownership
 
@@ -67,10 +76,22 @@ Files written in more than one stage, in stage order:
 | `design-docs/specs/design-ai-capture.md`, this overview's progress table | M16 |
 | Evidence roots | M23 `tmp/capture` and `target`; M16 `tmp` and `target` (CAP-R4-07) |
 
-Session 883 dispatch: `capture-s883-dispatch.json` (wave 1
-capture-23-wiring, wave 2 capture-16-docs-final). The s868 manifest must
-not be dispatched again. The plan author edited this ownership table
-before dispatch; M16 edits only the progress table.
+M23 sub-plan ownership (session 885, CAP-R6-01; each row is the only
+writer of its files in its wave):
+
+| Sub-plan | Writes | Artifact roots |
+| --- | --- | --- |
+| M23a | `crates/capture/src/tiles.rs`, `crates/capture/src/raster.rs`, `crates/capture/tests/scale.rs` | `target/capture-m23a`, `tmp/capture/m23a` |
+| M23f | `apps/desktop/src/shell/export-handlers.test.ts`, `apps/cli/src/capture-cad.test.ts`, `apps/cli/src/capture-command.test.ts` | `target/capture-m23f`, `tmp/capture/m23f` |
+| M23b | `crates/capture/src/raster.rs`, `crates/capture/tests/scale.rs`, `crates/capture/tests/census.rs` | `target/capture-m23b`, `tmp/capture/m23b` |
+| M23c | `crates/capture/tests/overlay.rs`, `crates/capture/tests/mesh.rs`, `crates/capture/src/shade.rs` (conditional) | `target/capture-m23c`, `tmp/capture/m23c` |
+| M23d | `crates/capture/tests/census.rs`, `crates/capture/tests/render.rs` | `target/capture-m23d`, `tmp/capture/m23d`, `tmp/capture/m23` |
+| M23e | `apps/cli/src/native-parity/capture.test.ts`, `apps/cli/src/capture-cad.ts` (conditional) | `target/capture-m23e`, `tmp/capture/m23e`, `tmp/capture/m23`, `tmp/capture/m09` |
+
+Each sub-plan also writes its own plan file (Progress only). Session 885
+dispatch: `capture-s885-dispatch.json`. The s868, s883 and s884 manifests
+must not be dispatched again. The plan author edited these tables before
+dispatch; M16 edits only the progress table.
 
 ## Rules for every implementer
 
@@ -138,5 +159,10 @@ before dispatch; M16 edits only the progress table.
 | M11 | pending |
 | M12 | pending |
 | M14 | pending |
-| M23 | pending |
+| M23a | pending |
+| M23f | pending |
+| M23b | pending |
+| M23c | pending |
+| M23d | pending |
+| M23e | pending |
 | M16 | pending |
