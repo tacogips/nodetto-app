@@ -18,7 +18,7 @@ use crate::CaptureError;
 const BAND_ROWS: usize = 32;
 const MAX_THREADS: usize = 8;
 
-type Visibility = Vec<(bool, bool, Liveness)>;
+type Visibility = Vec<(bool, bool, Vec<usize>)>;
 
 #[derive(Clone, Copy, Default)]
 struct Sample {
@@ -86,6 +86,8 @@ struct RayScratch {
 struct Raster<'a> {
     scene: &'a Scene,
     tools: Vec<Option<ProjectedPrism>>,
+    solid_tools: Vec<bool>,
+    open_bodies: Vec<bool>,
     tiles: TileLists,
     light: [f64; 3],
     samples_wide: usize,
@@ -121,25 +123,17 @@ impl Raster<'_> {
         for (index, (body, (present, _, live))) in
             self.scene.bodies.iter().zip(&mut *visibility).enumerate()
         {
-            let open = body.steps.iter().any(|step| {
-                self.scene
-                    .tools
-                    .get(step.tool as usize)
-                    .is_some_and(|tool| !tool_view::is_solid(tool))
-            });
-            if open {
-                for step in &body.steps {
-                    if let Some(projected) = self
-                        .tools
-                        .get(step.tool as usize)
-                        .and_then(Option::as_ref)
-                        .filter(|tool| tool.rect.contains(position))
-                    {
-                        if let Some(hit) = projected.view.first_surface_hit(&ray) {
-                            *present = true;
-                            if translucent.is_none_or(|(_, old)| hit.s < old.s - MERGE_EPS) {
-                                translucent = Some((index, hit));
-                            }
+            if self.open_bodies[index] {
+                if let Some(projected) = body
+                    .steps
+                    .first()
+                    .and_then(|step| self.tools.get(step.tool as usize).and_then(Option::as_ref))
+                    .filter(|tool| tool.rect.contains(position))
+                {
+                    if let Some(hit) = projected.view.first_surface_hit(&ray) {
+                        *present = true;
+                        if translucent.is_none_or(|(_, old)| hit.s < old.s - MERGE_EPS) {
+                            translucent = Some((index, hit));
                         }
                     }
                 }
@@ -150,7 +144,13 @@ impl Raster<'_> {
             for (offset, &step_index) in steps.iter().enumerate() {
                 let step = &body.steps[step_index as usize];
                 let projected = self.tools.get(step.tool as usize).and_then(Option::as_ref);
-                if let Some(prism) = projected.filter(|tool| tool.rect.contains(position)) {
+                if let Some(prism) = projected.filter(|tool| {
+                    self.solid_tools
+                        .get(step.tool as usize)
+                        .copied()
+                        .unwrap_or(false)
+                        && tool.rect.contains(position)
+                }) {
                     prism
                         .view
                         .surface_intervals(&ray, &mut scratch.crossings, &mut scratch.tool);
@@ -164,7 +164,8 @@ impl Raster<'_> {
                         .get(offset + 1)
                         .copied()
                         .map_or(body.steps.len(), |v| v as usize);
-                    live.mark(step_index as usize, end);
+                    let start = step_index as usize;
+                    live[start] = live[start].max(end);
                 }
             }
             if let Some(&first) = scratch.current.first() {
@@ -279,7 +280,7 @@ impl Raster<'_> {
             .scene
             .bodies
             .iter()
-            .map(|b| (false, false, Liveness::new(b.steps.len())))
+            .map(|b| (false, false, vec![0; b.steps.len()]))
             .collect();
         let mut scratch = RayScratch::default();
         let mut marks = MarkTable::default();
@@ -411,6 +412,19 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
             Some(ProjectedPrism { view, rect })
         })
         .collect();
+    let solid_tools: Vec<bool> = scene.tools.iter().map(tool_view::is_solid).collect();
+    let open_bodies: Vec<bool> = scene
+        .bodies
+        .iter()
+        .map(|body| {
+            body.steps.first().is_some_and(|step| {
+                !solid_tools
+                    .get(step.tool as usize)
+                    .copied()
+                    .unwrap_or(false)
+            })
+        })
+        .collect();
     let samples_wide = width * factor;
     let samples_high = height * factor;
     let step = camera.mm_per_pixel / f64::from(factor);
@@ -452,6 +466,8 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
     let raster = Raster {
         scene,
         tools,
+        solid_tools,
+        open_bodies,
         tiles,
         light: shade::light(camera),
         samples_wide: (width * factor) as usize,
@@ -487,7 +503,7 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
             let mut visibility: Visibility = scene
                 .bodies
                 .iter()
-                .map(|b| (false, false, Liveness::new(b.steps.len())))
+                .map(|b| (false, false, vec![0; b.steps.len()]))
                 .collect();
             let mut marks = MarkTable::default();
             for worker in workers {
@@ -500,25 +516,46 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
                 {
                     *present |= worker_present;
                     *drawn |= worker_drawn;
-                    live.merge(&worker_live);
+                    for (end, worker_end) in live.iter_mut().zip(worker_live) {
+                        *end = (*end).max(worker_end);
+                    }
                 }
             }
             Ok((visibility, marks))
         })?
     };
-    let liveness: Vec<_> = visibility.iter().map(|(_, _, live)| live.clone()).collect();
+    let liveness: Vec<_> = visibility
+        .iter()
+        .enumerate()
+        .map(|(index, (_, _, spans))| {
+            let mut live = Liveness::new(spans.len());
+            if raster.open_bodies[index] {
+                live.mark(0, spans.len());
+            } else {
+                let mut end = 0;
+                for (i, &span_end) in spans.iter().enumerate() {
+                    end = end.max(span_end);
+                    live.alive_after[i] = i < end;
+                }
+            }
+            live
+        })
+        .collect();
     let mut bodies: Vec<_> = visibility
         .into_iter()
-        .map(|(present, drawn, _)| BodyReport {
+        .enumerate()
+        .map(|(index, (present, drawn, _))| BodyReport {
             state: if drawn {
                 BodyState::Drawn
             } else if present {
                 BodyState::Hidden
+            } else if raster.open_bodies[index] {
+                BodyState::Outside
             } else {
                 BodyState::Absent
             },
             emptied_by_step: -1,
-            open: false,
+            open: raster.open_bodies[index],
         })
         .collect();
     census::resolve(
@@ -542,14 +579,6 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
     if scene.analyse && scene.draw_interference {
         let seen = marks.picture_only(&pairs)?;
         interference::add_view_pairs(scene, &mut pairs, &seen, scene.target_cell);
-    }
-    for (report, body) in bodies.iter_mut().zip(&scene.bodies) {
-        report.open = body.steps.iter().any(|step| {
-            scene
-                .tools
-                .get(step.tool as usize)
-                .is_some_and(|tool| !tool_view::is_solid(tool))
-        });
     }
     Ok((
         output,

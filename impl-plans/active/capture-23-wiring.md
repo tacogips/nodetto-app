@@ -185,3 +185,18 @@ path, retries, hashes. No state-changing git commands.
   101 with the three `render.rs` failures (`gate-1-rerun.log`); gates 2
   and 4 not run.
 - Session 884: pending.
+- Session 884 implementation continuation (2026-11-23): classified tools once
+  in raster setup, applied first-tool open-source behavior and recorded liveness
+  spans as per-step maxima; added an open operand/source regression. Raster
+  hashes: `ab34efdcebda3ced6505bae353ed8af56b05351f` ->
+  `11c4dc37ef923019f0e1b565ed5253fb3ab387f6` ->
+  `34480090d85bf0b39552b2ecb686d43da19f17bf`; mesh test hashes:
+  `89c35fe912e3a4876a02e1cc3312b7447aced33b` ->
+  `2571016b18afb89546b754c378bdde1a4097fb32`. Focused mesh regression
+  passed (1 test, exit 0), log `tmp/capture-s884/capture-23-wiring/open-operands-spans-test.log`;
+  rustfmt check passed, log `tmp/capture-s884/capture-23-wiring/rustfmt.log`.
+  `cargo test -p nodetto-capture` exited 101 with the three known render
+  assertions, log `tmp/capture-s884/capture-23-wiring/cargo-test-current.log`.
+  Admission, tile-major storage, per-tile visits, boundary allowance, required
+  acceptance tests, render assertion updates and all four final gates remain.
+  The digest remains unchanged pending CAP-R5-03 proof. No acceptance claimed.

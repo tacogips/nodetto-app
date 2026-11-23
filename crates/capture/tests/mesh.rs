@@ -83,3 +83,32 @@ fn two_hundred_thousand_triangles_fit_render_budget() {
     assert!(report.bodies[0].open);
     assert!(start.elapsed() < std::time::Duration::from_millis(3000));
 }
+
+#[test]
+fn open_operands_and_sources_follow_first_tool_rule() {
+    let mut mesh = cube_mesh();
+    if let Tool::Mesh(mesh) = &mut mesh {
+        mesh.triangles.truncate(mesh.triangles.len() - 3);
+    }
+    let prism = box_prism([-4.0, -4.0, 0.0], 8.0, 8.0, 4.0);
+    let mut s = scene(vec![prism, mesh], vec![body(&[(Op::Union, 0)])]);
+    let (original, _) = render_rgb(&s, 1).unwrap();
+    s.bodies[0] = body(&[(Op::Union, 0), (Op::Difference, 1)]);
+    let (difference, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(difference, original);
+    assert!(!report.bodies[0].open);
+    assert_eq!(report.bodies[0].state, BodyState::Drawn);
+    s.bodies[0] = body(&[(Op::Union, 0), (Op::Intersection, 1)]);
+    let (_, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(report.bodies[0].state, BodyState::Empty);
+    assert_eq!(report.bodies[0].emptied_by_step, 1);
+    s.bodies[0] = body(&[(Op::Union, 1)]);
+    let (open, _) = render_rgb(&s, 1).unwrap();
+    s.bodies[0] = body(&[(Op::Union, 1), (Op::Difference, 0)]);
+    s.bodies[0].analysed = true;
+    let (cut, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(cut, open);
+    assert!(report.bodies[0].open);
+    assert_eq!(report.bodies[0].emptied_by_step, -1);
+    assert!(report.pairs.is_empty());
+}
