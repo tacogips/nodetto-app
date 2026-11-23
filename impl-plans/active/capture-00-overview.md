@@ -53,7 +53,8 @@ Files written in more than one stage, in stage order:
 | `crates/capture/src/tool_view.rs` | M10 (new), M11, M23 (picture-family constructor only if needed) |
 | `crates/capture/src/overlay.rs`, `census.rs`, `mesh.rs`, `tiles.rs` | M10 (empty stub), then M17, M18, M11, M12; M23 (`mesh.rs` facet seam, CAP-R4-06; `tiles.rs` admission and tile-major layout, CAP-R4-08) |
 | `crates/capture/tests/render.rs` | M10 (report assertions), M23 (digest and the three authorised assertions) |
-| `packages/core/src/capture/cad-request.ts` and test | M20, M11 (forward `decodeMesh` only) |
+| `packages/core/src/capture/cad-request.ts` and test | M20, M11 (forward `decodeMesh` only); M23 (test only: fixture expectations, amendment round 1) |
+| `apps/cli/src/__fixtures__/capture-plate-no-interference.ncs1` | M23 (new, amendment round 1) |
 | `packages/core/src/capture/scene.ts` and test | M11 |
 | `packages/core/src/capture/report.ts`, `describe.ts`, `index.ts` | M22 |
 | `apps/cli/src/capture-help/interference.ts` | M22 |

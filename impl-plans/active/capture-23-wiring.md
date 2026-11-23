@@ -236,8 +236,47 @@ every case below.
 
 1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/raster.rs crates/capture/src/shade.rs crates/capture/src/lib.rs crates/capture/src/report.rs crates/capture/src/tool_view.rs crates/capture/src/mesh.rs crates/capture/src/tiles.rs crates/capture/tests/*.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test -p nodetto-capture'`
 2. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test --release -p nodetto-capture --lib --test overlay --test census --test mesh --test scale --test render -- --nocapture > tmp/capture/m23/release.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/release.txt; test $s -eq 0 && grep -Eq "test result: ok\. [1-9][0-9]* passed" tmp/capture/m23/release.txt && ! grep -Eq "[1-9][0-9]* failed" tmp/capture/m23/release.txt'`
-3. `sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
+3. `sh -c 'bun run typecheck && bunx biome check packages/core/src/capture/cad-request.test.ts apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
 4. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo test -p nodetto-cli && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/capture-m23/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts > tmp/capture/m23/native-parity.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/native-parity.txt; test $s -eq 0 && grep -Eq "[1-9][0-9]* pass" tmp/capture/m23/native-parity.txt && ! grep -Eq "[1-9][0-9]* skip" tmp/capture/m23/native-parity.txt'`
+
+## Amendment 2026-11-23 (blocked-wave-scope-or-contract, round 1)
+
+Blocker (wave 1): `packages/core/src/capture/cad-request.test.ts:137-170`
+(an M20 test) expects `capture-plate-default.ncs1` to hold the
+no-interference (options 0) bytes. Design 8.5 requires M23 to regenerate
+that fixture with `DEFAULT_CAD_INTERFERENCE` (options 3, already the
+committed bytes at `e883b4b`). `engine_tests.rs:369-405` also compares the
+CLI default with that fixture. Decisions:
+
+1. New fixture `apps/cli/src/__fixtures__/capture-plate-no-interference.ncs1`,
+   owned by M23. It holds exactly the options-0 bytes:
+   `prepareCadCapture(Plate, iso, 1024x768, light)` with no interference.
+   These are the pre-M23 committed bytes, so a byte copy of
+   `git show 198a0be:apps/cli/src/__fixtures__/capture-plate-default.ncs1`
+   is acceptable (read-only git). The test below checks them.
+2. `packages/core/src/capture/cad-request.test.ts` is owned by M23 for
+   this one test only (pre-authorized):
+   - The three equalities `run()`, `run(null)` and the `decodeMesh`-only
+     call are compared with the new no-interference fixture.
+   - Add `run(DEFAULT_CAD_INTERFERENCE).scene` equals
+     `capture-plate-default.ncs1`.
+   - Every other assertion stays as written. Nothing is weakened: the
+     options-0 contract is still pinned to committed bytes.
+3. The default fixture stays at options 3, and `engine_tests.rs` stays
+   unedited.
+4. Draw and analyse bits (needed so that
+   `tests/interference.rs:217-241` passes unedited, CAP-R4-07 to -10
+   unchanged):
+   - The draw bit alone controls marking and hatching in the picture.
+   - The analyse bit alone controls `analysis`, `picture_only` and
+     `add_view_pairs`. Report pairs exist only when the analyse bit is set.
+   - A draw-only scene (options 2, never written by the core) is hatched
+     but reports `analysis: None` and no pairs. Its picture equals the same
+     scene with the analyse bit also set.
+   - Do not edit `tests/interference.rs`.
+
+Gate 3 adds `packages/core/src/capture/cad-request.test.ts` to its biome
+list. `bun test packages/core/src/capture` already runs it.
 
 ## Progress
 
@@ -245,3 +284,18 @@ Session 868 left a partial implementation, blocked on two scope gaps
 that CAP-R4-07 now resolves. Workers append one entry per run with: date,
 command, exit status, log path, and the `git hash-object` of each owned
 file before and after, plus any drift.
+
+- 2026-11-23: Added the nullable desktop interference option and a focused
+  fake-backend assertion. `bun test apps/desktop/src/shell/export-handlers.test.ts`
+  exited 0 (7 passed), `tmp/capture-s883/capture-23-wiring/desktop-test.log`.
+  Gate 1 exited 101 on `touching_shallow_overlap_reference_and_analysis_flags`
+  (`gate-1.log`); gate 3 exited 1 with 199 passed and one fixture assertion
+  failure (`gate-3.log`), both logs under the same evidence directory. The
+  fixture conflict is in `packages/core/src/capture/cad-request.test.ts`, outside
+  this plan's write paths: it expects the fixture for null/omitted interference,
+  while M23's CLI fixture must contain enabled interference.
+  Admission, bounded scans, first-tool classification and much of the required
+  test inventory remain incomplete. Gates 2 and 4 were not run on incomplete
+  wiring. No drift observed in the edited files.
+  Hashes before -> after: `export-handlers.ts` 5f81e8d29d9a86d0f158af2953229a8fce6fecce -> 7795c7d120b86facbcdc415550d4176bb7d8aaf1;
+  `export-handlers.test.ts` da1e89d276b41a744ecd399eb3af14e6a4223276 -> 0a39780be6101d459ecd593c43ec543fd3e494d1.
