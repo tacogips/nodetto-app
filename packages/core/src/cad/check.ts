@@ -58,15 +58,6 @@ export function checkCadPage(
   elements: readonly Element[],
   pageId: PageId,
 ): CadCheckReport {
-  const page = elements.filter((element) => element.page === pageId);
-  const pcb = elements.filter(
-    ({ page, type }) =>
-      page !== pageId && (type === "pcb.board" || type === "pcb.graphic"),
-  );
-  const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
-  const geometry = createCadGeometry(history);
-  const status = new Map(history.status);
-  const bodies = new Set<ElementId>();
   const min: MutableVec3 = [
     Number.POSITIVE_INFINITY,
     Number.POSITIVE_INFINITY,
@@ -77,6 +68,31 @@ export function checkCadPage(
     Number.NEGATIVE_INFINITY,
     Number.NEGATIVE_INFINITY,
   ];
+  const report = visitCadConstruction(elements, pageId, (feature, tool) => {
+    if (feature.type === "cad.extrude") includeTool(tool, min, max);
+  });
+  return {
+    ...report,
+    bounds: min[0] === Number.POSITIVE_INFINITY ? null : { min, max },
+  };
+}
+
+/** Resolve each tool in history order, without triangulation or a kernel. */
+export function visitCadConstruction(
+  elements: readonly Element[],
+  pageId: PageId,
+  onTool: (element: Element, geometry: ExtrudeGeometry) => void,
+  onMesh?: (element: Element, data: string) => void,
+): Omit<CadCheckReport, "bounds"> {
+  const page = elements.filter((element) => element.page === pageId);
+  const pcb = elements.filter(
+    ({ page, type }) =>
+      page !== pageId && (type === "pcb.board" || type === "pcb.graphic"),
+  );
+  const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
+  const geometry = createCadGeometry(history);
+  const status = new Map(history.status);
+  const bodies = new Set<ElementId>();
 
   for (const { id } of history.features) {
     if (!status.get(id)?.ok) continue;
@@ -104,12 +120,16 @@ export function checkCadPage(
     if (feature.semantic.suppressed) continue;
     if (feature.type === "cad.mesh") {
       bodies.add(id);
+      onMesh?.(feature, feature.semantic.data);
       continue;
     }
     if (feature.type === "cad.pcb") {
       const outline = geometry.pcb(feature.semantic);
       if ("ok" in outline) status.set(id, outline);
-      else geometry.extrudes.set(id, outline);
+      else {
+        geometry.extrudes.set(id, outline);
+        onTool(feature, outline);
+      }
       continue;
     }
     for (const target of targets) {
@@ -126,7 +146,7 @@ export function checkCadPage(
     else {
       geometry.extrudes.set(id, tool);
       if (feature.semantic.op === "new") bodies.add(id);
-      includeTool(tool, min, max);
+      onTool(feature, tool);
     }
   }
 
@@ -142,6 +162,5 @@ export function checkCadPage(
     features: history.features.length,
     entities,
     errors,
-    bounds: min[0] === Number.POSITIVE_INFINITY ? null : { min, max },
   };
 }

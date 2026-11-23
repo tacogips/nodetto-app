@@ -141,12 +141,12 @@ milestone that breaks it, not in M18.
 | M12 | accepted |
 | M13 | accepted |
 | M20 | accepted |
-| M14 | implemented |
-| M21 | pending |
+| M14 | accepted |
+| M21 | accepted |
 | M15 | accepted |
 | M16 | accepted |
 | M17 | accepted |
-| M18 | pending |
+| M18 | implemented |
 
 M1 added the CAD IR and document content rule, registered shape defaults,
 advertised CAD types through the CLI, and added the canonical CAD fixture.
@@ -703,6 +703,42 @@ stalled in Bun discovery. The scoped repository run passed 4,452 tests with
 restriction. The Rust workspace passed 73 of 91 tests with 18 macOS
 file-write permission errors under the same restriction. Logs are under
 `tmp/cad3d/m14/`.
+
+M21 adds the PCB board tool to the CAD palette. A single board inserts in
+one undo step. With several boards, a keyboard-accessible menu lists them
+in page order. The inspector can relink the board and override or restore
+its source thickness. Editing a linked Edge.Cuts graphic reevaluates the CAD
+page, while changing unrelated PCB graphics does not. IR14-01 is fixed:
+dragging a cut or add from a board cap keeps the operation.
+
+M21 deviations: the board menu reuses the existing context-menu styles and
+keyboard helper because the context menu component is tied to editor
+actions. The toolbar icon and test register the new tile. The light and
+dark DOM fixtures add board records and are classified in the emitter
+inventory. For IR14-03, the outline reports the offending graphic ID when
+known, and the design records how endpoint snapping handles cell boundaries.
+The parallel M16/M17 merge left `cad check` unable to typecheck with M14's
+`cad.pcb` feature. The CLI now collects the foreign board inputs using the
+same collector as the viewport and resolves cap sketches without a kernel.
+An end-to-end CLI regression covers both a valid cap and a missing outline.
+Two M17 format assertions now account for the board reference and PCB
+records already added to the shared fixture by M14. The exact feature order,
+one-line rewrite and canonical byte comparison are still asserted.
+
+The three M21 verification commands passed with 80, 2 and 2 tests. The
+232-test CAD integration suite, nine JSONL format tests, repository
+TypeScript lint, and the production bundle audit also passed. Workspace
+verification used Bun's ignored-path setting for worktree scratch files
+and passed check and lint. Bun reported 4,505 passed, 77 skipped and three
+existing Chromium startup permission failures. The separate Rust workspace
+run passed 73 of 91 tests, with 18 macOS file-replacement permission failures
+under the same worktree write restriction. Logs are under `tmp/cad3d/m21/`.
+
+M18 adds kernel-free construction views, CAD user and CLI documentation,
+native export and validation parity, and final browser and system WKWebView
+checks. It also addresses extrusion drag cancellation, PCB picker lifecycle
+and keyboard handling, and readback-based GPU frame timing. The operational
+evidence and deviations are in the M18 plan.
 
 ## Completion
 

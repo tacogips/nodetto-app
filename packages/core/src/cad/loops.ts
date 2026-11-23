@@ -175,7 +175,16 @@ function profileError(error: LoopError, at: ElementId | undefined): Failure {
 }
 
 function segmentIntersection(a: Segment, b: Segment): boolean {
-  const sameLoop = a.profile === b.profile;
+  const adjacent =
+    a.profile === b.profile && (a.end === b.start || b.end === a.start);
+  // Neighbors may share their vertex. They can only double back if their
+  // bounds overlap along an axis beyond that vertex.
+  if (
+    adjacent &&
+    Math.max(a.minX, b.minX) >= Math.min(a.maxX, b.maxX) &&
+    Math.max(a.minY, b.minY) >= Math.min(a.maxY, b.maxY)
+  )
+    return false;
   const aGrid = a.profile.grid;
   const bGrid = b.profile.grid;
   const ax = coordinate(aGrid, a.start);
@@ -190,15 +199,7 @@ function segmentIntersection(a: Segment, b: Segment): boolean {
   const ry = by - ay;
   const side1 = gridCross(adx, ady, rx, ry);
   const side2 = gridCross(adx, ady, rx + bdx, ry + bdy);
-  if (sameLoop && (a.end === b.start || b.end === a.start)) {
-    // Neighbors may share their vertex, but may not double back over an edge.
-    return (
-      side1 === 0 &&
-      side2 === 0 &&
-      (Math.max(a.minX, b.minX) < Math.min(a.maxX, b.maxX) ||
-        Math.max(a.minY, b.minY) < Math.min(a.maxY, b.maxY))
-    );
-  }
+  if (adjacent) return side1 === 0 && side2 === 0;
   if ((side1 > 0 && side2 > 0) || (side1 < 0 && side2 < 0)) return false;
   const side3 = gridCross(bdx, bdy, -rx, -ry);
   const side4 = gridCross(bdx, bdy, adx - rx, ady - ry);

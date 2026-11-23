@@ -42,7 +42,7 @@ function defaultCadName(type: string): string {
     case "cad.circle":
       return "Circle";
     case "cad.pcb":
-      return "Board";
+      return "PCB board";
     case "cad.mesh":
       return "Mesh";
     default:

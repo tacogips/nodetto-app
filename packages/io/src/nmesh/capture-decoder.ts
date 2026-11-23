@@ -1,6 +1,4 @@
-import { fromInline } from "./armor.ts";
-import { toTriangleMesh } from "./canonical.ts";
-import { decodeNmesh } from "./decode.ts";
+import { decodeNmesh, fromInline, toTriangleMesh } from "@nodetto/nmesh";
 
 export function decodeCaptureMesh(data: string): {
   positions: Float64Array;

@@ -6,10 +6,20 @@ import {
 } from "@nodetto/core";
 import { isPlainObject } from "@nodetto/ir";
 import type { CanvasMode, CadRenderer } from "@nodetto/ui-solid";
-import { createWebgl2Renderer, NodettoCanvas } from "@nodetto/ui-solid";
+import {
+  createWebgl2Renderer,
+  NodettoCanvas,
+  Tool,
+  type ToolKind,
+} from "@nodetto/ui-solid";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { plateWithHoles } from "../../../../packages/core/src/cad/testing/documents.ts";
+import {
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../../../../packages/core/src/cad/testing/pcb.ts";
 import {
   type Camera3d,
   fitBounds,
@@ -25,9 +35,29 @@ import "../../src/styles/base.css";
 import "../../src/styles/canvas.css";
 
 const mountStart = performance.now();
-const editor = new Editor({ document: plateWithHoles(60) });
+const plate = plateWithHoles(60);
+const secondPage = { ...PCB_TEST_PAGE, id: "interface-pcb", name: "Interface" };
+const outline = edge("rim", { kind: "rect", start: [0, 0], end: [20, 10] });
+const editor = new Editor({
+  document: {
+    ...plate,
+    pages: [...plate.pages, PCB_TEST_PAGE, secondPage],
+    elements: [
+      ...plate.elements,
+      testBoard(2),
+      outline,
+      { ...testBoard(3), id: "interface-board", page: secondPage.id },
+      { ...outline, id: "interface-rim", page: secondPage.id },
+    ],
+  },
+});
 const worker = getCadEngine();
 const [mode, setMode] = createSignal<CanvasMode>("light");
+const [tool, setTool] = createSignal<ToolKind>(Tool.Select);
+const policyViolations: string[] = [];
+window.addEventListener("securitypolicyviolation", (event) =>
+  policyViolations.push(`${event.violatedDirective}: ${event.blockedURI}`),
+);
 const timings = { loadMs: 0, editToDisplayMs: 0 };
 let evaluated: CadEngineResult | undefined;
 let uploaded: CadEngineResult | undefined;
@@ -179,17 +209,86 @@ function cameraFrames(): number[] {
   renderer.setBodies([body]);
   try {
     renderer.draw(camera, width, height);
-    gl.finish();
+    const pixel = new Uint8Array(4);
+    const syncFrame = () =>
+      gl.readPixels(
+        width >> 1,
+        height >> 1,
+        1,
+        1,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        pixel,
+      );
+    syncFrame();
     return Array.from({ length: 30 }, () => {
       camera = orbit(camera, 2, 1);
       const start = performance.now();
       renderer.draw(camera, width, height);
-      gl.finish();
+      syncFrame();
+      if (gl.getError() !== gl.NO_ERROR)
+        throw new Error("Frame readback failed");
       return performance.now() - start;
     });
   } finally {
     renderer.setBodies(displayed?.bodies ?? []);
   }
+}
+
+async function checkBoardPicker(): Promise<Record<string, boolean>> {
+  const viewport = document.querySelector<HTMLElement>(".nodetto-cad-viewport");
+  if (!viewport) throw new Error("CAD viewport is missing");
+  const menu = () =>
+    viewport.querySelector('[aria-label="Choose a PCB board"]');
+  const items = () => Array.from(menu()?.querySelectorAll("button") ?? []);
+  const key = (target: EventTarget, name: string) =>
+    target.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: name,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  editor.selection.set(["ex1"]);
+  const undoSize = editor.history.undoSize;
+  setTool(Tool.CadPcb);
+  await painted();
+  const [first, second] = items();
+  if (!first || !second) throw new Error("PCB picker did not list two boards");
+  const pickerFocus = document.activeElement === first;
+  key(first, "Delete");
+  key(first, "Backspace");
+  const pickerProtectsSelection =
+    editor.store.has("ex1") &&
+    editor.history.undoSize === undoSize &&
+    menu() !== null;
+  key(viewport, "Escape");
+  const pickerClosesOnEscape = menu() === null && tool() === Tool.Select;
+  setTool(Tool.CadPcb);
+  document.body.dispatchEvent(
+    new PointerEvent("pointerdown", { bubbles: true }),
+  );
+  const pickerClosesOutside = menu() === null && tool() === Tool.Select;
+  setTool(Tool.CadPcb);
+  await painted();
+  const next = items()[1];
+  next?.click();
+  const pickerInsertsOnce =
+    tool() === Tool.Select &&
+    menu() === null &&
+    editor.history.undoSize === undoSize + 1 &&
+    editor.store
+      .getPageElements("cad")
+      .some(({ type }) => type === "cad.pcb") &&
+    editor.undo() &&
+    editor.store.getPageElements("cad").every(({ type }) => type !== "cad.pcb");
+  return {
+    pickerFocus,
+    pickerProtectsSelection,
+    pickerClosesOnEscape,
+    pickerClosesOutside,
+    pickerInsertsOnce,
+  };
 }
 
 const root = document.getElementById("app");
@@ -198,7 +297,8 @@ render(
   () => (
     <NodettoCanvas
       editor={editor}
-      tool="select"
+      tool={tool()}
+      onToolChange={setTool}
       snap={{ grid: false, objects: false }}
       showGrid={false}
       canvasBackground={{ diagram: mode(), pcb: mode() }}
@@ -249,5 +349,7 @@ const check = {
   },
   editRadius,
   cameraFrames,
+  checkBoardPicker,
+  policyViolations,
 };
 Object.assign(window, { __cadCheck: check });

@@ -14,7 +14,8 @@
     "./stl": "./src/stl/index.ts"
   },
   "dependencies": {
-    "@nodetto/ir": "workspace:*"
+    "@nodetto/ir": "workspace:*",
+    "@nodetto/nmesh": "workspace:*"
   },
   "license": "MIT"
 }

@@ -9,11 +9,13 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { generateCadDocument } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
+import { CAD_MESH_DATA_MAX_CHARS, type Document } from "@nodetto/ir";
 import {
   binary,
   cliSrcDir,
   compare,
   compareFile,
+  fixtureRoot,
   nativeTest,
 } from "./harness.ts";
 
@@ -117,3 +119,85 @@ nativeTest("the built native CLI engine has no WebAssembly identifier", () => {
       /\bWebAssembly\b/.test(readFileSync(join(directory, bundle), "utf8")),
     ).toBe(false);
 });
+
+nativeTest(
+  "native CAD SVG export matches Bun, including live PCB outlines and mesh bounds",
+  () => {
+    const started = performance.now();
+    const bracket = compare([
+      "export",
+      fixture,
+      "--page",
+      "bracket",
+      "--format",
+      "svg",
+    ]);
+    expect(bracket.exitCode).toBe(0);
+    expect(bracket.stdout.toString()).toContain("Construction view");
+    const elapsed = performance.now() - started;
+    console.log(`Native and Bun bracket SVG export: ${elapsed.toFixed(1)} ms`);
+    expect(elapsed).toBeLessThan(10_000);
+
+    const plate = join(fixtureRoot, "cad3d.jsonl");
+    const checked = compare([
+      "cad",
+      "check",
+      plate,
+      "--page",
+      "part",
+      "--json",
+    ]);
+    expect(checked.exitCode).toBe(0);
+    expect(JSON.parse(checked.stdout.toString())[0]?.errors).toEqual([]);
+    const exported = compare([
+      "export",
+      plate,
+      "--page",
+      "part",
+      "--format",
+      "svg",
+    ]);
+    expect(exported.exitCode).toBe(0);
+    expect(exported.stdout.toString().match(/<path /g)).toHaveLength(1);
+  },
+  30_000,
+);
+
+nativeTest(
+  "native validation matches Bun for four maximum-length CAD mesh fields",
+  () => {
+    mkdirSync(scratch, { recursive: true });
+    const cwd = mkdtempSync(join(scratch, "max-mesh-"));
+    try {
+      const prefix = "nmesh1:";
+      const data = prefix + "A".repeat(CAD_MESH_DATA_MAX_CHARS - prefix.length);
+      // The IR checks inline armor and length; the mesh reader checks the decoded payload.
+      const doc: Document = {
+        schemaVersion: 1,
+        id: "large-inline-meshes",
+        title: "Maximum inline mesh fields",
+        pages: [{ id: "cad", name: "Mesh samples", kind: "cad3d" }],
+        elements: Array.from({ length: 4 }, (_, i) => ({
+          id: `mesh-${i}`,
+          page: "cad",
+          type: "cad.mesh",
+          index: `a${i}`,
+          visual: {},
+          semantic: { name: `Mesh ${i + 1}`, data },
+        })),
+      };
+      const file = join(cwd, "maximum.jsonl");
+      writeFileSync(file, serializeDocument(doc));
+      const started = performance.now();
+      expect(compare(["validate", file], cwd).exitCode).toBe(0);
+      const elapsed = performance.now() - started;
+      console.log(
+        `Native and Bun validate four maximum CAD mesh fields: ${elapsed.toFixed(1)} ms`,
+      );
+      expect(elapsed).toBeLessThan(10_000);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);

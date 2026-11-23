@@ -61,6 +61,7 @@ export const Tool = {
   CadArc: "cad:arc",
   CadCircle: "cad:circle",
   CadExtrude: "cad:extrude",
+  CadPcb: "cad:pcb",
 
   Select: "select",
   Hand: "hand",
@@ -556,6 +557,8 @@ export function creationFor(tool: ToolKind): CreationTool | null {
       return { type: "cad.circle" };
     case Tool.CadExtrude:
       return { type: "cad.extrude" };
+    case Tool.CadPcb:
+      return { type: "cad.pcb" };
     case Tool.BpmnPool:
     case Tool.BpmnPoolCollapsed:
     case Tool.BpmnLane:

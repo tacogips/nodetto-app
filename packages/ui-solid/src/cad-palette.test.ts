@@ -8,7 +8,7 @@ import { searchPaletteShapes } from "./shape-search.ts";
 import { creationFor, Tool } from "./tools.ts";
 import { WORKSPACES, workspaceById } from "./workspaces.ts";
 
-test("the CAD workspace exposes only select and the six CAD creation tools", () => {
+test("the CAD workspace exposes only select and the CAD creation tools", () => {
   const cadTools = [
     [Tool.CadSketch, "cad.sketch"],
     [Tool.CadLine, "cad.line"],
@@ -16,6 +16,7 @@ test("the CAD workspace exposes only select and the six CAD creation tools", () 
     [Tool.CadArc, "cad.arc"],
     [Tool.CadCircle, "cad.circle"],
     [Tool.CadExtrude, "cad.extrude"],
+    [Tool.CadPcb, "cad.pcb"],
   ] as const;
   const primary = cadTools.map(([tool]) => tool);
   const all = [Tool.Select, ...primary];

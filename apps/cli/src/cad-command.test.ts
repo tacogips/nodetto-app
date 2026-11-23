@@ -4,6 +4,18 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CAD_ELEMENT_TYPES, shortPageId } from "@nodetto/ir";
 import { parseDocument, serializeDocument } from "@nodetto/io";
+import {
+  CAD_TEST_PAGE,
+  extrude,
+  rectangle,
+  sketch,
+} from "../../../packages/core/src/cad/testing/documents.ts";
+import {
+  boardReference,
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../../../packages/core/src/cad/testing/pcb.ts";
 import { runCli, type CommandIo } from "./commands.ts";
 import { createMcpServer } from "./mcp.ts";
 
@@ -18,6 +30,56 @@ const noWrite = () => {
 const io: CommandIo = { readText: () => source, writeText: noWrite };
 const check = (...args: string[]) =>
   runCli(["cad", "check", "bracket.jsonl", ...args], io, "test");
+
+test("cad check collects a foreign board outline and resolves its cap sketch", () => {
+  const reference = boardReference();
+  const cap = sketch("cap", "a1", {
+    face: { feature: reference.id, role: "end" },
+  });
+  const board = testBoard(3);
+  const outline = edge("border", {
+    kind: "rect",
+    start: [0, 0],
+    end: [40, 30],
+  });
+  const elements = [
+    reference,
+    cap,
+    ...rectangle(cap.id, 1, 2, 4, 6),
+    extrude("post", "a3", { sketch: cap.id, distance: 4, op: "new" }),
+    board,
+  ];
+  function run(includeOutline: boolean) {
+    const readText = () =>
+      serializeDocument({
+        ...document,
+        pages: [CAD_TEST_PAGE, PCB_TEST_PAGE],
+        elements: includeOutline ? [...elements, outline] : elements,
+      });
+    return runCli(
+      ["cad", "check", "enclosure.jsonl", "--json"],
+      { readText, writeText: noWrite },
+      "test",
+    );
+  }
+  const linked = run(true);
+  expect(linked.exitCode).toBe(0);
+  expect(JSON.parse(linked.stdout)).toEqual([
+    {
+      pageId: CAD_TEST_PAGE.id,
+      features: 3,
+      entities: 4,
+      errors: [],
+      bounds: { min: [1, 2, 3], max: [5, 8, 7] },
+    },
+  ]);
+  const incomplete = run(false);
+  expect(incomplete.exitCode).toBe(1);
+  expect(JSON.parse(incomplete.stdout)[0].errors).toContainEqual({
+    id: reference.id,
+    code: "cad.pcb.noOutline",
+  });
+});
 
 test("cad check reports every CAD page and its extrusion tool bounds", () => {
   expect(check()).toEqual({

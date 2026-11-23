@@ -69,13 +69,17 @@ for (const theme of ["light", "dark"]) {
       />
     ),
     (host) => {
-      assert.equal(host.querySelectorAll(".nodetto-shape-tile").length, 7);
+      assert.equal(host.querySelectorAll(".nodetto-shape-tile").length, 8);
       assert.equal(host.querySelector('[aria-label="Grouping"]'), null);
       const arc = button(host, "Arc");
       assert.ok(arc.querySelector('svg [stroke="currentColor"] path'));
       arc.click();
       assert.equal(tool(), Tool.CadArc);
       assert.equal(arc.getAttribute("aria-pressed"), "true");
+      const board = button(host, "PCB board");
+      assert.ok(board.querySelector('svg [stroke="currentColor"]'));
+      board.click();
+      assert.equal(tool(), Tool.CadPcb);
       button(host, "Select").click();
       assert.equal(tool(), Tool.Select);
       const search = host.querySelector<HTMLInputElement>('[type="search"]');
@@ -99,6 +103,7 @@ for (const theme of ["light", "dark"]) {
     Tool.CadArc,
     Tool.CadCircle,
     Tool.CadExtrude,
+    Tool.CadPcb,
     Tool.Rectangle,
   ]) {
     const { interaction } = interactionFor(editor, tool);

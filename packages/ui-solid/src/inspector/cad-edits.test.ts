@@ -4,7 +4,9 @@ import {
   cadElement,
   plateWithHoles,
 } from "../../../core/src/cad/testing/documents.ts";
+import { boardReference } from "../../../core/src/cad/testing/pcb.ts";
 import {
+  setCadBoard,
   setCadFlag,
   setCadNumber,
   setCadOperation,
@@ -20,6 +22,29 @@ const extrude = cadElement("solid", "cad.extrude", "B", {
 const sketch = cadElement("sketch", "cad.sketch", "C", {
   name: "Sketch",
   plane: { base: "zx" },
+});
+
+test("PCB reference edits preserve parameters and can restore board thickness", () => {
+  const reference = boardReference();
+  expect(setCadBoard(reference, "second-board")).toEqual({
+    type: "updateSemantic",
+    id: reference.id,
+    semantic: { ...reference.semantic, board: "second-board" },
+  });
+  expect(setCadBoard(reference, "board")).toEqual({ error: "unchanged" });
+  expect(setCadNumber(reference, "thickness", "0")).toHaveProperty("error");
+  expect(setCadNumber(reference, "thickness", "101")).toHaveProperty("error");
+  expect(setCadNumber(reference, "thickness", "1.2345678")).toMatchObject({
+    semantic: { thickness: 1.234568 },
+  });
+  expect(setCadNumber(reference, "thickness", " ")).toEqual({
+    error: "unchanged",
+  });
+  expect(setCadNumber(boardReference(3), "thickness", "")).toEqual({
+    type: "updateSemantic",
+    id: reference.id,
+    semantic: reference.semantic,
+  });
 });
 
 test("CAD length edits snap decimal input and reject invalid lengths", () => {

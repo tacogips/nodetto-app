@@ -35,6 +35,10 @@ export function setCadNumber(
 ): Edit {
   const { type, semantic } = element;
   if (!isPlainObject(semantic)) return invalidField;
+  if (type === "cad.pcb" && field === "thickness" && !text.trim()) {
+    const { thickness, ...inherited } = semantic;
+    return thickness === undefined ? unchanged : update(element, inherited);
+  }
   const value = decimalMm(text);
   if (value === undefined) return { error: "Enter a finite decimal length." };
   if (type === "cad.sketch" && field === "offset") {
@@ -46,13 +50,23 @@ export function setCadNumber(
   }
   if (
     (type === "cad.circle" && field === "r") ||
-    (type === "cad.extrude" && field === "distance")
+    (type === "cad.extrude" && field === "distance") ||
+    (type === "cad.pcb" && field === "thickness")
   ) {
     return semantic[field] === value
       ? unchanged
       : update(element, { ...semantic, [field]: value });
   }
   return invalidField;
+}
+
+export function setCadBoard(element: Element, boardId: ElementId): Edit {
+  const { semantic } = element;
+  if (element.type !== "cad.pcb" || !isPlainObject(semantic))
+    return invalidField;
+  return semantic.board === boardId
+    ? unchanged
+    : update(element, { ...semantic, board: boardId });
 }
 
 export function setCadPoint(

@@ -46,6 +46,9 @@ associations.
 - **PCB boards**: open KiCad boards, edit parts and tracks, export Gerber
   and drill files, and export the board as SVG, PNG or PDF. See [KiCad PCB
   boards](docs/pcb/kicad-pcb.md).
+- **3D CAD**: sketch and extrude parts on dedicated pages, reference PCB
+  outlines for enclosures, and exchange solid models with STL. See
+  [3D CAD pages](docs/cad3d.md).
 - **Design artboards**: web and iPhone screens, transitions, and code export.
   See [Design artboards](docs/design.md).
 - **Precise app layers**: text, searchable icons, thin borders and styleable controls.

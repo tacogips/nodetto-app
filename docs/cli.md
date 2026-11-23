@@ -105,6 +105,7 @@ export details.
 ```bash
 nodetto-cli cad check bracket.jsonl
 nodetto-cli cad check bracket.jsonl --page "Angle bracket" --json
+nodetto-cli export bracket.jsonl --page "Angle bracket" --format svg --output bracket.svg
 nodetto-cli types --kind cad3d
 nodetto-cli help edit
 ```
@@ -122,6 +123,11 @@ features. The edit help includes a working batch. CAD elements require a
 CAD page, and CAD pages hold CAD elements and document resources. Editing
 across that boundary reports `page.contentKind`. Changing an existing
 page to or from the CAD kind reports `page.kindLocked`.
+
+Whole-page SVG, PNG and PDF export uses an isometric construction view of the
+swept features and PCB outlines, with bounding boxes for imported meshes.
+Use the desktop app to export the finished solid as STL.
+See [3D CAD pages](cad3d.md).
 
 ## Drawing with AI agents and live co-editing
 

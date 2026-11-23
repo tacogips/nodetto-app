@@ -465,7 +465,7 @@ export function createCadGeometry(history: HistoryDetails) {
         history.pcbElements,
         semantic.board ?? "",
       );
-      if ("error" in outline) return cadFailure(outline.error);
+      if ("error" in outline) return cadFailure(outline.error, outline.at);
       const frame = baseFrame("xy");
       const span = { t0: 0, t1: semantic.thickness ?? outline.thickness };
       if (!withinExtent(outline.loops, frame, span))

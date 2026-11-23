@@ -54,7 +54,7 @@ test("measures NMESH size, codec time and estimated inline capacity", () => {
       ),
     };
   });
-  const outputDir = new URL("../../../../tmp/cad3d/m12/", import.meta.url);
+  const outputDir = new URL("../../../tmp/cad3d/m12/", import.meta.url);
   mkdirSync(outputDir, { recursive: true });
   writeFileSync(
     new URL("measure.json", outputDir),

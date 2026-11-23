@@ -14,6 +14,7 @@
     "check:erd-scale": "bun scripts/erd-scale-check.mjs",
     "check:cad-bundle": "bun scripts/cad-bundle-check.ts",
     "check:cad-viewport": "bun scripts/cad-viewport-check.mjs",
+    "check:cad-wkwebview": "bun scripts/cad-viewport-check.mjs --label m18 --wkwebview",
     "bench:cad-format": "bun scripts/cad-format-bench.ts",
     "bench:erd-scale": "bun scripts/erd-scale-bench.ts"
   },

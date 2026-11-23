@@ -15,6 +15,7 @@ fn main() {
         "packages/core/src",
         "packages/ir/src",
         "packages/io/src",
+        "packages/nmesh/src",
     ] {
         println!("cargo:rerun-if-changed={}", root.join(path).display());
     }

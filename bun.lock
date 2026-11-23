@@ -82,6 +82,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@nodetto/ir": "workspace:*",
+        "@nodetto/nmesh": "workspace:*",
         "polygon-clipping": "0.15.7",
       },
       "devDependencies": {
@@ -93,10 +94,15 @@
       "version": "0.1.0",
       "dependencies": {
         "@nodetto/ir": "workspace:*",
+        "@nodetto/nmesh": "workspace:*",
       },
     },
     "packages/ir": {
       "name": "@nodetto/ir",
+      "version": "0.1.0",
+    },
+    "packages/nmesh": {
+      "name": "@nodetto/nmesh",
       "version": "0.1.0",
     },
     "packages/ui-solid": {
@@ -318,6 +324,8 @@
     "@nodetto/io": ["@nodetto/io@workspace:packages/io"],
 
     "@nodetto/ir": ["@nodetto/ir@workspace:packages/ir"],
+
+    "@nodetto/nmesh": ["@nodetto/nmesh@workspace:packages/nmesh"],
 
     "@nodetto/ui-solid": ["@nodetto/ui-solid@workspace:packages/ui-solid"],
 

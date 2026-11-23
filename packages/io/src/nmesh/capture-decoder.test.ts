@@ -1,9 +1,12 @@
 import { expect, test } from "bun:test";
-import { toInline } from "./armor.ts";
-import { canonicalize, toTriangleMesh } from "./canonical.ts";
+import {
+  NmeshError,
+  canonicalize,
+  encodeNmesh,
+  toInline,
+  toTriangleMesh,
+} from "@nodetto/nmesh";
 import { decodeCaptureMesh } from "./capture-decoder.ts";
-import { encodeNmesh } from "./encode.ts";
-import { NmeshError } from "./types.ts";
 
 test("capture decoder round trips a cube and rejects corruption", () => {
   const cube = canonicalize({

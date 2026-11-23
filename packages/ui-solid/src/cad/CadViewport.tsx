@@ -5,8 +5,10 @@ import {
   type CadEngineResult,
   CadSupersededError,
   collectCadInput,
+  CommandError,
   type Editor,
   parseFaceName,
+  pcbReferenceCommands,
   type ViewportSize,
 } from "@nodetto/core";
 import { type ElementId, isCadTypeName, type PageId } from "@nodetto/ir";
@@ -15,6 +17,8 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  For,
+  on,
   onCleanup,
   onMount,
   Show,
@@ -23,6 +27,7 @@ import {
   CANVAS_DARK_CLASS,
   type CanvasMode,
 } from "../canvas/canvas-background.ts";
+import { stepMenuIndex } from "../menu-navigation.ts";
 import { isComposing } from "../NumberInput.tsx";
 import { Tool, type ToolKind } from "../tools.ts";
 import {
@@ -42,6 +47,7 @@ import {
   STL_SIZE_ERROR,
   stlToMeshCommands,
 } from "./mesh-io.ts";
+import { pcbBoardChoices, pcbBoardOptions } from "./pcb-insert.ts";
 import { type CadPick, pickBodies } from "./pick.ts";
 import { type CadRenderer, createWebgl2Renderer } from "./renderer.ts";
 import { handleCadSelectionKey } from "./selection-keys.ts";
@@ -94,6 +100,7 @@ export function CadViewport(props: CadViewportProps) {
   let root!: HTMLDivElement;
   let canvas!: HTMLCanvasElement;
   let fileInput!: HTMLInputElement;
+  let boardMenu: HTMLDivElement | undefined;
   const pageId = props.pageId ?? props.editor.currentPageId;
   const statusStore = cadStatusStoreFor(props.editor);
   const [revision, setRevision] = createSignal(props.editor.revision);
@@ -102,6 +109,8 @@ export function CadViewport(props: CadViewportProps) {
   const [bodies, setBodies] = createSignal<readonly CadDisplayBody[]>([]);
   const [failure, setFailure] = createSignal<string>();
   const [importNotice, setImportNotice] = createSignal<string>();
+  const [boardNotice, setBoardNotice] = createSignal<string>();
+  const [boardPicker, setBoardPicker] = createSignal<{ revision: number }>();
   let importing = false;
   let pickerRevision: number | undefined;
   let mounted = false;
@@ -127,6 +136,25 @@ export function CadViewport(props: CadViewportProps) {
       }
     | undefined;
   const tool = () => props.tool ?? Tool.Select;
+  const boardOptions = createMemo(
+    () => {
+      const picker = boardPicker();
+      if (!picker) return [];
+      revision();
+      return canInsertBoard(picker.revision)
+        ? pcbBoardOptions(pcbBoardChoices(props.editor.getSnapshot()))
+        : [];
+    },
+    [],
+    {
+      equals: (previous, next) =>
+        previous.length === next.length &&
+        previous.every(
+          ({ value, label }, index) =>
+            next[index]?.value === value && next[index]?.label === label,
+        ),
+    },
+  );
   const collected = createMemo(() =>
     collectCadInput(props.editor.getSnapshot(), pageId, revision()),
   );
@@ -159,6 +187,125 @@ export function CadViewport(props: CadViewportProps) {
     changeCamera,
     size,
   });
+
+  function canInsertBoard(version: number): boolean {
+    const { editor } = props;
+    return (
+      !editor.readOnly &&
+      editor.currentPageId === pageId &&
+      editor.documentOpenRevision === version &&
+      editor.canCreateOn(pageId, "cad.pcb")
+    );
+  }
+
+  function closeBoardPicker(restoreFocus = true): void {
+    setBoardPicker(undefined);
+    if (restoreFocus) root.focus();
+    props.onToolChange?.(Tool.Select);
+  }
+
+  function insertBoard(boardId: ElementId, version: number): void {
+    const { editor } = props;
+    if (
+      canInsertBoard(version) &&
+      editor.store.get(boardId)?.type === "pcb.board"
+    ) {
+      const elements = editor.store.getPageElements(pageId);
+      const after = elements.reduce<string | undefined>(
+        (last, { index }) =>
+          last === undefined || last < index ? index : last,
+        undefined,
+      );
+      const commands = pcbReferenceCommands(
+        pageId,
+        boardId,
+        "PCB board",
+        cadAuthoringIds(elements),
+        after,
+      );
+      try {
+        editor.apply(commands);
+        const command = commands[0];
+        if (command?.type === "createElement")
+          editor.selection.set([command.element.id]);
+      } catch (error) {
+        if (!(error instanceof CommandError)) throw error;
+        setBoardNotice(
+          error.issues[0]?.message ?? "Could not insert the PCB board.",
+        );
+      }
+    }
+    closeBoardPicker();
+  }
+
+  createEffect(
+    on(
+      tool,
+      (current) => {
+        setBoardPicker(undefined);
+        if (current !== Tool.Select) setBoardNotice(undefined);
+        if (current !== Tool.CadPcb) return;
+        const { editor } = props;
+        const version = editor.documentOpenRevision;
+        if (!canInsertBoard(version)) {
+          closeBoardPicker();
+          return;
+        }
+        const choices = pcbBoardChoices(editor.getSnapshot());
+        const first = choices[0];
+        if (!first) {
+          setBoardNotice("This document has no PCB page with a board.");
+          closeBoardPicker();
+        } else if (choices.length === 1) {
+          insertBoard(first.boardId, version);
+        } else {
+          setBoardPicker({ revision: version });
+        }
+      },
+      { defer: true },
+    ),
+  );
+
+  createEffect(() => {
+    if (boardPicker() && boardOptions().length === 0) closeBoardPicker(false);
+  });
+
+  createEffect(
+    on([selection, revision], () => setBoardNotice(undefined), { defer: true }),
+  );
+
+  function dismissBoardPicker(event: PointerEvent): void {
+    if (
+      !boardPicker() ||
+      (boardMenu && event.composedPath().includes(boardMenu))
+    )
+      return;
+    if (event.target === canvas) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeBoardPicker();
+    } else {
+      closeBoardPicker(false);
+    }
+  }
+
+  function boardMenuKey(
+    event: KeyboardEvent & { currentTarget: HTMLDivElement },
+  ): void {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const buttons = Array.from(event.currentTarget.querySelectorAll("button"));
+    const indices = buttons.map((_, index) => index);
+    const active = buttons.findIndex((item) => item === document.activeElement);
+    const next =
+      event.key === "Home"
+        ? indices[0]
+        : event.key === "End"
+          ? indices.at(-1)
+          : stepMenuIndex(indices, active, event.key === "ArrowDown" ? 1 : -1);
+    if (next != null) buttons[next]?.focus();
+  }
 
   function changeCamera(next: Camera3d): void {
     fitted = true;
@@ -244,6 +391,7 @@ export function CadViewport(props: CadViewportProps) {
       setRenderer((props.createRenderer ?? createWebgl2Renderer)(canvas));
     initialize();
     root.focus();
+    if (tool() === Tool.CadPcb) closeBoardPicker(false);
     const unsubscribe = props.editor.subscribe(() =>
       setRevision(props.editor.revision),
     );
@@ -265,6 +413,7 @@ export function CadViewport(props: CadViewportProps) {
     canvas.addEventListener("webglcontextlost", lost);
     canvas.addEventListener("webglcontextrestored", initialize);
     window.addEventListener("resize", measure);
+    document.addEventListener("pointerdown", dismissBoardPicker, true);
     const observer =
       typeof ResizeObserver === "undefined"
         ? undefined
@@ -276,6 +425,8 @@ export function CadViewport(props: CadViewportProps) {
       registerImportPicker?.(undefined);
       unsubscribe();
       unsubscribeSelection();
+      document.removeEventListener("pointerdown", dismissBoardPicker, true);
+      if (tool() === Tool.CadPcb) closeBoardPicker(false);
       window.removeEventListener("resize", measure);
       canvas.removeEventListener("webglcontextlost", lost);
       canvas.removeEventListener("webglcontextrestored", initialize);
@@ -600,6 +751,7 @@ export function CadViewport(props: CadViewportProps) {
   }
 
   const status = () =>
+    boardNotice() ??
     extrude.status() ??
     sketch.status() ??
     (!props.engine
@@ -611,6 +763,16 @@ export function CadViewport(props: CadViewportProps) {
           : failure());
 
   function keyDown(event: KeyboardEvent): void {
+    if (
+      boardPicker() &&
+      ["Escape", "Backspace", "Delete"].includes(event.key)
+    ) {
+      if (isComposing(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") closeBoardPicker();
+      return;
+    }
     if (
       event.key === "Escape" &&
       !isComposing(event) &&
@@ -681,6 +843,51 @@ export function CadViewport(props: CadViewportProps) {
         onWheel={zoom}
         onDblClick={fit}
       />
+      <Show when={boardPicker()}>
+        {(picker) => (
+          <div
+            ref={boardMenu}
+            class="nodetto-context-menu"
+            role="menu"
+            aria-label="Choose a PCB board"
+            style={{
+              top: "8px",
+              left: "8px",
+              "max-height": "calc(100% - 16px)",
+              "max-width": "calc(100% - 16px)",
+              "overflow-y": "auto",
+            }}
+            on:keydown={boardMenuKey}
+            on:focusout={(event) => {
+              if (
+                event.relatedTarget instanceof Node &&
+                !event.currentTarget.contains(event.relatedTarget)
+              )
+                closeBoardPicker(false);
+            }}
+          >
+            <For each={boardOptions()}>
+              {(option, index) => (
+                <button
+                  ref={(button) => {
+                    if (index() === 0)
+                      queueMicrotask(() => {
+                        if (button.isConnected) button.focus();
+                      });
+                  }}
+                  type="button"
+                  role="menuitem"
+                  tabindex="-1"
+                  class="nodetto-menu-item"
+                  onClick={() => insertBoard(option.value, picker().revision)}
+                >
+                  <span class="nodetto-menu-label">{option.label}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        )}
+      </Show>
       <Show when={importNotice() || status()}>
         <div class="nodetto-cad-status" role="status">
           {[importNotice(), status()].filter(Boolean).join(" ")}

@@ -28,7 +28,7 @@ export interface CadIds {
 type SketchElementType = "cad.sketch" | "cad.line" | "cad.circle" | "cad.arc";
 type Create = Extract<Command, { type: "createElement" }>;
 
-function create<T extends SketchElementType | "cad.extrude">(
+function create<T extends SketchElementType | "cad.extrude" | "cad.pcb">(
   page: PageId,
   type: T,
   semantic: SemanticByType[T],
@@ -46,6 +46,16 @@ function create<T extends SketchElementType | "cad.extrude">(
       visual: {},
     },
   };
+}
+
+export function pcbReferenceCommands(
+  pageId: PageId,
+  boardId: ElementId,
+  name: string,
+  ids: CadIds,
+  after?: string,
+): Command[] {
+  return [create(pageId, "cad.pcb", { name, board: boardId }, ids, after)];
 }
 
 export function sketchCommands(
@@ -218,7 +228,12 @@ export function extrudeIntent(
   currentOp: CadExtrudeSemantic["op"] = "new",
 ): CadExtrudeSemantic["op"] {
   const face = sketchFace(sketch);
-  const signed = face ? distance * faceOutwardSign(elements, face) : 0;
+  if (
+    !face ||
+    elements.some(({ id, type }) => id === face.feature && type === "cad.pcb")
+  )
+    return currentOp;
+  const signed = distance * faceOutwardSign(elements, face);
   return signed > 0 ? "add" : signed < 0 ? "cut" : currentOp;
 }
 

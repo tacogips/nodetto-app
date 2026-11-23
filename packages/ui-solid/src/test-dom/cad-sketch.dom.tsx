@@ -13,7 +13,6 @@ import { type CadXY, hasErrors, validateDocument } from "@nodetto/ir";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import {
-  boardReference,
   edge as pcbEdge,
   PCB_TEST_PAGE,
   testBoard,
@@ -53,7 +52,6 @@ for (const mode of ["light", "dark"] as const) {
       ],
       elements: [
         ...doc.elements,
-        boardReference(),
         testBoard(5),
         pcbEdge("board-rim", { kind: "rect", start: [0, 0], end: [100, 60] }),
       ],
@@ -63,6 +61,7 @@ for (const mode of ["light", "dark"] as const) {
   const [tool, setTool] = createSignal<ToolKind>(Tool.Select);
   let faceName = "ex1:end";
   let displayBoard = false;
+  let boardReferenceId = "";
   const body: CadDisplayBody = {
     id: "ex1",
     positions: new Float32Array([0, 0, 5, 100, 0, 5, 100, 60, 5, 0, 60, 5]),
@@ -75,7 +74,11 @@ for (const mode of ["light", "dark"] as const) {
   let evaluations = 0;
   const engine: CadEngine = {
     evaluate: async ({ revision, elements }) => {
-      assert.ok(elements.some(({ id }) => id === "board-rim"));
+      if (
+        elements.some(({ type }) => type === "cad.pcb") &&
+        editor.store.has("board")
+      )
+        assert.ok(elements.some(({ id }) => id === "board-rim"));
       evaluations++;
       return {
         revision,
@@ -83,7 +86,7 @@ for (const mode of ["light", "dark"] as const) {
           displayBoard
             ? {
                 ...body,
-                id: "board-reference",
+                id: boardReferenceId,
                 reference: true,
                 faceNames: [faceName],
               }
@@ -181,6 +184,27 @@ for (const mode of ["light", "dark"] as const) {
   const selectedId = () => [...editor.selection.ids()][0];
   const entities = (id: string) =>
     editor.store.getPageElements("cad").filter((e) => sketchParentOf(e) === id);
+
+  const beforeInsert = editor.history.undoSize;
+  const beforeInsertEval = evaluations;
+  setTool(Tool.CadPcb);
+  const reference = selectedId();
+  assert.ok(reference);
+  boardReferenceId = reference;
+  assert.equal(editor.store.get(reference)?.type, "cad.pcb");
+  assert.deepEqual(editor.store.get(reference)?.semantic, {
+    name: "PCB board",
+    board: "board",
+  });
+  assert.equal(tool(), Tool.Select);
+  assert.equal(evaluations, beforeInsertEval + 1);
+  assert.equal(editor.history.undoSize, beforeInsert + 1);
+  assert.ok(editor.undo());
+  assert.equal(editor.store.has(reference), false);
+  assert.ok(editor.redo());
+  assert.equal(editor.store.get(reference)?.type, "cad.pcb");
+  editor.selection.clear();
+  await nextFrame();
 
   assert.deepEqual(
     theme?.highlight,
@@ -380,6 +404,9 @@ for (const mode of ["light", "dark"] as const) {
   assert.ok(
     preview && preview.indices.length > 0 && preview.positions.includes(2),
   );
+  editor.renamePage("free", "Unrelated drawing edited during the drag");
+  assert.match(viewport.textContent ?? "", /-3 mm/);
+  assert.equal(evaluations, beforeEvaluation);
   pointer("pointerup", inward);
   assert.equal(evaluations, beforeEvaluation + 1);
   assert.equal(meshOverlay, null);
@@ -412,12 +439,24 @@ for (const mode of ["light", "dark"] as const) {
   pointer("pointermove", tip);
   assert.ok(meshOverlay);
   pressEscape();
+  assert.match(viewport.textContent ?? "", /drag cancelled/);
   pointer("pointerup", tip);
   assert.equal(meshOverlay, null);
   assert.equal(editor.getSnapshot(), beforeCancel);
   assert.equal(selectedId(), faceExtrude);
   click(inward);
   assert.equal(editor.getSnapshot(), beforeCancel);
+
+  pointer("pointerdown", inward);
+  pointer("pointermove", tip);
+  editor.apply([
+    { type: "updateVisual", id: faceExtrude, visual: { locked: true } },
+  ]);
+  const locked = editor.getSnapshot();
+  assert.match(viewport.textContent ?? "", /drag cancelled/);
+  pointer("pointerup", tip);
+  assert.equal(meshOverlay, null);
+  assert.equal(editor.getSnapshot(), locked);
 
   editor.selection.set([baseExtrude]);
   const baseHandle = lineOverlay as Float32Array | null;
@@ -432,7 +471,7 @@ for (const mode of ["light", "dark"] as const) {
   });
   assert.equal(hasErrors(validateDocument(editor.getSnapshot())), false);
 
-  faceName = "board-reference:end";
+  faceName = `${boardReferenceId}:end`;
   displayBoard = true;
   editor.apply([
     {
@@ -443,12 +482,12 @@ for (const mode of ["light", "dark"] as const) {
   ]);
   await nextFrame();
   click([73, 42, 5]);
-  assert.equal(selectedId(), "board-reference");
+  assert.equal(selectedId(), boardReferenceId);
   const boardSketch = begin();
   assert.ok(boardSketch);
   assert.deepEqual(editor.store.get(boardSketch)?.semantic, {
     name: "Sketch 3",
-    plane: { face: { feature: "board-reference", role: "end" } },
+    plane: { face: { feature: boardReferenceId, role: "end" } },
   });
   assert.deepEqual(
     sketchFrameOf(
@@ -469,6 +508,10 @@ for (const mode of ["light", "dark"] as const) {
         (value, i) => i % 3 !== 2 || value === 6,
       ),
   );
+  pointer("pointerdown", [32, 24, 6]);
+  pointer("pointermove", [44, 30, 6]);
+  pointer("pointerup", [44, 30, 6]);
+  assert.equal(entities(boardSketch).length, 4);
   setTool(Tool.CadExtrude);
   const boardExtrude = selectedId();
   assert.ok(boardExtrude);
@@ -480,6 +523,168 @@ for (const mode of ["light", "dark"] as const) {
     op: "new",
   });
 
+  const pocketPlane = { face: { feature: boardReferenceId, role: "start" } };
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: boardSketch,
+      semantic: { name: "Sketch 3", plane: pocketPlane },
+    },
+  ]);
+  const pocket = {
+    sketch: boardSketch,
+    name: "Extrude 3",
+    distance: -2,
+    op: "cut",
+    bodies: ["ex1"],
+  };
+  editor.apply([
+    { type: "updateSemantic", id: boardExtrude, semantic: pocket },
+  ]);
+  editor.selection.set([boardExtrude]);
+  await nextFrame();
+  const pocketHandle = lineOverlay as Float32Array | null;
+  assert.ok(pocketHandle);
+  const pocketTip: Vec3 = [pocketHandle[3], pocketHandle[4], pocketHandle[5]];
+  assert.equal(pocketTip[2], -2);
+  const deeper: Vec3 = [pocketTip[0], pocketTip[1], -9];
+  const beforePocketDrag = editor.history.undoSize;
+  pointer("pointerdown", pocketTip);
+  pointer("pointermove", deeper);
+  assert.deepEqual(editor.store.get(boardExtrude)?.semantic, pocket);
+  pointer("pointerup", deeper);
+  assert.equal(editor.history.undoSize, beforePocketDrag + 1);
+  assert.deepEqual(editor.store.get(boardExtrude)?.semantic, {
+    ...pocket,
+    distance: -9,
+  });
+  assert.ok(editor.undo());
+  assert.deepEqual(editor.store.get(boardExtrude)?.semantic, pocket);
+
+  const legend = pcbEdge(
+    "legend",
+    { kind: "rect", start: [0, 0], end: [10, 6] },
+    "F.SilkS",
+  );
+  const beforeOutlineEdit = evaluations;
+  editor.apply([{ type: "createElement", element: legend }]);
+  assert.equal(evaluations, beforeOutlineEdit);
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: "board-rim",
+      semantic: pcbEdge("board-rim", {
+        kind: "rect",
+        start: [0, 0],
+        end: [101, 65],
+      }).semantic,
+    },
+  ]);
+  assert.equal(evaluations, beforeOutlineEdit + 1);
+
+  const secondPage = {
+    ...PCB_TEST_PAGE,
+    id: "second-pcb",
+    name: "Expansion board",
+  };
+  const secondBoard = {
+    ...testBoard(4),
+    id: "second-board",
+    page: secondPage.id,
+  };
+  editor.apply([
+    { type: "createPage", page: secondPage },
+    { type: "createElement", element: secondBoard },
+  ]);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  const menu = viewport.querySelector('[role="menu"]');
+  const buttons = [
+    ...(menu?.querySelectorAll<HTMLButtonElement>("button") ?? []),
+  ];
+  assert.deepEqual(
+    buttons.map((item) => item.textContent),
+    ["Circuit", "Expansion board"],
+  );
+  assert.equal(document.activeElement, buttons[0]);
+  const beforeKeys = editor.getSnapshot();
+  for (const key of ["Delete", "Backspace"]) {
+    buttons[0]?.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
+  }
+  assert.equal(editor.getSnapshot(), beforeKeys);
+  assert.ok(selectedId() && editor.store.has(selectedId() ?? ""));
+  buttons[0]?.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "End",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.equal(document.activeElement, buttons[1]);
+  const beforeChoice = editor.history.undoSize;
+  buttons[1]?.click();
+  assert.equal(editor.history.undoSize, beforeChoice + 1);
+  assert.deepEqual(editor.store.get(selectedId())?.semantic, {
+    name: "PCB board",
+    board: secondBoard.id,
+  });
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  document.activeElement?.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  assert.equal(editor.history.undoSize, beforeChoice + 1);
+
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  host.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  assert.equal(tool(), Tool.Select);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  pressEscape();
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  editor.setCurrentPage("free");
+  assert.equal(tool(), Tool.Select);
+  setTool(Tool.CadPcb);
+  editor.setCurrentPage("cad");
+  await nextFrame();
+  assert.equal(tool(), Tool.Select);
+  const remounted = host.querySelector(".nodetto-cad-viewport");
+  assert.ok(remounted);
+  assert.equal(remounted.querySelector('[role="menu"]'), null);
+
+  editor.setReadOnly(true);
+  setTool(Tool.CadPcb);
+  assert.equal(tool(), Tool.Select);
+  assert.equal(editor.history.undoSize, beforeChoice + 1);
+  editor.setReadOnly(false);
+  editor.apply([
+    { type: "deletePage", id: PCB_TEST_PAGE.id },
+    { type: "deletePage", id: secondPage.id },
+  ]);
+  const boardless = editor.getSnapshot();
+  editor.selection.set([baseExtrude]);
+  setTool(Tool.CadPcb);
+  assert.equal(editor.getSnapshot(), boardless);
+  assert.match(remounted.textContent ?? "", /no PCB page with a board/);
+  editor.selection.clear();
+  assert.doesNotMatch(remounted.textContent ?? "", /no PCB page with a board/);
+  setTool(Tool.CadPcb);
+  assert.match(remounted.textContent ?? "", /no PCB page with a board/);
+  editor.renamePage("free", "Renamed drawing");
+  assert.doesNotMatch(remounted.textContent ?? "", /no PCB page with a board/);
+
   editor.setCurrentPage("free");
   const beforeFreeform = editor.getSnapshot();
   setTool(Tool.CadSketch);
@@ -487,8 +692,11 @@ for (const mode of ["light", "dark"] as const) {
   assert.equal(editor.getSnapshot(), beforeFreeform);
   setTool(Tool.CadExtrude);
   assert.equal(editor.getSnapshot(), beforeFreeform);
+  setTool(Tool.CadPcb);
+  assert.equal(editor.getSnapshot(), beforeFreeform);
   dispose();
   host.remove();
   console.log(`sketch ok ${mode}`);
   console.log(`extrude ok ${mode}`);
+  console.log(`pcb ok ${mode}`);
 }

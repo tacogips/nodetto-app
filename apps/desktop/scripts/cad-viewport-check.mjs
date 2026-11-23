@@ -11,7 +11,9 @@ const label = labelIndex < 0 ? "m19" : args[labelIndex + 1];
 if (!label || !/^[a-z0-9][a-z0-9_-]*$/i.test(label))
   throw new Error("--label must be a directory name");
 const output = resolve(repository, "tmp/cad3d", label);
-const dist = resolve(repository, "tmp/cad3d/viewport-check/dist");
+const dist = resolve(output, "viewport-dist");
+const serveOnly = args.includes("--serve-only");
+const wkwebview = args.includes("--wkwebview");
 const entry = "scripts/fixtures/cad-viewport.html";
 const chromeBinary =
   process.env.CHROME_BIN ??
@@ -89,6 +91,49 @@ try {
     },
   });
 
+  const fixtureUrl = new URL(entry, server.url).href;
+  if (serveOnly) {
+    console.log(fixtureUrl);
+    for await (const _ of Bun.stdin.stream()) {
+      // EOF ends the server lifetime.
+    }
+  } else if (wkwebview) {
+    const child = Bun.spawn(
+      [
+        "swift",
+        "-module-cache-path",
+        resolve(output, "swift-modules"),
+        resolve(import.meta.dir, "cad-wkwebview-check.swift"),
+        fixtureUrl,
+        resolve(output, "wkwebview.json"),
+      ],
+      { stdout: "inherit", stderr: "inherit" },
+    );
+    process.exitCode = await child.exited;
+  } else {
+    await checkChrome(fixtureUrl);
+  }
+} catch (error) {
+  report.failure = String(error);
+  console.error(error);
+  process.exitCode = 1;
+} finally {
+  ws?.close();
+  if (chrome) {
+    chrome.kill();
+    report.chromeExitCode = await chrome.exited;
+    await Bun.write(resolve(output, "chrome.log"), await chromeLog);
+  }
+  server?.stop(true);
+  if (profile) await rm(profile, { recursive: true, force: true });
+  if (!serveOnly && !wkwebview) {
+    const result = resolve(output, "viewport-check.json");
+    await Bun.write(result, `${JSON.stringify(report, null, 2)}\n`);
+    console.log(`CAD viewport report: ${result}`);
+  }
+}
+
+async function checkChrome(fixtureUrl) {
   if (customPort !== 0) {
     const url = `http://127.0.0.1:${customPort}/json/version`;
     const existing = await fetch(url, {
@@ -211,7 +256,7 @@ try {
       });`,
   });
   const navigation = await send("Page.navigate", {
-    url: new URL(entry, server.url).href,
+    url: fixtureUrl,
   });
   if (navigation.errorText) throw new Error(navigation.errorText);
   await retry(async () => {
@@ -302,11 +347,15 @@ try {
       report.timings.cameraFramesMs = frames;
       assert(
         "cameraFramesMeetBudget",
-        frames.length === 30 && Math.max(...frames) < 16,
+        frames.length === 30 &&
+          Math.max(...frames) > 0 &&
+          Math.max(...frames) < 16,
         `slowest frame ${Math.max(...frames)} ms`,
       );
     }
   }
+  const picker = await evaluate("window.__cadCheck.checkBoardPicker()");
+  for (const [name, passed] of Object.entries(picker)) assert(name, passed);
   policyViolations.push(...(await evaluate("window.cadPolicyViolations")));
   assert(
     "noCspViolations",
@@ -315,20 +364,4 @@ try {
   );
   assert("noPageErrors", errors.length === 0, errors.join("\n"));
   if (!Object.values(report.assertions).every(Boolean)) process.exitCode = 1;
-} catch (error) {
-  report.failure = String(error);
-  console.error(error);
-  process.exitCode = 1;
-} finally {
-  ws?.close();
-  if (chrome) {
-    chrome.kill();
-    report.chromeExitCode = await chrome.exited;
-    await Bun.write(resolve(output, "chrome.log"), await chromeLog);
-  }
-  server?.stop(true);
-  if (profile) await rm(profile, { recursive: true, force: true });
-  const result = resolve(output, "viewport-check.json");
-  await Bun.write(result, `${JSON.stringify(report, null, 2)}\n`);
-  console.log(`CAD viewport report: ${result}`);
 }

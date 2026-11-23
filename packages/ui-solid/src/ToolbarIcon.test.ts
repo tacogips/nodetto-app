@@ -48,12 +48,13 @@ const expectedIcons = {
   cadArc: "spline",
   cadCircle: "circle",
   cadExtrude: "box",
+  cadPcb: "circuit-board",
 } as const;
 
 test("toolbar icon mapping matches the accepted contract", () => {
-  expect(Object.keys(TOOLBAR_ICONS)).toHaveLength(45);
+  expect(Object.keys(TOOLBAR_ICONS)).toHaveLength(46);
   expect(TOOLBAR_ICONS).toEqual(expectedIcons);
-  expect(new Set(Object.values(TOOLBAR_ICONS)).size).toBe(45);
+  expect(new Set(Object.values(TOOLBAR_ICONS)).size).toBe(46);
 });
 
 test("every toolbar icon exists in the registry", () => {

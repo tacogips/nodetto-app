@@ -1,7 +1,8 @@
 # 3D CAD pages (`cad3d`): parametric solid modelling inside nodetto
 
-Status: design revision 3, base commit `0a35708`, branch `feat/cad3d-pages`.
-Implementation plan: `impl-plans/active/cad3d-00-overview.md`.
+Status: implemented (slice), design revision 3, base commit `0a35708`,
+branch `feat/cad3d-pages`.
+Implementation plan: `impl-plans/completed/cad3d-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[R-n]` are external sources listed in section 17. Measurements
 marked "spike" come from a throwaway script under `tmp/cad3d-spike/` (ignored
@@ -333,7 +334,7 @@ checks these forms in non-test TypeScript under `packages/*/src` and
 | B. Requires 2D content or has a guard in M2 | Core paths are `group.ts`, `frame-selection.ts`, `boolean-operations.ts`, `editor/components.ts`, `editor/connections.ts`, `editor/sequence.ts`, `editor/bpmn.ts`, `bpmn/containment.ts`, `screen-transition.ts`. | These helpers return without editing for a CAD-only page or selection. |
 | C. Canvas interaction | UI paths are `interaction/creation.ts`, `interaction/connectors.ts` and `cad/mesh-io.ts`. The CAD viewport also calls the command builders in core `cad/authoring.ts`. | M22 checks the page kind for 2D placements and connectors. The CAD viewport checks `canCreateOn` before applying sketch or STL import commands. The command layer enforces rule R in both cases. |
 | D. Resource carriers | Core paths are `color-tokens.ts`, `number-tokens.ts`, `text-styles.ts`, `page-guides.ts`, `comments.ts`. UI paths are `inspector/slide-transition-edits.ts`. | Rule R permits these elements. Comment pins and guides are absent from the 3D viewport in the slice. Comments stay listed in the comments panel. |
-| E. Fixtures, inverse commands and clipboard planning | CLI paths are `__fixtures__/bpmn-layered.ts`, `__fixtures__/connector-arrange.ts`, `__fixtures__/dense-relations.ts`, `__fixtures__/obstacle-routing-batch.ts`, `__fixtures__/sequence-self-timing.ts`, `__fixtures__/text-layout.ts`. Desktop paths are `file/session-test-helpers.ts`. Core paths are `commands.ts`, `clipboard.ts`. UI paths are `interaction-test-helpers.ts`, `test-dom/text-editor.dom.tsx`. | The list includes test-support files that lack a `.test.ts` or `.test.tsx` suffix. |
+| E. Fixtures, inverse commands and clipboard planning | CLI paths are `__fixtures__/bpmn-layered.ts`, `__fixtures__/connector-arrange.ts`, `__fixtures__/dense-relations.ts`, `__fixtures__/obstacle-routing-batch.ts`, `__fixtures__/sequence-self-timing.ts`, `__fixtures__/text-layout.ts`. Desktop paths are `file/session-test-helpers.ts`. Core paths are `commands.ts`, `clipboard.ts`. UI paths are `interaction-test-helpers.ts`, `test-dom/cad-inspector.dom.tsx`, `test-dom/cad-sketch.dom.tsx`, `test-dom/text-editor.dom.tsx`. | The list includes test-support files that lack a `.test.ts` or `.test.tsx` suffix. |
 
 Collaboration repair (never deletes). A conforming client cannot violate R
 or K, but a client of the current release can (fact 13): it can change the
@@ -350,21 +351,15 @@ untracked derived origin after remote changes, and only moves or relabels:
    elements: move the `cad.*` elements to a `cad3d` page with the
    deterministic id `<pageId>-cad` (created if absent).
 
-A move is `deleteElements` plus `createElement` with the same id in one
-command list; the collab differ publishes it as a write of the element's
-`page` field (fact 13), which is idempotent, and every peer computes the
-same target page id, so peers converge without duplicates. All `cad.*`
-elements of a page move together, so their mutual references stay intact.
-An element that stays behind and references a moved element (a
-`review.comment` whose `target` is a moved shape) would be detached by the
-delete expansion (`packages/core/src/commands.ts:169-231`); the repair
-appends an `updateSemantic` that restores its original payload, so the
-net effect of a repair is only the changed `page` of the moved elements (a
-cross-page target is a validation warning, not an error). No element is
-ever deleted by the repair, so an edit from an older client cannot destroy
-a model or anyone's shapes. Known limit: a field edit that the older client
-makes on a shape concurrently with its move can be lost, because the move
-rewrites the element.
+A move uses the internal relocation command sequence. It preserves the
+element ID and skips delete expansion, so both the moved records and their
+referrers keep their authored fields. The collaboration binding emits
+only the changed `page` field under the derived origin. All `cad.*` elements
+of a page move together, preserving their mutual references. Peers compute
+the same destination ID and converge without duplicates. A surviving
+review comment with a cross-page target gets a validation warning. Repairs
+stay out of Undo history, and independent field changes on a moved record
+can merge with the page write.
 
 File load and live session differ on purpose: a file is the user's text and
 is reported, never silently edited; a session must converge, so it repairs.
@@ -558,7 +553,9 @@ the CLI needs (section 10).
   boolean). The default extrude of a sketch on a face points outward
   (`distance = 10 * faceOutwardSign`) with `op: "add"`; while dragging,
   `distance * faceOutwardSign > 0` means add and `< 0` means cut into the
-  body. Commit: one `updateSemantic` (or `createElement`) at pointer up,
+  body. On a PCB reference cap, the default points outward with `op: "new"`,
+  and dragging preserves the current operation. Commit: one `updateSemantic`
+  (or `createElement`) at pointer up,
   hence one history entry, one changed JSONL line and one collaboration
   update. Camera moves only redraw GPU buffers.
 - A watchdog terminates and restarts the worker when a request exceeds 20 s
@@ -851,8 +848,9 @@ page and produces a reference body.
 
 - Outline: a new pure function `pcbBoardOutline(document, boardId)` chains
   the `Edge.Cuts` graphics (line, arc, circle, rect, polygon) of the board's
-  page into closed loops with a 1 micrometre end point tolerance, the first
-  code that does so (fact 9). Inner loops are cut-outs.
+  page into closed loops by snapping open-path endpoints to the same
+  1 micrometre grid before joining them (fact 9). Endpoints on opposite
+  sides of a cell boundary can stay separate. Inner loops are cut-outs.
 - Placement: X = x - minX, Y = maxY - y over the outline bounds, the mapping
   the Gerber export already uses (`packages/core/src/pcb-board/export.ts:328`),
   Z from 0 to `thickness` (`cad.pcb.thickness`, else board `thickness`, else
@@ -877,7 +875,8 @@ reverse direction (deriving `Edge.Cuts` from a CAD face).
 
 - STL export (binary) of the visible non-reference bodies, and STL import
   (binary and ASCII) into a `cad.mesh`, writer and reader in
-  `packages/io/src/stl/`. NMESH codec in `packages/io/src/nmesh/`. Both
+  `packages/io/src/stl/`. The NMESH codec is in `packages/nmesh/src/` and
+  remains available via `@nodetto/io/nmesh`. Both
   modules import nothing from the rest of the repository and take plain
   typed arrays, so they can be extracted as libraries.
   The import adapter refuses a file with no triangles left after
@@ -887,10 +886,11 @@ reverse direction (deriving `Edge.Cuts` from a CAD face).
   as references and have no kernel body to export. A page with no visible
   exportable solids reports an error before offering a save location.
 - Existing exports: `packages/core/src/svg-export/` draws a CAD page as an
-  isometric wireframe of the feature tool solids (loops at both caps plus
-  the connecting edges), computed without a kernel so the CLI produces the
-  same output. It is labelled a construction view; a hidden-line view needs
-  the phase 2 cache.
+  isometric wireframe of the feature tool solids and PCB references. It
+  projects the loops at both caps and connects vertices where the source
+  entity changes. Imported meshes contribute their axis-aligned bounding
+  boxes. The construction view uses the same kernel-free path in the editor
+  and native CLI. A hidden-line view needs the phase 2 cache.
 - Phase 2: STEP AP214 with a hand-written writer (planar faces merged per
   face name into `ADVANCED_FACE` on `PLANE`), 3MF through the existing
   stored-zip writer (`packages/core/src/zip.ts`).
@@ -1011,16 +1011,17 @@ Repair these problems in the source mesh before importing it.
 
 ## 14. Performance budgets and measurement
 
-| Budget | Value | Measured by |
+| Budget | Target | Observed |
 | --- | --- | --- |
-| Kernel load | under 100 ms warm (spike 10 to 30 ms) | M5 test log |
-| Regenerate reference part (plate, 60 holes) | under 150 ms (spike 58 ms) | M5 timing test with a generous CI deadline of 2 s |
-| Edit to display for the reference part | under 250 ms | M7 worker round trip test; browser check (M19, M18) |
-| Camera frame at 200,000 triangles | under 16 ms | browser check (M18); enforced only on a hardware GL context, recorded otherwise |
-| Pick at 200,000 triangles | under 50 ms | M8 unit test |
-| 10,000 CAD records parse + serialize | under 1 s each (Bun); `validate` and `cad check` under 10 s each native | M17, M16 |
-| NMESH decode of 128,008 vertices | under 50 ms (Bun) | M12 |
-| `validate` of four maximum-size inline meshes | under 10 s native | M18 |
+| Kernel load | under 100 ms warm | 2.4 ms in the M18 workspace tests |
+| Regenerate reference part (plate, 60 holes) | under 150 ms | 85.7 ms in the M18 workspace tests |
+| Edit to display for the reference part | under 250 ms | 74.9 ms on hardware Chrome, 117 ms in off-screen WKWebView |
+| Camera frame at 200,000 triangles | under 16 ms on a hardware GL context | 2.6 ms maximum across 30 frames on Apple M4 Metal |
+| Pick at 200,000 triangles | under 50 ms | M8 picking test passed |
+| 10,000 CAD records parse + serialize | under 1 s each (Bun); `validate` and `cad check` under 10 s each native | 65.5 ms parse and 141.0 ms serialize in Bun; 4.14 s validate and 7.95 s check in the native suite |
+| NMESH decode of 128,008 vertices | under 50 ms (Bun) | 8.3 ms in the workspace codec benchmark |
+| `validate` of four maximum-size inline meshes | under 10 s native | 622 ms combined between native and Bun, with byte parity |
+| Construction projection at 20,000 elements | under 1 s (Bun) | 182 ms in the M18 workspace tests |
 
 Real-host verification. Unit tests use a fake renderer and an in-process
 worker host, so they cannot show that the viewport draws. Two checks close
@@ -1039,10 +1040,13 @@ that gap:
   the rendered pixels. It records load, edit-to-display and frame times to
   `tmp/cad3d/<milestone>/viewport-check.json`.
 - WKWebView check, `apps/desktop/scripts/cad-wkwebview-check.swift` (M18):
-  loads the same served page in a `WKWebView` of the system WebKit, the
-  engine the desktop app runs in, waits for the page's result object and
-  exits non-zero unless the same functional assertions hold. Its output is
-  recorded in `tmp/cad3d/m18/wkwebview.json` and summarised here.
+  the same fixture passed the worker, shader, light and dark framebuffer,
+  radius edit and PCB picker checks on macOS 26.5.2 (25F84), WebKit
+  21624.2.5.11.8. The off-screen fixture uses a timer for animation
+  callbacks, so its edit timing describes the fixture's draw and readback.
+  Results are in `tmp/cad3d/m18/wkwebview.json`. The unsigned packaged
+  app built with its native CLI. The console was locked, leaving the
+  interactive packaged drop, picker and native file-dialog checks pending.
 
 Hosts not verified by this plan: WebKit on macOS 12 (the minimum the
 macOS builds declare) and WebKitGTK, in which the Linux builds run

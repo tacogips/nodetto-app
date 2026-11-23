@@ -341,6 +341,7 @@ const CAD_TOOL_ICONS = {
   [Tool.CadArc]: "cadArc",
   [Tool.CadCircle]: "cadCircle",
   [Tool.CadExtrude]: "cadExtrude",
+  [Tool.CadPcb]: "cadPcb",
 } as const;
 const CAD_SHAPES: readonly ShapePaletteItem[] = CAD_CREATION_TOOLS.map(
   (item) => ({ ...item, toolbarIcon: CAD_TOOL_ICONS[item.tool] }),
