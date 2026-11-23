@@ -21,10 +21,10 @@ export function writeBinaryStl(
   for (const { positions, triangles } of meshes) {
     for (let index = 0; index < triangles.length; index += 3) {
       for (let vertex = 0; vertex < 3; vertex++) {
-        const source = triangles[index + vertex] * 3;
+        const source = (triangles[index + vertex] as number) * 3;
         if (source >= positions.length) throw new StlError("stl.index");
         for (let axis = 0; axis < 3; axis++) {
-          const value = Math.fround(positions[source + axis]);
+          const value = Math.fround(positions[source + axis] as number);
           if (!Number.isFinite(value)) throw new StlError("stl.number");
           view.setFloat32(offset + 12 + vertex * 12 + axis * 4, value, true);
         }

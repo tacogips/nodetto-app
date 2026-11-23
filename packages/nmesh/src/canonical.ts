@@ -9,9 +9,9 @@ import {
 
 function compareVertices(positions: Int32Array, a: number, b: number): number {
   return (
-    positions[a * 3] - positions[b * 3] ||
-    positions[a * 3 + 1] - positions[b * 3 + 1] ||
-    positions[a * 3 + 2] - positions[b * 3 + 2]
+    (positions[a * 3] as number) - (positions[b * 3] as number) ||
+    (positions[a * 3 + 1] as number) - (positions[b * 3 + 1] as number) ||
+    (positions[a * 3 + 2] as number) - (positions[b * 3 + 2] as number)
   );
 }
 
@@ -26,12 +26,16 @@ function degenerate(
   c: number,
 ): boolean {
   if (a === b || b === c || a === c) return true;
-  const abx = positions[b * 3] - positions[a * 3];
-  const aby = positions[b * 3 + 1] - positions[a * 3 + 1];
-  const abz = positions[b * 3 + 2] - positions[a * 3 + 2];
-  const acx = positions[c * 3] - positions[a * 3];
-  const acy = positions[c * 3 + 1] - positions[a * 3 + 1];
-  const acz = positions[c * 3 + 2] - positions[a * 3 + 2];
+  const abx = (positions[b * 3] as number) - (positions[a * 3] as number);
+  const aby =
+    (positions[b * 3 + 1] as number) - (positions[a * 3 + 1] as number);
+  const abz =
+    (positions[b * 3 + 2] as number) - (positions[a * 3 + 2] as number);
+  const acx = (positions[c * 3] as number) - (positions[a * 3] as number);
+  const acy =
+    (positions[c * 3 + 1] as number) - (positions[a * 3 + 1] as number);
+  const acz =
+    (positions[c * 3 + 2] as number) - (positions[a * 3 + 2] as number);
   // Products of two coordinate differences remain exact in a JS number.
   return (
     aby * acz === abz * acy &&
@@ -73,7 +77,7 @@ export function canonicalize(mesh: TriangleMesh): QuantizedMesh {
   for (let offset = 0; offset < positions.length; offset += 3) {
     for (let axis = 0; axis < 3; axis++) {
       const position = Math.round(
-        positions[offset + axis] * unitsPerMillimetre,
+        (positions[offset + axis] as number) * unitsPerMillimetre,
       );
       if (!Number.isFinite(position) || Math.abs(position) > coordinateLimit) {
         throw new NmeshError("nmesh.range");
@@ -88,15 +92,15 @@ export function canonicalize(mesh: TriangleMesh): QuantizedMesh {
 
   const ordered: { a: number; b: number; c: number; faceId: number }[] = [];
   for (let offset = 0; offset < triangles.length; offset += 3) {
-    const x = triangles[offset];
-    const y = triangles[offset + 1];
-    const z = triangles[offset + 2];
+    const x = triangles[offset] as number;
+    const y = triangles[offset + 1] as number;
+    const z = triangles[offset + 2] as number;
     if (x >= weld.length || y >= weld.length || z >= weld.length) {
       throw new NmeshError("nmesh.index");
     }
-    const a = weld[x];
-    const b = weld[y];
-    const c = weld[z];
+    const a = weld[x] as number;
+    const b = weld[y] as number;
+    const c = weld[z] as number;
     if (degenerate(quantized, a, b, c)) continue;
     const faceId = triFace?.[offset / 3] ?? 0;
     // Comparing positions is equivalent to comparing their lexicographic ranks.
@@ -135,12 +139,12 @@ export function canonicalize(mesh: TriangleMesh): QuantizedMesh {
     for (const vertex of [a, b, c]) {
       if (emitted[vertex] === 0) {
         const offset = vertexCount * 3;
-        coordinates[offset] = quantized[vertex * 3];
-        coordinates[offset + 1] = quantized[vertex * 3 + 1];
-        coordinates[offset + 2] = quantized[vertex * 3 + 2];
+        coordinates[offset] = quantized[vertex * 3] as number;
+        coordinates[offset + 1] = quantized[vertex * 3 + 1] as number;
+        coordinates[offset + 2] = quantized[vertex * 3 + 2] as number;
         emitted[vertex] = ++vertexCount;
       }
-      indices[index++] = emitted[vertex] - 1;
+      indices[index++] = (emitted[vertex] as number) - 1;
     }
     const previous = groups.at(-1);
     if (previous?.faceId === faceId) previous.count++;
@@ -162,9 +166,9 @@ export function isCanonical({
   const keys = new Set<string>();
   for (let offset = 0; offset < positions.length; offset += 3) {
     if (
-      Math.abs(positions[offset]) > coordinateLimit ||
-      Math.abs(positions[offset + 1]) > coordinateLimit ||
-      Math.abs(positions[offset + 2]) > coordinateLimit
+      Math.abs(positions[offset] as number) > coordinateLimit ||
+      Math.abs(positions[offset + 1] as number) > coordinateLimit ||
+      Math.abs(positions[offset + 2] as number) > coordinateLimit
     ) {
       return false;
     }
@@ -189,14 +193,14 @@ export function isCanonical({
     }
     previousFace = faceId;
     for (let axis = offset; axis < end; axis++) {
-      const vertex = triangles[axis];
+      const vertex = triangles[axis] as number;
       if (vertex > used || vertex >= positions.length / 3) return false;
       if (vertex === used) used++;
     }
     for (let triangle = offset; triangle < end; triangle += 3) {
-      const a = triangles[triangle];
-      const b = triangles[triangle + 1];
-      const c = triangles[triangle + 2];
+      const a = triangles[triangle] as number;
+      const b = triangles[triangle + 1] as number;
+      const c = triangles[triangle + 2] as number;
       if (
         degenerate(positions, a, b, c) ||
         compareVertices(positions, a, b) >= 0 ||
@@ -204,9 +208,9 @@ export function isCanonical({
         (triangle > offset &&
           compareTriangles(
             positions,
-            triangles[triangle - 3],
-            triangles[triangle - 2],
-            triangles[triangle - 1],
+            triangles[triangle - 3] as number,
+            triangles[triangle - 2] as number,
+            triangles[triangle - 1] as number,
             a,
             b,
             c,

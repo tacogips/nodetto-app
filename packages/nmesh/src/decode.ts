@@ -22,7 +22,7 @@ export function decodeNmesh(bytes: Uint8Array): QuantizedMesh {
     let factor = 1;
     for (let place = 0; place < 5; place++) {
       if (offset >= end) throw new NmeshError("nmesh.truncated");
-      const next = bytes[offset++];
+      const next = bytes[offset++] as number;
       if (place === 4 && next > 15) throw new NmeshError("nmesh.range");
       value += (next % 128) * factor;
       if (next < 128) {
@@ -72,7 +72,7 @@ export function decodeNmesh(bytes: Uint8Array): QuantizedMesh {
   for (let index = 0; index < positions.length; index++) {
     const encoded = readVarint();
     const delta = encoded % 2 === 0 ? encoded / 2 : -(encoded + 1) / 2;
-    const position = delta + (index < 3 ? 0 : positions[index - 3]);
+    const position = delta + (index < 3 ? 0 : (positions[index - 3] as number));
     if (Math.abs(position) > coordinateLimit)
       throw new NmeshError("nmesh.range");
     positions[index] = position;

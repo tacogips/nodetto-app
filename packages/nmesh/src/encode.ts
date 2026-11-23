@@ -28,7 +28,9 @@ export function encodeNmesh(mesh: QuantizedMesh): Uint8Array {
     writeVarint(count);
   }
   for (let index = 0; index < positions.length; index++) {
-    const delta = positions[index] - (index < 3 ? 0 : positions[index - 3]);
+    const delta =
+      (positions[index] as number) -
+      (index < 3 ? 0 : (positions[index - 3] as number));
     writeVarint(delta < 0 ? -2 * delta - 1 : 2 * delta);
   }
   let used = 0;

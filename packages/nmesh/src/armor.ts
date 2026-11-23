@@ -25,7 +25,7 @@ export function toInline(bytes: Uint8Array): string {
     index < bytes.length;
     index += 3, offset += 4
   ) {
-    const first = bytes[index];
+    const first = bytes[index] as number;
     const second = bytes[index + 1] ?? 0;
     const third = bytes[index + 2] ?? 0;
     output[offset] = alphabet.charCodeAt(first >>> 2);

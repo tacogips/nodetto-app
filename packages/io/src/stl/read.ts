@@ -57,15 +57,15 @@ class AsciiScanner {
   }
 
   next(): string {
-    let byte = this.bytes[this.offset];
-    while (isWhitespace(byte)) byte = this.bytes[++this.offset];
+    let byte = this.bytes[this.offset] as number;
+    while (isWhitespace(byte)) byte = this.bytes[++this.offset] as number;
     let token = "";
     while (this.offset < this.bytes.length && !isWhitespace(byte)) {
       if (token.length === 128 || byte < 33 || byte > 126) {
         throw new StlError("stl.syntax");
       }
       token += String.fromCharCode(byte);
-      byte = this.bytes[++this.offset];
+      byte = this.bytes[++this.offset] as number;
     }
     return token;
   }
@@ -79,7 +79,7 @@ class AsciiScanner {
   skipName(): void {
     // The name occupies the rest of the line and is never materialized.
     while (this.offset < this.bytes.length) {
-      const byte = this.bytes[this.offset++];
+      const byte = this.bytes[this.offset++] as number;
       if (byte === 10 || byte === 13) break;
       if (byte < 32 && byte !== 9) throw new StlError("stl.syntax");
     }
