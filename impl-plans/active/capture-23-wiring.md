@@ -6,7 +6,10 @@
   superseded assertions), 10.2, 12.
 - writePaths: `crates/capture/src/lib.rs`, `crates/capture/src/raster.rs`,
   `crates/capture/src/shade.rs`, `crates/capture/src/report.rs`,
-  `crates/capture/src/tool_view.rs` (picture-family constructor only),
+  `crates/capture/src/tool_view.rs` (picture-family constructor and the
+  facet dispatch of the round-2 amendment only),
+  `crates/capture/src/mesh.rs` (additive facet-normal seam of the round-2
+  amendment only),
   `crates/capture/tests/render.rs`, `crates/capture/tests/support/mod.rs`
   (new helpers only), `crates/capture/tests/overlay.rs`,
   `crates/capture/tests/census.rs`, `crates/capture/tests/mesh.rs`,
@@ -16,7 +19,10 @@
   `apps/cli/src/__fixtures__/capture-plate-default.ncs1`,
   `apps/cli/src/native-parity/capture.test.ts`,
   `apps/desktop/src/shell/export-handlers.test.ts` (new cases only),
-  `impl-plans/active/capture-23-wiring.md`, `tmp/capture/m23`, `target`
+  `impl-plans/active/capture-23-wiring.md`,
+  `impl-plans/active/capture-s868-dispatch.json` (nominal owner only; the
+  worker must not edit it), `tmp/capture/m23`,
+  `tmp/capture-s868/capture-23-wiring`, `target`
 - Pre-authorised, exactly: (a) the pixel digest constant in
   `tests/render.rs` is replaced (the Plate fixture now has the draw bit and
   a pair); the commit message states old and new values. (b) In
@@ -40,8 +46,9 @@ census; the CLI registers the options and prints the report text.
 ## Non-goals
 
 No change to analysis rules, unit modules (`overlay.rs`, `census.rs`,
-`mesh.rs`, `tiles.rs`, `lattice.rs`, `interference.rs`), TypeScript core,
-help parts, desktop sources, docs (M16).
+`tiles.rs`, `lattice.rs`, `interference.rs`; `mesh.rs` except the additive
+seam of the round-2 amendment below), TypeScript core, help parts, desktop
+sources, docs (M16).
 
 ## Changes
 
@@ -126,11 +133,87 @@ help parts, desktop sources, docs (M16).
 
 ## Verification (each must exit 0)
 
-1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/raster.rs crates/capture/src/shade.rs crates/capture/src/lib.rs crates/capture/src/report.rs crates/capture/src/tool_view.rs crates/capture/tests/*.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test -p nodetto-capture'`
+1. `sh -c 'rustfmt --edition 2021 --check crates/capture/src/raster.rs crates/capture/src/shade.rs crates/capture/src/lib.rs crates/capture/src/report.rs crates/capture/src/tool_view.rs crates/capture/src/mesh.rs crates/capture/tests/*.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test -p nodetto-capture'`
+   This command also runs the new `mesh::tests` facet cases of the round-2
+   amendment and the unchanged M11 `mesh::tests`.
 2. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/capture-m23 cargo test --release -p nodetto-capture --test overlay --test census --test mesh --test scale --test render -- --nocapture > tmp/capture/m23/release.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/release.txt; test $s -eq 0 && ! grep -Eq "[1-9][0-9]* failed" tmp/capture/m23/release.txt'`
 3. `sh -c 'bun run typecheck && bunx biome check apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/ai-commands.test.ts apps/desktop/src/shell/export-handlers.test.ts'`
-4. `sh -c 'CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo test -p nodetto-cli && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/capture-m23/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts > tmp/capture/m23/native-parity.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/native-parity.txt; test $s -eq 0 && grep -Eq "[1-9][0-9]* pass" tmp/capture/m23/native-parity.txt && ! grep -Eq "[1-9][0-9]* skip" tmp/capture/m23/native-parity.txt'`
+4. `sh -c 'mkdir -p tmp/capture/m23 && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo test -p nodetto-cli && CARGO_TERM_QUIET=true CARGO_TARGET_DIR="$PWD/target/capture-m23" cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/capture-m23/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts > tmp/capture/m23/native-parity.txt 2>&1; s=$?; echo "exit=$s" >> tmp/capture/m23/native-parity.txt; test $s -eq 0 && grep -Eq "[1-9][0-9]* pass" tmp/capture/m23/native-parity.txt && ! grep -Eq "[1-9][0-9]* skip" tmp/capture/m23/native-parity.txt'`
+
+## Amendment 2026-11-23 (blocked-wave-scope-or-contract, round 2)
+
+Blocker (wave 6, evidence `crates/capture/src/mesh.rs:213`, `:257`,
+`impl-plans/active/capture-11-mesh-reference.md:108`): `MeshView::hits`
+pushes every boundary with `face: 0`, and no API returns the hit triangle
+or its normal. Design 6.5 shades a mesh sample with the triangle normal,
+and the edge rule needs that normal. Decision: M23 now also owns
+`crates/capture/src/mesh.rs`, for this additive seam only. M11 is accepted
+and no other pending plan writes `mesh.rs` (M16 does not), so the file has
+one writer. Design note: CAP-R4-06. This is not a redesign: 6.5 already
+asks for the triangle normal, and the M11 plan says "normal the
+triangle's".
+
+Contract. Copy the prism facet pattern exactly:
+`crate::prism::PrismView::surface_intervals` (facet-encoded face ids
+through `cast::<true>`) and `PrismView::surface(index) -> Option<(u32,
+[f64; 3])>` (`prism.rs:245-272`). Additions to `MeshView`:
+
+- `pub(crate) fn surface_intervals(&self, ray: &Ray, scratch: &mut
+  Vec<Boundary>, out: &mut Intervals)`. Same result as `intervals`: empty
+  for an open mesh, the pairs of the sorted crossings, an odd last crossing
+  dropped. The difference is that `Boundary.face` is the facet index, which
+  is the position of the hit triangle in `self.triangles`. That is not the
+  source triangle index, because invalid triangles are skipped.
+- `pub(crate) fn first_surface_hit(&self, ray: &Ray) -> Option<Boundary>`.
+  Same result as `first_hit` (nearest crossing, open or closed), with the
+  facet-encoded face.
+- `pub(crate) fn surface(&self, facet: u32) -> Option<(u32, [f64; 3])>`.
+  Returns `(0, unit normal)`. The unit normal is `cross(p1 - p0, p2 - p0)`
+  divided by its `sqrt` length, in the winding order of the stored
+  triangle. Returns `None` when the facet is out of range or the length is
+  zero or not finite. Do not orient the normal toward the viewer here:
+  `raster.rs` already applies `shade::facing`.
+- One way to do it: make the private `hits` generic,
+  `hits::<const FACETS: bool>`, as prism `cast` is. With `FACETS = false`
+  it must give exactly today's boundaries, face 0 included.
+
+In `tool_view.rs`, add the matching `ToolView` dispatch: `surface_intervals`
+and `surface` for both arms (prism arm calls the existing prism methods),
+plus a mesh-only `first_surface_hit` path for open meshes, alongside the
+picture-family constructor. Raster: for a mesh boundary, call `surface` to
+get face id 0 and the normal, then use them in `Hit` as the prism path
+does (`raster.rs:126-139`).
+
+Invariants: `intervals`, `first_hit`, `is_closed`, `mesh_bounds`,
+`MeshView::new` (binning, window, listings) and `average_occupancy` keep
+their behaviour and outputs. Analysis, lattice, interference and census
+keep calling `intervals` with face 0. Existing M11 `mesh::tests` are not
+edited, only new tests are added. Only `+ - * /` and `sqrt`; no panic on
+any index; no new allocation per ray beyond what `first_hit` already does.
+
+Forbidden: renaming or removing the public `MeshView` items; changing
+face ids that analysis sees; storing per-triangle normals in a new
+per-ray allocation; editing `lattice.rs`, `interference.rs`, `census.rs`
+or the M11 tests.
+
+New unit tests in `mesh.rs` `#[cfg(test)]`:
+- cube, ray along +z through (0.5, 0.5): `surface_intervals` gives the same
+  `s` values and tool as `intervals`. Mapped through `surface`, the faces
+  give face id 0 with unit normals `(0,0,+-1)` (length within 1e-12 of 1).
+- the same ray through `intervals`: every face id is 0 (analysis seam
+  unchanged).
+- an open mesh (cube missing one triangle): `surface_intervals` is empty,
+  and `first_surface_hit` has the same `s` as `first_hit`; its facet maps
+  to a unit normal.
+- `surface(u32::MAX)` and `surface(len)` give `None`. A mesh whose first
+  triangle has an invalid index keeps facet indices aligned with the stored
+  triangles: the normal of facet 0 is that of the first valid triangle.
+- `tests/mesh.rs` (already planned): sphere edges only on the outline and
+  the stepped-mesh edge rule now use real triangle normals.
 
 ## Progress
 
-Pending.
+Blocked before implementation: the mesh picture-hit API does not expose the
+hit triangle normal required by design 6.5. `mesh.rs` is outside M23's
+writePaths. Resume after a checkpoint amendment authorizes a minimal mesh
+picture-hit normal seam and its tests. No M23 verification has run.
