@@ -526,7 +526,11 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
         &mut bodies,
         &liveness,
         scene.target_cell,
-        u64::from(scene.budget_million_rays) * 1_000_000,
+        if scene.analyse {
+            u64::from(scene.budget_million_rays) * 1_000_000
+        } else {
+            24_000_000
+        },
     );
     drop(raster);
     let (analysis, mut pairs) = if scene.analyse {
@@ -535,7 +539,7 @@ pub fn render_rgb(scene: &Scene, threads: usize) -> Result<(Vec<u8>, Report), Ca
     } else {
         (None, Vec::new())
     };
-    if scene.draw_interference {
+    if scene.analyse && scene.draw_interference {
         let seen = marks.picture_only(&pairs)?;
         interference::add_view_pairs(scene, &mut pairs, &seen, scene.target_cell);
     }

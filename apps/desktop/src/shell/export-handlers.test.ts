@@ -308,6 +308,14 @@ test("CAD image capture saves PNG and JPG and reports interference and empty bod
   expect(requests[1]).toMatchObject({ format: "jpg", quality: 90 });
   expect(picks[1]).toEqual(["Capture plate.jpg", "jpg"]);
   expect(writes[1]).toEqual({ path: "/out/Capture plate.jpg", bytes: image });
+  await handlers.captureCadImage({ ...options, interference: null });
+  const disabled = prepareCadCapture(editor.getSnapshot().elements, page, {
+    ...options,
+    interference: null,
+    decodeMesh: decodeCaptureMesh,
+  });
+  expect(requests[2].scene).toEqual(disabled.scene);
+  expect(requests[2].scene).not.toEqual(requests[0].scene);
 });
 
 test("CAD capture errors and cancelled save never write", async () => {

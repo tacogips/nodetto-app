@@ -153,7 +153,7 @@ test("interference request preserves default fixture and selects bodies", async 
   const fixture = new Uint8Array(
     readFileSync(
       new URL(
-        "../../../../apps/cli/src/__fixtures__/capture-plate-default.ncs1",
+        "../../../../apps/cli/src/__fixtures__/capture-plate-no-interference.ncs1",
         import.meta.url,
       ),
     ),
@@ -170,6 +170,15 @@ test("interference request preserves default fixture and selects bodies", async 
   ).toEqual(fixture);
   expect(Object.isFrozen(DEFAULT_CAD_INTERFERENCE)).toBe(true);
   const all = run(DEFAULT_CAD_INTERFERENCE);
+  const defaultFixture = new Uint8Array(
+    readFileSync(
+      new URL(
+        "../../../../apps/cli/src/__fixtures__/capture-plate-default.ncs1",
+        import.meta.url,
+      ),
+    ),
+  );
+  expect(all.scene).toEqual(defaultFixture);
   const view = new DataView(
     all.scene.buffer,
     all.scene.byteOffset,

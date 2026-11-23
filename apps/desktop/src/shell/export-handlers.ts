@@ -12,6 +12,7 @@ import {
   describeBodies,
   type CaptureCameraRequest,
   type CaptureTheme,
+  type CadCaptureInterference,
   DOCUMENT_BUNDLE_EXTENSION,
   documentPdfPlan,
   encodeDocumentBundle,
@@ -73,6 +74,7 @@ export interface ExportHandlers {
     theme: CaptureTheme;
     width: number;
     height: number;
+    interference?: CadCaptureInterference | null;
   }) => Promise<void>;
 }
 
@@ -264,7 +266,10 @@ export function createExportHandlers(
           width: options.width,
           height: options.height,
           theme: options.theme,
-          interference: DEFAULT_CAD_INTERFERENCE,
+          interference:
+            options.interference === undefined
+              ? DEFAULT_CAD_INTERFERENCE
+              : options.interference,
           decodeMesh: decodeCaptureMesh,
         },
       );

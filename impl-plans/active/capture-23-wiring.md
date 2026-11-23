@@ -299,3 +299,17 @@ file before and after, plus any drift.
   wiring. No drift observed in the edited files.
   Hashes before -> after: `export-handlers.ts` 5f81e8d29d9a86d0f158af2953229a8fce6fecce -> 7795c7d120b86facbcdc415550d4176bb7d8aaf1;
   `export-handlers.test.ts` da1e89d276b41a744ecd399eb3af14e6a4223276 -> 0a39780be6101d459ecd593c43ec543fd3e494d1.
+
+- 2026-11-23 continuation: Applied the fixture amendment and separated
+  analysis from drawing; disabled analysis now retains the 24M census
+  budget. The fixture test passed 14 tests and the interference flag
+  regression passed one test (`fixture-rerun.log`,
+  `interference-rerun.log`). Gate 3 passed 200 tests
+  (`gate-3-rerun.log`). Gate 1 exited 101 with three render failures
+  (`gate-1-rerun.log`); admission, tile-major traversal, bounded scans,
+  first-tool classification and the required test inventory remain open.
+  Gates 2 and 4 remain unrun on incomplete wiring. Logs are under
+  `tmp/capture-s883/capture-23-wiring/`. No concurrent source drift observed.
+  Hashes before -> after: `raster.rs` ba48018e115c412fe5d2b4fbcfa71b6550ac2f3e -> ab34efdcebda3ced6505bae353ed8af56b05351f;
+  `cad-request.test.ts` 1bcf56096d0146f436727061c972d96b2e96de03 -> c1a08b4f687333cc3b1e10886aac7251a9cf5a92;
+  new `capture-plate-no-interference.ncs1` 82b3c688fadee1b235fe1271fafdd45aa08ab398.
