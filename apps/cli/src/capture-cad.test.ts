@@ -50,7 +50,7 @@ function harness(doc = plate) {
         report: JSON.stringify({
           width: view.getUint32(8, true),
           height: view.getUint32(12, true),
-          bodies: ["drawn", "hidden", "absent"].map((state) => ({
+          bodies: ["drawn", "hidden", "outside"].map((state) => ({
             state,
             open: false,
             emptiedByStep: -1,
@@ -134,7 +134,7 @@ test("reports cropped frame, body states and cad check errors in text and JSON",
     /camera: view=top direction=0,0,-1 up=0,1,0 centre=85,35,0 scale=[0-9.]+ mm\/px/,
   );
   expect(stdout).toContain(
-    "frame: cropped\nbodies: 3 (Plate, Block [hidden behind other bodies], Puck [not in the picture])\nerrors: 1\n",
+    "frame: cropped\nbodies: 3 (Plate, Block [hidden behind other bodies], Puck [outside the picture])\nerrors: 1\n",
   );
   const check = cadCommand(io, ["check", "capture-plate.jsonl"]);
   const issue = check.stdout.trim().split("\n").at(-1);
@@ -168,7 +168,7 @@ test("reports cropped frame, body states and cad check errors in text and JSON",
     bodies: [
       { id: "plate", name: "Plate", state: "drawn" },
       { id: "block", name: "Block", state: "hidden" },
-      { id: "puck", name: "Puck", state: "absent" },
+      { id: "puck", name: "Puck", state: "outside" },
     ],
     errors: [{ id: failed.id, code: issue?.split(" ").at(-1) }],
   });
@@ -222,6 +222,10 @@ test("the default CLI request matches the committed Plate document and NCS1 byte
   expect(scene).toEqual(
     new Uint8Array(readFileSync(location("-default.ncs1"))),
   );
+  expect((await run("--no-interference")).exitCode).toBe(0);
+  expect(scenes[1]).toEqual(
+    new Uint8Array(readFileSync(location("-no-interference.ncs1"))),
+  );
 });
 
 test("interference reports and failure exit retain the written image", async () => {
@@ -258,6 +262,15 @@ test("interference reports and failure exit retain the written image", async () 
             source: "analysis",
             capped: true,
           },
+          {
+            a: 0,
+            b: 2,
+            volume: 2,
+            min: [0, 0, 0],
+            max: [1, 1, 1],
+            source: "analysis",
+            capped: false,
+          },
         ],
       }),
     };
@@ -270,6 +283,12 @@ test("interference reports and failure exit retain the written image", async () 
   expect(text.exitCode).toBe(1);
   expect(text.stdout).toContain("Plate x Block: volume 590.7 mm3");
   expect(text.stdout).toContain("approximate");
+  expect(text.stdout).toContain(
+    "Plate x Block: volume 590.7 mm3, box 0,0,0 .. 1,1,1 mm, approximate",
+  );
+  expect(text.stdout).toContain(
+    "Plate x Puck: volume 2 mm3, box 0,0,0 .. 1,1,1 mm\n",
+  );
   expect(files.get("report.png")).toBe(image);
   const json = await captureCommand(
     io,
@@ -282,4 +301,93 @@ test("interference reports and failure exit retain the written image", async () 
     bName: "Block",
     approximate: true,
   });
+  expect(JSON.parse(json.stdout).interference.pairs[1]).toMatchObject({
+    aName: "Plate",
+    bName: "Puck",
+    approximate: false,
+  });
+});
+
+test("unchecked and capped analysis control exit codes and list limits", async () => {
+  const { io, backend } = harness();
+  const analysis = {
+    cell: 0.25,
+    candidates: 25,
+    checked: 0,
+    unchecked: Array.from({ length: 25 }, () => [0, 1]),
+    uncheckedCount: 25,
+    cappedCount: 0,
+    cappedWithoutHit: [],
+    budget: 24,
+  };
+  backend.renderSolid = () => ({
+    image,
+    report: JSON.stringify({
+      width: 1024,
+      height: 768,
+      bodies: Array.from({ length: 3 }, () => ({
+        state: "drawn",
+        open: false,
+        emptiedByStep: -1,
+      })),
+      analysis,
+      pairs: [],
+    }),
+  });
+  const unchecked = await captureCommand(
+    io,
+    ["capture-plate.jsonl", "--fail-on-interference"],
+    backend,
+  );
+  expect(unchecked.exitCode).toBe(1);
+  expect(unchecked.stdout.match(/ {2}not checked:/g)).toHaveLength(20);
+  expect(unchecked.stdout).toContain("... and 5 more");
+  const json = await captureCommand(
+    io,
+    ["capture-plate.jsonl", "--json"],
+    backend,
+  );
+  expect(json.exitCode).toBe(0);
+  expect(JSON.parse(json.stdout).interference).toMatchObject({
+    uncheckedCount: 25,
+    unchecked: Array.from({ length: 25 }, () => ["plate", "block"]),
+  });
+  analysis.unchecked = [];
+  analysis.uncheckedCount = 0;
+  analysis.cappedCount = 1;
+  expect(
+    (
+      await captureCommand(
+        io,
+        ["capture-plate.jsonl", "--fail-on-interference"],
+        backend,
+      )
+    ).exitCode,
+  ).toBe(0);
+});
+
+test("body notes identify empty, refilled, hidden and outside bodies", async () => {
+  const { io, backend } = harness();
+  backend.renderSolid = () => ({
+    image,
+    report: JSON.stringify({
+      width: 1024,
+      height: 768,
+      bodies: [
+        { state: "empty", open: false, emptiedByStep: 0 },
+        { state: "hidden", open: false, emptiedByStep: 0 },
+        { state: "outside", open: false, emptiedByStep: -1 },
+      ],
+      analysis: null,
+      pairs: [],
+    }),
+  });
+  const result = await captureCommand(io, ["capture-plate.jsonl"], backend);
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("Plate [no material]");
+  expect(result.stdout).toContain(
+    "Block [hidden behind other bodies] [differs from the app, see errors]",
+  );
+  expect(result.stdout).toContain("Puck [outside the picture]");
+  expect(result.stdout).toContain('leaves no material in "Block"');
 });

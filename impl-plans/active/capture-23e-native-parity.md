@@ -110,3 +110,12 @@ amendment; neither was changed. Gate 4 must be rerun after resolution.
 Complete logs, per-edit intentions, and hashes are under
 `tmp/capture-s885/capture-23e-native-parity/`. Formal reviews and commits
 remain downstream.
+
+2026-11-23 CAP-R6-07 resume: Changed only the existing cell expectation
+from `cell 1 mm` to `cell 0.938 mm`, as authorized. Gates 1, 3 and 4
+passed on the resulting source: 121 capture tests, 204 Bun tests, 29 CLI
+tests and 10 native parity tests, respectively; parity had no skips and
+recorded `exit=0` in `tmp/capture/m23/native-parity.txt`. The 1,000-element
+run measured 1,311.00 ms. Complete logs and edit hashes are in
+`tmp/capture-s885/capture-23e-native-parity/`. Implementation acceptance
+criteria are met; formal reviews and the local commit remain downstream.

@@ -101,6 +101,21 @@ Liveness must stay in the existing `Liveness` shape.
 
 ## Progress
 
-Pending. Same protocol as M23a (hashes before and after, logs under
-`tmp/capture/m23b/`, drift stops the run). Timing tests: up to 3
-attempts, then alone. Record the final `raster.rs` hash.
+Implementation complete; formal integrity and adversarial review pending.
+M23a raster handover hash matched `7ab3ea0d8079426386ffbf386bde5c37a0b1918e`.
+Tile-listed traversal, per-worker chunked boundary accounting, error-path
+statistics and liveness materialization are implemented. Seeded span,
+read-count, bounded refusal, multi-worker liveness/reference, zero-ray,
+off-tile and census regressions were added; M23a comparisons are unchanged.
+
+- Final hashes: raster `638cc6c40193386240820c1e1ddadf26a751e443`,
+  scale `b9b6e4831d0024f9d66c6c3926df7e80fe9975e5`, census
+  `6db08d2d95433f1a394be26d025606ad671c02a6`.
+- Both verification commands exited 0. Debug: 29 passed, release: 21
+  passed, no failures. Release off-tile suffix: 174.66 ms.
+- Complete logs, per-edit intentions, reads and hashes:
+  `tmp/capture-s885/capture-23b-tile-visit-allowance/`.
+  An earlier focused test failed because the Plate fixture was cropped;
+  its original fitted frame fixed the fixture, and both final gates passed.
+- Downstream plans retain their assigned work; no public API, Report or
+  scene-format changes were made.

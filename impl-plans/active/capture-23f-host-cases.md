@@ -55,5 +55,14 @@ amendment. `absent` stays a valid wire value elsewhere.
 
 ## Progress
 
-Pending. Hashes before and after per owned file, logs under
-`tmp/capture/m23f/`, drift stops the run.
+Implementation complete; formal review and integration remain downstream. CAP-R6-05
+updates the cropped fake report and both representations. CLI tests cover both
+fixture scenes, capped and complete pairs, unchecked truncation and exit codes,
+body notes, and 2D option rejection. Desktop tests cover Plate fixture bytes and
+a single cube mesh request. Existing assertions are preserved.
+
+The assigned combined gate passed on the implementation tree: typecheck, Biome
+and 77 tests (0 failures). Complete log and per-edit snapshots, intentions and
+hashes: `tmp/capture-s885/capture-23f-host-cases/`. Earlier attempts exposed a
+Biome regex diagnostic and a fake report body-count mismatch; both were fixed
+and the complete gate rerun. No production files changed.

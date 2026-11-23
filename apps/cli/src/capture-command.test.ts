@@ -342,6 +342,11 @@ test("capture rejects CAD options on 2D pages and never rasterizes CAD pages", a
   expect(misuse.stderr).toContain(
     "--direction cannot be used on a freeform page.",
   );
+  const interference = await run("--interference-cell", "0.25");
+  expect(interference.exitCode).toBe(2);
+  expect(interference.stderr).toContain(
+    "--interference-cell cannot be used on a freeform page.",
+  );
   const cad = editor.createPage({ name: "Sketch", kind: "cad3d" });
   backend.renderSolid = () => {
     throw new Error("No body should reach the renderer");

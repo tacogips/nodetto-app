@@ -13,6 +13,21 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { Editor } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
+import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
+import {
+  CAD_TEST_PAGE,
+  cadElement,
+  extrude,
+  rectangle,
+  sketch,
+} from "../../../../packages/core/src/cad/testing/documents.ts";
+import {
+  PCB_TEST_PAGE,
+  boardReference,
+  edge,
+  testBoard,
+} from "../../../../packages/core/src/cad/testing/pcb.ts";
+import { document } from "../../../../packages/core/src/test-helpers.ts";
 import { captureSelectedLoopsDocument } from "../../../../packages/core/src/capture/testing/selected-loops.ts";
 import { binary, cliEntry, nativeTest } from "./harness.ts";
 
@@ -477,7 +492,7 @@ nativeTest(
           "--size",
           "320x240",
         ]).stdout,
-      ).toContain("cell 1 mm");
+      ).toContain("cell 0.938 mm");
       expect(
         runCad(cwd, plateFixture, [
           "--interference-bodies",
@@ -506,4 +521,257 @@ nativeTest(
     }
   },
   30_000,
+);
+
+nativeTest(
+  "native interference hatch uses both theme colours deterministically",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-hatch-"));
+    try {
+      for (const [theme, colours] of [
+        [
+          "light",
+          [
+            [0x33, 0x5c, 0x67],
+            [0xff, 0xfd, 0xf8],
+          ],
+        ],
+        [
+          "dark",
+          [
+            [0x5f, 0xb4, 0xc7],
+            [0x1f, 0x24, 0x27],
+          ],
+        ],
+      ] as const) {
+        const args = ["--view", "top", "--size", "320x240", "--theme", theme];
+        const first = runCad(cwd, plateFixture, args, "first.png");
+        expect(runCad(cwd, plateFixture, args, "second.png").bytes).toEqual(
+          first.bytes,
+        );
+        const picture = decodeCadPng(first.bytes);
+        const found = new Set<string>();
+        for (let y = 0; y < picture.height; y++)
+          for (let x = 0; x < picture.width; x++)
+            found.add(picture.at(x, y).join(","));
+        for (const colour of colours)
+          expect(found.has(colour.join(","))).toBe(true);
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "native capture reports emptied bodies and accepts mesh and PCB bodies",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-cases-"));
+    try {
+      const save = (
+        name: string,
+        elements: Parameters<typeof document>[0],
+        pages: Parameters<typeof document>[1] = [CAD_TEST_PAGE],
+      ) => {
+        const path = join(cwd, name);
+        writeFileSync(path, serializeDocument(document(elements, pages)));
+        return path;
+      };
+      const empty = save("empty.jsonl", [
+        sketch("base", "a1"),
+        ...rectangle("base", 0, 0, 10, 10),
+        cadElement("plate", "cad.extrude", "a2", {
+          name: "Plate",
+          sketch: "base",
+          distance: 5,
+          op: "new",
+        }),
+        sketch("trim-profile", "a3"),
+        ...rectangle("trim-profile", -1, -1, 12, 12),
+        cadElement("trim", "cad.extrude", "a4", {
+          name: "Trim",
+          sketch: "trim-profile",
+          distance: 5,
+          op: "cut",
+          bodies: ["plate"],
+        }),
+        sketch("boss-profile", "a5"),
+        ...rectangle("boss-profile", 1, 1, 3, 3),
+        cadElement("boss", "cad.extrude", "a6", {
+          name: "Boss",
+          sketch: "boss-profile",
+          distance: 5,
+          op: "add",
+          bodies: ["plate"],
+        }),
+      ]);
+      const emptyResult = runCad(cwd, empty, ["--size", "320x240"]);
+      expect(emptyResult.stdout).toContain("errors: 1");
+      expect(emptyResult.stdout).toContain("cad.result.empty (sampled)");
+      const mesh = toInline(
+        encodeNmesh(
+          canonicalize({
+            positions: new Float64Array([
+              0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0, 0, 0, 10, 10, 0, 10, 10,
+              10, 10, 0, 10, 10,
+            ]),
+            triangles: new Uint32Array([
+              0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1,
+              6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+            ]),
+          }),
+        ),
+      );
+      const meshPath = save("mesh.jsonl", [
+        cadElement("mesh", "cad.mesh", "a0", { name: "Cube", data: mesh }),
+        sketch("cut-profile", "a1"),
+        ...rectangle("cut-profile", 0, 0, 2, 2),
+        extrude("cut", "a2", {
+          sketch: "cut-profile",
+          distance: 10,
+          op: "cut",
+          bodies: ["mesh"],
+        }),
+      ]);
+      expect(runCad(cwd, meshPath, ["--size", "320x240"]).stdout).toContain(
+        "Cube",
+      );
+      const pcbPath = save(
+        "pcb.jsonl",
+        [
+          boardReference(),
+          testBoard(1.2),
+          edge("rim", { kind: "rect", start: [0, 0], end: [30, 40] }),
+        ],
+        [CAD_TEST_PAGE, PCB_TEST_PAGE],
+      );
+      expect(runCad(cwd, pcbPath, ["--size", "320x240"]).stdout).toContain(
+        "Controller board",
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "native interference finds a narrow pin and ignores a moved block",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-pairs-"));
+    try {
+      const path = join(cwd, "pairs.jsonl");
+      const make = (x: number, pin: boolean) =>
+        document(
+          [
+            sketch("base", "a1"),
+            ...rectangle("base", 0, 0, 20, 20),
+            cadElement("plate", "cad.extrude", "a2", {
+              name: "Plate",
+              sketch: "base",
+              distance: 5,
+              op: "new",
+            }),
+            sketch("other", "a3"),
+            ...(pin
+              ? [
+                  cadElement("pin-circle", "cad.circle", "a1", {
+                    sketch: "other",
+                    c: [10, 10],
+                    r: 0.75,
+                  }),
+                ]
+              : rectangle("other", x, 0, 5, 5)),
+            cadElement("other-body", "cad.extrude", "a4", {
+              name: pin ? "Pin" : "Block",
+              sketch: "other",
+              distance: 5,
+              op: "new",
+            }),
+          ],
+          [CAD_TEST_PAGE],
+        );
+      writeFileSync(path, serializeDocument(make(30, false)));
+      expect(runCad(cwd, path, ["--size", "320x240"]).stdout).toContain(
+        "interference: 0",
+      );
+      writeFileSync(path, serializeDocument(make(0, true)));
+      expect(runCad(cwd, path, ["--size", "320x240"]).stdout).toContain(
+        "interference: 1",
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "native capture meets the 1000-element budget and checks stacked candidates",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-scale-"));
+    try {
+      const path = join(cwd, "scale.jsonl");
+      const elements = Array.from({ length: 50 }, (_, i) => {
+        const id = `profile-${i}`;
+        return [
+          sketch(id, "a1"),
+          ...rectangle(id, i * 12, 0, 10, 10),
+          ...Array.from({ length: 14 }, (_, j) =>
+            cadElement(`${id}-circle-${j}`, "cad.circle", "a1", {
+              sketch: id,
+              c: [i * 12 + 1 + (j % 7), 2 + Math.floor(j / 7) * 4],
+              r: 0.2,
+            }),
+          ),
+          cadElement(`body-${i}`, "cad.extrude", "a2", {
+            name: `Body ${i}`,
+            sketch: id,
+            distance: 2,
+            op: "new",
+          }),
+        ];
+      }).flat();
+      expect(elements).toHaveLength(1000);
+      writeFileSync(
+        path,
+        serializeDocument(document(elements, [CAD_TEST_PAGE])),
+      );
+      const start = performance.now();
+      runCad(cwd, path, ["--size", "320x240", "--no-interference"]);
+      const elapsed = performance.now() - start;
+      mkdirSync(join(import.meta.dir, "../../../../tmp/capture/m23"), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(import.meta.dir, "../../../../tmp/capture/m23/timing.json"),
+        `${JSON.stringify({ milliseconds: elapsed })}\n`,
+      );
+      expect(elapsed).toBeLessThan(10_000);
+      const stacked = Array.from({ length: 50 }, (_, i) => {
+        const id = `stack-${i}`;
+        return [
+          sketch(id, "a1"),
+          ...rectangle(id, 0, 0, 1, 1),
+          cadElement(`solid-${i}`, "cad.extrude", "a2", {
+            name: `Solid ${i}`,
+            sketch: id,
+            distance: 1,
+            op: "new",
+          }),
+        ];
+      }).flat();
+      writeFileSync(
+        path,
+        serializeDocument(document(stacked, [CAD_TEST_PAGE])),
+      );
+      expect(runCad(cwd, path, ["--size", "320x240"]).stdout).toContain(
+        "1225 candidate pairs checked",
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  60_000,
 );

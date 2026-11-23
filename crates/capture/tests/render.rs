@@ -170,12 +170,16 @@ fn nearest_face_wins_and_hidden_is_distinct_from_absent() {
             BodyState::Drawn,
             BodyState::Drawn,
             BodyState::Hidden,
-            BodyState::Absent,
-            BodyState::Absent
+            BodyState::Outside,
+            BodyState::Empty
         ]
     );
 
+    assert_eq!(report.bodies[4].emptied_by_step, -1);
+    assert_eq!(report.bodies[5].emptied_by_step, 1);
+
     scene.camera = camera([0.0, 1.0, -0.35], [87.5, 45.0, 8.0], 0.25);
+    scene.draw_interference = false;
     let (rgb, _) = render_rgb(&scene, 1).unwrap();
     let block_shade = shade(&scene, [0.0, -1.0, 0.0]);
     assert_ne!(block_shade, shade(&scene, [0.0, 0.0, 1.0]));
@@ -336,7 +340,7 @@ fn reports_and_encoded_images_are_deterministic_across_workers() {
     }
     assert_eq!(
         digest(&one.0),
-        0x29c6_4b3e_156d_0941,
+        0x093f_f8ec_cdac_365b,
         "new RGB digest: {:016x}",
         digest(&one.0)
     );
@@ -404,7 +408,19 @@ fn references_meshes_and_interference_stay_out_of_the_m8_picture() {
     scene.budget_million_rays = 1;
     scene.draw_interference = true;
     let (actual, report) = render_rgb(&scene, 2).unwrap();
-    assert_eq!(baseline, actual);
+    let sample = [6.0, -3.0, 2.0];
+    let behind = at(&scene, &baseline, sample);
+    let reference_only = small(
+        vec![box_prism([-7.0, -7.0, 2.0], 14.0, 14.0, 5.0)],
+        vec![body(&[(Op::Union, 0)])],
+    );
+    let front = at(&scene, &render_rgb(&reference_only, 1).unwrap().0, sample);
+    let opacity = u32::from(scene.reference_opacity);
+    let expected = std::array::from_fn(|i| {
+        ((u32::from(behind[i]) * (255 - opacity) + u32::from(front[i]) * opacity + 127) / 255) as u8
+    });
+    assert_ne!(front, behind);
+    assert_eq!(at(&scene, &actual, sample), expected);
     assert_eq!(
         report.analysis.unwrap(),
         nodetto_capture::report::Analysis {
@@ -419,8 +435,9 @@ fn references_meshes_and_interference_stay_out_of_the_m8_picture() {
         }
     );
     assert!(report.pairs.is_empty());
-    assert_eq!(report.bodies[1].state, BodyState::Absent);
-    assert_eq!(report.bodies[2].state, BodyState::Absent);
+    assert_eq!(report.bodies[1].state, BodyState::Drawn);
+    assert_eq!(report.bodies[2].state, BodyState::Drawn);
+    assert!(report.bodies[2].open);
 }
 
 #[test]

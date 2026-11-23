@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { capturePlateDocument } from "../../../../packages/core/src/capture/testing/plate.ts";
 import { createManifoldKernel } from "@nodetto/cad-kernel";
 import {
   type CadEngine,
@@ -390,4 +392,162 @@ test("CAD capture errors and cancelled save never write", async () => {
   await failing.captureCadImage(options);
   expect(notes.at(-1)).toContain("render failed");
   expect(writes).toEqual([]);
+});
+
+test("CAD Plate capture sends the committed default scene", async () => {
+  const editor = new Editor();
+  editor.loadDocument(capturePlateDocument());
+  let scene: Uint8Array | undefined;
+  const backend: ExportBackend = {
+    available: true,
+    pickExportPath: async () => null,
+    writeBytes: async () => {},
+    writeText: async () => {},
+    captureSolid: async (bytes) => {
+      scene = bytes;
+      return {
+        image: Uint8Array.of(1),
+        report: JSON.stringify({
+          width: 1024,
+          height: 768,
+          bodies: [],
+          analysis: null,
+          pairs: [],
+        }),
+      };
+    },
+  };
+  const handlers = createExportHandlers(
+    { editor, exportBackend: backend },
+    () => {},
+  );
+  await handlers.captureCadImage({
+    camera: { view: "iso" },
+    width: 1024,
+    height: 768,
+    theme: "light",
+    format: "png",
+  });
+  expect(scene).toEqual(
+    new Uint8Array(
+      readFileSync(
+        new URL(
+          "../../../cli/src/__fixtures__/capture-plate-default.ncs1",
+          import.meta.url,
+        ),
+      ),
+    ),
+  );
+});
+
+test("CAD mesh-only capture sends the prepared cube scene", async () => {
+  const editor = new Editor();
+  const page = editor.createPage({ kind: "cad3d", name: "Cube" });
+  const cube = {
+    positions: Float32Array.of(
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0,
+      1,
+      1,
+      1,
+      1,
+      0,
+      1,
+      1,
+    ),
+    triangles: Uint32Array.of(
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      3,
+      0,
+      4,
+      3,
+      4,
+      7,
+    ),
+  };
+  editor.createElement("cad.mesh", {
+    semantic: { name: "Cube", data: stlToInlineMesh(writeBinaryStl([cube])) },
+  });
+  let scene: Uint8Array | undefined;
+  const backend: ExportBackend = {
+    available: true,
+    pickExportPath: async () => null,
+    writeBytes: async () => {},
+    writeText: async () => {},
+    captureSolid: async (bytes) => {
+      scene = bytes;
+      return {
+        image: Uint8Array.of(1),
+        report: JSON.stringify({
+          width: 1024,
+          height: 768,
+          bodies: [],
+          analysis: null,
+          pairs: [],
+        }),
+      };
+    },
+  };
+  const options = {
+    camera: { view: "iso" as const },
+    width: 1024,
+    height: 768,
+    theme: "light" as const,
+    format: "png" as const,
+  };
+  await createExportHandlers(
+    { editor, exportBackend: backend },
+    () => {},
+  ).captureCadImage(options);
+  expect(scene).toEqual(
+    prepareCadCapture(editor.getSnapshot().elements, page, {
+      ...options,
+      interference: DEFAULT_CAD_INTERFERENCE,
+      decodeMesh: decodeCaptureMesh,
+    }).scene,
+  );
 });

@@ -118,3 +118,16 @@ per-edit snapshots, intentions, hashes and logs are in
 `tmp/capture-s885/capture-23d-census-render-digest/`. Commit and review are
 later workflow steps; commit messages must state old and new expectations and
 digest.
+
+### Amendment resolution
+
+CAP-R6-06 is applied: the draw bit is cleared only before the single-thread
+shading render; the sample and assertions remain unchanged. The preceding
+blocked progress is historical. Gate 1 passed (121 tests, 0 failures; debug
+release-only tests ignored), gate 2 passed (142 tests, 0 failures), and the
+focused render suite passed (14 tests, 0 failures, 2 ignored). Complete logs
+are in `tmp/capture-s885/capture-23d-census-render-digest/` as
+`gate1-amended.log`, `gate2-amended.log`, and `render-amended.log`; the release
+output is also `tmp/capture/m23/release.txt`. Implementation and behavioral
+verification are complete on the shared tree. Formal review and the separate
+commits with the specified old/new expectations and digest remain downstream.

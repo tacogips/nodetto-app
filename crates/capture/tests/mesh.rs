@@ -112,3 +112,115 @@ fn open_operands_and_sources_follow_first_tool_rule() {
     assert_eq!(report.bodies[0].emptied_by_step, -1);
     assert!(report.pairs.is_empty());
 }
+
+#[test]
+fn reference_composites_at_45_percent_and_can_be_hidden() {
+    let mut reference = body(&[(Op::Union, 1)]);
+    reference.reference = true;
+    let mut s = scene(
+        vec![
+            box_prism([-4.0, -4.0, 0.0], 8.0, 8.0, 1.0),
+            box_prism([-4.0, -4.0, 2.0], 8.0, 8.0, 1.0),
+        ],
+        vec![body(&[(Op::Union, 0)]), reference],
+    );
+    if let Tool::Prism(front) = &mut s.tools[1] {
+        front.o[2] = 6.0;
+        front.u = [0.866_025_403_784_438_6, 0.0, -0.5];
+        front.n = [0.5, 0.0, 0.866_025_403_784_438_6];
+    }
+    s.reference_opacity = 115;
+    let (mixed, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(report.bodies[0].state, BodyState::Drawn);
+    assert_eq!(report.bodies[1].state, BodyState::Drawn);
+    let sample = (48, 48);
+    let mixed_pixel = pixel(&mixed, s.width, sample);
+    s.bodies.pop();
+    let behind = pixel(&render_rgb(&s, 1).unwrap().0, s.width, sample);
+    s.bodies = vec![body(&[(Op::Union, 1)])];
+    let front = pixel(&render_rgb(&s, 1).unwrap().0, s.width, sample);
+    assert_ne!(front, behind);
+    let expected = std::array::from_fn(|i| {
+        ((u32::from(behind[i]) * 140 + u32::from(front[i]) * 115 + 127) / 255) as u8
+    });
+    assert_eq!(mixed_pixel, expected);
+
+    s.tools[1] = box_prism([-5.0, -5.0, 2.0], 10.0, 10.0, 1.0);
+    let mut behind_reference = body(&[(Op::Union, 0)]);
+    behind_reference.reference = true;
+    s.bodies = vec![behind_reference, body(&[(Op::Union, 1)])];
+    let (_, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(report.bodies[0].state, BodyState::Hidden);
+    assert_eq!(report.bodies[1].state, BodyState::Drawn);
+}
+
+#[test]
+fn open_mesh_outside_the_camera_is_outside() {
+    let mut mesh = cube_mesh();
+    if let Tool::Mesh(mesh) = &mut mesh {
+        mesh.triangles.truncate(mesh.triangles.len() - 3);
+        for x in mesh.positions.iter_mut().step_by(3) {
+            *x += 100.0;
+        }
+    }
+    let s = scene(vec![mesh], vec![body(&[(Op::Union, 0)])]);
+    let (_, report) = render_rgb(&s, 1).unwrap();
+    assert!(report.bodies[0].open);
+    assert_eq!(report.bodies[0].state, BodyState::Outside);
+}
+
+#[test]
+fn sphere_mesh_edges_are_confined_to_its_outline() {
+    const RINGS: u32 = 32;
+    const SEGMENTS: u32 = 64;
+    let mut positions = vec![0.0, 0.0, 4.0];
+    for ring in 1..RINGS {
+        let theta = std::f64::consts::PI * f64::from(ring) / f64::from(RINGS);
+        for segment in 0..SEGMENTS {
+            let phi = std::f64::consts::TAU * f64::from(segment) / f64::from(SEGMENTS);
+            positions.extend([
+                4.0 * theta.sin() * phi.cos(),
+                4.0 * theta.sin() * phi.sin(),
+                4.0 * theta.cos(),
+            ]);
+        }
+    }
+    let south = 1 + (RINGS - 1) * SEGMENTS;
+    positions.extend([0.0, 0.0, -4.0]);
+    let mut triangles = Vec::new();
+    for segment in 0..SEGMENTS {
+        let next = (segment + 1) % SEGMENTS;
+        triangles.extend([0, 1 + segment, 1 + next]);
+        for ring in 0..RINGS - 2 {
+            let a = 1 + ring * SEGMENTS + segment;
+            let b = 1 + ring * SEGMENTS + next;
+            triangles.extend([a, a + SEGMENTS, b, b, a + SEGMENTS, b + SEGMENTS]);
+        }
+        let last = 1 + (RINGS - 2) * SEGMENTS;
+        triangles.extend([south, last + next, last + segment]);
+    }
+    let s = scene(
+        vec![Tool::Mesh(nodetto_capture::scene::Mesh {
+            positions,
+            triangles,
+        })],
+        vec![body(&[(Op::Union, 0)])],
+    );
+    let (image, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(report.bodies[0].state, BodyState::Drawn);
+    let mut edge_count = 0;
+    for y in 0..s.height as usize {
+        for x in 0..s.width as usize {
+            if pixel(&image, s.width, (x, y)) == s.colours.edge {
+                edge_count += 1;
+                let distance =
+                    ((x as f64 + 0.5 - 48.0).powi(2) + (y as f64 + 0.5 - 48.0).powi(2)).sqrt();
+                assert!(
+                    (14.0..=18.0).contains(&distance),
+                    "interior edge at ({x}, {y}), radius {distance}"
+                );
+            }
+        }
+    }
+    assert!(edge_count > 0);
+}

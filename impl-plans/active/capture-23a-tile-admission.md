@@ -113,3 +113,26 @@ Pending. One entry per run: date, command, exit status, complete log
 path under `tmp/capture/m23a/`, retries, `git hash-object` of each owned
 file before and after. A hash that differs from the last recorded value
 is drift: stop and record it. Record the final `raster.rs` hash for M23b.
+
+### 2026-11-23 implementation progress (incomplete)
+
+- Pre-edit scene: 11 passed, exit 0; debug scale: 0 passed, 2 ignored, exit 0. Logs: `tmp/capture-s885/capture-23a-tile-admission/pre-scene.log`, `pre-scale.log`.
+- Implemented admission and tile-major groups, seeded equivalence and sparse-body tests, and entry-limit scale test. Reference renderer and five comparison tests remain outstanding.
+- Debug and release aggregate commands exited 0 but each raster filter ran zero tests; neither satisfies the positive-count gate. Logs: `tmp/capture-s885/capture-23a-tile-admission/gate-debug.log`, `gate-release.log`. Release tiles: 6 passed; release scale: 3 passed. Work refusal 0.690 ms, entry refusal 0.734 ms, 600-hole plate 5.61 ms.
+- Before hashes: plan `a0bb96d5345c78bb8b5bf4bad77ed2e2ee85c82d`; tiles `db968aec25ee58904faff25f1a2cfc502e5703ae`; raster `34480090d85bf0b39552b2ecb686d43da19f17bf`; scale `2387c6e71ed58e3b2e455cf362e281d361ccb26c`.
+- Current `crates/capture/src/tiles.rs`: `e9a48fc0a2dd950ccdd1ad75d18d861ee8a84358`.
+- Current `crates/capture/src/raster.rs`: `ec4526a0b1933871c48455184264215e4b218289`.
+- Current `crates/capture/tests/scale.rs`: `0885b22815f52afc8de4c826c2a53b8ff709f1c5`.
+- Per-edit snapshots, intent and hashes are in `tmp/capture-s885/capture-23a-tile-admission/`. No drift observed. Formal review and commit remain downstream.
+
+### 2026-11-23 continuation: implementation complete, review pending
+
+- Added private independent all-steps reference rendering and all five full comparisons, plus reduced Plate and emptied/refilled debug comparisons, for requested thread counts 1, 2 and 5. Liveness is marked per sample; the reference never builds or selects tile lists.
+- Tool IDs are stored only for tile entries; added off-frame storage and M12-case admission equivalence regressions. Existing M12 tests and deadlines remain unchanged.
+- Debug aggregate exit 0: format and clippy passed, tiles 5 passed and raster 2 passed. Release aggregate exit 0: tiles 8 passed, raster 7 passed, scale 3 passed. Complete logs: `tmp/capture-s885/capture-23a-tile-admission/gate-debug-cont-1.log`, `tmp/capture-s885/capture-23a-tile-admission/gate-release-cont-1.log`. The earlier zero-raster-count logs remain diagnostic only.
+- Release timings: work refusal 1.44 ms, entry refusal 1.78 ms, 600-hole plate 9.46 ms. Sparse 20,000-body and existing 20,000-tool timing assertions passed.
+- `git diff --check` exit 0: `tmp/capture-s885/capture-23a-tile-admission/diff-check-cont.log`. Per-edit intent, fresh snapshots and before/after hashes are in the same evidence directory.
+- Final `crates/capture/src/tiles.rs`: `d717a11147e50fc0578204aa37edd52bd63bc97f`.
+- Final `crates/capture/src/raster.rs`: `7ab3ea0d8079426386ffbf386bde5c37a0b1918e`.
+- Final `crates/capture/tests/scale.rs`: `0885b22815f52afc8de4c826c2a53b8ff709f1c5`.
+- Implementation acceptance criteria are satisfied pending independent integrity, adversarial and integration review; M23b receives the raster hash above. Commit and final acceptance belong to downstream workflow steps.

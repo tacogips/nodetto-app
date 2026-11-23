@@ -63,6 +63,18 @@ new digests here. Keep seeds fixed.
 
 ## Progress
 
-Pending. Hashes before and after per owned file, logs under
-`tmp/capture/m23c/`, drift stops the run. Record the CAP-R5-03 evidence
-(test names, log path) for M23d.
+Implementation complete; formal review remains downstream. M23b is admitted by
+runtime `acceptedPlanIds`. CAP-R5-03 is proven on this tree by
+`plate_iso_bit_clear_retains_picture_digest` and
+`plate_iso_changes_are_contained_in_reported_pair_boxes_and_use_both_hatch_colours`:
+the old digest, nonempty bounded changes and both colours pass. The remaining
+overlay and mesh cases are in their owned test files; no production edit was
+needed. The unchanged 200,000-triangle test took 100.815 ms in release.
+
+Evidence: `tmp/capture-s885/capture-23c-picture-acceptance/` contains fresh
+before/after snapshots, git hashes and intentions for each edit. The initial
+debug gate failed clippy on fixed-size chunks (`gate-debug.log`, exit 101);
+the owned test was corrected. Final `gate-debug-final.log` exited 0 (36 passed,
+12 existing ignored); `gate-release-final.log` exited 0 (48 passed). Both
+logs include exit status. The 100 seeded scenes use two bodies each. No git
+state was changed. M23d owns the digest replacement after review.
