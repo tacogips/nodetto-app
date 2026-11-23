@@ -138,6 +138,7 @@ nodetto-cli draw flow.jsonl flowchart:decision --label "In stock?"   # one shape
 nodetto-cli draw flow.jsonl erd.foreign-key --from 01M4WD --to 01M4X2  # a connector shape
 nodetto-cli edit flow.jsonl --ops ops.json --snapshot .last.jsonl  # add/connect/update/..., all-or-nothing
 nodetto-cli diff .last.jsonl flow.jsonl         # what the person changed since the agent's last write
+nodetto-cli capture flow.jsonl --output flow.png  # inspect the current page
 nodetto-cli export flow.jsonl --page Flow --format png --output /tmp/flow.png
 nodetto-cli export schema.jsonl --element f-orders --format png --output /tmp/frame.png
 nodetto-cli export flow.jsonl --format pdf --pdf-page a4 --output flow.pdf
@@ -516,3 +517,14 @@ nodetto-cli export document.jsonl --format markdown --output document.md
 
 The Markdown shorthand is equivalent to the explicit document form. The CLI
 writes SVG assets alongside the Markdown file in `<stem>.assets/`.
+
+## Capturing page images
+
+Capture a 2D page or choose a view of a CAD page:
+
+```bash
+nodetto-cli capture drawing.jsonl --output drawing.png
+nodetto-cli capture plate.jsonl --view top --output plate.png
+```
+
+See the [capture guide](capture.md) for options, interference and MCP images.

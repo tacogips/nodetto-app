@@ -101,7 +101,22 @@ Step 3 native measurement command (run once, then retries per step 5):
 
 ## Progress
 
-Pending. Read the design fresh before editing and record `git hash-object`
-before and after; a differing hash from the last recorded value is drift:
-stop and record it. Append: date, command, exit status, full log path,
-attempts, hashes.
+2026-11-23: Implementation complete, pending independent review. Design
+section 10.3 contains the measured table; the rest of the design is unchanged.
+Design hash before: `4069e0f74444d9aa0b5dc4343627e013637b2c0d`; after:
+`1c212d1d0755000fce1eebcfc0f53b5d7d31cfe7`. Plan hash before progress:
+`58c5b358bd392b0af11416c58348fb70bcd044c0`. No drift observed.
+
+- Verification 1: exit 0, 142 passed, 0 failed; first attempt;
+  `target/capture-m16/crate-release.log`.
+- Step 3 native build and timings: exit 0, first attempt; command log
+  `target/capture-m16/native-command.log`, case logs `native-plate-png.txt`,
+  `native-plate-jpg.txt`, `native-led-2d.txt` in `target/capture-m16/`.
+- Verification 2: exit 0, 1 passed, 0 failed; first attempt;
+  `target/capture-m16/bun-scene.log`.
+- Verification 3: exit 0, 1 selected test; first attempt;
+  `target/capture-m16/gate-3.log` (test output suppressed by the plan).
+- Machine and load: `target/capture-m16/machine.txt`. Intent records:
+  `target/capture-m16/design-edit-intent.txt` and `plan-edit-intent.txt`.
+  No test, fixture, deadline, or budget was changed. Full repository
+  verification remains deferred and NOT yet run, per CAP-R7-01.

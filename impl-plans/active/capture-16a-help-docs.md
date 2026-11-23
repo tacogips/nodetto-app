@@ -138,7 +138,23 @@ them into `docs/capture.md`).
 
 ## Progress
 
-Pending. Read each owned file fresh before editing and record
-`git hash-object` before and after; a hash that differs from the last
-recorded value is drift: stop and record it. Append: date, command, exit
-status, full log path, retries, hashes.
+Implementation complete 2026-11-23; formal review and acceptance remain downstream.
+The help, guide, CLI discovery and executable documentation examples satisfy
+this plan. The first help/docs attempt failed typecheck on an import path;
+the path was corrected and both final gates passed on the current source.
+Per-edit intentions and hashes are in `tmp/capture-s889/capture-16a-help-docs/`.
+The formatter was applied to the newly created test after its initial write;
+the later edit snapshot records the resulting content and hash. No drift was
+observed in owned files. Final source hashes:
+
+- `apps/cli/src/capture-help.ts`: `85101801f150e59c5ca3238257eee00d33cd30b0`
+- `apps/cli/src/capture-docs.test.ts`: `8fe58205b2ac8e522d1ef82b6bcac9235fc092d3`
+- `docs/capture.md`: `3649646f1ac222b8226cdce439dbbc8dbb38e09c`
+- `docs/cli.md`: `be9e1a65b6c56c3b836d559c0567bb6adf3df604`
+
+- Help/docs gate: exit 0, 60 passed, 0 failed; `target/capture-m16a/help-docs.log`.
+- CLI unit gate with `UPDATE_CAPTURE_FIXTURES=0`: exit 0, 81 passed, 0 failed;
+  `target/capture-m16a/cli-unit.log`; fixture diff clean.
+- Earlier attempt: exit 1 (typecheck exit 2),
+  `tmp/capture-s889/capture-16a-help-docs/help-docs-attempt1.log`.
+- Full repository verification remains deferred as specified by CAP-R7-01.
