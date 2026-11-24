@@ -110,6 +110,11 @@ export interface CommandIo {
   readStdin?(): string;
   /** Binary output (PNG, PDF); required only by commands that write bytes. */
   writeBytes?(path: string, bytes: Uint8Array): void;
+  /** A faster decoder for inline CAD meshes; it throws on invalid data. */
+  decodeMesh?(data: string): {
+    readonly positions: Float64Array;
+    readonly triangles: Uint32Array;
+  };
   readonly capture?: {
     /** Per-user private capture directory, created on first use. */
     dir(): string;

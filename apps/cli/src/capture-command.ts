@@ -252,6 +252,7 @@ export async function captureCommand(
         format,
         quality,
         interferenceOptions.failOnInterference,
+        io.decodeMesh,
       );
     }
     const rendered =

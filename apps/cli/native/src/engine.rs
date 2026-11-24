@@ -7,7 +7,7 @@ use boa_engine::{
     object::builtins::{JsArray, JsPromise, JsUint8Array},
     Context, JsArgs, JsNativeError, JsResult, JsValue, NativeFunction, Source,
 };
-use nodetto_capture::{render_scene, transcode_png, ImageFormat};
+use nodetto_capture::{render_parsed, scene::parse_scene, transcode_png, ImageFormat};
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::PathBuf, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
@@ -140,13 +140,24 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             let replace = args.get_or_undefined(2).to_boolean();
             Ok(js_string!(files::write_capture(&path, &data, replace).map_err(host_error)?).into())
         }
+        "nmeshDecode" => byte_value(
+            nodetto_capture::nmesh::decode_inline(&string(args, 0, ctx)?)
+                .ok_or_else(|| host_error("Invalid mesh data."))?
+                .to_packet(),
+            ctx,
+        ),
         "digest" => Ok(js_string!(files::digest(&bytes(args.get_or_undefined(0), ctx)?)).into()),
         "captureSolid" | "captureEncode" => {
             let format = capture_format(args, ctx)?;
             let input = bytes(args.get_or_undefined(0), ctx)?;
             if operation == "captureSolid" {
+                let scene = parse_scene(&input).map_err(host_error)?;
+                drop(input);
+                // The renderer needs its memory now: give back what the
+                // script side no longer uses of the parsed document.
+                boa_engine::gc::force_collect();
                 let nodetto_capture::CaptureOutput { image, report } =
-                    render_scene(&input, format, 0).map_err(host_error)?;
+                    render_parsed(&scene, format, 0).map_err(host_error)?;
                 let length = u32::try_from(report.len()).map_err(host_error)?;
                 let mut packet = Vec::with_capacity(4 + report.len() + image.len());
                 packet.extend_from_slice(&length.to_le_bytes());
@@ -299,7 +310,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
         globalThis.native = Object.fromEntries([
           'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','open','png','pdf','pdfPages','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random',
-          'captureDir','captureAbsolute','writeCapture','digest','captureEncode','captureSolid'
+          'captureDir','captureAbsolute','writeCapture','digest','captureEncode','captureSolid','nmeshDecode'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };
         globalThis.TextDecoder = class { decode(bytes = []) { return native.decodeUtf8(new Uint8Array(bytes)); } };

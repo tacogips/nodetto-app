@@ -405,7 +405,7 @@ fn solid_capture_runs_through_boa_and_matches_bun_scene_bytes() {
     assert!(bytes(&observed, &mut ctx).unwrap() == SCENE);
 
     let image = std::fs::read(folder.path().join("plate.png")).unwrap();
-    let expected = render_scene(SCENE, ImageFormat::Png, 0).unwrap();
+    let expected = nodetto_capture::render_scene(SCENE, ImageFormat::Png, 0).unwrap();
     assert_eq!(image, expected.image);
     assert_eq!(&image[..8], b"\x89PNG\r\n\x1a\n");
     assert_eq!(&image[12..26], b"IHDR\0\0\x04\0\0\0\x03\0\x08\x02");

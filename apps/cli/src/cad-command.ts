@@ -53,7 +53,7 @@ export function cadCommand(
     const input = local.some(({ type }) => type === "cad.pcb")
       ? collectCadInput(document, id, 0).elements
       : local;
-    const report = checkCadPage(input, id);
+    const report = checkCadPage(input, id, io.decodeMesh);
     return {
       ...report,
       errors: [...report.errors].sort((a, b) => compareFractional(a.id, b.id)),

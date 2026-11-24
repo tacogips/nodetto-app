@@ -67,14 +67,17 @@ pub fn mesh_bounds(mesh: &Mesh) -> ([f64; 3], [f64; 3]) {
     }
     (lo, hi)
 }
-#[derive(Clone, Copy)]
-struct Triangle {
-    p: [[f64; 3]; 3],
-    q: [[f64; 2]; 3],
-}
+/// One projected mesh. Corners are shared through vertex indices and the
+/// bins are one flat list: a view costs about 40 bytes per triangle.
 pub struct MeshView {
-    triangles: Vec<Triangle>,
-    bins: Vec<Vec<usize>>,
+    /// Vertex positions and their projection onto the view plane.
+    points: Vec<[f64; 3]>,
+    projected: Vec<[f64; 2]>,
+    /// The valid triangles; a facet number indexes this list.
+    triangles: Vec<[u32; 3]>,
+    /// Bin `b` lists `items[starts[b]..starts[b + 1]]`, in triangle order.
+    starts: Vec<u32>,
+    items: Vec<u32>,
     lo: [f64; 2],
     hi: [f64; 2],
     side: usize,
@@ -82,7 +85,6 @@ pub struct MeshView {
     forward: [f64; 3],
     tool: u32,
     closed: bool,
-    listings: usize,
 }
 fn index(v: f64, lo: f64, hi: f64, side: usize) -> usize {
     if hi <= lo || !v.is_finite() {
@@ -118,33 +120,31 @@ impl MeshView {
             u = [1.0, 0.0, 0.0];
         }
         let v = cross(f, u);
-        let basis = [u, v];
-        let mut triangles = Vec::new();
+        let points = mesh.positions.as_chunks::<3>().0.to_vec();
+        let projected: Vec<_> = points
+            .iter()
+            .map(|&point| [dot(point, u), dot(point, v)])
+            .collect();
+        let finite = |i: u32| {
+            points
+                .get(i as usize)
+                .is_some_and(|point| point.iter().all(|v| v.is_finite()))
+        };
+        let triangles: Vec<[u32; 3]> = mesh
+            .triangles
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .copied()
+            .filter(|t| t.iter().all(|&i| finite(i)))
+            .collect();
         let mut lo = [f64::INFINITY; 2];
         let mut hi = [f64::NEG_INFINITY; 2];
-        for t in mesh.triangles.as_chunks::<3>().0 {
-            let mut p = [[0.0; 3]; 3];
-            let mut valid = true;
-            for i in 0..3 {
-                let n = (t[i] as usize).checked_mul(3);
-                if let Some(s) = n.and_then(|n| mesh.positions.get(n..n.saturating_add(3))) {
-                    p[i].copy_from_slice(s);
-                    valid &= s.iter().all(|v| v.is_finite());
-                } else {
-                    valid = false;
-                }
+        for &i in triangles.iter().flatten() {
+            for a in 0..2 {
+                lo[a] = lo[a].min(projected[i as usize][a]);
+                hi[a] = hi[a].max(projected[i as usize][a]);
             }
-            if !valid {
-                continue;
-            }
-            let q = p.map(|point| [dot(point, u), dot(point, v)]);
-            for point in q {
-                for a in 0..2 {
-                    lo[a] = lo[a].min(point[a]);
-                    hi[a] = hi[a].max(point[a]);
-                }
-            }
-            triangles.push(Triangle { p, q });
         }
         if let Some((a, b)) = window {
             if (0..2).all(|i| a[i].is_finite() && b[i].is_finite() && a[i] < b[i]) {
@@ -156,62 +156,85 @@ impl MeshView {
             lo = [0.0; 2];
             hi = [0.0; 2];
         }
+        // The bins each triangle's projected box covers, as (x range, y range).
+        let cover = |t: &[u32; 3], side: usize| {
+            let mut a = [f64::INFINITY; 2];
+            let mut b = [f64::NEG_INFINITY; 2];
+            for &i in t {
+                for k in 0..2 {
+                    a[k] = a[k].min(projected[i as usize][k]);
+                    b[k] = b[k].max(projected[i as usize][k]);
+                }
+            }
+            (0..2).all(|k| b[k] >= lo[k] && a[k] <= hi[k]).then(|| {
+                let range =
+                    |k: usize| index(a[k], lo[k], hi[k], side)..=index(b[k], lo[k], hi[k], side);
+                (range(0), range(1))
+            })
+        };
         let mut side = ((triangles.len() as f64 / 2.0).sqrt() as usize).clamp(1, 1024);
-        let (bins, listings) = loop {
-            let mut bins = vec![Vec::new(); side * side];
-            let mut count = 0usize;
+        // Halve the grid until the listings fit the limit, then fill the
+        // bins in two passes: count each bin, then place the triangles.
+        let mut starts = loop {
             let limit = triangles
                 .len()
                 .saturating_mul(4)
                 .saturating_add(side * side);
-            'triangles: for (i, t) in triangles.iter().enumerate() {
-                let mut a = [f64::INFINITY; 2];
-                let mut b = [f64::NEG_INFINITY; 2];
-                for q in t.q {
-                    for k in 0..2 {
-                        a[k] = a[k].min(q[k]);
-                        b[k] = b[k].max(q[k]);
-                    }
-                }
-                if (0..2).any(|k| b[k] < lo[k] || a[k] > hi[k]) {
+            let mut counts = vec![0u32; side * side + 1];
+            let mut total = 0usize;
+            'triangles: for t in &triangles {
+                let Some((xs, ys)) = cover(t, side) else {
                     continue;
-                }
-                for y in index(a[1], lo[1], hi[1], side)..=index(b[1], lo[1], hi[1], side) {
-                    for x in index(a[0], lo[0], hi[0], side)..=index(b[0], lo[0], hi[0], side) {
-                        bins[y * side + x].push(i);
-                        count += 1;
-                        if count > limit {
+                };
+                for y in ys {
+                    for x in xs.clone() {
+                        counts[y * side + x + 1] += 1;
+                        total += 1;
+                        if total > limit {
                             break 'triangles;
                         }
                     }
                 }
             }
-            if count
-                <= triangles
-                    .len()
-                    .saturating_mul(4)
-                    .saturating_add(side * side)
-                || side == 1
-            {
-                break (bins, count);
+            if total <= limit || side == 1 {
+                break counts;
             }
             side = (side / 2).max(1);
         };
+        for bin in 1..starts.len() {
+            starts[bin] += starts[bin - 1];
+        }
+        let mut items = vec![0u32; starts[side * side] as usize];
+        let mut next = starts.clone();
+        for (i, t) in triangles.iter().enumerate() {
+            let Some((xs, ys)) = cover(t, side) else {
+                continue;
+            };
+            for y in ys {
+                for x in xs.clone() {
+                    let slot = &mut next[y * side + x];
+                    items[*slot as usize] = i as u32;
+                    *slot += 1;
+                }
+            }
+        }
         Self {
+            points,
+            projected,
             triangles,
-            bins,
+            starts,
+            items,
             lo,
             hi,
             side,
-            basis,
+            basis: [u, v],
             forward: f,
             tool,
             closed: is_closed(mesh),
-            listings,
         }
     }
     /// The triangles one ray tests: the bin the ray falls in.
-    fn bin(&self, ray: &Ray) -> Option<([f64; 2], &[usize])> {
+    fn bin(&self, ray: &Ray) -> Option<([f64; 2], &[u32])> {
         let q = [
             dot(ray.origin, self.basis[0]),
             dot(ray.origin, self.basis[1]),
@@ -221,7 +244,8 @@ impl MeshView {
         }
         let bin = index(q[1], self.lo[1], self.hi[1], self.side) * self.side
             + index(q[0], self.lo[0], self.hi[0], self.side);
-        Some((q, &self.bins[bin]))
+        let listed = self.starts[bin] as usize..self.starts[bin + 1] as usize;
+        Some((q, &self.items[listed]))
     }
     pub(crate) fn scan_cost(&self, ray: &Ray) -> usize {
         self.bin(ray).map_or(0, |(_, bin)| bin.len())
@@ -232,16 +256,17 @@ impl MeshView {
             return;
         };
         for &i in bin {
-            let t = self.triangles[i];
-            let area = edge(t.q[0], t.q[1], t.q[2]);
+            let corners = self.triangles[i as usize].map(|vertex| vertex as usize);
+            let tq = corners.map(|vertex| self.projected[vertex]);
+            let area = edge(tq[0], tq[1], tq[2]);
             if area == 0.0 || !area.is_finite() {
                 continue;
             }
             let order = if area > 0.0 { [0, 1, 2] } else { [0, 2, 1] };
             let mut inside = true;
             for j in 0..3 {
-                let a = t.q[order[j]];
-                let b = t.q[order[(j + 1) % 3]];
+                let a = tq[order[j]];
+                let b = tq[order[(j + 1) % 3]];
                 let e = edge(a, b, q);
                 if e < 0.0 || (e == 0.0 && !inclusive(a, b)) {
                     inside = false;
@@ -251,20 +276,21 @@ impl MeshView {
             if !inside {
                 continue;
             }
+            let p = corners.map(|vertex| self.points[vertex]);
             let n = cross(
-                std::array::from_fn(|k| t.p[1][k] - t.p[0][k]),
-                std::array::from_fn(|k| t.p[2][k] - t.p[0][k]),
+                std::array::from_fn(|k| p[1][k] - p[0][k]),
+                std::array::from_fn(|k| p[2][k] - p[0][k]),
             );
             let d = dot(n, self.forward);
             if d == 0.0 || !d.is_finite() {
                 continue;
             }
-            let s = dot(n, std::array::from_fn(|k| t.p[0][k] - ray.origin[k])) / d;
+            let s = dot(n, std::array::from_fn(|k| p[0][k] - ray.origin[k])) / d;
             if s.is_finite() {
                 scratch.push(Boundary {
                     s,
                     tool: self.tool,
-                    face: if FACETS { i as u32 } else { 0 },
+                    face: if FACETS { i } else { 0 },
                 });
             }
         }
@@ -291,10 +317,13 @@ impl MeshView {
         scratch.first().copied()
     }
     pub(crate) fn surface(&self, facet: u32) -> Option<(u32, [f64; 3])> {
-        let t = self.triangles.get(facet as usize)?;
+        let p = self
+            .triangles
+            .get(facet as usize)?
+            .map(|vertex| self.points[vertex as usize]);
         let normal = cross(
-            std::array::from_fn(|i| t.p[1][i] - t.p[0][i]),
-            std::array::from_fn(|i| t.p[2][i] - t.p[0][i]),
+            std::array::from_fn(|i| p[1][i] - p[0][i]),
+            std::array::from_fn(|i| p[2][i] - p[0][i]),
         );
         let length = dot(normal, normal).sqrt();
         if !length.is_finite() || length == 0.0 {
@@ -316,10 +345,13 @@ impl MeshView {
         scratch.first().copied()
     }
     pub fn average_occupancy(&self) -> f64 {
-        self.listings as f64 / self.bins.len() as f64
+        self.listings() as f64 / self.bin_count() as f64
     }
     pub fn listings(&self) -> usize {
-        self.listings
+        self.items.len()
+    }
+    pub fn bin_count(&self) -> usize {
+        self.side * self.side
     }
 }
 
@@ -398,7 +430,7 @@ mod tests {
         view.intervals(&ray, &mut scratch, &mut out);
         assert_eq!(out.len(), 2);
         assert!((out[1].s - out[0].s - 1.).abs() < 1e-9);
-        assert!(view.listings() <= 4 * 12 + view.bins.len());
+        assert!(view.listings() <= 4 * 12 + view.bin_count());
         mesh.triangles.truncate(33);
         assert!(!is_closed(&mesh));
         let view = MeshView::new(&mesh, 0, &family, None);
@@ -478,7 +510,7 @@ mod tests {
         assert_eq!(out.len(), 2);
         let exact = 2.0_f64 * (1.0_f64 - 0.25 * 0.25 - 0.125 * 0.125).sqrt();
         assert!(((out[1].s - out[0].s) - exact).abs() < 0.02);
-        assert!(view.listings() <= 4 * mesh.triangles.len() / 3 + view.bins.len());
+        assert!(view.listings() <= 4 * mesh.triangles.len() / 3 + view.bin_count());
     }
     #[test]
     fn facet_surfaces_preserve_analysis_and_open_hits() {

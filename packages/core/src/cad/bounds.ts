@@ -81,11 +81,18 @@ export function sweptBounds(
 /** Bounds of packed x, y, z triples; empty for no points. */
 export function pointBounds(positions: ArrayLike<number>): MutableBounds3 {
   const box = emptyBounds();
-  for (let i = 0; i < positions.length; i += 3) {
-    for (const axis of AXES) {
-      const value = coordinate(positions, i + axis);
-      box.min[axis] = Math.min(box.min[axis], value);
-      box.max[axis] = Math.max(box.max[axis], value);
+  // Plain indexed loops with the length read once: the native CLI's
+  // interpreter builds an iterator for every `for...of` and looks the
+  // length up on every pass, which costs seconds on a large mesh.
+  const { min, max } = box;
+  const count = positions.length;
+  for (let i = 0; i < count; i += 3) {
+    for (let axis = 0; axis < 3; axis++) {
+      const value = positions[i + axis];
+      if (value === undefined)
+        throw new RangeError("Missing polygon coordinate");
+      min[axis] = Math.min(min[axis], value);
+      max[axis] = Math.max(max[axis], value);
     }
   }
   return box;

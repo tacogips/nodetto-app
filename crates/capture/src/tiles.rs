@@ -126,20 +126,28 @@ impl TileLists {
         let mut entry_counts = vec![0usize; count];
         let mut body_counts = vec![0usize; count];
         let mut touched = Vec::new();
-        for body in &scene.bodies {
-            for step in &body.steps {
-                if let Some((x0, y0, x1, y1)) = tiles_for(step, rects, samples_x, samples_y) {
-                    for y in y0..y1 {
-                        for x in x0..x1 {
-                            let i = y as usize * columns as usize + x as usize;
-                            if body_counts[i] == 0 {
-                                touched.push(i);
-                            }
-                            body_counts[i] += 1;
-                        }
+        // The tiles one step covers, as indices into the tile grid.
+        let step_tiles = |step: &crate::scene::Step| {
+            tiles_for(step, rects, samples_x, samples_y)
+                .into_iter()
+                .flat_map(move |(x0, y0, x1, y1)| {
+                    (y0..y1).flat_map(move |y| {
+                        (x0..x1).map(move |x| y as usize * columns as usize + x as usize)
+                    })
+                })
+        };
+        // Count a body's steps per tile and note the tiles it touches.
+        let count_steps =
+            |body: &crate::scene::Body, counts: &mut [usize], touched: &mut Vec<usize>| {
+                for i in body.steps.iter().flat_map(step_tiles) {
+                    if counts[i] == 0 {
+                        touched.push(i);
                     }
+                    counts[i] += 1;
                 }
-            }
+            };
+        for body in &scene.bodies {
+            count_steps(body, &mut body_counts, &mut touched);
             for i in touched.drain(..) {
                 group_counts[i] += 1;
                 entry_counts[i] += body_counts[i];
@@ -164,19 +172,7 @@ impl TileLists {
         let mut group_cursor = offsets[..count].to_vec();
         let mut entry_cursor = entry_offsets[..count].to_vec();
         for (body_index, body) in scene.bodies.iter().enumerate() {
-            for step in &body.steps {
-                if let Some((x0, y0, x1, y1)) = tiles_for(step, rects, samples_x, samples_y) {
-                    for y in y0..y1 {
-                        for x in x0..x1 {
-                            let i = y as usize * columns as usize + x as usize;
-                            if body_counts[i] == 0 {
-                                touched.push(i);
-                            }
-                            body_counts[i] += 1;
-                        }
-                    }
-                }
-            }
+            count_steps(body, &mut body_counts, &mut touched);
             for &i in &touched {
                 let start = entry_cursor[i];
                 groups[group_cursor[i]] = Group {
@@ -188,15 +184,10 @@ impl TileLists {
                 body_counts[i] = 0;
             }
             for (step_index, step) in body.steps.iter().enumerate() {
-                if let Some((x0, y0, x1, y1)) = tiles_for(step, rects, samples_x, samples_y) {
-                    for y in y0..y1 {
-                        for x in x0..x1 {
-                            let i = y as usize * columns as usize + x as usize;
-                            indices[entry_cursor[i]] = step_index as u32;
-                            tools[entry_cursor[i]] = step.tool;
-                            entry_cursor[i] += 1;
-                        }
-                    }
+                for i in step_tiles(step) {
+                    indices[entry_cursor[i]] = step_index as u32;
+                    tools[entry_cursor[i]] = step.tool;
+                    entry_cursor[i] += 1;
                 }
             }
             touched.clear();

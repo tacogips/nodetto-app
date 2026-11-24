@@ -36,7 +36,9 @@ import "../../src/styles/base.css";
 import "../../src/styles/canvas.css";
 
 const mountStart = performance.now();
-await preloadCadUi();
+// Not awaited: the CAD chunks import this entry chunk back, so a top-level
+// await here would never settle. The viewport appears once they have loaded.
+void preloadCadUi();
 const plate = plateWithHoles(60);
 const secondPage = { ...PCB_TEST_PAGE, id: "interface-pcb", name: "Interface" };
 const outline = edge("rim", { kind: "rect", start: [0, 0], end: [20, 10] });

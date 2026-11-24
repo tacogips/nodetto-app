@@ -17,20 +17,30 @@ export interface CadCheckReport extends CadConstructionReport {
   readonly bounds: { min: Vec3; max: Vec3 } | null;
 }
 
+type MeshDecoder = (data: string) => {
+  readonly positions: ArrayLike<number>;
+  readonly triangles: ArrayLike<number>;
+};
+
 /** A payload that passes the field check can still be corrupt inside. */
-function meshDecodes(data: string): boolean {
+function meshDecodes(data: string, decode?: MeshDecoder): boolean {
   try {
-    const { positions, triangles } = decodeNmesh(fromInline(data));
+    const { positions, triangles } = decode
+      ? decode(data)
+      : decodeNmesh(fromInline(data));
     return positions.length > 0 && triangles.length > 0;
   } catch (error) {
-    if (!(error instanceof NmeshError)) throw error;
+    // A host decoder reports invalid data with a plain error.
+    if (!decode && !(error instanceof NmeshError)) throw error;
     return false;
   }
 }
 
+/** `decodeMesh` replaces the built-in mesh decoder with a faster one. */
 export function checkCadPage(
   elements: readonly Element[],
   pageId: PageId,
+  decodeMesh?: MeshDecoder,
 ): CadCheckReport {
   const bounds = emptyBounds();
   const report = visitCadConstruction(elements, pageId, {
@@ -38,7 +48,7 @@ export function checkCadPage(
       if (feature.type === "cad.extrude")
         includeBounds(bounds, sweptBounds(frame, t0, t1, loops));
     },
-    mesh: ({ semantic }) => meshDecodes(semantic.data),
+    mesh: ({ semantic }) => meshDecodes(semantic.data, decodeMesh),
   });
   return { ...report, bounds: isEmptyBounds(bounds) ? null : bounds };
 }

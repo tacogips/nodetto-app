@@ -208,9 +208,8 @@ export function buildCadCaptureModel(
       let positions: Float64Array;
       let triangles: Uint32Array;
       try {
-        const decoded = options.decodeMesh(semantic.data);
-        positions = new Float64Array(decoded.positions);
-        triangles = new Uint32Array(decoded.triangles);
+        // The decoder returns fresh arrays; a mesh is megabytes, so keep them.
+        ({ positions, triangles } = options.decodeMesh(semantic.data));
       } catch {
         return false;
       }

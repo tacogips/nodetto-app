@@ -201,3 +201,57 @@ nativeTest(
   },
   30_000,
 );
+
+nativeTest(
+  "the native mesh decoder accepts and rejects the same payloads as the source decoder",
+  () => {
+    mkdirSync(scratch, { recursive: true });
+    const cwd = mkdtempSync(join(scratch, "mesh-decode-"));
+    try {
+      const valid = readFileSync(
+        join(root, "crates/capture/tests/fixtures/tetrahedron.nmesh.txt"),
+        "utf8",
+      ).trim();
+      const at = valid.length - 12;
+      const payloads = [
+        valid,
+        // A changed character breaks the checksum.
+        `${valid.slice(0, at)}${valid[at] === "A" ? "B" : "A"}${valid.slice(at + 1)}`,
+        // Well-formed armor around bytes that are not a mesh.
+        "nmesh1:UExBVEU=",
+        "nmesh1:AAAAAAAAAAAAAAAAAAAAAAAA",
+        // Unused bits after the last byte.
+        `${valid.slice(0, -4)}AAB=`,
+      ];
+      const doc: Document = {
+        schemaVersion: 1,
+        id: "mesh-decoding",
+        title: "Mesh decoding",
+        pages: [{ id: "cad", name: "Meshes", kind: "cad3d" }],
+        elements: payloads.map((data, i) => ({
+          id: `mesh-${i}`,
+          page: "cad",
+          type: "cad.mesh",
+          index: `a${i}`,
+          visual: {},
+          semantic: { name: `Mesh ${i + 1}`, data },
+        })),
+      };
+      const file = join(cwd, "meshes.jsonl");
+      writeFileSync(file, serializeDocument(doc));
+      const checked = compare(["cad", "check", file, "--json"], cwd);
+      const [report] = JSON.parse(checked.stdout.toString()) as [
+        { errors: { id: string; code: string }[] },
+      ];
+      expect(report.errors).toEqual(
+        [1, 2, 3, 4].map((i) => ({
+          id: `mesh-${i}`,
+          code: "cad.mesh.invalid",
+        })),
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);

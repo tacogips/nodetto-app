@@ -120,10 +120,11 @@ export function renderCadCapture(
   format: "png" | "jpg",
   quality: number,
   failOnInterference = false,
+  decodeMesh: CadCaptureRequest["decodeMesh"] = decodeCaptureMesh,
 ) {
   const { scene, model, camera, frame } = prepareCadCapture(elements, page.id, {
     ...request,
-    decodeMesh: decodeCaptureMesh,
+    decodeMesh,
   });
   const rendered = renderSolid(scene, format, quality);
   const report = parseSolidReport(rendered.report);

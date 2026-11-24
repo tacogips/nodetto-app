@@ -7,6 +7,7 @@ pub mod interference;
 pub mod interval;
 pub mod lattice;
 pub mod mesh;
+pub mod nmesh;
 pub mod overlay;
 pub mod prism;
 mod raster;
@@ -47,8 +48,17 @@ pub fn render_scene(
     format: ImageFormat,
     threads: usize,
 ) -> Result<CaptureOutput, CaptureError> {
-    let scene = scene::parse_scene(scene)?;
-    let (rgb, report) = render_rgb(&scene, threads)?;
+    render_parsed(&scene::parse_scene(scene)?, format, threads)
+}
+
+/// Render and encode a parsed scene. A caller that owns the NCS1 bytes can
+/// free them first: a mesh-heavy scene is tens of megabytes.
+pub fn render_parsed(
+    scene: &scene::Scene,
+    format: ImageFormat,
+    threads: usize,
+) -> Result<CaptureOutput, CaptureError> {
+    let (rgb, report) = render_rgb(scene, threads)?;
     let (width, height) = (report.width, report.height);
     let image = match format {
         ImageFormat::Png => encode::png_rgb8(&rgb, width, height),

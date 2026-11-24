@@ -25,6 +25,7 @@ declare const native: {
     replace: boolean,
   ): "written" | "identical" | "exists";
   digest(bytes: Uint8Array): string;
+  nmeshDecode(data: string): Uint8Array;
   captureSolid(
     scene: Uint8Array,
     format: "png" | "jpg",
@@ -69,6 +70,19 @@ const io = {
     native.writeBytes(native.path(path), new TextEncoder().encode(text)),
   writeBytes: (path: string, bytes: Uint8Array) =>
     native.writeBytes(native.path(path), bytes),
+  // The interpreter is too slow for the per-byte loops of the mesh codec.
+  decodeMesh: (data: string) => {
+    const packet = native.nmeshDecode(data);
+    const [vertices = 0, triangles = 0] = new Uint32Array(packet.buffer, 0, 2);
+    return {
+      positions: new Float64Array(packet.buffer, 8, vertices * 3),
+      triangles: new Uint32Array(
+        packet.buffer,
+        8 + vertices * 24,
+        triangles * 3,
+      ),
+    };
+  },
   capture: {
     dir: native.captureDir,
     absolute: native.captureAbsolute,
