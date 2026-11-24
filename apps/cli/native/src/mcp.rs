@@ -5,7 +5,6 @@ use serde::Deserialize;
 use serde_json::json;
 use std::{
     borrow::Cow,
-    fs,
     io::{self, Read},
     path::Path,
     sync::Arc,
@@ -74,45 +73,7 @@ fn capture_path_matches(path: &Path, args: &[String]) -> io::Result<bool> {
 }
 
 fn read_inline_image(path: &Path, mime_type: &'static str) -> io::Result<ContentBlock> {
-    let entry = path.symlink_metadata()?;
-    if !entry.is_file() {
-        return Err(io::Error::other("The capture is not a regular file."));
-    }
-    let mut options = fs::OpenOptions::new();
-    options.read(true);
-    // O_NOFOLLOW and O_NONBLOCK reject a swapped-in link or avoid a FIFO hang.
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x100 | 0x4);
-    }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x20000 | 0x800);
-    }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x8000 | 0x800);
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x00200000); // FILE_FLAG_OPEN_REPARSE_POINT
-    }
-    let mut file = options.open(path)?;
-    let opened = file.metadata()?;
-    if !opened.is_file() {
-        return Err(io::Error::other("The capture is not a regular file."));
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        if opened.dev() != entry.dev() || opened.ino() != entry.ino() {
-            return Err(io::Error::other("The capture changed before reading it."));
-        }
-    }
+    let (mut file, opened) = nodetto_native::fs::open_regular(path, "capture")?;
     let size = opened.len();
     if size > MCP_INLINE_MAX_BYTES {
         return Ok(ContentBlock::text(format!(
@@ -281,6 +242,7 @@ pub async fn serve() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn tokens(args: &[&str]) -> Vec<String> {
         args.iter().map(|arg| (*arg).to_owned()).collect()

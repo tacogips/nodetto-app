@@ -21,4 +21,4 @@ export * from "./tessellate.ts";
 export { generateCadDocument } from "./testing/generate.ts";
 export * from "./tool-solid.ts";
 export * from "./triangulate.ts";
-export type { Vec3 } from "./vec.ts";
+export { dot3, type Vec3 } from "./vec.ts";

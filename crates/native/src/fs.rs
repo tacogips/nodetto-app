@@ -48,11 +48,28 @@ fn write_new_with(
 
 fn existing_matches(path: &Path, bytes: &[u8]) -> io::Result<bool> {
     let size = bytes.len() as u64;
-    let metadata = path.symlink_metadata()?;
-    if !metadata.is_file() || metadata.len() != size {
+    if path.symlink_metadata()?.len() != size {
         return Ok(false);
     }
+    let (file, opened) = open_regular(path, "output")?;
+    if opened.len() != size {
+        return Ok(false);
+    }
+    let mut contents = Vec::new();
+    file.take(size + 1).read_to_end(&mut contents)?;
+    Ok(contents == bytes)
+}
 
+/// Open an existing regular file for reading without following a link,
+/// blocking on a named pipe, or accepting an entry swapped in meanwhile.
+/// `what` names the file in the error, as in "The capture is not ...".
+pub fn open_regular(path: impl AsRef<Path>, what: &str) -> io::Result<(fs::File, fs::Metadata)> {
+    let path = path.as_ref();
+    let not_regular = || io::Error::other(format!("The {what} is not a regular file."));
+    let entry = path.symlink_metadata()?;
+    if !entry.is_file() {
+        return Err(not_regular());
+    }
     let mut options = fs::OpenOptions::new();
     options.read(true);
     // O_NOFOLLOW rejects a link swapped in after the metadata check.
@@ -62,15 +79,14 @@ fn existing_matches(path: &Path, bytes: &[u8]) -> io::Result<bool> {
         use std::os::unix::fs::OpenOptionsExt;
         options.custom_flags(0x100 | 0x4);
     }
-    #[cfg(all(
-        target_os = "linux",
-        any(target_arch = "x86_64", target_arch = "aarch64")
-    ))]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        #[cfg(target_arch = "x86_64")]
         options.custom_flags(0x20000 | 0x800);
-        #[cfg(target_arch = "aarch64")]
+    }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
         options.custom_flags(0x8000 | 0x800);
     }
     #[cfg(windows)]
@@ -81,19 +97,19 @@ fn existing_matches(path: &Path, bytes: &[u8]) -> io::Result<bool> {
     }
     let file = options.open(path)?;
     let opened = file.metadata()?;
-    if !opened.is_file() || opened.len() != size {
-        return Ok(false);
+    if !opened.is_file() {
+        return Err(not_regular());
     }
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        if opened.dev() != metadata.dev() || opened.ino() != metadata.ino() {
-            return Ok(false);
+        if opened.dev() != entry.dev() || opened.ino() != entry.ino() {
+            return Err(io::Error::other(format!(
+                "The {what} changed before reading it."
+            )));
         }
     }
-    let mut contents = Vec::new();
-    file.take(size + 1).read_to_end(&mut contents)?;
-    Ok(contents == bytes)
+    Ok((file, opened))
 }
 
 /// Atomically replace a regular file, or create the target exclusively.

@@ -1,4 +1,4 @@
-import { cross3, type Vec3 } from "../cad/vec.ts";
+import { cross3, dot3 as dot, type Vec3 } from "../cad/vec.ts";
 
 export type CaptureView =
   | "iso"
@@ -55,10 +55,6 @@ function unit([x, y, z]: Vec3, message: string): Vec3 {
   const c = z / scale;
   const length = Math.sqrt(a * a + b * b + c * c);
   return [a / length, b / length, c / length];
-}
-
-function dot([x, y, z]: Vec3, [a, b, c]: Vec3): number {
-  return x * a + y * b + z * c;
 }
 
 /** The two extreme corners along this basis vector. */

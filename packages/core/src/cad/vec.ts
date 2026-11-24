@@ -8,6 +8,10 @@ export function cross3(a: Vec3, b: Vec3): Vec3 {
   ];
 }
 
+export function dot3(a: Vec3, b: Vec3): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
 export const NM_PER_MM = 1_000_000;
 
 export function coordinate(points: ArrayLike<number>, index: number): number {

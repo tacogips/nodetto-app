@@ -1,4 +1,4 @@
-import type { CadFrame, Vec3 } from "@nodetto/core";
+import { type CadFrame, dot3 as dot, type Vec3 } from "@nodetto/core";
 
 export interface Camera3d {
   readonly target: Vec3;
@@ -20,10 +20,6 @@ const NEAR_DISTANCE_RATIO = 0.01;
 // The model extent is limited to 10 m. Keep the far plane beyond the model
 // when the camera zooms in on a detail.
 const FAR_MARGIN = 40_000;
-
-function dot(a: Vec3, b: Vec3): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
 
 export function cameraAxes({ yaw, pitch, roll = 0 }: Camera3d): {
   right: Vec3;

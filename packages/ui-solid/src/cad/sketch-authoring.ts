@@ -76,6 +76,16 @@ export function cadAuthoringIds(elements: readonly Element[]): CadIds {
   };
 }
 
+/** The highest fractional index on a page: new history goes after it. */
+export function lastElementIndex(
+  elements: readonly Element[],
+): string | undefined {
+  return elements.reduce<string | undefined>(
+    (last, { index }) => (last === undefined || last < index ? index : last),
+    undefined,
+  );
+}
+
 export interface SketchViewportPoint {
   readonly x: number;
   readonly y: number;
@@ -240,10 +250,7 @@ export function createSketchAuthoring(options: {
     );
     let number = 1;
     while (sketches.has(`Sketch ${number}`)) number++;
-    const after = current.reduce<string | undefined>(
-      (last, { index }) => (last === undefined || last < index ? index : last),
-      undefined,
-    );
+    const after = lastElementIndex(current);
     const { id, commands } = sketchCommands(
       pageId,
       plane,
