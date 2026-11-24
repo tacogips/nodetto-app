@@ -30,6 +30,8 @@ export interface CadCaptureRequest {
   readonly theme: CaptureTheme;
   readonly interference?: CadCaptureInterference | null;
   readonly decodeMesh?: CaptureMeshDecoder;
+  // Test-only counter for indexed body selection.
+  readonly selectionStats?: { lookups: number };
 }
 
 export interface PreparedCadCapture {
@@ -50,6 +52,73 @@ export class CaptureInputError extends Error {
     super(message);
     this.name = "CaptureInputError";
   }
+}
+
+function resolveInterferenceBodies(
+  bodies: CadCaptureModel["bodies"],
+  queries: readonly string[],
+  stats?: { lookups: number },
+): number[] {
+  const ids = new Map<string, number>();
+  const names = new Map<string, number[]>();
+  const sorted: Array<readonly [string, number]> = [];
+  bodies.forEach((body, index) => {
+    ids.set(body.id, index);
+    const matches = names.get(body.name) ?? [];
+    matches.push(index);
+    names.set(body.name, matches);
+    sorted.push([body.id, index]);
+  });
+  sorted.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const probe = () => {
+    if (stats) stats.lookups++;
+  };
+  const lowerBound = (value: string, afterPrefix: boolean): number => {
+    let low = 0;
+    let high = sorted.length;
+    while (low < high) {
+      probe();
+      const mid = Math.floor((low + high) / 2);
+      const id = sorted[mid]?.[0];
+      if (
+        id !== undefined &&
+        (id < value || (afterPrefix && id.startsWith(value)))
+      )
+        low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  };
+  const bodyNames = () => bodies.map((body) => body.name).join(", ");
+  const selected = new Set<number>();
+  for (const query of new Set(queries)) {
+    probe();
+    const exact = ids.get(query);
+    if (query.length > 0 && exact !== undefined) {
+      selected.add(exact);
+      continue;
+    }
+    probe();
+    const matches = new Set(names.get(query) ?? []);
+    if (query.length > 0) {
+      const start = lowerBound(query, false);
+      const end = lowerBound(query, true);
+      for (let i = start; i < end && matches.size < 2; i++) {
+        const entry = sorted[i];
+        if (entry) matches.add(entry[1]);
+      }
+    }
+    if (query.length === 0 || matches.size !== 1)
+      throw new CaptureInputError(
+        `Body query "${query}" is unknown or ambiguous. Bodies: ${bodyNames()}.`,
+      );
+    for (const index of matches) selected.add(index);
+  }
+  if (selected.size < 2)
+    throw new CaptureInputError(
+      `Select at least two distinct bodies. Bodies: ${bodyNames()}.`,
+    );
+  return [...selected].sort((a, b) => a - b);
 }
 
 export function prepareCadCapture(
@@ -79,25 +148,11 @@ export function prepareCadCapture(
       throw new CaptureInputError("Interference cell must be in 0.01..10 mm.");
     let selected: number[] | undefined;
     if (bodies !== undefined) {
-      const names = model.bodies.map((body) => body.name).join(", ");
-      const indices = new Set<number>();
-      for (const query of bodies) {
-        const matches = model.bodies.flatMap((body, index) =>
-          body.id === query || body.id.startsWith(query) || body.name === query
-            ? [index]
-            : [],
-        );
-        if (query.length === 0 || matches.length !== 1)
-          throw new CaptureInputError(
-            `Body query "${query}" is unknown or ambiguous. Bodies: ${names}.`,
-          );
-        indices.add(matches[0] as number);
-      }
-      if (indices.size < 2)
-        throw new CaptureInputError(
-          `Select at least two distinct bodies. Bodies: ${names}.`,
-        );
-      selected = [...indices].sort((a, b) => a - b);
+      selected = resolveInterferenceBodies(
+        model.bodies,
+        bodies,
+        request.selectionStats,
+      );
     }
     interference = {
       cellMm,

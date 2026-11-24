@@ -1,7 +1,8 @@
 # 3D CAD pages (`cad3d`): parametric solid modelling inside nodetto
 
 Status: implemented (slice), design revision 3, base commit `0a35708`,
-branch `feat/cad3d-pages`.
+branch `feat/cad3d-pages`. Revision 4 (audit round 1 on `feat/ai-capture`,
+`0a35708..eb7d8c9`) adds the editor-side corrections of section 19.
 Implementation plan: `impl-plans/completed/cad3d-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[R-n]` are external sources listed in section 17. Measurements
@@ -517,7 +518,8 @@ the CLI needs (section 10).
   `cad.mesh`) the feature itself; for `add`, `cut` and `intersect` the
   first id in the feature's `bodies` that names an existing earlier body
   creator. A cut through several bodies therefore offers its first body as
-  the default target, and the user can change `bodies` in the inspector.
+  the default target, and the user can change `bodies` in the inspector
+  (Add keeps exactly one target, section 19 F14).
 - Loops: line and arc end points are chained by exact equality of grid
   coordinates; a circle is a loop. Each loop edge records its source entity
   and whether the stored direction was reversed to make the loop
@@ -1184,3 +1186,158 @@ immutable, canonical, size-capped inline mesh.
 | Old clients in a shared session change a CAD page's kind or add shapes to it | Non-destructive reconcile repair (section 4); CAD creation off for cloud documents until cloud follow-up items 1 and 2 |
 | The installed dependency tree of `manifold-3d` grows or changes licence | Licence inventory test and bundle marker test (section 11) |
 | Viewport renders nothing although unit tests pass | Browser check and WKWebView check are verification commands (section 14) |
+
+## 19. Audit round 1 corrections (editor side)
+
+Source: audit round 1 of `feat/ai-capture` (`0a35708..eb7d8c9`). The
+capture findings, the common test rule (a test that fails before the fix;
+deterministic counts for performance findings; no golden, error code or
+message change unless named here) and the plan grouping are in
+`design-docs/specs/design-ai-capture.md` section 19. This section states
+the editor and core rules. Where an earlier sentence of this document and
+this section disagree, this section wins.
+
+F2 `function-pcb-reference-page-kind`, editor half (high). Section 8
+already makes a board count only while its page is a PCB page
+(`collectCadInput`, `packages/core/src/cad/engine.ts`). The board choices
+(`pcbBoardChoices`, `packages/ui-solid/src/cad/pcb-insert.ts`) list only
+boards on pages of kind `pcb`, so the picker, the single-board shortcut and
+the inspector relink list omit a board whose page was converted.
+
+Commit-time guard. `pcb-insert.ts` exports `isPcbBoardChoice(document,
+boardId)`, the same page-kind rule as the choices. The only insertion path
+is `insert` in `packages/ui-solid/src/cad/board-picker.tsx`. Today it
+checks only editability and record type, then calls
+`pcbReferenceCommands` (core `authoring.ts`). It must call the new check
+against a fresh snapshot and otherwise show the existing failure notice
+and apply nothing.
+
+No file in the finding's list can enforce this check: the command builder
+in `authoring.ts` and the handler are both unlisted. The minimal amendment
+is `board-picker.tsx` (a three-line guard) plus its adjacent test
+`packages/ui-solid/src/cad/viewport.test.tsx`. It is recorded as Q1 in
+`design-docs/user-qa/ai-capture-audit-r1.md` (recommended answer:
+approve). Plan D lands the choices filter and the capture entry points
+without Q1 and adds the guard only after Q1 is approved.
+
+Tests:
+
+- `pcb-insert.test.ts`: after the page is converted to freeform, the
+  choices omit the board and `isPcbBoardChoice` is false; after Undo of
+  the conversion, both return the board again.
+- `viewport.test.tsx`, after Q1: open the picker with two boards, convert
+  the chosen board's page to freeform, then submit the stale choice. No
+  command is applied and the notice is shown. After Undo, the same
+  submission inserts the reference.
+
+F3 `function-hosted-cad-strict-compilation` (high). The CAD UI modules
+compile under `noUncheckedIndexedAccess`, which the hosted web app and the
+sync Worker use. The 63 diagnostics are in `packages/ui-solid/src/cad/`
+`pick.ts` (19), `theme.ts` (3), `renderer.ts` (8), `sketch-overlay.ts`
+(22), `sketch-authoring.ts` (1), `extrude-interaction.ts` (8) and
+`CadViewport.tsx` (2). Fixes use typed tuples or checked accessors where
+the geometry guarantees a value (a triangle has three corners, a matrix
+sixteen entries), and an explicit skip or early return where a buffer or
+selection can be incomplete; no non-null assertion hides a reachable
+missing case. A new Bun test (`packages/ui-solid/src/cad/strict-index.test.ts`)
+builds a TypeScript program rooted at `packages/ui-solid/src/cad-ui.tsx`
+with the options of `tsconfig.json`, `noEmit` and
+`noUncheckedIndexedAccess: true`, and asserts zero diagnostics, printing
+the first ones on failure (63 before). The adjacent picking, renderer,
+overlay, camera and interaction tests pass unchanged.
+
+F6 `function-sketch-base-plane-control` (medium). For a sketch whose
+`plane` has a string `base`, the inspector shows a "Base plane" select
+with XY, YZ and ZX (values `xy`, `yz`, `zx`, the values of
+`packages/ir/src/registry/cad.ts`) next to the offset. A new edit helper
+in `cad-edits.ts` returns `unchanged` for the same base, an invalid-field
+edit for a face sketch or an unknown value, and otherwise one
+`updateSemantic` that replaces `base` and keeps `offset` and every other
+field. The select uses the offset field's disabled rule (read-only mode or
+a locked element). Face sketches show no select. `sketch-authoring.ts` is
+not changed. DOM test (`test-dom/cad-sketch.dom.tsx`): an XY sketch with
+offset 5 is changed to YZ, then ZX; after each change the stored plane
+and offset 5 are asserted; Undo restores the previous base; a locked
+sketch's select is disabled.
+
+F14 `maintainability-cad-add-targets` (medium). Add has exactly one
+target (`history.ts`, `named.size !== 1` fails `cad.body.reference`):
+
+- `setCadOperation` with op `add` keeps only the first given target. The
+  inspector passes targets in the order it displays them: listed earlier
+  bodies in history order, then stored ids that are not listed (detached
+  references) in stored order. Converting a Cut of `a` and `b` to Add
+  therefore keeps the first visibly selected body.
+- With op `add`, checking a body commits `[body]` (it replaces the
+  target), and unchecking the current target is a no-op, so no commit
+  leaves Add with two targets. Cut and Intersect keep multi-selection.
+  New to Add with no stored target keeps today's empty list.
+- Tests (`cad-edits.test.ts`, `test-dom/cad-inspector.dom.tsx`). Each
+  inspector change is its own commit and its own Undo entry; history
+  batching is unchanged.
+  1. Convert Cut `[a, b]` to Add. The stored targets are `[a]` and
+     `scanCadPage` reports ok.
+  2. Switch the Add target to `b`. The targets are `[b]` and the status is
+     ok.
+  3. Undo restores Add `[a]` (asserted).
+  4. A second Undo restores Cut `[a, b]` (asserted).
+  5. On Add `[a]`, unchecking `a` applies no command.
+  The existing New, Cut and Intersect multi-selection tests pass
+  unchanged.
+
+F8 `performance-sketch-profile-pair-scans` (medium). In
+`packages/core/src/cad/loops.ts`, segment intersection and contour
+containment examine only pairs whose two-dimensional bounds overlap. The
+candidate pairs come from a sweep along the axis (X or Y) with fewer
+overlapping pairs, counted in O(n log n) after sorting; ties go to X. The
+exact predicates stay. The reported segment stays the one the current
+code reports: the first segment, in the current `(minX, minY)` sort order,
+that intersects any later segment. Depth counts the containing profiles
+among candidates, which equals the full scan because a container's bounds
+overlap the contained profile's bounds. A test-only candidate count shows
+that horizontal and vertical rows of disjoint circles (160, 320 and 640)
+grow near-linearly per doubling (fails before for the vertical row in the
+segment sweep and for both rows in the depth loop). Existing intersection,
+nesting, winding and error-id assertions pass unchanged.
+
+F12 `performance-stl-inline-refusal` (medium). Canonicalisation in
+`packages/nmesh/src/canonical.ts` has no duplicate removal after the
+sort, so the number of triangles that survive welding and degenerate
+removal is the final count. No new public export is added, so
+`packages/nmesh/src/index.ts` is not edited:
+
+- The existing export gains an optional second argument,
+  `canonicalize(mesh, { inline: true })`. The export already reaches
+  `packages/io` through `export * from "@nodetto/nmesh"` in
+  `packages/io/src/nmesh/index.ts`.
+- With `inline: true`, `canonical.ts` throws `NmeshError("nmesh.inline")`
+  (the code the armor already throws) as soon as the surviving count
+  exceeds the cutoff, before sorting and encoding.
+- The cutoff is computed inside the codec files (`canonical.ts` with
+  `encode.ts` and `armor.ts` constants). It is the largest count whose
+  smallest possible encoding (header plus the minimum bytes per triangle
+  that `encode.ts` can write, derived from the format) still fits
+  `NMESH_INLINE_MAX_CHARS` after base64 and the prefix. A codec test over
+  generated meshes asserts that the encoded length never goes below that
+  minimum.
+- `stlToInlineMesh` (`packages/io/src/cad-mesh.ts`) passes
+  `{ inline: true }`. The final armor check in `toInline` stays as the
+  exact guard. `packages/io` imports only `@nodetto/nmesh` through its
+  existing re-export, never `@nodetto/core` and never a package-internal
+  path.
+
+Tests (`packages/nmesh/src/codec.test.ts`,
+`packages/io/src/cad-mesh.test.ts`,
+`packages/ui-solid/src/cad/mesh-io.test.ts`):
+
+- An oversized generated plate is refused by `canonicalize(mesh,
+  { inline: true })` itself. Before the fix it returns.
+- A high-facet input dominated by degenerate triangles still imports.
+- The inline bytes of accepted fixtures are unchanged.
+- The import shows the existing size message.
+
+Plans J (F3), K (F6 with F14), L (F8) and M (F12) share no file with each
+other or with the capture plans and run in the first wave. Plan M owns
+`packages/nmesh/src/{canonical.ts,encode.ts,armor.ts}`,
+`packages/io/src/cad-mesh.ts` and the three tests above. The F2 plan D
+owns `pcb-insert.ts`, and `board-picker.tsx` only after Q1 is approved.

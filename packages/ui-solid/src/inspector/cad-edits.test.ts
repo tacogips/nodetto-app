@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { Editor } from "@nodetto/core";
+import { scanCadPage } from "../../../core/src/cad/history.ts";
 import {
   cadElement,
   plateWithHoles,
@@ -11,6 +12,7 @@ import {
   setCadNumber,
   setCadOperation,
   setCadPoint,
+  setCadSketchBase,
 } from "./cad-edits.ts";
 
 const circle = cadElement("hole", "cad.circle", "A", { c: [2, 3], r: 5 });
@@ -143,4 +145,47 @@ test("CAD layers and inspector share selection, edits and statuses in light and 
   expect(result.exitCode, output).toBe(0);
   expect(output).toContain("ok light");
   expect(output).toContain("ok dark");
+});
+
+test("base-plane edits preserve offset and validate the plane", () => {
+  const base = {
+    ...sketch,
+    semantic: { name: "Sketch", plane: { base: "xy", offset: 5 } },
+  };
+  expect(setCadSketchBase(base, "yz")).toMatchObject({
+    semantic: { plane: { base: "yz", offset: 5 } },
+  });
+  expect(setCadSketchBase(base, "xy")).toEqual({ error: "unchanged" });
+  expect(setCadSketchBase(base, "invalid")).toHaveProperty("error");
+  expect(
+    setCadSketchBase(
+      {
+        ...base,
+        semantic: { plane: { face: { feature: "ex1", role: "end" } } },
+      },
+      "yz",
+    ),
+  ).toHaveProperty("error");
+});
+
+test("converting a multi-target cut to Add yields a valid single target", () => {
+  const doc = plateWithHoles(1);
+  const second = cadElement("second", "cad.extrude", "a2V", {
+    sketch: "base",
+    distance: 5,
+    op: "new",
+  });
+  const cut = doc.elements.find((element) => element.id === "ex2");
+  if (!cut) throw new Error("missing cut");
+  const edit = setCadOperation(cut, "add", ["ex1", "second"]);
+  expect(edit).toMatchObject({ semantic: { op: "add", bodies: ["ex1"] } });
+  if ("error" in edit || edit.type !== "updateSemantic")
+    throw new Error("expected edit");
+  expect(
+    scanCadPage([
+      ...doc.elements.filter((element) => element.id !== cut.id),
+      second,
+      { ...cut, semantic: edit.semantic },
+    ]).status.get(cut.id)?.ok,
+  ).toBe(true);
 });

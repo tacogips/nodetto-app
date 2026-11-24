@@ -1,5 +1,6 @@
 import {
   type CadCaptureRequest,
+  assertSolidReportMatches,
   type CaptureCameraRequest,
   CaptureInputError,
   describeBodies,
@@ -128,14 +129,11 @@ export function renderCadCapture(
   });
   const rendered = renderSolid(scene, format, quality);
   const report = parseSolidReport(rendered.report);
-  if (
-    report.width !== request.width ||
-    report.height !== request.height ||
-    report.bodies.length !== model.bodies.length
-  )
-    throw new Error(
-      "The solid capture report does not match the requested scene.",
-    );
+  assertSolidReportMatches(report, {
+    width: request.width,
+    height: request.height,
+    bodies: model.bodies.length,
+  });
   const bodies = report.bodies.map((bodyReport, index) => {
     const body = model.bodies[index];
     if (!body) throw new Error("Missing body in the solid capture scene.");

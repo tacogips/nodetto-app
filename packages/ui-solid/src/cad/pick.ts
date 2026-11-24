@@ -23,18 +23,40 @@ export function pickBodies(
 
   for (const { id, positions, indices, triFace, faceNames } of bodies) {
     for (let i = 0; i + 2 < indices.length; i += 3) {
-      const a = indices[i] * 3;
-      const b = indices[i + 1] * 3;
-      const c = indices[i + 2] * 3;
+      const ai = indices[i];
+      const bi = indices[i + 1];
+      const ci = indices[i + 2];
+      if (ai === undefined || bi === undefined || ci === undefined) continue;
+      const a = ai * 3;
+      const b = bi * 3;
+      const c = ci * 3;
       const ax = positions[a];
       const ay = positions[a + 1];
       const az = positions[a + 2];
-      const e1x = positions[b] - ax;
-      const e1y = positions[b + 1] - ay;
-      const e1z = positions[b + 2] - az;
-      const e2x = positions[c] - ax;
-      const e2y = positions[c + 1] - ay;
-      const e2z = positions[c + 2] - az;
+      const bx = positions[b];
+      const by = positions[b + 1];
+      const bz = positions[b + 2];
+      const cx = positions[c];
+      const cy = positions[c + 1];
+      const cz = positions[c + 2];
+      if (
+        ax === undefined ||
+        ay === undefined ||
+        az === undefined ||
+        bx === undefined ||
+        by === undefined ||
+        bz === undefined ||
+        cx === undefined ||
+        cy === undefined ||
+        cz === undefined
+      )
+        continue;
+      const e1x = bx - ax;
+      const e1y = by - ay;
+      const e1z = bz - az;
+      const e2x = cx - ax;
+      const e2y = cy - ay;
+      const e2z = cz - az;
 
       // Two-sided Möller–Trumbore with a scale-relative parallel test.
       const px = dy * e2z - dz * e2y;
@@ -65,7 +87,9 @@ export function pickBodies(
 
       const t = (e2x * qx + e2y * qy + e2z * qz) * inverse;
       if (!(t > 0 && t < nearest)) continue;
-      const name = faceNames[triFace[i / 3]];
+      const face = triFace[i / 3];
+      if (face === undefined) continue;
+      const name = faceNames[face];
       if (name === undefined) continue;
       nearest = t;
       bodyId = id;

@@ -1,6 +1,7 @@
 import type { Element, ElementId, PageId } from "@nodetto/ir";
 import {
   type CadFeature,
+  type CadGeometryStats,
   cadFailure,
   createCadGeometry,
   type ExtrudeGeometry,
@@ -41,6 +42,7 @@ export function visitCadConstruction(
   elements: readonly Element[],
   pageId: PageId,
   visitor: CadConstructionVisitor,
+  stats?: CadGeometryStats,
 ): CadConstructionReport {
   const page: Element[] = [];
   const pcb: Element[] = [];
@@ -50,7 +52,15 @@ export function visitCadConstruction(
       pcb.push(element);
   }
   const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
-  const geometry = createCadGeometry(history);
+  const referenced = new Set<ElementId>();
+  for (const feature of history.typed.values()) {
+    if (feature.type !== "cad.sketch" || !("face" in feature.semantic.plane))
+      continue;
+    const id = feature.semantic.plane.face?.feature;
+    if (id !== undefined && history.dependencies.get(feature.id)?.includes(id))
+      referenced.add(id);
+  }
+  const geometry = createCadGeometry(history, stats);
   const status = new Map(history.status);
   const bodies = new Set<ElementId>();
   const missingTarget = (target: ElementId) =>
@@ -110,7 +120,10 @@ export function visitCadConstruction(
       continue;
     }
     // Later face references read these loops.
-    geometry.extrudes.set(id, tool);
+    if (referenced.has(id)) {
+      geometry.extrudes.set(id, tool);
+      if (stats) stats.retainedTools += 1;
+    }
     if (feature.type === "cad.extrude" && feature.semantic.op === "new")
       bodies.add(id);
     visitor.tool(feature, tool, targets);

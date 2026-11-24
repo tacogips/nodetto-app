@@ -75,8 +75,12 @@ function fitBodies(
     for (let i = 0; i < positions.length; i += 3) {
       for (let axis = 0; axis < 3; axis++) {
         const value = positions[i + axis];
-        min[axis] = Math.min(min[axis], value);
-        max[axis] = Math.max(max[axis], value);
+        const lower = min[axis];
+        const upper = max[axis];
+        if (value === undefined || lower === undefined || upper === undefined)
+          continue;
+        min[axis] = Math.min(lower, value);
+        max[axis] = Math.max(upper, value);
       }
     }
   }

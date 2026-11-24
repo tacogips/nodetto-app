@@ -391,3 +391,30 @@ test("body notes identify empty, refilled, hidden and outside bodies", async () 
   expect(result.stdout).toContain("Puck [outside the picture]");
   expect(result.stdout).toContain('leaves no material in "Block"');
 });
+
+test.each(["width", "height", "bodies"] as const)(
+  "rejects a mismatched renderer %s",
+  async (field) => {
+    const { io, backend, files } = harness();
+    backend.renderSolid = () => ({
+      image,
+      report: JSON.stringify({
+        width: field === "width" ? 1025 : 1024,
+        height: field === "height" ? 769 : 768,
+        bodies: Array.from({ length: field === "bodies" ? 2 : 3 }, () => ({
+          state: "drawn",
+          open: false,
+          emptiedByStep: -1,
+        })),
+        analysis: null,
+        pairs: [],
+      }),
+    });
+    const result = await captureCommand(io, ["capture-plate.jsonl"], backend);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain(
+      "The solid capture report does not match the requested scene.",
+    );
+    expect(files.size).toBe(0);
+  },
+);

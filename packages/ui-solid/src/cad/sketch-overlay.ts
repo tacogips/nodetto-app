@@ -83,12 +83,17 @@ function appendPath(
   dashed = false,
 ): void {
   if (points.length < 4) return;
-  const first = toWorld(frame, [points[0], points[1]]);
+  const firstX = points[0];
+  const firstY = points[1];
+  if (firstX === undefined || firstY === undefined) return;
+  const first = toWorld(frame, [firstX, firstY]);
   let previous = first;
   let phase = 0;
   for (let i = 2; i <= points.length - (closed ? 0 : 2); i += 2) {
-    const next =
-      i === points.length ? first : toWorld(frame, [points[i], points[i + 1]]);
+    const x = points[i];
+    const y = points[i + 1];
+    if (i !== points.length && (x === undefined || y === undefined)) break;
+    const next = i === points.length ? first : toWorld(frame, [x ?? 0, y ?? 0]);
     if (dashed) {
       phase = appendDashes(lines, previous, next, phase);
     } else {
@@ -224,12 +229,32 @@ function project(
   y: number,
   z: number,
 ): ProjectedPoint | null {
-  const w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+  if (matrix.length < 16) return null;
+  const w =
+    (matrix[3] ?? Number.NaN) * x +
+    (matrix[7] ?? Number.NaN) * y +
+    (matrix[11] ?? Number.NaN) * z +
+    (matrix[15] ?? Number.NaN);
   if (w <= 0) return null;
   return {
-    x: (matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]) / w,
-    y: (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) / w,
-    depth: (matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]) / w,
+    x:
+      ((matrix[0] ?? Number.NaN) * x +
+        (matrix[4] ?? Number.NaN) * y +
+        (matrix[8] ?? Number.NaN) * z +
+        (matrix[12] ?? Number.NaN)) /
+      w,
+    y:
+      ((matrix[1] ?? Number.NaN) * x +
+        (matrix[5] ?? Number.NaN) * y +
+        (matrix[9] ?? Number.NaN) * z +
+        (matrix[13] ?? Number.NaN)) /
+      w,
+    depth:
+      ((matrix[2] ?? Number.NaN) * x +
+        (matrix[6] ?? Number.NaN) * y +
+        (matrix[10] ?? Number.NaN) * z +
+        (matrix[14] ?? Number.NaN)) /
+      w,
   };
 }
 
@@ -261,23 +286,33 @@ export function pickSketchEntity(
         ? 1
         : bodyDepth + (sketch === selectedSketch ? 1e-6 : -1e-6);
     for (let i = 0; i < segments.length; i += 6) {
-      const a = project(matrix, segments[i], segments[i + 1], segments[i + 2]);
-      const b = project(
-        matrix,
-        segments[i + 3],
-        segments[i + 4],
-        segments[i + 5],
-      );
+      const ax = segments[i];
+      const ay = segments[i + 1];
+      const az = segments[i + 2];
+      const bx = segments[i + 3];
+      const by = segments[i + 4];
+      const bz = segments[i + 5];
+      if (
+        ax === undefined ||
+        ay === undefined ||
+        az === undefined ||
+        bx === undefined ||
+        by === undefined ||
+        bz === undefined
+      )
+        continue;
+      const a = project(matrix, ax, ay, az);
+      const b = project(matrix, bx, by, bz);
       if (!a || !b) continue;
-      const ax = ((a.x - x) * width) / 2;
-      const ay = ((a.y - y) * height) / 2;
+      const screenX = ((a.x - x) * width) / 2;
+      const screenY = ((a.y - y) * height) / 2;
       const dx = ((b.x - a.x) * width) / 2;
       const dy = ((b.y - a.y) * height) / 2;
       const length = dx * dx + dy * dy;
       const t = length
-        ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length))
+        ? Math.max(0, Math.min(1, -(screenX * dx + screenY * dy) / length))
         : 0;
-      const distance = (ax + t * dx) ** 2 + (ay + t * dy) ** 2;
+      const distance = (screenX + t * dx) ** 2 + (screenY + t * dy) ** 2;
       const depth = a.depth + t * (b.depth - a.depth);
       if (
         depth < -1 ||

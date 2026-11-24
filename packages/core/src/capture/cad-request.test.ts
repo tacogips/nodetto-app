@@ -212,3 +212,71 @@ test("interference request preserves default fixture and selects bodies", async 
   for (const cellMm of [0.009, 11, Number.NaN, Number.POSITIVE_INFINITY])
     expect(() => run({ cellMm })).toThrow(CaptureInputError);
 });
+
+function selectionDocument(count: number) {
+  return Array.from({ length: count }, (_, i) =>
+    cadElement(
+      `part${String(i).padStart(5, "0")}-extra`,
+      "cad.mesh",
+      `a${String(i).padStart(5, "0")}`,
+      {
+        name: `Name ${i}`,
+        data: "nmesh1:UExBVEU=",
+      },
+    ),
+  );
+}
+
+const selectionMesh = () => ({
+  positions: new Float64Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+  triangles: new Uint32Array([0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3]),
+});
+
+test("body selection prioritizes exact ids and preserves ordered distinct results", () => {
+  const elements = [
+    cadElement("part", "cad.mesh", "a1", {
+      name: "First",
+      data: "nmesh1:UExBVEU=",
+    }),
+    cadElement("part-extra", "cad.mesh", "a2", {
+      name: "part",
+      data: "nmesh1:UExBVEU=",
+    }),
+  ];
+  const run = (bodies: string[]) =>
+    prepareCadCapture(elements, CAD_TEST_PAGE.id, {
+      ...size,
+      camera: {},
+      decodeMesh: selectionMesh,
+      interference: { cellMm: 1, bodies },
+    });
+  expect(run(["part", "part-extra"]).scene).toEqual(
+    run(["part-extra", "part", "part"]).scene,
+  );
+  expect(() => run(["par", "part-extra"])).toThrow(
+    'Body query "par" is unknown or ambiguous. Bodies: First, part.',
+  );
+  expect(() => run(["", "part"])).toThrow(
+    'Body query "" is unknown or ambiguous. Bodies: First, part.',
+  );
+});
+
+test("body selection uses bounded indexed lookups for large models", () => {
+  const stats = { lookups: 0 };
+  const queries = Array.from({ length: 500 }, (_, i) => {
+    if (i % 3 === 0) return `part${String(i).padStart(5, "0")}-extra`;
+    if (i % 3 === 1) return `Name ${i}`;
+    return `part${String(i).padStart(5, "0")}-`;
+  });
+  const result = prepareCadCapture(selectionDocument(5000), CAD_TEST_PAGE.id, {
+    ...size,
+    camera: {},
+    decodeMesh: selectionMesh,
+    selectionStats: stats,
+    interference: { cellMm: 1, bodies: queries },
+  });
+  expect(result.model.bodies).toHaveLength(5000);
+  expect(stats.lookups).toBeLessThanOrEqual(
+    500 * (2 + 2 * Math.ceil(Math.log2(5000))),
+  );
+});

@@ -22,14 +22,24 @@ export function pcbBoardChoices(document: {
     if (boards) boards.push(element);
     else boardsByPage.set(element.page, [element]);
   }
-  return [...document.pages].sort(comparePageOrder).flatMap((page) =>
-    (boardsByPage.get(page.id) ?? [])
-      .sort(compareCadHistoryOrder)
-      .map(({ id }) => ({
-        boardId: id,
-        pageName: page.name,
-      })),
-  );
+  return [...document.pages]
+    .filter((page) => page.kind === "pcb")
+    .sort(comparePageOrder)
+    .flatMap((page) =>
+      (boardsByPage.get(page.id) ?? [])
+        .sort(compareCadHistoryOrder)
+        .map(({ id }) => ({
+          boardId: id,
+          pageName: page.name,
+        })),
+    );
+}
+
+export function isPcbBoardChoice(
+  document: { pages: readonly Page[]; elements: readonly Element[] },
+  boardId: ElementId,
+): boolean {
+  return pcbBoardChoices(document).some((choice) => choice.boardId === boardId);
 }
 
 export function pcbBoardOptions(choices: readonly PcbBoardChoice[]) {

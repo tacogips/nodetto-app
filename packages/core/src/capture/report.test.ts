@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { parseSolidReport } from "./report.ts";
+import { assertSolidReportMatches, parseSolidReport } from "./report.ts";
 
 const body = { state: "drawn", emptiedByStep: -1, open: false } as const;
 const report = {
@@ -68,4 +68,18 @@ test("rejects a real that decodes to a nonfinite number", () => {
       JSON.stringify({ ...report, analysis }).replace("0.25", "1e999"),
     ),
   ).toThrow("Invalid solid capture report");
+});
+
+test("matches report dimensions and body count", () => {
+  const expected = { width: 64, height: 128, bodies: 1 };
+  expect(() => assertSolidReportMatches(report, expected)).not.toThrow();
+  for (const mismatch of [
+    { ...expected, width: 65 },
+    { ...expected, height: 129 },
+    { ...expected, bodies: 2 },
+  ]) {
+    expect(() => assertSolidReportMatches(report, mismatch)).toThrow(
+      "The solid capture report does not match the requested scene.",
+    );
+  }
 });

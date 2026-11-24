@@ -60,6 +60,22 @@ export function setCadNumber(
   return invalidField;
 }
 
+export function setCadSketchBase(element: Element, base: string): Edit {
+  const { semantic } = element;
+  if (element.type !== "cad.sketch" || !isPlainObject(semantic))
+    return invalidField;
+  const plane = semantic.plane;
+  if (
+    !isPlainObject(plane) ||
+    typeof plane.base !== "string" ||
+    !["xy", "yz", "zx"].includes(base)
+  )
+    return invalidField;
+  return plane.base === base
+    ? unchanged
+    : update(element, { ...semantic, plane: { ...plane, base } });
+}
+
 export function setCadBoard(element: Element, boardId: ElementId): Edit {
   const { semantic } = element;
   if (element.type !== "cad.pcb" || !isPlainObject(semantic))
@@ -100,7 +116,10 @@ export function setCadOperation(
   const { type, semantic } = element;
   if (type !== "cad.extrude" || !isPlainObject(semantic)) return invalidField;
   const { bodies: previous, ...rest } = semantic;
-  const targets = op === "new" ? [] : [...new Set(bodies)];
+  const targets =
+    op === "new"
+      ? []
+      : [...new Set(bodies)].slice(0, op === "add" ? 1 : undefined);
   const existing = Array.isArray(previous) ? previous : [];
   if (
     op === semantic.op &&

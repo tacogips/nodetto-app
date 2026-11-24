@@ -1,3 +1,4 @@
+import { NMESH_INLINE_MAX_CHARS, NMESH_INLINE_PREFIX } from "./armor.ts";
 import {
   type QuantizedMesh,
   type TriangleMesh,
@@ -60,7 +61,20 @@ function compareTriangles(
   );
 }
 
-export function canonicalize(mesh: TriangleMesh): QuantizedMesh {
+// Every triangle writes three index varints, each at least one byte.
+export const MIN_TRIANGLE_BYTES = 3;
+export const MIN_NMESH_FIXED_BYTES = 12; // Eight-byte header and four-byte CRC.
+
+const maxInlineBytes =
+  Math.floor((NMESH_INLINE_MAX_CHARS - NMESH_INLINE_PREFIX.length) / 4) * 3;
+const maxInlineTriangles = Math.floor(
+  (maxInlineBytes - MIN_NMESH_FIXED_BYTES) / MIN_TRIANGLE_BYTES,
+);
+
+export function canonicalize(
+  mesh: TriangleMesh,
+  options?: { inline?: boolean },
+): QuantizedMesh {
   const { positions, triangles, triFace } = mesh;
   const triangleCount = triangles.length / 3;
   if (
@@ -114,6 +128,9 @@ export function canonicalize(mesh: TriangleMesh): QuantizedMesh {
     } else {
       ordered.push({ a, b, c, faceId });
     }
+  }
+  if (options?.inline && ordered.length > maxInlineTriangles) {
+    throw new NmeshError("nmesh.inline");
   }
   ordered.sort(
     (left, right) =>

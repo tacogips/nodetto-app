@@ -205,3 +205,77 @@ test("each edge joins the end of the previous edge", () => {
     expect(point(i + 1)).toEqual(loop.reversed[i] ? a : b);
   }
 });
+
+test("disjoint circle rows have near-linear candidate counts on either axis", () => {
+  for (const vertical of [false, true]) {
+    const counts = [160, 320, 640].map((count) => {
+      const stats = { segmentPairs: 0, containmentPairs: 0 };
+      const entities = Array.from({ length: count }, (_, i) =>
+        circle(`circle-${i}`, vertical ? [0, i * 4] : [i * 4, 0], 1),
+      );
+      expect(buildLoops(entities, undefined, stats)).toHaveProperty("loops");
+      return stats;
+    });
+    for (let i = 1; i < counts.length; i += 1) {
+      const previous = counts[i - 1];
+      const current = counts[i];
+      if (!previous || !current) throw new Error("Missing counts");
+      expect(previous.segmentPairs).toBeGreaterThan(0);
+      expect(current.segmentPairs).toBeLessThanOrEqual(
+        previous.segmentPairs * 2.5,
+      );
+      expect(current.containmentPairs).toBeLessThanOrEqual(
+        previous.containmentPairs * 2.5,
+      );
+    }
+  }
+});
+
+test("intersection reports the first segment in the original nested scan", () => {
+  const entities = [
+    ...rectangle("a", 0, 0, 10, 10),
+    ...rectangle("b", 2, -2, 4, 14),
+    ...rectangle("c", -2, 3, 14, 4),
+  ];
+  const segments = entities
+    .map(({ id, semantic: { a, b } }) => ({
+      id,
+      a,
+      b,
+      minX: Math.min(a[0], b[0]),
+      minY: Math.min(a[1], b[1]),
+      maxX: Math.max(a[0], b[0]),
+      maxY: Math.max(a[1], b[1]),
+    }))
+    .sort((a, b) => a.minX - b.minX || a.minY - b.minY);
+  const cross = (a: CadXY, b: CadXY, c: CadXY) =>
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  let expected: string | undefined;
+  outer: for (const [i, a] of segments.entries()) {
+    for (let j = i + 1; j < segments.length; j += 1) {
+      const b = segments[j];
+      if (!b || b.minX > a.maxX) break;
+      if (b.minY > a.maxY || a.minY > b.maxY) continue;
+      const sides = [
+        cross(a.a, a.b, b.a),
+        cross(a.a, a.b, b.b),
+        cross(b.a, b.b, a.a),
+        cross(b.a, b.b, a.b),
+      ];
+      if (
+        (sides[0] ?? 0) * (sides[1] ?? 0) <= 0 &&
+        (sides[2] ?? 0) * (sides[3] ?? 0) <= 0
+      ) {
+        // Shared endpoints of neighbouring rectangle edges are allowed.
+        if (a.id[0] === b.id[0]) continue;
+        expected = a.id;
+        break outer;
+      }
+    }
+  }
+  expect(expected).toBeDefined();
+  expect(buildLoops(entities)).toEqual({
+    error: "cad.profile.intersect",
+    at: expected,
+  });
+});

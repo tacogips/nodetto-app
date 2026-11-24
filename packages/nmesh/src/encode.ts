@@ -2,6 +2,8 @@ import { isCanonical } from "./canonical.ts";
 import { crc32 } from "./crc32.ts";
 import { NmeshError, type QuantizedMesh } from "./types.ts";
 
+export { MIN_NMESH_FIXED_BYTES, MIN_TRIANGLE_BYTES } from "./canonical.ts";
+
 export function encodeNmesh(mesh: QuantizedMesh): Uint8Array {
   if (!isCanonical(mesh)) throw new NmeshError("nmesh.canonical");
   const { positions, triangles, groups } = mesh;

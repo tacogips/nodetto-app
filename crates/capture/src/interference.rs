@@ -120,8 +120,11 @@ struct PairSample {
     report: Option<PairReport>,
     cell: f64,
     capped: bool,
+    boundary_exhausted: bool,
     #[cfg(test)]
     rays: u64,
+    #[cfg(test)]
+    boundary_reads: u64,
 }
 
 /// Sample a pair with the given allowance of weighted refinement rays.
@@ -165,6 +168,7 @@ fn sample(
     );
     let cell = axes.iter().map(|sample| sample.cell).fold(0.0, f64::max);
     let capped = axes.iter().any(|sample| sample.capped);
+    let boundary_exhausted = axes.iter().any(|sample| sample.boundary_exhausted);
     let mut extent = lattice::empty_bounds();
     let mut volume = 0.0;
     let mut hits = 0;
@@ -187,8 +191,11 @@ fn sample(
         report,
         cell,
         capped,
+        boundary_exhausted,
         #[cfg(test)]
         rays: axes.iter().map(|axis| axis.rays).sum(),
+        #[cfg(test)]
+        boundary_reads: axes.iter().map(|axis| axis.boundary_reads).sum(),
     }
 }
 
@@ -322,6 +329,10 @@ mod tests {
             lattice::level0_rays(pair.min, pair.max, 1.0) + 128
         );
         assert!(sample.capped);
+        let steps = scene.bodies[0].steps.len() + scene.bodies[1].steps.len();
+        let weight = (steps as u64).div_ceil(8).max(1);
+        assert!(sample.boundary_reads > 0);
+        assert!(sample.boundary_reads <= 64 * weight * (sample.rays + 16));
     }
 
     #[test]
@@ -405,19 +416,24 @@ pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPa
                 &tools,
                 &cache,
             )
-            .report
+            .into()
         } else {
             None
         };
-        let mut report = sampled.unwrap_or(PairReport {
-            a: view.a,
-            b: view.b,
-            volume: 0.0,
-            min: view.min,
-            max: view.max,
-            from_view: true,
-            capped: index >= VIEW_PAIR_SAMPLES,
-        });
+        let boundary_exhausted = sampled
+            .as_ref()
+            .is_some_and(|sample| sample.boundary_exhausted);
+        let mut report = sampled
+            .and_then(|sample| sample.report)
+            .unwrap_or(PairReport {
+                a: view.a,
+                b: view.b,
+                volume: 0.0,
+                min: view.min,
+                max: view.max,
+                from_view: true,
+                capped: index >= VIEW_PAIR_SAMPLES || boundary_exhausted,
+            });
         report.from_view = true;
         pairs.push(report);
     }

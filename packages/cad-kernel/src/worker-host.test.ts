@@ -411,3 +411,35 @@ test("a WASM trap caught in feature evaluation still requests a worker restart",
     expect(transfer).toEqual([]);
   });
 });
+
+test("the real worker agrees with capture mesh eligibility fixtures", async () => {
+  const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
+  for (const [fixture, eligible] of [
+    ["tetrahedron", true],
+    ["tetrahedron-reversed", true],
+    ["tetrahedron-mixed", false],
+    ["triangle", false],
+    ["double-sided-triangle", false],
+    ["coplanar-tetrahedron", false],
+    ["thin-bar", true],
+    ["translated-flat-shell", false],
+    ["translated-thin-bar", true],
+  ] as const) {
+    const data = (
+      await Bun.file(
+        new URL(
+          `../../../crates/capture/tests/fixtures/${fixture}.nmesh.txt`,
+          import.meta.url,
+        ),
+      ).text()
+    ).trim();
+    const mesh = cadElement("mesh", "cad.mesh", "a0", { name: fixture, data });
+    const result = await evaluate([mesh]);
+    expect(result.status).toContainEqual([
+      "mesh",
+      eligible
+        ? { ok: true }
+        : expect.objectContaining({ code: "cad.mesh.open" }),
+    ]);
+  }
+});

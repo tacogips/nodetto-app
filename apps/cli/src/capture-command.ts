@@ -1,4 +1,4 @@
-import { CaptureInputError } from "@nodetto/core";
+import { CaptureInputError, collectCadInput } from "@nodetto/core";
 import {
   comparePageOrder,
   pageAtNumber,
@@ -239,7 +239,7 @@ export async function captureCommand(
       if (!backend.renderSolid)
         return fail(`${warnings}3D CAD capture needs the native nodetto-cli.`);
       cad = renderCadCapture(
-        document.elements,
+        collectCadInput(document, page.id, 0).elements,
         page,
         {
           camera,

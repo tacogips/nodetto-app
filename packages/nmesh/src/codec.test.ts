@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { crc32 } from "./crc32.ts";
+import { MIN_NMESH_FIXED_BYTES, MIN_TRIANGLE_BYTES } from "./encode.ts";
 import {
   NMESH_INLINE_MAX_CHARS,
   NMESH_INLINE_PREFIX,
@@ -295,6 +296,45 @@ describe("NMESH v1", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(NmeshError);
       }
+    }
+  });
+});
+
+describe("inline canonicalization", () => {
+  test("refuses too many surviving triangles before sorting", () => {
+    const maxBytes =
+      Math.floor((NMESH_INLINE_MAX_CHARS - NMESH_INLINE_PREFIX.length) / 4) * 3;
+    const count =
+      Math.floor((maxBytes - MIN_NMESH_FIXED_BYTES) / MIN_TRIANGLE_BYTES) + 1;
+    const triangles = new Uint32Array(count * 3);
+    for (let i = 0; i < triangles.length; i += 3) triangles.set([0, 1, 2], i);
+    const mesh = {
+      positions: Float64Array.of(0, 0, 0, 1, 0, 0, 0, 1, 0),
+      triangles,
+    };
+    const sort = Array.prototype.sort;
+    let sorted = false;
+    Array.prototype.sort = function (...args) {
+      sorted = true;
+      return sort.apply(this, args);
+    };
+    try {
+      expectCode(() => canonicalize(mesh, { inline: true }), "nmesh.inline");
+      expect(sorted).toBe(false);
+    } finally {
+      Array.prototype.sort = sort;
+    }
+  });
+
+  test("encoded triangle indices occupy at least three bytes each", () => {
+    let seed = 41;
+    for (let trial = 0; trial < 40; trial++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const mesh = canonicalize(prism(3 + (seed % 80)), { inline: true });
+      expect(encodeNmesh(mesh).length).toBeGreaterThanOrEqual(
+        MIN_NMESH_FIXED_BYTES +
+          MIN_TRIANGLE_BYTES * (mesh.triangles.length / 3),
+      );
     }
   });
 });

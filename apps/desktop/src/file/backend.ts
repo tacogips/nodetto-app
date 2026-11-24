@@ -174,15 +174,29 @@ export interface ExportBackend {
   ): Promise<{ image: Uint8Array; report: string }>;
 }
 
-export function createTauriExportBackend(): ExportBackend {
+export function createTauriExportBackend(
+  invokeImpl: typeof invoke = invoke,
+): ExportBackend {
   return {
     available: true,
     captureSolid: async (scene, format, quality) => {
-      const result = await invoke<{ image: number[]; report: string }>(
-        "capture_solid",
-        { scene: Array.from(scene), format, quality },
-      );
-      return { image: new Uint8Array(result.image), report: result.report };
+      const result = await invokeImpl<ArrayBuffer>("capture_solid", scene, {
+        headers: {
+          "x-nodetto-format": format,
+          "x-nodetto-quality": String(quality),
+        },
+      });
+      if (result.byteLength < 4)
+        throw new Error("Truncated solid capture packet.");
+      const reportLength = new DataView(result).getUint32(0, true);
+      const imageOffset = 4 + reportLength;
+      if (imageOffset >= result.byteLength)
+        throw new Error("Truncated solid capture packet.");
+      const bytes = new Uint8Array(result);
+      return {
+        report: new TextDecoder().decode(bytes.subarray(4, imageOffset)),
+        image: bytes.subarray(imageOffset),
+      };
     },
     pickExportPath: (defaultName: string, extension: string) =>
       invoke<string | null>("pick_export_path", { defaultName, extension }),

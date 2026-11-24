@@ -218,17 +218,13 @@ impl Raster<'_> {
         }
         let mut marked = false;
         if self.scene.draw_interference {
-            let bodies: Vec<_> = scratch
-                .visited
-                .iter()
-                .filter_map(|&body| {
-                    let intervals = &scratch.body_intervals[body as usize];
-                    (!intervals.is_empty()).then_some(SampleBody { body, intervals })
-                })
-                .collect();
+            let bodies = scratch.visited.iter().filter_map(|&body| {
+                let intervals = &scratch.body_intervals[body as usize];
+                (!intervals.is_empty()).then_some(SampleBody { body, intervals })
+            });
             scratch.overlaps.clear();
-            overlay::overlapping_pairs(
-                &bodies,
+            overlay::overlapping_pairs_iter(
+                bodies,
                 self.scene.tolerance,
                 &mut 0,
                 &mut scratch.overlaps,

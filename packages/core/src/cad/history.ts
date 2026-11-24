@@ -430,7 +430,18 @@ function withinExtent(
   return true;
 }
 
-export function createCadGeometry(history: HistoryDetails) {
+export interface CadGeometryStats {
+  profileBuilds: number;
+  pointArrays: number;
+  retainedTools: number;
+}
+
+export function createCadGeometry(
+  history: HistoryDetails,
+  stats?: CadGeometryStats,
+) {
+  const profiles = new Map<ElementId, ReturnType<typeof buildLoops>>();
+  const points = stats ? new Set<CadLoop["points"]>() : undefined;
   const frames = new Map<ElementId, CadFrame>();
   const extrudes = new Map<ElementId, ExtrudeGeometry>();
   return {
@@ -486,18 +497,35 @@ export function createCadGeometry(history: HistoryDetails) {
         const failure = history.status.get(id);
         if (failure && !failure.ok) return failure;
       }
-      const profile = buildLoops(entities, semantic.loops);
+      let profile = profiles.get(sketch);
+      if (profile === undefined) {
+        profile = buildLoops(entities);
+        profiles.set(sketch, profile);
+        if (stats) stats.profileBuilds += 1;
+      }
       if ("error" in profile) return cadFailure(profile.error, profile.at);
-      if (!profile.loops.some(({ depth }) => depth % 2 === 0))
+      const selection =
+        semantic.loops === undefined ? undefined : new Set(semantic.loops);
+      const loops =
+        selection === undefined
+          ? profile.loops
+          : profile.loops.filter((loop) =>
+              loop.members.some((id) => selection.has(id)),
+            );
+      if (!loops.some(({ depth }) => depth % 2 === 0))
         return cadFailure("cad.profile.empty");
 
       const span = extrudeSpan(semantic);
-      if (!withinExtent(profile.loops, frame, span))
+      if (!withinExtent(loops, frame, span))
         return cadFailure(
           "cad.limit",
           "Tool vertices must lie within 10000 mm of the origin along each axis",
         );
-      return { frame, span, loops: profile.loops };
+      if (stats && points) {
+        for (const loop of loops) points.add(loop.points);
+        stats.pointArrays = points.size;
+      }
+      return { frame, span, loops };
     },
   };
 }

@@ -5,7 +5,13 @@ import {
   PCB_TEST_PAGE,
   testBoard,
 } from "../../../core/src/cad/testing/pcb.ts";
-import { pcbBoardChoices, pcbBoardOptions } from "./pcb-insert.ts";
+import { Editor } from "@nodetto/core";
+import { document } from "../../../core/src/test-helpers.ts";
+import {
+  isPcbBoardChoice,
+  pcbBoardChoices,
+  pcbBoardOptions,
+} from "./pcb-insert.ts";
 
 test("lists PCB board records, leaving out other CAD and PCB elements", () => {
   const pages = [CAD_TEST_PAGE, PCB_TEST_PAGE];
@@ -37,4 +43,22 @@ test("includes hidden pages and follows fractional page order", () => {
     { value: "board", label: "Circuit (1)" },
     { value: "second", label: "Circuit (2)" },
   ]);
+});
+
+test("board choices follow page kind and undo", () => {
+  const editor = new Editor({
+    document: document([testBoard()], [CAD_TEST_PAGE, PCB_TEST_PAGE]),
+  });
+  const check = (present: boolean) => {
+    const snapshot = editor.getSnapshot();
+    expect(
+      pcbBoardChoices(snapshot).some((choice) => choice.boardId === "board"),
+    ).toBe(present);
+    expect(isPcbBoardChoice(snapshot, "board")).toBe(present);
+  };
+  check(true);
+  editor.setPageKind(PCB_TEST_PAGE.id, "freeform");
+  check(false);
+  editor.undo();
+  check(true);
 });

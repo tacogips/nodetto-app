@@ -1,3 +1,9 @@
+import {
+  boardReference,
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../../../../packages/core/src/cad/testing/pcb.ts";
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { capturePlateDocument } from "../../../../packages/core/src/capture/testing/plate.ts";
@@ -6,6 +12,7 @@ import {
   type CadEngine,
   type CadEngineInput,
   createCadEngineClient,
+  collectCadInput,
   DEFAULT_CAD_INTERFERENCE,
   Editor,
   extractPdfText,
@@ -326,9 +333,13 @@ test("CAD capture errors and cancelled save never write", async () => {
   const writes: Uint8Array[] = [];
   const notes: (string | null)[] = [];
   let renders = 0;
+  let picks = 0;
   const backend: ExportBackend = {
     available: true,
-    pickExportPath: async () => null,
+    pickExportPath: async () => {
+      picks++;
+      return null;
+    },
     writeBytes: async (_path, bytes) => {
       writes.push(bytes);
     },
@@ -338,9 +349,9 @@ test("CAD capture errors and cancelled save never write", async () => {
       return {
         image: Uint8Array.of(1),
         report: JSON.stringify({
-          width: 1,
-          height: 1,
-          bodies: [],
+          width: 1024,
+          height: 768,
+          bodies: [{ state: "drawn", emptiedByStep: -1, open: false }],
           analysis: null,
           pairs: [],
         }),
@@ -369,6 +380,7 @@ test("CAD capture errors and cancelled save never write", async () => {
   });
   await handlers.captureCadImage(options);
   expect(renders).toBe(1);
+  expect(picks).toBe(1);
   expect(writes).toEqual([]);
   const unavailable = createExportHandlers(
     { editor, exportBackend: { ...backend, captureSolid: undefined } },
@@ -410,7 +422,11 @@ test("CAD Plate capture sends the committed default scene", async () => {
         report: JSON.stringify({
           width: 1024,
           height: 768,
-          bodies: [],
+          bodies: Array.from({ length: 3 }, () => ({
+            state: "drawn",
+            emptiedByStep: -1,
+            open: false,
+          })),
           analysis: null,
           pairs: [],
         }),
@@ -525,7 +541,7 @@ test("CAD mesh-only capture sends the prepared cube scene", async () => {
         report: JSON.stringify({
           width: 1024,
           height: 768,
-          bodies: [],
+          bodies: [{ state: "drawn", emptiedByStep: -1, open: false }],
           analysis: null,
           pairs: [],
         }),
@@ -551,3 +567,151 @@ test("CAD mesh-only capture sends the prepared cube scene", async () => {
     }).scene,
   );
 });
+
+test("CAD capture follows PCB page kind and undo", async () => {
+  const base = capturePlateDocument();
+  const editor = new Editor({
+    document: {
+      ...base,
+      pages: [...base.pages, PCB_TEST_PAGE],
+      elements: [
+        ...base.elements,
+        boardReference(),
+        testBoard(1.6),
+        edge("rim", { kind: "rect", start: [0, 0], end: [20, 10] }),
+      ],
+    },
+  });
+  const scenes: Uint8Array[] = [];
+  const notes: (string | null)[] = [];
+  const backend: ExportBackend = {
+    available: true,
+    pickExportPath: async () => "/out/image.png",
+    writeBytes: async () => {},
+    writeText: async () => {},
+    captureSolid: async (scene) => {
+      scenes.push(scene);
+      return {
+        image: Uint8Array.of(1),
+        report: JSON.stringify({
+          width: 1024,
+          height: 768,
+          bodies: Array.from(
+            {
+              length:
+                editor
+                  .getSnapshot()
+                  .pages.find((page) => page.id === PCB_TEST_PAGE.id)?.kind ===
+                "pcb"
+                  ? 4
+                  : 3,
+            },
+            () => ({ state: "drawn", emptiedByStep: -1, open: false }),
+          ),
+          analysis: null,
+          pairs: [],
+        }),
+      };
+    },
+  };
+  const options = {
+    camera: { view: "iso" as const },
+    width: 1024,
+    height: 768,
+    theme: "light" as const,
+    format: "png" as const,
+  };
+  const handlers = createExportHandlers(
+    { editor, exportBackend: backend },
+    (note) => notes.push(note),
+  );
+  editor.setPageKind(PCB_TEST_PAGE.id, "freeform");
+  const expected = () =>
+    prepareCadCapture(
+      collectCadInput(editor.getSnapshot(), "cad", editor.revision).elements,
+      "cad",
+      {
+        ...options,
+        interference: DEFAULT_CAD_INTERFERENCE,
+        decodeMesh: decodeCaptureMesh,
+      },
+    );
+  const missing = expected();
+  expect(missing.model.errors).toContainEqual(
+    expect.objectContaining({
+      id: "board-reference",
+      code: "cad.reference.missing",
+    }),
+  );
+  expect(
+    missing.model.bodies.some((body) => body.id === "board-reference"),
+  ).toBe(false);
+  await handlers.captureCadImage(options);
+  expect(scenes.at(-1)).toEqual(missing.scene);
+  expect(notes.at(-1)).toContain(
+    `${missing.model.errors.length} features failed`,
+  );
+  editor.undo();
+  const restored = expected();
+  expect(
+    restored.model.bodies.some((body) => body.id === "board-reference"),
+  ).toBe(true);
+  await handlers.captureCadImage(options);
+  expect(scenes.at(-1)).toEqual(restored.scene);
+});
+
+test.each(["width", "height", "bodies"] as const)(
+  "CAD capture rejects mismatched report %s before saving",
+  async (field) => {
+    const editor = new Editor();
+    editor.createPage({ kind: "cad3d", name: "Capture" });
+    editor.createElement("cad.mesh", {
+      semantic: {
+        name: "Mesh",
+        data: stlToInlineMesh(writeBinaryStl([openTriangle])),
+      },
+    });
+    let picks = 0;
+    let writes = 0;
+    const notes: (string | null)[] = [];
+    const backend: ExportBackend = {
+      available: true,
+      pickExportPath: async () => {
+        picks++;
+        return "/out/image.png";
+      },
+      writeBytes: async () => {
+        writes++;
+      },
+      writeText: async () => {},
+      captureSolid: async () => ({
+        image: Uint8Array.of(1),
+        report: JSON.stringify({
+          width: field === "width" ? 1025 : 1024,
+          height: field === "height" ? 769 : 768,
+          bodies: Array.from({ length: field === "bodies" ? 2 : 1 }, () => ({
+            state: "drawn",
+            emptiedByStep: -1,
+            open: false,
+          })),
+          analysis: null,
+          pairs: [],
+        }),
+      }),
+    };
+    await createExportHandlers({ editor, exportBackend: backend }, (note) =>
+      notes.push(note),
+    ).captureCadImage({
+      camera: { view: "iso" },
+      width: 1024,
+      height: 768,
+      theme: "light",
+      format: "png",
+    });
+    expect(notes.at(-1)).toBe(
+      "could not capture: The solid capture report does not match the requested scene.",
+    );
+    expect(picks).toBe(0);
+    expect(writes).toBe(0);
+  },
+);

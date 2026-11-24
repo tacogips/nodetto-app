@@ -7,6 +7,40 @@ use crate::view::Ray;
 
 pub type Bounds = ([f64; 3], [f64; 3]);
 
+const BOUNDARY_READS_PER_WEIGHTED_RAY: u64 = 64;
+
+struct BoundaryBudget {
+    reads: u64,
+    rays: u64,
+    weight: u64,
+    exhausted: bool,
+}
+
+impl BoundaryBudget {
+    fn new(steps: usize) -> Self {
+        Self {
+            reads: 0,
+            rays: 0,
+            weight: (steps as u64).div_ceil(8).max(1),
+            exhausted: false,
+        }
+    }
+
+    fn charge(&mut self, count: usize) -> bool {
+        let next = self.reads.saturating_add(count as u64);
+        let allowance = BOUNDARY_READS_PER_WEIGHTED_RAY
+            .saturating_mul(self.weight)
+            .saturating_mul(self.rays.saturating_add(16));
+        if next > allowance {
+            self.exhausted = true;
+            false
+        } else {
+            self.reads = next;
+            true
+        }
+    }
+}
+
 const AXIS_REFINEMENT_LIMIT: u64 = 2_000_000;
 const SMALL_LOOP_CELLS: f64 = 4.0;
 const BOUNDARY_DIVISIONS: u8 = 8;
@@ -29,6 +63,10 @@ pub struct AxisSample {
     pub cell: f64,
     pub rays: u64,
     pub capped: bool,
+    #[doc(hidden)]
+    pub boundary_exhausted: bool,
+    #[doc(hidden)]
+    pub boundary_reads: u64,
 }
 
 /// Bounds of each swept loop, in world coordinates. Meshes enter analysis in M11.
@@ -198,6 +236,7 @@ impl<'a> AxisFold<'a> {
         grid: Grid,
         origin: [f64; 3],
         scratch: &mut Scratch,
+        budget: &mut BoundaryBudget,
     ) -> Stretch {
         let [x, y] = grid.plane;
         let ray = Ray { origin };
@@ -217,6 +256,9 @@ impl<'a> AxisFold<'a> {
                     prism.intervals(&ray, &mut scratch.crossings, &mut scratch.tool);
                     if scratch.tool.is_empty() && op != Op::Intersection {
                         continue;
+                    }
+                    if !budget.charge(current.len()) {
+                        return Stretch::default();
                     }
                     combine(current, &scratch.tool, op, &mut scratch.next);
                     std::mem::swap(current, &mut scratch.next);
@@ -306,7 +348,14 @@ struct AxisSampler<'a, 's> {
 }
 
 impl AxisSampler<'_, '_> {
-    fn cast(&mut self, cell: [usize; 2], sub: [usize; 2], divisions: u8) -> ([f64; 3], Stretch) {
+    fn cast(
+        &mut self,
+        cell: [usize; 2],
+        sub: [usize; 2],
+        divisions: u8,
+        budget: &mut BoundaryBudget,
+    ) -> ([f64; 3], Stretch) {
+        budget.rays += 1;
         let mut origin = [0.0; 3];
         let mut corner = origin;
         for (i, axis) in self.grid.plane.into_iter().enumerate() {
@@ -320,27 +369,50 @@ impl AxisSampler<'_, '_> {
         (
             corner,
             self.fold
-                .cast(self.request, self.grid, origin, &mut self.scratch),
+                .cast(self.request, self.grid, origin, &mut self.scratch, budget),
         )
     }
 
-    fn sample(mut self, small: &[u8], small_rays: u64, boundary_left: &mut u64) -> AxisSample {
+    fn sample(
+        mut self,
+        small: &[u8],
+        small_rays: u64,
+        boundary_left: &mut u64,
+        budget: &mut BoundaryBudget,
+    ) -> AxisSample {
         let grid = self.grid;
         let [width, height] = grid.size;
+        let start_reads = budget.reads;
+        let start_rays = budget.rays;
         let mut rows = [Vec::new(), Vec::new(), Vec::new()];
         for (y, row) in rows.iter_mut().enumerate().take(height.min(2)) {
-            *row = (0..width).map(|x| self.cast([x, y], [0, 0], 1).1).collect();
+            for x in 0..width {
+                if budget.exhausted {
+                    break;
+                }
+                row.push(self.cast([x, y], [0, 0], 1, budget).1);
+            }
         }
-        let mut rays = (width * height) as u64;
         let mut result = Accumulator::new();
         let mut small_left = small_rays;
         let mut axis_left = AXIS_REFINEMENT_LIMIT - small_rays;
         let mut capped = false;
-        for y in 0..height {
+        'sampling: for y in 0..height {
+            if budget.exhausted {
+                break;
+            }
             if y + 1 < height && y > 0 {
-                rows[(y + 1) % 3] = (0..width)
-                    .map(|x| self.cast([x, y + 1], [0, 0], 1).1)
-                    .collect();
+                let mut row = Vec::with_capacity(width);
+                for x in 0..width {
+                    if budget.exhausted {
+                        break;
+                    }
+                    row.push(self.cast([x, y + 1], [0, 0], 1, budget).1);
+                }
+                rows[(y + 1) % 3] = row;
+                if budget.exhausted {
+                    break;
+                }
             }
             for x in 0..width {
                 let index = y * width + x;
@@ -370,12 +442,14 @@ impl AxisSampler<'_, '_> {
                     result.add(grid, self.corner([x, y]), grid.side, coarse);
                     continue;
                 }
-                rays += cost;
                 let side = grid.side.map(|side| side / f64::from(divisions));
                 let mut refined_hit = false;
                 for sy in 0..usize::from(divisions) {
                     for sx in 0..usize::from(divisions) {
-                        let (corner, stretch) = self.cast([x, y], [sx, sy], divisions);
+                        let (corner, stretch) = self.cast([x, y], [sx, sy], divisions, budget);
+                        if budget.exhausted {
+                            break 'sampling;
+                        }
                         refined_hit |= stretch.hit();
                         result.add(grid, corner, side, stretch);
                     }
@@ -387,7 +461,7 @@ impl AxisSampler<'_, '_> {
                 }
             }
         }
-        debug_assert_eq!(small_left, 0);
+        debug_assert!(budget.exhausted || small_left == 0);
         let hit = result.volume > 0.0;
         let (min, max) = if hit {
             result.bounds
@@ -400,8 +474,10 @@ impl AxisSampler<'_, '_> {
             min,
             max,
             cell: grid.side[0].max(grid.side[1]),
-            rays,
-            capped,
+            rays: budget.rays - start_rays,
+            capped: capped || budget.exhausted,
+            boundary_exhausted: budget.exhausted,
+            boundary_reads: budget.reads - start_reads,
         }
     }
 
@@ -472,7 +548,14 @@ fn sample_axes<const N: usize>(
         refinement_left -= spent;
         spent
     });
+    let mut budget = BoundaryBudget::new(steps.iter().map(Vec::len).sum());
     std::array::from_fn(|i| {
+        if budget.exhausted {
+            let mut result = empty_sample(request);
+            result.capped = true;
+            result.boundary_exhausted = true;
+            return result;
+        }
         let grid = grids[i];
         AxisSampler {
             request,
@@ -480,7 +563,7 @@ fn sample_axes<const N: usize>(
             fold: AxisFold::new(request, grid, &steps, tools, cache),
             scratch: Scratch::default(),
         }
-        .sample(&small[i], small_rays[i], &mut refinement_left)
+        .sample(&small[i], small_rays[i], &mut refinement_left, &mut budget)
     })
 }
 
@@ -503,6 +586,8 @@ fn empty_sample(request: &LatticeRequest) -> AxisSample {
         cell: 0.0,
         rays: 0,
         capped: false,
+        boundary_exhausted: false,
+        boundary_reads: 0,
     }
 }
 
@@ -590,7 +675,11 @@ pub fn sample_body_axis(
     let mut scratch = Scratch::default();
     let mut rays = 0u64;
     let mut any_hit = false;
+    let mut boundary_budget = BoundaryBudget::new(body.steps.len());
+    let mut marks = Vec::new();
     let mut cast = |x: usize, y: usize, sx: usize, sy: usize, divisions: usize| {
+        boundary_budget.rays += 1;
+        marks.clear();
         let mut origin = [0.0; 3];
         for (i, axis) in grid.plane.into_iter().enumerate() {
             let (cell, sub) = if i == 0 { (x, sx) } else { (y, sy) };
@@ -617,6 +706,9 @@ pub fn sample_body_axis(
                 });
             if let Some(view) = view {
                 view.intervals(&ray, &mut scratch.crossings, &mut scratch.tool);
+                if !boundary_budget.charge(scratch.bodies[0].len()) {
+                    return (false, false, true);
+                }
                 combine(
                     &scratch.bodies[0],
                     &scratch.tool,
@@ -635,8 +727,11 @@ pub fn sample_body_axis(
                     far.s.min(request.max[axis]) - near.s.max(request.min[axis]) > 0.0
                 });
             if material {
-                liveness.mark(i, i + 1);
+                marks.push(i);
             }
+        }
+        for &i in &marks {
+            liveness.mark(i, i + 1);
         }
         let hit = scratch.bodies[0]
             .as_chunks::<2>()
@@ -652,6 +747,7 @@ pub fn sample_body_axis(
                 .take(body.steps.len())
                 .all(|&alive| alive)
                 && liveness.alive_after.len() >= body.steps.len(),
+            false,
         )
     };
     let [width, height] = grid.size;
@@ -666,7 +762,12 @@ pub fn sample_body_axis(
             }
             *budget_left -= 1;
             rays += 1;
-            let (hit, done) = cast(x, y, 0, 0, 1);
+            let (hit, done, boundary_exhausted) = cast(x, y, 0, 0, 1);
+            if boundary_exhausted {
+                *budget_left = 0;
+                exhausted = true;
+                break 'coarse;
+            }
             coarse[y * width + x] = hit;
             if done {
                 complete = true;
@@ -704,7 +805,13 @@ pub fn sample_body_axis(
                             *budget_left -= 1;
                             rays += 1;
                             refined += 1;
-                            if cast(x, y, sx, sy, n).1 {
+                            let (_, done, boundary_exhausted) = cast(x, y, sx, sy, n);
+                            if boundary_exhausted {
+                                *budget_left = 0;
+                                exhausted = true;
+                                break 'refine;
+                            }
+                            if done {
                                 break 'refine;
                             }
                         }
@@ -721,5 +828,7 @@ pub fn sample_body_axis(
         cell: grid.side[0].max(grid.side[1]),
         rays,
         capped: exhausted,
+        boundary_exhausted: boundary_budget.exhausted,
+        boundary_reads: boundary_budget.reads,
     }
 }

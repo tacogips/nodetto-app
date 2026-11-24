@@ -23,6 +23,7 @@ import {
   setCadNumber,
   setCadOperation,
   setCadPoint,
+  setCadSketchBase,
 } from "./cad-edits.ts";
 import {
   Checkbox,
@@ -99,6 +100,14 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
       )
       .sort(compareCadHistoryOrder);
   });
+  const orderedTargets = () => {
+    const selected = targets();
+    const listed = earlierBodies().map((body) => body.id);
+    return [
+      ...listed.filter((id) => selected.includes(id)),
+      ...selected.filter((id) => !listed.includes(id)),
+    ];
+  };
   const status = () => statusFor(current().id);
   const board = () => {
     const id = semantic().board;
@@ -179,7 +188,22 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
       <Switch>
         <Match when={type() === "cad.sketch"}>
           <Show when={offset() !== undefined}>
-            {length("Plane offset (mm)", "offset")}
+            <>
+              <Field label="Base plane">
+                <SelectInput
+                  label="Base plane"
+                  value={String((semantic().plane as { base: string }).base)}
+                  options={[
+                    { value: "xy", label: "XY" },
+                    { value: "yz", label: "YZ" },
+                    { value: "zx", label: "ZX" },
+                  ]}
+                  disabled={readOnly()}
+                  onCommit={(value) => edit(setCadSketchBase(current(), value))}
+                />
+              </Field>
+              {length("Plane offset (mm)", "offset")}
+            </>
           </Show>
         </Match>
         <Match when={type() === "cad.extrude"}>
@@ -191,7 +215,7 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
               options={OPERATIONS}
               disabled={readOnly()}
               onCommit={(value) =>
-                edit(setCadOperation(current(), value, targets()))
+                edit(setCadOperation(current(), value, orderedTargets()))
               }
             />
           </Field>
@@ -200,17 +224,28 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
               <div>Target bodies</div>
               <For each={earlierBodies()} fallback={<p>No earlier bodies</p>}>
                 {(body) => (
-                  <Checkbox
-                    label={layerName(body)}
-                    checked={targets().includes(body.id)}
-                    disabled={readOnly()}
-                    onCommit={(checked) => {
-                      const next = checked
-                        ? [...targets(), body.id]
-                        : targets().filter((id) => id !== body.id);
-                      edit(setCadOperation(current(), operation(), next));
+                  <span
+                    onClick={(event) => {
+                      if (operation() === "add" && targets().includes(body.id))
+                        event.preventDefault();
                     }}
-                  />
+                  >
+                    <Checkbox
+                      label={layerName(body)}
+                      checked={targets().includes(body.id)}
+                      disabled={readOnly()}
+                      onCommit={(checked) => {
+                        if (operation() === "add" && !checked) return;
+                        const next =
+                          operation() === "add"
+                            ? [body.id]
+                            : checked
+                              ? [...orderedTargets(), body.id]
+                              : orderedTargets().filter((id) => id !== body.id);
+                        edit(setCadOperation(current(), operation(), next));
+                      }}
+                    />
+                  </span>
                 )}
               </For>
             </div>

@@ -45,7 +45,11 @@ export function parseCssColor(text: string): Rgb | null {
   ) {
     return null;
   }
-  const [red, green, blue] = channels.map(Number);
+  const [r, g, b] = channels;
+  if (r === undefined || g === undefined || b === undefined) return null;
+  const red = Number(r);
+  const green = Number(g);
+  const blue = Number(b);
   return [red, green, blue].every((channel) => channel >= 0 && channel <= 255)
     ? [red, green, blue]
     : null;

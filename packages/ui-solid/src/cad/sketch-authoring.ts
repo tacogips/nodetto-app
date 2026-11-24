@@ -124,6 +124,7 @@ export function createSketchAuthoring(options: {
     const ids = selection();
     if (ids.size !== 1) return;
     const [id] = ids;
+    if (id === undefined) return;
     const element = editor.store.get(id);
     if (element?.page === pageId)
       return element.type === "cad.sketch" ? id : sketchParentOf(element);

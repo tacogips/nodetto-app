@@ -1,0 +1,573 @@
+{
+  "taskId": "car1-r1",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "eb7d8c912fa38f669082aaa318ce28de1dab987b",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md",
+    "design-docs/specs/design-cad3d.md",
+    "design-docs/user-qa/ai-capture-audit-r1.md"
+  ],
+  "evidenceRoot": "tmp/car1-r1",
+  "waves": [
+    ["car1-a1-nmesh-contract", "car1-b1-shared-contours", "car1-c-body-selection", "car1-d-pcb-page-kind", "car1-f-desktop-transport", "car1-g-boundary-fold", "car1-h-overlay-alloc", "car1-j-cad-ui-strict", "car1-k-inspector", "car1-l-sketch-loops", "car1-m-stl-refusal"],
+    ["car1-e-report-contract", "car1-i-pairs-classification", "car1-d2-pcb-insert-guard", "car1-a2-native-wiring"],
+    ["car1-b2-open-mesh-targets"],
+    ["car1-b3-point-limit"]
+  ],
+  "reviewContext": {
+    "issueReference": "audit-round-1:feat/ai-capture:0a357086e71f252f35c6639f755d28551f772517..eb7d8c912fa38f669082aaa318ce28de1dab987b",
+    "userProblem": "Round 1 of the audit of the 3D CAD pages and the AI capture feature on feat/ai-capture (0a35708..eb7d8c9) returned needs_fix=true with 16 major findings (5 high, 11 medium): open-mesh multi-target cuts, PCB reference page kind, CAD UI strict-index compilation, point limit after allocation, interference boundary fold, sketch base-plane control, full body ID selection, sketch profile pair scans, native mesh bounds, desktop capture byte arrays, overlay sample allocation, STL inline refusal, interference sparse pairs, Add targets, capture report contract and capture body classification.",
+    "requiredOutcomes": [
+      "F1 function-open-mesh-multitarget-cut: a Boolean feature with any display-only open mesh target fails atomically (cad.body.missing), attaches no step, fails dependants; mesh stays visible; worker and capture agree; block scene bytes equal the cut-suppressed capture (plans a1, a2, b2).",
+      "F2 function-pcb-reference-page-kind: CLI, MCP and desktop capture report cad.reference.missing like cad check when a board page is no longer PCB; picker omits it; insertion rejects it (Q1-gated d2); undo restores (plans d, d2).",
+      "F3 function-hosted-cad-strict-compilation: zero noUncheckedIndexedAccess diagnostics rooted at packages/ui-solid/src/cad-ui.tsx, enforced by strict-index.test.ts (plan j).",
+      "F4 performance-capture-point-limit-after-allocation: point limit charged before allocation, zero tools visited past the threshold, precedence and admitted bytes unchanged (plans a1, b1, b3).",
+      "F5 performance-interference-boundary-fold: accumulated boundary reads charged against a deterministic allowance with incomplete-analysis reporting; admitted reports and bytes identical across thread counts (plan g).",
+      "F6 function-sketch-base-plane-control: undoable XY/YZ/ZX selector keeping the offset and respecting lock/read-only (plan k).",
+      "F7 function-interference-full-body-id: exact ID first, indexed lookup, dedup, stable order, ambiguity still fails, lazy error list (plan c).",
+      "F8 performance-sketch-profile-pair-scans: 2D bounds-narrowed segment and containment candidates, non-quadratic counts in both layouts (plan l).",
+      "F9 performance-native-mesh-bounds: native wireframe export uses Rust bounds without the TS decoder; native shaded capture uses decode-pass bounds; bytes unchanged (plans a1, a2; Q2-gated).",
+      "F10 performance-desktop-capture-byte-arrays: binary request body and binary framed reply; image and report equal the direct render (plan f).",
+      "F11 performance-overlay-sample-allocation: no per-sample candidate vector, skip pairs with fewer than two hits, pixels unchanged (plan h).",
+      "F12 performance-stl-inline-refusal: refuse before sort/encode on a conservative surviving-triangle bound; degenerate-heavy input still imports; packages/io does not import @nodetto/core (plan m).",
+      "F13 performance-interference-sparse-pairs: sweep-based candidate discovery with sub-quadratic comparisons and output equal to exhaustive enumeration (plan i).",
+      "F14 maintainability-cad-add-targets: Add never commits more than one target; undo restores the original Cut (plan k).",
+      "F15 maintainability-capture-report-contract: shared report validation; desktop rejects mismatches before picker/write (plan e).",
+      "F16 maintainability-capture-body-classification: first-tool classification computed once per render and shared by picture and candidates (plan i).",
+      "Repository lint, typecheck and existing tests pass; final integration runs CARGO_TERM_QUIET=true mise run verify, bun run typecheck and bun run lint."
+    ],
+    "nonGoals": [
+      "The two low findings function-force-identical-rewrite and performance-identical-capture-file-copy.",
+      "Editing files outside each plan's writePaths, tsconfig*.json, impl-plans/README.md, lockfiles or indexes; archiving plans; workspace-wide formatting.",
+      "Regenerating goldens or changing error codes/messages except where a finding requires it.",
+      "Reclassifying tools in lattice::sample_body_axis (census path; census.rs out of scope).",
+      "Any server, auth, secret or deployment content; pushing or rewriting history."
+    ],
+    "constraints": [
+      "Work only in /Users/taco/gits/tacogips/nodetto-app-capture on feat/ai-capture; never push, never rewrite history, never touch other worktrees.",
+      "AGENTS.md: English only, no emojis, strict typing; cargo with CARGO_TERM_QUIET=true and a plan-local CARGO_TARGET_DIR=target/car1-<plan>; cargo fmt on touched Rust.",
+      "Indexed reads must type-check under noUncheckedIndexedAccess; packages/io must not import @nodetto/core; packages/core/src/pcb imports only itself.",
+      "Heavy per-pixel, per-vertex and per-byte work stays in Rust (native CLI runs TS core in Boa).",
+      "Captures stay deterministic; existing goldens and digests unchanged.",
+      "Every fix ships a test failing on eb7d8c9 and passing after; performance findings assert deterministic counts, never wall-clock.",
+      "Never relax or delete tests; timing tests may be retried up to three times, then compared in isolation.",
+      "Gated plans read design-docs/user-qa/ai-capture-audit-r1.md first: car1-d2-pcb-insert-guard needs Q1 'Decision: approved', car1-a2-native-wiring needs Q2 'Decision: approved'; otherwise they make no edit and record 'blocked: Qn pending'; b2 and b3 stay blocked through a2.",
+      "Each plan writes only its writePaths and its own progress log impl-plans/progress/<planId>.md with pre/post sha256, commands, exit codes and log paths under target/car1-<plan>/logs/.",
+      "Native parity requires building the release nodetto-cli first and setting NODETTO_CLI_TEST_BINARY."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "One plan per finding or per same-module finding group, 17 plans in four waves (a1,b1,c,d,f,g,h,j,k,l,m | e,i,d2,a2 | b2 | b3).", "rationale": "Maximum concurrency with disjoint writes per wave; dependencies only where plans share files (scene.ts, construction.ts, cad-request.ts, export-handlers.ts, crates/capture interference/lattice/raster) or a contract (a1 decoder overloads, j strict-index test)."},
+      {"decision": "Mesh decoder capture contract (vertexCount, bounds, booleanTarget, optional geometry, streaming over-limit path) defined once in Rust and TS by a1 with exactly two TS overloads; a2 types it in core and the native CLI.", "rationale": "Shared seam for F1 eligibility, F4 pre-allocation limit and F9 Rust bounds; the one-argument overload keeps existing callers (capture-cad.ts:123, export-handlers.ts:273, cad-command.ts:56) compiling unedited without casts."},
+      {"decision": "Scope amendments Q1 (board-picker.tsx guard) and Q2 (commands.ts, svg-export theme.ts and document.ts) are gated in design-docs/user-qa/ai-capture-audit-r1.md.", "rationale": "These files are outside the audit's listed files; plans self-block while the decision reads pending, so ungated plans proceed independently."},
+      {"decision": "F1 implemented as a display-only mesh visitor result in construction.ts so the existing absent-target rule fails the whole feature.", "rationale": "Matches editor semantics without renderer or Rust changes and keeps dependency failure propagation (cad.reference.failed)."},
+      {"decision": "F5 charges |accumulated boundaries| per combine against 64 * w * (rays + 16) per request.", "rationale": "Deterministic per-request cast order, no shared atomics, admitted cases unchanged."},
+      {"decision": "F10 uses a raw Tauri request body with format/quality headers and a u32-LE-framed binary reply.", "rationale": "Same framing as the native CLI packet; export-handlers.ts captureSolid signature unchanged."}
+    ],
+    "intentionalTradeoffs": [
+      "Census path (lattice::sample_body_axis) keeps its own is_solid filter; F16 shared classification covers picture and candidates only (residual).",
+      "a1 is 181 lines, above the ~150-line guideline, because it carries the requested overload contract.",
+      "If Q1/Q2 stay pending, F2 commit-time guard, F9, F1 and F4 remain open and plans d2, a2, b2, b3 report blocked.",
+      "If TS overload resolution fails at cad-command.ts:56, a2 stops with a scope-amendment request rather than adding casts."
+    ],
+    "supportedEdgeCases": [
+      "Open, mixed-winding, double-sided, coplanar and translated flat-shell meshes as rejected targets; closed tetrahedra, thin bar and translated thin bar as valid targets.",
+      "Body queries: full ID that is also a prefix or another body's name, duplicates, truly ambiguous prefixes.",
+      "More than eight depth-tied bodies in the overlay; single screen-filling body.",
+      "Horizontal and vertical disjoint contour rows; crossing segments reporting the same first segment.",
+      "Degenerate-dominated high-facet STL inputs still import.",
+      "Point limit exactly at 4,000,000 admitted; overflow with sentinel prisms and meshes; hidden-only overflow; body-query and header-error precedence.",
+      "Report mismatches in width, height or body count individually; cancellation with a matching report."
+    ],
+    "outOfScopeEdgeCases": [
+      "Pre-existing EPERM roundtrip-log failure in packages/cad-kernel/src/worker-host.test.ts (compared in isolation).",
+      "Transient sibling failures in shared-tree typecheck, strict-index probe or crate builds (rerun after the sibling is done and record both runs).",
+      "GUI runs beyond DOM tests."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "design-docs/specs/design-cad3d.md",
+      "design-docs/user-qa/ai-capture-audit-r1.md",
+      "impl-plans/active/car1-00-overview.md",
+      "impl-plans/active/car1-a1-nmesh-contract.md",
+      "impl-plans/active/car1-a2-native-wiring.md",
+      "impl-plans/active/car1-b1-shared-contours.md",
+      "impl-plans/active/car1-b2-open-mesh-targets.md",
+      "impl-plans/active/car1-b3-point-limit.md",
+      "impl-plans/active/car1-c-body-selection.md",
+      "impl-plans/active/car1-d-pcb-page-kind.md",
+      "impl-plans/active/car1-d2-pcb-insert-guard.md",
+      "impl-plans/active/car1-e-report-contract.md",
+      "impl-plans/active/car1-f-desktop-transport.md",
+      "impl-plans/active/car1-g-boundary-fold.md",
+      "impl-plans/active/car1-h-overlay-alloc.md",
+      "impl-plans/active/car1-i-pairs-classification.md",
+      "impl-plans/active/car1-j-cad-ui-strict.md",
+      "impl-plans/active/car1-k-inspector.md",
+      "impl-plans/active/car1-l-sketch-loops.md",
+      "impl-plans/active/car1-m-stl-refusal.md"
+    ],
+    "finalIntegration": [
+      "CARGO_TERM_QUIET=true mise run verify",
+      "bun run typecheck",
+      "bun run lint"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car1-a1-nmesh-contract",
+      "planPath": "impl-plans/active/car1-a1-nmesh-contract.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/nmesh.rs",
+        "crates/capture/tests/fixtures/tetrahedron-reversed.nmesh.txt",
+        "crates/capture/tests/fixtures/tetrahedron-mixed.nmesh.txt",
+        "crates/capture/tests/fixtures/triangle.nmesh.txt",
+        "crates/capture/tests/fixtures/double-sided-triangle.nmesh.txt",
+        "crates/capture/tests/fixtures/coplanar-tetrahedron.nmesh.txt",
+        "crates/capture/tests/fixtures/thin-bar.nmesh.txt",
+        "crates/capture/tests/fixtures/translated-flat-shell.nmesh.txt",
+        "crates/capture/tests/fixtures/translated-thin-bar.nmesh.txt",
+        "packages/nmesh/src/decode.ts",
+        "packages/io/src/nmesh/capture-decoder.ts",
+        "packages/io/src/nmesh/capture-decoder.test.ts",
+        "packages/cad-kernel/src/worker-host.test.ts",
+        "impl-plans/progress/car1-a1-nmesh-contract.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "All nine nmesh fixtures exist and Rust decode_capture, TS decodeCaptureMesh and the Manifold worker agree on booleanTarget per the design 19.1 F1 table.",
+        "Over-limit paths allocate no geometry (AllocStats and onAllocate counters zero; no millimetres with needTarget).",
+        "decode_inline and one-argument decodeNmesh behaviour unchanged; existing nmesh and codec tests pass.",
+        "decodeCaptureMesh has exactly two overloads with required options in the second; bun run typecheck exits 0 with capture-cad.ts and export-handlers.ts unedited.",
+        "Each new test fails on eb7d8c9; progress log records hashes, commands and exit codes."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-a1 cargo fmt -p nodetto-capture -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-a1 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-a1 cargo test -p nodetto-capture nmesh",
+        "biome check packages/nmesh/src/decode.ts packages/io/src/nmesh/capture-decoder.ts packages/io/src/nmesh/capture-decoder.test.ts packages/cad-kernel/src/worker-host.test.ts && bun test packages/io/src/nmesh/capture-decoder.test.ts packages/nmesh/src/codec.test.ts packages/cad-kernel/src/worker-host.test.ts",
+        "bun run typecheck && bun test packages/io/src/nmesh/capture-decoder.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-b1-shared-contours",
+      "planPath": "impl-plans/active/car1-b1-shared-contours.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/cad/history.ts",
+        "packages/core/src/cad/construction.ts",
+        "packages/core/src/cad/history.test.ts",
+        "impl-plans/progress/car1-b1-shared-contours.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Counters show one profile build and one point array per sketch contour across many extrusions (profileBuilds == 1, pointArrays == 1).",
+        "retainedTools equals the number of face-referenced features.",
+        "Selection semantics, statuses, error codes and at fields unchanged; all core cad and capture tests pass with unchanged scene bytes."
+      ],
+      "verification": [
+        "biome check packages/core/src/cad/history.ts packages/core/src/cad/construction.ts packages/core/src/cad/history.test.ts && bun test packages/core/src/cad",
+        "bun run typecheck && bun test packages/core/src/capture packages/core/src/cad/history.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-c-body-selection",
+      "planPath": "impl-plans/active/car1-c-body-selection.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "impl-plans/progress/car1-c-body-selection.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "part,part-extra selects both bodies; a full ID wins over another body's name; truly ambiguous partial queries fail with the existing message.",
+        "Duplicate queries are deduplicated, output is ascending and the error name list is built only on failure.",
+        "5,000 bodies and 500 queries use at most 500 * (2 + 2 * ceil(log2(5000))) lookups.",
+        "Existing cad-request tests unchanged and passing."
+      ],
+      "verification": [
+        "biome check packages/core/src/capture/cad-request.ts packages/core/src/capture/cad-request.test.ts && bun test packages/core/src/capture/cad-request.test.ts",
+        "bun run typecheck && bun test packages/core/src/capture apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-d-pcb-page-kind",
+      "planPath": "impl-plans/active/car1-d-pcb-page-kind.md",
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/src/capture-command.ts",
+        "apps/cli/src/capture-command.test.ts",
+        "apps/desktop/src/shell/export-handlers.ts",
+        "apps/desktop/src/shell/export-handlers.test.ts",
+        "packages/ui-solid/src/cad/pcb-insert.ts",
+        "packages/ui-solid/src/cad/pcb-insert.test.ts",
+        "impl-plans/progress/car1-d-pcb-page-kind.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "CLI (and MCP) and desktop capture use collectCadInput and report cad.reference.missing with no reference body when the board page is freeform, matching cad check.",
+        "pcbBoardChoices omits the board and isPcbBoardChoice is false; after undo both report the board again.",
+        "Existing picker and capture tests unchanged and passing."
+      ],
+      "verification": [
+        "biome check apps/cli/src/capture-command.ts apps/desktop/src/shell/export-handlers.ts packages/ui-solid/src/cad/pcb-insert.ts packages/ui-solid/src/cad/pcb-insert.test.ts apps/cli/src/capture-command.test.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/ui-solid/src/cad/pcb-insert.test.ts apps/cli/src/capture-command.test.ts apps/desktop/src/shell/export-handlers.test.ts",
+        "bun run typecheck && bun test apps/cli/src/mcp.test.ts packages/core/src/capture/cad-request.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-f-desktop-transport",
+      "planPath": "impl-plans/active/car1-f-desktop-transport.md",
+      "dependsOn": [],
+      "writePaths": [
+        "apps/desktop/src/file/backend.ts",
+        "apps/desktop/src/file/backend.test.ts",
+        "apps/desktop/src-tauri/src/capture.rs",
+        "impl-plans/progress/car1-f-desktop-transport.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "captureSolid sends the scene Uint8Array itself as a raw body with x-nodetto-format and x-nodetto-quality headers.",
+        "The reply is a u32-LE-framed binary buffer split into report and image; a truncated reply throws.",
+        "frame_reply(capture_solid_blocking(...)) splits into exactly the image and report of render_scene; existing invalid-input messages kept.",
+        "export-handlers.ts is unchanged."
+      ],
+      "verification": [
+        "biome check apps/desktop/src/file/backend.ts apps/desktop/src/file/backend.test.ts && bun test apps/desktop/src/file/backend.test.ts apps/desktop/src/shell/export-handlers.test.ts",
+        "CARGO_TERM_QUIET=true cargo fmt -p app -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-f cargo test -p app capture",
+        "bun run typecheck && bun test apps/desktop/src/file/backend.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-g-boundary-fold",
+      "planPath": "impl-plans/active/car1-g-boundary-fold.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/lattice.rs",
+        "crates/capture/src/interference.rs",
+        "crates/capture/tests/boundary_fold.rs",
+        "impl-plans/progress/car1-g-boundary-fold.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Boundary reads per lattice request stay at most 64 * w * (rays + 16), counted deterministically, in pair and census folds.",
+        "Exhaustion reports a capped pair, a capped view fallback or an unknown census body.",
+        "Admitted reports and image bytes are identical at 1 and 8 threads and equal existing digests."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-g cargo fmt -p nodetto-capture -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-g cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-g cargo test -p nodetto-capture",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-g cargo test -p nodetto-capture --release --test boundary_fold --test interference --test census"
+      ]
+    },
+    {
+      "planId": "car1-h-overlay-alloc",
+      "planPath": "impl-plans/active/car1-h-overlay-alloc.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/overlay.rs",
+        "crates/capture/src/raster.rs",
+        "crates/capture/tests/overlay_alloc.rs",
+        "crates/capture/tests/overlay.rs",
+        "impl-plans/progress/car1-h-overlay-alloc.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "A counting global allocator shows render allocations below samples / 16 for one screen-filling solid (no per-sample vector).",
+        "More than eight depth-tied bodies give hatch pixels, pair order and image bytes equal to the old sort-and-truncate reference.",
+        "Single-body image bytes and existing overlay digests unchanged."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-h cargo fmt -p nodetto-capture -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-h cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-h cargo test -p nodetto-capture --test overlay_alloc --test overlay --test render",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-h cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car1-j-cad-ui-strict",
+      "planPath": "impl-plans/active/car1-j-cad-ui-strict.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/cad/pick.ts",
+        "packages/ui-solid/src/cad/theme.ts",
+        "packages/ui-solid/src/cad/renderer.ts",
+        "packages/ui-solid/src/cad/sketch-overlay.ts",
+        "packages/ui-solid/src/cad/sketch-authoring.ts",
+        "packages/ui-solid/src/cad/extrude-interaction.ts",
+        "packages/ui-solid/src/cad/CadViewport.tsx",
+        "packages/ui-solid/src/cad/strict-index.test.ts",
+        "impl-plans/progress/car1-j-cad-ui-strict.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "strict-index.test.ts (tsconfig.json options plus noEmit and noUncheckedIndexedAccess, rooted at cad-ui.tsx) reports 0 diagnostics; it reported 63 before.",
+        "No non-null assertion hides a reachable missing case; hot loops stay allocation-free.",
+        "Adjacent pick, theme, sketch-overlay, extrude-interaction, sketch-interaction, camera3d and viewport DOM tests pass unchanged."
+      ],
+      "verification": [
+        "biome check packages/ui-solid/src/cad/pick.ts packages/ui-solid/src/cad/theme.ts packages/ui-solid/src/cad/renderer.ts packages/ui-solid/src/cad/sketch-overlay.ts packages/ui-solid/src/cad/sketch-authoring.ts packages/ui-solid/src/cad/extrude-interaction.ts packages/ui-solid/src/cad/CadViewport.tsx packages/ui-solid/src/cad/strict-index.test.ts && bun test packages/ui-solid/src/cad/strict-index.test.ts packages/ui-solid/src/cad/pick.test.ts packages/ui-solid/src/cad/theme.test.ts packages/ui-solid/src/cad/sketch-overlay.test.ts packages/ui-solid/src/cad/extrude-interaction.test.ts packages/ui-solid/src/cad/sketch-interaction.test.ts packages/ui-solid/src/cad/camera3d.test.ts",
+        "bun run typecheck && bun test packages/ui-solid/src/cad/viewport.test.tsx"
+      ]
+    },
+    {
+      "planId": "car1-k-inspector",
+      "planPath": "impl-plans/active/car1-k-inspector.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/inspector/cad-edits.ts",
+        "packages/ui-solid/src/inspector/CadSection.tsx",
+        "packages/ui-solid/src/inspector/cad-edits.test.ts",
+        "packages/ui-solid/src/test-dom/cad-sketch.dom.tsx",
+        "packages/ui-solid/src/test-dom/cad-inspector.dom.tsx",
+        "packages/core/src/cad/emitters.test.ts",
+        "impl-plans/progress/car1-k-inspector.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Base-plane sketches show an XY/YZ/ZX selector, disabled when read-only or locked, that keeps the offset; changes are separate undoable commits.",
+        "Converting a two-target Cut to Add commits one target, switching the Add target commits [body], unchecking the current target is a no-op; every commit passes history validation and Undo restores the Cut with both targets.",
+        "Existing New, Cut and Intersect inspector tests pass unchanged; emitters.test.ts list is extended only if required by this plan's DOM edits."
+      ],
+      "verification": [
+        "biome check packages/ui-solid/src/inspector/cad-edits.ts packages/ui-solid/src/inspector/CadSection.tsx packages/ui-solid/src/inspector/cad-edits.test.ts packages/ui-solid/src/test-dom/cad-sketch.dom.tsx packages/ui-solid/src/test-dom/cad-inspector.dom.tsx && bun test packages/ui-solid/src/inspector/cad-edits.test.ts packages/ui-solid/src/cad/viewport.test.tsx",
+        "bun run typecheck && bun test packages/core/src/cad/emitters.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-l-sketch-loops",
+      "planPath": "impl-plans/active/car1-l-sketch-loops.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/cad/loops.ts",
+        "packages/core/src/cad/loops.test.ts",
+        "impl-plans/progress/car1-l-sketch-loops.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "segmentPairs and containmentPairs grow by at most 2.5x per doubling for 160/320/640 disjoint circles in horizontal and vertical rows.",
+        "The reported cad.profile.intersect at id equals the old nested-loop result.",
+        "Existing intersection, nesting, winding and error-id assertions pass unchanged."
+      ],
+      "verification": [
+        "biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/history.test.ts packages/core/src/cad/check.test.ts",
+        "bun run typecheck && bun test packages/core/src/cad packages/core/src/capture/scene.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-m-stl-refusal",
+      "planPath": "impl-plans/active/car1-m-stl-refusal.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/nmesh/src/canonical.ts",
+        "packages/nmesh/src/encode.ts",
+        "packages/nmesh/src/codec.test.ts",
+        "packages/io/src/cad-mesh.ts",
+        "packages/io/src/cad-mesh.test.ts",
+        "packages/ui-solid/src/cad/mesh-io.test.ts",
+        "impl-plans/progress/car1-m-stl-refusal.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "canonicalize(mesh, { inline: true }) throws nmesh.inline before sorting when surviving triangles exceed the conservative maxInlineTriangles bound.",
+        "A degenerate-dominated high-facet input still imports; accepted inline bytes unchanged.",
+        "packages/io imports only @nodetto/nmesh through its index, never @nodetto/core."
+      ],
+      "verification": [
+        "biome check packages/nmesh/src/canonical.ts packages/nmesh/src/encode.ts packages/nmesh/src/codec.test.ts packages/io/src/cad-mesh.ts packages/io/src/cad-mesh.test.ts packages/ui-solid/src/cad/mesh-io.test.ts && bun test packages/nmesh/src/codec.test.ts packages/io/src/cad-mesh.test.ts packages/ui-solid/src/cad/mesh-io.test.ts packages/nmesh/src/isolation.test.ts",
+        "bun run typecheck && bun test packages/nmesh packages/io/src/cad-mesh.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-e-report-contract",
+      "planPath": "impl-plans/active/car1-e-report-contract.md",
+      "dependsOn": ["car1-d-pcb-page-kind", "car1-j-cad-ui-strict"],
+      "writePaths": [
+        "packages/core/src/capture/report.ts",
+        "packages/core/src/capture/report.test.ts",
+        "apps/cli/src/capture-cad.ts",
+        "apps/cli/src/capture-cad.test.ts",
+        "apps/desktop/src/shell/export-handlers.ts",
+        "apps/desktop/src/shell/export-handlers.test.ts",
+        "impl-plans/progress/car1-e-report-contract.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "assertSolidReportMatches is shared by CLI and desktop with the existing message.",
+        "Desktop rejects each width, height and body-count mismatch before pickExportPath or writeBytes is called.",
+        "Cancellation tests use a matching report; existing PNG, JPG, cancellation and scene-byte tests pass."
+      ],
+      "verification": [
+        "biome check packages/core/src/capture/report.ts packages/core/src/capture/report.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture/report.test.ts apps/cli/src/capture-cad.test.ts apps/desktop/src/shell/export-handlers.test.ts",
+        "bun run typecheck && bun test apps/cli/src/capture-command.test.ts packages/ui-solid/src/cad/strict-index.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-i-pairs-classification",
+      "planPath": "impl-plans/active/car1-i-pairs-classification.md",
+      "dependsOn": ["car1-g-boundary-fold", "car1-h-overlay-alloc"],
+      "writePaths": [
+        "crates/capture/src/interference.rs",
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/mesh.rs",
+        "crates/capture/src/lattice.rs",
+        "crates/capture/tests/interference.rs",
+        "crates/capture/tests/mesh.rs",
+        "impl-plans/progress/car1-i-pairs-classification.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Comparison counts for disjoint X, Y and grid assemblies of 1,000/2,000/4,000 bodies stay below n*n/16 and grow at most 2.5x per doubling.",
+        "Ordered candidates, checked prefix and total equal an exhaustive reference on small mixed and dense assemblies.",
+        "closure_checks() increases by exactly the number of mesh tools per analysed render; two-body solid/open source cases follow section 6.7.",
+        "Existing mesh, census and overlay tests and image digests pass."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-i cargo fmt -p nodetto-capture -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-i cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-i cargo test -p nodetto-capture",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-i cargo test -p nodetto-capture --release --test interference --test mesh"
+      ]
+    },
+    {
+      "planId": "car1-d2-pcb-insert-guard",
+      "planPath": "impl-plans/active/car1-d2-pcb-insert-guard.md",
+      "dependsOn": ["car1-d-pcb-page-kind"],
+      "writePaths": [
+        "packages/ui-solid/src/cad/board-picker.tsx",
+        "packages/ui-solid/src/test-dom/cad-workspace.dom.tsx",
+        "impl-plans/progress/car1-d2-pcb-insert-guard.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Gate Q1: proceeds only when design-docs/user-qa/ai-capture-audit-r1.md reads 'Decision: approved' under Q1; otherwise no edit and 'blocked: Q1 pending' in the progress log.",
+        "A stale picker submission for a board whose page became freeform applies no command and shows 'Could not insert the PCB board.'; after undo the board inserts again.",
+        "The ok light and ok dark DOM markers are present."
+      ],
+      "verification": [
+        "biome check packages/ui-solid/src/cad/board-picker.tsx packages/ui-solid/src/test-dom/cad-workspace.dom.tsx && bun test packages/ui-solid/src/cad-palette.test.ts packages/ui-solid/src/cad/pcb-insert.test.ts",
+        "bun run typecheck && bun test packages/ui-solid/src/cad/pcb-insert.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-a2-native-wiring",
+      "planPath": "impl-plans/active/car1-a2-native-wiring.md",
+      "dependsOn": ["car1-a1-nmesh-contract", "car1-c-body-selection", "car1-j-cad-ui-strict"],
+      "writePaths": [
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "apps/cli/native/src/engine.rs",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/commands.ts",
+        "packages/core/src/svg-export/theme.ts",
+        "packages/core/src/svg-export/document.ts",
+        "packages/core/src/cad/wireframe.ts",
+        "packages/core/src/cad/wireframe.test.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/native-parity/export.test.ts",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "impl-plans/progress/car1-a2-native-wiring.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Gate Q2: proceeds only when design-docs/user-qa/ai-capture-audit-r1.md reads 'Decision: approved' under Q2; otherwise no edit and 'blocked: Q2 pending' in the progress log.",
+        "CaptureMeshDecoder is an overloaded call type matching a1; cad-command.ts and check.ts compile unedited with no casts or any (else a scope-amendment request is recorded).",
+        "Native construction-view export uses Rust nmeshBounds with zero TS decoder calls; native shaded capture uses decode-pass bounds.",
+        "Native export SVG bytes and native capture camera, frame and image digests equal the pre-fix run; TS/Rust decoder parity holds."
+      ],
+      "verification": [
+        "biome check packages/core/src/capture/cad-request.ts packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts packages/core/src/capture/cad-request.test.ts packages/core/src/cad/wireframe.ts packages/core/src/cad/wireframe.test.ts packages/core/src/svg-export/theme.ts packages/core/src/svg-export/document.ts apps/cli/src/commands.ts apps/cli/src/native-engine.ts apps/cli/src/export-command.ts && bun test packages/core/src/capture packages/core/src/cad/wireframe.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/cli/src/cad-command.test.ts packages/core/src/cad/check.test.ts packages/ui-solid/src/cad/strict-index.test.ts",
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-cli -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-a2 cargo test -p nodetto-cli",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-a2 cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car1-a2/release/nodetto-cli\" bun test apps/cli/src/native-parity/export.test.ts apps/cli/src/native-parity/capture.test.ts",
+        "bun run typecheck && bun test packages/core/src/svg-export"
+      ]
+    },
+    {
+      "planId": "car1-b2-open-mesh-targets",
+      "planPath": "impl-plans/active/car1-b2-open-mesh-targets.md",
+      "dependsOn": ["car1-a2-native-wiring", "car1-b1-shared-contours"],
+      "writePaths": [
+        "packages/core/src/cad/construction.ts",
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "packages/cad-kernel/src/worker-host.test.ts",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "impl-plans/progress/car1-b2-open-mesh-targets.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Gate: blocked with 'blocked: depends on a2' unless impl-plans/progress/car1-a2-native-wiring.md ends with done.",
+        "For the five display-only meshes, worker and capture report the cut cad.body.missing and the dependent sketch cad.reference.failed; the block has a single step; the mesh body is present; scene bytes equal the cut-suppressed document.",
+        "Positive controls (tetrahedron both orientations, thin bar, translated thin bar) accept the cut with one difference step on both bodies.",
+        "Native image bytes of case (1) equal the cut-suppressed document; existing capture digests unchanged."
+      ],
+      "verification": [
+        "biome check packages/core/src/cad/construction.ts packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts packages/cad-kernel/src/worker-host.test.ts apps/cli/src/native-parity/capture.test.ts && bun test packages/core/src/capture/scene.test.ts packages/core/src/cad packages/cad-kernel/src/worker-host.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-b2 cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car1-b2/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts",
+        "bun run typecheck && bun test packages/core/src/capture packages/ui-solid/src/cad/strict-index.test.ts"
+      ]
+    },
+    {
+      "planId": "car1-b3-point-limit",
+      "planPath": "impl-plans/active/car1-b3-point-limit.md",
+      "dependsOn": ["car1-b2-open-mesh-targets", "car1-c-body-selection", "car1-b1-shared-contours"],
+      "writePaths": [
+        "packages/core/src/capture/scene-binary.ts",
+        "packages/core/src/capture/scene-binary.test.ts",
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "apps/cli/native/src/engine_tests.rs",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "impl-plans/progress/car1-b3-point-limit.md",
+        "target"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target"],
+      "acceptanceCriteria": [
+        "Gate: blocked with 'blocked: depends on b2' unless impl-plans/progress/car1-b2-open-mesh-targets.md ends with done.",
+        "Tools are charged against the 4,000,000-point rule before allocation; zero capture visits, tool arrays and decoder geometry allocations after the first excess.",
+        "Precedence is exact: no-body, cell, body queries, camera and frame, header checks, then the point limit; existing messages unchanged.",
+        "Admitted scene, NCS1 and image digests (TS and native) equal the pre-fix run; the over-limit native document exits 2 without calling captureSolid."
+      ],
+      "verification": [
+        "biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene-binary.ts packages/core/src/capture/cad-request.ts packages/core/src/capture/scene.test.ts packages/core/src/capture/cad-request.test.ts packages/core/src/capture/scene-binary.test.ts apps/cli/src/native-parity/capture.test.ts && bun test packages/core/src/capture packages/core/src/cad",
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-cli -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-b3 cargo test -p nodetto-cli",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car1-b3 cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car1-b3/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts",
+        "bun run typecheck && bun test apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts packages/ui-solid/src/cad/strict-index.test.ts"
+      ]
+    }
+  ]
+}

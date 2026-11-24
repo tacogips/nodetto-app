@@ -9,6 +9,10 @@ remaining M23 work into sub-plans M23a to M23f; revision 7, session 889,
 checked against `ac31a91`, CAP-R7-01 to CAP-R7-06, reduces the closing
 milestone M16). Section 18 lists what revisions 2 to 7 changed and why;
 section 8.5 gives the completion order of the remaining milestones.
+Revision 8 (audit round 1 of `0a35708..eb7d8c9`, 16 major findings)
+corrects the rules in sections 4.1, 6.1, 6.3, 6.6, 6.7 and 13; section 19
+states each correction, its test and the plan grouping. Where an earlier
+sentence and section 19 disagree, section 19 wins.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -320,7 +324,7 @@ nodetto-cli capture <doc.jsonl> [--page <short-id|id|name> | --page-number <n>]
 | `--no-interference` | off | Skips analysis and overlay |
 | `--fail-on-interference` | off | Exit 1 when a pair interferes or a candidate pair could not be checked; the image is still written |
 | `--interference-cell` | 0.25 | Target sampling cell in mm, 0.01 to 10 (section 6.6) |
-| `--interference-bodies` | all bodies | Ids, short ids or names; only pairs among the named bodies are checked and drawn |
+| `--interference-bodies` | all bodies | Ids, short ids or names; only pairs among the named bodies are checked and drawn. A full body id always selects that body; a name or id prefix must match exactly one body (section 19.1, F7) |
 | `--json` | off | One JSON object on stdout instead of lines |
 | `--inline` | off | MCP only (section 4.5); ignored in a terminal |
 
@@ -532,7 +536,10 @@ pages never reaches `capture`.
   `cad.pcb`, and steps `(op, tool)` where `new` and `add` are union, `cut`
   is difference and `intersect` is intersection; a feature with several
   targets appends its step to each target body
-  (`packages/core/src/cad/evaluate.ts:660-669`);
+  (`packages/core/src/cad/evaluate.ts:660-669`), but only when every
+  target is a valid Boolean target: a feature with any display-only mesh
+  target (open or inconsistently wound) fails as a whole and appends
+  nothing (section 19.1, F1);
 - statuses of every feature, as `cad check` reports them;
 - conservative bounds per body: the union of the boxes of its union tools
   (cut and intersect cannot enlarge a body).
@@ -560,8 +567,10 @@ through unchanged, as in the evaluator
 (`design-docs/specs/design-cad3d.md:597-598`). A body whose creator is
 hidden (`visual.hidden`) is left out, as the STL export and the 2D exports
 skip hidden elements (`apps/desktop/src/shell/export-handlers.ts:192-196`).
-The function receives the whole document's elements because a PCB
-reference reads the board's page. Mesh payloads are decoded by an injected
+The function receives the elements that `collectCadInput`
+(`packages/core/src/cad/engine.ts`) returns for the page, the evaluator's
+input, because a PCB reference reads the board's page and a board counts
+only while its page is a PCB page (section 19.1, F2). Mesh payloads are decoded by an injected
 `decodeMesh`, the pattern of the evaluator
 (`packages/core/src/cad/evaluate.ts:34-36`); the CLI passes the NMESH
 decoder (`packages/io/src/nmesh/index.ts:7-8`).
@@ -800,7 +809,11 @@ Analysis (independent of the camera):
 1. Candidates are all pairs of bodies that take part (all bodies, or
    those named by `--interference-bodies`; open meshes never) whose
    conservative boxes overlap by more than the tolerance on all three
-   axes. The candidate box `P` is that overlap.
+   axes. The candidate box `P` is that overlap. They are found with an
+   axis-selected sweep, not by testing every pair, and keep the
+   history order of exhaustive enumeration (section 19.1, F13). Every
+   lattice fold charges its accumulated boundary reads against a per-pair
+   allowance (section 19.1, F5).
 2. Cell. For a cell size `c`, a candidate needs on each axis a lattice of
    `n = clamp(ceil(extent / c), 16, 1024)` rays per side of the box
    cross-section. `c` starts at the target cell (0.25 mm, or
@@ -1028,7 +1041,10 @@ names `--no-interference` for an unobstructed picture of the same view.
   - Each tool is classified once, in picture setup, and the result is
     shared by every body, band and sample. No closure or topology check
     runs inside the sample loop (the mesh closure test allocates and sorts
-    every edge).
+    every edge). Revision 8: the same per-render classification is also
+    passed to interference candidate selection and lattice tool bounds;
+    only standalone analysis entry points compute it themselves (section
+    19.1, F16).
 - Curved faces are faceted with the tessellation of the core
   (`packages/core/src/cad/tessellate.ts`), as in the app.
 - Kernel limits and failures (`cad.limit` on triangles, `cad.kernel.failed`)
@@ -2023,7 +2039,10 @@ same model and scene bytes as the CLI through the shared
 mode, and invokes the Tauri command `capture_solid`, which calls
 `nodetto_capture::render_scene` on a blocking thread. For equal options
 the desktop and the CLI produce equal bytes. The dialog shows the
-interference lines of section 4.2 after saving.
+interference lines of section 4.2 after saving. Revision 8: the scene
+and the reply cross the bridge as raw binary bodies (section 19.1, F10),
+and the handler validates the report against the request before the save
+picker opens (F15).
 
 "Current view" uses the direction, target and visible height of the
 viewport camera (the request field `viewHeight`, which replaces fit and
@@ -2169,3 +2188,696 @@ watcher (`docs/cli.md:201-203`).
 | CAP-R7-04 (revision 7) | Until M16 is complete, the header and the overview record M1 to M15, M17 to M20, M22 and M23a to M23f as accepted and M16 as pending. Only after the M16 deliverables, its three targeted gates and its per-plan review are complete does M16 mark every milestone row of the overview progress table `accepted`, M16 included, and change the header status to "implemented (slice); every milestone accepted". Both final records keep the sentence that full repository verification is deferred and NOT yet run. If a gate fails, M16 stays pending and the failure is reported as a blocker. The overview evidence-roots row for M16 changes from `tmp` and `target` to `target`. No Completed entry in `impl-plans/README.md`, because that index means "passed final verification" | header, 8.5, 15 |
 | CAP-R7-05 (revision 7, session 891 design review M16B-01, M16C-02) | Each gate attempt gets a new, complete log whose last line is the status of the whole gate after all of its assertions. Nothing is truncated or sent to `/dev/null`. The session 889 M16b verification 3 sent its test output to `/dev/null`, so `target/capture-m16/gate-3.log` holds only `exit=0`. That log stays as history, and the repaired check is rerun into a new log. Measurements and 10.3 values are unchanged | 8.5 |
 | CAP-R7-06 (revision 7, session 891 design review M16C-01) | The accepted status is published only by the integration commit, after final G1 to G3 and the per-plan review have passed on the exact candidate, identified by file hashes. A preliminary gate failure restores nothing, because no status edit exists yet. A failed candidate gate or a rejection puts both records back to pending, using only that candidate attempt's own snapshot (`target/capture-m16/gates/candidate-<n>.*`) and the hashes recorded for it. The status check asserts the required content of the owned sections (no HTML comments, deferral text in the prose after the Progress table, an exact Evidence roots row), not just a match anywhere in the file (review rounds 1 and 2 of M16C-01). This replaces the session 889 trade-off "16c marks M16 accepted before its own Step-6 review"; `capture-s889-dispatch.json` stays as history | 8.5 |
+
+## 19. Revision 8: audit round 1 corrections
+
+Source: audit round 1 of `feat/ai-capture`, base `0a35708` (0.10.5) to
+`eb7d8c9`, sixteen major findings. The two low findings
+(`function-force-identical-rewrite`, `performance-identical-capture-file-copy`)
+are out of scope. The editor half of F2 and findings F3, F6, F8, F12 and
+F14 are specified in `design-docs/specs/design-cad3d.md` section 19; this
+section gives the capture rules, the common test rule and the plan
+grouping for all sixteen.
+
+Common rules. Every fix ships a test that fails on `eb7d8c9` and passes
+after the fix; for a performance finding the test asserts a deterministic
+count (visits, reads, comparisons, candidates, allocations), never a wall
+clock. Admitted captures keep their bytes: no golden, digest, error code or
+message changes unless a rule below names the change. Indexed reads
+type-check under `noUncheckedIndexedAccess`. Heavy per-vertex work stays in
+Rust on the native CLI.
+
+### 19.1 Rules
+
+F1 `function-open-mesh-multitarget-cut` (high). The app evaluates an open
+imported mesh as display-only: the mesh feature fails `cad.mesh.open`, has
+no body, and a feature that targets it fails `cad.body.missing`, so a cut
+of a block and an open triangle leaves the block unchanged
+(`packages/core/src/cad/evaluate.ts`, target loop of the extrude branch).
+Capture now decides this before a feature is committed to any target:
+
+- Eligibility rule. The app hands the welded mesh to Manifold and retries
+  once with every triangle reversed. A kernel rejection or an empty solid
+  becomes `OpenMesh` (`packages/core/src/cad/evaluate.ts:343-397`), so the
+  mesh is display-only. Capture does not run Manifold; it applies a
+  conservative rule. A mesh is a Boolean target only when all of these
+  hold, in this order:
+  - (a) Closure, the rule of `crates/capture/src/mesh.rs` `is_closed`:
+    index range, finite coordinates, non-zero cross-product area, every
+    undirected edge shared by exactly two triangles.
+  - (b) Consistent orientation: for every directed edge `(u, v)` of a
+    triangle, `(v, u)` occurs in exactly one other triangle and `(u, v)` in
+    no other.
+  - (c) No two triangles use the same three vertex indices in any order.
+    This rejects paired coincident faces, including a double-sided
+    triangle.
+  - (d) Not empty by the editor's own emptiness test.
+    `packages/cad-kernel/src/manifold-kernel.ts:155-165` treats a solid as
+    empty when `volume === 0 || 2 * |volume| < area * 5e-7`: its
+    thickness, volume over area, is below half the 1 nm grid. Capture
+    applies the same test to the mesh as given:
+    - Mesh-local origin: `o` is the position of vertex 0, the first
+      vertex in the canonical NMESH order and identical in both decoders.
+      Every term uses `q = p - o`, computed per coordinate in doubles from
+      the decoded millimetre positions.
+    - `V` is the signed volume, the sum over triangles of
+      `qa . (qb x qc) / 6`, accumulated in triangle order with the same
+      operation order in Rust and TypeScript.
+    - In exact arithmetic `V` does not depend on `o`. Using local
+      coordinates avoids subtracting nearly equal world-scale products:
+      world coordinates gave a flat shell at 9000 mm a spurious
+      `V = -2.2e-5 mm^3` (R2 of round 5).
+    - `A` is the surface area, the sum of `|(qb - qa) x (qc - qa)| / 2`,
+      in the same order;
+    - the mesh is a target only if `V != 0` and `2 * |V| >= A * 5e-7`
+      (millimetre units, as in the kernel).
+
+    The test depends on thickness, not on the longest extent. This rejects
+    flat closed shells and keeps long thin solids. The kernel measures in
+    `Float32` positions, so a mesh within rounding of the threshold may be
+    classified differently; such a mesh is outside the tested boundary.
+
+  Rules (b) to (d) do not depend on the global orientation, so an outward-
+  and an inward-wound solid both pass, as both pass in the app.
+- Tested boundary. Equivalence with Manifold is claimed only for these
+  fixtures, all written by `packages/nmesh` with vertices `(0,0,0)`,
+  `(1,0,0)`, `(0,1,0)` and `(0,0,1)` unless noted:
+
+  | Fixture | Triangles | Rule that rejects it | Expected `booleanTarget` and worker |
+  | --- | --- | --- | --- |
+  | Tetrahedron | `[0,2,1, 0,1,3, 0,3,2, 1,2,3]` | none | true, ok |
+  | The same, every face reversed | | none | true, ok |
+  | Mixed winding (V2 of round 2) | `[0,1,2, 0,1,3, 0,3,2, 1,2,3]` | (b) | false, `cad.mesh.open` |
+  | Single triangle | `[0,1,2]` | (a) | false, `cad.mesh.open` |
+  | Double-sided triangle (V2 of round 3) | `[0,1,2, 0,2,1]` | (c), also (d) | false, `cad.mesh.open` |
+  | Coplanar tetrahedron (four coplanar vertices, consistently oriented; V4 of round 3) | | (d) | false, `cad.mesh.open` |
+| Thin bar, outward-wound 1000 x 0.01 x 0.01 mm box, 8 vertices and 12 triangles (R2 of round 4) | | none (V = 0.1 mm^3, A ~ 40 mm^2, 2V = 0.2 >= 2e-5) | true, ok |
+| Translated flat shell (R2 of round 5): coplanar tetrahedron at (9000.001,9000.007,9000), (9000.012,9000.007,9000), (9000.001,9000.020,9000), (9000.018,9000.026,9000) | `[0,2,1, 0,1,3, 0,3,2, 1,2,3]` | (d) with the local origin | false, `cad.mesh.open` |
+| Translated thin bar: the thin bar moved by (9000, 9000, 9000) mm | | none | true, ok |
+
+  Outside these fixtures the rule may still differ from Manifold; that is
+  recorded as a residual risk, not claimed as equivalence. The
+  worker-parity test below is the evidence for the table.
+- Decoder contract (plan A). The capture mesh decoder (`CaptureMeshDecoder`
+  in `cad-request.ts`) returns, besides `positions` and `triangles`,
+  `booleanTarget: boolean` (the rule above) and `bounds: {min, max}` in
+  millimetres. The native decoder computes both in Rust in
+  `crates/capture/src/nmesh.rs` (calling `mesh::is_closed`, then the
+  checks (b) to (d)); `mesh.rs` is not edited by plan A. The TypeScript
+  decoder (`packages/io/src/nmesh/capture-decoder.ts`, used by the desktop
+  webview and Bun) ports the same four checks with the same operation
+  order, so the doubles of (d) are identical. The nine fixtures of the
+  table are stored under `crates/capture/tests/fixtures/`; the existing
+  `tetrahedron.nmesh.txt` is the first one.
+  - `crates/capture/src/nmesh.rs` tests and
+    `packages/io/src/nmesh/capture-decoder.test.ts` assert the table's
+    `booleanTarget` and identical `bounds` for every fixture.
+  - `packages/cad-kernel/src/worker-host.test.ts` evaluates each fixture
+    alone with the real Manifold worker and asserts the table's worker
+    column (ok or `cad.mesh.open`), which is the same as `booleanTarget`.
+- Construction walk (plan B). `visitCadConstruction` accepts
+  `"display-only"` as a result of `visitor.mesh`. Capture returns it when
+  `booleanTarget` is false. Such a mesh keeps status ok and its body
+  (drawn exactly as today), but it is not added to the walk's set of
+  Boolean targets. The existing absent-target check then fails a later
+  `add`, `cut` or `intersect` with any such target as `cad.body.missing`
+  (the mesh-target code of `missingTarget`) before `visitor.tool` runs, so
+  no target receives a step. Dependants fail through the existing
+  dependency rule (`cad.reference.failed`). `cad check` and the wireframe
+  keep their boolean mesh visitor and are unchanged.
+- Display. The Rust renderer is not changed. It still classifies with
+  `is_closed` alone (section 6.7), so the picture of every mesh is
+  unchanged, and it still ignores later steps on an open-source body.
+- Tests (fail before). Worker
+  (`packages/cad-kernel/src/worker-host.test.ts`) and capture
+  (`packages/core/src/capture/scene.test.ts` plus a crate or Bun pixel
+  comparison) run the same documents: a 10 x 10 x 5 mm block and a
+  2 x 3 mm through-cut targeting the block and (1) a single-triangle mesh,
+  (2) the mixed-winding tetrahedron, (3) the double-sided triangle, (4) the
+  coplanar tetrahedron, (5) the translated flat shell at 9000 mm, with
+  the block and the cut unchanged, as in R2 of round 5. In each, the cut
+  fails with
+  `cad.body.missing`, a sketch on the cut's face fails as a dependant, the
+  block has no difference step, the mesh surface is present, and the
+  block's pixels equal a capture with the cut suppressed. Positive
+  controls, where the worker reports ok for the mesh and the cut and
+  capture appends one difference step to both bodies with no error:
+  - the same cut with the consistently wound tetrahedron, in each global
+    orientation;
+  - the R2 document: the thin bar and the block as targets of the 2 x 3 mm
+    through-cut at XY (2, 2);
+  - the translated thin bar with the block and the cut unchanged.
+
+F2 `function-pcb-reference-page-kind` (high). Both capture entry points
+pass `collectCadInput(document, page.id, revision).elements` instead of all
+document elements: the CLI in `apps/cli/src/capture-command.ts` (MCP
+capture runs this command, `apps/cli/src/mcp-image.ts`, so it is covered)
+and the desktop `captureCadImage` in
+`apps/desktop/src/shell/export-handlers.ts`. A board whose page is no
+longer a PCB page is then absent from `scanCadPage`, and capture reports
+`cad.reference.missing` for the reference exactly as `cad check` does.
+`construction.ts` is unchanged, because it receives only collected input.
+Picker and the commit-time guard: cad3d section 19 (the guard needs the
+`board-picker.tsx` amendment Q1 of
+`design-docs/user-qa/ai-capture-audit-r1.md`). Tests:
+
+- `apps/cli/src/capture-cad.test.ts`: convert the board's page to
+  freeform; CLI capture reports `cad.reference.missing`, like `cad check`
+  on the same document, and draws no reference body.
+- `apps/desktop/src/shell/export-handlers.test.ts`: the desktop handler
+  gives the same result.
+- After Undo of the conversion, both draw the reference body again.
+
+F4 `performance-capture-point-limit-after-allocation` (high). The writer's
+rule (`scene-binary.ts`, `validate`) is a running total, in tool push order
+over all tools (also tools of hidden features), of prism loop point counts
+after normalisation (`points.length / 2` per kept loop) and mesh vertex
+counts, checked after each tool against `MAX_POINTS = 4,000,000`; the
+per-loop and mesh-vertex bounds are checked first. `scene-binary.ts`
+exports that check as one function, used by the writer and by
+`buildCadCaptureModel`.
+
+Existing precedence (`cad-request.ts:58-129` and the writer). These errors
+are raised in this order, and the first one wins:
+
+1. The no-body message, with every feature error.
+2. The interference cell range.
+3. The body-query errors.
+4. Camera and frame errors (`camera.ts`, partly dependent on the fitted
+   bounds of all bodies).
+5. The writer's own checks, in its order: the request header, `tool
+   count` and `body count` (at most 20,000 each), then per tool the loop
+   or mesh bounds and the running total. The limit is the first total
+   above 4,000,000.
+
+The point-limit message is reached only when none of 1 to 4 fires, and the
+no-body and body-query diagnostics outrank it (confirmed by V5 of round 3).
+The fix keeps this order exactly, with no exception and no user decision,
+by splitting the work into two walks over the same construction history.
+
+Capture walk (allocating). The builder's capture visitor builds tools as
+today, but charges every tool before allocating:
+
+- Prism. The count comes from the normalised loops before any typed array
+  exists. The per-loop bounds and the running total are checked first;
+  only a passing tool allocates its `Float64Array`/`Uint32Array`.
+- Mesh (the A/B seam, contract owned by plan A). `CaptureMeshDecoder`
+  takes `{ maxVertices }`. It always validates exactly as a full decode
+  does, in the same order, so `cad.mesh.invalid` keeps its meaning. It
+  also returns `vertexCount`, `bounds` and `booleanTarget`.
+  - It returns `positions` and `triangles` only when `vertexCount <=
+    maxVertices`.
+  - Indexed access. Validation needs no random vertex access, which makes
+    a streaming check possible:
+    - positions are delta-coded against the previous vertex only
+      (`decode.ts:70-80`, `nmesh.rs:137-150`), so the range check and
+      `bounds` need three running coordinates;
+    - triangle codes are checked against a running `used` counter
+      (`decode.ts:81-89`), so the index check needs no positions.
+
+    When `vertexCount > maxVertices`, the decoder therefore makes one
+    streaming pass with O(1) scratch (previous vertex, min/max, counters)
+    and the same error order.
+  - `booleanTarget` does need indexed vertices, for the area, volume and
+    edge rules. In the over-limit path it is computed only when the caller
+    asks for it (`{ needTarget: true }`). The builder asks only for a mesh
+    that some later `add`, `cut` or `intersect` in the history targets,
+    which is known before the walk from `history.targets`.
+  - For such a mesh, the allowed decoder scratch is its quantized integer
+    positions, its index list and the edge list. They are bounded by the
+    1 MiB inline cap, freed before the next feature, and never converted to
+    millimetre `Float64` capture geometry.
+  - The payload buffer from the inline armor is input, not geometry.
+  - Rust lives in `nmesh.rs`. TS lives in `packages/nmesh/src/decode.ts`,
+    through an optional second argument of the existing `decodeNmesh`
+    export (`index.ts` unchanged) and `capture-decoder.ts`.
+  - The builder passes `maxVertices = MAX_POINTS - points`, so an
+    overflowing mesh never allocates its geometry arrays.
+- First excess. The capture visitor stops. It never runs again for this
+  request, so no later capture tool, step or typed array is created. The
+  builder records the writer's exact limit message as the pending
+  `overLimit`.
+
+Metadata walk (non-allocating). The construction walk continues with a
+second, metadata-only visitor:
+
+- It records what the remaining precedence needs and nothing more:
+  - statuses and feature errors;
+  - each visible body's id, name, reference flag and conservative bounds
+    (the same `normaliseToolLoops` and `sweptBounds` computation the
+    capture tool uses, so the doubles are identical, and mesh `bounds`);
+  - the tool and body counts.
+- Meshes are decoded with `maxVertices = 0`: streaming validation and
+  `bounds`, plus `booleanTarget` only for a mesh that a later feature
+  targets. No geometry is returned, so display-only targets fail later
+  features exactly as in the capture walk.
+- It allocates no capture tool and no capture typed array.
+- No per-feature tool geometry is rebuilt or retained in the tail.
+  Today `history.ts:489-500` builds a fresh profile for every extrusion,
+  and `construction.ts:104-116` keeps every extrusion's geometry in
+  `geometry.extrudes` (R3 of round 4: 64 uses of one rectangle give 64
+  point arrays). Two changes, both in all walks:
+  - Shared contours (`history.ts` only; `loops.ts` and its sweep, owned
+    by plan L, are not edited). Today `buildLoops(entities, pick)`
+    (`loops.ts:290-399`):
+    1. builds every profile of the whole sketch;
+    2. validates them (open, branch, intersect, and a winding-0 profile
+       anywhere fails);
+    3. computes each depth against all profiles;
+    4. keeps, in profile order, the counter-clockwise loop of each profile
+       whose `members` meet `pick`;
+    5. returns `cad.profile.empty` (no `at`) when none is kept.
+
+    Steps 1 to 3 and every error before step 4 do not depend on `pick`.
+    So `createCadGeometry` calls `buildLoops(entities)` (no pick) once per
+    sketch id and memoises the result: the loop list or the error.
+    - Each extrusion then resolves its selection against that list: the
+      loops whose `members` meet the selection, in list order, or
+      `cad.profile.empty` without `at` when none meet it. With no
+      selection, all loops are kept.
+    - This is exactly the current output, but the `CadLoop` objects and
+      their `points` arrays are shared by contour identity. An extrusion
+      holds only a short array of references. Different member ids that
+      select the same contour therefore share one point array.
+    - The frame, span and status are still computed per feature, including
+      the `cad.limit` extent check, which only iterates points. Statuses
+      are therefore exact.
+    - Loop values are identical, so the capture tool arrays and admitted
+      bytes do not change.
+  - Reference-only retention. Before the walk, the set `R` of features
+    whose faces some sketch plane references is read from the history
+    (`history.ts` face dependencies). `geometry.extrudes` keeps an entry
+    only for features in `R`, because only a face reference reads it.
+    Features in `R` keep their frame, span and shared loops; nothing is
+    recomputed for them. Every other feature's geometry is dropped once
+    its status and bounds are known.
+- Remaining tail cost: per later feature, time proportional to its loop
+  points for the extent check and `sweptBounds`, with no allocation that
+  grows with the feature count. Memory grows with the number of distinct
+  profiles and with `R`, not with the number of extrusions.
+
+`prepareCadCapture` (plan B, after plan C's resolver) then applies the
+existing order to the full metadata:
+
+1. The no-body message, with all feature errors.
+2. The cell range.
+3. Body queries (plan C's resolver over the full body list, in history
+   order).
+4. Camera and frame, from the full bounds.
+5. The writer's pre-tool checks (request header, tool and body counts),
+   exported from `scene-binary.ts` as one function that the writer also
+   uses.
+6. Only then the pending `overLimit`, as `CaptureInputError(message,
+   undefined, true)`.
+
+Admitted requests never enter the metadata walk, so their model, scene and
+image bytes are unchanged. The CLI exit code (2) and every message are
+unchanged.
+
+The builder takes an optional test-only `stats` object with separate
+counters:
+
+- `captureVisits`: capture-visitor calls (tool and mesh);
+- `toolArrays`: capture tools whose typed arrays were created;
+- `metadataVisits`: metadata-visitor calls;
+- `profileBuilds`: `buildLoops` calls made by `createCadGeometry` (at most
+  one per sketch);
+- `pointArrays`: distinct `points` arrays reachable from the loops handed
+  to features, counted by identity;
+- `retainedTools`: entries kept in `geometry.extrudes`.
+
+Decoder allocations are counted where they happen, not from what the
+decoder returns. The TS `decodeNmesh` takes a test-only `onAllocate(kind,
+length)` hook, called at every array allocation site:
+
+- quantized positions;
+- triangles;
+- the `toTriangleMesh` millimetre positions in `capture-decoder.ts`;
+- the target scratch.
+
+The Rust decoder exposes an internal `decode_with_stats` used by its unit
+tests, counting each `Vec::with_capacity` site the same way. A discarded
+array is therefore still counted.
+
+Each sentinel is identified by feature id, so a test can assert that the
+capture visitor never received it.
+
+Tests (all fail before; Bun tests in `packages/core/src/capture/scene.test.ts`
+and `cad-request.test.ts`):
+
+- Admitted. One sketch is reused by visible `new` extrusions so that the
+  total lands exactly on 4,000,000 points (for example a 2,000-edge sketch
+  and 2,000 extrusions). The scene bytes equal the digest recorded in the
+  pre-fix run, and `metadataVisits` is 0.
+- Visible prism overflow, then sentinels. One more extrusion overflows,
+  followed by a sentinel extrusion and a sentinel mesh. The result is the
+  existing message. `toolArrays` equals the tools before the excess. No
+  capture visit happens after the overflowing tool, and the overflowing
+  prism allocated nothing. Neither sentinel reaches the capture visitor,
+  and the decoder records no geometry allocation after the excess.
+- Mixed mesh overflow, with an instrumented decoder. Prism tools sit just
+  below the limit, then a visible mesh overflows, then a sentinel mesh.
+  With `onAllocate`, the overflowing mesh and the sentinel each record
+  zero allocations of positions, triangles and millimetre positions.
+  Neither is targeted, so neither records target scratch either. The
+  message is the writer's.
+- Targeted mesh after the excess. A later cut targets the overflowing
+  mesh. Only the target scratch is recorded, and the cut's status equals
+  the pre-fix run.
+- Long unreferenced tail. One visible sketch is reused by enough `new`
+  extrusions to pass the limit, followed by 1,000 more unreferenced
+  extrusions of the same sketch and a mesh sentinel. `profileBuilds` is
+  1, `retainedTools` stays at `|R|` (0 here), and `captureVisits` and
+  `toolArrays` do not grow after the excess. This fails before: R3 shows
+  one profile array per extrusion.
+- Distinct member selections (R3 of round 5). One closed 64-edge sketch
+  and 64 `new` extrusions, each with `loops: [edgeId]` naming a
+  different member edge of the same contour.
+  - `pointArrays` is 1 and `profileBuilds` is 1; before the fix both are
+    64.
+  - The extrusions' loops, depths, statuses and capture tool bytes equal
+    the pre-fix run.
+  - The same pattern placed after the point-limit excess keeps
+    `pointArrays` at 1 and adds no capture visits or tool arrays.
+  - Selection-semantics regressions keep their results: a selection of no
+    contour gives `cad.profile.empty` without `at`; a selection of a
+    nested contour keeps its whole-sketch depth; a winding-0 profile
+    outside the selection still fails; the existing `loops.test.ts` and
+    `history` tests pass unchanged.
+- Face reference in the tail. A sketch on a face of an extrusion after
+  the excess, then an extrusion of it: `R` holds that feature, the
+  status of both features equals the pre-fix run, and `retainedTools`
+  is 1.
+- Rust (`nmesh.rs` unit tests, `CARGO_TARGET_DIR=target/plan-a cargo test
+  -p nodetto-capture`): `decode_with_stats` with `maxVertices` below the
+  count reports zero geometry allocations and the same validation errors
+  as the full decode for each corruption case of
+  `rejects_what_the_reference_decoder_rejects`.
+- Hidden-only overflow, with the same sentinels. Capture visits stop at the
+  excess, exactly as in the visible case. The metadata walk then gives the
+  no-body message and feature errors equal to the pre-fix run, with
+  `toolArrays` and the decoder geometry allocations frozen at the excess.
+- Body-query precedence (`cad-request.test.ts`, the V5 shape). A visible
+  over-limit model with `--interference-bodies nonexistent,mesh-0` gives
+  the existing unknown-body error. The same model with a valid query gives
+  the point-limit error. A query that names a body created after the
+  excess resolves (it is in the metadata), so the result is the
+  point-limit error, as before.
+- Writer pre-tool precedence. The shared pre-tool function runs before
+  `overLimit`. A unit test gives it an over-limit model and a request with
+  an out-of-range header field (for example `supersample` 4 through the
+  writer options) and expects the header error, as the writer gave
+  before.
+- Native NCS1 and image, in the native engine test
+  `apps/cli/native/src/engine_tests.rs`, which intercepts
+  `native.captureSolid` with the existing pattern at `:382-386`. It runs
+  with `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/plan-b cargo test -p
+  nodetto-cli`.
+  - For the admitted document, the observed NCS1 bytes and the image bytes
+    equal the digests recorded by the pre-fix run.
+  - The over-limit document exits 2 with the existing message, and
+    `captureSolid` is never called.
+  - Inline meshes may supply most of the points so that the Boa walk stays
+    in the test's time class; prism extrusions cross the threshold and
+    supply the sentinel.
+- Native CLI parity. The same two documents through the release binary
+  (`CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/plan-b cargo build
+  --release -p nodetto-cli`, then `NODETTO_CLI_TEST_BINARY=...` `bun test
+  apps/cli/src/native-parity/capture.test.ts`) give the pre-fix stdout,
+  the image bytes, and exit 2 with the message.
+- The plan records the native durations. If one exceeds its class, the
+  plan reports that instead of dropping the case.
+
+F5 `performance-interference-boundary-fold` (high). Every lattice fold in
+`lattice.rs` charges `|accumulated|`, the boundaries carried from earlier
+steps, before each `combine`. That covers the pair cast (used by analysed
+pairs and by the view pairs of `add_view_pairs`) and the census fold
+`sample_body_axis`, which is the same mechanism. The tool's own intervals
+are not charged: they are linear in the steps and already bounded by ray
+work.
+
+Rule (one rule, local to one lattice request, so no state crosses requests
+or threads):
+
+- `w = max(1, ceil(s / 8))`, where `s` is the step count the request
+  folds: the active steps of the two bodies for a pair request (the list
+  `sample_axes` already builds, not the candidate's `weight`, which is 1
+  for view pairs), and the body's step count for a census request.
+- A combine may run only if `reads + charge <= 64 * w * (rays + 16)`,
+  where `reads` and `rays` are the boundary reads and rays already
+  executed in this request, counting the current ray. A request is
+  processed in a fixed axis, row and cell order on one thread, so the
+  outcome does not depend on the thread count.
+- Exhaustion. The combine is not run, the current ray counts as a miss,
+  no further ray of the request is cast, and the axis sample sets a new
+  flag `boundary_exhausted` in addition to `capped`. The flag is distinct
+  from refinement capping and travels `AxisSample` to `PairSample`.
+
+Report outcomes for every capped exit:
+
+- Analysed pair. `capped` is set, so it counts in `cappedCount`, is
+  listed in `cappedWithoutHit` without a hit and is `approximate` in JSON.
+  Hits found earlier stay reported.
+- View pair with a report. Its `capped` is set as above.
+- View pair without a report (no hit before exhaustion, one of the first
+  `VIEW_PAIR_SAMPLES = 64`). The fallback report is `capped` when
+  `index >= VIEW_PAIR_SAMPLES` or `boundary_exhausted`. Today it reads only
+  the index, so it is `approximate` with volume 0 (printed as unmeasured)
+  instead of looking fully measured. For admitted cases `boundary_exhausted`
+  is false, so refinement caps and view fallbacks are unchanged.
+- Census (`census.rs` is not edited). On exhaustion `sample_body_axis`
+  returns `capped` and sets its `budget_left` to 0. The existing
+  `census::resolve` then marks the body `unknown` (incomplete with zero
+  budget) and charges its whole remaining allotment. A later suspect body
+  gets at most the remainder, which is less than one weighted ray per step
+  of the exhausted body. It is `unknown` unless that remainder settles it.
+
+Bounds:
+
+- Analysed pairs: reads are at most 64 x the weighted rays they cast (at
+  most twice the analysis budget) plus a slack of 64 x 16 x w per pair.
+- View pairs: at most 64 sampled, each at level 0 only (refinement 0),
+  with reads at most 64 x w x (rays + 16) each.
+- Census: reads are at most 64 x the census weighted rays plus the same
+  slack per axis call.
+
+All bounds hold whatever the step count.
+
+Tests (crate, `CARGO_TARGET_DIR=target/plan-g`), through an internal entry
+that returns executed reads:
+
+- 1,000 separated internal cuts over a 20 x 20 mm footprint, a second
+  overlapping body and a side-view camera: reads stay within the bound, the
+  pair is `capped` and the report is approximate. This fails before, when
+  reads exceed the bound by orders of magnitude.
+- The same body pair forced into the picture-only path with no hit before
+  exhaustion: the fallback is `capped`.
+- Two suspect census bodies that both exhaust: both `unknown`.
+- Admitted cases (the plate fixture, the 600-hole pair, the 200-body
+  shared-loop case, the view-pair tests): reports and image bytes are
+  identical at 1 and 8 threads and equal the existing digests. The pre-fix
+  run records the largest reads-to-allowance ratio over the existing
+  interference and census tests. It must be below 1; otherwise the plan
+  stops and reports instead of changing a verdict.
+
+F7 `function-interference-full-body-id` (medium). The indexed resolver
+stays in `packages/core/src/capture/cad-request.ts`, the existing owner, as
+a module-private function called from `prepareCadCapture`. No new
+production file is added. It resolves `--interference-bodies`:
+
+1. Deduplicate queries, keeping the first occurrence.
+2. Build once an id map, a name map (name to body indices) and an id list
+   sorted by UTF-16 code units.
+3. Per query: an empty query fails; an exact id selects that body;
+   otherwise the distinct bodies whose name equals the query or whose id
+   starts with it (a binary-searched range of the sorted ids) must be
+   exactly one.
+4. The first failing query in input order throws the existing message
+   `Body query "<q>" is unknown or ambiguous. Bodies: <names>.`; the name
+   list is built only then. Fewer than two distinct bodies keeps its
+   message. Indices are returned in ascending order.
+
+For tests, the resolver adds its lookup count to an optional test-only
+`stats` field of the request. Tests in `cad-request.test.ts`: `part,part-extra` selects both, a full id wins over
+another body's equal name, a truly ambiguous prefix still fails,
+duplicates are accepted, the order is stable, and 500 queries over 5,000
+bodies make about queries x log2(bodies) lookups instead of 2,500,000.
+
+F9 `performance-native-mesh-bounds` (medium). The Rust decode pass returns
+`bounds` (and `booleanTarget`, F1) with the decoded geometry. Bounds of
+millimetre positions equal the current `min(q) / 1000` values bit for bit,
+because division by 1000 is monotone. Traced paths:
+
+- Native shaded capture. `apps/cli/src/native-engine.ts` `decodeMesh`
+  reads the new fields from the `nmeshDecode` packet
+  (`apps/cli/native/src/engine.rs`, `crates/capture/src/nmesh.rs`). The
+  value goes through `CommandIo.decodeMesh` (`apps/cli/src/commands.ts`,
+  whose return type becomes the `CaptureMeshDecoder` result), then
+  `apps/cli/src/capture-command.ts` (unchanged; it already forwards
+  `io.decodeMesh`), then `renderCadCapture` (`capture-cad.ts`), then
+  `prepareCadCapture`. Finally `scene.ts` uses `bounds` instead of
+  `pointBounds(positions)`. The Bun and desktop decoder
+  (`capture-decoder.ts`) computes the same fields in TypeScript.
+- Native construction-view export. `apps/cli/src/export-command.ts` calls
+  `editor.exportPageSvg`, which goes through `page-editing.ts` (forwards
+  options unchanged; not edited) to `renderPageSvg` in
+  `packages/core/src/svg-export/document.ts`, which calls
+  `cadPageWireframe(elements, pageId)`. A new optional per-call option
+  `meshBounds?: (data: string) => { min: Vec3; max: Vec3 } | null`:
+  - is declared in `SvgExportOptions` (`packages/core/src/svg-export/theme.ts`);
+  - is forwarded by `renderPageSvg` to `cadPageWireframe(elements, pageId,
+    { meshBounds })`;
+  - is passed by `export-command.ts` from a new optional
+    `CommandIo.meshBounds`, which `native-engine.ts` implements with a
+    bounds-only Rust host function (decode in Rust, return six doubles, no
+    position transfer).
+
+  Without the option (browser, Bun, desktop) the current TypeScript path
+  runs. A decode failure returns null and keeps the current empty-corner
+  result.
+- Scope. `commands.ts`, `svg-export/theme.ts` and `svg-export/document.ts`
+  are outside the finding's file list. They are the minimal amendment
+  this path needs: one type change and one optional member in
+  `commands.ts`, one optional member in `theme.ts`, and one forwarded
+  argument in `document.ts`. The amendment is recorded for confirmation in
+  `design-docs/user-qa/ai-capture-audit-r1.md` (Q2, recommended answer:
+  approve). Plan A edits these three files only after Q2 is approved; the
+  strict decoder typing on the native capture path needs `commands.ts`
+  too, so all of plan A waits for Q2. The other plans do not depend on
+  Q2, except B and C, which wait for A.
+
+Tests:
+
+- Native (release `nodetto-cli` built with
+  `CARGO_TARGET_DIR=target/plan-a`), through the real commands:
+  `nodetto-cli export` of a page with a large inline mesh gives an SVG
+  byte-equal to the pre-fix output, and a test-only counter on the TS
+  decoder path (`decodeNmesh` call count in the wireframe module) stays 0.
+  `nodetto-cli capture` of the same page gives the pre-fix camera and frame
+  lines and image bytes.
+- Bun: `cadPageWireframe` with and without `meshBounds` gives equal SVG.
+- The decoder fixture parity of F1 passes.
+
+F10 `performance-desktop-capture-byte-arrays` (medium). Only the capture
+transport changes. Request: `invoke("capture_solid", scene, { headers:
+{ "x-nodetto-format": format, "x-nodetto-quality": String(quality) } })`
+with the scene as the raw body. The Rust command takes
+`tauri::ipc::Request`, rejects a non-raw body or bad headers with the
+existing format and quality messages, and returns `tauri::ipc::Response`
+whose body is the reply framing of section 6.3: `u32` little-endian report
+length, the report JSON, the image. `backend.ts` splits the reply and
+returns `{ image: Uint8Array, report: string }`, so the `captureSolid`
+signature and `export-handlers.ts` do not change. `writeBytes` is not
+changed. Tests: a backend test with an injected `invoke` and a
+1,179,856-byte scene asserts that the body is that `Uint8Array` (not an
+array), the headers, and the split image and report; the Rust test asserts
+that the framed reply splits into the image and report of `render_scene`.
+
+F11 `performance-overlay-sample-allocation` (medium). Overlay marking picks
+the nearest eight bodies with material into fixed-size storage ordered by
+first boundary depth, then body index, with no per-sample vector, and skips
+pair processing when fewer than two bodies have material. Test: a separate
+crate test binary with a counting global allocator renders one
+screen-filling body and asserts allocations far below the sample count
+(fails before: at least two per sample); hatch pixels, pair order and image
+bytes equal the current renderer for one body and for more than eight
+depth-tied bodies.
+
+F13 `performance-interference-sparse-pairs` (medium). Candidate discovery
+sorts the analysed boxes on the axis with the fewest overlapping pairs
+(counted in O(n log n) per axis; ties go to X, then Y), sweeps that axis,
+and applies the exact three-axis tolerance test to every examined pair.
+Pairs go into a bounded selection of the `keep` smallest `(a, b)` in
+history order plus a total count, so storage stays `keep` and the output
+equals exhaustive enumeration. Step counts are computed for kept
+candidates only. Tests: a comparison count for disjoint assemblies along
+X, along Y and in a grid stays far below n^2 / 2 and grows near-linearly
+when n doubles; ordered candidates, checked prefixes and totals equal an
+exhaustive reference on small mixed and dense assemblies; the 2,000-body
+test keeps its assertions.
+
+F15 `maintainability-capture-report-contract` (medium). `report.ts`
+exports one check of width, height and body count against the request; it
+throws the CLI's existing message `The solid capture report does not match
+the requested scene.` `capture-cad.ts` and the desktop handler call it
+right after `parseSolidReport`, the desktop before `pickExportPath`. Tests:
+width, height and body count each varied alone are rejected by both
+adapters, and the desktop calls neither the picker nor the writer; the
+cancellation tests get a matching report.
+
+F16 `maintainability-capture-body-classification` (medium). One function
+classifies every tool once per render (solid or not; meshes through
+`is_closed`); the picture's open-body flags, interference candidate
+selection and lattice tool bounds all read that result. The standalone
+`interference::candidates` and analysis entry points compute it themselves
+when none is passed. Tests: an internal render entry reports the number of
+closure checks, equal to the number of mesh tools; two overlapping analysed
+bodies (solid source then open operand, and open source then solid
+operand) give the candidate counts and report states of section 6.7; the
+existing mesh, census and overlay tests and digests pass.
+
+### 19.2 Plan grouping
+
+One plan per finding or per group in one module, each about 150 lines or
+less, with its own `CARGO_TARGET_DIR` under `target/` and `artifactRoots
+["target"]`. Dependencies exist only for shared files or contracts.
+
+| Plan | Findings | Owns | After |
+| --- | --- | --- | --- |
+| A mesh-decode | F9 and the decoder contract of F1 and F4 (`booleanTarget` rules a to d, `bounds`, `vertexCount`, `maxVertices` without geometry) | `crates/capture/src/nmesh.rs` and the nine fixtures, `packages/nmesh/src/decode.ts` (optional argument of `decodeNmesh`: `maxVertices`, `needTarget`, test-only `onAllocate`), `packages/cad-kernel/src/worker-host.test.ts` (fixture-parity case), `apps/cli/native/src/engine.rs`, `apps/cli/src/native-engine.ts`, `apps/cli/src/export-command.ts`, `packages/io/src/nmesh/capture-decoder.ts` and its test, `packages/core/src/cad/wireframe.ts` and its test, the `CaptureMeshDecoder` type in `cad-request.ts`, mesh bounds in `scene.ts`, the fake decoders in `scene.test.ts` and `cad-request.test.ts`, `apps/cli/src/native-parity/{capture,export}.test.ts`; after Q2: `apps/cli/src/commands.ts`, `packages/core/src/svg-export/theme.ts`, `packages/core/src/svg-export/document.ts` | Q2 |
+| B model-build | F1, F4 | `packages/core/src/cad/construction.ts` (display-only result, reference-only retention), `packages/core/src/cad/history.ts` (per-sketch shared contours in `createCadGeometry`; `loops.ts` untouched) and `history.test.ts` (selection-semantics and pointArrays cases), with the other `packages/core/src/cad/*.test.ts` and `evaluate.test.ts` unchanged and passing, `scene.ts` (capture and metadata visitors), `scene-binary.ts` (shared point rule and pre-tool checks), the precedence flow of `prepareCadCapture` in `cad-request.ts`, `scene.test.ts`, `cad-request.test.ts` (precedence cases), `packages/cad-kernel/src/worker-host.test.ts` (atomic-cut cases), `apps/cli/native/src/engine_tests.rs`, `apps/cli/src/native-parity/capture.test.ts` | A, C |
+| C body-selection | F7 | the resolver hunk of `cad-request.ts`, `cad-request.test.ts` (selection cases) | A |
+| D pcb-page-kind | F2 | `capture-command.ts`, the `captureCadImage` input in `export-handlers.ts`, `pcb-insert.ts`, `pcb-insert.test.ts`, `capture-cad.test.ts`, `export-handlers.test.ts`; after Q1: `board-picker.tsx`, `viewport.test.tsx` | - (the guard waits for Q1) |
+| E report-contract | F15 | `report.ts`, `capture-cad.ts`, the report check in `export-handlers.ts`, `export-handlers.test.ts`, `capture-cad.test.ts` | D |
+| F desktop-transport | F10 | `apps/desktop/src/file/backend.ts` and a new adjacent backend test, `apps/desktop/src-tauri/src/capture.rs` | - |
+| G boundary-fold | F5 | `lattice.rs` folds and flag, `interference.rs` view fallback and `PairSample`, new crate tests; `census.rs` is not edited | - |
+| H overlay | F11 | `raster.rs` overlay hunk, `overlay.rs`, new allocator test binary | - |
+| I pairs-classification | F13, F16 | `interference.rs` candidates, `lattice.rs` tool bounds, `raster.rs` setup, `mesh.rs` | G, H |
+| J to M | F3, F6 with F14, F8, F12 | `design-docs/specs/design-cad3d.md` section 19 | - |
+
+Waves: D (except the Q1 guard), F, G, H and J to M first; A as soon as Q2
+is approved; then C after A and B after C (both edit `cad-request.ts`, and
+B's precedence calls C's resolver); E after D; I after G and H.
+
+### 19.3 Decisions on the intake unknowns
+
+- The census fold uses the same accumulated-boundary `combine`, so it gets
+  the F5 accounting, entirely inside `lattice.rs` (no `census.rs` edit).
+- Scope amendments that need confirmation are listed in
+  `design-docs/user-qa/ai-capture-audit-r1.md`: Q1 (`board-picker.tsx`,
+  F2 guard) and Q2 (`commands.ts`, `svg-export/theme.ts`,
+  `svg-export/document.ts`, F9 and the decoder typing of F1). F7 and F12
+  need no amendment.
+- F4 keeps the full existing diagnostic precedence (no-body, cell,
+  body query, camera and frame, writer pre-tool checks, then the limit)
+  through a pending `overLimit` and a non-allocating metadata walk. No
+  exception and no user decision is needed.
+- F1 eligibility is a conservative rule (closure, consistent orientation,
+  no duplicate vertex triple, and the kernel's own emptiness test
+  `V != 0 && 2|V| >= A * 5e-7` from `manifold-kernel.ts:155-165`). Its
+  agreement with the Manifold worker is claimed only for the nine tested
+  fixtures.
+- Tauri transport: raw request body with headers and an `ipc::Response`
+  carrying the existing reply framing (F10).
+- MCP capture runs the CLI capture command; F2 needs no MCP change.
+- The point rule is the writer's, shared through one exported function
+  (F4).
+- The boundary allowance is 64 reads per weighted ray (F5); the pre-fix run
+  shows that existing tests stay under it. If one does not, the plan stops
+  and reports instead of changing a verdict.
+- Each performance plan records its baseline count on `eb7d8c9` in its
+  pre-fix run.
+
+### 19.4 Intentional differences
+
+- Capture does not report a display-only mesh's own feature as
+  `cad.mesh.open` (the app does); it stays a body as before, so existing
+  reports and codes do not change. Only features that target it change.
+- `cad check` does not classify mesh closure, so it does not fail a feature
+  that targets an open mesh; it stays the structural check (cad3d section
+  6.6). Capture and the app agree.
+- The renderer keeps classifying meshes with `is_closed` alone. A mesh
+  that passes `is_closed` but fails F1 rule (b), (c) or (d) is therefore
+  still drawn and analysed as a solid (unchanged picture), although it is
+  not a Boolean target (F1) and the app shows it display-only. Changing
+  the picture of such meshes is not part of this audit round.

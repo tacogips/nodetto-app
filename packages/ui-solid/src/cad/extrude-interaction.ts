@@ -24,19 +24,25 @@ function clip(
   [x, y, z]: Vec3,
   offset: number,
 ): number {
-  return matrix[row] * x + matrix[row + 4] * y + matrix[row + 8] * z + offset;
+  return (
+    (matrix[row] ?? Number.NaN) * x +
+    (matrix[row + 4] ?? Number.NaN) * y +
+    (matrix[row + 8] ?? Number.NaN) * z +
+    offset
+  );
 }
 
 export function projectExtrudePoint(
   matrix: Float32Array,
   point: Vec3,
 ): Point | null {
-  const w = clip(matrix, 3, point, matrix[15]);
-  const depth = clip(matrix, 2, point, matrix[14]);
+  if (matrix.length < 16) return null;
+  const w = clip(matrix, 3, point, matrix[15] ?? Number.NaN);
+  const depth = clip(matrix, 2, point, matrix[14] ?? Number.NaN);
   return w > 0 && Math.abs(depth) <= w
     ? {
-        x: clip(matrix, 0, point, matrix[12]) / w,
-        y: clip(matrix, 1, point, matrix[13]) / w,
+        x: clip(matrix, 0, point, matrix[12] ?? Number.NaN) / w,
+        y: clip(matrix, 1, point, matrix[13] ?? Number.NaN) / w,
       }
     : null;
 }
@@ -56,7 +62,7 @@ export function dragDistance(
   const tip = extrudeTip(frame, start, options.symmetric);
   const point = projectExtrudePoint(matrix, tip);
   if (!point) return start;
-  const w = clip(matrix, 3, tip, matrix[15]);
+  const w = clip(matrix, 3, tip, matrix[15] ?? Number.NaN);
   const dw = clip(matrix, 3, frame.n, 0) * normalScale;
   // The screen axis is measured in equal-sized pixels on both axes.
   const x =

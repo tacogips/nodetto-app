@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const NEAREST_BODIES: usize = 8;
 pub const VIEW_PAIR_LIMIT: usize = 4096;
+#[derive(Clone, Copy)]
 pub struct SampleBody<'a> {
     pub body: u32,
     pub intervals: &'a [Boundary],
@@ -20,16 +21,45 @@ pub fn overlapping_pairs(
     comparisons: &mut u64,
     out: &mut Vec<(u32, u32, f64, f64)>,
 ) {
-    let mut nearest: Vec<_> = bodies.iter().filter(|b| !b.intervals.is_empty()).collect();
-    nearest.sort_by(|a, b| {
-        a.intervals[0]
-            .s
-            .total_cmp(&b.intervals[0].s)
-            .then(a.body.cmp(&b.body))
-    });
-    nearest.truncate(NEAREST_BODIES);
+    overlapping_pairs_iter(bodies.iter().copied(), tolerance, comparisons, out);
+}
+
+pub(crate) fn overlapping_pairs_iter<'a>(
+    bodies: impl Iterator<Item = SampleBody<'a>>,
+    tolerance: f64,
+    comparisons: &mut u64,
+    out: &mut Vec<(u32, u32, f64, f64)>,
+) {
+    let mut nearest: [Option<SampleBody<'_>>; NEAREST_BODIES] = [None; NEAREST_BODIES];
+    let mut len = 0;
+    for body in bodies.filter(|body| !body.intervals.is_empty()) {
+        let position = (0..len)
+            .find(|&i| {
+                let current = nearest[i].unwrap();
+                body.intervals[0]
+                    .s
+                    .total_cmp(&current.intervals[0].s)
+                    .then(body.body.cmp(&current.body))
+                    .is_lt()
+            })
+            .unwrap_or(len);
+        if position < NEAREST_BODIES {
+            let end = len.min(NEAREST_BODIES - 1);
+            for i in (position..end).rev() {
+                nearest[i + 1] = nearest[i];
+            }
+            nearest[position] = Some(body);
+            len = (len + 1).min(NEAREST_BODIES);
+        }
+    }
+    if len < 2 {
+        return;
+    }
+    let nearest = &nearest[..len];
     for (i, a) in nearest.iter().enumerate() {
+        let a = a.unwrap();
         for b in &nearest[i + 1..] {
+            let b = b.unwrap();
             *comparisons = comparisons.saturating_add(1);
             if a.body != b.body {
                 if let Some((s0, s1, _)) = overlap(a.intervals, b.intervals, tolerance) {

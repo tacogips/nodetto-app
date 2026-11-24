@@ -297,3 +297,69 @@ fn two_hundred_subcell_bodies_exceed_view_pair_limit() {
         "{error}"
     );
 }
+
+#[test]
+fn tied_depth_matches_sort_truncate_reference() {
+    use nodetto_capture::interval::{overlap, Boundary};
+    use nodetto_capture::overlay::{overlapping_pairs, SampleBody};
+    let interval = [
+        Boundary {
+            s: 0.0,
+            tool: 0,
+            face: 0,
+        },
+        Boundary {
+            s: 2.0,
+            tool: 0,
+            face: 0,
+        },
+    ];
+    let bodies: Vec<_> = (0..12)
+        .rev()
+        .map(|body| SampleBody {
+            body,
+            intervals: &interval,
+        })
+        .collect();
+    let mut reference: Vec<_> = bodies.iter().collect();
+    reference.sort_by(|a, b| {
+        a.intervals[0]
+            .s
+            .total_cmp(&b.intervals[0].s)
+            .then(a.body.cmp(&b.body))
+    });
+    reference.truncate(8);
+    let mut expected = Vec::new();
+    for (i, a) in reference.iter().enumerate() {
+        for b in &reference[i + 1..] {
+            if let Some((s0, s1, _)) = overlap(a.intervals, b.intervals, 0.001) {
+                expected.push((a.body.min(b.body), a.body.max(b.body), s0, s1));
+            }
+        }
+    }
+    let mut actual = Vec::new();
+    let mut comparisons = 0;
+    overlapping_pairs(&bodies, 0.001, &mut comparisons, &mut actual);
+    assert_eq!(actual, expected);
+    assert_eq!(comparisons, 28);
+    let mut s = scene(
+        vec![box_prism([-5.0, -5.0, 0.0], 10.0, 10.0, 4.0)],
+        (0..12)
+            .map(|_| {
+                let mut b = body(&[(Op::Union, 0)]);
+                b.analysed = true;
+                b
+            })
+            .collect(),
+    );
+    s.budget_million_rays = 0;
+    let (twelve, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(
+        report.pairs.iter().map(|p| (p.a, p.b)).collect::<Vec<_>>(),
+        expected.iter().map(|p| (p.0, p.1)).collect::<Vec<_>>()
+    );
+    s.bodies.truncate(8);
+    assert_eq!(twelve, render_rgb(&s, 1).unwrap().0);
+    s.draw_interference = false;
+    assert_ne!(twelve, render_rgb(&s, 1).unwrap().0);
+}

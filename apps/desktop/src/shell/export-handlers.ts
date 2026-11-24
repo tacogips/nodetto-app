@@ -5,6 +5,7 @@
 
 import { decodeRasterDataUrl } from "@nodetto/ir";
 import {
+  assertSolidReportMatches,
   DEFAULT_CAD_INTERFERENCE,
   prepareCadCapture,
   parseSolidReport,
@@ -259,7 +260,11 @@ export function createExportHandlers(
       const capture = source.exportBackend.captureSolid;
       if (!capture) throw new Error("Capture is available in the desktop app.");
       const prepared = prepareCadCapture(
-        source.editor.getSnapshot().elements,
+        collectCadInput(
+          source.editor.getSnapshot(),
+          page.id,
+          source.editor.revision,
+        ).elements,
         page.id,
         {
           camera: options.camera,
@@ -275,6 +280,11 @@ export function createExportHandlers(
       );
       const result = await capture(prepared.scene, options.format, 90);
       const report = parseSolidReport(result.report);
+      assertSolidReportMatches(report, {
+        width: options.width,
+        height: options.height,
+        bodies: prepared.model.bodies.length,
+      });
       const path = await source.exportBackend.pickExportPath(
         `${exportBaseName(page.name)}.${options.format}`,
         options.format,

@@ -130,3 +130,18 @@ export function parseSolidReport(json: string): SolidReport {
   if (!isSolidReport(report)) throw new Error("Invalid solid capture report.");
   return report;
 }
+
+/** Check that a validated renderer report describes the requested scene. */
+export function assertSolidReportMatches(
+  report: SolidReport,
+  expected: { width: number; height: number; bodies: number },
+): void {
+  if (
+    report.width !== expected.width ||
+    report.height !== expected.height ||
+    report.bodies.length !== expected.bodies
+  )
+    throw new Error(
+      "The solid capture report does not match the requested scene.",
+    );
+}

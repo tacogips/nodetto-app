@@ -109,12 +109,21 @@ function groupFaces(body: CadDisplayBody): {
   ranges: ReadonlyMap<string, Range>;
 } {
   const counts = new Uint32Array(body.faceNames.length);
-  for (const face of body.triFace) counts[face] += 3;
+  for (let tri = 0; tri < body.triFace.length; tri++) {
+    const face = body.triFace[tri];
+    if (
+      face === undefined ||
+      face >= counts.length ||
+      tri * 3 + 2 >= body.indices.length
+    )
+      continue;
+    counts[face] = (counts[face] ?? 0) + 3;
+  }
   const cursors = new Uint32Array(counts.length);
   const ranges = new Map<string, Range>();
   let offset = 0;
   for (const [face, name] of body.faceNames.entries()) {
-    const count = counts[face];
+    const count = counts[face] ?? 0;
     cursors[face] = offset;
     ranges.set(name, { offset, count });
     offset += count;
@@ -123,11 +132,22 @@ function groupFaces(body: CadDisplayBody): {
   const indices = new Uint32Array(body.indices.length);
   for (let tri = 0; tri < body.triFace.length; tri++) {
     const face = body.triFace[tri];
+    if (face === undefined) continue;
     const target = cursors[face];
-    indices[target] = body.indices[tri * 3];
-    indices[target + 1] = body.indices[tri * 3 + 1];
-    indices[target + 2] = body.indices[tri * 3 + 2];
-    cursors[face] += 3;
+    const a = body.indices[tri * 3];
+    const b = body.indices[tri * 3 + 1];
+    const c = body.indices[tri * 3 + 2];
+    if (
+      target === undefined ||
+      a === undefined ||
+      b === undefined ||
+      c === undefined
+    )
+      continue;
+    indices[target] = a;
+    indices[target + 1] = b;
+    indices[target + 2] = c;
+    cursors[face] = target + 3;
   }
   return { indices, ranges };
 }

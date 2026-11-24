@@ -5,7 +5,12 @@ import {
   Editor,
 } from "@nodetto/core";
 import { render } from "solid-js/web";
-import { plateWithHoles } from "../../../core/src/cad/testing/documents.ts";
+import { isPlainObject } from "@nodetto/ir";
+import { scanCadPage } from "../../../core/src/cad/history.ts";
+import {
+  cadElement,
+  plateWithHoles,
+} from "../../../core/src/cad/testing/documents.ts";
 import {
   boardReference,
   PCB_TEST_PAGE,
@@ -183,6 +188,111 @@ for (const theme of ["light", "dark"] as const) {
   assert.ok(
     find<HTMLInputElement>('[aria-label="Target bodies"] input').checked,
   );
+
+  const fields = (id: string) => {
+    const value = editor.store.get(id)?.semantic;
+    assert.ok(isPlainObject(value));
+    return value;
+  };
+  // Base-plane edits are separate history entries and preserve the offset.
+  rowName("base").click();
+  const baseElement = editor.store.get("base");
+  assert.ok(baseElement);
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: "base",
+      semantic: { name: "base", plane: { base: "xy", offset: 5 } },
+    },
+  ]);
+  const plane = find<HTMLSelectElement>('select[aria-label="Base plane"]');
+  change(plane, "yz");
+  assert.deepEqual(fields("base").plane, {
+    base: "yz",
+    offset: 5,
+  });
+  change(plane, "zx");
+  assert.deepEqual(fields("base").plane, {
+    base: "zx",
+    offset: 5,
+  });
+  assert.ok(editor.undo());
+  assert.deepEqual(fields("base").plane, {
+    base: "yz",
+    offset: 5,
+  });
+  assert.ok(editor.undo());
+  assert.deepEqual(fields("base").plane, {
+    base: "xy",
+    offset: 5,
+  });
+  editor.apply([
+    { type: "updateVisual", id: "base", visual: { locked: true } },
+  ]);
+  assert.equal(plane.disabled, true);
+  editor.setReadOnly(true);
+  assert.equal(plane.disabled, true);
+  editor.setReadOnly(false);
+  editor.apply([
+    { type: "updateVisual", id: "base", visual: { locked: false } },
+  ]);
+  editor.apply([
+    { type: "updateSemantic", id: "base", semantic: baseElement.semantic },
+  ]);
+
+  const second = cadElement("second", "cad.extrude", "a2V", {
+    sketch: "base",
+    name: "second",
+    distance: 5,
+    op: "new",
+  });
+  editor.apply([{ type: "createElement", element: second }]);
+  const originalCut = editor.store.get("ex2");
+  assert.ok(originalCut);
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: "ex2",
+      semantic: { ...fields("ex2"), bodies: ["ex1", "second"] },
+    },
+  ]);
+  rowName("Relief").click();
+  const currentOperation = find<HTMLSelectElement>(
+    'select[aria-label="Operation"]',
+  );
+  const valid = () =>
+    assert.equal(
+      scanCadPage(editor.store.getPageElements("cad")).status.get("ex2")?.ok,
+      true,
+    );
+  change(currentOperation, "add");
+  assert.deepEqual(fields("ex2").bodies, ["ex1"]);
+  valid();
+  const secondLabel = [...root.querySelectorAll("label")].find(
+    (label) => label.textContent === "second",
+  );
+  assert.ok(secondLabel);
+  const secondSwitch = secondLabel.querySelector<HTMLInputElement>(
+    'input[role="switch"]',
+  );
+  assert.ok(secondSwitch);
+  secondSwitch.click();
+  assert.deepEqual(fields("ex2").bodies, ["second"]);
+  valid();
+  const beforeUncheck = editor.history.undoSize;
+  secondSwitch.click();
+  assert.equal(secondSwitch.checked, true);
+  assert.equal(editor.history.undoSize, beforeUncheck);
+  assert.ok(editor.undo());
+  assert.deepEqual(fields("ex2").bodies, ["ex1"]);
+  valid();
+  assert.ok(editor.undo());
+  assert.deepEqual(fields("ex2").bodies, ["ex1", "second"]);
+  valid();
+  editor.apply([
+    { type: "updateSemantic", id: "ex2", semantic: originalCut.semantic },
+    { type: "deleteElements", ids: ["second"] },
+  ]);
 
   await respond({ status: [], failure: "cad.kernel.failed" });
   assert.equal(

@@ -206,7 +206,61 @@ function segmentIntersection(a: Segment, b: Segment): boolean {
   return !((side3 > 0 && side4 > 0) || (side3 < 0 && side4 < 0));
 }
 
-function intersection(profiles: readonly Profile[]): Segment | undefined {
+interface LoopStats {
+  segmentPairs: number;
+  containmentPairs: number;
+}
+
+// Count one-dimensional overlaps before choosing the less crowded axis.
+function overlappingPairs(
+  boxes: readonly Bounds[],
+  visit: (i: number, j: number) => void,
+  count: () => void,
+): void {
+  const sorted = (axis: "X" | "Y") =>
+    boxes
+      .map((box, i) => ({ i, min: box[`min${axis}`], max: box[`max${axis}`] }))
+      .sort((a, b) => a.min - b.min || a.i - b.i);
+  const x = sorted("X");
+  const y = sorted("Y");
+  const overlapCount = (items: typeof x): number => {
+    const ends = items.map((item) => item.max).sort((a, b) => a - b);
+    let expired = 0;
+    let total = 0;
+    for (const [i, item] of items.entries()) {
+      while (
+        expired < ends.length &&
+        (ends[expired] ?? Number.POSITIVE_INFINITY) < item.min
+      )
+        expired += 1;
+      total += i - expired;
+    }
+    return total;
+  };
+  const items = overlapCount(x) <= overlapCount(y) ? x : y;
+  for (const [index, a] of items.entries()) {
+    for (let j = index + 1; j < items.length; j += 1) {
+      const b = items[j];
+      if (b === undefined || b.min > a.max) break;
+      count();
+      const first = boxes[a.i];
+      const second = boxes[b.i];
+      if (first === undefined || second === undefined) continue;
+      if (
+        first.minX <= second.maxX &&
+        second.minX <= first.maxX &&
+        first.minY <= second.maxY &&
+        second.minY <= first.maxY
+      )
+        visit(a.i, b.i);
+    }
+  }
+}
+
+function intersection(
+  profiles: readonly Profile[],
+  stats?: LoopStats,
+): Segment | undefined {
   const segments: Segment[] = [];
   for (const profile of profiles) {
     const { grid } = profile;
@@ -230,14 +284,21 @@ function intersection(profiles: readonly Profile[]): Segment | undefined {
     }
   }
   segments.sort((a, b) => a.minX - b.minX || a.minY - b.minY);
-  for (const [i, a] of segments.entries()) {
-    for (let j = i + 1; j < segments.length; j += 1) {
+  let first = segments.length;
+  overlappingPairs(
+    segments,
+    (i, j) => {
+      const a = segments[i];
       const b = segments[j];
-      if (!b || b.minX > a.maxX) break;
-      if (b.minY <= a.maxY && a.minY <= b.maxY && segmentIntersection(a, b))
-        return a;
-    }
-  }
+      if (a !== undefined && b !== undefined && segmentIntersection(a, b)) {
+        first = Math.min(first, i, j);
+      }
+    },
+    () => {
+      if (stats !== undefined) stats.segmentPairs += 1;
+    },
+  );
+  return segments[first];
 }
 
 function contains({ grid, bounds }: Profile, x: number, y: number): boolean {
@@ -290,6 +351,7 @@ export interface CadProfilePath {
 export function buildLoops(
   entities: readonly Element[],
   pick?: readonly ElementId[],
+  stats?: LoopStats,
 ): { loops: readonly CadLoop[] } | Failure {
   const paths: CadProfilePath[] = [];
   const ordered = entities
@@ -316,7 +378,7 @@ export function buildLoops(
       paths.push({ id, points });
     }
   }
-  return buildProfileLoops(paths, pick);
+  return buildProfileLoops(paths, pick, stats);
 }
 
 // Paths arrive in deterministic order with open endpoints already normalized
@@ -324,6 +386,7 @@ export function buildLoops(
 export function buildProfileLoops(
   paths: readonly CadProfilePath[],
   pick?: readonly ElementId[],
+  stats?: LoopStats,
 ): { loops: readonly CadLoop[] } | Failure {
   const byPoint = new Map<string, ChainEdge[]>();
   const chainEdges: ChainEdge[] = [];
@@ -374,13 +437,29 @@ export function buildProfileLoops(
     if ("error" in profile) return profile;
     profiles.push(profile);
   }
-  const crossing = intersection(profiles);
+  const crossing = intersection(profiles, stats);
   if (crossing !== undefined)
     return { error: "cad.profile.intersect", at: crossing.id };
 
   const selected = pick === undefined ? undefined : new Set(pick);
+  const depths = profiles.map(() => 0);
+  overlappingPairs(
+    profiles.map((profile) => profile.bounds),
+    (i, j) => {
+      const a = profiles[i];
+      const b = profiles[j];
+      if (a === undefined || b === undefined) return;
+      if (contains(b, coordinate(a.grid, 0), coordinate(a.grid, 1)))
+        depths[i] = (depths[i] ?? 0) + 1;
+      if (contains(a, coordinate(b.grid, 0), coordinate(b.grid, 1)))
+        depths[j] = (depths[j] ?? 0) + 1;
+    },
+    () => {
+      if (stats !== undefined) stats.containmentPairs += 1;
+    },
+  );
   const loops: CadLoop[] = [];
-  for (const profile of profiles) {
+  for (const [index, profile] of profiles.entries()) {
     if (profile.winding === 0)
       return profileError("cad.profile.empty", profile.outline.members[0]);
     if (
@@ -388,13 +467,7 @@ export function buildProfileLoops(
       !profile.outline.members.some((id) => selected.has(id))
     )
       continue;
-    const x = coordinate(profile.grid, 0);
-    const y = coordinate(profile.grid, 1);
-    let depth = 0;
-    for (const other of profiles) {
-      if (other !== profile && contains(other, x, y)) depth += 1;
-    }
-    loops.push(counterClockwise(profile, depth));
+    loops.push(counterClockwise(profile, depths[index] ?? 0));
   }
   return loops.length === 0 ? { error: "cad.profile.empty" } : { loops };
 }

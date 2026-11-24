@@ -1,3 +1,10 @@
+import { capturePlateDocument } from "../../../packages/core/src/capture/testing/plate.ts";
+import {
+  boardReference,
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../../../packages/core/src/cad/testing/pcb.ts";
 import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -512,4 +519,58 @@ test("Bun capture writes deterministic PNGs and reports the encoded size at frac
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+test("CAD capture excludes a board on a converted page and restores it on undo", async () => {
+  const base = capturePlateDocument();
+  const editor = new Editor({
+    document: {
+      ...base,
+      pages: [...base.pages, PCB_TEST_PAGE],
+      elements: [
+        ...base.elements,
+        boardReference(),
+        testBoard(1.6),
+        edge("rim", { kind: "rect", start: [0, 0], end: [20, 10] }),
+      ],
+    },
+  });
+  const state = harness(editor);
+  let bodyCount = 3;
+  state.backend.renderSolid = () => ({
+    image: png,
+    report: JSON.stringify({
+      width: 1024,
+      height: 768,
+      bodies: Array.from({ length: bodyCount }, () => ({
+        state: "drawn",
+        emptiedByStep: -1,
+        open: false,
+      })),
+      analysis: null,
+      pairs: [],
+    }),
+  });
+  editor.setPageKind(PCB_TEST_PAGE.id, "freeform");
+  const missing = await state.run("--page", "Plate", "--json");
+  expect(missing.exitCode).toBe(0);
+  const absent = JSON.parse(missing.stdout);
+  expect(absent.errors).toContainEqual(
+    expect.objectContaining({
+      id: "board-reference",
+      code: "cad.reference.missing",
+    }),
+  );
+  expect(
+    absent.bodies.some((body: { id: string }) => body.id === "board-reference"),
+  ).toBe(false);
+  editor.undo();
+  bodyCount = 4;
+  const restored = await state.run("--page", "Plate", "--json");
+  expect(restored.exitCode).toBe(0);
+  expect(
+    JSON.parse(restored.stdout).bodies.some(
+      (body: { id: string }) => body.id === "board-reference",
+    ),
+  ).toBe(true);
 });

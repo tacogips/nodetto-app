@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
 import type { CadFaceRef } from "@nodetto/ir";
 import { analyzeCadPage, faceBody, faceOutwardSign } from "./index.ts";
+import { visitCadConstruction } from "./construction.ts";
+import { cadFailure, createCadGeometry, scanCadPage } from "./history.ts";
+import { buildLoops, type CadLoop } from "./loops.ts";
 import {
   cadElement,
   extrude,
@@ -217,3 +220,142 @@ test.each([
     ).toBeNull();
   },
 );
+
+test("construction shares each sketch contour across many selected extrusions", () => {
+  const vertices = Array.from({ length: 64 }, (_, i) => {
+    const angle = (i * 2 * Math.PI) / 64;
+    return [
+      Math.round(Math.cos(angle) * 1000),
+      Math.round(Math.sin(angle) * 1000),
+    ] as const;
+  });
+  const edges = vertices.map((a, i) =>
+    cadElement(`edge-${i}`, "cad.line", "a1", {
+      sketch: "profile",
+      a,
+      b: vertices[(i + 1) % vertices.length],
+    }),
+  );
+  const features = edges.map((edge, i) =>
+    extrude(`ex-${i}`, "b", {
+      sketch: "profile",
+      distance: 1,
+      op: "new",
+      loops: [edge.id],
+    }),
+  );
+  const stats = { profileBuilds: 0, pointArrays: 0, retainedTools: 0 };
+  const tools = new Map<string, readonly CadLoop[]>();
+  const report = visitCadConstruction(
+    [sketch("profile", "a"), ...edges, ...features],
+    "cad",
+    {
+      tool(feature, tool) {
+        tools.set(feature.id, tool.loops);
+      },
+    },
+    stats,
+  );
+  expect(report.errors).toEqual([]);
+  for (const feature of features) {
+    const expected = buildLoops(edges, feature.semantic.loops);
+    expect("loops" in expected && tools.get(feature.id)).toEqual(
+      "loops" in expected && expected.loops,
+    );
+  }
+  expect(stats).toEqual({ profileBuilds: 1, pointArrays: 1, retainedTools: 0 });
+
+  const repeated = Array.from({ length: 1000 }, (_, i) =>
+    extrude(`repeat-${i}`, "b", {
+      sketch: "profile",
+      distance: 1,
+      op: "new",
+      loops: ["edge-0"],
+    }),
+  );
+  const repeatedStats = { profileBuilds: 0, pointArrays: 0, retainedTools: 0 };
+  const repeatedReport = visitCadConstruction(
+    [sketch("profile", "a"), ...edges, ...repeated],
+    "cad",
+    { tool() {} },
+    repeatedStats,
+  );
+  expect(repeatedReport.errors).toEqual([]);
+  expect(repeatedStats).toEqual({
+    profileBuilds: 1,
+    pointArrays: 1,
+    retainedTools: 0,
+  });
+});
+
+test("construction retains only tools referenced by sketch faces", () => {
+  const elements = [
+    ...plateElements(),
+    sketch("upper", "a3", { face: { feature: "ex1", role: "end" } }),
+    ...rectangle("upper", 2, 2, 5, 5),
+    extrude("ex2", "a4", { sketch: "upper", distance: 2, op: "new" }),
+  ];
+  const stats = { profileBuilds: 0, pointArrays: 0, retainedTools: 0 };
+  const report = visitCadConstruction(elements, "cad", { tool() {} }, stats);
+  expect(report.errors).toEqual([]);
+  expect(stats.retainedTools).toBe(1);
+});
+
+test("shared profiles preserve selection, nesting and errors outside the selection", () => {
+  const outer = rectangle("profile", 0, 0, 10, 10);
+  const inner = rectangle("inner", 2, 2, 2, 2).map((edge) => ({
+    ...edge,
+    semantic: { ...edge.semantic, sketch: "profile" },
+  }));
+  const entities = [...outer, ...inner];
+  const geometry = createCadGeometry(
+    scanCadPage([sketch("profile", "a"), ...entities]),
+  );
+  const frame = geometry.sketch({ base: "xy" });
+  if ("ok" in frame) throw new Error("invalid frame");
+  geometry.frames.set("profile", frame);
+  const semantic = {
+    sketch: "profile",
+    distance: 1,
+    op: "new" as const,
+    name: "test",
+  };
+  expect(geometry.extrude({ ...semantic, loops: ["missing"] })).toEqual({
+    ok: false,
+    code: "cad.profile.empty",
+  });
+  const tool = geometry.extrude({
+    ...semantic,
+    loops: ["profile-edge-0", "inner-edge-0"],
+  });
+  expect(
+    "loops" in tool && tool.loops.map((loop) => loop.depth).sort(),
+  ).toEqual([0, 1]);
+  const invalid = [
+    cadElement("zero-0", "cad.line", "a1", {
+      sketch: "profile",
+      a: [20, 0],
+      b: [21, 0],
+    }),
+    cadElement("zero-1", "cad.line", "a1", {
+      sketch: "profile",
+      a: [21, 0],
+      b: [22, 0],
+    }),
+    cadElement("zero-2", "cad.line", "a1", {
+      sketch: "profile",
+      a: [22, 0],
+      b: [20, 0],
+    }),
+  ];
+  const expected = buildLoops([...outer, ...invalid], ["profile-edge-0"]);
+  const broken = createCadGeometry(
+    scanCadPage([sketch("profile", "a"), ...outer, ...invalid]),
+  );
+  broken.frames.set("profile", frame);
+  expect(expected).toEqual({ error: "cad.profile.empty", at: "zero-0" });
+  if ("error" in expected)
+    expect(broken.extrude({ ...semantic, loops: ["profile-edge-0"] })).toEqual(
+      cadFailure(expected.error, expected.at),
+    );
+});
