@@ -3,6 +3,7 @@
 Status: implemented (slice), design revision 3, base commit `0a35708`,
 branch `feat/cad3d-pages`. Revision 4 (audit round 1 on `feat/ai-capture`,
 `0a35708..eb7d8c9`) adds the editor-side corrections of section 19.
+Revision 5 (audit round 3, `0a35708..a964ad5`) adds section 20.
 Implementation plan: `impl-plans/completed/cad3d-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[R-n]` are external sources listed in section 17. Measurements
@@ -1341,3 +1342,415 @@ other or with the capture plans and run in the first wave. Plan M owns
 `packages/nmesh/src/{canonical.ts,encode.ts,armor.ts}`,
 `packages/io/src/cad-mesh.ts` and the three tests above. The F2 plan D
 owns `pcb-insert.ts`, and `board-picker.tsx` only after Q1 is approved.
+
+## 20. Audit round 3 corrections (editor and core)
+
+Source: audit round 3 of `feat/ai-capture` (`0a35708..a964ad5`). The
+following live in `design-docs/specs/design-ai-capture.md` section 21:
+
+- the capture findings (R3-1, R3-2 and R3-7);
+- the common test rule: a test that fails on `a964ad5` and passes after
+  it, deterministic counts for performance findings, and no change to
+  golden, NCS1, error code or message bytes;
+- the plan table and the integration gates.
+
+This section states R3-3 to R3-6. Where an earlier sentence of this
+document and this section disagree, this section wins.
+
+R3-3 `function-cad-drag-multitarget-cut-to-add` (high). This reopens F14
+(section 19) on the viewport path.
+
+An Add has exactly one target. Every path that commits an extrude
+operation applies one target-normalisation rule. Today the viewport drag
+(`packages/ui-solid/src/cad/extrude-authoring.ts:387-400`) changes only
+`distance` and `op`, so a two-target Cut that is dragged outward is stored
+as an Add with two targets. `scanCadPage` then reports
+`cad.body.reference` (`history.ts:262-267`).
+
+- New pure module `packages/ui-solid/src/cad/extrude-targets.ts`. It sits
+  in `cad/` because the inspector already imports from `cad/`, never the
+  reverse. It exports:
+  - `earlierExtrudeBodies(pageElements, element)`: the list that
+    `CadSection.tsx:87-102` builds today. These are the `cad.mesh`
+    elements and the `op: "new"` extrudes before `element` in
+    `compareCadHistoryOrder` order.
+  - `displayedExtrudeTargets(pageElements, element, stored)`: the stored
+    ids that are listed, in list order, followed by the stored ids that are
+    not listed, in stored order. This is the current `orderedTargets`
+    (`CadSection.tsx:103-110`).
+  - `targetsForOperation(op, displayed)`: `[]` for `new`; the first
+    distinct id for `add`; the distinct ids in the given order for `cut`
+    and `intersect`. This is the current rule of `setCadOperation`
+    (`cad-edits.ts:116-133`).
+- `setCadOperation` calls `targetsForOperation`, so its behaviour does not
+  change. `CadSection.tsx` uses the two list functions in place of its
+  local memo bodies, with unchanged results.
+- Viewport commit. At pointer up, when the resolved `op` is `add`, the
+  stored targets are replaced by `targetsForOperation("add",
+  displayedExtrudeTargets(editor.store.getPageElements(pageId), element,
+  semantic.bodies))`. For any other `op`, the stored targets are kept
+  unchanged and in stored order, so inward drags and Cut-to-Cut drags do
+  not rewrite the list. The distance, the `op` and the targets are
+  committed in the single existing `updateSemantic`, which is one history
+  entry and one Undo. Today's targetless `New` behaviour is kept.
+
+Tests:
+
+- `packages/ui-solid/src/cad/extrude-targets.test.ts` covers the three
+  functions: display order with detached ids, deduplication, and each
+  `op`.
+- `packages/ui-solid/src/inspector/cad-edits.test.ts`: the F14 cases pass
+  unchanged.
+- `packages/ui-solid/src/test-dom/cad-sketch.dom.tsx`, which
+  `packages/ui-solid/src/cad/viewport.test.tsx` runs. Set up two bodies,
+  `left` (history first) and `right`, and a face-based Cut with stored
+  `bodies: [right, left]` and distance -2.
+  1. Commit an outward drag, with no cancel.
+  2. The stored element is an Add with a positive distance and `bodies:
+     [left]`, and `scanCadPage` reports the feature ok.
+  3. The undo stack grew by one entry.
+  4. One Undo restores the Cut, distance -2 and `bodies: [right, left]`,
+     each asserted.
+
+  The existing single-target drag and cancel cases pass unchanged.
+- `packages/ui-solid/src/test-dom/cad-inspector.dom.tsx`: the F14 inspector
+  cases pass unchanged. They now exercise the shared module.
+
+R3-4 `performance-cad-intermediate-solid-retention` (high). This amends
+section 6.5.
+
+Cause. The cache limits are enforced only in `finish`
+(`evaluate.ts:227-249`), after every final body is materialized
+(`evaluate.ts:675-699`). A cold evaluation of a long history therefore
+keeps every superseded prism and Boolean result live.
+
+Rule. The limits of section 6.5 (256 entries, 4,000,000 triangles) are
+also enforced during evaluation, inside tool builds and after every
+feature, successful or failed.
+
+- Accounting. `MemoState` keeps `lruTriangles`, the triangle sum of the
+  solids in the LRU. Every LRU mutation goes through three helpers:
+  - `lruAdd` counts a solid only when it is not already a member; the
+    re-insertion in `markUsed` is not a membership change;
+  - `lruDelete` subtracts only when the solid was a member;
+  - `lruClear` resets the sum to 0.
+
+  `retain`, `markUsed`, the new trim, the eviction loop of `finish` and
+  `releaseCadMemo` use only these helpers. `finish` reads `lruTriangles`
+  instead of recomputing the sum. Which solids `finish` releases, and when,
+  is unchanged.
+- Pins (holds taken by active work; see Holds below). Every pin is
+  released in a `finally`, so every exit, including a thrown
+  `SolidFailure` or `BodyBuildFailure`, unpins. The hold contract is
+  continuous: a solid that is still needed is never without a hold at a
+  trim boundary.
+  - No unheld window. `trim` runs only at the boundaries listed below.
+    Between a solid's creation or cache hit (`getSolid`, `getPrism`,
+    `cached`) and the first hold its consumer takes, no trim runs.
+  - `getTool` returns a held solid, and the caller owns that hold. Inside
+    `getTool`:
+    1. Each depth's prisms are pinned as they are obtained.
+    2. When a prism becomes the aggregate (`prisms.shift()`, or a depth
+       with no further prisms), its existing pin is transferred to the
+       aggregate role and is not released.
+    3. When a depth step's Boolean returns result R, R is pinned first.
+       Then the pins on the consumed previous aggregate and that depth's
+       prisms are released. Only then does the depth trim run. R stays
+       pinned as the aggregate through the next depth.
+    4. A cache hit on the whole tool (`cached(memo, key)`) is pinned
+       before return. A reused alias, where tool, step and body keys share
+       one handle, is a single solid with one count, so each role's hold
+       adds to the same count.
+    5. On a throw, every pin `getTool` holds, including the current
+       aggregate, is released before the error propagates.
+  - `materializeBody`:
+    - Each `previous` solid is pinned before its Boolean runs.
+    - The step result is pinned before `previous` is unpinned. In a suffix
+      replay, that result is then the next step's `previous`.
+    - For `op: "new"`, the held solid from `getTool` becomes the result
+      directly; its hold is kept, not re-acquired.
+    - For `add`, `cut` and `intersect`, the operand hold from `getTool` is
+      released after the Boolean returns and after the result is pinned.
+    - The final result's pin is handed to the caller.
+  - Extrude feature: each target's result keeps its pin as a staged
+    result until the whole feature has finished, so a multi-target update
+    is never split. On commit, each staged pin becomes that body's
+    current-body hold, transferred without release. On failure, the
+    staged pins are released before the feature-boundary trim.
+- Holds. Pins and current bodies share one reference count,
+  `MemoState.holds: Map<Solid, number>`:
+  - A pin adds one hold. Each current `BodyState` in `bodies` adds one
+    hold on the solid cached under its key.
+  - When a feature commits a new state for a body, `evaluateHistory`
+    adds a hold on the new solid and removes the hold on the superseded
+    state's solid.
+  - When `evaluateHistory` ends, normally or by throwing, it drops every
+    body hold it added, so no hold outlives the evaluation.
+
+  A solid with a hold count above zero is protected. Those are the active
+  operands, the staged multi-target results, and the operands of later
+  features and the future final bodies.
+- Eligible order. Besides the LRU (all retained solids, used for the
+  limits and for `finish`), `MemoState` keeps `evictable`, an
+  insertion-ordered `Map<Solid, true>`. It contains exactly the LRU
+  members whose hold count is 0, in LRU order.
+  - `lruAdd` and `markUsed` move an unheld solid to the end of
+    `evictable`.
+  - When a hold count rises from 0, the solid is removed from
+    `evictable`.
+  - When a hold count falls to 0 and the solid is still in the LRU, it is
+    appended to `evictable` as most recently used.
+  - `lruDelete` and `lruClear` keep `evictable` in step.
+
+  Each change is O(1).
+- `trim(state)`. While `lru.size > entries` or `lruTriangles >
+  triangleLimit`, and `evictable` is not empty, it takes the oldest entry
+  of `evictable` and:
+  - calls `lruDelete`;
+  - deletes the solid's cache keys;
+  - releases the handle at once.
+
+  The exception is a handle in `memo.visible`, a published final of the
+  previous evaluation. It is not released there, and `finish` releases it
+  exactly once when it is not retained, as today.
+
+  `trim` never visits a held solid. Each call visits exactly the solids it
+  evicts plus one emptiness check. Total trim work over one evaluation is
+  therefore linear in solids created plus trim calls, even when held
+  current bodies alone exceed the limits. A solid leaves the LRU at most
+  once, so it is released at most once. A test-only counter,
+  `trimVisits`, reported by `cadMemoUsage`, counts the entries `trim`
+  takes from `evictable`.
+- Trim boundaries:
+  1. in `getTool`, after each depth step's Boolean, once that step's
+     prisms and the previous aggregate are unpinned;
+  2. in `evaluateHistory`, after each mesh, PCB or extrude feature, in a
+     `finally`, so it runs after a success and after a failure, once the
+     feature's pins are released;
+  3. in `finish`, as today.
+
+  Below both limits, `trim` evicts nothing, so every existing reuse,
+  replay and call-sequence assertion is unaffected.
+- Unchanged: the replay rule (`successful` keys and suffix replay), the
+  `replayFailure` second pass, the published-final lifetime and the
+  exactly-once release. A trimmed intermediate that a later edit needs is
+  replayed from the newest retained predecessor, which section 6.5 already
+  allows. `packages/cad-kernel/src/manifold-kernel.ts` and
+  `packages/cad-kernel/src/worker-host.ts` are not changed. Releasing a
+  superseded result releases its copied source set.
+
+Peak bound. During evaluation:
+
+- live handles stay at or below `entries` plus the protected solids plus
+  one handle under construction;
+- charged triangles stay at or below `triangleLimit` plus the triangles of
+  those solids.
+
+Tests (`packages/core/src/cad/evaluate.test.ts`). They use `RecordingKernel`
+with a test-side wrapper that tracks, after every kernel call, the live
+handle count and the sum of `triangles` over live handles. Each test
+records the peaks measured on `a964ad5` before the edit, and the result
+after the fix:
+
+- Entry limit. 300 successive Adds on one body, default limits, small
+  meshes. The peak live handles are at most 256 + 3: the protected body,
+  the tool and the Boolean result. The pre-fix peak is 601.
+- Triangle limit. 60 successive Adds with `triangles: 100_000` per handle
+  and `entries: 10_000`. The peak charged triangles are at most 4,000,000
+  + 300,000. The pre-fix peak is 12,100,000.
+- Nested single feature. 12 concentric circles with radii 2 to 24 mm, one
+  `New` extrusion, `entries: 4`. The peak live handles are at most 4 + 4:
+  the aggregate, the current depth's prism, the step result and one in
+  construction. The body is valid. The reviewer's pre-fix probe measured
+  23.
+- Repeated failed Booleans. 60 Adds whose results are empty, with
+  `triangles: 100_000` and the default triangle limit. The peak charged
+  triangles are at most 4,000,000 + 300,000, and every feature reports
+  `cad.result.empty`. The reviewer's pre-fix probe measured 62 handles,
+  which is 6,200,000.
+- Multi-target atomicity. A feature with three targets and `entries: 2`
+  publishes all three results. While it runs, no target's result is
+  released, and the wrapper sees no release of a held handle.
+- Many bodies, protected beyond the limit. One rectangular sketch with
+  N = 1,000 and N = 2,000 independent one-loop `New` extrusions, small
+  solids and the default 256-entry limit, so the current bodies alone
+  exceed the limit. Assert:
+  - every final body is published and stays live until `releaseCadMemo`;
+  - no current body is released during evaluation;
+  - `trimVisits` equals the number of solids `trim` evicted, so no held
+    solid is ever visited;
+  - it grows at most linearly: `visits(2N) <= 2 * visits(N) + 2`;
+  - a second variant with two-loop sketches, where each tool aggregate is
+    a distinct evictable intermediate, gives the same equality and growth
+    with nonzero visits.
+
+  For reference, a walk-from-oldest trim would visit about N²/2 protected
+  entries; the reviewer derived 49,972,104 visits for N = 10,000.
+- The handle, triangle, nested and failed-Boolean peak tests above run
+  unchanged with the holds design.
+- Zero-entry handoff. Use `createCadMemo(kernel, { entries: 0 })`, so
+  every unheld solid is evicted at the first boundary. Two features:
+  1. a `New` extrusion of two disjoint loops (two prisms, one depth-0
+     aggregate);
+  2. an `Add` whose sketch has an outer loop, a hole and an island, so
+     the aggregate is reused across three depths.
+
+  The RecordingKernel wrapper asserts that every `boolean`, `measure`
+  and `mesh` export call receives only live handles, so a use after
+  release fails at once. Assert:
+  - both features are ok and the final body is published live;
+  - `releaseCadMemo` releases every handle exactly once and leaves none
+    live;
+  - `cadMemoUsage` reports zero holds after evaluation and after release.
+
+  Failure variant: the kernel throws on the island-depth Boolean. The
+  feature reports `cad.kernel.failed`, the previous body stays published,
+  zero holds remain, and no handle is released twice. Under the
+  previously written transition (input pins dropped before trim with no
+  successor hold), the wrapper would see the released aggregate used, so
+  the test fails before the handoff rule.
+- Accounting. After every evaluation in these tests, a test-only
+  `cadMemoUsage(memo)` export returns `{ entries, triangles, holds,
+  trimVisits }`. `entries` and `triangles` must equal a recomputation over
+  the LRU, and `holds` must be 0 between evaluations. After `releaseCadMemo`, `entries`,
+  `triangles` and `holds` are 0, and the kernel has no live handle.
+- The existing replay, multi-target failure atomicity, triangle-limit
+  release and exactly-once release tests pass unchanged. In every new
+  test, each handle is released at most once.
+
+R3-5 `performance-cad-face-frame-history-replay` (medium).
+
+Cause. `sketchFrameLookup` (`history.ts:587-603`) caches only the
+requested frame. Every miss on a face sketch calls `geometryFor`, which
+builds a fresh `createCadGeometry` and the whole ancestor chain again.
+
+Rule. One lookup object, which is one page revision, shares one geometry
+context and one per-feature resolution across all its lookups.
+
+- `sketchFrameLookup(elements)` keeps its signature. It creates one
+  `createCadGeometry`, a `resolved: Map<ElementId, boolean>` (feature ok
+  or failed) and an index from feature id to history position.
+- On a miss for sketch `X`:
+  1. Collect the dependency closure of `X` through
+     `history.dependencies`, stopping at features already in `resolved`.
+  2. Sort the new ids by history position.
+  3. Process them with exactly the per-item logic of `geometryFor`
+     (`history.ts:541-556`).
+
+  A feature fails when its status is not ok, when a dependency failed, or
+  when its own `sketch`, `extrude` or `pcb` geometry fails. A suppressed
+  extrude or PCB, a suppressed mesh, or an item of any other type in the
+  closure also fails, which mirrors `geometryFor`'s `return null`. The
+  frame of `X` is `geometry.frames.get(X)` when `X` resolved ok, and
+  `null` otherwise.
+
+  This gives the same frame or `null` as today. Dependencies precede
+  their dependents in history order, and every geometry result depends
+  only on the results of its own dependencies.
+- The base-plane shortcut (`history.ts:596`) and the frame cache stay.
+  Each feature's profile is built at most once per lookup object.
+- Revision. `sketch-authoring.ts:119-121` already creates one lookup per
+  `geometryElements()` value, which changes with the page revision, so an
+  edit gets a fresh lookup. `sketch-authoring.ts` and `CadViewport.tsx` are
+  not edited. `sketchFrameOf`, `extrudeGeometryOf`, `faceOutwardSign` and
+  `geometryFor` are unchanged.
+
+Work measurement, shared by R3-5 and R3-6.
+
+- `history.ts` exports a test-only counter object, `cadGeometryWork = {
+  profileBuilds, statusVisits, loopProbes }`. It is not re-exported from
+  the package index. `createCadGeometry` increments it in every geometry
+  context, including the contexts that `geometryFor` creates:
+  - `profileBuilds`: once per `buildLoops` call;
+  - `statusVisits`: once per entity status read;
+  - `loopProbes`: once per profile loop examined in any selection path,
+    meaning the index build (each loop once), each index lookup, and any
+    filter or scan over `profile.loops`.
+
+  Because every loop examination is counted, a residual per-extrusion full
+  scan shows up in the count.
+- Baseline. Before editing, the plan applies a temporary patch to the
+  `a964ad5` `history.ts` that adds only these increments at the same
+  sites: the `buildLoops` call, the status walk at `history.ts:496-499`,
+  and the filter at `history.ts:511-514`. It runs the new tests, records
+  the measured counts, then reverts the patch. The patch and counts are
+  kept as evidence under `tmp/<taskId>/`, never as a `*.test.ts` file.
+- The plan result records the baseline and candidate counts for both
+  fixture sizes.
+
+Tests (`packages/core/src/cad/history.test.ts`, the counters reset before
+each measurement):
+
+- Build chains of 40 and 80 rectangle sketches. The first is on the XY
+  base plane. Each later one is on the end face of the previous sketch's
+  1 mm extrusion. Create one lookup, reset the counters, and resolve every
+  frame. Assert:
+  - sketch k (counting from 0) has its origin at z = k mm, normal +Z,
+    and in-plane axes equal to sketch 1's axes. These are analytic
+    values, not another lookup's result.
+  - `profileBuilds` equals the number of ancestor extrusions, 39 and 79,
+    which is linear. The baseline measures about n²/2: 780 and 3,160 by
+    the derivation of the finding, recorded as measured.
+- Change the first extrusion's distance, build a new lookup on the new
+  elements, and assert that every dependent origin moved by the change.
+- A failed ancestor gives `null` for every dependent, as today.
+
+R3-6 `performance-cad-shared-sketch-extrusion-rescans` (medium).
+
+Cause. `createCadGeometry().extrude` (`history.ts:495-515`) visits every
+entity status of the source sketch on every call, and filters every
+profile loop for an explicit selection.
+
+Rule (inside `createCadGeometry`, so evaluation, capture construction,
+the check and the frame lookup all benefit):
+
+- `entityFailures: Map<sketchId, Failure | null>` holds the first entity
+  of `history.entitiesOf(sketch)`, in that order, whose status is not ok.
+  It is computed once per sketch and consulted where the walk is today, so
+  error precedence is unchanged. The order is: frame, entity failure,
+  profile error, empty selection, extent.
+- Beside each cached profile, a member index maps each member id to the
+  ascending indices of the loops that contain it. It is built once per
+  sketch, together with the profile.
+- An explicit selection resolves through the index. The indices of every
+  selected id are collected into a set, sorted ascending and mapped to
+  loops. The result equals the current
+  `profile.loops.filter(loop => loop.members.some(id => selection.has(id)))`:
+  - profile loop order;
+  - each loop once, even when several selected ids or duplicates hit it;
+  - ids that are in no loop are ignored.
+
+  With no selection, `profile.loops` is used as today.
+- `CadGeometryStats` and its existing `toEqual` assertions
+  (`history.test.ts:247-298`) are unchanged. `construction.ts` is not
+  edited. Counting uses `cadGeometryWork` (see R3-5).
+
+Tests:
+
+- `packages/core/src/cad/history.test.ts`. Build N = 250 and 500 disjoint
+  circles in one sketch, with one single-contour extrusion each. Run
+  `createCadGeometry().extrude` for all of them, through the same
+  production entry that `buildCadCaptureModel` uses. Assert:
+  - `statusVisits` equals N, one per entity;
+  - `loopProbes` equals 2N: N for the index build and N lookups.
+
+  The baseline measures N² status visits and N² loop probes (62,500 and
+  250,000 for N = 250 and 500), recorded as measured.
+- An oracle case in the same file compares the selected loops with the
+  old filter expression for a selection with duplicates, an unknown id and
+  ids in reverse loop order.
+- Errors: a failing entity still reports first, before a profile error,
+  and an empty selection still reports `cad.profile.empty`.
+- Capture scene bytes. The NCS1 golden and determinism tests under
+  `packages/core/src/capture/` pass unchanged.
+
+Plans (one wave with the capture plans; no shared file):
+
+| Plan | Owns | Gate (each exits 0 and runs at least one test) |
+| --- | --- | --- |
+| car3-cad-drag | new `packages/ui-solid/src/cad/{extrude-targets.ts,extrude-targets.test.ts}`, `packages/ui-solid/src/cad/extrude-authoring.ts`, `packages/ui-solid/src/inspector/{CadSection.tsx,cad-edits.ts,cad-edits.test.ts}`, `packages/ui-solid/src/test-dom/{cad-sketch.dom.tsx,cad-inspector.dom.tsx}`, `packages/ui-solid/src/cad/viewport.test.tsx` (only if the DOM list must be extended) | `bun test packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/inspector/cad-edits.test.ts packages/ui-solid/src/cad/viewport.test.tsx` |
+| car3-cad-evaluate | `packages/core/src/cad/evaluate.ts`, `packages/core/src/cad/evaluate.test.ts`, `packages/core/src/cad/testing/recording-kernel.ts` (only if a peak counter belongs there) | `bun test packages/core/src/cad/evaluate.test.ts packages/core/src/cad/check.test.ts packages/cad-kernel/src` |
+| car3-g2-cad-history | `packages/core/src/cad/history.ts`, `packages/core/src/cad/history.test.ts`, `packages/core/src/cad/frames.test.ts` (only if a frame assertion must be extended), baseline evidence under `tmp/<taskId>/` (outside the artifact roots) | `bun test packages/core/src/cad packages/core/src/capture` |
+
+`bun run typecheck` is an integration gate (design-ai-capture section
+21.2). Each plan runs biome on its touched files.

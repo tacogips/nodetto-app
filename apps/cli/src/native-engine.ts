@@ -48,6 +48,7 @@ declare const native: {
   exists(path: string): boolean;
   readStdin(): string;
   attachment(document: string, path: string): Uint8Array;
+  attachmentDataUrl(document: string, path: string): string;
   open(path: string, app: string | undefined, link: string | undefined): void;
   png(
     svg: string,
@@ -175,6 +176,8 @@ const io = {
   listDir: (path: string) =>
     JSON.parse(native.listDir(native.path(path))) as string[],
   readStdin: native.readStdin,
+  readAttachmentDataUrl: (document: string, path: string) =>
+    native.attachmentDataUrl(native.path(document), path),
   readAttachment: (document: string, path: string) =>
     new Uint8Array(native.attachment(native.path(document), path)),
   openDocument: async (path: string, app?: string, page?: string) => {

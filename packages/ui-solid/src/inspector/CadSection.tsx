@@ -1,9 +1,4 @@
-import {
-  type Command,
-  compareCadHistoryOrder,
-  layerName,
-  renameLayer,
-} from "@nodetto/core";
+import { type Command, layerName, renameLayer } from "@nodetto/core";
 import { CAD_OPERATIONS, isPlainObject } from "@nodetto/ir";
 import {
   createMemo,
@@ -15,6 +10,10 @@ import {
   Switch,
 } from "solid-js";
 import { createEditorSignals } from "../adapter.ts";
+import {
+  displayedExtrudeTargets,
+  earlierExtrudeBodies,
+} from "../cad/extrude-targets.ts";
 import { pcbBoardChoices, pcbBoardOptions } from "../cad/pcb-insert.ts";
 import { useCadStatus } from "../cad/status-store.ts";
 import {
@@ -88,25 +87,20 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
     if (type() !== "cad.extrude" || operation() === "new") return [];
     signals.rev();
     const element = current();
-    return props.editor.store
-      .getPageElements(element.page)
-      .filter(
-        (item) =>
-          compareCadHistoryOrder(item, element) < 0 &&
-          (item.type === "cad.mesh" ||
-            (item.type === "cad.extrude" &&
-              isPlainObject(item.semantic) &&
-              item.semantic.op === "new")),
-      )
-      .sort(compareCadHistoryOrder);
+    return earlierExtrudeBodies(
+      props.editor.store.getPageElements(element.page),
+      element,
+    );
   });
   const orderedTargets = () => {
-    const selected = targets();
-    const listed = earlierBodies().map((body) => body.id);
-    return [
-      ...listed.filter((id) => selected.includes(id)),
-      ...selected.filter((id) => !listed.includes(id)),
-    ];
+    earlierBodies();
+    if (type() !== "cad.extrude" || operation() === "new") return targets();
+    const element = current();
+    return displayedExtrudeTargets(
+      props.editor.store.getPageElements(element.page),
+      element,
+      targets(),
+    );
   };
   const status = () => statusFor(current().id);
   const board = () => {

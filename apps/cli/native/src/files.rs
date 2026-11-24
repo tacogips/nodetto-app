@@ -4,8 +4,35 @@ use std::{
     process::{Command, Stdio},
 };
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use nodetto_native::fs::{current_owner, private_dir, replace_regular, write_new, NewFile};
 pub use nodetto_native::{attachments::read as attachment, fs::write_atomic};
+
+pub fn raster_data_url(document: &str, relative: &str) -> io::Result<String> {
+    let bytes = attachment(document, relative)?;
+    if bytes.len() > 30 * 1024 * 1024 {
+        return Err(io::Error::other(
+            "Raster attachment exceeds the 30 MiB attachment limit.",
+        ));
+    }
+    let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        "png"
+    } else if bytes.starts_with(b"\xff\xd8\xff") {
+        "jpeg"
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        "gif"
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        "webp"
+    } else {
+        return Err(io::Error::other(
+            "Attachment is not a supported raster image.",
+        ));
+    };
+    Ok(format!(
+        "data:image/{mime};base64,{}",
+        STANDARD.encode(&bytes)
+    ))
+}
 
 pub fn capture_dir() -> io::Result<PathBuf> {
     capture_dir_in(&std::env::temp_dir())

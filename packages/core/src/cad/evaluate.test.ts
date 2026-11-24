@@ -8,6 +8,7 @@ import {
   evaluateCadPage,
   releaseCadMemo,
 } from "./index.ts";
+import { cadMemoUsage } from "./evaluate.ts";
 import type { CadKernel } from "./kernel.ts";
 import {
   bossOnFace,
@@ -931,4 +932,259 @@ test("PCB thickness precedence, cap directions and reference target protection",
   } finally {
     releaseCadMemo(memo);
   }
+});
+
+class PeakKernel extends RecordingKernel {
+  liveCount = 0;
+  peakLive = 0;
+  peakTriangles = 0;
+  constructor(
+    private readonly charge: number,
+    empty = false,
+  ) {
+    super({ triangles: charge, booleanResult: () => ({ empty }) });
+  }
+  private created(handle: number): number {
+    this.liveCount += 1;
+    this.peakLive = Math.max(this.peakLive, this.liveCount);
+    this.peakTriangles = Math.max(
+      this.peakTriangles,
+      this.liveCount * this.charge,
+    );
+    return handle;
+  }
+  override solid(mesh: Parameters<CadKernel["solid"]>[0]): number {
+    return this.created(super.solid(mesh));
+  }
+  override boolean(...args: Parameters<CadKernel["boolean"]>): number {
+    return this.created(super.boolean(...args));
+  }
+  override release(handle: number): void {
+    super.release(handle);
+    this.liveCount -= 1;
+  }
+}
+
+test.each([
+  ["entries", 300, 12, { entries: 256 }, 259],
+  ["triangles", 60, 100_000, { entries: 10_000 }, 4_300_000],
+] as const)(
+  "cold evaluation bounds peak %s",
+  (limit, count, charge, limits, max) => {
+    const kernel = new PeakKernel(charge);
+    const memo = createCadMemo(kernel, limits);
+    const result = evaluateCadPage(stackedPlate(count), kernel, memo);
+    expect(result.status.get(`layer-${count - 1}`)).toEqual({ ok: true });
+    const peak = limit === "entries" ? kernel.peakLive : kernel.peakTriangles;
+    expect(peak).toBeLessThanOrEqual(max);
+    releaseCadMemo(memo);
+    expect(kernel.liveCount).toBe(0);
+  },
+);
+
+function concentricSketch(): Element[] {
+  return [
+    sketch("rings", "a1"),
+    ...Array.from({ length: 12 }, (_, i) =>
+      cadElement(`ring-${i}`, "cad.circle", "a1", {
+        sketch: "rings",
+        c: [0, 0],
+        r: 2 * (i + 1),
+      }),
+    ),
+    extrude("rings-body", "a2", { sketch: "rings", distance: 5, op: "new" }),
+  ];
+}
+
+test("nested tool building bounds peak handles", () => {
+  const kernel = new PeakKernel(12);
+  const memo = createCadMemo(kernel, { entries: 4 });
+  const result = evaluateCadPage(concentricSketch(), kernel, memo);
+  expect(result.status.get("rings-body")).toEqual({ ok: true });
+  expect(kernel.peakLive).toBeLessThanOrEqual(8);
+  releaseCadMemo(memo);
+  expect(kernel.liveCount).toBe(0);
+});
+
+test("failed empty features also trim during evaluation", () => {
+  const kernel = new PeakKernel(100_000, true);
+  const memo = createCadMemo(kernel);
+  const result = evaluateCadPage(stackedPlate(60), kernel, memo);
+  for (let i = 0; i < 60; i += 1)
+    expect(result.status.get(`layer-${i}`)).toMatchObject({
+      code: "cad.result.empty",
+    });
+  expect(kernel.peakTriangles).toBeLessThanOrEqual(4_300_000);
+  releaseCadMemo(memo);
+  expect(kernel.liveCount).toBe(0);
+});
+
+function manyBodies(count: number, twoLoops: boolean): Element[] {
+  return [
+    sketch("many", "a1"),
+    cadElement("circle-a", "cad.circle", "a1", {
+      sketch: "many",
+      c: [0, 0],
+      r: 2,
+    }),
+    ...(twoLoops
+      ? [
+          cadElement("circle-b", "cad.circle", "a1", {
+            sketch: "many",
+            c: [6, 0],
+            r: 2,
+          }),
+        ]
+      : []),
+    ...Array.from({ length: count }, (_, i) =>
+      extrude(`body-${i}`, `b${String(i).padStart(4, "0")}a`, {
+        sketch: "many",
+        distance: 5,
+        op: "new",
+      }),
+    ),
+  ];
+}
+
+test.each([false, true])(
+  "many bodies trim in linear visits, two loops: %s",
+  (twoLoops) => {
+    const measure = (count: number) => {
+      const kernel = new PeakKernel(12);
+      const memo = createCadMemo(kernel);
+      const result = evaluateCadPage(manyBodies(count, twoLoops), kernel, memo);
+      expect(result.bodies).toHaveLength(count);
+      expect(result.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(
+        true,
+      );
+      const usage = cadMemoUsage(memo);
+      const releases = kernel.calls.filter(
+        ({ kind }) => kind === "release",
+      ).length;
+      expect(usage.trimVisits).toBe(releases);
+      expect(usage.triangles).toBe(usage.entries * 12);
+      expect(usage.holds).toBe(0);
+      releaseCadMemo(memo);
+      expect(cadMemoUsage(memo)).toMatchObject({
+        entries: 0,
+        triangles: 0,
+        holds: 0,
+      });
+      expect(kernel.liveCount).toBe(0);
+      return usage.trimVisits;
+    };
+    const n = measure(1000);
+    const doubled = measure(2000);
+    if (twoLoops) expect(n).toBeGreaterThan(0);
+    expect(doubled).toBeLessThanOrEqual(2 * n + 2);
+  },
+);
+
+test("three target results stay live under a small cache", () => {
+  const kernel = new PeakKernel(12);
+  const memo = createCadMemo(kernel, { entries: 2 });
+  const result = evaluateCadPage(
+    [
+      ...manyBodies(3, false),
+      extrude("all", "c0", {
+        sketch: "many",
+        distance: 3,
+        op: "cut",
+        bodies: ["body-0", "body-1", "body-2"],
+      }),
+    ],
+    kernel,
+    memo,
+  );
+  expect(result.status.get("all")).toEqual({ ok: true });
+  expect(result.bodies).toHaveLength(3);
+  expect(result.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(true);
+  expect(cadMemoUsage(memo).holds).toBe(0);
+  releaseCadMemo(memo);
+  expect(kernel.liveCount).toBe(0);
+});
+
+test.each([false, true])(
+  "zero-entry tool handoff retains final body on failure: %s",
+  (fail) => {
+    class HandoffKernel extends PeakKernel {
+      override boolean(...args: Parameters<CadKernel["boolean"]>): number {
+        if (
+          fail &&
+          args[0] === "add" &&
+          this.calls.filter(({ kind }) => kind === "boolean").length === 2
+        )
+          throw new Error("island failed");
+        return super.boolean(...args);
+      }
+    }
+    const kernel = new HandoffKernel(12);
+    const memo = createCadMemo(kernel, { entries: 0 });
+    const elements = [
+      ...manyBodies(1, true),
+      sketch("nested", "c0"),
+      ...[6, 4, 2].map((r, i) =>
+        cadElement(`nested-${i}`, "cad.circle", "a1", {
+          sketch: "nested",
+          c: [0, 0],
+          r,
+        }),
+      ),
+      extrude("nested-add", "c1", {
+        sketch: "nested",
+        distance: 3,
+        op: "add",
+        bodies: ["body-0"],
+      }),
+    ];
+    const result = evaluateCadPage(elements, kernel, memo);
+    expect(result.status.get("body-0")).toEqual({ ok: true });
+    expect(result.status.get("nested-add")).toMatchObject(
+      fail ? { code: "cad.kernel.failed" } : { ok: true },
+    );
+    expect(result.bodies).toHaveLength(1);
+    expect(result.bodies.every(({ handle }) => kernel.isLive(handle))).toBe(
+      true,
+    );
+    expect(cadMemoUsage(memo)).toMatchObject({
+      entries: 0,
+      triangles: 0,
+      holds: 0,
+    });
+    releaseCadMemo(memo);
+    expect(kernel.liveCount).toBe(0);
+    const releases = kernel.calls.flatMap((call) =>
+      call.kind === "release" ? [call.handle] : [],
+    );
+    expect(new Set(releases).size).toBe(releases.length);
+  },
+);
+
+test("memo accounting matches its retained solids across evaluations", () => {
+  const kernel = new PeakKernel(12);
+  const memo = createCadMemo(kernel, { entries: 4 });
+  const symbol = Object.getOwnPropertySymbols(memo)[0];
+  if (!symbol) throw new Error("Missing memo state");
+  const state = Reflect.get(memo, symbol) as {
+    lru: Map<{ triangles: number }, unknown>;
+  };
+  for (const count of [1, 8, 8, 2, 12]) {
+    evaluateCadPage(stackedPlate(count), kernel, memo);
+    const usage = cadMemoUsage(memo);
+    const triangles = [...state.lru.keys()].reduce(
+      (sum, solid) => sum + solid.triangles,
+      0,
+    );
+    expect(usage.entries).toBe(state.lru.size);
+    expect(usage.triangles).toBe(triangles);
+    expect(usage.holds).toBe(0);
+  }
+  releaseCadMemo(memo);
+  expect(cadMemoUsage(memo)).toEqual({
+    entries: 0,
+    triangles: 0,
+    holds: 0,
+    trimVisits: 0,
+  });
+  expect(kernel.liveCount).toBe(0);
 });

@@ -436,11 +436,19 @@ export interface CadGeometryStats {
   retainedTools: number;
 }
 
+export const cadGeometryWork = {
+  profileBuilds: 0,
+  statusVisits: 0,
+  loopProbes: 0,
+};
+
 export function createCadGeometry(
   history: HistoryDetails,
   stats?: CadGeometryStats,
 ) {
   const profiles = new Map<ElementId, ReturnType<typeof buildLoops>>();
+  const entityFailures = new Map<ElementId, Failure | null>();
+  const memberIndices = new Map<ElementId, Map<ElementId, number[]>>();
   const points = stats ? new Set<CadLoop["points"]>() : undefined;
   const frames = new Map<ElementId, CadFrame>();
   const extrudes = new Map<ElementId, ExtrudeGeometry>();
@@ -493,25 +501,55 @@ export function createCadGeometry(
         return cadFailure("cad.reference.failed", sketch);
 
       const entities = history.entitiesOf(sketch);
-      for (const { id } of entities) {
-        const failure = history.status.get(id);
-        if (failure && !failure.ok) return failure;
+      let failure = entityFailures.get(sketch);
+      if (failure === undefined) {
+        failure = null;
+        for (const { id } of entities) {
+          cadGeometryWork.statusVisits += 1;
+          const status = history.status.get(id);
+          if (status && !status.ok) {
+            failure = status;
+            break;
+          }
+        }
+        entityFailures.set(sketch, failure);
       }
+      if (failure) return failure;
       let profile = profiles.get(sketch);
       if (profile === undefined) {
+        cadGeometryWork.profileBuilds += 1;
         profile = buildLoops(entities);
         profiles.set(sketch, profile);
         if (stats) stats.profileBuilds += 1;
+        if (!("error" in profile)) {
+          const index = new Map<ElementId, number[]>();
+          for (const [i, loop] of profile.loops.entries()) {
+            cadGeometryWork.loopProbes += 1;
+            for (const id of loop.members) {
+              const indices = index.get(id) ?? [];
+              indices.push(i);
+              index.set(id, indices);
+            }
+          }
+          memberIndices.set(sketch, index);
+        }
       }
       if ("error" in profile) return cadFailure(profile.error, profile.at);
-      const selection =
-        semantic.loops === undefined ? undefined : new Set(semantic.loops);
-      const loops =
-        selection === undefined
-          ? profile.loops
-          : profile.loops.filter((loop) =>
-              loop.members.some((id) => selection.has(id)),
-            );
+      let loops: readonly CadLoop[] = profile.loops;
+      if (semantic.loops !== undefined) {
+        const selected = new Set<number>();
+        const index = memberIndices.get(sketch);
+        for (const id of new Set(semantic.loops)) {
+          cadGeometryWork.loopProbes += 1;
+          for (const i of index?.get(id) ?? []) selected.add(i);
+        }
+        loops = [...selected]
+          .sort((a, b) => a - b)
+          .flatMap((i) => {
+            const loop = profile.loops[i];
+            return loop === undefined ? [] : [loop];
+          });
+      }
       if (!loops.some(({ depth }) => depth % 2 === 0))
         return cadFailure("cad.profile.empty");
 
@@ -589,6 +627,9 @@ export function sketchFrameLookup(
 ): (sketchId: ElementId) => CadFrame | null {
   const history = scanCadPage(elements);
   const frames = new Map<ElementId, CadFrame | null>();
+  const geometry = createCadGeometry(history);
+  const resolved = new Map<ElementId, boolean>();
+  const positions = new Map(history.features.map(({ id }, i) => [id, i]));
   return (sketchId) => {
     const sketch = history.typed.get(sketchId);
     if (sketch?.type !== "cad.sketch" || !history.status.get(sketchId)?.ok)
@@ -597,7 +638,52 @@ export function sketchFrameLookup(
     if ("base" in plane) return baseFrame(plane.base, plane.offset);
     const cached = frames.get(sketchId);
     if (cached !== undefined) return cached;
-    const frame = geometryFor(history, sketchId)?.frames.get(sketchId) ?? null;
+    const needed = new Set<ElementId>();
+    const todo = [sketchId];
+    for (let id = todo.pop(); id !== undefined; id = todo.pop()) {
+      if (needed.has(id) || resolved.has(id)) continue;
+      needed.add(id);
+      for (const ref of history.dependencies.get(id) ?? []) todo.push(ref);
+    }
+    const ordered = [...needed].sort(
+      (a, b) =>
+        (positions.get(a) ?? Number.POSITIVE_INFINITY) -
+        (positions.get(b) ?? Number.POSITIVE_INFINITY),
+    );
+    for (const id of ordered) {
+      let ok =
+        history.status.get(id)?.ok === true &&
+        (history.dependencies.get(id) ?? []).every(
+          (ref) => resolved.get(ref) === true,
+        );
+      const item = history.typed.get(id);
+      if (ok && item?.type === "cad.sketch") {
+        const frame = geometry.sketch(item.semantic.plane);
+        if ("ok" in frame) ok = false;
+        else geometry.frames.set(id, frame);
+      } else if (
+        ok &&
+        item?.type === "cad.extrude" &&
+        !item.semantic.suppressed
+      ) {
+        const tool = geometry.extrude(item.semantic);
+        if ("ok" in tool) ok = false;
+        else geometry.extrudes.set(id, tool);
+      } else if (ok && item?.type === "cad.pcb" && !item.semantic.suppressed) {
+        const tool = geometry.pcb(item.semantic);
+        if ("ok" in tool) ok = false;
+        else geometry.extrudes.set(id, tool);
+      } else if (
+        ok &&
+        (item?.type !== "cad.mesh" || item.semantic.suppressed)
+      ) {
+        ok = false;
+      }
+      resolved.set(id, ok);
+    }
+    const frame = resolved.get(sketchId)
+      ? (geometry.frames.get(sketchId) ?? null)
+      : null;
     frames.set(sketchId, frame);
     return frame;
   };

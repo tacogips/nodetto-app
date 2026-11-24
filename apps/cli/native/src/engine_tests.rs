@@ -712,3 +712,73 @@ fn capture_point_budget_rejects_before_native_render() {
         }
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn attachment_data_url_rejects_symlink_escape() {
+    let folder = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(folder.path().join("doc.jsonl"), "diagram").unwrap();
+    std::fs::create_dir(folder.path().join("artifacts")).unwrap();
+    std::fs::write(outside.path().join("image.png"), b"\x89PNG\r\n\x1a\n").unwrap();
+    std::os::unix::fs::symlink(
+        outside.path().join("image.png"),
+        folder.path().join("artifacts/escape.png"),
+    )
+    .unwrap();
+    assert_eq!(
+        evaluate(
+            r#"(() => { try { native.attachmentDataUrl(native.path('doc.jsonl'), 'artifacts/escape.png'); } catch (e) { return e.message; } })()"#,
+            Input::Mcp(None),
+            Some(folder.path().into())
+        ),
+        json!("Attachment must be a file inside the document directory.")
+    );
+}
+
+#[test]
+fn attachment_data_url_preserves_formats_and_refusals() {
+    let folder = tempfile::tempdir().unwrap();
+    std::fs::write(folder.path().join("doc.jsonl"), "diagram").unwrap();
+    std::fs::create_dir(folder.path().join("artifacts")).unwrap();
+    for (name, bytes) in [
+        ("png", &b"\x89PNG\r\n\x1a\n"[..]),
+        ("jpeg", &b"\xff\xd8\xff"[..]),
+        ("gif", &b"GIF89a"[..]),
+        ("webp", &b"RIFF\0\0\0\0WEBP"[..]),
+    ] {
+        std::fs::write(folder.path().join(format!("artifacts/{name}")), bytes).unwrap();
+    }
+    std::fs::write(folder.path().join("artifacts/fake.png"), b"fake").unwrap();
+    std::fs::write(
+        folder.path().join("artifacts/big.png"),
+        vec![0; 30 * 1024 * 1024 + 1],
+    )
+    .unwrap();
+    assert_eq!(
+        evaluate(
+            r#"(() => {
+      const doc = native.path('doc.jsonl');
+      const formats = ['png', 'jpeg', 'gif', 'webp'].map(mime => {
+        const path = 'artifacts/' + mime;
+        const bytes = native.attachment(doc, path);
+        const binary = Array.from(bytes, b => String.fromCharCode(b)).join('');
+        return native.attachmentDataUrl(doc, path) === 'data:image/' + mime + ';base64,' + btoa(binary);
+      });
+      const errors = ['fake.png', 'big.png'].map(name => {
+        try { native.attachmentDataUrl(doc, 'artifacts/' + name); } catch (e) { return e.message; }
+      });
+      return [formats, errors];
+    })()"#,
+            Input::Mcp(None),
+            Some(folder.path().into())
+        ),
+        json!([
+            [true, true, true, true],
+            [
+                "Attachment is not a supported raster image.",
+                "Raster attachment exceeds the 30 MiB attachment limit."
+            ]
+        ])
+    );
+}

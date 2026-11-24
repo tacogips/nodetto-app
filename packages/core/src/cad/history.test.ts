@@ -2,7 +2,13 @@ import { expect, test } from "bun:test";
 import type { CadFaceRef } from "@nodetto/ir";
 import { analyzeCadPage, faceBody, faceOutwardSign } from "./index.ts";
 import { visitCadConstruction } from "./construction.ts";
-import { cadFailure, createCadGeometry, scanCadPage } from "./history.ts";
+import {
+  cadFailure,
+  cadGeometryWork,
+  createCadGeometry,
+  scanCadPage,
+  sketchFrameLookup,
+} from "./history.ts";
 import { buildLoops, type CadLoop } from "./loops.ts";
 import {
   cadElement,
@@ -358,4 +364,141 @@ test("shared profiles preserve selection, nesting and errors outside the selecti
     expect(broken.extrude({ ...semantic, loops: ["profile-edge-0"] })).toEqual(
       cadFailure(expected.error, expected.at),
     );
+});
+
+function resetWork() {
+  cadGeometryWork.profileBuilds = 0;
+  cadGeometryWork.statusVisits = 0;
+  cadGeometryWork.loopProbes = 0;
+}
+
+function chain(count: number, distance = 1) {
+  return Array.from({ length: count }, (_, i) => {
+    const id = `chain-${i}`;
+    const index = (n: number) => `f${String(n).padStart(4, "0")}`;
+    return [
+      sketch(
+        id,
+        index(i * 2),
+        i === 0
+          ? { base: "xy" }
+          : { face: { feature: `chain-ex-${i - 1}`, role: "end" } },
+      ),
+      ...rectangle(id, 0, 0, 1, 1),
+      extrude(`chain-ex-${i}`, index(i * 2 + 1), {
+        sketch: id,
+        distance: i === 0 ? distance : 1,
+        op: "new",
+      }),
+    ];
+  }).flat();
+}
+
+test.each([40, 80])(
+  "face frame lookup shares ancestors for %i sketches",
+  (count) => {
+    const lookup = sketchFrameLookup(chain(count));
+    resetWork();
+    for (let i = 0; i < count; i++) {
+      expect(lookup(`chain-${i}`)).toEqual({
+        o: [0, 0, i],
+        u: [1, 0, 0],
+        v: [0, 1, 0],
+        n: [0, 0, 1],
+      });
+    }
+    console.log(`chain ${count}: ${cadGeometryWork.profileBuilds}`);
+    expect(cadGeometryWork.profileBuilds).toBe(count - 1);
+    const changed = sketchFrameLookup(chain(count, 3));
+    for (let i = 1; i < count; i++)
+      expect(changed(`chain-${i}`)?.o).toEqual([0, 0, i + 2]);
+    const broken = chain(count).filter(({ id }) => id !== "chain-0-edge-0");
+    const failed = sketchFrameLookup(broken);
+    for (let i = 1; i < count; i++) expect(failed(`chain-${i}`)).toBeNull();
+  },
+);
+
+test.each([250, 500])(
+  "shared sketch selection performs linear work for %i contours",
+  (count) => {
+    const entities = Array.from({ length: count }, (_, i) =>
+      cadElement(`circle-${i}`, "cad.circle", "a1", {
+        sketch: "profile",
+        c: [i * 3, 0],
+        r: 1,
+      }),
+    );
+    const geometry = createCadGeometry(
+      scanCadPage([sketch("profile", "a"), ...entities]),
+    );
+    const frame = geometry.sketch({ base: "xy" });
+    if ("ok" in frame) throw new Error("invalid frame");
+    geometry.frames.set("profile", frame);
+    resetWork();
+    for (const entity of entities) {
+      const result = geometry.extrude({
+        name: "test",
+        sketch: "profile",
+        distance: 1,
+        op: "new",
+        loops: [entity.id],
+      });
+      expect("loops" in result).toBe(true);
+    }
+    console.log(
+      `contours ${count}: ${cadGeometryWork.statusVisits} ${cadGeometryWork.loopProbes}`,
+    );
+    expect(cadGeometryWork.statusVisits).toBe(count);
+    expect(cadGeometryWork.loopProbes).toBe(2 * count);
+    const selection = [
+      `circle-${count - 1}`,
+      "missing",
+      "circle-0",
+      "circle-0",
+    ];
+    const profile = buildLoops(entities);
+    if ("error" in profile) throw new Error(profile.error);
+    const expected = profile.loops.filter((loop) =>
+      loop.members.some((id) => new Set(selection).has(id)),
+    );
+    const result = geometry.extrude({
+      name: "test",
+      sketch: "profile",
+      distance: 1,
+      op: "new",
+      loops: selection,
+    });
+    expect("loops" in result && result.loops).toEqual(expected);
+  },
+);
+
+test("extrusion preserves frame and entity failure precedence", () => {
+  const bad = cadElement("bad-circle", "cad.circle", "a1", {
+    sketch: "profile",
+    c: [0, 0],
+    r: -1,
+  });
+  const open = cadElement("open", "cad.line", "a1", {
+    sketch: "profile",
+    a: [0, 0],
+    b: [1, 0],
+  });
+  const history = scanCadPage([sketch("profile", "a"), bad, open]);
+  const geometry = createCadGeometry(history);
+  const semantic = {
+    name: "test",
+    sketch: "profile",
+    distance: 1,
+    op: "new" as const,
+    loops: ["missing"],
+  };
+  expect(geometry.extrude(semantic)).toEqual(
+    cadFailure("cad.reference.failed", "profile"),
+  );
+  const frame = geometry.sketch({ base: "xy" });
+  if ("ok" in frame) throw new Error("invalid frame");
+  geometry.frames.set("profile", frame);
+  const failure = history.status.get(bad.id);
+  if (!failure || failure.ok) throw new Error("expected entity failure");
+  expect(geometry.extrude(semantic)).toEqual(failure);
 });

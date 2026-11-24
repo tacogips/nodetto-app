@@ -17,6 +17,7 @@ import {
   PCB_TEST_PAGE,
   testBoard,
 } from "../../../core/src/cad/testing/pcb.ts";
+import { scanCadPage } from "../../../core/src/cad/history.ts";
 import { plateWithHoles } from "../../../core/src/cad/testing/documents.ts";
 import { type Camera3d, viewProjection } from "../cad/camera3d.ts";
 import type { CadRenderer } from "../cad/renderer.ts";
@@ -449,6 +450,43 @@ for (const mode of ["light", "dark"] as const) {
   assert.equal(selectedId(), faceExtrude);
   click(inward);
   assert.equal(editor.getSnapshot(), beforeCancel);
+
+  const multiCut = {
+    sketch: face,
+    name: "Extrude 2",
+    distance: -2,
+    op: "cut",
+    bodies: [baseExtrude, "ex1"],
+  };
+  editor.apply([
+    { type: "updateSemantic", id: faceExtrude, semantic: multiCut },
+  ]);
+  editor.selection.set([faceExtrude]);
+  await nextFrame();
+  const multiHandle = lineOverlay as Float32Array | null;
+  assert.ok(multiHandle);
+  const multiTip: Vec3 = [multiHandle[3], multiHandle[4], multiHandle[5]];
+  const outward: Vec3 = [multiHandle[0], multiHandle[1], multiHandle[2] + 2];
+  const beforeMultiDrag = editor.history.undoSize;
+  pointer("pointerdown", multiTip);
+  pointer("pointermove", outward);
+  pointer("pointerup", outward);
+  assert.equal(editor.history.undoSize, beforeMultiDrag + 1);
+  assert.deepEqual(editor.store.get(faceExtrude)?.semantic, {
+    ...multiCut,
+    distance: 2,
+    op: "add",
+    bodies: ["ex1"],
+  });
+  assert.equal(
+    scanCadPage(editor.store.getPageElements("cad")).status.get(faceExtrude)
+      ?.ok,
+    true,
+  );
+  assert.ok(editor.undo());
+  assert.deepEqual(editor.store.get(faceExtrude)?.semantic, multiCut);
+  assert.ok(editor.undo());
+  await nextFrame();
 
   pointer("pointerdown", inward);
   pointer("pointermove", tip);

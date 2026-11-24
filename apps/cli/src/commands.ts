@@ -105,6 +105,7 @@ export interface CommandIo {
    */
   openDocument?(path: string, app?: string, page?: string): Promise<void>;
   readAttachment?(documentPath: string, relative: string): Uint8Array;
+  readAttachmentDataUrl?(documentPath: string, relative: string): string;
   writeText(path: string, text: string): void;
   /** Standard input, for `--ops -`. */
   readStdin?(): string;

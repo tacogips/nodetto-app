@@ -10,6 +10,8 @@ import {
   type Document,
   type Element,
   encodeRasterDataUrl,
+  isRasterDataUrl,
+  MAX_ATTACHMENT_IMAGE_BYTES,
   isRasterAttachmentPath,
   type Page,
 } from "@nodetto/ir";
@@ -112,9 +114,21 @@ export async function renderArtworkCapture(
   const resolveAsset = (source: string): string => {
     const cached = editor.assets.resolve(source);
     if (cached) return cached;
-    if (!isRasterAttachmentPath(source) || !io.readAttachment)
+    if (
+      !isRasterAttachmentPath(source) ||
+      (!io.readAttachmentDataUrl && !io.readAttachment)
+    )
       throw new Error(`Missing attachment: ${source}`);
-    const data = encodeRasterDataUrl(io.readAttachment(documentPath, source));
+    let data: string;
+    if (io.readAttachmentDataUrl) {
+      data = io.readAttachmentDataUrl(documentPath, source);
+      if (!isRasterDataUrl(data, MAX_ATTACHMENT_IMAGE_BYTES))
+        throw new Error("Invalid raster attachment.");
+    } else if (io.readAttachment) {
+      data = encodeRasterDataUrl(io.readAttachment(documentPath, source));
+    } else {
+      throw new Error(`Missing attachment: ${source}`);
+    }
     editor.assets.set(source, data);
     return data;
   };

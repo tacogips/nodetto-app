@@ -1,0 +1,272 @@
+{
+  "taskId": "car3-r3",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "a964ad59d431b86d526c9f652a0dae9d07e8dd93",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md",
+    "design-docs/specs/design-cad3d.md"
+  ],
+  "evidenceRoot": "tmp/car3-r3",
+  "waves": [
+    ["car3-g1-capture-raster", "car3-cad-drag", "car3-cad-evaluate", "car3-g2-cad-history", "car3-native-attachment"]
+  ],
+  "reviewContext": {
+    "issueReference": "round-3-audit:feat/ai-capture@a964ad5 (base 0a35708); no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car3-00-overview.md",
+    "requiredOutcomes": [
+      "function-capture-touching-cap-interference (R3-1; car3-g1-capture-raster): shared-cap and opposed-frame shared-side contact give no hatch, zero candidates and pairs, and native exit 0 with --fail-on-interference in both rasterizers at threads 0 and 1-8; 0.01 mm overlaps give one pair and exit 1; shading unchanged; witness work fully charged.",
+      "function-capture-translucent-layer-visibility (R3-2; car3-g1-capture-raster): every translucent layer in front of the nearest opaque hit is composited in (depth, body) order and marked drawn; single capped worker arena with band-restart and bottom-row lifecycle; over-cap refuses with the existing message; single-layer bytes unchanged.",
+      "function-cad-drag-multitarget-cut-to-add (R3-3; car3-cad-drag): outward drag on a two-target Cut stores Add, positive distance, first displayed target, status ok, one undo entry; one Undo restores Cut and stored order; inspector and viewport share extrude-targets.ts.",
+      "performance-cad-intermediate-solid-retention (R3-4; car3-cad-evaluate): limits enforced inside tool builds and after every feature through holds and an evictable map; measured peaks within limits plus held operands; zero-entry handoff and many-body linear trim tests; replay, atomicity and exactly-once release unchanged.",
+      "performance-cad-face-frame-history-replay (R3-5; car3-g2-cad-history): one shared geometry context per lookup; profileBuilds 39/79 for 40/80 chains versus measured quadratic baseline; analytic frames and next-revision update.",
+      "performance-cad-shared-sketch-extrusion-rescans (R3-6; car3-g2-cad-history): cached entity failure and member index; statusVisits N and loopProbes 2N versus measured N^2 baseline; loop order, errors and capture bytes unchanged.",
+      "performance-native-artwork-attachment-byte-roundtrip (R3-7; car3-native-attachment): Rust attachmentDataUrl; zero attachment/base64/btoa calls; data URL, SVG and PNG equal the legacy oracle on the same multi-MiB file; release binary matches the oracle hash; refusals and first-use caching preserved.",
+      "Integration: bun run typecheck, bun run lint, CARGO_TERM_QUIET=true mise run verify, CARGO_TERM_QUIET=true mise run test-cli and the *.test.ts scan all exit 0."
+    ],
+    "nonGoals": [
+      "Editing interference.rs, overlay.rs, capture-interference-options.ts, manifold-kernel.ts, worker-host.ts, construction.ts, sketch-authoring.ts, CadViewport.tsx, export-command.ts, bundle-command.ts or packages/ir/src/image.ts.",
+      "Changing messages, exit codes, limits, or goldens other than those the design names.",
+      "Editing impl-plans/README.md, lockfiles or indexes, archiving plans, workspace-wide formatting, git commits, branches or worktrees during plan execution."
+    ],
+    "userProblem": "The round-three audit of feat/ai-capture (base 0a35708, head a964ad5) found seven major defects: touching caps fail interference checks; a translucent sheet hides a PCB reference in image and report; an outward viewport drag on a multi-target Cut stores an invalid multi-target Add; cold CAD evaluation retains intermediate solids beyond cache limits; face-attached sketch frames replay ancestors quadratically; shared sketches are rescanned per extrusion; native 2D capture round-trips attachment bytes through Boa per byte.",
+    "constraints": [
+      "Work only in this working tree on feat/ai-capture; no push, no history rewrite, no other worktrees; no server, auth, secrets or deployment config.",
+      "Follow AGENTS.md: English only, no emojis, strict typing, cargo with CARGO_TERM_QUIET=true and a per-plan CARGO_TARGET_DIR under target/.",
+      "Indexed reads must type-check under noUncheckedIndexedAccess; packages/io must not depend on @nodetto/core; packages/core/src/pcb depends only on itself.",
+      "Heavy per-pixel, per-vertex and per-byte work stays in Rust for the native CLI (Boa is 40-100x slower).",
+      "Captures stay deterministic; goldens change only where a finding requires a visible change.",
+      "Every fix has a regression test that fails before and passes after; performance tests assert deterministic counts, not wall-clock time.",
+      "Never relax or delete existing tests or deadlines; timing tests may be retried up to three times.",
+      "Per-plan verification is focused; workspace-wide typecheck, lint, mise run verify and test-cli run once at integration.",
+      "No *.test.ts files may remain under target/ or tmp/; evidence goes to tmp/car3-r3/<planId>/.",
+      "New dependencies need compatible licenses recorded in THIRD_PARTY_NOTICES.md; no copying third-party code."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "R3-1: picture-interference witnesses use volume-boundary ownership at shared caps and sides in both rasterizers; shading keeps facet identity.",
+        "rationale": "Touching faces have zero shared volume (docs/capture.md:88,102-106); design-ai-capture.md 21.1 R3-1."
+      },
+      {
+        "decision": "R3-2: composite every translucent layer in front of the nearest opaque hit in (depth, body) order using one capped worker arena; over-cap refuses with the existing message.",
+        "rationale": "Reference bodies blend at 45% and visible-through bodies count as drawn, with bounded work and storage; design-ai-capture.md 21.1 R3-2."
+      },
+      {
+        "decision": "R3-1 and R3-2 are grouped in car3-g1-capture-raster.",
+        "rationale": "Both change raster.rs and raster/reference.rs (Raster::sample and bands)."
+      },
+      {
+        "decision": "R3-3: a shared extrude-targets.ts rule is used by the inspector and the viewport drag; distance, operation and targets commit in one editor command.",
+        "rationale": "Round one fixed only the inspector; one rule prevents divergence and keeps one undo entry; design-cad3d.md 20 R3-3."
+      },
+      {
+        "decision": "R3-4: cache limits are enforced during evaluation through holds and an evictable map, protecting active operands, atomic multi-target updates and published finals.",
+        "rationale": "Measured peaks of 601 handles and 12.1M triangles against limits of 256 and 4M; design-cad3d.md 20 R3-4."
+      },
+      {
+        "decision": "R3-5 and R3-6 are grouped in car3-g2-cad-history: one shared geometry context per page revision, plus a cached first entity failure and member-to-contour index per sketch.",
+        "rationale": "Both edit history.ts; grouping avoids shared-file conflicts; design-cad3d.md 20 R3-5, R3-6."
+      },
+      {
+        "decision": "R3-7: a Rust attachmentDataUrl host path reads, sniffs and base64-encodes attachments; TypeScript keeps only the existing isRasterDataUrl regex and length check.",
+        "rationale": "Removes about 12.6M interpreted callbacks for a 12 MiB file while keeping the exact data URL; design-ai-capture.md 21.1 R3-7."
+      },
+      {
+        "decision": "One wave of five plans with disjoint writePaths and no dependencies; artifactRoots [target, tmp/cad3d]; evidence root tmp/car3-r3 outside both.",
+        "rationale": "Maximum concurrency; plan review confirmed no duplicate owners."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "The release-only R3-7 legacy oracle is slow (about 3.3M interpreted callbacks) but gives a byte-exact comparison.",
+      "Per-command logs live under target/car3-<plan>/logs/ inside an artifact root; progress logs record paths, exit codes and pre-fix literals in tracked files.",
+      "Sibling test suites overlap; worker rule 10 reruns after the sibling is done, which may serialize end-of-wave verification.",
+      "car3-g1-capture-raster sits at the 150-line plan bound rather than splitting the shared Raster::sample code."
+    ],
+    "supportedEdgeCases": [
+      "Shared-cap and opposed-frame shared-side contact at every supported thread count; a 0.01 mm genuine overlap still reports a pair and exit 1.",
+      "Translucent sheet over a PCB reference; an opaque foreground still hides it; single-layer bytes unchanged.",
+      "Two-target Cut whose stored target order differs from display order; Undo restores the original stored order.",
+      "Zero-entry cache handoff, many-body linear trimming, multi-target failure atomicity and exactly-once release.",
+      "Editing an early extrusion updates every dependent face frame on the next revision; base-plane shortcut preserved.",
+      "Duplicate loop selections, selected-loop order and existing error precedence for shared sketches.",
+      "Attachment document-directory confinement, MIME and size refusals, first-use caching and multi-MiB rasters."
+    ],
+    "outOfScopeEdgeCases": [
+      "Desktop pixel output, real Manifold peak memory, native Boa elapsed time, allocation failures and watchdog behaviour (unmeasured residual risks).",
+      "Cross-platform determinism, golden regeneration and Rust rendering benchmarks beyond existing tests.",
+      "Accepted items: about 224 MB native CLI startup, cadCreationAllowed on cloud documents, 3D CAD capture only on native CLI and desktop, paired TS/Rust nmesh decoders, local copy in packages/core/src/pcb/lines.ts."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "design-docs/specs/design-cad3d.md",
+      "impl-plans/active/car3-00-overview.md",
+      "impl-plans/active/car3-g1-capture-raster.md",
+      "impl-plans/active/car3-cad-drag.md",
+      "impl-plans/active/car3-cad-evaluate.md",
+      "impl-plans/active/car3-g2-cad-history.md",
+      "impl-plans/active/car3-native-attachment.md",
+      "crates/capture/src/raster.rs",
+      "crates/capture/src/raster/reference.rs",
+      "packages/ui-solid/src/cad/extrude-authoring.ts",
+      "packages/core/src/cad/evaluate.ts",
+      "packages/core/src/cad/history.ts",
+      "apps/cli/src/capture-artwork.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car3-g1-capture-raster",
+      "planPath": "impl-plans/active/car3-g1-capture-raster.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/raster/budget.rs",
+        "crates/capture/src/raster/reference.rs",
+        "crates/capture/src/raster/tests.rs",
+        "crates/capture/src/prism.rs",
+        "crates/capture/src/mesh.rs",
+        "crates/capture/src/tool_view.rs",
+        "crates/capture/src/shade.rs",
+        "crates/capture/tests/render.rs",
+        "crates/capture/tests/overlay.rs",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "docs/capture.md",
+        "apps/cli/src/capture-help.ts",
+        "apps/cli/src/capture-docs.test.ts",
+        "tmp/capture/m09/timing.json",
+        "tmp/capture/m23/timing.json",
+        "tmp/car3-r3/car3-g1-capture-raster",
+        "impl-plans/progress/car3-g1-capture-raster.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Stacked-cap and opposed-frame shared-side contact: no marked sample, analysis.candidates 0, pairs empty, RGB equal to the draw_interference=false render, production equals reference at threads 0 and 1-8; opposed side shows a false pair on a964ad5 (recorded).",
+        "0.01 mm overlap controls give one pair; disjoint_scene(50) with analysis has witness 0 and pre-fix reads; stacked caps charged == no-flag charged + witness; existing exact read tests unedited.",
+        "Sheet over board and four sheets over board: board pixels differ from sheets alone, outline edge-mixed, all bodies drawn; opaque control hides the board; single-layer scene equals pre-fix literals.",
+        "Layer storage: over-cap refusal with existing message; staggered stripes and band-boundary stripe succeed with layer_capacity <= cap; layered final row matches reference.",
+        "Native: caps (front) and side (top) exit 0 with interference: 0; overlaps exit 1 with one pair; PCB plus STL sheet lists both bodies without the hidden note."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo test --release -p nodetto-capture",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/native-parity/capture.test.ts apps/cli/src/capture-help.ts apps/cli/src/capture-docs.test.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car3-g1-capture-raster/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/capture-docs.test.ts"
+      ]
+    },
+    {
+      "planId": "car3-cad-drag",
+      "planPath": "impl-plans/active/car3-cad-drag.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/cad/extrude-targets.ts",
+        "packages/ui-solid/src/cad/extrude-targets.test.ts",
+        "packages/ui-solid/src/cad/extrude-authoring.ts",
+        "packages/ui-solid/src/inspector/CadSection.tsx",
+        "packages/ui-solid/src/inspector/cad-edits.ts",
+        "packages/ui-solid/src/inspector/cad-edits.test.ts",
+        "packages/ui-solid/src/test-dom/cad-sketch.dom.tsx",
+        "packages/ui-solid/src/test-dom/cad-inspector.dom.tsx",
+        "packages/ui-solid/src/cad/viewport.test.tsx",
+        "tmp/car3-r3/car3-cad-drag",
+        "impl-plans/progress/car3-cad-drag.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "extrude-targets.ts exports earlierExtrudeBodies, displayedExtrudeTargets and targetsForOperation; setCadOperation and CadSection use them with unchanged behaviour.",
+        "Committed outward drag on Cut bodies [right, left] (display order left, right) stores op add, distance > 0, bodies [left]; scanCadPage ok; undo stack +1; one Undo restores cut, distance -2, bodies [right, left]; fails on a964ad5 (recorded).",
+        "Existing F14 inspector tests and existing drag/cancel cases pass unchanged; strict-index test reports zero diagnostics."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/cad/extrude-targets.ts packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/cad/extrude-authoring.ts packages/ui-solid/src/inspector/CadSection.tsx packages/ui-solid/src/inspector/cad-edits.ts packages/ui-solid/src/test-dom/cad-sketch.dom.tsx && bun test packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/inspector/cad-edits.test.ts packages/ui-solid/src/cad/viewport.test.tsx",
+        "bun test packages/ui-solid/src/cad/strict-index.test.ts"
+      ]
+    },
+    {
+      "planId": "car3-cad-evaluate",
+      "planPath": "impl-plans/active/car3-cad-evaluate.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/cad/evaluate.ts",
+        "packages/core/src/cad/evaluate.test.ts",
+        "packages/core/src/cad/testing/recording-kernel.ts",
+        "tmp/car3-r3/car3-cad-evaluate",
+        "impl-plans/progress/car3-cad-evaluate.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Peaks: 300 Adds <= 259 live (pre-fix 601); 60 x 100k Adds <= 4.3M triangles (pre-fix 12.1M); nested 12-circle New at entries 4 <= 8 live (pre-fix 23); 60 empty Adds <= 4.3M triangles.",
+        "Many-body News N=1000/2000 (one- and two-loop): finals live until release, trimVisits equals evictions, visits(2N) <= 2*visits(N)+2.",
+        "Zero-entry handoff and its failure variant: no use-after-release, final published live, holds 0, each handle released once.",
+        "cadMemoUsage entries/triangles equal recomputation after every evaluation; all zero after releaseCadMemo; existing replay, atomicity and release tests unchanged."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/cad/evaluate.ts packages/core/src/cad/evaluate.test.ts packages/core/src/cad/testing/recording-kernel.ts && bun test packages/core/src/cad/evaluate.test.ts packages/core/src/cad/check.test.ts packages/cad-kernel/src"
+      ]
+    },
+    {
+      "planId": "car3-g2-cad-history",
+      "planPath": "impl-plans/active/car3-g2-cad-history.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/cad/history.ts",
+        "packages/core/src/cad/history.test.ts",
+        "packages/core/src/cad/frames.test.ts",
+        "tmp/car3-r3/car3-g2-cad-history",
+        "impl-plans/progress/car3-g2-cad-history.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "40/80 face-sketch chains: analytic origins and axes; profileBuilds 39/79; baseline counts measured on a964ad5 with an increment-only patch and recorded; patch reverted (hash verified).",
+        "Editing the first extrusion moves every dependent origin on a new lookup; failed ancestor gives null for dependents.",
+        "N=250/500 shared-sketch extrusions: statusVisits N, loopProbes 2N; baseline N^2 recorded; oracle selection order, duplicates and unknown ids equal the old filter; error precedence unchanged.",
+        "packages/core/src/capture goldens and determinism tests pass unchanged."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/cad/history.ts packages/core/src/cad/history.test.ts && bun test packages/core/src/cad packages/core/src/capture"
+      ]
+    },
+    {
+      "planId": "car3-native-attachment",
+      "planPath": "impl-plans/active/car3-native-attachment.md",
+      "dependsOn": [],
+      "writePaths": [
+        "apps/cli/native/src/files.rs",
+        "apps/cli/native/src/engine.rs",
+        "apps/cli/native/src/engine_tests.rs",
+        "apps/cli/src/commands.ts",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/capture-artwork.ts",
+        "apps/cli/src/capture-command.test.ts",
+        "apps/cli/src/native-parity/capture-attachments.test.ts",
+        "tmp/car3-r3/car3-native-attachment",
+        "impl-plans/progress/car3-native-attachment.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "native.attachmentDataUrl equals 'data:image/<mime>;base64,' + btoa for PNG, JPEG, GIF and WEBP; fake, big and escape refusals keep literal messages.",
+        "Release engine oracle on MULTI_MIB_PNG: run A has 1 attachmentDataUrl and 0 attachment/base64/btoa calls (pre-fix 1 attachment, 1 btoa); data URL, SVG and PNG equal run B (verbatim legacy resolver); PNG hash equals MULTI_MIB_CAPTURE_SHA256.",
+        "Release binary parity: same page gives MULTI_MIB_CAPTURE_SHA256, bytes repeat; refusal messages and exit codes equal a964ad5 literals; capture-command.test.ts shows first-use caching and legacy fallback."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo clippy -p nodetto-cli --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo test --release -p nodetto-cli",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/commands.ts apps/cli/src/native-engine.ts apps/cli/src/capture-artwork.ts apps/cli/src/capture-command.test.ts apps/cli/src/native-parity/capture-attachments.test.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car3-native-attachment/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture-attachments.test.ts apps/cli/src/capture-command.test.ts"
+      ]
+    }
+  ]
+}

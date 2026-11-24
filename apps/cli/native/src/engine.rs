@@ -216,6 +216,11 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             std::fs::create_dir_all(string(args, 0, ctx)?).map_err(host_error)?;
             Ok(JsValue::undefined())
         }
+        "attachmentDataUrl" => {
+            let document = string(args, 0, ctx)?;
+            let path = string(args, 1, ctx)?;
+            Ok(js_string!(files::raster_data_url(&document, &path).map_err(host_error)?).into())
+        }
         "attachment" => {
             let document = string(args, 0, ctx)?;
             let path = string(args, 1, ctx)?;
@@ -342,7 +347,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
     .map_err(|e| e.to_string())?;
     ctx.eval(Source::from_bytes(r#"
         globalThis.native = Object.fromEntries([
-          'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','open','png','pdf','pdfPages','fontCoverage',
+          'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','attachmentDataUrl','open','png','pdf','pdfPages','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random',
           'captureDir','captureAbsolute','writeCapture','digest','captureEncode','captureSolid','nmeshDecode','nmeshCapture','nmeshBounds'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));

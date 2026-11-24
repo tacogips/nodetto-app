@@ -661,3 +661,33 @@ test("CAD capture routes mesh decoding through the capture decoder", async () =>
   expect(captureCalls).toBe(1);
   expect(legacyCalls).toBe(0);
 });
+
+test("capture caches native attachment data URLs and retains the legacy fallback", async () => {
+  const editor = new Editor();
+  for (const x of [0, 20])
+    editor.createElement("image.raster", {
+      semantic: { src: "artifacts/logo.png", alt: "Logo" },
+      visual: { x, y: 0, width: 10, height: 10 },
+    });
+  const dataUrl = `data:image/png;base64,${btoa(String.fromCharCode(...png))}`;
+  const fast = harness(editor);
+  let fastCalls = 0;
+  fast.io.readAttachmentDataUrl = () => {
+    fastCalls += 1;
+    return dataUrl;
+  };
+  fast.io.readAttachment = () => {
+    throw new Error("legacy path called");
+  };
+  expect((await fast.run()).exitCode).toBe(0);
+  expect(fastCalls).toBe(1);
+  const legacy = harness(editor);
+  let legacyCalls = 0;
+  legacy.io.readAttachment = () => {
+    legacyCalls += 1;
+    return png;
+  };
+  expect((await legacy.run()).exitCode).toBe(0);
+  expect(legacyCalls).toBe(1);
+  expect(fast.calls[0]?.[0]).toBe(legacy.calls[0]?.[0]);
+});

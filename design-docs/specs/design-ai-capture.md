@@ -14,7 +14,10 @@ corrects the rules in sections 4.1, 6.1, 6.3, 6.6, 6.7 and 13; section 19
 states each correction, its test and the plan grouping. Where an earlier
 sentence and section 19 disagree, section 19 wins. Revision 9 (audit round
 2 of `0a35708..3cd2401`, 10 blocking findings) is section 20; where section
-19 and section 20 disagree, section 20 wins.
+19 and section 20 disagree, section 20 wins. Revision 10 (audit round 3 of
+`0a35708..a964ad5`, 7 major findings) is section 21 here and section 20 of
+`design-docs/specs/design-cad3d.md`; where an earlier section and section
+21 disagree, section 21 wins.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -3675,3 +3678,546 @@ never kept as `*.test.ts` files under `target/` or `tmp/`.
   would race.
 - Native parity is meaningful only against a release binary built in the
   same plan.
+
+## 21. Revision 10: audit round 3 corrections
+
+Source: audit round 3 of `feat/ai-capture`, base `0a35708` (0.10.5) to
+`a964ad5`, seven major findings (four high, three medium), no minor
+findings. Issue reference: `round-3-audit:feat/ai-capture@a964ad5`; no
+GitHub issue exists. This section states the capture rules (R3-1, R3-2,
+R3-7) and the plan grouping of all seven. The CAD editor and core rules
+(R3-3 to R3-6) are in `design-docs/specs/design-cad3d.md` section 20.
+
+The common rules of sections 19 and 20 apply unchanged:
+
+- Every fix ships a test that fails on `a964ad5` and passes after it.
+- A performance test asserts a deterministic count, never a wall clock.
+- NCS1 bytes, PNG and SVG bytes, goldens, digests, error codes and messages
+  do not change, except the pixels R3-2 names. Diagnostic precedence is
+  kept.
+- Indexed reads type-check under `noUncheckedIndexedAccess`. Per-pixel,
+  per-vertex and per-byte work stays in Rust on the native CLI.
+- No round-1 or round-2 finding may regress. Two of them protect code
+  that round 3 edits: `performance-interference-boundary-fold` and
+  `performance-interference-sparse-pairs` (`interference.rs`, `overlay.rs`),
+  and `maintainability-capture-raster-rounding` (`capture-artwork.ts`).
+  Their tests run unchanged in the owning plans.
+
+### 21.1 Rules
+
+R3-1 `function-capture-touching-cap-interference` (high).
+
+Cause. Both rasterizers copy the shading intervals
+(`PrismView::surface_intervals`, `FACETS = true`) into the per-body
+interference witness (`raster.rs:204-208`, `raster/reference.rs:82-85`).
+Shading intervals are closed at both caps (`prism.rs:221-224`). A ray that
+lies in a cap plane shared by two touching bodies therefore gets material
+from both bodies. `overlay::overlapping_pairs_iter` records a picture pair,
+and `interference.rs:529-544` keeps that pair even though volume sampling
+finds none. The volume mode (`FACETS = false`, `ToolView::intervals`)
+already gives such a ray to exactly one side (`prism.rs:225-237`, and the
+side rule at `prism.rs:296-330`).
+
+Rule. A picture-interference witness uses volume-boundary ownership.
+Shading keeps facet identity.
+
+- Production rasterizer. `ToolView::surface_intervals` (prism and mesh)
+  also reports whether the ray fell inside the volume-mode ownership band
+  of any boundary. That covers three cases:
+  - a coplanar slab within the cap error;
+  - an edge endpoint within `c_error`;
+  - a parallel crossing within `error`.
+
+  The mesh flag covers whatever case `hits_impl::<false>` resolves
+  differently from `hits_impl::<true>`. Outside these cases the two modes
+  give the same `s` values bit for bit: the slab is the same, the crossing
+  set is the same and the clamp has no effect. Only `face` ids differ, and
+  the overlay does not read them.
+- Shared history until divergence. For an analysed body, while
+  `draw_interference` is on, the witness of a body on a ray is the shading
+  accumulator itself, with no copy and no extra combine, until the first
+  step whose cast reports the flag. At that step, before the shading
+  combine:
+  1. The volume interval is cast (`ToolView::intervals`).
+  2. The witness becomes `combine(current, volume, op)` in a separate
+     scratch accumulator.
+  3. The shading accumulator then combines its surface interval as today.
+
+  From then on, every later step of that body on that ray also combines
+  the witness, with the volume interval on flagged steps and the surface
+  interval otherwise. `body_intervals` is filled from the witness when the
+  body diverged, otherwise from the shading accumulator, which is then
+  identical.
+- Budget. All extra work is charged through the existing worker budget:
+  - Each volume recast is charged in full with
+    `WorkerBudget::scan(scan_cost, 0)`. Admission paid for exactly one
+    cast per step, so a zero admitted weight makes the whole second cast
+    surplus.
+  - Each witness combine is charged with `WorkerBudget::charge(witness.len()
+    + tool.len())`, the same rule as the shading combine.
+
+  A ray whose bodies never diverge performs and charges exactly the work
+  of today. Over-budget scenes take the existing refusal path.
+- Test-only statistics. `RenderStats` gains `charged`, the total published
+  charge, and `witness`, the part charged for recasts and witness combines.
+  These are counted like `reads`.
+- Reference rasterizer (`raster/reference.rs`). It is an independent
+  oracle. It always builds the witness from `ToolView::intervals` over the
+  same steps, with no flag. The production-versus-reference equality tests
+  therefore check that the flag misses no ownership-sensitive case on
+  their fixtures.
+- Shading, edges, liveness, the census and the lattice are unchanged.
+  Genuine picture-only overlap, meaning a stretch longer than the
+  tolerance, is still detected, because volume and surface intervals agree
+  away from the ownership band.
+- Intended visible change. R3-1 removes false hatch pixels and the false
+  `--fail-on-interference` exit 1 for bodies that only touch. These are
+  the only pixel and exit changes it permits. A golden or parity
+  expectation that changes must be shown to be such a touching contact,
+  and the plan records it. Any other change is a defect.
+
+Tests (`crates/capture/src/raster/tests.rs`; every case compares the
+production and reference rasterizers, reports and RGB bytes, at thread
+count 0 (auto, the production default) and at every explicit count 1 to
+8):
+
+- Stacked caps. Two boxes with identical 16 x 8 mm footprints, the lower
+  one at Z 0 to 0.9375 mm and the upper one at Z 0.9375 to 2 mm. The front
+  view has 0.25 mm/px and is at least 64 x 512 pixels, so that eight
+  workers each get at least one band of `BAND_ROWS` rows. The scene is
+  placed so that a supersample row inside a band other than the first lies
+  in the plane z = 0.9375. With the analysis on, assert:
+  - no marked sample;
+  - zero candidates and zero pairs;
+  - RGB bytes equal to the same render with `draw_interference` off.
+    This is the "shading otherwise unchanged" check.
+- Shared side, opposed frames. Two boxes touch in the plane x = 8: the
+  left one covers x = 0 to 8 and the right one covers x = 8 to 16. The
+  view is from the top, so a supersample column lies in that plane.
+  - The left box's sketch frame is rotated 180 degrees about Z, and its
+    world bounds are kept. The ray then sits at local minimum X in both
+    frames, so the surface rule (`qx > x`, `prism.rs:323-350`) gives
+    material to both boxes. With identically oriented frames, the old rule
+    already assigns the ray to one box only, and that case cannot fail
+    before the fix.
+  - Fail-before evidence. The plan writes this case first and runs it on
+    `a964ad5` before any raster edit. It must report one pair and marked
+    samples. The pair and marked-sample count are recorded as the
+    baseline. After the fix, the same assertions as the stacked caps hold.
+  - An identically oriented copy is kept as an unchanged control.
+- Positive controls. Lowering the upper box by 0.01 mm, or overlapping the
+  opposed side boxes by 0.01 mm, gives one pair and marked samples.
+- Work accounting:
+  - `disjoint_scene(50)` rendered with the analysis on has `witness == 0`,
+    and its `reads` and `charged` equal the analysis-on values before the
+    fix, recorded in the plan as literals.
+  - In the stacked-cap scene, `witness > 0` and `charged` equals the
+    `charged` of the same render with the flag treated as never set (a
+    test-only switch on `render_with`) plus `witness`.
+  - The existing exact read-count tests pass unchanged.
+- `apps/cli/src/native-parity/capture.test.ts` (release binary). Every
+  capture uses `--size 64x64 --zoom 1.08 --fail-on-interference`.
+  - Stacked caps: the stacked rectangle extrusions as a CAD document,
+    captured with `--view front`. Expect exit 0 and `interference: 0`.
+  - Shared side: two rectangle extrusions touching at x = 8, captured with
+    `--view top`. Expect exit 0 and `interference: 0`.
+    - The plan first looks for a document construction whose frames are
+      opposed in X. One candidate is a left box sketched on a start (back)
+      face, whose frame is mirrored. If such a construction gives exit 1
+      on the `a964ad5` binary, it is used and that result is recorded as
+      the native baseline.
+    - Otherwise, an ordinary construction is used and the plan records
+      that the native side case is a regression guard only. In that case
+      the fail-before evidence comes from the Rust opposed-frame case.
+  - Each case has a 0.01 mm overlap control that gives exit 1 and one
+    pair.
+
+R3-2 `function-capture-translucent-layer-visibility` (high).
+
+Cause. Each sample keeps one translucent hit, the nearest
+(`raster.rs:136`, `162-165`, `209-216`; `raster/reference.rs:34`, `53-55`,
+`87-94`). A larger open sheet in front of a PCB reference wins every ray.
+The board is then neither blended (`raster.rs:387-412`) nor marked drawn
+(`raster.rs:261-270`), so the report classifies it `hidden`. Sections 4.2
+and 6.7 say a body seen through translucent bodies counts as drawn, and
+section 6.5 says reference bodies are mixed over whatever lies behind
+them.
+
+Rule:
+
+- Layers. Every translucent hit on the ray is a candidate: the first
+  surface hit of an open mesh, or the first interval boundary of a
+  reference body. A candidate is a layer when its depth is nearer than
+  the nearest opaque hit by more than `MERGE_EPS`; with no opaque hit,
+  every candidate is a layer. Each body contributes at most one layer.
+  Every layer is composited and marked drawn. Nothing is truncated.
+- Order. Layers are sorted by `(depth.total_cmp, body index)`, which is a
+  total and deterministic order.
+- Storage. Each worker has exactly one layer arena, a single `Vec<Hit>`,
+  shared by all its held sample rows. A sample stores its solid hit, its
+  marked bit, and an offset and count into that arena. The sample buffer
+  stays `samples_wide * (factor + 1)` entries.
+- Row lifecycle. Each held row slot carries a `sampled` flag. A slot owns
+  layers only while its flag is set.
+  - Band restart. Before a band samples its first row (`raster.rs:330`),
+    the arena is truncated to length 0 (capacity is kept), and every slot's
+    `sampled` flag and layer counts are cleared. The previous band's
+    lookahead row is resampled from scratch, as today, so the same row is
+    never charged twice against the cap.
+  - Sampling a row appends its layers at the end of the arena and sets the
+    slot's flag. A lookahead row beyond the picture (`y >=
+    samples_high`, which `raster.rs:349` skips) is not sampled. Its slot
+    is cleared to zero layers with the flag unset, so its stale offsets
+    can never be read.
+  - Rotation. When `samples.copy_within` (`raster.rs:435`) moves the last
+    held slot to the front:
+    - if that slot is sampled, its layers are copied to the start of the
+      arena, its offsets are rewritten and the arena is truncated after
+      them;
+    - if it is not sampled (the picture bottom), the arena is truncated to
+      0 and the moved slot is cleared.
+
+    In both cases, every other slot is cleared and marked unsampled until
+    it is resampled.
+  - Invariant. The arena holds exactly the layers of the currently sampled
+    slots, and every `offset + count` of a sampled slot lies within the
+    arena. A debug assertion checks this after every row. No per-row
+    allocation exists.
+  - Edge tests read a neighbour's layers only when the neighbour slot is
+    sampled, which matches today's `sample_y + dy + 1 < samples_high`
+    guard.
+- Storage bound. `MAX_LAYER_WINDOW = 262_144` layers, which is about 15 MB
+  per worker and 120 MB for eight workers, bounds the arena's retained
+  capacity, not only its live length:
+  - Growth is explicit. Before an append that needs more room, the
+    capacity becomes `min(max(2 * capacity, needed), MAX_LAYER_WINDOW)`
+    through `reserve_exact`. It never exceeds the cap.
+  - When `needed > MAX_LAYER_WINDOW`, the worker stops the shared budget,
+    exactly as an exhausted scan allowance does. The picture is refused
+    through the existing path, `The scene is too heavy for this picture
+    size (...). Use a smaller --size.`, and is never truncated.
+  - Truncation and compaction never shrink below the live length and never
+    grow, so the retained capacity of one worker is at most
+    `MAX_LAYER_WINDOW` for the whole render.
+  - The test-only `render_with` takes the cap as an argument, and
+    production passes the constant. `RenderStats` gains `layer_capacity`,
+    the largest arena capacity seen by any worker.
+- Compaction copies are charged through `WorkerBudget::charge`, one per
+  moved layer, only when the moved row has a sample with two or more
+  layers.
+- Work charges. A sample with at most one layer charges nothing new, so
+  scenes without overlapping translucent bodies keep their exact reads,
+  charges and bytes. A sample with `k >= 2` layers charges through
+  `WorkerBudget::charge`:
+  - `k` for storage;
+  - `k * (k - 1) / 2` for the insertion ordering;
+  - one per neighbour-layer probe in the edge test below.
+
+  Over-budget scenes take the existing refusal.
+- Colour. Start from the opaque colour: edge, lit body or background, as
+  today. Then apply the layers from the farthest to the nearest:
+  `colour = reference_mix(colour, layer_colour, reference_opacity)`. The
+  layer colour is `palette.edge` when the layer is an edge, otherwise the
+  lit body colour.
+- Edge per layer. Find the right and lower neighbour's layer of the same
+  body: a linear probe over that neighbour's layers, charged as above.
+  Then apply `shade::is_edge` to the layer and that hit (`None` when the
+  neighbour has no layer of the body). When at most one translucent body
+  reaches each sample, this equals the current rule (`is_edge` against
+  the neighbour's single translucent hit), because a different body and a
+  missing layer both give an edge.
+- Visibility. Every kept layer marks its body drawn
+  (`visibility[body].1 = true`). The `hidden`, `drawn` and `outside` rule
+  of section 6.7 is otherwise unchanged.
+- Both rasterizers implement the rule. The reference keeps its simpler
+  structure, with no tiles and no budget.
+
+Goldens. A golden may change only when its scene has two or more
+translucent bodies that overlap in screen space in front of the nearest
+opaque surface. With at most one translucent layer per sample, the colour
+and edge rules reduce to the current ones, so every other golden,
+determinism digest and parity byte check stays identical. The plan runs
+every capture golden and digest test unchanged. It regenerates a golden
+only after showing that the golden's scene meets the overlap condition,
+and records the name and reason in its result.
+
+Tests:
+
+- `crates/capture/src/raster/tests.rs`. Build a 10 x 10 mm reference box
+  from z = 0 to 1 mm and an open two-triangle sheet covering x, y = -1 to
+  11 mm at z = 3 mm. Capture from above. Assert:
+  - against the sheet alone, interior pixels over the board differ;
+  - the board's outline pixels are edge-mixed;
+  - the report marks both bodies drawn.
+
+  Controls:
+  - Four sheets over the board (z = 3, 4, 5 and 6 mm, all larger than the
+    board), five layers per board sample. Board interior pixels differ
+    from the four sheets alone, the board's outline is edge-mixed, and
+    all five bodies are reported drawn.
+  - An opaque box placed above the board, below the sheet, hides the
+    board. The board is reported `hidden` and the pixels inside the
+    opaque box equal the sheet-over-opaque render.
+  - Single layer: a scene with one reference body and no other
+    translucent body gives RGB, report and `reads` identical to the
+    pre-fix values, recorded in the plan as literals measured on
+    `a964ad5` before the edit.
+  - Storage cap: the four-sheet scene with `render_with`'s layer cap set
+    below one window's layer count is refused with the existing message
+    at every thread count, and no partial result is returned.
+  - Staggered dense rows (retained capacity). Use a tall picture (at least
+    64 x 512) with dense translucent stacks in separated horizontal
+    stripes, placed so that each held row position meets a dense row at a
+    different time. Set the test cap C to a little above the largest live
+    window and below the sum of the per-stripe peaks. The render
+    succeeds, contains every layer, matches the reference, and has
+    `layer_capacity <= C` at threads 0 and 1 to 8. A per-row-arena design
+    would fail this check.
+  - Band-boundary stripe. Put a dense layer stripe on the first sample
+    row of the second band. Set the cap C above the largest live window
+    and below twice that stripe's layer count. At thread count 1, one
+    worker processes both bands and carries the row as lookahead into the
+    restart. At thread counts 0 and 1 to 8, assert:
+    - the render succeeds and matches the reference;
+    - `layer_capacity <= C`.
+
+    A design that appended without the band-restart reset would refuse.
+  - Final-row control. Put translucent layers on the last sampled row of
+    the picture, at a picture height that leaves the lookahead slot
+    unsampled. The render matches the reference at threads 0 and 1 to 8,
+    and the debug invariant (no offset beyond the arena) holds.
+
+  Every case except the storage cap compares the production and reference
+  rasterizers (reports and RGB), at thread count 0 (auto) and at every
+  count 1 to 8. The reference has no budget and no cap.
+- `apps/cli/src/native-parity/capture.test.ts`. Write the PCB plus
+  imported-STL-sheet document through the production importer (the
+  existing STL-to-NMESH path), capture it from the top, and assert both
+  bodies are listed without the `[hidden behind other bodies]` note.
+- `docs/capture.md:74-78` states that every translucent body in front of
+  the nearest solid is mixed in depth order and that a body visible
+  through them counts as drawn. It also names the refusal for pictures
+  whose stacked translucent layers exceed the per-worker storage bound.
+
+R3-7 `performance-native-artwork-attachment-byte-roundtrip` (medium).
+
+Cause. Native 2D capture resolves a raster attachment in two steps:
+`io.readAttachment`, then `encodeRasterDataUrl`
+(`apps/cli/src/capture-artwork.ts:112-120`). The bytes cross into Boa as
+a `Uint8Array` (`native-engine.ts:178-179`). They become 8,192-byte
+`String.fromCharCode` chunks (`packages/ir/src/image.ts:95-97`). The native
+`btoa` then rebuilds them one character callback at a time
+(`apps/cli/native/src/engine.rs:351`).
+
+Rule. The native CLI resolves an attachment to its data URL in Rust, and
+the attachment bytes never enter the interpreter.
+
+- Rust function `raster_data_url(document, relative) -> io::Result<String>`
+  next to `files::attachment` in `apps/cli/native/src/files.rs`. The steps
+  run in the order the TypeScript path uses:
+  1. `nodetto_native::attachments::read`. This is unchanged and keeps
+     confinement, the regular-file check and the 32 MiB cap, with the
+     same errors.
+  2. More than `MAX_ATTACHMENT_IMAGE_BYTES` (30 MiB) fails with
+     `Raster attachment exceeds the 30 MiB attachment limit.`.
+  3. The MIME sniff of `encodeRasterDataUrl`: PNG, JPEG, GIF87a or
+     GIF89a, and RIFF....WEBP, in that order. Otherwise it fails with
+     `Attachment is not a supported raster image.`.
+  4. `data:image/<png|jpeg|gif|webp>;base64,` followed by
+     `base64::STANDARD`.
+
+  The old path produced the same string: `btoa` is `native.base64`, which
+  is `STANDARD.encode` of the same bytes, and the MIME is sniffed in the
+  same order.
+- Host function `attachmentDataUrl(document, path)` in `engine.rs`. It is
+  registered in the `native` name list and returns a JS string. Errors go
+  through `host_error`, which keeps the message.
+- `CommandIo.readAttachmentDataUrl?(documentPath, relative): string` is a
+  new optional member (`apps/cli/src/commands.ts`), wired in
+  `native-engine.ts`. `readAttachment` stays for bundle and export.
+- `capture-artwork.ts` `resolveAsset`. The cache lookup comes first, as
+  today. When `io.readAttachmentDataUrl` exists, the resolver uses it,
+  checks the result with `isRasterDataUrl(result,
+  MAX_ATTACHMENT_IMAGE_BYTES)` (otherwise `Invalid raster attachment.`,
+  the encoder's final check), and caches the result with
+  `editor.assets.set`. Without it (Bun, tests), the path is
+  `encodeRasterDataUrl(readAttachment(...))`, unchanged. The R2-10 raster
+  planning code in the same file is not touched.
+- Out of scope: `export-command.ts` and `bundle-command.ts` keep their
+  current path. The finding names only capture.
+
+Tests:
+
+- `apps/cli/native/src/engine_tests.rs`:
+  - `native.attachmentDataUrl` on generated PNG, JPEG, GIF and WEBP
+    headers equals `'data:image/<mime>;base64,' + btoa(binary)` of the
+    same bytes.
+  - It refuses each of these with the messages above or the existing
+    confinement error:
+    - a text file named `artifacts/fake.png`;
+    - a 30 MiB + 1 byte `artifacts/big.png`;
+    - the symlink `artifacts/escape.png`, which points to a PNG outside
+      the document directory. The path passes `isRasterAttachmentPath`,
+      so the refusal comes from the native reader: `Attachment must be a
+      file inside the document directory.`.
+- The shared fixture, `MULTI_MIB_PNG`. It is a decodable 1100 x 1000 RGB
+  PNG of xorshift32 noise (seed 1) in stored deflate blocks, about
+  3.15 MiB. Rust (`engine_tests.rs`) and TypeScript
+  (`capture-attachments.test.ts`) generate it with the same algorithm. Both
+  assert its SHA-256 against one literal, so both tests provably use the
+  same bytes. The page is 2D with two `image.raster` elements that share
+  `artifacts/noise.png`. The capture options are fixed: `--output
+  out.png --padding 0`.
+- Legacy-versus-new oracle (`engine_tests.rs`, release only:
+  `#[cfg_attr(debug_assertions, ignore = "release only")]`, because the
+  legacy path makes millions of interpreted callbacks). This is the same
+  Boa engine and renderer that the binary embeds.
+  - Run A, the new path. Using the interception pattern of
+    `engine_tests.rs:382-386`, `execute(["capture", ...])` records:
+    - every `attachmentDataUrl`, `attachment`, `base64` and `btoa` call;
+    - the SVG passed to the rasterize host;
+    - the written PNG.
+
+    Assert one `attachmentDataUrl` call and zero `attachment`, `base64`
+    and `btoa` calls. This is the zero per-byte callback measure: the
+    bytes never become a JS array or binary string. Before the fix, both
+    `attachment` and `btoa` are called once.
+  - Run B, the legacy path, in a fresh context. `native.attachmentDataUrl`
+    is replaced by a test-only JS oracle: a verbatim copy of the
+    pre-fix `encodeRasterDataUrl` body (MIME sniff, 8,192-byte
+    `String.fromCharCode` chunks, `btoa`) applied to
+    `new Uint8Array(native.attachment(document, path))`. This is exactly
+    the pre-fix resolver.
+  - Assert:
+    - the data URL inside the rasterized SVG is identical in A and B;
+    - the whole SVG is identical;
+    - the PNG bytes are identical and their SHA-256 equals the literal
+      `MULTI_MIB_CAPTURE_SHA256`, recorded from run B.
+- New file `apps/cli/src/native-parity/capture-attachments.test.ts`. It is
+  a separate file so that it shares nothing with plan
+  `car3-g1-capture-raster`, and it runs against the release binary:
+  - It generates `MULTI_MIB_PNG`, captures the same page with the same
+    options, and expects exit 0. The PNG's SHA-256 equals
+    `MULTI_MIB_CAPTURE_SHA256`, the legacy-oracle literal. This ties the
+    shipped binary to the legacy bytes for the same multi-MiB external
+    attachment. A second run repeats the bytes.
+  - The refusals give the same stderr message and exit code as before.
+    Both are literals measured with the `a964ad5` binary before the edit:
+    - MIME: `artifacts/fake.png`;
+    - size: the 30 MiB + 1 byte file;
+    - confinement: the `artifacts/escape.png` symlink.
+
+### 21.2 Plan grouping
+
+Plans are named `car3-*`. Each plan:
+
+- is about 150 lines or less;
+- uses its own `CARGO_TARGET_DIR=target/car3-<plan>`;
+- sets `artifactRoots ["target", "tmp/cad3d"]` exactly. The evidence root
+  is `tmp/<taskId>`, outside both artifact roots;
+- lists every edited file in `writePaths`, including docs and its plan
+  file;
+- runs only focused verification: `bun test <paths>`, `cargo test -p
+  <crate>`, clippy on the touched crate, and biome on touched files.
+
+`bun run typecheck` and `mise run verify` run once, at integration. All
+five plans run in one wave, and no two plans own the same file:
+
+| Plan | Findings | Owns |
+| --- | --- | --- |
+| car3-g1-capture-raster | R3-1, R3-2 | `crates/capture/src/{raster.rs,raster/budget.rs,raster/reference.rs,raster/tests.rs,prism.rs,mesh.rs,tool_view.rs,shade.rs}` (`budget.rs` holds the `charged` and `witness` statistics and the shared stop used by the layer cap), `crates/capture/tests/{render.rs,overlay.rs}` (only if a golden assertion must be extended), `apps/cli/src/native-parity/capture.test.ts`, `docs/capture.md`, `apps/cli/src/capture-help.ts` and `apps/cli/src/capture-docs.test.ts` (only if the help text mirrors the changed doc sentence) |
+| car3-cad-drag | R3-3 | see design-cad3d section 20 |
+| car3-cad-evaluate | R3-4 | see design-cad3d section 20 |
+| car3-g2-cad-history | R3-5, R3-6 | see design-cad3d section 20 |
+| car3-native-attachment | R3-7 | `apps/cli/native/src/{files.rs,engine.rs,engine_tests.rs}`, `apps/cli/src/{commands.ts,native-engine.ts,capture-artwork.ts}`, new `apps/cli/src/native-parity/capture-attachments.test.ts`, `apps/cli/src/capture-command.test.ts` |
+
+`interference.rs`, `overlay.rs` and `capture-interference-options.ts` are
+not edited. R3-1 removes the false witness before it reaches them, so the
+round-2 sweep and boundary-fold code stays as reviewed.
+
+Both native plans build the `nodetto-cli` binary, which links
+`nodetto-capture`. Because each plan has its own `CARGO_TARGET_DIR`, the
+two builds do not race. A compile failure caused by a sibling's
+in-progress edit is rerun after the sibling finishes. It is never fixed by
+editing the sibling's files.
+
+Gates. Each entry is one command that runs tests; lint and build
+prerequisites are chained with `&&` into the test-bearing command:
+
+- car3-g1-capture-raster:
+  1. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo test --release -p nodetto-capture`.
+     The test run includes the release-only reference comparisons and
+     `boundary_read_counts_and_refusal_are_bounded`.
+  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car3-g1-capture-raster/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/capture-docs.test.ts`
+- car3-native-attachment:
+  1. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo clippy -p nodetto-cli --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo test --release -p nodetto-cli`.
+     The test run includes the release-only legacy-versus-new oracle.
+  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car3-native-attachment/release/nodetto-cli" bun test apps/cli/src/native-parity/capture-attachments.test.ts apps/cli/src/capture-command.test.ts`
+- The CAD plans: see design-cad3d section 20.
+
+`cargo fmt --manifest-path` runs after Rust changes.
+
+Integration gates. Each runs once, after all five plans land, must exit 0,
+and records its command, exit status and complete log path:
+
+1. `bun run typecheck` and `bun run lint`;
+2. `CARGO_TERM_QUIET=true mise run verify`;
+3. `CARGO_TERM_QUIET=true mise run test-cli`;
+4. the `*.test.ts` scan of section 20.3, gate 4.
+
+### 21.3 Decisions
+
+- R3-1 tags ownership-sensitive rays at the cast instead of always
+  casting twice.
+  - The witness shares the shading history until the first flagged step,
+    so rays without divergence do and charge exactly today's work.
+  - Every extra recast is charged in full (`scan(cost, 0)`) and every extra
+    combine through `charge`, so no added work escapes the allowance.
+  - The reference rasterizer always uses volume intervals. It is a
+    stricter oracle than a copy of the flag logic would be.
+- R3-1 does not touch `interference.rs` or `capture-interference-options.ts`.
+  The audit's exit-code chain starts at the false picture witness, and
+  removing that witness fixes the exit code at its source.
+- R3-2 composites every qualifying layer. A bounded number of layers
+  would silently drop a visible body, which is the defect itself.
+  Bounds come from refusal, never from truncation:
+  - layer storage is capped per worker (`MAX_LAYER_WINDOW`);
+  - multi-layer work is charged to the existing allowance.
+
+  Both refuse through the existing "too heavy" message.
+- R3-2 keeps the per-layer edge rule equivalent to today's rule when one
+  layer is present, so only multi-layer scenes change bytes.
+- R3-7 keeps all checks in their current order and messages in Rust, and
+  validates the returned string with the same `isRasterDataUrl` that ends
+  `encodeRasterDataUrl`.
+  - Proof of zero per-byte callbacks comes from host interception in the
+    real Boa engine, which is deterministic. No environment variable or
+    counter is added to the shipped binary.
+  - Legacy byte identity comes from a test-only oracle: a verbatim pre-fix
+    resolver injected in the engine test, compared on the same multi-MiB
+    file. Its PNG hash literal is then asserted against the release
+    binary, so no production switch and no pre-fix checkout is needed.
+- No user decision is pending, so no `design-docs/user-qa/` file is written
+  for round 3.
+
+### 21.4 Risks
+
+- R3-1: if the cast flag misses an ownership-sensitive case, a false pair
+  can remain on rare grazing rays. The reference rasterizer, which always
+  uses volume intervals, catches any miss on the test fixtures. The flag
+  is derived from the same error terms as the volume mode.
+- R3-2: a picture with very deep translucent stacks, beyond 262,144 layers
+  in one worker's held rows, is refused rather than drawn. The single
+  capped arena bounds retained memory at about 15 MB per worker. The message
+  asks for a smaller `--size`, which reduces the held rows.
+- R3-2: golden regeneration is limited to scenes that meet the overlap
+  condition. A golden outside that condition that changes is a defect, not
+  a reason to regenerate.
+- R3-7: the Rust MIME sniff and size check duplicate the TypeScript
+  encoder's rules. The engine test compares the two on all four formats
+  and both refusals.
+- The audit did not measure native PNG bytes, desktop pixels, Boa elapsed
+  time or cross-platform determinism. The gates above measure native PNG
+  bytes and exit codes for the fixtures. They replace Boa elapsed time with
+  host-call counts. Desktop pixels and cross-platform determinism stay
+  unmeasured.

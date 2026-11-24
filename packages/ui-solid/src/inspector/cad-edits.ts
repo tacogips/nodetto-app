@@ -8,6 +8,8 @@ import {
   roundNm,
 } from "@nodetto/ir";
 
+import { targetsForOperation } from "../cad/extrude-targets.ts";
+
 type Edit = Command | { error: string };
 const unchanged = { error: "unchanged" } as const;
 const invalidField = { error: "This parameter is unavailable." } as const;
@@ -116,10 +118,7 @@ export function setCadOperation(
   const { type, semantic } = element;
   if (type !== "cad.extrude" || !isPlainObject(semantic)) return invalidField;
   const { bodies: previous, ...rest } = semantic;
-  const targets =
-    op === "new"
-      ? []
-      : [...new Set(bodies)].slice(0, op === "add" ? 1 : undefined);
+  const targets = targetsForOperation(op, bodies);
   const existing = Array.isArray(previous) ? previous : [];
   if (
     op === semantic.op &&

@@ -30,6 +30,10 @@ import {
   viewProjection,
 } from "./camera3d.ts";
 import {
+  displayedExtrudeTargets,
+  targetsForOperation,
+} from "./extrude-targets.ts";
+import {
   CAD_DRAG_THRESHOLD,
   dragDistance,
   type ExtrudeDrag,
@@ -391,12 +395,37 @@ export function createExtrudeAuthoring(options: {
           ? "add"
           : "cut"
         : semantic.op;
+    const { bodies: storedBodies, ...withoutBodies } = semantic;
+    const targets =
+      op === "add"
+        ? targetsForOperation(
+            "add",
+            displayedExtrudeTargets(
+              editor.store.getPageElements(pageId),
+              element,
+              Array.isArray(storedBodies)
+                ? storedBodies.filter(
+                    (id): id is string => typeof id === "string",
+                  )
+                : [],
+            ),
+          )
+        : undefined;
+    const nextSemantic =
+      op === "add"
+        ? {
+            ...withoutBodies,
+            distance: stroke.distance,
+            op,
+            ...(targets?.length ? { bodies: targets } : {}),
+          }
+        : { ...semantic, distance: stroke.distance, op };
     try {
       editor.apply([
         {
           type: "updateSemantic",
           id: element.id,
-          semantic: { ...semantic, distance: stroke.distance, op },
+          semantic: nextSemantic,
         },
       ]);
     } catch (error) {
