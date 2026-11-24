@@ -91,8 +91,9 @@ export function pointBounds(positions: ArrayLike<number>): MutableBounds3 {
       const value = positions[i + axis];
       if (value === undefined)
         throw new RangeError("Missing polygon coordinate");
-      min[axis] = Math.min(min[axis], value);
-      max[axis] = Math.max(max[axis], value);
+      // The fallbacks only satisfy strict indexed access: axis is 0 to 2.
+      min[axis] = Math.min(min[axis] ?? value, value);
+      max[axis] = Math.max(max[axis] ?? value, value);
     }
   }
   return box;
