@@ -1,11 +1,13 @@
 import type { Element, ElementId, PageId } from "@nodetto/ir";
-import type { CadFrame } from "../cad/frames.ts";
 import {
-  cadFailure,
-  createCadGeometry,
-  type ExtrudeGeometry,
-  scanCadPage,
-} from "../cad/history.ts";
+  includeBounds,
+  type MutableBounds3,
+  pointBounds,
+  sweptBounds,
+} from "../cad/bounds.ts";
+import { visitCadConstruction } from "../cad/construction.ts";
+import type { CadFrame } from "../cad/frames.ts";
+import type { ExtrudeGeometry } from "../cad/history.ts";
 import type { CadLoop } from "../cad/loops.ts";
 import { coordinate } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
@@ -114,54 +116,19 @@ export function normaliseToolLoops(
   });
 }
 
-type MutableVec3 = [number, number, number];
-type MutableBounds = { min: MutableVec3; max: MutableVec3 };
 type BuildingBody = Omit<CaptureBody, "steps" | "bounds"> & {
   steps: CaptureStep[];
-  bounds: MutableBounds;
+  bounds: MutableBounds3;
 };
 
-const AXES = [0, 1, 2] as const;
+const STEP_OPS = {
+  add: "union",
+  cut: "difference",
+  intersect: "intersection",
+} as const;
 
-function sweepBounds({
-  frame: { o, u, v, n },
-  t0,
-  t1,
-  loops,
-}: CaptureTool): MutableBounds {
-  const min: MutableVec3 = [0, 0, 0];
-  const max: MutableVec3 = [0, 0, 0];
-  for (const axis of AXES) {
-    let lower = o[axis];
-    let upper = o[axis];
-    if (u[axis] !== 0 || v[axis] !== 0) {
-      lower = Number.POSITIVE_INFINITY;
-      upper = Number.NEGATIVE_INFINITY;
-      for (const { points } of loops) {
-        for (let i = 0; i < points.length; i += 2) {
-          const base =
-            o[axis] +
-            u[axis] * coordinate(points, i) +
-            v[axis] * coordinate(points, i + 1);
-          lower = Math.min(lower, base);
-          upper = Math.max(upper, base);
-        }
-      }
-    }
-    const start = n[axis] * t0;
-    const end = n[axis] * t1;
-    min[axis] = lower + Math.min(start, end);
-    max[axis] = upper + Math.max(start, end);
-  }
-  return { min, max };
-}
-
-function includeBounds(box: MutableBounds, { min, max }: Bounds3): void {
-  for (const axis of AXES) {
-    box.min[axis] = Math.min(box.min[axis], min[axis]);
-    box.max[axis] = Math.max(box.max[axis], max[axis]);
-  }
-}
+const toolBounds = ({ frame, t0, t1, loops }: CaptureTool) =>
+  sweptBounds(frame, t0, t1, loops);
 
 function makeTool(feature: ElementId, geometry: ExtrudeGeometry): CaptureTool {
   const bySource = new Map<ElementId, number>();
@@ -204,167 +171,99 @@ export function buildCadCaptureModel(
   pageId: PageId,
   options?: { readonly decodeMesh?: CaptureMeshDecoder },
 ): CadCaptureModel {
-  const page: Element[] = [];
-  const pcb: Element[] = [];
-  for (const element of elements) {
-    if (element.page === pageId) page.push(element);
-    else if (element.type === "pcb.board" || element.type === "pcb.graphic")
-      pcb.push(element);
-  }
-  const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
-  const geometry = createCadGeometry(history);
-  const status = new Map(history.status);
   const tools: (CaptureTool | CaptureMeshTool)[] = [];
   const bodies: BuildingBody[] = [];
-  // A null body is valid for cad check but has no geometry in this capture.
-  const targetsById = new Map<ElementId, BuildingBody | null>();
+  // Hidden bodies are valid targets but have no geometry in a capture.
+  const visible = new Map<ElementId, BuildingBody>();
   const skipped: { id: ElementId; reason: "mesh" }[] = [];
   let sketches = 0;
 
-  // Follow checkCadPage's validation order, including dependencies of
-  // suppressed features and targets whose creators did not produce a body.
-  for (const { id } of history.features) {
-    if (!status.get(id)?.ok) continue;
-    const feature = history.typed.get(id);
-    if (!feature) continue;
-    const failed = history.dependencies
-      .get(id)
-      ?.find((ref) => !status.get(ref)?.ok);
-    const targets = history.targets.get(id) ?? [];
-    if (failed !== undefined) {
-      const code =
-        targets.includes(failed) &&
-        history.byId.get(failed)?.type === "cad.mesh"
-          ? "cad.body.missing"
-          : "cad.reference.failed";
-      status.set(id, cadFailure(code));
-      continue;
-    }
-    if (feature.type === "cad.sketch") {
-      const frame = geometry.sketch(feature.semantic.plane);
-      if ("ok" in frame) status.set(id, frame);
-      else {
-        geometry.frames.set(id, frame);
-        sketches += 1;
-      }
-      continue;
-    }
-    if (feature.semantic.suppressed) continue;
-    if (feature.type === "cad.mesh") {
-      if (!options?.decodeMesh) {
-        targetsById.set(id, null);
-        skipped.push({ id, reason: "mesh" });
-        continue;
-      }
-      try {
-        const decoded = options.decodeMesh(feature.semantic.data);
-        const positions = new Float64Array(decoded.positions);
-        const triangles = new Uint32Array(decoded.triangles);
-        // An empty mesh has no bounds; as a body it would make the whole
-        // page impossible to frame. The app rejects it as well.
-        if (triangles.length === 0 || positions.length === 0) {
-          status.set(id, cadFailure("cad.mesh.invalid"));
-          continue;
-        }
-        const min: MutableVec3 = [
-          Number.POSITIVE_INFINITY,
-          Number.POSITIVE_INFINITY,
-          Number.POSITIVE_INFINITY,
-        ];
-        const max: MutableVec3 = [
-          Number.NEGATIVE_INFINITY,
-          Number.NEGATIVE_INFINITY,
-          Number.NEGATIVE_INFINITY,
-        ];
-        for (let i = 0; i < positions.length; i += 3) {
-          for (const axis of AXES) {
-            const value = coordinate(positions, i + axis);
-            min[axis] = Math.min(min[axis], value);
-            max[axis] = Math.max(max[axis], value);
-          }
-        }
-        const toolIndex = tools.length;
-        tools.push({ kind: "mesh", feature: id, positions, triangles });
-        const body: BuildingBody | null = feature.visual.hidden
-          ? null
-          : {
-              id,
-              name: feature.semantic.name,
-              reference: false,
-              steps: [{ op: "union", tool: toolIndex }],
-              bounds: { min, max },
-            };
-        if (body) bodies.push(body);
-        targetsById.set(id, body);
-      } catch {
-        status.set(id, cadFailure("cad.mesh.invalid"));
-      }
-      continue;
-    }
-    for (const target of targets) {
-      if (targetsById.has(target)) continue;
-      const code =
-        history.byId.get(target)?.type === "cad.mesh"
-          ? "cad.body.missing"
-          : "cad.reference.failed";
-      status.set(id, cadFailure(code));
-    }
-    if (!status.get(id)?.ok) continue;
-    const prism =
-      feature.type === "cad.pcb"
-        ? geometry.pcb(feature.semantic)
-        : geometry.extrude(feature.semantic);
-    if ("ok" in prism) {
-      status.set(id, prism);
-      continue;
-    }
-    // Keep original loops here so later face references use the same
-    // geometry as cad check, even for a loop omitted from a capture tool.
-    geometry.extrudes.set(id, prism);
-    const tool = makeTool(id, prism);
-    const toolIndex = tools.length;
+  /** Register a tool as a new body, unless the feature is hidden. */
+  function addBody(
+    feature: { id: ElementId; visual: { hidden?: boolean } },
+    name: string,
+    reference: boolean,
+    tool: CaptureTool | CaptureMeshTool,
+    bounds: MutableBounds3,
+  ): void {
+    const step: CaptureStep = { op: "union", tool: tools.length };
     tools.push(tool);
-
-    const op = feature.type === "cad.pcb" ? "new" : feature.semantic.op;
-    if (op === "new") {
-      const reference = feature.type === "cad.pcb";
-      const body: BuildingBody | null = feature.visual.hidden
-        ? null
-        : {
-            id,
-            name: feature.semantic.name,
-            reference,
-            steps: [{ op: "union", tool: toolIndex }],
-            bounds: sweepBounds(tool),
-          };
-      if (body) bodies.push(body);
-      if (!reference) targetsById.set(id, body);
-      continue;
-    }
-    const step: CaptureStep = {
-      op: op === "add" ? "union" : op === "cut" ? "difference" : "intersection",
-      tool: toolIndex,
-    };
-    const added = step.op === "union" ? sweepBounds(tool) : undefined;
-    for (const target of targets) {
-      const body = targetsById.get(target);
-      if (!body) continue;
-      body.steps.push(step);
-      if (added) includeBounds(body.bounds, added);
-    }
+    if (feature.visual.hidden) return;
+    const body = { id: feature.id, name, reference, steps: [step], bounds };
+    bodies.push(body);
+    // A reference body is drawn but can never be a boolean target.
+    if (!reference) visible.set(feature.id, body);
   }
 
-  let bounds: MutableBounds | null = null;
+  const report = visitCadConstruction(elements, pageId, {
+    sketch() {
+      sketches += 1;
+    },
+    mesh(feature) {
+      const { id, semantic } = feature;
+      if (!options?.decodeMesh) {
+        skipped.push({ id, reason: "mesh" });
+        return true;
+      }
+      let positions: Float64Array;
+      let triangles: Uint32Array;
+      try {
+        const decoded = options.decodeMesh(semantic.data);
+        positions = new Float64Array(decoded.positions);
+        triangles = new Uint32Array(decoded.triangles);
+      } catch {
+        return false;
+      }
+      // An empty mesh has no bounds; as a body it would make the whole
+      // page impossible to frame. The app rejects it as well.
+      if (triangles.length === 0 || positions.length === 0) return false;
+      addBody(
+        feature,
+        semantic.name,
+        false,
+        { kind: "mesh", feature: id, positions, triangles },
+        pointBounds(positions),
+      );
+      return true;
+    },
+    tool(feature, geometry, targets) {
+      // The walk keeps the original loops for later face references, even
+      // for a loop omitted from the capture tool.
+      const tool = makeTool(feature.id, geometry);
+      if (feature.type === "cad.pcb" || feature.semantic.op === "new") {
+        const reference = feature.type === "cad.pcb";
+        addBody(
+          feature,
+          feature.semantic.name,
+          reference,
+          tool,
+          toolBounds(tool),
+        );
+        return;
+      }
+      const step: CaptureStep = {
+        op: STEP_OPS[feature.semantic.op],
+        tool: tools.length,
+      };
+      tools.push(tool);
+      const added = step.op === "union" ? toolBounds(tool) : undefined;
+      for (const target of targets) {
+        const body = visible.get(target);
+        if (!body) continue;
+        body.steps.push(step);
+        if (added) includeBounds(body.bounds, added);
+      }
+    },
+  });
+
+  let bounds: MutableBounds3 | null = null;
   for (const body of bodies) {
     if (bounds === null)
       bounds = { min: [...body.bounds.min], max: [...body.bounds.max] };
     else includeBounds(bounds, body.bounds);
   }
-  const errors: { id: ElementId; code: string }[] = [];
-  for (const { id } of page) {
-    const result = status.get(id);
-    if (result && !result.ok) errors.push({ id, code: result.code });
-  }
-  errors.sort((a, b) => compareFractional(a.id, b.id));
+  const errors = [...report.errors].sort((a, b) =>
+    compareFractional(a.id, b.id),
+  );
   return { tools, bodies, errors, bounds, sketches, skipped };
 }

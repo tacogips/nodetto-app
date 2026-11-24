@@ -1,19 +1,11 @@
-import {
-  CAPTURE_THEMES,
-  CaptureInputError,
-  Editor,
-  captureRasterPlan,
-  snapSvgFrameToPixels,
-  svgRasterDimensions,
-} from "@nodetto/core";
+import { CaptureInputError } from "@nodetto/core";
 import {
   comparePageOrder,
-  encodeRasterDataUrl,
-  isRasterAttachmentPath,
   pageAtNumber,
   resolvePageQuery,
   shortPageId,
 } from "@nodetto/ir";
+import { renderArtworkCapture } from "./capture-artwork.ts";
 import {
   ARTWORK_OPTIONS,
   CAMERA_OPTIONS,
@@ -35,10 +27,6 @@ import {
   ok,
   parseArgs,
 } from "./commands.ts";
-import {
-  attributeMissingGlyphs,
-  glyphMissingMessage,
-} from "./glyph-coverage.ts";
 import { resolveId } from "./ids.ts";
 
 const CAPTURE_OPTIONS = new Set([
@@ -90,45 +78,6 @@ function describe(cause: unknown): string {
 
 function usageError(message: string): CommandResult {
   return fail(`${message}\n\n${CAPTURE_HELP}`);
-}
-
-/** Give both renderers the same integer surface. Zooming in the backend
- * can add a pixel when its single-precision product rounds above an integer.
- * The viewBox still applies the requested scale to the artwork. */
-function pixelFrame(
-  svg: string,
-  viewport: { width: number; height: number },
-  scale: number,
-): string {
-  const snap = (span: number) => Math.max(1, Math.ceil(span * scale - 1e-6));
-  const width = snap(viewport.width);
-  const height = snap(viewport.height);
-  return snapSvgFrameToPixels(svg, scale).replace(/^<svg\s[^>]*>/, (root) =>
-    root
-      .replace(/\bwidth="[^"]*"/, `width="${width}"`)
-      .replace(/\bheight="[^"]*"/, `height="${height}"`)
-      .replace(
-        /\bviewBox="([^ ]+) ([^ ]+) [^"]+"/,
-        (_, x: string, y: string) =>
-          `viewBox="${x} ${y} ${width / scale} ${height / scale}"`,
-      ),
-  );
-}
-
-/** Report the actual encoded size. Pixel-frame snapping can remove a sliver
- * that the conservative raster plan rounded up to an extra pixel. */
-function pngSize(bytes: Uint8Array): { width: number; height: number } {
-  const header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (
-    header.byteLength < 33 ||
-    header.getUint32(0) !== 0x89504e47 ||
-    header.getUint32(4) !== 0x0d0a1a0a ||
-    header.getUint32(8) !== 13 ||
-    header.getUint32(12) !== 0x49484452
-  ) {
-    throw new Error("The capture renderer did not produce a PNG header.");
-  }
-  return { width: header.getUint32(16), height: header.getUint32(20) };
 }
 
 function writeCapture(
@@ -217,9 +166,12 @@ export async function captureCommand(
   if (theme !== "light" && theme !== "dark")
     return usageError("--theme must be light or dark.");
   const size = options.get("--size");
-  const box = /^(\d+)x(\d+)$/i.exec(size ?? "") ?? undefined;
-  if (size !== undefined && box === undefined)
+  const sizeMatch = /^(\d+)x(\d+)$/i.exec(size ?? "");
+  if (size !== undefined && !sizeMatch)
     return usageError("--size must be W x H in pixels (for example 1024x768).");
+  const box = sizeMatch
+    ? { width: Number(sizeMatch[1]), height: Number(sizeMatch[2]) }
+    : undefined;
 
   const loaded = loadDocument(io, documentPath);
   if (typeof loaded === "string") return fail(loaded);
@@ -272,95 +224,10 @@ export async function captureCommand(
 
   let warnings = loaded.warnings;
 
-  const renderArtwork = async (
-    page: (typeof pages)[number],
-    theme: "light" | "dark",
-  ) => {
-    const transcode =
-      format === "jpg" ? backend.transcode?.bind(backend) : undefined;
-    if (format === "jpg" && !transcode)
-      return usageError("JPG capture needs the native nodetto-cli.");
-    const background =
-      options.get("--background") ?? CAPTURE_THEMES[theme].background;
-    if (!/^#[0-9a-f]{6}$/i.test(background))
-      return usageError(
-        "--background must be a six-digit hex color (#rrggbb).",
-      );
-    const padding = Number(options.get("--padding") ?? "16");
-    if (!Number.isFinite(padding) || padding < 0 || padding > 256)
-      return usageError("--padding must be a number between 0 and 256.");
-    const requestedScale = options.get("--scale");
-    const fontDir = options.get("--font-dir");
-    const editor = new Editor({ document });
-    editor.setCurrentPage(page.id);
-    const resolveAsset = (source: string): string => {
-      const cached = editor.assets.resolve(source);
-      if (cached) return cached;
-      if (!isRasterAttachmentPath(source) || !io.readAttachment)
-        throw new Error(`Missing attachment: ${source}`);
-      const data = encodeRasterDataUrl(io.readAttachment(documentPath, source));
-      editor.assets.set(source, data);
-      return data;
-    };
-
-    let svg: string | null;
-    if (target?.type === "frame") {
-      svg = editor.exportArtboardSvg(target.id, { background, resolveAsset });
-    } else if (target) {
-      editor.selection.set([target.id]);
-      svg = editor.exportSelectionSvg({ padding, background, resolveAsset });
-    } else {
-      svg = editor.exportPageSvg({ padding, background, resolveAsset });
-    }
-    if (svg === null)
-      return fail(
-        `${warnings}Page ${JSON.stringify(page.name)} has no visible content to capture.`,
-      );
-
-    const viewport = svgRasterDimensions(svg);
-    const plan = captureRasterPlan(viewport, {
-      box:
-        box === undefined
-          ? undefined
-          : { width: Number(box[1]), height: Number(box[2]) },
-      scale: requestedScale === undefined ? undefined : Number(requestedScale),
-    });
-    svg = pixelFrame(svg, viewport, plan.scale);
-    const coverage = io.fontCoverage?.(svg, fontDir);
-    if (coverage?.missing.length) {
-      const elements = document.elements.filter(
-        (element) =>
-          element.page === page.id &&
-          (!target ||
-            target.type === "frame" ||
-            target.type === "group" ||
-            element.id === target.id),
-      );
-      const { rows, unattributed } = attributeMissingGlyphs(
-        elements,
-        new Set(coverage.missing),
-      );
-      for (const row of rows)
-        warnings += `warning: glyph-missing ${row.elementId}: ${glyphMissingMessage(row.codePoints)}\n`;
-      if (unattributed.length)
-        warnings += `warning: glyph-missing page ${page.id}: ${glyphMissingMessage(unattributed)}\n`;
-    }
-    const png = await backend.rasterize(
-      svg,
-      1,
-      fontDir,
-      coverage?.needsFallback === true,
-    );
-    const { width, height } = pngSize(png);
-    const image = transcode ? transcode(png, "jpg", quality, background) : png;
-    return { image, width, height };
-  };
-
   try {
     let cad: ReturnType<typeof renderCadCapture> | undefined;
     if (isCad) {
-      const width = Number(box?.[1] ?? "1024");
-      const height = Number(box?.[2] ?? "768");
+      const { width, height } = box ?? { width: 1024, height: 768 };
       if (width < 64 || width > 2048 || height < 64 || height > 2048)
         return usageError(
           "--size on a cad3d page must be 64 to 2048 pixels per side.",
@@ -387,8 +254,26 @@ export async function captureCommand(
         interferenceOptions.failOnInterference,
       );
     }
-    const rendered = cad ?? (await renderArtwork(page, theme));
-    if (!("image" in rendered)) return rendered;
+    const rendered =
+      cad ??
+      (await renderArtworkCapture(io, backend, {
+        document,
+        documentPath,
+        page,
+        target,
+        options,
+        format,
+        quality,
+        theme,
+        box,
+        warn(message) {
+          warnings += `warning: ${message}\n`;
+        },
+      }));
+    if ("error" in rendered)
+      return rendered.usage
+        ? usageError(rendered.error)
+        : fail(`${warnings}${rendered.error}`);
     const { image, width, height } = rendered;
     const path = writeCapture(
       io.capture,

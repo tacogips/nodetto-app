@@ -45,7 +45,7 @@ export function cadFailure(code: string, detail?: string): Failure {
     : { ok: false, code, detail };
 }
 
-type CadFeature =
+export type CadFeature =
   | (Element<CadSketchSemantic> & { readonly type: "cad.sketch" })
   | (Element<CadExtrudeSemantic> & { readonly type: "cad.extrude" })
   | (Element<CadMeshSemantic> & { readonly type: "cad.mesh" })

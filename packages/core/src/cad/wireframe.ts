@@ -1,6 +1,7 @@
 import { decodeNmesh, fromInline, NmeshError } from "@nodetto/nmesh";
 import type { Element, PageId } from "@nodetto/ir";
-import { visitCadConstruction } from "./check.ts";
+import { pointBounds } from "./bounds.ts";
+import { visitCadConstruction } from "./construction.ts";
 import { toWorld } from "./frames.ts";
 import { coordinate, type Vec3 } from "./vec.ts";
 
@@ -29,28 +30,13 @@ function meshCorners(data: string): Point[] {
   try {
     const { positions } = decodeNmesh(fromInline(data));
     if (!positions.length) return [];
-    const min: [number, number, number] = [
-      Number.POSITIVE_INFINITY,
-      Number.POSITIVE_INFINITY,
-      Number.POSITIVE_INFINITY,
-    ];
-    const max: [number, number, number] = [
-      Number.NEGATIVE_INFINITY,
-      Number.NEGATIVE_INFINITY,
-      Number.NEGATIVE_INFINITY,
-    ];
-    for (let i = 0; i < positions.length; i += 3) {
-      for (const axis of [0, 1, 2] as const) {
-        const mm = coordinate(positions, i + axis) / 1000;
-        min[axis] = Math.min(min[axis], mm);
-        max[axis] = Math.max(max[axis], mm);
-      }
-    }
+    const { min, max } = pointBounds(positions);
+    const mm = (value: number) => value / 1000;
     return Array.from({ length: 8 }, (_, i) =>
       project([
-        i & 1 ? max[0] : min[0],
-        i & 2 ? max[1] : min[1],
-        i & 4 ? max[2] : min[2],
+        mm(i & 1 ? max[0] : min[0]),
+        mm(i & 2 ? max[1] : min[1]),
+        mm(i & 4 ? max[2] : min[2]),
       ]),
     );
   } catch (error) {
@@ -85,10 +71,8 @@ export function cadPageWireframe(
     maxY = Math.max(maxY, y1, y2);
   }
 
-  visitCadConstruction(
-    elements,
-    pageId,
-    (_, { frame, span: { t0, t1 }, loops }) => {
+  visitCadConstruction(elements, pageId, {
+    tool(_, { frame, span: { t0, t1 }, loops }) {
       for (const { points, sources } of loops) {
         const caps = Array.from({ length: sources.length }, (_, i) => {
           const point: Point = [
@@ -110,8 +94,8 @@ export function cadPageWireframe(
         }
       }
     },
-    (_, data) => {
-      const corners = meshCorners(data);
+    mesh({ semantic }) {
+      const corners = meshCorners(semantic.data);
       for (const [i, start] of corners.entries()) {
         for (const axis of [1, 2, 4]) {
           const end = corners[i | axis];
@@ -120,7 +104,7 @@ export function cadPageWireframe(
       }
       return true;
     },
-  );
+  });
   return {
     segments: Float64Array.from(segments),
     bounds: segments.length ? { minX, minY, maxX, maxY } : null,
