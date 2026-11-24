@@ -27,6 +27,7 @@ import {
   breadboardLabelBounds,
   breadboardNotation,
 } from "../breadboard/notation.ts";
+import { collectCadInput } from "../cad/engine.ts";
 import { cadPageWireframe } from "../cad/wireframe.ts";
 import { intersectClip, isRasterMaskSource } from "../clipping.ts";
 import { effectsBounds, layerEffects } from "../effects.ts";
@@ -592,7 +593,15 @@ export function renderPageSvg(
 ): string | null {
   if (store.getPage(pageId)?.kind === "cad3d")
     return renderCadPageSvg(
-      cadPageWireframe(store.listElements(), pageId),
+      cadPageWireframe(
+        collectCadInput(
+          { pages: store.listPages(), elements: store.listElements() },
+          pageId,
+          0,
+        ).elements,
+        pageId,
+        { meshBounds: options.meshBounds },
+      ),
       options,
     );
   const elements = store.getPageElements(pageId);

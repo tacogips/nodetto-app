@@ -1,3 +1,4 @@
+import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import { expect } from "bun:test";
 import {
   mkdtempSync,
@@ -282,3 +283,37 @@ nativeTest(
   },
   60000,
 );
+
+nativeTest("native CAD mesh SVG matches Bun", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-mesh-svg-"));
+  try {
+    const editor = new Editor();
+    const page = editor.createPage({ name: "CAD", kind: "cad3d" });
+    const mesh = toInline(
+      encodeNmesh(
+        canonicalize({
+          positions: new Float64Array([
+            -4, -2, -3, 7, -2, -3, -4, 6, -3, -4, -2, 5,
+          ]),
+          triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+        }),
+      ),
+    );
+    editor.createElement("cad.mesh", {
+      semantic: { name: "Mesh", data: mesh },
+    });
+    const input = join(cwd, "mesh.jsonl");
+    writeFileSync(input, serializeDocument(editor.getSnapshot()));
+    const result = compare([
+      "export",
+      input,
+      "--page",
+      page,
+      "--format",
+      "svg",
+    ]);
+    expect(result.exitCode).toBe(0);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

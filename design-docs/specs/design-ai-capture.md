@@ -12,7 +12,9 @@ section 8.5 gives the completion order of the remaining milestones.
 Revision 8 (audit round 1 of `0a35708..eb7d8c9`, 16 major findings)
 corrects the rules in sections 4.1, 6.1, 6.3, 6.6, 6.7 and 13; section 19
 states each correction, its test and the plan grouping. Where an earlier
-sentence and section 19 disagree, section 19 wins.
+sentence and section 19 disagree, section 19 wins. Revision 9 (audit round
+2 of `0a35708..3cd2401`, 10 blocking findings) is section 20; where section
+19 and section 20 disagree, section 20 wins.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -2881,3 +2883,795 @@ B's precedence calls C's resolver); E after D; I after G and H.
   still drawn and analysed as a solid (unchanged picture), although it is
   not a Boolean target (F1) and the app shows it display-only. Changing
   the picture of such meshes is not part of this audit round.
+
+## 20. Revision 9: audit round 2 corrections
+
+Source: audit round 2 of `feat/ai-capture`, base `0a35708` (0.10.5) to
+`3cd2401`, ten blocking findings (two high, eight medium). The common
+rules of section 19 apply unchanged:
+
+- Every fix ships a test that fails on `3cd2401` and passes after it.
+- A performance test asserts a deterministic count, never a wall clock.
+- Admitted NCS1, PNG and SVG bytes, goldens, digests, error codes and
+  messages do not change, and the existing diagnostic precedence is kept.
+- Indexed reads type-check under `noUncheckedIndexedAccess`.
+- Per-vertex work stays in Rust on the native CLI.
+
+### 20.1 What round 1 left open
+
+Checked against `3cd2401`. `git grep -e booleanTarget -e maxVertices -e
+meshBounds` finds nothing.
+
+- Landed:
+  - the nine eligibility fixtures under `crates/capture/tests/fixtures/`
+    and their worker-parity case
+    (`packages/cad-kernel/src/worker-host.test.ts:415`);
+  - per-sketch shared contours and reference-only retention
+    (`createCadGeometry`, `packages/core/src/cad/history.ts:439-531`;
+    `retainedTools`, `construction.ts:122-126`);
+  - the picker's choice filter (`pcb-insert.ts:14-43`);
+  - capture's `collectCadInput` input (`capture-command.ts:242`,
+    `export-handlers.ts:263`).
+- Not landed:
+  - the decoder contract (section 19.1: F1 "Decoder contract", the F4
+    "Mesh" seam, F9);
+  - the display-only walk result (F1 "Construction walk");
+  - the charged capture walk and metadata mode (F4);
+  - the bounds-only export (F9);
+  - the sweep (F13);
+  - the once-per-render classification (F16);
+  - the picker's commit-time guard (F2, Q1).
+
+Round-2 findings 1, 2, 3, 5, 6 and 7 are therefore these round-1 rules,
+which are still valid. Below they are restated only where they change.
+Findings 4, 8, 9 and 10 are new.
+
+The Q1 and Q2 decisions in `design-docs/user-qa/ai-capture-audit-r1.md`
+read `approved`. No plan in this section is gated on a question, and no
+new question is opened.
+
+### 20.2 Rules
+
+R2-1 `function-open-mesh-multitarget-cut` (high). Section 19.1 F1 applies
+in full:
+
+- the eligibility rules (a) to (d) and the fixture table;
+- the construction-walk result `"display-only"`;
+- the unchanged renderer;
+- the tests: five negative documents and three positive controls, worker
+  and capture side by side, and block pixels equal to the suppressed-cut
+  control.
+
+Changes against round 1:
+
+- The decoder contract is R2-D below, which replaces the round-1 text.
+- `visitor.mesh` receives a second argument, `{ targeted: boolean }`.
+  `visitCadConstruction` computes `targeted` once, before the walk: it is
+  true when some feature's `history.targets` contains this mesh.
+  - Capture asks the decoder for `needTarget` only when `targeted` is
+    true.
+  - An untargeted mesh never needs the rule, because nothing can fold into
+    it.
+- Capture's mesh visitor returns `"display-only"` when `booleanTarget` is
+  false. The walk then:
+  - keeps the mesh status ok;
+  - does not add the mesh to the Boolean body set;
+  - fails any later `add`, `cut` or `intersect` that targets it with
+    `cad.body.missing`, before `visitor.tool` runs, so no target receives a
+    step.
+
+  The mesh's capture body is still created, so the surface stays drawn.
+  `cad check` and the wireframe keep returning a boolean.
+- The test at `packages/core/src/capture/scene.test.ts:324-342` expects a
+  difference step on a single open triangle. It is replaced by the
+  single-triangle negative case. The same case with a closed tetrahedron
+  keeps the difference step.
+- Pixel comparison:
+  - A rejected cut never reaches `visitor.tool`, and a suppressed cut is
+    skipped by the walk, so neither pushes a capture tool. In
+    `scene.test.ts`, `prepareCadCapture` of each negative document
+    therefore gives NCS1 bytes equal to those of the same document with the
+    cut suppressed. The renderer is deterministic, so equal scenes give
+    equal pixels.
+  - `apps/cli/src/native-parity/capture.test.ts` runs the same pair
+    through a freshly built release binary and asserts equal image bytes,
+    a `cad.body.missing` line for the cut and a failed face sketch. The
+    single-triangle document and the closed-tetrahedron control run there
+    too; the control's image differs from its suppressed-cut capture.
+
+R2-D Decoder contract, shared by R2-1, R2-3 and R2-5. There is one
+contract with two implementations, which accept, reject and measure
+identically.
+
+- Options:
+  - `maxVertices`, default unlimited;
+  - `needTarget`, default false.
+- Result:
+  - `vertexCount` and `triangleCount`;
+  - `bounds`: `{ min, max }` in millimetres, null exactly when
+    `vertexCount` is 0;
+  - `booleanTarget`: present exactly when `needTarget` is true;
+  - `positions` (a millimetre `Float64Array`) and `triangles` (a
+    `Uint32Array`): present exactly when `vertexCount <= maxVertices`.
+
+  Invalid data throws in TypeScript and returns `None` in Rust, with the
+  existing error order.
+- The budgeted decoder is a new entry point next to the existing one; the
+  existing full-geometry entry points keep their names, signatures,
+  packet and callers:
+  - Rust: `nmesh::decode_inline` and `InlineMesh::to_packet` are
+    unchanged; `decode_inline_with(text, options)` is new.
+  - TypeScript: `decodeCaptureMesh(data)` in `packages/io` keeps returning
+    required `positions` and `triangles`; `decodeCaptureMeshWith(data,
+    options)` is new.
+  - Native host: `nmeshDecode(data)` keeps its packet; `nmeshCapture(data,
+    maxVertices, needTarget)` and `nmeshBounds(data)` are new.
+  - `CommandIo.decodeMesh?(data)` keeps its required-array return type, so
+    `apps/cli/src/cad-command.ts:56` still passes it to `checkCadPage`,
+    whose `MeshDecoder` (`check.ts:20-23`) requires both arrays.
+    `CommandIo.decodeCaptureMesh?(data, options)` and
+    `CommandIo.meshBounds?(data)` are new optional members.
+  - `CaptureMeshDecoder` becomes the budgeted signature `(data: string,
+    options: CaptureMeshDecodeOptions) => CaptureMeshDecodeResult`, with
+    `options` required and `positions` and `triangles` optional in the
+    result. Only capture uses it.
+
+  So `cad check`, its packet and its types never change, and no reader
+  ever sees a packet layout it was not written for.
+- Bounds are `min(q) / 1000` and `max(q) / 1000` over the quantized
+  integers.
+  - They equal `pointBounds` of the millimetre positions bit for bit,
+    because division by 1000 is correctly rounded and monotone.
+  - Cameras and NCS1 bytes therefore do not change.
+- Over the limit, the decoder first reads the header counts. When
+  `vertexCount > maxVertices`:
+  - It makes one streaming validation pass with O(1) scratch: the previous
+    vertex, the running min and max, and the `used` counter. This works
+    because positions are delta-coded against the previous vertex only,
+    and triangle codes against `used` (`decode.ts:70-89`,
+    `nmesh.rs:137-160`).
+  - The pass runs the same checks in the same order.
+  - It allocates no position array and no triangle array.
+
+  A malformed header takes the full path, so its error is unchanged.
+- Eligibility (`needTarget`):
+  - In both languages it reads vertex `i` as `q[3i + k] / 1000`, directly
+    from the quantized integers, so the doubles of rules (a) and (d) are
+    identical. No millimetre position array is materialized for the rule,
+    on any path.
+  - Over the limit, it needs scratch: the quantized positions, the index
+    list and the edge list. That scratch is bounded by the 1 MiB inline
+    cap, never converted to millimetre `Float64` geometry, and owned by the
+    eligibility function, so it is dropped before the decoder returns; the
+    result holds no scratch. Its allocations are reported with kind
+    `"target"`.
+- Closure input (rule (a) in Rust). `mesh::is_closed(&Mesh)` reads
+  millimetre positions from the owned `scene::Mesh`
+  (`scene.rs:68-71`), so the decoder cannot call it without building
+  `Vec<f64>` geometry. Plan a1-rust-decoder therefore moves the body of
+  `is_closed` (`mesh.rs:6-57`) unchanged into
+  `mesh::closed_by(vertex_count: usize, triangles: &[u32], position: impl
+  Fn(usize) -> [f64; 3]) -> bool`:
+  - `is_closed(mesh)` becomes a one-line wrapper with `position = |i|
+    [p[3i], p[3i+1], p[3i+2]]`, so the renderer's result and every
+    existing `is_closed` test are unchanged;
+  - the decoder calls `closed_by` with `position = |i| [q[3i] as f64 /
+    1000.0, ...]`, reading the quantized scratch on demand;
+  - the `positions.len()` multiple-of-three check stays in the wrapper,
+    which passes `vertex_count = positions.len() / 3`; the index-range,
+    finite-coordinate, zero-area and edge-pairing checks move into
+    `closed_by` in their current order.
+
+  This is the only `mesh.rs` edit in a1-rust-decoder; c2-closure-once
+  edits `mesh.rs` after it (section 20.3).
+- Rust (`crates/capture/src/nmesh.rs`):
+  - `decode_inline_with(text, options)` returns the result above.
+    `decode_inline` and `InlineMesh::to_packet` stay unchanged.
+  - A test-only `decode_with_stats` counts each `Vec::with_capacity` site
+    by kind: `positions`, `triangles`, `target`.
+  - The new capture packet (`DecodedMesh::to_packet`, written by a1 and
+    first emitted by the `nmeshCapture` host function in a2-native-host)
+    starts with a 64-byte header:
+    - `u32 vertexCount`;
+    - `u32 triangleCount`;
+    - `u32 flags`: bit 0 geometry present, bit 1 `booleanTarget` present,
+      bit 2 its value, bit 3 bounds present;
+    - a zero `u32`;
+    - six `f64` bounds (`min` x y z, then `max` x y z), zero when absent.
+
+    When geometry is present, the `f64` positions follow at offset 64 and
+    the `u32` indices at `64 + 24 * vertexCount`. All values are
+    little-endian.
+- TypeScript:
+  - `packages/nmesh/src/decode.ts`: `decodeNmesh` gains an optional second
+    argument, `{ maxVertices?, onAllocate? }`. A new exported streaming
+    `inspectNmesh(bytes)` returns the counts and quantized bounds, with the
+    same error order.
+  - `packages/io/src/nmesh/capture-decoder.ts` adds
+    `decodeCaptureMeshWith(data, options)`, which implements the contract
+    and ports rules (a) to (d) with the same operation order, reading
+    vertices from the quantized `Int32Array` as `q / 1000` on demand. In
+    the over-limit targeted path every allocation (including those inside
+    `decodeNmesh`) is reported as `target`. `decodeCaptureMesh(data)` is
+    unchanged.
+  - It calls `onAllocate(kind, length)` at every allocation site:
+    `positions`, `triangles`, `mm` (the millimetre positions of
+    `toTriangleMesh`) and `target`.
+  - `packages/io` still does not import `@nodetto/core`.
+- Hosts:
+  - New native CLI host functions in `apps/cli/native/src/engine.rs`,
+    added by a2-native-host:
+    - `nmeshCapture(data, maxVertices, needTarget)` returns the capture
+      packet above;
+    - `nmeshBounds(data)` returns six `f64` (48 bytes), or null for
+      invalid or empty data.
+
+    `nmeshDecode(data)` and its packet stay as they are.
+  - `apps/cli/src/native-engine.ts` reads them as
+    `CommandIo.decodeCaptureMesh` and `CommandIo.meshBounds`. The packet
+    writer (`engine.rs`) and its reader (`native-engine.ts`) land in the
+    same plan, a2-native-host, and its `engine_tests.rs` case asserts the
+    offsets (positions at 64, indices at `64 + 24V`) on an asymmetric mesh.
+  - `CaptureMeshDecoder` (`packages/core/src/capture/cad-request.ts`) is
+    the TypeScript form of the budgeted contract. `capture-command.ts`
+    passes `io.decodeCaptureMesh`; when it is absent (Bun),
+    `capture-cad.ts` defaults to `decodeCaptureMeshWith`.
+  - The desktop decodes meshes with `decodeCaptureMeshWith` in the webview
+    (`export-handlers.ts:278`) and sends only the finished NCS1 scene over
+    Tauri. `apps/desktop/src-tauri/src/capture.rs` has no mesh decoder, so
+    the Tauri IPC payload is unchanged.
+- Tests, in the `nmesh.rs` unit tests and `capture-decoder.test.ts`:
+  - For all nine fixtures, they assert the table's `booleanTarget` and
+    identical `bounds` doubles.
+  - An asymmetric mesh with negative coordinates checks all six extrema.
+  - For each corruption case of
+    `rejects_what_the_reference_decoder_rejects` and of the TS codec
+    tests, a decode with `maxVertices` below the vertex count rejects with
+    the same result as the full decode. It records zero `positions`,
+    `triangles` and `mm` allocations.
+  - Over-limit targeted controls: `tetrahedron.nmesh.txt` with
+    `maxVertices = 3, needTarget = true` gives `booleanTarget = true`, and
+    `triangle.nmesh.txt` with `maxVertices = 2, needTarget = true` gives
+    `false`. Both give the same counts and bounds as the full decode, no
+    `positions` or `geometry` in the result, zero `positions`,
+    `triangles` and `mm` allocations, and only `target` allocations,
+    whose buffers are not reachable from the returned value.
+  - `mesh.rs` unit tests: `is_closed` results are unchanged for every
+    existing case, and `closed_by` over quantized input agrees with
+    `is_closed` over the decoded millimetre mesh for all nine fixtures.
+
+R2-2 `function-pcb-reference-page-kind` (medium). The change is in
+`insert` (`packages/ui-solid/src/cad/board-picker.tsx:79-102`):
+
+- The record-type test is replaced by `isPcbBoardChoice(editor.getSnapshot(),
+  boardId)`. It is read immediately before `pcbReferenceCommands` is built.
+- A stale choice:
+  - applies no command, so there is no history entry and no reference;
+  - leaves the selection unchanged;
+  - sets the existing fallback notice, `Could not insert the PCB board.`;
+  - closes the picker.
+- The notice must still be visible after the reactive batch that converted
+  the page settles. The clearing effect on `[selection, revision]`
+  (`board-picker.tsx:135-139`) must not erase a notice set by that same
+  batch, for example by recording the revision at which the notice was
+  set.
+
+Tests are in `packages/ui-solid/src/test-dom/cad-sketch.dom.tsx`, run by
+`packages/ui-solid/src/cad/viewport.test.tsx`:
+
+- In one batch, convert the source page to freeform and click the stale
+  option. Then assert the history length, the absence of a `cad.pcb`
+  element, the unchanged selection, the notice text and the closed picker.
+- Undo the conversion, reopen the picker and click the restored choice. It
+  adds exactly one reference and one history entry.
+
+R2-3 `performance-capture-point-limit-after-allocation` (high). Section
+19.1 F4 applies (the precedence list, capture walk, metadata walk, stats
+and tests), with these changes.
+
+- The shared rule lives in `packages/core/src/capture/scene-binary.ts` as
+  two exported functions. The writer itself calls both, so the writer and
+  the builder cannot drift.
+  - `checkScenePreTool(options, counts)` checks the request header fields,
+    then `tool count` and `body count`.
+  - `chargeTool(state, tool)` is a point accountant. In the writer's order
+    it applies the per-loop point bounds (or, for a mesh, the vertex and
+    triangle bounds), then the running total against `MAX_POINTS`. On the
+    first failure it returns the writer's exact `RangeError` message.
+- Charging:
+  - For a prism, the builder charges the normalised loop counts
+    (`points.length / 2`) before `makeTool` creates any typed array.
+  - For a mesh, it calls the decoder with `maxVertices = MAX_POINTS -
+    points`, then charges the decoder's `vertexCount` and `triangleCount`.
+  - The 1 MiB inline cap keeps any single mesh far below the mesh triangle
+    bound, so in practice only the running total fires.
+- Metadata mode. At the first failing charge the same visitor switches to
+  metadata mode; the construction walk is not restarted. In metadata mode
+  the visitor:
+  - records statuses, body ids, names, reference flags, step lists (tool
+    indices only), and the tool and body counts;
+  - records bounds: `sweptBounds` of the `normaliseToolLoops` output for
+    prisms, and the decoder `bounds` for meshes;
+  - allocates no capture typed array;
+  - calls the decoder with `maxVertices = 0`, and with `needTarget` only
+    for a targeted mesh (R2-1).
+- `buildCadCaptureModel` returns the allocated tool prefix, the full body
+  list, `toolCount`, and an optional `overLimit` message.
+- `prepareCadCapture` applies these checks in this order:
+  1. the no-body message;
+  2. the cell range;
+  3. the body queries;
+  4. camera and frame;
+  5. `checkScenePreTool`;
+  6. `overLimit`, raised as `CaptureInputError(message, undefined, true)`.
+
+  An admitted model never enters metadata mode and is written exactly as
+  it is today.
+- Tests: the section 19.1 F4 list.
+  - The allocation counters are the decoder hook of R2-D (`onAllocate`,
+    `decode_with_stats`) and `stats.toolArrays` for capture typed arrays.
+  - "Zero geometry allocations from the overflowing tool onward" means
+    zero `toolArrays` and zero decoder `positions`, `triangles` and `mm`
+    allocations, for the overflowing tool and for every later feature.
+    `target` scratch is allowed only for a targeted mesh.
+  - The admitted 4,000,000-point case asserts the NCS1 digest recorded on
+    `3cd2401`.
+
+R2-4 `performance-capture-loop-normalization-pair-scans` (medium).
+`normaliseToolLoops` (`packages/core/src/capture/scene.ts:90-117`) keeps
+its result and loop order. Only the ancestor search changes.
+
+- The candidates are the loops handed to the tool, which are the selected
+  loops. They are bucketed by `depth`.
+- For a loop at depth `d > 0`, the search visits the buckets `d - 1`,
+  `d - 2`, down to 0. It stops at the first bucket that holds a loop whose
+  bounds contain the loop's first point and whose polygon contains it
+  (`containsPoint`, unchanged).
+- The result is the greatest containing depth below `d`. That is exactly
+  what the current scan computes, since it keeps the maximum containing
+  depth below `d`. Parity, winding, kept loops and face numbering are
+  therefore unchanged for every selection.
+- A perforated plate (holes at depth 1, one outline at depth 0) now costs
+  one probe per hole.
+- An optional test-only argument, `stats: { ancestorProbes }`, counts every
+  candidate examined.
+- `loops.ts` and `history.ts` are not changed.
+
+Tests, in `scene.test.ts`:
+
+- Probes. Circular holes come before a line-built outline, with 500, 1,000
+  and 2,000 holes, built through the production loop builder.
+  - The pre-fix scan measures 252,002, 1,004,002 and 4,008,002 probes.
+  - After the fix, each doubling multiplies the probes by at most 2.2.
+    Before the fix the factor is about 4, so the test fails.
+- Equivalence.
+  - Cases: a full selection, a partial selection that omits the outline,
+    one that omits a hole, and nested islands (outline, hole, island, hole
+    in island), with selections dropping each level.
+  - The kept loops equal those of a verbatim copy of the pre-fix function,
+    kept in the test as the oracle.
+  - The capture scene bytes of a perforated-plate document equal the
+    digest recorded on `3cd2401`.
+
+R2-5 `performance-native-mesh-bounds` (medium). Section 19.1 F9 applies,
+with the R2-D contract and these paths.
+
+- Shaded capture. `scene.ts` takes a mesh body's bounds from the decoder
+  `bounds` and no longer calls `pointBounds(positions)`. On the native CLI
+  these bounds come from Rust through `nmeshCapture`, so the interpreter
+  performs no per-vertex read for bounds.
+- Construction export:
+  - `SvgExportOptions.meshBounds?: (data: string) => { min: Vec3; max: Vec3
+    } | null` is declared in `packages/core/src/svg-export/theme.ts`.
+  - `renderPageSvg` forwards it as `cadPageWireframe(elements, pageId, {
+    meshBounds })`.
+  - `apps/cli/src/export-command.ts` passes `io.meshBounds`, which is the
+    native `nmeshBounds`.
+  - `page-editing.ts` forwards options unchanged and is not edited.
+  - Without the option (browser, Bun, desktop), the current TypeScript
+    decode runs.
+  - A null or thrown result is the decode failure of R2-9.
+- Instrumentation. `cadPageWireframe` takes an optional test-only `stats:
+  { decodes }` that counts TypeScript decodes. With `meshBounds` supplied,
+  the count is 0 and the hook is called once per mesh.
+- Tests:
+  - `wireframe.test.ts`: an asymmetric mesh with negative coordinates
+    gives equal SVG with and without `meshBounds`, and a corrupt mesh fails
+    on both paths.
+  - `export-command.test.ts`: the export passes `io.meshBounds` through
+    `editor.exportPageSvg`.
+  - `capture-command.test.ts` or `scene.test.ts`: cameras, frame lines and
+    NCS1 bytes are identical with decoder bounds.
+  - `apps/cli/src/native-parity/export.test.ts`, `capture.test.ts` and
+    `cad.test.ts` (the valid and corrupt `cad check` cases at `:124` and
+    `:206`), against a freshly built release binary: SVG bytes, camera
+    lines, image bytes and `cad check` results equal the pre-fix output.
+
+R2-6 `performance-interference-sparse-pairs` (medium). Section 19.1 F13
+applies. Details:
+
+- The analysed boxes are filtered exactly as they are today.
+- Axis choice:
+  - For each axis, count the pairs whose intervals overlap under the
+    relaxed test `a.max >= b.min && b.max >= a.min`. This takes O(n log n),
+    using sorted starts and ends with binary search.
+  - The sweep runs on the axis with the smallest count. Ties go to X, then
+    Y, then Z.
+- Sweep: the boxes are sorted by `min` on that axis, and each box is
+  compared with the earlier boxes whose `max` is not below its `min`.
+- Every compared pair gets the existing exact three-axis tolerance test
+  (`interference.rs:60-64`), so `total` counts exactly the pairs that pass.
+- The passing pairs go into a bounded max-heap that keeps the `keep`
+  smallest `(a, b)` in body order; the heap is sorted at the end.
+  - Step counts and weights are computed only for kept pairs, as today.
+  - The output therefore equals the current all-pairs enumeration in
+    order, totals, weights, checked prefixes and unchecked lists.
+- A doc-hidden test entry returns the comparison count.
+- Tests, in `crates/capture/tests/interference.rs`:
+  - Separated boxes along X, and separated boxes along Y, each make at
+    most `n` comparisons.
+  - In a sparse grid, doubling `n` multiplies the comparisons by at most 3
+    (all-pairs: by 4).
+  - Small dense, mixed and tolerance-boundary assemblies give the same
+    output as an all-pairs oracle kept in the test.
+  - The 2,000-body test keeps its assertions.
+
+R2-7 `performance-capture-repeated-mesh-closure` (medium). Section 19.1
+F16 applies. Details:
+
+- `tool_view::classify(scene) -> Vec<bool>` gives, per tool, whether it is
+  solid: prisms are true, and meshes use `is_closed`. It runs once, at the
+  start of `render_with`, and its slice is passed by reference to every
+  render-path consumer through new crate-internal `_with` variants (below):
+  - `Raster::prepare`: the open-body flags (replacing the `is_solid` map
+    at `raster.rs:473`) and the picture views (`raster.rs:468`);
+  - `interference::analyse_scene_with` and `add_view_pairs_with`: candidate
+    eligibility (replacing `is_solid` at `interference.rs:48-52`) and their
+    `ViewCache` instances (`interference.rs:236`, `:318`, `:361`, `:397`);
+  - `census::resolve_with`, which passes it to the lattice entries it calls
+    for every request it builds (`census.rs:89`); the lattice uses it for
+    the slot bounds (`lattice.rs:654`), for the census lazy slot view
+    (`lattice.rs:705`, today `ToolView::new` inside `get_or_init`) and for
+    the axis views it takes from `ViewCache` (`lattice.rs:223`).
+- Existing interfaces stay source-compatible; nothing new is added to a
+  public struct:
+  - `LatticeRequest` (`lattice.rs:48-55`) keeps its six fields, so the
+    struct literals in `crates/capture/tests/boundary_fold.rs:46`, `:64`
+    and `crates/capture/tests/interference.rs:302`, `:313`, `:341` compile
+    unchanged. The classification travels as a separate `solid: &[bool]`
+    argument of crate-internal `sample_axis_with`, `sample_pair_with` and
+    `sample_body_axis_with`.
+  - `sample_axis`, `sample_body_axis`, `census::resolve`,
+    `interference::analyse_scene`, `add_view_pairs`, `candidates` and
+    `analyse_pair` keep their signatures. Each becomes a wrapper that calls
+    `tool_view::classify(request.scene)` (or `scene`) once and then its
+    `_with` variant, so standalone and test callers behave as today.
+  - The `#[cfg(test)]` reference renderer (`raster/reference.rs:321`,
+    `:326`, `:379`, `:392`, `:399`) calls only these unchanged entries and
+    is not edited. Its classifications are outside `render_scene`, so they
+    do not reach the closure-count test (separate binary, below).
+  - `render_with` calls only the `_with` variants with its one slice.
+- Views take the precomputed value:
+  - `MeshView::new` takes `closed: bool` instead of calling `is_closed`
+    (`mesh.rs:233`).
+  - New crate-internal constructors `ToolView::classified(tool, index,
+    family, closed)` and `ToolView::picture_classified(tool, index, family,
+    window, closed)` pass it through. `ViewCache::get` takes the
+    classification slice and calls `classified`. The lattice slot view
+    calls `classified` with `solid[index]`.
+  - `ToolView::new` and `ToolView::picture` keep their signatures and
+    classify for themselves, like the wrappers above. `reference.rs` is
+    not edited; its unit tests stay in the crate gate.
+- The first-tool body rule is unchanged. This renderer closure stays
+  separate from the editor eligibility `booleanTarget` (R2-1): a mesh that
+  is closed but is not a Boolean target is still drawn as a solid.
+- Instrumentation counts actual evaluations, not calls of `classify`:
+  - `mesh.rs` gets a doc-hidden `pub static CLOSURE_EVALUATIONS:
+    AtomicU64`, incremented (relaxed) on entry to `closed_by` (R2-D), which
+    every closure evaluation goes through, including `is_closed`, any
+    retained standalone constructor and any bypass of `classify`.
+  - The test lives in its own test binary,
+    `crates/capture/tests/closure_count.rs`, with a single `#[test]` that
+    runs its scenarios one after another, so no other test thread changes
+    the counter. It reads the counter before and after each
+    `render_scene` call.
+- Tests (`closure_count.rs`):
+  - Three cases, each with one open and one closed mesh tool: analysis
+    disabled, an overlapping three-axis pair, and a census case. Each
+    render adds exactly the number of mesh tools to the counter, at 1 and
+    at 8 threads. Before the fix it adds at least two per mesh (picture
+    view plus the `is_solid` map), so the test fails.
+  - Body states, ordered reports and image bytes are equal at 1 and at 8
+    threads, and equal the digests recorded on `3cd2401`.
+  - The existing crate suites pass unchanged, without edits: the
+    reference renderer's unit tests, `boundary_fold.rs` (boundary
+    behaviour), `interference.rs`, `census.rs` and `mesh.rs`. The gate is
+    the full `cargo test -p nodetto-capture`.
+
+R2-8 `maintainability-wireframe-pcb-input` (medium). The CAD branch of
+`renderPageSvg` (`packages/core/src/svg-export/document.ts:591-596`)
+passes this to `cadPageWireframe`:
+
+`collectCadInput({ pages: store.listPages(), elements: store.listElements()
+}, pageId, 0).elements`
+
+This is the input the capture entry points already use. The test is in
+`packages/core/src/svg-export/cad.test.ts` and goes through the public
+`editor.exportPageSvg`. A board-only CAD page gives:
+
+- an SVG;
+- null after the board's page is converted to freeform;
+- the original SVG bytes after Undo.
+
+R2-9 `maintainability-wireframe-mesh-failure` (medium). The wireframe's
+mesh lookup returns either the eight projected corners or a failure.
+
+- It fails in three cases:
+  - decoding throws `NmeshError`;
+  - `meshBounds` returns null;
+  - the mesh has no vertex. In valid data this is the same as having no
+    triangle, so it is the same emptiness rule as `check.ts:26-37` and the
+    capture visitor.
+- On failure, the mesh visitor returns false.
+  - `visitCadConstruction` then fails the mesh as `cad.mesh.invalid` and
+    does not register it as a body.
+  - Dependants fail as they do in `cad check`.
+- On success, the corners are drawn once, from that same result.
+- Tests, in `wireframe.test.ts`:
+  - A corrupt mesh plus a cut targeting it gives zero segments and null
+    bounds. Before the fix it gives 12 segments.
+  - A valid-mesh control draws both the mesh box and the cut.
+
+R2-10 `maintainability-capture-raster-rounding` (medium).
+
+- `packages/core/src/capture/raster-fit.ts` exports one rounding function,
+  `capturePixelSpan(span, scale) = max(1, ceil(span * scale - 1e-6))`.
+  This is the frame builder's existing rule
+  (`apps/cli/src/capture-artwork.ts:52`).
+- `captureRasterPlan` uses it to compute width and height once per scale
+  step. It uses those same values for the box, area and raster-limit
+  checks, and returns them in the plan.
+- `pixelFrame` takes the plan's `width` and `height` instead of
+  recomputing them.
+- Scale quantization and the `snapSvgFrameToPixels` overscan are
+  unchanged.
+
+Tests:
+
+- `raster-fit.test.ts` plans a 10000 x 100 viewport twice: at explicit
+  scale 0.07, and with a 700 x 7 box. Both give scale 0.07 and 700 x 7.
+  Before the fix, the explicit scale gives 701 x 8 and the box reduces the
+  scale to 0.069.
+- `capture-command.test.ts` captures that viewport both ways and gets a
+  700 x 7 PNG with equal bytes.
+- The existing over-limit tests and the deterministic PNG tests pass
+  unchanged.
+
+### 20.3 Plan grouping
+
+Plans are named `car2-*`. Each plan:
+
+- is about 150 lines or less;
+- uses its own `CARGO_TARGET_DIR=target/car2-<plan>` and `artifactRoots
+  ["target", "tmp/cad3d"]` (existing tests write measurements under
+  `tmp/cad3d`). The dispatch manifest is
+  `impl-plans/active/car2-r2b-dispatch.json`. It replaces
+  `car2-r2-dispatch.json`, whose `["target", "tmp"]` roots contained its
+  evidence root `tmp/car2-r2`. The new manifest uses `taskId car2-r2b`
+  (the evidence root must equal `tmp/<taskId>`) and keeps every other
+  field except these changes:
+  - every `artifactRoots` becomes `["target", "tmp/cad3d"]`;
+  - every evidence path becomes `tmp/car2-r2b` (the `evidenceRoot` and the
+    `tmp/car2-r2/<planId>/<attempt>/` constraint text). `tmp/car2-r2b` is
+    outside every artifact root;
+  - the `"tmp"` entry in every plan's `writePaths` becomes `"tmp/cad3d"`.
+    An artifact root must equal a `writePaths` entry and must not lie
+    inside another source path. A `"tmp"` source path would also contain
+    the evidence root and about 500 MB of earlier evidence;
+  - the four plans that run `native-parity/capture.test.ts` (a2-native-host,
+    a2-core-wiring, a4-open-mesh-targets, a5-charged-walk) also list the two
+    files that test writes, `tmp/capture/m09/timing.json` and
+    `tmp/capture/m23/timing.json`. These plans are in different waves;
+  - `reviewContext.finalIntegration` adds gates 3 and 4 below;
+- runs only the tests next to the files it touches (`bun test <paths>`,
+  `cargo test -p <crate>`, clippy and biome on touched files).
+
+Workspace checks run once, at integration, after all 14 plans land. Every
+gate must exit 0, and its command, exit status and complete log path are
+recorded:
+
+1. `bun run typecheck` and `bun run lint`;
+2. `CARGO_TERM_QUIET=true mise run verify`;
+3. `CARGO_TERM_QUIET=true mise run test-cli` (nodetto-native and
+   nodetto-cli cargo tests, then the release binary with all of
+   `apps/cli/src`, including native parity and MCP stdio);
+4. after gates 2 and 3, a scan that fails on any match or scan error:
+   `sh -c 'for root in target tmp; do if [ -d "$root" ]; then
+   matches=$(find "$root" -name "*.test.ts" -print) || exit 1; if [ -n
+   "$matches" ]; then printf "%s\n" "$matches"; exit 1; fi; fi; done'`.
+
+A plan depends on another only when it edits a file, or uses
+a contract, that the earlier plan creates. In wave 1, a1-rust-decoder and
+c1-sweep both build the `nodetto-capture` crate. A compile failure caused
+by a sibling's in-progress edit is rerun after that sibling finishes, and
+is never fixed by editing the sibling's files.
+
+| Plan | Findings | Owns | After |
+| --- | --- | --- | --- |
+| a1-rust-decoder | R2-D Rust half | `crates/capture/src/nmesh.rs` (`decode_inline_with`, `decode_with_stats`, `DecodedMesh::to_packet`; `decode_inline` and `InlineMesh::to_packet` unchanged); the `closed_by` extraction in `crates/capture/src/mesh.rs` and its unit tests | - |
+| a1-ts-decoder | R2-D TS half | `packages/nmesh/src/{decode,index}.ts`, `packages/nmesh/src/codec.test.ts`, `packages/io/src/nmesh/{capture-decoder,index}.ts` (`decodeCaptureMeshWith`; `decodeCaptureMesh` unchanged), `capture-decoder.test.ts` | - |
+| a3-loop-normalisation | R2-4 | `normaliseToolLoops` in `scene.ts`; `scene.test.ts` (probe and equivalence cases) | - |
+| a5-point-rule | R2-3 shared rule | `scene-binary.ts`, `scene-binary.test.ts` | - |
+| b-wireframe | R2-8, R2-9 | `svg-export/document.ts`, `cad/wireframe.ts`, `wireframe.test.ts`, `svg-export/cad.test.ts` | - |
+| c1-sweep | R2-6 | `collect_candidates` in `interference.rs`; `crates/capture/tests/interference.rs` | - |
+| p-picker-guard | R2-2 | `board-picker.tsx`, `test-dom/cad-sketch.dom.tsx`, `viewport.test.tsx` | - |
+| r-raster-rounding | R2-10 | `raster-fit.ts`, `capture-artwork.ts`, `raster-fit.test.ts`, `capture-command.test.ts` | - |
+| a2-native-host | R2-D native host | `apps/cli/native/src/engine.rs` (new `nmeshCapture`, `nmeshBounds`; `nmeshDecode` unchanged), `apps/cli/native/src/engine_tests.rs` (packet offsets), `apps/cli/src/native-engine.ts` (readers for both: writer and reader in one plan), `apps/cli/src/commands.ts` (new optional `decodeCaptureMesh` and `meshBounds`, typed structurally; `decodeMesh` unchanged) | a1-rust-decoder |
+| c2-closure-once | R2-7 | `mesh.rs` (`MeshView::new(closed)`, `CLOSURE_EVALUATIONS`), `tool_view.rs`, `raster.rs`, `lattice.rs` (`_with` variants; `LatticeRequest` unchanged), `census.rs` (`resolve_with`), the classification, `_with` and `ViewCache` hunks of `interference.rs`, new `crates/capture/tests/closure_count.rs`. Not edited: `raster/reference.rs`, `crates/capture/tests/{boundary_fold,interference,census,mesh}.rs` | c1-sweep, a1-rust-decoder |
+| a2-core-wiring | R2-D TypeScript callers, R2-5 shaded bounds | `CaptureMeshDecoder` in `cad-request.ts`; the mesh decode call and decoder `bounds` in `scene.ts`; `capture-command.ts` (passes `io.decodeCaptureMesh`); `capture-cad.ts` (default `decodeCaptureMeshWith`); `apps/desktop/src/shell/export-handlers.ts`; the fake decoders in `scene.test.ts`, `cad-request.test.ts`, `capture-cad.test.ts` and `export-handlers.test.ts`; a routing case in `capture-command.test.ts`; a routing case in `engine_tests.rs` | a2-native-host, a1-ts-decoder, a3 |
+| a2-export-bounds | R2-5 export path | `svg-export/theme.ts`; the `meshBounds` forward in `document.ts`; the `meshBounds` path and test-only `stats` in `wireframe.ts`; `wireframe.test.ts`; `export-command.ts` and `export-command.test.ts`; `native-parity/export.test.ts` | a2-native-host, b |
+| a4-open-mesh-targets | R2-1 | `cad/construction.ts`; the mesh visitor in `scene.ts`; `scene.test.ts`; `worker-host.test.ts`; an eligibility case in `engine_tests.rs`; `native-parity/capture.test.ts` | a2-core-wiring |
+| a5-charged-walk | R2-3 | `buildCadCaptureModel` in `scene.ts`; `prepareCadCapture` in `cad-request.ts`; `scene.test.ts`; `cad-request.test.ts`; `engine_tests.rs`; `native-parity/capture.test.ts` | a4-open-mesh-targets, a5-point-rule |
+
+The plans run in five waves:
+
+1. The eight plans with no predecessor.
+2. a2-native-host and c2-closure-once.
+3. a2-core-wiring and a2-export-bounds.
+4. a4-open-mesh-targets.
+5. a5-charged-walk.
+
+No two plans of one wave own the same file. `engine_tests.rs` is edited by
+a2-native-host, a2-core-wiring, a4 and a5-charged-walk in waves 2, 3, 4
+and 5, one at a time.
+
+Staged decoder rollout. At the end of every wave, native CLI capture
+decodes meshes in Rust; no completed wave uses the interpreter decoder on
+the native CLI, no packet writer exists without its reader, and no type an
+unchanged caller depends on changes:
+
+- Wave 1 adds `decode_inline_with`, `DecodedMesh::to_packet` and
+  `decodeCaptureMeshWith` beside the unchanged entry points. Nothing emits
+  the new packet. Native capture still forwards `io.decodeMesh`
+  (`capture-command.ts:255`), the Rust `nmeshDecode`.
+- Wave 2 adds the `nmeshCapture` and `nmeshBounds` writers, their readers
+  in `native-engine.ts` and the optional `CommandIo` members, all in
+  a2-native-host. No caller uses them yet, so native capture is still the
+  Rust `nmeshDecode` path.
+- Wave 3 switches `capture-command.ts` from `io.decodeMesh` to
+  `io.decodeCaptureMesh`, which the native host already implements, so
+  native capture moves from one Rust decoder to the other in a single
+  plan. Bun and the desktop use `decodeCaptureMeshWith`, as the TypeScript
+  fallback. a2-export-bounds switches native export to `io.meshBounds` in
+  the same wave.
+- The `cad check` path (`nmeshDecode`, `CommandIo.decodeMesh`,
+  `checkCadPage`) is untouched in every wave.
+
+Routing evidence (Rust is really used):
+
+- a2-core-wiring, `engine_tests.rs`: with the existing interception
+  pattern (`engine_tests.rs:382-386`), a native capture of a document with
+  one imported mesh calls `native.nmeshCapture` once and
+  `native.nmeshDecode` zero times; `cad check` on the same document still
+  calls `nmeshDecode` once. `capture-command.test.ts` asserts that a fake
+  `io.decodeCaptureMesh` is the decoder that capture uses.
+- a4, `engine_tests.rs`: the cut documents of R2-1 call `nmeshCapture`
+  with `needTarget = true` for the targeted mesh. The single triangle
+  returns `booleanTarget = false` and the cut reports `cad.body.missing`;
+  the closed tetrahedron returns `true` and both targets get the
+  difference step.
+
+A single wave is not possible without two plans editing the same region
+or contract at once:
+
+- a2-native-host needs the Rust decoder.
+- a2-core-wiring switches the caller only after the native host exists,
+  needs the TypeScript decoder, and edits `scene.ts` after a3.
+- a2-export-bounds needs the native `meshBounds` and b's wireframe.
+- a4 needs a2-core-wiring's typed contract, and its native gate must run
+  against a binary with `nmeshCapture` and the switched caller.
+- a5-charged-walk rewrites the visitor a4 changes.
+- c2 edits `mesh.rs` after a1-rust-decoder's `closed_by` extraction.
+
+Gates of the native plans (each after its own release build,
+`CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-<plan> cargo build
+--release -p nodetto-cli`, with `NODETTO_CLI_TEST_BINARY` set to that
+binary):
+
+- a2-native-host: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a2-native-host cargo test -p nodetto-cli`,
+  then `bun test apps/cli/src/native-parity/cad.test.ts
+  apps/cli/src/native-parity/capture.test.ts`.
+- a2-core-wiring: the same two commands with its own target directory.
+- a2-export-bounds: `bun test apps/cli/src/native-parity/export.test.ts
+  apps/cli/src/native-parity/cad.test.ts`.
+- a4 and a5-charged-walk: `cargo test -p nodetto-cli` with their own
+  target directory, then `bun test
+  apps/cli/src/native-parity/capture.test.ts
+  apps/cli/src/native-parity/cad.test.ts`. Because a4 runs after
+  a2-core-wiring and a2-native-host, its release binary always contains
+  the Rust capture host and the switched caller.
+- c2-closure-once: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-c2-closure-once cargo test -p nodetto-capture`
+  (all crate suites, including `closure_count.rs` and the reference
+  renderer's unit tests).
+
+`apps/desktop/src-tauri/src/capture.rs` is not edited (see the Hosts
+bullet of R2-D).
+
+Native parity always builds first:
+
+1. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-<plan> cargo build
+   --release -p nodetto-cli`
+2. Set `NODETTO_CLI_TEST_BINARY="$PWD/target/car2-<plan>/release/nodetto-cli"`.
+
+Oracle copies of pre-fix functions live inside the test files. They are
+never kept as `*.test.ts` files under `target/` or `tmp/`.
+
+### 20.4 Decisions
+
+- Eligibility travels as `booleanTarget` in the R2-D result.
+  - It is computed in Rust on the native CLI, and in TypeScript in the
+    desktop webview and in Bun.
+  - The Tauri payload does not change, because the desktop never decodes
+    meshes in Rust.
+- Group A is split by contract into nine plans with an explicit order
+  (section 20.3) rather than given to one owner, to keep each plan near 150
+  lines.
+- The budgeted decoder is added beside the full-geometry decoder in every
+  layer (`decode_inline_with`, `decodeCaptureMeshWith`, `nmeshCapture`,
+  `CommandIo.decodeCaptureMesh`) instead of changing the existing entry
+  points. `cad check` keeps its packet and its required-array type, and
+  every packet writer lands in the same plan as its reader.
+- The native host lands one wave before the caller switches to it, and
+  the switch happens in one plan, so native capture is Rust-backed at
+  every completed wave. Engine tests intercept the host functions to show
+  which one capture and `cad check` actually call.
+- The renderer classification reaches the lattice, census and analysis
+  through crate-internal `_with` variants and a separate argument, not a
+  new `LatticeRequest` field. The public struct and every existing
+  signature stay, so the integration tests and the reference renderer
+  compile unedited.
+- Rust rule (a) reuses the renderer's closure code through
+  `mesh::closed_by` with a position accessor, so the decoder reads
+  quantized positions on demand and the renderer's `is_closed` result
+  cannot drift from the eligibility rule's closure test.
+- Closure instrumentation counts evaluations inside `closed_by` with a
+  process-wide counter read by a single-test binary, so any duplicate
+  evaluation, from any caller, fails the regression.
+- The interference broad phase is a single-axis sweep on the axis with the
+  fewest overlapping pairs, not a grid. A sweep needs no cell size, and
+  its examined set is easy to compare with all-pairs enumeration.
+- The shared point rule lives in `scene-binary.ts`, the writer's module,
+  and the writer calls it, so the rule has one owner.
+- After the point-limit excess, a mesh that a later feature targets may
+  still allocate `target` scratch (bounded by the 1 MiB inline cap, freed
+  per mesh, never capture geometry). Without it, that feature's status,
+  and so the no-body message's error list, would differ from an admitted
+  walk. No other decoder or capture geometry is allocated after the
+  excess.
+- Loop normalisation uses depth buckets rather than a "complete profile"
+  shortcut. The bucketed result is provably the current one for every
+  selection, so no difference between float and grid containment can
+  change bytes.
+- The wireframe treats an empty decoded mesh as a failure, as `cad check`
+  and capture already do.
+
+### 20.5 Risks
+
+- In R2-4, same-depth siblings that each contain loops (for example many
+  islands in many holes) still cost O(siblings x children) bounding-box
+  checks. The audited case, the perforated plate, is linear.
+- The R2-1 rule agrees with Manifold only on the nine fixtures (section
+  19.1).
+- If the implementation misses the R2-2 rule, the revision effect of the
+  same batch can clear the notice. The DOM test checks the notice after
+  the batch settles.
+- Five waves lengthen the critical path (a1-rust-decoder, a2-native-host,
+  a2-core-wiring, a4, a5-charged-walk). A slip in any of them delays R2-1
+  and R2-3. The chain is kept because every step is a real contract and
+  no completed wave may decode meshes in the interpreter on the native
+  CLI.
+- The `CLOSURE_EVALUATIONS` counter is process-wide. It is reliable only
+  in its own single-test binary; another test binary that asserts on it
+  would race.
+- Native parity is meaningful only against a release binary built in the
+  same plan.

@@ -10,6 +10,7 @@ import {
   encodeNmesh,
   fromInline,
   isCanonical,
+  inspectNmesh,
   toInline,
   toTriangleMesh,
 } from "./index.ts";
@@ -374,4 +375,41 @@ describe("NMESH inline armour", () => {
     expectCode(() => toInline(new Uint8Array(maxBytes + 1)), "nmesh.inline");
     expectCode(() => fromInline(`${armored}AAAA`), "nmesh.inline");
   });
+});
+
+test("inspector preserves corruption errors", () => {
+  const invalid = [
+    Uint8Array.of(1),
+    ...[0, 4, 5, 6, 7].map((offset) => {
+      const bytes = file([0, 0, 0]);
+      bytes[offset] = (bytes[offset] as number) + 1;
+      return bytes;
+    }),
+    file([128, 128, 128]),
+    file([128, 128, 128, 128, 128, 0, 0, 0]),
+    file([255, 255, 255, 255, 16, 0, 0]),
+    file([0x83, 0, 1, 1, 0, 1, 0, 0, 0, 0, 2, 0, 2, 1, 0, 0, 0, 0]),
+    file([0, 1, 1, 0, 1, 0, 0, 0]),
+    file([1, 0, 0, 0, 0, 0]),
+    file([0, 1, 0, 0, 0, 0]),
+    file([0, 0, 2, 1, 0, 1, 0]),
+    file([0, 1, 1, 0, 0, 0, 0, 0]),
+    file([0, 0, 1, 0, 1]),
+    file([1, 0, 0, ...varint(20_000_002), 0, 0]),
+    file([2, 0, 0, ...varint(20_000_000), 0, 0, 2, 0, 0]),
+    file([0, 0, 0, 0]),
+  ];
+  const badCrc = file([0, 0, 0]);
+  badCrc[badCrc.length - 1] ^= 1;
+  invalid.push(badCrc);
+  for (const bytes of invalid) {
+    let caught: unknown;
+    try {
+      decodeNmesh(bytes);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(NmeshError);
+    expect(() => inspectNmesh(bytes)).toThrow(caught as NmeshError);
+  }
 });

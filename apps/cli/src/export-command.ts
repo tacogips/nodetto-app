@@ -534,6 +534,7 @@ export async function exportCommand(
         background,
         resolveAsset,
         prototypeView,
+        meshBounds: io.meshBounds?.bind(io),
       });
   } catch (error) {
     return fail(

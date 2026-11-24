@@ -1,4 +1,5 @@
 import { expect } from "bun:test";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -774,4 +775,152 @@ nativeTest(
     }
   },
   60_000,
+);
+
+nativeTest(
+  "native capture rejects shared cuts targeting an open mesh",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-open-mesh-"));
+    try {
+      for (const fixture of ["triangle", "tetrahedron"] as const) {
+        const data = readFileSync(
+          new URL(
+            `../../../../crates/capture/tests/fixtures/${fixture}.nmesh.txt`,
+            import.meta.url,
+          ),
+          "utf8",
+        ).trim();
+        const cut = extrude("cut", "a5", {
+          sketch: "opening",
+          distance: 5,
+          op: "cut",
+          bodies: ["block", "mesh"],
+        });
+        const elements = [
+          sketch("base", "a1"),
+          ...rectangle("base", 0, 0, 10, 10),
+          extrude("block", "a2", { sketch: "base", distance: 5, op: "new" }),
+          cadElement("mesh", "cad.mesh", "a3", { name: fixture, data }),
+          sketch("opening", "a4"),
+          ...rectangle("opening", 2, 2, 2, 3),
+          cut,
+          sketch("face", "a6", { face: { feature: "cut", role: "end" } }),
+        ];
+        const twin = elements.map((element) =>
+          element.id === "cut"
+            ? { ...cut, semantic: { ...cut.semantic, suppressed: true } }
+            : element,
+        );
+        const path = join(cwd, `${fixture}.jsonl`);
+        const twinPath = join(cwd, `${fixture}-suppressed.jsonl`);
+        writeFileSync(
+          path,
+          serializeDocument(document(elements, [CAD_TEST_PAGE])),
+        );
+        writeFileSync(
+          twinPath,
+          serializeDocument(document(twin, [CAD_TEST_PAGE])),
+        );
+        const actual = runCad(cwd, path, ["--size", "320x240"]);
+        const suppressed = runCad(cwd, twinPath, ["--size", "320x240"]);
+        if (fixture === "triangle") {
+          expect(actual.stdout).toContain("cad.body.missing");
+          expect(actual.stdout).toContain("cad.reference.failed");
+          expect(actual.bytes).toEqual(suppressed.bytes);
+        } else {
+          expect(actual.bytes.equals(suppressed.bytes)).toBe(false);
+        }
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "native capture admits the point boundary and rejects the first excess",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-point-boundary-"));
+    try {
+      const positions = new Int32Array(20_000 * 3);
+      for (let i = 0; i < 20_000; i++) {
+        positions[i * 3] = i;
+        positions[i * 3 + 1] = i % 2;
+      }
+      const triangles = new Uint32Array(20_001);
+      for (let i = 0; i < 19_998; i++) triangles[i] = i;
+      triangles.set([19_997, 19_998, 19_999], 19_998);
+      const data = toInline(
+        encodeNmesh({
+          positions,
+          triangles,
+          groups: [{ faceId: 0, count: 6_667 }],
+        }),
+      );
+      const meshes = Array.from({ length: 201 }, (_, i) => {
+        const id = `mesh-${String(i).padStart(3, "0")}`;
+        const mesh = cadElement(id, "cad.mesh", "a1", { name: id, data });
+        return { ...mesh, visual: i === 0 ? {} : { hidden: true } };
+      });
+      const save = (name: string, count: number) => {
+        const path = join(cwd, name);
+        writeFileSync(
+          path,
+          serializeDocument(
+            document(meshes.slice(0, count), [
+              { id: "cad", name: "Mesh", kind: "cad3d" },
+            ]),
+          ),
+        );
+        return path;
+      };
+      const admitted = save("admitted.jsonl", 200);
+      const overflow = save("overflow.jsonl", 201);
+      const run = (path: string, output: string) => {
+        const start = performance.now();
+        const result = Bun.spawnSync(
+          [
+            binary as string,
+            "capture",
+            path,
+            "--output",
+            output,
+            "--size",
+            "64x64",
+            "--no-interference",
+          ],
+          { cwd },
+        );
+        console.log(
+          `point-boundary ${output}: ${Math.round(performance.now() - start)} ms`,
+        );
+        return result;
+      };
+      const accepted = run(admitted, "admitted.png");
+      expect(accepted.exitCode).toBe(0);
+      expect(accepted.stderr.toString()).toBe("");
+      expect(accepted.stdout.toString()).toContain("bodies: 1 (mesh-000 ");
+      const image = readFileSync(join(cwd, "admitted.png"));
+      let fnv = 0xcbf29ce484222325n;
+      for (const byte of image)
+        fnv = BigInt.asUintN(64, (fnv ^ BigInt(byte)) * 0x100000001b3n);
+      expect(fnv.toString(16).padStart(16, "0")).toBe("783ff56857da9294");
+      expect(createHash("sha256").update(image).digest("hex")).toBe(
+        "6dbaebe1560218804831f5a48b387414ae40a5bce4b4cc491b9081dc10ef4d99",
+      );
+      expect(image.subarray(0, 8)).toEqual(
+        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      );
+      const rejected = run(overflow, "overflow.png");
+      expect(rejected.exitCode).toBe(2);
+      expect(rejected.stderr.toString()).toContain(
+        "Capture scene total point count must be an integer in 0..4000000.",
+      );
+      expect(existsSync(join(cwd, "overflow.png"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  600_000,
 );

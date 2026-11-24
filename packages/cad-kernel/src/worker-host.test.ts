@@ -441,5 +441,32 @@ test("the real worker agrees with capture mesh eligibility fixtures", async () =
         ? { ok: true }
         : expect.objectContaining({ code: "cad.mesh.open" }),
     ]);
+    const shared = await evaluate([
+      sketch("base", "a1"),
+      ...rectangle("base", 0, 0, 10, 10),
+      extrude("block", "a2", { sketch: "base", distance: 5, op: "new" }),
+      { ...mesh, index: "a3" },
+      sketch("opening", "a4"),
+      ...rectangle("opening", 2, 2, 2, 3),
+      extrude("cut", "a5", {
+        sketch: "opening",
+        distance: 5,
+        op: "cut",
+        bodies: ["block", "mesh"],
+      }),
+      sketch("face", "a6", { face: { feature: "cut", role: "end" } }),
+    ]);
+    expect(shared.status).toContainEqual([
+      "cut",
+      eligible
+        ? { ok: true }
+        : expect.objectContaining({ code: "cad.body.missing" }),
+    ]);
+    expect(shared.status).toContainEqual([
+      "face",
+      eligible
+        ? { ok: true }
+        : expect.objectContaining({ code: "cad.reference.failed" }),
+    ]);
   }
 });

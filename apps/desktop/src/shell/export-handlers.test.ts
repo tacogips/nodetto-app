@@ -19,7 +19,7 @@ import {
   prepareCadCapture,
 } from "@nodetto/core";
 import { stlToInlineMesh } from "@nodetto/io/cad-mesh";
-import { decodeCaptureMesh } from "@nodetto/io/nmesh";
+import { decodeCaptureMeshWith } from "@nodetto/io/nmesh";
 import { readStl, writeBinaryStl } from "@nodetto/io/stl";
 import { createWorkerHost } from "../../../../packages/cad-kernel/src/worker-host.ts";
 import type { ExportBackend } from "../file/backend.ts";
@@ -302,7 +302,7 @@ test("CAD image capture saves PNG and JPG and reports interference and empty bod
   const expected = prepareCadCapture(editor.getSnapshot().elements, page, {
     ...options,
     interference: DEFAULT_CAD_INTERFERENCE,
-    decodeMesh: decodeCaptureMesh,
+    decodeMesh: decodeCaptureMeshWith,
   });
   expect(requests[0].scene).toEqual(expected.scene);
   expect(requests[0]).toMatchObject({ format: "png", quality: 90 });
@@ -321,7 +321,7 @@ test("CAD image capture saves PNG and JPG and reports interference and empty bod
   const disabled = prepareCadCapture(editor.getSnapshot().elements, page, {
     ...options,
     interference: null,
-    decodeMesh: decodeCaptureMesh,
+    decodeMesh: decodeCaptureMeshWith,
   });
   expect(requests[2].scene).toEqual(disabled.scene);
   expect(requests[2].scene).not.toEqual(requests[0].scene);
@@ -563,7 +563,7 @@ test("CAD mesh-only capture sends the prepared cube scene", async () => {
     prepareCadCapture(editor.getSnapshot().elements, page, {
       ...options,
       interference: DEFAULT_CAD_INTERFERENCE,
-      decodeMesh: decodeCaptureMesh,
+      decodeMesh: decodeCaptureMeshWith,
     }).scene,
   );
 });
@@ -633,7 +633,7 @@ test("CAD capture follows PCB page kind and undo", async () => {
       {
         ...options,
         interference: DEFAULT_CAD_INTERFERENCE,
-        decodeMesh: decodeCaptureMesh,
+        decodeMesh: decodeCaptureMeshWith,
       },
     );
   const missing = expected();

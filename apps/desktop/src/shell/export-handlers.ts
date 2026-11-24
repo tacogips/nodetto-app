@@ -32,7 +32,7 @@ import {
   exportPcbPage,
   toBreadboardNetlist,
 } from "@nodetto/core";
-import { decodeCaptureMesh } from "@nodetto/io/nmesh";
+import { decodeCaptureMeshWith } from "@nodetto/io/nmesh";
 import { pagesToPdf, rasterizeSvg } from "@nodetto/ui-solid";
 import type { ExportBackend } from "../file/backend.ts";
 
@@ -275,7 +275,7 @@ export function createExportHandlers(
             options.interference === undefined
               ? DEFAULT_CAD_INTERFERENCE
               : options.interference,
-          decodeMesh: decodeCaptureMesh,
+          decodeMesh: decodeCaptureMeshWith,
         },
       );
       const result = await capture(prepared.scene, options.format, 90);

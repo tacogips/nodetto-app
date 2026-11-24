@@ -429,3 +429,62 @@ test("rejects bypassed mesh triangle and vertex bounds and invalid frame reals",
     ).toThrow("coordinate");
   }
 });
+
+test("shared point accounting preserves bounds and failure state", async () => {
+  const { MAX_POINTS, chargeTool } = await import("./scene-binary.ts");
+  expect(MAX_POINTS).toBe(4_000_000);
+  const state = { points: MAX_POINTS - 3 };
+  expect(chargeTool(state, { kind: "prism", loopCounts: [3] })).toBeUndefined();
+  expect(state.points).toBe(MAX_POINTS);
+  expect(chargeTool(state, { kind: "mesh", vertices: 1, triangles: 0 })).toBe(
+    "Capture scene total point count must be an integer in 0..4000000.",
+  );
+  expect(state.points).toBe(MAX_POINTS);
+  expect(chargeTool(state, { kind: "prism", loopCounts: [20_001] })).toBe(
+    "Capture scene loop point count must be an integer in 3..20000.",
+  );
+  expect(state.points).toBe(MAX_POINTS);
+});
+
+test("header validation precedes tool count", async () => {
+  const { checkScenePreTool } = await import("./scene-binary.ts");
+  expect(() =>
+    checkScenePreTool(
+      { ...options, supersample: 4 as CaptureSceneOptions["supersample"] },
+      { tools: 20_001, bodies: 0 },
+    ),
+  ).toThrow("Capture scene supersample must be an integer in 1..3.");
+});
+
+test("existing writer scenes retain baseline sha256", async () => {
+  const { createHash } = await import("node:crypto");
+  const cases = [
+    {
+      doc: capturePlateDocument(),
+      view: "iso" as const,
+      size: { width: 1024, height: 768 },
+      interference: analysis,
+      digest:
+        "855b169a9485379de21b4dc78aa90c6879728a6dcaed70fb6704ccf830a342c9",
+    },
+    {
+      doc: captureSelectedLoopsDocument(),
+      view: "top" as const,
+      size: { width: 640, height: 480 },
+      interference: null,
+      digest:
+        "365d6eb54ecd35dddcac7a0c47a0b75df86c42574ed1b156d4ce1a951b510052",
+    },
+  ];
+  for (const { doc, view, size, interference, digest } of cases) {
+    const { model, camera } = fixtureModel(doc, view, size);
+    const bytes = writeCaptureScene(model, {
+      ...options,
+      ...size,
+      camera,
+      referenceOpacity: 0.45,
+      interference,
+    });
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(digest);
+  }
+});

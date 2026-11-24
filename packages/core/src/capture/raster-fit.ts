@@ -28,6 +28,10 @@ function validSize({ width, height }: RasterSize): boolean {
   );
 }
 
+export function capturePixelSpan(span: number, scale: number): number {
+  return Math.max(1, Math.ceil(span * scale - 1e-6));
+}
+
 /** Plan a 2D capture from the SVG viewport and the requested fit or scale. */
 export function captureRasterPlan(
   viewport: RasterSize,
@@ -82,8 +86,8 @@ export function captureRasterPlan(
 
   for (;;) {
     const scale = steps / SCALE_PRECISION;
-    const pixelWidth = Math.max(1, Math.ceil(width * scale));
-    const pixelHeight = Math.max(1, Math.ceil(height * scale));
+    const pixelWidth = capturePixelSpan(width, scale);
+    const pixelHeight = capturePixelSpan(height, scale);
     const pixels = pixelWidth * pixelHeight;
     if (
       box &&

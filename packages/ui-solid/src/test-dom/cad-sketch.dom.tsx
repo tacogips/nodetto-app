@@ -10,7 +10,7 @@ import {
   type Vec3,
 } from "@nodetto/core";
 import { type CadXY, hasErrors, validateDocument } from "@nodetto/ir";
-import { createSignal } from "solid-js";
+import { batch, createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import {
   edge as pcbEdge,
@@ -599,6 +599,53 @@ for (const mode of ["light", "dark"] as const) {
     { type: "createPage", page: secondPage },
     { type: "createElement", element: secondBoard },
   ]);
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  const staleButton = viewport.querySelector<HTMLButtonElement>(
+    '[role="menu"] button',
+  );
+  assert.ok(staleButton, "stale button");
+  const referencesBefore = editor.store
+    .getPageElements("cad")
+    .filter((element) => element.type === "cad.pcb")
+    .map((element) => element.id);
+  const selectionBefore = [...editor.selection.ids()];
+  let historyAfterConversion = 0;
+  batch(() => {
+    editor.setPageKind(PCB_TEST_PAGE.id, "freeform");
+    historyAfterConversion = editor.history.undoSize;
+    staleButton.click();
+  });
+  assert.equal(editor.history.undoSize, historyAfterConversion);
+  assert.deepEqual(
+    editor.store
+      .getPageElements("cad")
+      .filter((element) => element.type === "cad.pcb")
+      .map((element) => element.id),
+    referencesBefore,
+  );
+  assert.deepEqual([...editor.selection.ids()], selectionBefore);
+  assert.match(viewport.textContent ?? "", /Could not insert the PCB board\./);
+  assert.equal(viewport.querySelector('[role="menu"]'), null);
+  assert.ok(editor.undo());
+  setTool(Tool.CadPcb);
+  await nextFrame();
+  const restoredButton = viewport.querySelector<HTMLButtonElement>(
+    '[role="menu"] button',
+  );
+  assert.ok(restoredButton, "restored button");
+  const beforeRestored = editor.history.undoSize;
+  restoredButton.click();
+  assert.equal(editor.history.undoSize, beforeRestored + 1);
+  assert.equal(
+    editor.store
+      .getPageElements("cad")
+      .filter((element) => element.type === "cad.pcb").length,
+    referencesBefore.length + 1,
+  );
+  assert.ok(editor.undo());
+  editor.selection.set(selectionBefore);
+
   setTool(Tool.CadPcb);
   await nextFrame();
   const menu = viewport.querySelector('[role="menu"]');

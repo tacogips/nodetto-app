@@ -1,3 +1,4 @@
+import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import { expect, test } from "bun:test";
 import { Editor, HANDOFF_FORMATS, svgRasterDimensions } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
@@ -329,4 +330,37 @@ test("raster export snaps the frame to whole pixels so the background covers the
     );
   expect(Number(background?.[1]) * 0.75).toBeGreaterThanOrEqual(475);
   expect(Number(background?.[2]) * 0.75).toBeGreaterThanOrEqual(267);
+});
+
+test("CAD SVG export forwards mesh bounds", async () => {
+  const { editor, io } = fixture();
+  const page = editor.createPage({ name: "CAD", kind: "cad3d" });
+  const mesh = toInline(
+    encodeNmesh(
+      canonicalize({
+        positions: new Float64Array([
+          -4, -2, -3, 7, -2, -3, -4, 6, -3, -4, -2, 5,
+        ]),
+        triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+      }),
+    ),
+  );
+  editor.createElement("cad.mesh", { semantic: { name: "Mesh", data: mesh } });
+  const args = ["mixed.jsonl", "--format", "svg", "--page", page];
+  const fallback = await exportCommand(io, args);
+  let calls = 0;
+  const native = await exportCommand(
+    {
+      ...io,
+      meshBounds: (data) => {
+        expect(data).toBe(mesh);
+        calls++;
+        return { min: [-4, -2, -3], max: [7, 6, 5] };
+      },
+    },
+    args,
+  );
+  expect(fallback.exitCode).toBe(0);
+  expect(native).toEqual(fallback);
+  expect(calls).toBe(1);
 });

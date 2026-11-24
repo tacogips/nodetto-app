@@ -53,6 +53,24 @@ pub fn resolve(
     cell: f64,
     budget_rays: u64,
 ) -> CensusStats {
+    resolve_with(
+        scene,
+        bodies,
+        picture,
+        cell,
+        budget_rays,
+        &crate::tool_view::classify(scene),
+    )
+}
+
+pub(crate) fn resolve_with(
+    scene: &Scene,
+    bodies: &mut [BodyReport],
+    picture: &[Liveness],
+    cell: f64,
+    budget_rays: u64,
+    solid: &[bool],
+) -> CensusStats {
     let mut stats = CensusStats::default();
     let mut budget = budget_rays;
     let mut suspects = 0usize;
@@ -106,7 +124,8 @@ pub fn resolve(
                 incomplete = true;
                 break;
             }
-            let result = lattice::sample_body_axis(&request, axis, &mut alive, &mut raw_budget);
+            let result =
+                lattice::sample_body_axis_with(&request, axis, &mut alive, &mut raw_budget, solid);
             incomplete |= result.capped;
         }
         let spent = (initial - raw_budget).saturating_mul(weight);

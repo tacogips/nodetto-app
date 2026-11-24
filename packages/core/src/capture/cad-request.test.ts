@@ -4,6 +4,9 @@ import { boardReference, edge, testBoard } from "../cad/testing/pcb.ts";
 import { CaptureInputError, prepareCadCapture } from "./cad-request.ts";
 import { type CaptureCameraRequest, captureCamera } from "./camera.ts";
 import { capturePlateDocument } from "./testing/plate.ts";
+import { buildCadCaptureModel } from "./scene.ts";
+import { type CaptureSceneOptions, writeCaptureScene } from "./scene-binary.ts";
+import { CAPTURE_THEMES } from "./theme.ts";
 
 const size = { width: 320, height: 240, theme: "dark" } as const;
 const plate = capturePlateDocument();
@@ -20,6 +23,9 @@ test("serializes a decoded mesh-only page", () => {
   const result = prepareCadCapture([mesh], CAD_TEST_PAGE.id, {
     ...request,
     decodeMesh: () => ({
+      vertexCount: 8,
+      triangleCount: 12,
+      bounds: { min: [0, 0, 0], max: [1, 1, 1] },
       positions: new Float64Array([
         0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
       ]),
@@ -228,6 +234,9 @@ function selectionDocument(count: number) {
 }
 
 const selectionMesh = () => ({
+  vertexCount: 4,
+  triangleCount: 4,
+  bounds: { min: [0, 0, 0] as const, max: [1, 1, 1] as const },
   positions: new Float64Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
   triangles: new Uint32Array([0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3]),
 });
@@ -278,5 +287,54 @@ test("body selection uses bounded indexed lookups for large models", () => {
   expect(result.model.bodies).toHaveLength(5000);
   expect(stats.lookups).toBeLessThanOrEqual(
     500 * (2 + 2 * Math.ceil(Math.log2(5000))),
+  );
+});
+
+test("writer header precedes pending point limit", () => {
+  const elements = [
+    cadElement("seed-limit", "cad.mesh", "a1", {
+      name: "Seed",
+      data: "nmesh1:UExBVEU=",
+    }),
+    cadElement("excess-limit", "cad.mesh", "a2", {
+      name: "Excess",
+      data: "nmesh1:UExBVEU=",
+    }),
+  ];
+  let calls = 0;
+  const decodeMesh = () => ({
+    ...selectionMesh(),
+    vertexCount: ++calls % 2 ? 4_000_000 : 4,
+  });
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    decodeMesh,
+  });
+  expect(model.overLimit).toBe(
+    "Capture scene total point count must be an integer in 0..4000000.",
+  );
+  const { camera } = prepareCadCapture(plate.elements, CAD_TEST_PAGE.id, {
+    ...size,
+    camera: {},
+  });
+  expect(() =>
+    writeCaptureScene(model, {
+      width: size.width,
+      height: size.height,
+      camera,
+      supersample: 4 as CaptureSceneOptions["supersample"],
+      colours: CAPTURE_THEMES.dark,
+      referenceOpacity: 0.45,
+      interference: null,
+    }),
+  ).toThrow("Capture scene supersample must be an integer in 1..3.");
+  calls = 0;
+  expect(() =>
+    prepareCadCapture(elements, CAD_TEST_PAGE.id, {
+      ...size,
+      camera: {},
+      decodeMesh,
+    }),
+  ).toThrow(
+    "Capture scene total point count must be an integer in 0..4000000.",
   );
 });

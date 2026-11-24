@@ -1,0 +1,501 @@
+{
+  "taskId": "car2-r2b",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "3cd2401ce1044d7c51dc0f4af9b0a6d4457e8589",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md"
+  ],
+  "evidenceRoot": "tmp/car2-r2b",
+  "waves": [
+    ["car2-a1-rust-decoder", "car2-a1-ts-decoder", "car2-a3-loop-normalisation", "car2-a5-point-rule", "car2-b-wireframe", "car2-c1-sweep", "car2-p-picker-guard", "car2-r-raster-rounding"],
+    ["car2-a2-native-host", "car2-c2-closure-once"],
+    ["car2-a2-core-wiring", "car2-a2-export-bounds"],
+    ["car2-a4-open-mesh-targets"],
+    ["car2-a5-charged-walk"]
+  ],
+  "reviewContext": {
+    "issueReference": "feat/ai-capture audit round 2 (base 0a35708, head 3cd2401ce1044d7c51dc0f4af9b0a6d4457e8589): 10 blocking findings",
+    "userProblem": "Round 2 of the audit of the 3D CAD pages and the AI capture feature on feat/ai-capture (0a35708..3cd2401) found ten blocking findings, two high and eight medium. (1) Capture applies a shared cut to a solid block that the editor rejects when one target is an open mesh. (2) A stale PCB board-picker choice can still be committed. (3) The four-million-point limit is enforced only after all geometry is allocated. (4) Loop normalisation is quadratic for perforated plates. (5) Mesh bounds are scanned in the interpreter on native capture and native SVG export. (6) Interference discovery compares all pairs. (7) Mesh closure is reclassified repeatedly. (8) Wireframe export ignores PCB page eligibility. (9) Wireframe export treats a corrupt mesh as a body. (10) Raster-plan and frame rounding disagree.",
+    "requiredOutcomes": [
+      "function-open-mesh-multitarget-cut (R2-1; plans a1-rust-decoder, a1-ts-decoder, a2-native-host, a2-core-wiring, a4-open-mesh-targets): eligibility follows design 19.1 F1 rules (a)-(d), computed in Rust on the native path; both decoders agree on the nine fixtures; a cut shared by a block and an ineligible mesh reports cad.body.missing, leaves every target unchanged and fails a sketch on its face; the open surface stays visible; block NCS1 bytes and pixels equal the suppressed-cut control; the closed-mesh controls cut both targets; the scene.test.ts single-triangle difference expectation is replaced.",
+      "function-pcb-reference-page-kind (R2-2; plan p-picker-guard): board-picker.tsx re-checks isPcbBoardChoice on a fresh snapshot at commit; a stale choice adds no history, creates no reference, preserves the selection, shows the existing notice and closes; after Undo the restored choice inserts exactly once.",
+      "performance-capture-point-limit-after-allocation (R2-3; plans a5-point-rule, a5-charged-walk, with a1 decoders): one shared point rule in scene-binary.ts; each tool is charged before allocation and meshes get the remaining vertex allowance; zero geometry allocations from the overflowing tool onward; diagnostic precedence unchanged; admitted NCS1 bytes identical.",
+      "performance-capture-loop-normalization-pair-scans (R2-4; plan a3-loop-normalisation): depth-bucketed ancestor search; ancestor probes grow at most ~linearly as holes double (previously 252,002 / 1,004,002 / 4,008,002); full, partial and nested-island selections equal the pre-fix oracle; scene bytes identical.",
+      "performance-native-mesh-bounds (R2-5; plans a2-native-host, a2-core-wiring, a2-export-bounds): shaded native capture takes bounds from the Rust decoder; native construction SVG export uses a bounds-only operation through CommandIo, SvgExportOptions, renderPageSvg and cadPageWireframe with zero TS decodes; six extrema, cameras, NCS1 and SVG bytes match on asymmetric negative-coordinate geometry; TS fallback and invalid input preserved; native parity passes against a fresh release CLI.",
+      "performance-interference-sparse-pairs (R2-6; plan c1-sweep): single-axis sweep; comparison counts on separated X rows, Y rows and sparse grids grow sub-quadratically; totals, weights, ordered pairs, checked prefixes and unchecked lists equal exhaustive enumeration; the dense 2,000-body test still passes.",
+      "performance-capture-repeated-mesh-closure (R2-7; plan c2-closure-once, after a1-rust-decoder's closed_by): CLOSURE_EVALUATIONS shows one classification per mesh tool per render with analysis disabled, an overlapping three-axis pair and a census case; body states, reports and image bytes identical at 1 and 8 threads; first-tool body rule and renderer-closure versus booleanTarget distinction preserved.",
+      "maintainability-wireframe-pcb-input (R2-8; plan b-wireframe): renderPageSvg CAD branch uses collectCadInput; public SVG export gives SVG before PCB-to-freeform conversion, null after, and the original bytes after Undo.",
+      "maintainability-wireframe-mesh-failure (R2-9; plans b-wireframe, a2-export-bounds): a failed or empty mesh decode returns false from the wireframe visitor; a corrupt mesh with a dependent cut gives zero segments and null bounds; the valid-mesh control draws both.",
+      "maintainability-capture-raster-rounding (R2-10; plan r-raster-rounding): captureRasterPlan computes integer dimensions once with the renderer rule; a 10000 x 100 viewport at scale 0.07 and with a 700 x 7 box both give scale 0.07 and a 700 x 7 frame; over-limit and deterministic PNG tests still pass.",
+      "Repository lint, typecheck and existing tests pass; final integration runs bun run typecheck, bun run lint, CARGO_TERM_QUIET=true mise run verify and native parity against a fresh release build."
+    ],
+    "nonGoals": [
+      "Changing the cad check path: nmeshDecode, CommandIo.decodeMesh, checkCadPage, cad-command.ts and check.ts.",
+      "Editing history.ts, loops.ts, LatticeRequest fields, raster/reference.rs, apps/desktop/src-tauri/src/capture.rs or the Tauri IPC payload.",
+      "Adding a complete-profile shortcut to loop normalisation (design 20.4).",
+      "Regenerating goldens or changing messages, exit codes or admitted NCS1/PNG/SVG bytes unless the design names the change.",
+      "Editing impl-plans/README.md, lockfiles or indexes, archiving plans, or running workspace-wide formatters during plan execution.",
+      "Any server, auth, secret or deployment content; pushing, rewriting history or creating worktrees."
+    ],
+    "constraints": [
+      "Work only in /Users/taco/gits/tacogips/nodetto-app-capture on feat/ai-capture from 3cd2401; never push or rewrite history; never touch other worktrees.",
+      "AGENTS.md: English only, no emojis, strict typing; cargo always with CARGO_TERM_QUIET=true and a plan-local CARGO_TARGET_DIR=target/car2-<plan>; rustfmt on touched Rust files only.",
+      "Indexed reads must type-check under noUncheckedIndexedAccess; packages/io must not import @nodetto/core; packages/core/src/pcb imports only itself; Biome must pass on touched TS files.",
+      "Heavy per-vertex, per-pixel and per-byte work stays in Rust (the native CLI runs TS core in Boa).",
+      "Captures stay deterministic; admitted bytes and goldens unchanged.",
+      "Every fix ships a test that fails on 3cd2401 and passes after; performance tests assert deterministic counts, never wall-clock.",
+      "Never relax or delete tests; timing tests may be retried up to three times, then compared in isolation.",
+      "Each plan edits only its writePaths and its own progress log impl-plans/progress/<planId>.md, recording pre/post sha256 per edited file, commands, exit codes, log paths under target/car2-<plan>/logs/, pre-fix failing evidence and final status.",
+      "Native parity runs only after CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-<plan> cargo build --release -p nodetto-cli in the same plan, with NODETTO_CLI_TEST_BINARY set to that binary.",
+      "Per-plan verification is focused; workspace bun run typecheck, bun run lint and mise run verify run only at integration.",
+      "No *.test.ts files may remain under target/ or tmp/; evidence data under tmp/car2-r2b/<planId>/<attempt>/ only.",
+      "A failure caused by a sibling plan's in-progress edit is rerun after that sibling's progress log reads done, never fixed by editing the sibling's files."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "14 plans in five waves (design 20.3): wave 1 a1-rust-decoder, a1-ts-decoder, a3-loop-normalisation, a5-point-rule, b-wireframe, c1-sweep, p-picker-guard, r-raster-rounding; wave 2 a2-native-host, c2-closure-once; wave 3 a2-core-wiring, a2-export-bounds; wave 4 a4-open-mesh-targets; wave 5 a5-charged-walk.", "rationale": "Dependencies exist only for real contracts or same-file ordering; same-wave writePaths are disjoint; every completed wave keeps native capture decoding in Rust."},
+      {"decision": "Budgeted decoder added beside the existing entry points in every layer (decode_inline_with, decodeCaptureMeshWith, nmeshCapture, CommandIo.decodeCaptureMesh), returning counts, millimetre bounds, optional booleanTarget and geometry only within maxVertices.", "rationale": "One seam serves R2-1 eligibility, R2-3 remaining allowance and R2-5 Rust bounds while cad check keeps its packet and types (design 20.4)."},
+      {"decision": "Packet writer and reader land in one plan (a2-native-host); the caller switches in one plan (a2-core-wiring) one wave later.", "rationale": "No completed wave has a writer without its reader or an interpreter decode on the native CLI."},
+      {"decision": "Rust eligibility rule (a) reuses the renderer closure code through mesh::closed_by with a quantized position accessor.", "rationale": "Renderer closure and eligibility closure cannot drift, and the over-limit path reads positions without allocating capture geometry."},
+      {"decision": "R2-1 is implemented as a display-only mesh visitor result in construction.ts.", "rationale": "The existing absent-target rule then fails the whole feature with cad.body.missing before any step, matching the editor, while the surface stays drawn."},
+      {"decision": "Shared point rule (MAX_POINTS, checkScenePreTool, chargeTool) lives in scene-binary.ts and the writer calls it.", "rationale": "One owner for the limit; charging before allocation preserves messages and precedence."},
+      {"decision": "Interference broad phase is a single-axis sweep on the axis with the fewest relaxed overlaps; closure is classified once per render and passed through crate-internal _with variants.", "rationale": "No cell size needed, output easy to compare with exhaustive enumeration; LatticeRequest and existing signatures stay source-compatible."},
+      {"decision": "Loop normalisation uses depth buckets, not a complete-profile shortcut.", "rationale": "Provably equal to the current max-containing-depth result for every selection, so bytes cannot change."},
+      {"decision": "Checkpoint added car2-r-raster-rounding to car2-a2-core-wiring dependsOn (plan file and overview updated).", "rationale": "Both plans add cases to apps/cli/src/capture-command.test.ts; without an explicit edge the two owners had no ordering in the DAG. The wave numbers are unchanged (r is wave 1, core-wiring wave 3)."}
+    ],
+    "intentionalTradeoffs": [
+      "Five-wave critical path (a1-rust-decoder -> a2-native-host -> a2-core-wiring -> a4-open-mesh-targets -> a5-charged-walk); a slip delays R2-1 and R2-3.",
+      "After the point-limit excess, a mesh that a later feature targets may still allocate bounded target scratch (1 MiB inline cap) so that feature status matches an admitted walk.",
+      "R2-4 nested same-depth siblings stay super-linear (O(siblings x children)); the audited perforated plate is linear.",
+      "R2-1 agreement with Manifold is limited to the nine fixtures of design 19.1.",
+      "decodeNmesh gains only onAllocate; the over-limit path routes through inspectNmesh instead of a maxVertices option (accepted minor divergence from R2-D wording).",
+      "chargeTool charges a whole prism before the writer's per-loop mismatch check; ordering differs only for internally inconsistent models the builder never produces.",
+      "CLOSURE_EVALUATIONS is process-wide and asserted only in its own single-test binary closure_count.rs."
+    ],
+    "supportedEdgeCases": [
+      "Eligibility fixtures: single triangle, mixed-winding tetrahedron, double-sided triangle, coplanar tetrahedron and translated flat shell rejected; tetrahedron in both orientations, thin bar and translated thin bar accepted; hidden meshes follow the same rule.",
+      "Corrupt mesh input on both full and over-limit decoder paths gives the same error with zero geometry allocations; empty meshes are failures in capture and wireframe.",
+      "Point limit exactly 4,000,000 admitted; first excess; visible, hidden and mesh long tails; hidden-only overflow; body-query and writer-header precedence.",
+      "Full, partial and nested-island loop selections.",
+      "Interference tolerance-boundary pairs at, just below and just above scene.tolerance on each axis; keep in {0, 1, 3, all}.",
+      "Stale picker option clicked in the same reactive batch as the page conversion; Undo restoring eligibility.",
+      "Decimal rounding boundary of a 10000 x 100 viewport at scale 0.07 and a 700 x 7 box."
+    ],
+    "outOfScopeEdgeCases": [
+      "Transient sibling failures in the shared working tree (rerun after the sibling is done and record both runs).",
+      "Desktop Tauri-side mesh decoding (the desktop never decodes meshes in Rust).",
+      "GUI runs beyond DOM tests.",
+      "Pre-existing environmental test failures, compared in isolation before reporting."
+    ],
+    "reviewerNotesForImplementers": [
+      "car2-a1-ts-decoder: put the decodeCaptureMeshWith maxVertices:0 corruption assertions in packages/io/src/nmesh/capture-decoder.test.ts, not packages/nmesh/src/codec.test.ts; @nodetto/nmesh must not depend on @nodetto/io. codec.test.ts keeps only the inspectNmesh versus decodeNmesh error-code assertions.",
+      "car2-c2-closure-once: the #[doc(hidden)] candidate_comparisons entry from c1 must classify for itself and keep its signature so crates/capture/tests/interference.rs compiles unedited.",
+      "car2-a5-charged-walk: the native admitted document need not be the 4,000,000-point case; let inline meshes supply most points and record durations."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car2-00-overview.md",
+      "impl-plans/active/car2-a1-rust-decoder.md",
+      "impl-plans/active/car2-a1-ts-decoder.md",
+      "impl-plans/active/car2-a3-loop-normalisation.md",
+      "impl-plans/active/car2-a5-point-rule.md",
+      "impl-plans/active/car2-b-wireframe.md",
+      "impl-plans/active/car2-c1-sweep.md",
+      "impl-plans/active/car2-p-picker-guard.md",
+      "impl-plans/active/car2-r-raster-rounding.md",
+      "impl-plans/active/car2-a2-native-host.md",
+      "impl-plans/active/car2-c2-closure-once.md",
+      "impl-plans/active/car2-a2-core-wiring.md",
+      "impl-plans/active/car2-a2-export-bounds.md",
+      "impl-plans/active/car2-a4-open-mesh-targets.md",
+      "impl-plans/active/car2-a5-charged-walk.md"
+    ],
+    "finalIntegration": [
+      "bun run typecheck",
+      "bun run lint",
+      "CARGO_TERM_QUIET=true mise run verify",
+      "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-integration cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car2-integration/release/nodetto-cli\" bun test apps/cli/src/native-parity",
+      "CARGO_TERM_QUIET=true mise run test-cli",
+      "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car2-a1-rust-decoder",
+      "planPath": "impl-plans/active/car2-a1-rust-decoder.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/nmesh.rs",
+        "crates/capture/src/mesh.rs",
+        "impl-plans/progress/car2-a1-rust-decoder.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "decode_inline_with with need_target gives boolean_target equal to the design 19.1 F1 table for all nine fixtures; bounds equal the min and max of decode_inline positions bit for bit; an asymmetric negative-coordinate mesh gives all six extrema.",
+        "Every corruption case gives None with max_vertices 0 and with the default; the limited runs record zero positions and triangles allocations; tetrahedron (max_vertices 3) and triangle (max_vertices 2) give Some(true)/Some(false), full counts and bounds, geometry None and target allocations > 0.",
+        "closed_by over the quantized accessor equals is_closed for all nine fixtures; existing is_closed tests unchanged and pass.",
+        "DecodedMesh::to_packet header fields and flags match R2-D, positions at byte 64 and indices at 64 + 24V; decode_inline and InlineMesh::to_packet byte-for-byte unchanged.",
+        "New tests fail on 3cd2401 (APIs absent); progress log records hashes, commands, exit codes and done."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 --check crates/capture/src/nmesh.rs crates/capture/src/mesh.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a1-rust-decoder cargo clippy -p nodetto-capture --all-targets && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a1-rust-decoder cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car2-a1-ts-decoder",
+      "planPath": "impl-plans/active/car2-a1-ts-decoder.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/nmesh/src/decode.ts",
+        "packages/nmesh/src/index.ts",
+        "packages/nmesh/src/codec.test.ts",
+        "packages/io/src/nmesh/capture-decoder.ts",
+        "packages/io/src/nmesh/index.ts",
+        "packages/io/src/nmesh/capture-decoder.test.ts",
+        "impl-plans/progress/car2-a1-ts-decoder.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "decodeCaptureMeshWith with needTarget gives booleanTarget equal to the design 19.1 F1 table for all nine fixtures, matching the Rust decoder.",
+        "bounds equal the min and max of decodeCaptureMesh positions (Object.is per value); an asymmetric negative-coordinate mesh gives all six extrema; bounds null exactly when vertexCount is 0; booleanTarget absent when needTarget is falsy.",
+        "Over-limit tetrahedron/triangle give true/false with full counts and bounds, no positions/triangles in the result, zero positions, triangles and mm hook calls and at least one target call; default options equal decodeCaptureMesh arrays.",
+        "inspectNmesh throws the same NmeshError code as decodeNmesh for every corruption case; decodeCaptureMeshWith with maxVertices 0 throws the same error with zero positions, triangles and mm calls (asserted in capture-decoder.test.ts; nmesh does not import io).",
+        "decodeCaptureMesh and one-argument decodeNmesh unchanged; existing codec and capture-decoder tests pass unedited; new tests fail on 3cd2401."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/nmesh/src/decode.ts packages/nmesh/src/index.ts packages/nmesh/src/codec.test.ts packages/io/src/nmesh/capture-decoder.ts packages/io/src/nmesh/index.ts packages/io/src/nmesh/capture-decoder.test.ts && bun test packages/nmesh/src packages/io/src/nmesh"
+      ]
+    },
+    {
+      "planId": "car2-a3-loop-normalisation",
+      "planPath": "impl-plans/active/car2-a3-loop-normalisation.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "impl-plans/progress/car2-a3-loop-normalisation.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "ancestorProbes is at most N + 2 for N = 500, 1,000 and 2,000 holes before a line-built outline, and each doubling multiplies it by at most 2.2 (pre-fix 252,002 / 1,004,002 / 4,008,002 recorded in the progress log).",
+        "Kept loop identity and order equal the in-test oracleNormalise for full selection, without outline, without one hole and nested islands dropping each level.",
+        "Perforated-plate NCS1 sha256 equals the digest recorded on 3cd2401; only normaliseToolLoops changed in scene.ts; existing capture tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts packages/core/src/capture/cad-request.test.ts packages/core/src/capture/determinism.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-a5-point-rule",
+      "planPath": "impl-plans/active/car2-a5-point-rule.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/capture/scene-binary.ts",
+        "packages/core/src/capture/scene-binary.test.ts",
+        "impl-plans/progress/car2-a5-point-rule.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "MAX_POINTS (4,000,000), checkScenePreTool, PointCharge and chargeTool are exported from scene-binary.ts and the writer uses them.",
+        "chargeTool admits exactly 4,000,000, returns the exact total point count message for one more, returns the loop message for 20,001, and leaves state.points unchanged on failure.",
+        "checkScenePreTool with supersample 4 throws the supersample message even with 20,001 tools; check order unchanged.",
+        "Writer output sha256 for existing test scenes equals digests recorded on 3cd2401; existing writer tests pass unedited; new tests fail on 3cd2401."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/scene-binary.ts packages/core/src/capture/scene-binary.test.ts && bun test packages/core/src/capture/scene-binary.test.ts packages/core/src/capture/scene.test.ts packages/core/src/capture/determinism.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-b-wireframe",
+      "planPath": "impl-plans/active/car2-b-wireframe.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/svg-export/document.ts",
+        "packages/core/src/cad/wireframe.ts",
+        "packages/core/src/cad/wireframe.test.ts",
+        "packages/core/src/svg-export/cad.test.ts",
+        "impl-plans/progress/car2-b-wireframe.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "renderPageSvg CAD branch passes collectCadInput output to cadPageWireframe; through editor.exportPageSvg a board-only CAD page gives SVG before PCB-to-freeform conversion, null after, and byte-equal SVG after Undo.",
+        "The wireframe mesh visitor returns false on decode failure or empty mesh; a corrupt mesh with a dependent cut gives 0 segments and null bounds; an empty mesh with a dependent cut gives 0 segments; a valid-mesh control draws both mesh and cut.",
+        "The mesh is decoded once; renderCadPageSvg unchanged; existing SVG and wireframe tests pass unedited; new tests fail on 3cd2401."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/svg-export/document.ts packages/core/src/cad/wireframe.ts packages/core/src/cad/wireframe.test.ts packages/core/src/svg-export/cad.test.ts && bun test packages/core/src/cad/wireframe.test.ts packages/core/src/svg-export/cad.test.ts packages/core/src/cad/check.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-c1-sweep",
+      "planPath": "impl-plans/active/car2-c1-sweep.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/interference.rs",
+        "crates/capture/tests/interference.rs",
+        "impl-plans/progress/car2-c1-sweep.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Separated X and Y rows of n = 500 and 1,000 boxes give compared_pairs <= n and total 0; a 2k x k sparse grid compares at most 3x the k x k grid (k = 20).",
+        "Candidates (a, b, min, max, weight) and total equal the in-test exhaustive_candidates for keep in {0, 1, 3, all} on dense, mixed and tolerance-boundary cases.",
+        "Existing analyse_scene tests, including the 2,000-body test, pass unedited; only collect_candidates, its helpers and candidate_comparisons changed; new tests fail on 3cd2401."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 --check crates/capture/src/interference.rs crates/capture/tests/interference.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-c1-sweep cargo clippy -p nodetto-capture --all-targets && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-c1-sweep cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car2-p-picker-guard",
+      "planPath": "impl-plans/active/car2-p-picker-guard.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/ui-solid/src/cad/board-picker.tsx",
+        "packages/ui-solid/src/test-dom/cad-sketch.dom.tsx",
+        "impl-plans/progress/car2-p-picker-guard.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "insert re-checks isPcbBoardChoice on editor.getSnapshot() immediately before building pcbReferenceCommands.",
+        "A stale option clicked in the conversion batch leaves history length unchanged, creates no cad.pcb element, preserves the selection, shows 'Could not insert the PCB board.' after the batch settles and closes the picker.",
+        "After Undo the restored option inserts exactly one cad.pcb element with one new history entry; existing picker cases pass unedited; the notice accessor type stays string | undefined; the new case fails on 3cd2401."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/ui-solid/src/cad/board-picker.tsx packages/ui-solid/src/test-dom/cad-sketch.dom.tsx && bun test packages/ui-solid/src/cad/viewport.test.tsx packages/ui-solid/src/cad/pcb-insert.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-r-raster-rounding",
+      "planPath": "impl-plans/active/car2-r-raster-rounding.md",
+      "dependsOn": [],
+      "writePaths": [
+        "packages/core/src/capture/raster-fit.ts",
+        "packages/core/src/capture/raster-fit.test.ts",
+        "apps/cli/src/capture-artwork.ts",
+        "apps/cli/src/capture-command.test.ts",
+        "impl-plans/progress/car2-r-raster-rounding.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "capturePixelSpan is exported and captureRasterPlan uses it once for admission and the returned plan; pixelFrame uses plan.width and plan.height.",
+        "captureRasterPlan for a 10000 x 100 viewport gives scale 0.07 and 700 x 7 both with explicit scale 0.07 and with a 700 x 7 box (fails before: 701 x 8 and 0.069).",
+        "CLI capture with --scale 0.07 and --size 700x7 gives equal 700 x 7 PNG bytes; existing over-limit and deterministic PNG tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/raster-fit.ts packages/core/src/capture/raster-fit.test.ts apps/cli/src/capture-artwork.ts apps/cli/src/capture-command.test.ts && bun test packages/core/src/capture/raster-fit.test.ts apps/cli/src/capture-command.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-a2-native-host",
+      "planPath": "impl-plans/active/car2-a2-native-host.md",
+      "dependsOn": ["car2-a1-rust-decoder"],
+      "writePaths": [
+        "apps/cli/native/src/engine.rs",
+        "apps/cli/native/src/engine_tests.rs",
+        "apps/cli/src/native-engine.ts",
+        "apps/cli/src/commands.ts",
+        "impl-plans/progress/car2-a2-native-host.md",
+        "target",
+        "tmp/capture/m09/timing.json",
+        "tmp/capture/m23/timing.json",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "native.nmeshCapture returns the R2-D packet: positions at 64, first index at 64 + 24V, six header bounds equal the decoded extrema, flags 0b1111 or 0b1011 by eligibility; maxVertices 0 gives bit 0 clear and a 64-byte packet.",
+        "native.nmeshBounds returns 48 bytes equal to the header bounds, or null for invalid data or empty bounds.",
+        "native-engine.ts decodeCaptureMesh and meshBounds read those packets; CommandIo gains optional structurally typed decodeCaptureMesh and meshBounds.",
+        "nmeshDecode, its legacy layout and CommandIo.decodeMesh are unchanged; native parity cad and capture suites pass against this plan's release binary."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 --check apps/cli/native/src/engine.rs apps/cli/native/src/engine_tests.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a2-native-host cargo test -p nodetto-cli",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/native-engine.ts apps/cli/src/commands.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a2-native-host cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car2-a2-native-host/release/nodetto-cli\" bun test apps/cli/src/native-parity/cad.test.ts apps/cli/src/native-parity/capture.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-c2-closure-once",
+      "planPath": "impl-plans/active/car2-c2-closure-once.md",
+      "dependsOn": ["car2-c1-sweep", "car2-a1-rust-decoder"],
+      "writePaths": [
+        "crates/capture/src/mesh.rs",
+        "crates/capture/src/tool_view.rs",
+        "crates/capture/src/lattice.rs",
+        "crates/capture/src/census.rs",
+        "crates/capture/src/interference.rs",
+        "crates/capture/src/raster.rs",
+        "crates/capture/tests/closure_count.rs",
+        "impl-plans/progress/car2-c2-closure-once.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "closure_count.rs (one #[test]) shows CLOSURE_EVALUATIONS increases by exactly the mesh-tool count (2) per render_scene with analysis disabled, an overlapping three-axis analysed pair and a census case, at 1 and 8 threads (fails before: at least 4).",
+        "Each scenario gives equal image bytes and reports at 1 and 8 threads; crate digest tests pass unedited.",
+        "LatticeRequest, raster/reference.rs and crates/capture/tests/{boundary_fold,interference,census,mesh}.rs unchanged; public signatures kept; c1's candidate_comparisons keeps its signature and classifies for itself; renderer closure stays distinct from booleanTarget."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 --check crates/capture/src/mesh.rs crates/capture/src/tool_view.rs crates/capture/src/lattice.rs crates/capture/src/census.rs crates/capture/src/interference.rs crates/capture/src/raster.rs crates/capture/tests/closure_count.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-c2-closure-once cargo clippy -p nodetto-capture --all-targets && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-c2-closure-once cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car2-a2-core-wiring",
+      "planPath": "impl-plans/active/car2-a2-core-wiring.md",
+      "dependsOn": ["car2-a2-native-host", "car2-a1-ts-decoder", "car2-a3-loop-normalisation", "car2-r-raster-rounding"],
+      "writePaths": [
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "apps/cli/src/capture-command.ts",
+        "apps/cli/src/capture-command.test.ts",
+        "apps/cli/src/capture-cad.ts",
+        "apps/cli/src/capture-cad.test.ts",
+        "apps/desktop/src/shell/export-handlers.ts",
+        "apps/desktop/src/shell/export-handlers.test.ts",
+        "apps/cli/native/src/engine_tests.rs",
+        "impl-plans/progress/car2-a2-core-wiring.md",
+        "target",
+        "tmp/capture/m09/timing.json",
+        "tmp/capture/m23/timing.json",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "CaptureMeshDecoder in cad-request.ts is the structural (data, options) => CaptureMeshDecodeResult contract; core does not import @nodetto/io.",
+        "The scene.ts mesh visitor uses decoder bounds instead of pointBounds and rejects throw, zero vertices, zero triangles or missing geometry.",
+        "capture-command.ts passes io.decodeCaptureMesh; capture-cad.ts and export-handlers.ts default to decodeCaptureMeshWith; test fakes updated with assertion meaning kept.",
+        "Routing: a fake CommandIo decodeCaptureMesh spy is called once and decodeMesh never; engine_tests.rs shows native capture calls nmeshCapture once and nmeshDecode zero times while cad check calls nmeshDecode once.",
+        "An asymmetric negative-coordinate mesh capture gives the camera, frame and NCS1 sha256 recorded on 3cd2401; native parity cad and capture pass against this plan's release binary; CommandIo.decodeMesh, cad-command.ts and check.ts unchanged."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/cad-request.ts packages/core/src/capture/cad-request.test.ts packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts apps/cli/src/capture-command.ts apps/cli/src/capture-command.test.ts apps/cli/src/capture-cad.ts apps/cli/src/capture-cad.test.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts && bun test packages/core/src/capture apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts apps/desktop/src/shell/export-handlers.test.ts",
+        "rustfmt --edition 2021 --check apps/cli/native/src/engine_tests.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a2-core-wiring cargo test -p nodetto-cli",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a2-core-wiring cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car2-a2-core-wiring/release/nodetto-cli\" bun test apps/cli/src/native-parity/cad.test.ts apps/cli/src/native-parity/capture.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-a2-export-bounds",
+      "planPath": "impl-plans/active/car2-a2-export-bounds.md",
+      "dependsOn": ["car2-a2-native-host", "car2-b-wireframe"],
+      "writePaths": [
+        "packages/core/src/svg-export/theme.ts",
+        "packages/core/src/svg-export/document.ts",
+        "packages/core/src/cad/wireframe.ts",
+        "packages/core/src/cad/wireframe.test.ts",
+        "apps/cli/src/export-command.ts",
+        "apps/cli/src/export-command.test.ts",
+        "apps/cli/src/native-parity/export.test.ts",
+        "impl-plans/progress/car2-a2-export-bounds.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "SvgExportOptions gains meshBounds; renderPageSvg forwards it to cadPageWireframe; meshCorners uses it when given (null or throw is a visitor failure) and otherwise keeps the TS decode counted in stats.decodes.",
+        "With meshBounds an asymmetric negative-coordinate mesh gives segments and bounds equal to the run without it, stats.decodes 0 and one hook call per mesh; without it decodes is 1; null meshBounds with a dependent cut gives 0 segments.",
+        "export-command.ts forwards io.meshBounds; a CommandIo spy is called once and the SVG equals the export without it.",
+        "Native construction SVG export of the asymmetric inline mesh is byte-equal to the in-process Bun export against this plan's release binary; existing SVG export tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/svg-export/theme.ts packages/core/src/svg-export/document.ts packages/core/src/cad/wireframe.ts packages/core/src/cad/wireframe.test.ts apps/cli/src/export-command.ts apps/cli/src/export-command.test.ts apps/cli/src/native-parity/export.test.ts && bun test packages/core/src/cad/wireframe.test.ts packages/core/src/svg-export apps/cli/src/export-command.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a2-export-bounds cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car2-a2-export-bounds/release/nodetto-cli\" bun test apps/cli/src/native-parity/export.test.ts apps/cli/src/native-parity/cad.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-a4-open-mesh-targets",
+      "planPath": "impl-plans/active/car2-a4-open-mesh-targets.md",
+      "dependsOn": ["car2-a2-core-wiring"],
+      "writePaths": [
+        "packages/core/src/cad/construction.ts",
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "packages/cad-kernel/src/worker-host.test.ts",
+        "apps/cli/native/src/engine_tests.rs",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "impl-plans/progress/car2-a4-open-mesh-targets.md",
+        "target",
+        "tmp/capture/m09/timing.json",
+        "tmp/capture/m23/timing.json",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The construction visitor accepts a display-only mesh result: status stays ok, the mesh is not a Boolean body, and later targeting features fail cad.body.missing before any step with dependants failing cad.reference.failed.",
+        "The scene.ts visitor decodes with needTarget only for targeted meshes and returns display-only when booleanTarget is false, keeping the surface in the capture model.",
+        "The scene.test.ts single-triangle difference expectation is replaced; the five negative documents give cut cad.body.missing, failed face sketch, block steps [union], mesh body present, and NCS1 equal to the suppressed-cut twin; positive controls (tetrahedron both orientations, thin bar, translated thin bar) cut both targets without errors.",
+        "worker-host.test.ts gives the same statuses through the real worker; engine_tests.rs shows nmeshCapture called with needTarget true and the eligibility bit false for the triangle and true for the tetrahedron; native parity triangle image equals its suppressed twin with cad.body.missing on stdout while the tetrahedron image differs.",
+        "check.test.ts, wireframe.test.ts and evaluate.test.ts pass unedited; cad.mesh.open is not reported for the mesh's own feature."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/cad/construction.ts packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts packages/cad-kernel/src/worker-host.test.ts apps/cli/src/native-parity/capture.test.ts && bun test packages/core/src/capture packages/core/src/cad packages/cad-kernel/src/worker-host.test.ts",
+        "rustfmt --edition 2021 --check apps/cli/native/src/engine_tests.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a4-open-mesh-targets cargo test -p nodetto-cli",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a4-open-mesh-targets cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car2-a4-open-mesh-targets/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/native-parity/cad.test.ts"
+      ]
+    },
+    {
+      "planId": "car2-a5-charged-walk",
+      "planPath": "impl-plans/active/car2-a5-charged-walk.md",
+      "dependsOn": ["car2-a4-open-mesh-targets", "car2-a5-point-rule"],
+      "writePaths": [
+        "packages/core/src/capture/scene.ts",
+        "packages/core/src/capture/scene.test.ts",
+        "packages/core/src/capture/cad-request.ts",
+        "packages/core/src/capture/cad-request.test.ts",
+        "apps/cli/native/src/engine_tests.rs",
+        "apps/cli/src/native-parity/capture.test.ts",
+        "impl-plans/progress/car2-a5-charged-walk.md",
+        "target",
+        "tmp/capture/m09/timing.json",
+        "tmp/capture/m23/timing.json",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "buildCadCaptureModel charges each tool with chargeTool before allocating its typed arrays, decodes meshes with maxVertices MAX_POINTS - state.points, and switches to metadata mode at the first failure without allocating capture geometry.",
+        "Admitted exactly-4,000,000 case gives the NCS1 sha256 recorded on 3cd2401 with metadataVisits 0.",
+        "Prism overflow, mixed mesh overflow and the 1,000-extrusion long tail record zero positions, triangles and mm allocations and no captureVisits or toolArrays growth after the excess; a targeted mesh after the excess records only target allocations and its cut status equals the admitted walk.",
+        "Hidden-only overflow, body-query precedence and writer pre-tool header precedence are unchanged; prepareCadCapture raises the pending limit message after checkScenePreTool.",
+        "engine_tests.rs and native parity: the admitted document gives the recorded NCS1/image digests; the over-limit document exits 2 with the existing message and captureSolid is never called; native durations recorded."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts packages/core/src/capture/cad-request.ts packages/core/src/capture/cad-request.test.ts apps/cli/src/native-parity/capture.test.ts && bun test packages/core/src/capture packages/core/src/cad",
+        "rustfmt --edition 2021 --check apps/cli/native/src/engine_tests.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a5-charged-walk cargo test -p nodetto-cli",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car2-a5-charged-walk cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car2-a5-charged-walk/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/native-parity/cad.test.ts"
+      ]
+    }
+  ]
+}

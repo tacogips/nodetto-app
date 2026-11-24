@@ -28,7 +28,28 @@ impl Candidate {
 
 /// The first `keep` candidates in body order and the number of all candidates.
 pub fn candidates(scene: &Scene, boxes: &[Bounds], keep: usize) -> (Vec<Candidate>, u64) {
-    collect_candidates(scene, boxes, &lattice::scene_tool_bounds(scene), keep)
+    collect_candidates(
+        scene,
+        boxes,
+        &lattice::scene_tool_bounds(scene),
+        keep,
+        &crate::tool_view::classify(scene),
+    )
+}
+
+#[doc(hidden)]
+pub fn candidate_comparisons(
+    scene: &Scene,
+    boxes: &[Bounds],
+    keep: usize,
+) -> (Vec<Candidate>, u64, u64) {
+    collect_candidates_impl::<true>(
+        scene,
+        boxes,
+        &lattice::scene_tool_bounds(scene),
+        keep,
+        &crate::tool_view::classify(scene),
+    )
 }
 
 fn collect_candidates(
@@ -36,7 +57,19 @@ fn collect_candidates(
     boxes: &[Bounds],
     tools: &[Bounds],
     keep: usize,
+    solid: &[bool],
 ) -> (Vec<Candidate>, u64) {
+    let (candidates, total, _) = collect_candidates_impl::<false>(scene, boxes, tools, keep, solid);
+    (candidates, total)
+}
+
+fn collect_candidates_impl<const COUNT: bool>(
+    scene: &Scene,
+    boxes: &[Bounds],
+    tools: &[Bounds],
+    keep: usize,
+    solid: &[bool],
+) -> (Vec<Candidate>, u64, u64) {
     let analysed = scene
         .bodies
         .iter()
@@ -48,39 +81,93 @@ fn collect_candidates(
                 && body
                     .steps
                     .first()
-                    .and_then(|step| scene.tools.get(step.tool as usize))
-                    .is_some_and(crate::tool_view::is_solid)
+                    .and_then(|step| solid.get(step.tool as usize))
+                    .copied()
+                    .unwrap_or(false)
         })
         .map(|(i, (_, &bounds))| (i, bounds))
         .collect::<Vec<_>>();
-    let mut stored = Vec::new();
+    let mut best_axis = 0;
+    let mut best_count = u64::MAX;
+    for axis in 0..3 {
+        let mut starts = analysed
+            .iter()
+            .map(|(_, (min, _))| min[axis])
+            .collect::<Vec<_>>();
+        let mut ends = analysed
+            .iter()
+            .map(|(_, (_, max))| max[axis])
+            .collect::<Vec<_>>();
+        starts.sort_unstable_by(f64::total_cmp);
+        ends.sort_unstable_by(f64::total_cmp);
+        let count = starts
+            .iter()
+            .enumerate()
+            .map(|(i, start)| (i - ends.partition_point(|end| end < start)) as u64)
+            .sum();
+        if count < best_count {
+            best_count = count;
+            best_axis = axis;
+        }
+    }
+    let mut order = (0..analysed.len()).collect::<Vec<_>>();
+    order.sort_unstable_by(|&a, &b| {
+        analysed[a].1 .0[best_axis]
+            .total_cmp(&analysed[b].1 .0[best_axis])
+            .then_with(|| analysed[a].0.cmp(&analysed[b].0))
+    });
+    let mut active = Vec::new();
+    let mut pairs = std::collections::BinaryHeap::new();
     let mut total = 0;
-    for (index, &(a, (a_min, a_max))) in analysed.iter().enumerate() {
-        for &(b, (b_min, b_max)) in &analysed[index + 1..] {
-            let min = std::array::from_fn(|i| a_min[i].max(b_min[i]));
-            let max = std::array::from_fn(|i| a_max[i].min(b_max[i]));
-            if (0..3).any(|axis| max[axis] - min[axis] <= scene.tolerance) {
+    let mut compared = 0;
+    for index in order {
+        let (body, (min, max)) = analysed[index];
+        active.retain(|&other: &usize| analysed[other].1 .1[best_axis] >= min[best_axis]);
+        for &other in &active {
+            if COUNT {
+                compared += 1;
+            }
+            let (other_body, (other_min, other_max)) = analysed[other];
+            if (0..3).any(|axis| {
+                max[axis].min(other_max[axis]) - min[axis].max(other_min[axis]) <= scene.tolerance
+            }) {
                 continue;
             }
             total += 1;
-            if stored.len() < keep {
-                let steps = scene.bodies[a]
-                    .steps
-                    .iter()
-                    .chain(&scene.bodies[b].steps)
-                    .filter(|step| lattice::active_step(step, tools, (min, max)))
-                    .count() as u64;
-                stored.push(Candidate {
-                    a: a as u32,
-                    b: b as u32,
-                    min,
-                    max,
-                    weight: steps.div_ceil(8).max(1),
-                });
+            let pair = (body.min(other_body), body.max(other_body));
+            if pairs.len() < keep {
+                pairs.push(pair);
+            } else if pairs.peek().is_some_and(|largest| pair < *largest) {
+                pairs.pop();
+                pairs.push(pair);
             }
         }
+        active.push(index);
     }
-    (stored, total)
+    let stored = pairs
+        .into_sorted_vec()
+        .into_iter()
+        .map(|(a, b)| {
+            let (a_min, a_max) = boxes[a];
+            let (b_min, b_max) = boxes[b];
+            let min = std::array::from_fn(|i| a_min[i].max(b_min[i]));
+            let max = std::array::from_fn(|i| a_max[i].min(b_max[i]));
+            let steps = scene.bodies[a]
+                .steps
+                .iter()
+                .chain(&scene.bodies[b].steps)
+                .filter(|step| lattice::active_step(step, tools, (min, max)))
+                .count() as u64;
+            Candidate {
+                a: a as u32,
+                b: b as u32,
+                min,
+                max,
+                weight: steps.div_ceil(8).max(1),
+            }
+        })
+        .collect();
+    (stored, total, compared)
 }
 
 /// Select one cell size for all checked pairs. An infinite nominal cell means
@@ -137,7 +224,7 @@ pub fn analyse_pair(
 ) -> (Option<PairReport>, f64) {
     let loops = lattice::tool_loops(scene);
     let tools = lattice::scene_tool_bounds(scene);
-    let cache = ViewCache::new(scene.tools.len());
+    let cache = ViewCache::new(crate::tool_view::classify(scene));
     let result = sample(scene, candidate, cell, refinement, &loops, &tools, &cache);
     (result.report, result.cell)
 }
@@ -203,9 +290,18 @@ fn allocate(budget: u64, work: u64, total_work: u64) -> u64 {
     ((u128::from(budget) * u128::from(work)) / u128::from(total_work)) as u64
 }
 
+#[allow(dead_code)]
 pub(crate) fn analyse_scene(
     scene: &Scene,
     threads: usize,
+) -> Result<(Analysis, Vec<PairReport>), CaptureError> {
+    analyse_scene_with(scene, threads, &crate::tool_view::classify(scene))
+}
+
+pub(crate) fn analyse_scene_with(
+    scene: &Scene,
+    threads: usize,
+    solid: &[bool],
 ) -> Result<(Analysis, Vec<PairReport>), CaptureError> {
     let budget = u64::from(scene.budget_million_rays) * 1_000_000;
     let loops = lattice::tool_loops(scene);
@@ -227,13 +323,13 @@ pub(crate) fn analyse_scene(
         })
         .collect::<Vec<_>>();
     let keep = (budget / MIN_RAYS) as usize + UNCHECKED_LIST_LIMIT;
-    let (candidates, total) = collect_candidates(scene, &boxes, &tools, keep);
+    let (candidates, total) = collect_candidates(scene, &boxes, &tools, keep, solid);
     let (cell, checked) = plan(&candidates, total, scene.target_cell, budget);
     let work = candidates[..checked]
         .iter()
         .map(|pair| pair.work(cell))
         .sum();
-    let cache = ViewCache::new(scene.tools.len());
+    let cache = ViewCache::new(solid.to_vec());
     let cast_pairs = |pairs: &[Candidate]| {
         pairs
             .iter()
@@ -315,7 +411,7 @@ mod tests {
         let scene = parse_scene(include_bytes!("../tests/fixtures/plate-iso.ncs1")).unwrap();
         let loops = lattice::tool_loops(&scene);
         let tools = lattice::scene_tool_bounds(&scene);
-        let cache = ViewCache::new(scene.tools.len());
+        let cache = ViewCache::new(crate::tool_view::classify(&scene));
         let pair = Candidate {
             a: 0,
             b: 1,
@@ -358,7 +454,7 @@ mod tests {
         ];
         let (budget, cell) = (4_001, 1.0);
         let work: u64 = candidates.iter().map(|pair| pair.work(cell)).sum();
-        let cache = ViewCache::new(scene.tools.len());
+        let cache = ViewCache::new(crate::tool_view::classify(&scene));
         let mut used = 0;
         let mut capped = false;
         for pair in &candidates {
@@ -389,12 +485,22 @@ pub struct ViewPair {
 pub const VIEW_PAIR_SAMPLES: usize = 64;
 
 pub fn add_view_pairs(scene: &Scene, pairs: &mut Vec<PairReport>, seen: &[ViewPair], cell: f64) {
+    add_view_pairs_with(scene, pairs, seen, cell, &crate::tool_view::classify(scene));
+}
+
+pub fn add_view_pairs_with(
+    scene: &Scene,
+    pairs: &mut Vec<PairReport>,
+    seen: &[ViewPair],
+    cell: f64,
+    solid: &[bool],
+) {
     if seen.is_empty() {
         return;
     }
     let loops = lattice::tool_loops(scene);
     let tools = lattice::scene_tool_bounds(scene);
-    let cache = ViewCache::new(scene.tools.len());
+    let cache = ViewCache::new(solid.to_vec());
     for (index, view) in seen.iter().enumerate() {
         let sampled = if index < VIEW_PAIR_SAMPLES {
             let min = view.min.map(|v| v - cell);

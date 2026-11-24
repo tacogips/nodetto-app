@@ -5,7 +5,11 @@ import {
   captureCamera,
   captureFrame,
 } from "./camera.ts";
-import { writeCaptureScene } from "./scene-binary.ts";
+import {
+  type CaptureSceneOptions,
+  checkScenePreTool,
+  writeCaptureScene,
+} from "./scene-binary.ts";
 import { type CadCaptureModel, buildCadCaptureModel } from "./scene.ts";
 import { CAPTURE_THEMES, type CaptureTheme } from "./theme.ts";
 
@@ -14,10 +18,27 @@ export interface CadCaptureInterference {
   readonly bodies?: readonly string[];
 }
 
-export type CaptureMeshDecoder = (data: string) => {
-  readonly positions: Float64Array;
-  readonly triangles: Uint32Array;
-};
+export interface CaptureMeshDecodeOptions {
+  readonly maxVertices?: number;
+  readonly needTarget?: boolean;
+}
+
+export interface CaptureMeshDecodeResult {
+  readonly vertexCount: number;
+  readonly triangleCount: number;
+  readonly bounds: {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+  } | null;
+  readonly booleanTarget?: boolean;
+  readonly positions?: Float64Array;
+  readonly triangles?: Uint32Array;
+}
+
+export type CaptureMeshDecoder = (
+  data: string,
+  options: CaptureMeshDecodeOptions,
+) => CaptureMeshDecodeResult;
 
 export const DEFAULT_CAD_INTERFERENCE: CadCaptureInterference = Object.freeze({
   cellMm: 0.25,
@@ -166,7 +187,7 @@ export function prepareCadCapture(
   try {
     const camera = captureCamera(request.camera, model.bounds, request, boxes);
     const frame = captureFrame(camera, boxes, request);
-    const scene = writeCaptureScene(model, {
+    const options: CaptureSceneOptions = {
       width: request.width,
       height: request.height,
       camera,
@@ -174,7 +195,13 @@ export function prepareCadCapture(
       colours: CAPTURE_THEMES[request.theme],
       referenceOpacity: 0.45,
       interference,
+    };
+    checkScenePreTool(options, {
+      tools: model.toolCount,
+      bodies: model.bodies.length,
     });
+    if (model.overLimit) throw new RangeError(model.overLimit);
+    const scene = writeCaptureScene(model, options);
     return { scene, model, camera, frame };
   } catch (error) {
     if (error instanceof RangeError)

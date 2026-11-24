@@ -46,12 +46,10 @@ const usage = (error: string): ArtworkCapture => ({ error, usage: true });
  * The viewBox still applies the requested scale to the artwork. */
 function pixelFrame(
   svg: string,
-  viewport: { width: number; height: number },
   scale: number,
+  width: number,
+  height: number,
 ): string {
-  const snap = (span: number) => Math.max(1, Math.ceil(span * scale - 1e-6));
-  const width = snap(viewport.width);
-  const height = snap(viewport.height);
   return snapSvgFrameToPixels(svg, scale).replace(/^<svg\s[^>]*>/, (root) =>
     root
       .replace(/\bwidth="[^"]*"/, `width="${width}"`)
@@ -64,8 +62,7 @@ function pixelFrame(
   );
 }
 
-/** Report the actual encoded size. Pixel-frame snapping can remove a sliver
- * that the conservative raster plan rounded up to an extra pixel. */
+/** Report the actual encoded size. */
 function pngSize(bytes: Uint8Array): { width: number; height: number } {
   const header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (
@@ -142,7 +139,7 @@ export async function renderArtworkCapture(
     box,
     scale: requestedScale === undefined ? undefined : Number(requestedScale),
   });
-  svg = pixelFrame(svg, viewport, plan.scale);
+  svg = pixelFrame(svg, plan.scale, plan.width, plan.height);
   const coverage = io.fontCoverage?.(svg, fontDir);
   if (coverage?.missing.length) {
     const elements = document.elements.filter(

@@ -142,3 +142,12 @@ test("the default stays within 1568 visual tokens for 1000 seeded viewports", ()
     ).toBeLessThanOrEqual(1568);
   }
 });
+
+test("decimal scale and box use the same pixel rounding", () => {
+  const viewport = { width: 10000, height: 100 };
+  const expected = { scale: 0.07, width: 700, height: 7 };
+  expect(captureRasterPlan(viewport, { scale: 0.07 })).toEqual(expected);
+  expect(
+    captureRasterPlan(viewport, { box: { width: 700, height: 7 } }),
+  ).toEqual(expected);
+});

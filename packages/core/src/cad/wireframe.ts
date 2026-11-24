@@ -26,28 +26,50 @@ function project([x, y, z]: Vec3): Point {
   return [(x - y) * ISO_X, (x + y) * ISO_Y - z * ISO_Z];
 }
 
-function meshCorners(data: string): Point[] {
+type MeshBounds = { readonly min: Vec3; readonly max: Vec3 };
+interface WireframeOptions {
+  readonly meshBounds?: (data: string) => MeshBounds | null;
+  readonly stats?: { decodes: number };
+}
+
+function meshCorners(data: string, options: WireframeOptions): Point[] | null {
   try {
-    const { positions } = decodeNmesh(fromInline(data));
-    if (!positions.length) return [];
-    const { min, max } = pointBounds(positions);
-    const mm = (value: number) => value / 1000;
+    let bounds: MeshBounds | null;
+    if (options.meshBounds) {
+      try {
+        bounds = options.meshBounds(data);
+      } catch {
+        return null;
+      }
+    } else {
+      if (options.stats) options.stats.decodes++;
+      const { positions, triangles } = decodeNmesh(fromInline(data));
+      if (!positions.length || !triangles.length) return null;
+      const { min, max } = pointBounds(positions);
+      bounds = {
+        min: [min[0] / 1000, min[1] / 1000, min[2] / 1000],
+        max: [max[0] / 1000, max[1] / 1000, max[2] / 1000],
+      };
+    }
+    if (!bounds) return null;
+    const { min, max } = bounds;
     return Array.from({ length: 8 }, (_, i) =>
       project([
-        mm(i & 1 ? max[0] : min[0]),
-        mm(i & 2 ? max[1] : min[1]),
-        mm(i & 4 ? max[2] : min[2]),
+        i & 1 ? max[0] : min[0],
+        i & 2 ? max[1] : min[1],
+        i & 4 ? max[2] : min[2],
       ]),
     );
   } catch (error) {
     if (!(error instanceof NmeshError)) throw error;
-    return [];
+    return null;
   }
 }
 
 export function cadPageWireframe(
   elements: readonly Element[],
   pageId: PageId,
+  options: WireframeOptions = {},
 ): CadWireframe {
   const segments: number[] = [];
   const seen = new Set<string>();
@@ -95,7 +117,8 @@ export function cadPageWireframe(
       }
     },
     mesh({ semantic }) {
-      const corners = meshCorners(semantic.data);
+      const corners = meshCorners(semantic.data, options);
+      if (!corners) return false;
       for (const [i, start] of corners.entries()) {
         for (const axis of [1, 2, 4]) {
           const end = corners[i | axis];

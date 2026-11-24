@@ -2,31 +2,42 @@
 use crate::interval::{Boundary, Intervals};
 use crate::scene::Mesh;
 use crate::view::{cross, dot, Ray, RayFamily};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+#[doc(hidden)]
+pub static CLOSURE_EVALUATIONS: AtomicU64 = AtomicU64::new(0);
 
 pub fn is_closed(mesh: &Mesh) -> bool {
-    if !mesh.positions.len().is_multiple_of(3)
-        || mesh.triangles.is_empty()
-        || !mesh.triangles.len().is_multiple_of(3)
-    {
+    mesh.positions.len().is_multiple_of(3)
+        && closed_by(mesh.positions.len() / 3, &mesh.triangles, |i| {
+            let n = i * 3;
+            [
+                mesh.positions[n],
+                mesh.positions[n + 1],
+                mesh.positions[n + 2],
+            ]
+        })
+}
+
+pub fn closed_by(
+    vertex_count: usize,
+    triangles: &[u32],
+    position: impl Fn(usize) -> [f64; 3],
+) -> bool {
+    CLOSURE_EVALUATIONS.fetch_add(1, Ordering::Relaxed);
+    if triangles.is_empty() || !triangles.len().is_multiple_of(3) {
         return false;
     }
-    let mut edges = Vec::with_capacity(mesh.triangles.len());
-    for tri in mesh.triangles.as_chunks::<3>().0 {
-        if tri.iter().any(|&i| i as usize >= mesh.positions.len() / 3)
+    let mut edges = Vec::with_capacity(triangles.len());
+    for tri in triangles.as_chunks::<3>().0 {
+        if tri.iter().any(|&i| i as usize >= vertex_count)
             || tri[0] == tri[1]
             || tri[1] == tri[2]
             || tri[2] == tri[0]
         {
             return false;
         }
-        let points = tri.map(|i| {
-            let n = i as usize * 3;
-            [
-                mesh.positions[n],
-                mesh.positions[n + 1],
-                mesh.positions[n + 2],
-            ]
-        });
+        let points = tri.map(|i| position(i as usize));
         if points.iter().flatten().any(|v| !v.is_finite()) {
             return false;
         }
@@ -105,6 +116,15 @@ impl MeshView {
         tool: u32,
         family: &RayFamily,
         window: Option<([f64; 2], [f64; 2])>,
+    ) -> Self {
+        Self::with_closure(mesh, tool, family, window, is_closed(mesh))
+    }
+    pub(crate) fn with_closure(
+        mesh: &Mesh,
+        tool: u32,
+        family: &RayFamily,
+        window: Option<([f64; 2], [f64; 2])>,
+        closed: bool,
     ) -> Self {
         let f = family.forward;
         let helper = if f[0].abs() < 0.8 {
@@ -230,7 +250,7 @@ impl MeshView {
             basis: [u, v],
             forward: f,
             tool,
-            closed: is_closed(mesh),
+            closed,
         }
     }
     /// The triangles one ray tests: the bin the ray falls in.

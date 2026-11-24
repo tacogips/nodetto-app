@@ -55,7 +55,10 @@ pre-archive `planPath` values and must not be dispatched again. The document
 pages and snippets manifests `dps-s861-dispatch.json`,
 `dps-s863-dispatch.json` and `dps-s864-dispatch.json` also stay in `active/`
 with their pre-archive `planPath` values; s864 was the final dispatch, and
-s861 and s863 must not be dispatched again.
+s861 and s863 must not be dispatched again. The AI capture audit round-2
+manifest `car2-r2b-dispatch.json` also stays in `active/` with its
+pre-archive `planPath` values and must not be dispatched again; it replaced
+`car2-r2-dispatch.json`, which was removed.
 
 ## Completed
 
@@ -65,6 +68,38 @@ The 22 CAD milestones and their [overview](completed/cad3d-00-overview.md)
 are archived here. [M18](completed/cad3d-18-export-docs-final.md) records the
 final checks and the remaining packaged host verification. See the
 [design](../design-docs/specs/design-cad3d.md) and [user guide](../docs/cad3d.md).
+
+### AI capture audit round 2 (car2-r2b)
+
+The [overview](completed/car2-00-overview.md) and its 14 plans fix the ten
+blocking findings of the second audit of `feat/ai-capture` (base 0a35708,
+head 3cd2401). See the
+[design](../design-docs/specs/design-ai-capture.md) (section 20) and the
+[capture guide](../docs/capture.md). Evidence is under `tmp/car2-r2b/<planId>/`;
+progress logs remain in `progress/`.
+
+| Plan | Finding |
+| --- | --- |
+| [car2-a1-rust-decoder](completed/car2-a1-rust-decoder.md) | Budgeted Rust capture-mesh decoder and eligibility (R2-1, R2-3, R2-5) |
+| [car2-a1-ts-decoder](completed/car2-a1-ts-decoder.md) | Budgeted TS capture-mesh decoder (R2-1, R2-3) |
+| [car2-a2-native-host](completed/car2-a2-native-host.md) | Native CLI decoder packet writer and reader (R2-5) |
+| [car2-a2-core-wiring](completed/car2-a2-core-wiring.md) | Capture takes mesh bounds from the native decoder (R2-5) |
+| [car2-a2-export-bounds](completed/car2-a2-export-bounds.md) | Bounds-only mesh operation for native SVG export (R2-5, R2-9) |
+| [car2-a3-loop-normalisation](completed/car2-a3-loop-normalisation.md) | Depth-bucketed loop normalisation (R2-4) |
+| [car2-a4-open-mesh-targets](completed/car2-a4-open-mesh-targets.md) | Open-mesh targets fail a shared cut as in the editor (R2-1) |
+| [car2-a5-point-rule](completed/car2-a5-point-rule.md) | Shared point rule in scene-binary.ts (R2-3) |
+| [car2-a5-charged-walk](completed/car2-a5-charged-walk.md) | Point limit charged before allocation (R2-3) |
+| [car2-b-wireframe](completed/car2-b-wireframe.md) | Wireframe PCB eligibility and corrupt-mesh failure (R2-8, R2-9) |
+| [car2-c1-sweep](completed/car2-c1-sweep.md) | Single-axis sweep for interference pairs (R2-6) |
+| [car2-c2-closure-once](completed/car2-c2-closure-once.md) | Mesh closure classified once per render (R2-7) |
+| [car2-p-picker-guard](completed/car2-p-picker-guard.md) | Stale PCB board-picker choice rejected at commit (R2-2) |
+| [car2-r-raster-rounding](completed/car2-r-raster-rounding.md) | One raster-plan rounding rule (R2-10) |
+
+Integration: `CARGO_TERM_QUIET=true mise run verify` exited 0 (bun 4774
+pass, 0 fail across 750 files; `/private/tmp/car2-final-review/verify.log`)
+and `mise run test-cli` exited 0 (`/private/tmp/car2-final-review/test-cli.log`).
+Open item: 753 round-1 `*.test.ts` copies under `tmp/car1-r1/` (listed in
+`tmp/car2-r2b/reconcile-wave-005/stray-tests.txt`) must still be removed.
 
 ### iPhone app design
 

@@ -115,6 +115,24 @@ export interface CommandIo {
     readonly positions: Float64Array;
     readonly triangles: Uint32Array;
   };
+  decodeCaptureMesh?(
+    data: string,
+    options: { readonly maxVertices?: number; readonly needTarget?: boolean },
+  ): {
+    readonly vertexCount: number;
+    readonly triangleCount: number;
+    readonly bounds: {
+      readonly min: readonly [number, number, number];
+      readonly max: readonly [number, number, number];
+    } | null;
+    readonly booleanTarget?: boolean;
+    readonly positions?: Float64Array;
+    readonly triangles?: Uint32Array;
+  };
+  meshBounds?(data: string): {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+  } | null;
   readonly capture?: {
     /** Per-user private capture directory, created on first use. */
     dir(): string;

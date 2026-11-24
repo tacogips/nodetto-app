@@ -26,6 +26,12 @@ declare const native: {
   ): "written" | "identical" | "exists";
   digest(bytes: Uint8Array): string;
   nmeshDecode(data: string): Uint8Array;
+  nmeshCapture(
+    data: string,
+    maxVertices: number,
+    needTarget: boolean,
+  ): Uint8Array;
+  nmeshBounds(data: string): Uint8Array | null;
   captureSolid(
     scene: Uint8Array,
     format: "png" | "jpg",
@@ -81,6 +87,80 @@ const io = {
         8 + vertices * 24,
         triangles * 3,
       ),
+    };
+  },
+  decodeCaptureMesh: (
+    data: string,
+    options: { readonly maxVertices?: number; readonly needTarget?: boolean },
+  ) => {
+    const packet = native.nmeshCapture(
+      data,
+      options.maxVertices ?? Number.POSITIVE_INFINITY,
+      options.needTarget === true,
+    );
+    const view = new DataView(
+      packet.buffer,
+      packet.byteOffset,
+      packet.byteLength,
+    );
+    const vertexCount = view.getUint32(0, true);
+    const triangleCount = view.getUint32(4, true);
+    const flags = view.getUint32(8, true);
+    const bounds =
+      (flags & 8) === 0
+        ? null
+        : {
+            min: [
+              view.getFloat64(16, true),
+              view.getFloat64(24, true),
+              view.getFloat64(32, true),
+            ] as const,
+            max: [
+              view.getFloat64(40, true),
+              view.getFloat64(48, true),
+              view.getFloat64(56, true),
+            ] as const,
+          };
+    return {
+      vertexCount,
+      triangleCount,
+      bounds,
+      ...((flags & 2) !== 0 ? { booleanTarget: (flags & 4) !== 0 } : {}),
+      ...((flags & 1) !== 0
+        ? {
+            positions: new Float64Array(
+              packet.buffer,
+              packet.byteOffset + 64,
+              vertexCount * 3,
+            ),
+            triangles: new Uint32Array(
+              packet.buffer,
+              packet.byteOffset + 64 + vertexCount * 24,
+              triangleCount * 3,
+            ),
+          }
+        : {}),
+    };
+  },
+  meshBounds: (data: string) => {
+    const packet = native.nmeshBounds(data);
+    if (packet === null) return null;
+    const view = new DataView(
+      packet.buffer,
+      packet.byteOffset,
+      packet.byteLength,
+    );
+    return {
+      min: [
+        view.getFloat64(0, true),
+        view.getFloat64(8, true),
+        view.getFloat64(16, true),
+      ] as const,
+      max: [
+        view.getFloat64(24, true),
+        view.getFloat64(32, true),
+        view.getFloat64(40, true),
+      ] as const,
     };
   },
   capture: {

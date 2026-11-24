@@ -1,3 +1,7 @@
+import {
+  CAD_TEST_PAGE,
+  cadElement,
+} from "../../../packages/core/src/cad/testing/documents.ts";
 import { capturePlateDocument } from "../../../packages/core/src/capture/testing/plate.ts";
 import {
   boardReference,
@@ -487,7 +491,8 @@ test("Bun capture writes deterministic PNGs and reports the encoded size at frac
         args: ["--scale", "1.1"],
         expected: [110, 110],
       },
-      { width: 3000, height: 3296, args: [], expected: [1020, 1121] },
+      // The old size reflected the R2-10 rounding mismatch; 0.341 now fits the pixel cap.
+      { width: 3000, height: 3296, args: [], expected: [1023, 1124] },
       { width: 12247, height: 5468, args: [], expected: [1568, 700] },
       { width: 19780, height: 14187, args: [], expected: [1266, 908] },
     ]) {
@@ -573,4 +578,86 @@ test("CAD capture excludes a board on a converted page and restores it on undo",
       (body: { id: string }) => body.id === "board-reference",
     ),
   ).toBe(true);
+});
+
+test("capture scale and size agree at a decimal rounding boundary", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "nodetto-capture-rounding-"));
+  try {
+    const editor = new Editor();
+    addRect(editor, 9968, 68);
+    const document = join(cwd, "art.jsonl");
+    writeFileSync(document, serializeDocument(editor.getSnapshot()));
+    const captures: Uint8Array[] = [];
+    for (const [name, option, value] of [
+      ["scale.png", "--scale", "0.07"],
+      ["size.png", "--size", "700x7"],
+    ]) {
+      if (!name || !option || !value) throw new Error("missing capture option");
+      const output = join(cwd, name);
+      const result = await runCliAsync(
+        ["capture", document, "--output", output, option, value],
+        localIo(),
+        "test",
+      );
+      expect(result.stderr).toBe("");
+      expect(result.exitCode).toBe(0);
+      const bytes = readFileSync(output);
+      expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([
+        700, 7,
+      ]);
+      captures.push(bytes);
+    }
+    expect(captures[0]).toEqual(captures[1]);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("CAD capture routes mesh decoding through the capture decoder", async () => {
+  const base = capturePlateDocument();
+  const mesh = cadElement("mesh", "cad.mesh", "a0", {
+    name: "Mesh",
+    data: readFileSync(
+      new URL(
+        "../../../crates/capture/tests/fixtures/tetrahedron.nmesh.txt",
+        import.meta.url,
+      ),
+      "utf8",
+    ).trim(),
+  });
+  const state = harness(
+    new Editor({
+      document: { ...base, pages: [CAD_TEST_PAGE], elements: [mesh] },
+    }),
+  );
+  let captureCalls = 0;
+  let legacyCalls = 0;
+  state.io.decodeCaptureMesh = () => {
+    captureCalls += 1;
+    return {
+      vertexCount: 3,
+      triangleCount: 1,
+      bounds: { min: [0, 0, 0], max: [1, 1, 0] },
+      positions: new Float64Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      triangles: new Uint32Array([0, 1, 2]),
+    };
+  };
+  state.io.decodeMesh = () => {
+    legacyCalls += 1;
+    throw new Error("legacy decoder called");
+  };
+  state.backend.renderSolid = () => ({
+    image: png,
+    report: JSON.stringify({
+      width: 1024,
+      height: 768,
+      bodies: [{ state: "drawn", emptiedByStep: -1, open: true }],
+      analysis: null,
+      pairs: [],
+    }),
+  });
+  const result = await state.run("--page", CAD_TEST_PAGE.id);
+  expect(result.exitCode).toBe(0);
+  expect(captureCalls).toBe(1);
+  expect(legacyCalls).toBe(0);
 });

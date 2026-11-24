@@ -10,7 +10,7 @@ import {
   prepareCadCapture,
 } from "@nodetto/core";
 import type { Element, Page } from "@nodetto/ir";
-import { decodeCaptureMesh } from "@nodetto/io/nmesh";
+import { decodeCaptureMeshWith } from "@nodetto/io/nmesh";
 import type { CaptureBackend } from "./capture-command.ts";
 import { shortIds } from "./ids.ts";
 import { interferenceExitCode } from "./capture-interference-options.ts";
@@ -121,7 +121,7 @@ export function renderCadCapture(
   format: "png" | "jpg",
   quality: number,
   failOnInterference = false,
-  decodeMesh: CadCaptureRequest["decodeMesh"] = decodeCaptureMesh,
+  decodeMesh: CadCaptureRequest["decodeMesh"] = decodeCaptureMeshWith,
 ) {
   const { scene, model, camera, frame } = prepareCadCapture(elements, page.id, {
     ...request,

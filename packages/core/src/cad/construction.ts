@@ -22,7 +22,10 @@ export interface CadConstructionVisitor {
     targets: readonly ElementId[],
   ): void;
   /** An imported mesh. Returning false fails it as `cad.mesh.invalid`. */
-  mesh?(feature: FeatureOf<"cad.mesh">): boolean;
+  mesh?(
+    feature: FeatureOf<"cad.mesh">,
+    info: { readonly targeted: boolean },
+  ): boolean | "display-only";
 }
 
 export interface CadConstructionReport {
@@ -52,6 +55,9 @@ export function visitCadConstruction(
       pcb.push(element);
   }
   const history = scanCadPage(pcb.length ? [...page, ...pcb] : page);
+  const targetedMeshes = new Set<ElementId>();
+  for (const targets of history.targets.values())
+    for (const target of targets) targetedMeshes.add(target);
   const referenced = new Set<ElementId>();
   for (const feature of history.typed.values()) {
     if (feature.type !== "cad.sketch" || !("face" in feature.semantic.plane))
@@ -99,9 +105,11 @@ export function visitCadConstruction(
     // Dependencies of a suppressed feature are still checked above.
     if (feature.semantic.suppressed) continue;
     if (feature.type === "cad.mesh") {
-      if (visitor.mesh?.(feature) === false)
-        status.set(id, cadFailure("cad.mesh.invalid"));
-      else bodies.add(id);
+      const result = visitor.mesh?.(feature, {
+        targeted: targetedMeshes.has(id),
+      });
+      if (result === false) status.set(id, cadFailure("cad.mesh.invalid"));
+      else if (result !== "display-only") bodies.add(id);
       continue;
     }
     // A target whose creator did not produce a body fails the feature.

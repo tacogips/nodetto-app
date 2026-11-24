@@ -146,6 +146,40 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
                 .to_packet(),
             ctx,
         ),
+        "nmeshCapture" => {
+            let limit = args.get_or_undefined(1).to_number(ctx)?;
+            let max_vertices = if !limit.is_finite() || limit >= 9_007_199_254_740_992.0 {
+                u64::MAX
+            } else {
+                limit as u64
+            };
+            let options = nodetto_capture::nmesh::DecodeOptions {
+                max_vertices,
+                need_target: args.get_or_undefined(2).to_boolean(),
+            };
+            let mesh = nodetto_capture::nmesh::decode_inline_with(&string(args, 0, ctx)?, options)
+                .ok_or_else(|| host_error("Invalid mesh data."))?;
+            byte_value(mesh.to_packet(), ctx)
+        }
+        "nmeshBounds" => {
+            let options = nodetto_capture::nmesh::DecodeOptions {
+                max_vertices: 0,
+                need_target: false,
+            };
+            let bounds =
+                nodetto_capture::nmesh::decode_inline_with(&string(args, 0, ctx)?, options)
+                    .and_then(|mesh| mesh.bounds);
+            match bounds {
+                Some((min, max)) => byte_value(
+                    min.into_iter()
+                        .chain(max)
+                        .flat_map(f64::to_le_bytes)
+                        .collect(),
+                    ctx,
+                ),
+                None => Ok(JsValue::null()),
+            }
+        }
         "digest" => Ok(js_string!(files::digest(&bytes(args.get_or_undefined(0), ctx)?)).into()),
         "captureSolid" | "captureEncode" => {
             let format = capture_format(args, ctx)?;
@@ -310,7 +344,7 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
         globalThis.native = Object.fromEntries([
           'path','readText','readBytes','listDir','exists','writeBytes','ensureDir','attachment','open','png','pdf','pdfPages','fontCoverage',
           'readStdin','graphemes','utf8','decodeUtf8','base64','unbase64','random',
-          'captureDir','captureAbsolute','writeCapture','digest','captureEncode','captureSolid','nmeshDecode'
+          'captureDir','captureAbsolute','writeCapture','digest','captureEncode','captureSolid','nmeshDecode','nmeshCapture','nmeshBounds'
         ].map(name => [name, (...args) => __nodettoHost(name, ...args)]));
         globalThis.TextEncoder = class { encode(text = "") { return native.utf8(String(text)); } };
         globalThis.TextDecoder = class { decode(bytes = []) { return native.decodeUtf8(new Uint8Array(bytes)); } };

@@ -27,6 +27,10 @@ export const DEFAULT_SVG_THEME: SvgTheme = {
 };
 
 export interface SvgExportOptions {
+  readonly meshBounds?: (data: string) => {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+  } | null;
   readonly resolveAsset?: (source: string) => string;
   /** Page units of empty space around the content. Defaults to 16. */
   readonly padding?: number;

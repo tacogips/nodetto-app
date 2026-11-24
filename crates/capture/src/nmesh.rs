@@ -36,6 +36,257 @@ pub fn decode_inline(text: &str) -> Option<InlineMesh> {
     decode(&unarmor(text)?)
 }
 
+/// Options for the budgeted capture decoder.
+pub struct DecodeOptions {
+    pub max_vertices: u64,
+    pub need_target: bool,
+}
+impl Default for DecodeOptions {
+    fn default() -> Self {
+        Self {
+            max_vertices: u64::MAX,
+            need_target: false,
+        }
+    }
+}
+#[derive(Debug, PartialEq)]
+pub struct DecodedMesh {
+    pub vertex_count: u32,
+    pub triangle_count: u32,
+    pub bounds: Option<([f64; 3], [f64; 3])>,
+    pub boolean_target: Option<bool>,
+    pub geometry: Option<InlineMesh>,
+}
+impl DecodedMesh {
+    pub fn to_packet(&self) -> Vec<u8> {
+        let mut packet = Vec::new();
+        let flags = u32::from(self.geometry.is_some())
+            | (u32::from(self.boolean_target.is_some()) << 1)
+            | (u32::from(self.boolean_target == Some(true)) << 2)
+            | (u32::from(self.bounds.is_some()) << 3);
+        for n in [self.vertex_count, self.triangle_count, flags, 0] {
+            packet.extend(n.to_le_bytes());
+        }
+        let (lo, hi) = self.bounds.unwrap_or(([0.; 3], [0.; 3]));
+        for n in lo.into_iter().chain(hi) {
+            packet.extend(n.to_le_bytes());
+        }
+        if let Some(mesh) = &self.geometry {
+            for n in &mesh.positions {
+                packet.extend(n.to_le_bytes());
+            }
+            for n in &mesh.triangles {
+                packet.extend(n.to_le_bytes());
+            }
+        }
+        packet
+    }
+}
+#[derive(Default)]
+struct AllocStats {
+    positions: usize,
+    triangles: usize,
+    target: usize,
+}
+
+pub fn decode_inline_with(text: &str, options: DecodeOptions) -> Option<DecodedMesh> {
+    decode_budgeted(text, options, &mut AllocStats::default())
+}
+#[cfg(test)]
+fn decode_with_stats(text: &str, options: DecodeOptions) -> (Option<DecodedMesh>, AllocStats) {
+    let mut stats = AllocStats::default();
+    let result = decode_budgeted(text, options, &mut stats);
+    (result, stats)
+}
+fn decode_budgeted(
+    text: &str,
+    options: DecodeOptions,
+    stats: &mut AllocStats,
+) -> Option<DecodedMesh> {
+    let bytes = unarmor(text)?;
+    let end = bytes.len().checked_sub(4)?;
+    if bytes.len() < 12 || bytes[..8] != [b'N', b'M', b'S', b'H', 1, 0, 3, 0] {
+        return None;
+    }
+    let mut body = Varints {
+        bytes: &bytes[8..end],
+    };
+    let vertices = body.next()?;
+    let triangles = body.next()?;
+    let groups = body.next()?;
+    if 3 * vertices + 3 * triangles + 2 * groups > bytes.len() as u64 - 12
+        || crc32(&bytes[..end]).to_le_bytes() != bytes[end..]
+        || (triangles > 0 && groups == 0)
+    {
+        return None;
+    }
+    let mut previous_face = None;
+    let mut grouped = 0;
+    for _ in 0..groups {
+        let face = body.next()?;
+        grouped += body.next()?;
+        if previous_face.is_some_and(|previous| face <= previous) || grouped > triangles {
+            return None;
+        }
+        previous_face = Some(face);
+    }
+    if grouped != triangles {
+        return None;
+    }
+    let geometry_body = body.bytes;
+    let mut previous = [0i64; 3];
+    let mut lo = [i64::MAX; 3];
+    let mut hi = [i64::MIN; 3];
+    for _ in 0..vertices {
+        for axis in 0..3 {
+            let encoded = body.next()? as i64;
+            let delta = if encoded % 2 == 0 {
+                encoded / 2
+            } else {
+                -(encoded + 1) / 2
+            };
+            previous[axis] += delta;
+            if previous[axis].abs() > COORDINATE_LIMIT {
+                return None;
+            }
+            lo[axis] = lo[axis].min(previous[axis]);
+            hi[axis] = hi[axis].max(previous[axis]);
+        }
+    }
+    let mut used = 0;
+    for _ in 0..triangles * 3 {
+        let code = body.next()?;
+        if code > used || (code == 0 && used == vertices) {
+            return None;
+        }
+        used += u64::from(code == 0);
+    }
+    if used != vertices || !body.bytes.is_empty() {
+        return None;
+    }
+    let bounds = (vertices != 0).then(|| {
+        (
+            lo.map(|n| n as f64 / UNITS_PER_MILLIMETRE),
+            hi.map(|n| n as f64 / UNITS_PER_MILLIMETRE),
+        )
+    });
+    let fits = vertices <= options.max_vertices;
+    let mut geometry = None;
+    let mut boolean_target = None;
+    if fits || options.need_target {
+        let mut body = Varints {
+            bytes: geometry_body,
+        };
+        if fits {
+            stats.positions += 1;
+            stats.triangles += 1;
+        } else {
+            stats.target += 2;
+        }
+        let mut quantized = Vec::with_capacity(vertices as usize * 3);
+        let mut prev = [0i64; 3];
+        for _ in 0..vertices {
+            for value in &mut prev {
+                let encoded = body.next()? as i64;
+                *value += if encoded % 2 == 0 {
+                    encoded / 2
+                } else {
+                    -(encoded + 1) / 2
+                };
+                quantized.push(*value);
+            }
+        }
+        let mut indices = Vec::with_capacity(triangles as usize * 3);
+        let mut used = 0;
+        for _ in 0..triangles * 3 {
+            let code = body.next()?;
+            indices.push((used - code) as u32);
+            used += u64::from(code == 0);
+        }
+        if options.need_target {
+            boolean_target = Some(target_eligible(&quantized, &indices, stats));
+        }
+        if fits {
+            stats.positions += 1;
+            let mut positions = Vec::with_capacity(quantized.len());
+            positions.extend(
+                quantized
+                    .into_iter()
+                    .map(|q| q as f64 / UNITS_PER_MILLIMETRE),
+            );
+            geometry = Some(InlineMesh {
+                positions,
+                triangles: indices,
+            });
+        }
+    }
+    Some(DecodedMesh {
+        vertex_count: vertices as u32,
+        triangle_count: triangles as u32,
+        bounds,
+        boolean_target,
+        geometry,
+    })
+}
+fn target_eligible(q: &[i64], triangles: &[u32], stats: &mut AllocStats) -> bool {
+    let point = |i: usize| {
+        [
+            q[3 * i] as f64 / UNITS_PER_MILLIMETRE,
+            q[3 * i + 1] as f64 / UNITS_PER_MILLIMETRE,
+            q[3 * i + 2] as f64 / UNITS_PER_MILLIMETRE,
+        ]
+    };
+    if !triangles.is_empty() && triangles.len().is_multiple_of(3) {
+        stats.target += 1;
+    }
+    if !crate::mesh::closed_by(q.len() / 3, triangles, point) {
+        return false;
+    }
+    stats.target += 2;
+    let mut edges = Vec::with_capacity(triangles.len());
+    let mut faces = Vec::with_capacity(triangles.len() / 3);
+    for tri in triangles.as_chunks::<3>().0 {
+        for (a, b) in [(tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])] {
+            edges.push((a.min(b), a.max(b), a < b));
+        }
+        let mut face = [tri[0], tri[1], tri[2]];
+        face.sort_unstable();
+        faces.push(face);
+    }
+    edges.sort_unstable();
+    if edges
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .any(|pair| pair[0].0 != pair[1].0 || pair[0].1 != pair[1].1 || pair[0].2 == pair[1].2)
+    {
+        return false;
+    }
+    faces.sort_unstable();
+    if faces.windows(2).any(|pair| pair[0] == pair[1]) {
+        return false;
+    }
+    let origin = point(0);
+    let mut volume = 0.;
+    let mut area = 0.;
+    for tri in triangles.as_chunks::<3>().0 {
+        let p = [
+            point(tri[0] as usize),
+            point(tri[1] as usize),
+            point(tri[2] as usize),
+        ]
+        .map(|p| std::array::from_fn::<_, 3, _>(|i| p[i] - origin[i]));
+        let cross = crate::view::cross(p[1], p[2]);
+        volume += crate::view::dot(p[0], cross) / 6.;
+        let normal = crate::view::cross(
+            std::array::from_fn(|i| p[1][i] - p[0][i]),
+            std::array::from_fn(|i| p[2][i] - p[0][i]),
+        );
+        area += crate::view::dot(normal, normal).sqrt() / 2.;
+    }
+    volume != 0. && 2. * volume.abs() >= area * 5e-7
+}
+
 fn unarmor(text: &str) -> Option<Vec<u8>> {
     let data = text.strip_prefix(PREFIX)?.as_bytes();
     if text.len() > MAX_CHARS || data.is_empty() || !data.len().is_multiple_of(4) {
@@ -211,5 +462,164 @@ mod tests {
         ] {
             assert_eq!(decode_inline(bad), None, "{bad}");
         }
+    }
+    #[test]
+    fn budgeted_fixture_contract() {
+        let fixtures = [
+            (
+                include_str!("../tests/fixtures/tetrahedron.nmesh.txt"),
+                true,
+            ),
+            (
+                include_str!("../tests/fixtures/tetrahedron-reversed.nmesh.txt"),
+                true,
+            ),
+            (
+                include_str!("../tests/fixtures/tetrahedron-mixed.nmesh.txt"),
+                false,
+            ),
+            (include_str!("../tests/fixtures/triangle.nmesh.txt"), false),
+            (
+                include_str!("../tests/fixtures/double-sided-triangle.nmesh.txt"),
+                false,
+            ),
+            (
+                include_str!("../tests/fixtures/coplanar-tetrahedron.nmesh.txt"),
+                false,
+            ),
+            (include_str!("../tests/fixtures/thin-bar.nmesh.txt"), true),
+            (
+                include_str!("../tests/fixtures/translated-flat-shell.nmesh.txt"),
+                false,
+            ),
+            (
+                include_str!("../tests/fixtures/translated-thin-bar.nmesh.txt"),
+                true,
+            ),
+        ];
+        for (text, expected) in fixtures {
+            let text = text.trim();
+            let original = decode_inline(text).unwrap();
+            let result = decode_inline_with(
+                text,
+                DecodeOptions {
+                    max_vertices: u64::MAX,
+                    need_target: true,
+                },
+            )
+            .unwrap();
+            assert_eq!(result.boolean_target, Some(expected));
+            assert_eq!(result.geometry.as_ref(), Some(&original));
+            let mut lo = [f64::INFINITY; 3];
+            let mut hi = [f64::NEG_INFINITY; 3];
+            for point in original.positions.as_chunks::<3>().0 {
+                for i in 0..3 {
+                    lo[i] = lo[i].min(point[i]);
+                    hi[i] = hi[i].max(point[i]);
+                }
+            }
+            assert_eq!(result.bounds, Some((lo, hi)));
+            let mesh = crate::scene::Mesh {
+                positions: original.positions.clone(),
+                triangles: original.triangles.clone(),
+            };
+            let quantized: Vec<i64> = mesh
+                .positions
+                .iter()
+                .map(|p| (p * UNITS_PER_MILLIMETRE).round() as i64)
+                .collect();
+            assert_eq!(
+                crate::mesh::closed_by(mesh.positions.len() / 3, &mesh.triangles, |i| [
+                    quantized[3 * i] as f64 / UNITS_PER_MILLIMETRE,
+                    quantized[3 * i + 1] as f64 / UNITS_PER_MILLIMETRE,
+                    quantized[3 * i + 2] as f64 / UNITS_PER_MILLIMETRE
+                ]),
+                crate::mesh::is_closed(&mesh)
+            );
+            let (limited, stats) = decode_with_stats(
+                text,
+                DecodeOptions {
+                    max_vertices: u64::from(result.vertex_count) - 1,
+                    need_target: true,
+                },
+            );
+            let limited = limited.unwrap();
+            assert_eq!(
+                (
+                    limited.vertex_count,
+                    limited.triangle_count,
+                    limited.bounds,
+                    limited.boolean_target
+                ),
+                (
+                    result.vertex_count,
+                    result.triangle_count,
+                    result.bounds,
+                    result.boolean_target
+                )
+            );
+            assert!(limited.geometry.is_none());
+            assert_eq!((stats.positions, stats.triangles), (0, 0));
+            assert!(stats.target > 0);
+            let packet = result.to_packet();
+            assert_eq!(&packet[0..4], &result.vertex_count.to_le_bytes());
+            assert_eq!(&packet[4..8], &result.triangle_count.to_le_bytes());
+            assert_eq!(
+                &packet[8..12],
+                &(11u32 | if expected { 4 } else { 0 }).to_le_bytes()
+            );
+            assert_eq!(&packet[64..72], &original.positions[0].to_le_bytes());
+            let index_offset = 64 + 24 * result.vertex_count as usize;
+            assert_eq!(
+                &packet[index_offset..index_offset + 4],
+                &original.triangles[0].to_le_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn budgeted_rejects_corruption_without_geometry_allocation() {
+        let text = TETRAHEDRON.trim();
+        let mut flipped = text.as_bytes().to_vec();
+        flipped[PREFIX.len() + 14] ^= 1;
+        let flipped = String::from_utf8(flipped).unwrap();
+        for bad in [
+            "",
+            "nmesh1:",
+            "nmesh1:UExBVEU=",
+            "nmesh2:AAAA",
+            "nmesh1:AA=A",
+            "nmesh1:\u{e9}AAA",
+            &text[..text.len() - 4],
+            &flipped,
+        ] {
+            let (result, stats) = decode_with_stats(
+                bad,
+                DecodeOptions {
+                    max_vertices: 0,
+                    need_target: true,
+                },
+            );
+            assert_eq!(result, None);
+            assert_eq!((stats.positions, stats.triangles), (0, 0));
+            assert_eq!(decode_inline_with(bad, DecodeOptions::default()), None);
+        }
+    }
+    #[test]
+    fn asymmetric_bounds_and_packet() {
+        let text = "nmesh1:Tk1TSAEAAwADAQEAAb8+oB/fXbBtr22QywGfH5DLAc+MAQAAAFBZiOA=";
+        let result = decode_inline_with(
+            text,
+            DecodeOptions {
+                max_vertices: 3,
+                need_target: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.bounds, Some(([-4., -5., -6.], [3., 8., 7.])));
+        let packet = result.to_packet();
+        assert_eq!(&packet[8..12], &11u32.to_le_bytes());
+        assert_eq!(&packet[64..72], &(-4f64).to_le_bytes());
+        assert_eq!(&packet[64 + 24 * 3..64 + 24 * 3 + 4], &0u32.to_le_bytes());
     }
 }

@@ -774,3 +774,158 @@ fn wide_lattice_finds_seeded_corners_and_thin_z_overlap() {
     let result = analyse_pair(&scene, &pair, 1.0, 0).0.unwrap();
     assert!((result.volume - 0.002).abs() < 1e-10);
 }
+
+fn exhaustive_candidates(
+    scene: &Scene,
+    boxes: &[nodetto_capture::lattice::Bounds],
+    keep: usize,
+) -> (Vec<Candidate>, u64) {
+    let tools = scene
+        .tools
+        .iter()
+        .map(|tool| {
+            nodetto_capture::tool_view::tool_bounds(tool)
+                .unwrap_or(([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]))
+        })
+        .collect::<Vec<_>>();
+    let analysed = scene
+        .bodies
+        .iter()
+        .zip(boxes)
+        .enumerate()
+        .filter(|&(_, (body, &(min, max)))| {
+            body.analysed
+                && (0..3).all(|axis| {
+                    min[axis].is_finite() && max[axis].is_finite() && min[axis] <= max[axis]
+                })
+                && body
+                    .steps
+                    .first()
+                    .and_then(|step| scene.tools.get(step.tool as usize))
+                    .is_some_and(nodetto_capture::tool_view::is_solid)
+        })
+        .map(|(i, (_, &bounds))| (i, bounds))
+        .collect::<Vec<_>>();
+    let mut stored = Vec::new();
+    let mut total = 0;
+    for (index, &(a, (a_min, a_max))) in analysed.iter().enumerate() {
+        for &(b, (b_min, b_max)) in &analysed[index + 1..] {
+            let min = std::array::from_fn(|i| a_min[i].max(b_min[i]));
+            let max = std::array::from_fn(|i| a_max[i].min(b_max[i]));
+            if (0..3).any(|axis| max[axis] - min[axis] <= scene.tolerance) {
+                continue;
+            }
+            total += 1;
+            if stored.len() < keep {
+                let steps = scene.bodies[a]
+                    .steps
+                    .iter()
+                    .chain(&scene.bodies[b].steps)
+                    .filter(|step| {
+                        step.op == Op::Intersection
+                            || tools.get(step.tool as usize).is_some_and(|&(lo, hi)| {
+                                (0..3).all(|axis| lo[axis] <= max[axis] && hi[axis] >= min[axis])
+                            })
+                    })
+                    .count() as u64;
+                stored.push(Candidate {
+                    a: a as u32,
+                    b: b as u32,
+                    min,
+                    max,
+                    weight: steps.div_ceil(8).max(1),
+                });
+            }
+        }
+    }
+    (stored, total)
+}
+
+fn sweep_scene(count: usize) -> Scene {
+    let mut result = scene(
+        vec![box_prism([-1000.0; 3], 4000.0, 4000.0, 4000.0)],
+        (0..count)
+            .map(|i| analysed(&vec![(Op::Union, 0); 1 + i % 9]))
+            .collect(),
+    );
+    result.tolerance = 0.125;
+    result
+}
+
+#[test]
+fn sweep_sparse_comparison_counts() {
+    for axis in 0..2 {
+        for n in [500, 1000] {
+            let boxes = (0..n)
+                .map(|i| {
+                    let mut min = [0.0; 3];
+                    min[axis] = i as f64 * 2.0;
+                    (min, min.map(|v| v + 1.0))
+                })
+                .collect::<Vec<_>>();
+            let (_, total, compared) =
+                nodetto_capture::interference::candidate_comparisons(&sweep_scene(n), &boxes, 0);
+            assert_eq!(total, 0);
+            assert!(
+                compared <= n as u64,
+                "axis={axis} n={n} compared={compared}"
+            );
+        }
+    }
+    let counts = [20, 40].map(|width| {
+        let boxes = (0..width)
+            .flat_map(|x| {
+                (0..20).map(move |y| {
+                    let min = [x as f64 * 2.0, y as f64 * 2.0, 0.0];
+                    (min, min.map(|v| v + 1.0))
+                })
+            })
+            .collect::<Vec<_>>();
+        nodetto_capture::interference::candidate_comparisons(&sweep_scene(boxes.len()), &boxes, 0).2
+    });
+    assert!(counts[1] <= 3 * counts[0], "{counts:?}");
+}
+
+#[test]
+fn sweep_matches_exhaustive_candidates() {
+    let dense = (0..12)
+        .map(|i| {
+            let min = [i as f64 * 0.03; 3];
+            (min, min.map(|v| v + 2.0))
+        })
+        .collect::<Vec<_>>();
+    let mixed = (0..18)
+        .map(|i| {
+            let min = [
+                (i % 6) as f64 * 0.7,
+                (i / 6) as f64 * 1.3,
+                (i % 3) as f64 * 0.2,
+            ];
+            (min, min.map(|v| v + 1.0))
+        })
+        .collect::<Vec<_>>();
+    let mut boundary = Vec::new();
+    for axis in 0..3 {
+        for overlap in [0.125, 0.125 - 1e-8, 0.125 + 1e-8] {
+            let mut min = [0.0; 3];
+            min[axis] = 1.0 - overlap;
+            boundary.push(([0.0; 3], [1.0; 3]));
+            boundary.push((min, min.map(|v| v + 1.0)));
+        }
+    }
+    for boxes in [dense, mixed, boundary] {
+        let scene = sweep_scene(boxes.len());
+        for keep in [0, 1, 3, usize::MAX] {
+            let (expected, expected_total) = exhaustive_candidates(&scene, &boxes, keep);
+            let (actual, total, _) =
+                nodetto_capture::interference::candidate_comparisons(&scene, &boxes, keep);
+            let values = |v: Vec<Candidate>| {
+                v.into_iter()
+                    .map(|c| (c.a, c.b, c.min, c.max, c.weight))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(total, expected_total);
+            assert_eq!(values(actual), values(expected));
+        }
+    }
+}

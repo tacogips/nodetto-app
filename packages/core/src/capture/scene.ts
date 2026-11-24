@@ -2,7 +2,6 @@ import type { Element, ElementId, PageId } from "@nodetto/ir";
 import {
   includeBounds,
   type MutableBounds3,
-  pointBounds,
   sweptBounds,
 } from "../cad/bounds.ts";
 import { visitCadConstruction } from "../cad/construction.ts";
@@ -13,7 +12,11 @@ import { coordinate } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
 import type { Bounds3 } from "./camera.ts";
 import type { CaptureMeshDecoder } from "./cad-request.ts";
-import type { CaptureMeshTool } from "./scene-binary.ts";
+import {
+  chargeTool,
+  MAX_POINTS,
+  type CaptureMeshTool,
+} from "./scene-binary.ts";
 
 export interface CaptureTool {
   readonly kind: "prism";
@@ -42,6 +45,8 @@ export interface CaptureBody {
 
 export interface CadCaptureModel {
   readonly tools: readonly (CaptureTool | CaptureMeshTool)[];
+  readonly toolCount: number;
+  readonly overLimit?: string;
   readonly bodies: readonly CaptureBody[];
   readonly errors: readonly { id: ElementId; code: string }[];
   readonly bounds: Bounds3 | null;
@@ -89,28 +94,39 @@ function containsPoint(
  */
 export function normaliseToolLoops(
   loops: readonly CadLoop[],
+  stats?: { ancestorProbes: number },
 ): readonly CadLoop[] {
   // Disjoint profiles already describe the same region by either rule.
   if (loops.every(({ depth }) => depth === 0)) return loops;
-  const candidates = loops.map((loop) => ({ loop, ...loopBounds(loop) }));
+  const buckets = new Map<
+    number,
+    { loop: CadLoop; minX: number; minY: number; maxX: number; maxY: number }[]
+  >();
+  for (const loop of loops) {
+    const bucket = buckets.get(loop.depth) ?? [];
+    bucket.push({ loop, ...loopBounds(loop) });
+    buckets.set(loop.depth, bucket);
+  }
   return loops.filter(({ points, depth }) => {
     if (depth === 0) return true;
     const x = coordinate(points, 0);
     const y = coordinate(points, 1);
     let ancestorDepth = -1;
-    for (const { loop, minX, minY, maxX, maxY } of candidates) {
-      if (
-        loop.depth < depth &&
-        loop.depth > ancestorDepth &&
-        x >= minX &&
-        x <= maxX &&
-        y >= minY &&
-        y <= maxY &&
-        containsPoint(loop.points, x, y)
-      ) {
-        ancestorDepth = loop.depth;
-        if (ancestorDepth === depth - 1) break;
+    for (let k = depth - 1; k >= 0; k -= 1) {
+      for (const { loop, minX, minY, maxX, maxY } of buckets.get(k) ?? []) {
+        if (stats) stats.ancestorProbes += 1;
+        if (
+          x >= minX &&
+          x <= maxX &&
+          y >= minY &&
+          y <= maxY &&
+          containsPoint(loop.points, x, y)
+        ) {
+          ancestorDepth = k;
+          break;
+        }
       }
+      if (ancestorDepth !== -1) break;
     }
     return (depth - ancestorDepth) % 2 === 1;
   });
@@ -127,27 +143,26 @@ const STEP_OPS = {
   intersect: "intersection",
 } as const;
 
-const toolBounds = ({ frame, t0, t1, loops }: CaptureTool) =>
-  sweptBounds(frame, t0, t1, loops);
-
-function makeTool(feature: ElementId, geometry: ExtrudeGeometry): CaptureTool {
+function makeTool(
+  feature: ElementId,
+  geometry: ExtrudeGeometry,
+  normalized: readonly CadLoop[],
+): CaptureTool {
   const bySource = new Map<ElementId, number>();
-  const loops = normaliseToolLoops(geometry.loops).map(
-    ({ points, sources }) => {
-      const faces = new Uint32Array(sources.length);
-      let i = 0;
-      for (const source of sources) {
-        let face = bySource.get(source);
-        if (face === undefined) {
-          face = 2 + bySource.size;
-          bySource.set(source, face);
-        }
-        faces[i] = face;
-        i += 1;
+  const loops = normalized.map(({ points, sources }) => {
+    const faces = new Uint32Array(sources.length);
+    let i = 0;
+    for (const source of sources) {
+      let face = bySource.get(source);
+      if (face === undefined) {
+        face = 2 + bySource.size;
+        bySource.set(source, face);
       }
-      return { points: new Float64Array(points), faces };
-    },
-  );
+      faces[i] = face;
+      i += 1;
+    }
+    return { points: new Float64Array(points), faces };
+  });
   return {
     kind: "prism",
     feature,
@@ -157,6 +172,12 @@ function makeTool(feature: ElementId, geometry: ExtrudeGeometry): CaptureTool {
   };
 }
 
+export interface CaptureWalkStats {
+  captureVisits: number;
+  toolArrays: number;
+  metadataVisits: number;
+}
+
 export function buildCadCaptureModel(
   elements: readonly Element[],
   pageId: PageId,
@@ -164,12 +185,18 @@ export function buildCadCaptureModel(
 export function buildCadCaptureModel(
   elements: readonly Element[],
   pageId: PageId,
-  options: { readonly decodeMesh?: CaptureMeshDecoder },
+  options: {
+    readonly decodeMesh?: CaptureMeshDecoder;
+    readonly stats?: CaptureWalkStats;
+  },
 ): CadCaptureModel;
 export function buildCadCaptureModel(
   elements: readonly Element[],
   pageId: PageId,
-  options?: { readonly decodeMesh?: CaptureMeshDecoder },
+  options?: {
+    readonly decodeMesh?: CaptureMeshDecoder;
+    readonly stats?: CaptureWalkStats;
+  },
 ): CadCaptureModel {
   const tools: (CaptureTool | CaptureMeshTool)[] = [];
   const bodies: BuildingBody[] = [];
@@ -177,17 +204,21 @@ export function buildCadCaptureModel(
   const visible = new Map<ElementId, BuildingBody>();
   const skipped: { id: ElementId; reason: "mesh" }[] = [];
   let sketches = 0;
+  let toolCount = 0;
+  let overLimit: string | undefined;
+  const charge = { points: 0 };
+  const stats = options?.stats;
 
   /** Register a tool as a new body, unless the feature is hidden. */
   function addBody(
     feature: { id: ElementId; visual: { hidden?: boolean } },
     name: string,
     reference: boolean,
-    tool: CaptureTool | CaptureMeshTool,
+    tool: CaptureTool | CaptureMeshTool | undefined,
     bounds: MutableBounds3,
   ): void {
-    const step: CaptureStep = { op: "union", tool: tools.length };
-    tools.push(tool);
+    const step: CaptureStep = { op: "union", tool: toolCount++ };
+    if (tool) tools.push(tool);
     if (feature.visual.hidden) return;
     const body = { id: feature.id, name, reference, steps: [step], bounds };
     bodies.push(body);
@@ -199,53 +230,84 @@ export function buildCadCaptureModel(
     sketch() {
       sketches += 1;
     },
-    mesh(feature) {
+    mesh(feature, info) {
       const { id, semantic } = feature;
       if (!options?.decodeMesh) {
         skipped.push({ id, reason: "mesh" });
         return true;
       }
-      let positions: Float64Array;
-      let triangles: Uint32Array;
+      let decoded: ReturnType<CaptureMeshDecoder>;
       try {
-        // The decoder returns fresh arrays; a mesh is megabytes, so keep them.
-        ({ positions, triangles } = options.decodeMesh(semantic.data));
+        decoded = options.decodeMesh(semantic.data, {
+          maxVertices: overLimit ? 0 : MAX_POINTS - charge.points,
+          needTarget: info.targeted,
+        });
       } catch {
         return false;
       }
-      // An empty mesh has no bounds; as a body it would make the whole
-      // page impossible to frame. The app rejects it as well.
-      if (triangles.length === 0 || positions.length === 0) return false;
-      addBody(
-        feature,
-        semantic.name,
-        false,
-        { kind: "mesh", feature: id, positions, triangles },
-        pointBounds(positions),
-      );
-      return true;
+      const { positions, triangles, bounds, vertexCount, triangleCount } =
+        decoded;
+      if (!vertexCount || !triangleCount || !bounds) return false;
+      if (
+        !overLimit &&
+        vertexCount <= MAX_POINTS - charge.points &&
+        (!positions || !triangles)
+      )
+        return false;
+      if (!overLimit) {
+        if (stats) stats.captureVisits++;
+        overLimit = chargeTool(charge, {
+          kind: "mesh",
+          vertices: vertexCount,
+          triangles: triangleCount,
+        });
+      } else if (stats) stats.metadataVisits++;
+      if (!overLimit && (!positions || !triangles)) return false;
+      const tool =
+        !overLimit && positions && triangles
+          ? { kind: "mesh" as const, feature: id, positions, triangles }
+          : undefined;
+      if (tool && stats) stats.toolArrays++;
+      addBody(feature, semantic.name, false, tool, {
+        min: [...bounds.min],
+        max: [...bounds.max],
+      });
+      return info.targeted && decoded.booleanTarget === false
+        ? "display-only"
+        : true;
     },
     tool(feature, geometry, targets) {
       // The walk keeps the original loops for later face references, even
       // for a loop omitted from the capture tool.
-      const tool = makeTool(feature.id, geometry);
+      const loops = normaliseToolLoops(geometry.loops);
+      if (!overLimit) {
+        if (stats) stats.captureVisits++;
+        overLimit = chargeTool(charge, {
+          kind: "prism",
+          loopCounts: loops.map(({ points }) => points.length / 2),
+        });
+      } else if (stats) stats.metadataVisits++;
+      const tool = overLimit
+        ? undefined
+        : makeTool(feature.id, geometry, loops);
+      if (tool && stats) stats.toolArrays++;
+      const bounds = sweptBounds(
+        geometry.frame,
+        geometry.span.t0,
+        geometry.span.t1,
+        loops,
+      );
       if (feature.type === "cad.pcb" || feature.semantic.op === "new") {
         const reference = feature.type === "cad.pcb";
-        addBody(
-          feature,
-          feature.semantic.name,
-          reference,
-          tool,
-          toolBounds(tool),
-        );
+        addBody(feature, feature.semantic.name, reference, tool, bounds);
         return;
       }
       const step: CaptureStep = {
         op: STEP_OPS[feature.semantic.op],
-        tool: tools.length,
+        tool: toolCount++,
       };
-      tools.push(tool);
-      const added = step.op === "union" ? toolBounds(tool) : undefined;
+      if (tool) tools.push(tool);
+      const added = step.op === "union" ? bounds : undefined;
       for (const target of targets) {
         const body = visible.get(target);
         if (!body) continue;
@@ -264,5 +326,14 @@ export function buildCadCaptureModel(
   const errors = [...report.errors].sort((a, b) =>
     compareFractional(a.id, b.id),
   );
-  return { tools, bodies, errors, bounds, sketches, skipped };
+  return {
+    tools,
+    toolCount,
+    overLimit,
+    bodies,
+    errors,
+    bounds,
+    sketches,
+    skipped,
+  };
 }

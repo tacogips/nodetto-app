@@ -72,7 +72,9 @@ skipped. A `cad.result.empty (sampled)` error identifies a feature the app
 rejects but the picture applies, even with `--no-interference`.
 
 Closed imported meshes participate like solids; open meshes are translucent
-and marked not checked. Reference bodies are drawn at 45% over what is behind
+and marked not checked. As in the app, a feature with an open mesh among its
+targets fails with `cad.body.missing` and changes none of its targets; the
+open mesh stays drawn. Reference bodies are drawn at 45% over what is behind
 and participate in interference. 2D artwork options do not apply to CAD.
 `export` draws a CAD page as a construction wireframe; `capture` renders the shaded solids.
 

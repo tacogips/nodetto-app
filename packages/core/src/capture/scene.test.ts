@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
+import { createHash } from "node:crypto";
+import {
+  canonicalize,
+  decodeCaptureMeshWith,
+  encodeNmesh,
+  toInline,
+} from "@nodetto/io/nmesh";
 import type { CadXY, Element, PageId } from "@nodetto/ir";
 import { checkCadPage } from "../cad/check.ts";
 import { buildLoops, type CadLoop } from "../cad/loops.ts";
@@ -16,7 +22,13 @@ import { generateCadDocument } from "../cad/testing/generate.ts";
 import { boardReference, edge, testBoard } from "../cad/testing/pcb.ts";
 import { coordinate } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
-import { buildCadCaptureModel, normaliseToolLoops } from "./index.ts";
+import { prepareCadCapture } from "./cad-request.ts";
+import {
+  buildCadCaptureModel,
+  CAPTURE_THEMES,
+  normaliseToolLoops,
+  writeCaptureScene,
+} from "./index.ts";
 
 function modelOf(
   elements: readonly Element[],
@@ -305,7 +317,7 @@ test("reports a failed mesh dependency as a missing target body", () => {
   ]);
 });
 
-test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh", () => {
+test("keeps display-only mesh bodies and rejects cuts; decoder errors fail the mesh", () => {
   const mesh = cadElement("mesh", "cad.mesh", "a0", {
     name: "Imported",
     data: "nmesh1:UExBVEU=",
@@ -324,7 +336,14 @@ test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh",
   const positions = new Float64Array([0, 0, 0, 2, 0, 0, 0, 2, 2]);
   const triangles = new Uint32Array([0, 1, 2]);
   const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
-    decodeMesh: () => ({ positions, triangles }),
+    decodeMesh: () => ({
+      positions,
+      triangles,
+      vertexCount: 3,
+      triangleCount: 1,
+      booleanTarget: false,
+      bounds: { min: [0, 0, 0], max: [2, 2, 2] },
+    }),
   });
   expect(model.tools[0]).toMatchObject({
     kind: "mesh",
@@ -335,11 +354,9 @@ test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh",
   expect(model.bodies[0]).toMatchObject({
     id: "mesh",
     bounds: { min: [0, 0, 0], max: [2, 2, 2] },
-    steps: [
-      { op: "union", tool: 0 },
-      { op: "difference", tool: 1 },
-    ],
+    steps: [{ op: "union", tool: 0 }],
   });
+  expect(model.errors).toEqual([{ id: "cut", code: "cad.body.missing" }]);
   expect(model.skipped).toEqual([]);
   const failed = buildCadCaptureModel([mesh], CAD_TEST_PAGE.id, {
     decodeMesh: () => {
@@ -351,6 +368,9 @@ test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh",
   // A mesh without triangles has no bounds and must not become a body.
   const empty = buildCadCaptureModel([mesh], CAD_TEST_PAGE.id, {
     decodeMesh: () => ({
+      vertexCount: 0,
+      triangleCount: 0,
+      bounds: null,
       positions: new Float64Array(0),
       triangles: new Uint32Array(0),
     }),
@@ -358,6 +378,33 @@ test("decodes mesh bodies and applies later cuts; decoder errors fail the mesh",
   expect(empty.errors).toEqual([{ id: "mesh", code: "cad.mesh.invalid" }]);
   expect(empty.bodies).toEqual([]);
   expect(empty.tools).toEqual([]);
+  for (const decoded of [
+    {
+      vertexCount: 3,
+      triangleCount: 0,
+      bounds: { min: [0, 0, 0] as const, max: [2, 2, 2] as const },
+      positions,
+      triangles,
+    },
+    {
+      vertexCount: 3,
+      triangleCount: 1,
+      bounds: { min: [0, 0, 0] as const, max: [2, 2, 2] as const },
+      triangles,
+    },
+    {
+      vertexCount: 3,
+      triangleCount: 1,
+      bounds: { min: [0, 0, 0] as const, max: [2, 2, 2] as const },
+      positions,
+    },
+  ]) {
+    const invalid = buildCadCaptureModel([mesh], CAD_TEST_PAGE.id, {
+      decodeMesh: () => decoded,
+    });
+    expect(invalid.errors).toEqual([{ id: "mesh", code: "cad.mesh.invalid" }]);
+    expect(invalid.bodies).toEqual([]);
+  }
 });
 
 function selectedLoops(entities: readonly Element[], pick?: readonly string[]) {
@@ -502,4 +549,493 @@ test("builds 20,000 CAD elements in under 1,000 ms", () => {
   expect(model.sketches).toBe(1_000);
   expect(model.errors).toEqual(checkCadPage(doc.elements, page.id).errors);
   expect(model.errors).toEqual([]);
+});
+
+function perforated(count: number): Element[] {
+  const holes = Array.from({ length: count }, (_, i) =>
+    circle(
+      `perforation-${i}`,
+      "profile",
+      [(i % 50) * 3 + 2, Math.floor(i / 50) * 3 + 2],
+      0.5,
+    ),
+  );
+  return [
+    ...holes,
+    ...rectangle("profile", 0, 0, 151, Math.ceil(count / 50) * 3 + 1),
+  ];
+}
+
+// Original implementation retained as a selection oracle.
+function loopBounds({ points }: CadLoop) {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < points.length; i += 2) {
+    const x = coordinate(points, i);
+    const y = coordinate(points, i + 1);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function containsPoint(
+  points: readonly number[],
+  x: number,
+  y: number,
+): boolean {
+  let inside = false;
+  let ax = coordinate(points, points.length - 2);
+  let ay = coordinate(points, points.length - 1);
+  for (let i = 0; i < points.length; i += 2) {
+    const bx = coordinate(points, i);
+    const by = coordinate(points, i + 1);
+    if (ay > y !== by > y && x < ax + ((bx - ax) * (y - ay)) / (by - ay))
+      inside = !inside;
+    ax = bx;
+    ay = by;
+  }
+  return inside;
+}
+
+function oracleNormalise(loops: readonly CadLoop[]): readonly CadLoop[] {
+  // Disjoint profiles already describe the same region by either rule.
+  if (loops.every(({ depth }) => depth === 0)) return loops;
+  const candidates = loops.map((loop) => ({ loop, ...loopBounds(loop) }));
+  return loops.filter(({ points, depth }) => {
+    if (depth === 0) return true;
+    const x = coordinate(points, 0);
+    const y = coordinate(points, 1);
+    let ancestorDepth = -1;
+    for (const { loop, minX, minY, maxX, maxY } of candidates) {
+      if (
+        loop.depth < depth &&
+        loop.depth > ancestorDepth &&
+        x >= minX &&
+        x <= maxX &&
+        y >= minY &&
+        y <= maxY &&
+        containsPoint(loop.points, x, y)
+      ) {
+        ancestorDepth = loop.depth;
+        if (ancestorDepth === depth - 1) break;
+      }
+    }
+    return (depth - ancestorDepth) % 2 === 1;
+  });
+}
+
+test("normalisation probes scale linearly for perforated plates", () => {
+  const counts: number[] = [];
+  for (const n of [500, 1000, 2000]) {
+    const loops = selectedLoops(perforated(n));
+    const stats = { ancestorProbes: 0 };
+    normaliseToolLoops(loops, stats);
+    counts.push(stats.ancestorProbes);
+    expect(stats.ancestorProbes).toBeGreaterThanOrEqual(n);
+    expect(stats.ancestorProbes).toBeLessThanOrEqual(n + 2);
+  }
+  expect(counts[1] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (counts[0] ?? 0) * 2.2,
+  );
+  expect(counts[2] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (counts[1] ?? 0) * 2.2,
+  );
+});
+
+test("normalisation preserves oracle identities and order across selections", () => {
+  const entities = perforated(5);
+  const selections = [
+    selectedLoops(entities),
+    selectedLoops(
+      entities,
+      entities.slice(0, 5).map(({ id }) => id),
+    ),
+    selectedLoops(
+      entities,
+      entities.filter(({ id }) => id !== "perforation-0").map(({ id }) => id),
+    ),
+  ];
+  const nested = [...outer, hole, island, well];
+  const ids = [outerId, hole.id, island.id, well.id];
+  selections.push(selectedLoops(nested));
+  for (const id of ids)
+    selections.push(
+      selectedLoops(
+        nested,
+        ids.filter((item) => item !== id),
+      ),
+    );
+  for (const selected of selections) {
+    const expected = oracleNormalise(selected);
+    const actual = normaliseToolLoops(selected);
+    expect(actual).toHaveLength(expected.length);
+    actual.forEach((loop, i) => expect(loop).toBe(expected[i]));
+  }
+});
+
+test("perforated plate capture preserves NCS1 bytes", () => {
+  const model = buildCadCaptureModel(
+    [
+      sketch("profile", "a1"),
+      ...perforated(20),
+      extrude("plate", "a2", { sketch: "profile", distance: 5, op: "new" }),
+    ],
+    CAD_TEST_PAGE.id,
+  );
+  const bytes = writeCaptureScene(model, {
+    width: 64,
+    height: 128,
+    supersample: 2,
+    camera: {
+      right: [1, 0, 0],
+      up: [0, 1, 0],
+      forward: [0, 0, -1],
+      centre: [1, 2, 0],
+      mmPerPixel: 0.5,
+      view: "top",
+    },
+    colours: CAPTURE_THEMES.light,
+    referenceOpacity: 0.5,
+    interference: null,
+  });
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  console.log(`perforated digest: ${digest}`);
+  expect(digest).toBe(
+    "f66e95cd114f0cb905c75c6382dd9795d435bc745d85545aa7a70c994177c531",
+  );
+});
+
+test("targeted mesh eligibility rejects the entire shared cut", async () => {
+  for (const [fixture, eligible] of [
+    ["triangle", false],
+    ["tetrahedron-mixed", false],
+    ["double-sided-triangle", false],
+    ["coplanar-tetrahedron", false],
+    ["translated-flat-shell", false],
+    ["tetrahedron", true],
+    ["tetrahedron-reversed", true],
+    ["thin-bar", true],
+    ["translated-thin-bar", true],
+  ] as const) {
+    const data = (
+      await Bun.file(
+        new URL(
+          `../../../../crates/capture/tests/fixtures/${fixture}.nmesh.txt`,
+          import.meta.url,
+        ),
+      ).text()
+    ).trim();
+    const cut = extrude("cut", "a5", {
+      sketch: "opening",
+      distance: 5,
+      op: "cut",
+      bodies: ["block", "mesh"],
+    });
+    const elements = [
+      sketch("base", "a1"),
+      ...rectangle("base", 0, 0, 10, 10),
+      extrude("block", "a2", { sketch: "base", distance: 5, op: "new" }),
+      cadElement("mesh", "cad.mesh", "a3", { name: fixture, data }),
+      sketch("opening", "a4"),
+      ...rectangle("opening", 2, 2, 2, 3),
+      cut,
+      sketch("face", "a6", { face: { feature: "cut", role: "end" } }),
+    ];
+    const options = { decodeMesh: decodeCaptureMeshWith };
+    const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, options);
+    expect(model.errors).toEqual(
+      eligible
+        ? []
+        : [
+            { id: "cut", code: "cad.body.missing" },
+            { id: "face", code: "cad.reference.failed" },
+          ],
+    );
+    expect(
+      model.bodies.map((body) => body.steps.map((step) => step.op)),
+    ).toEqual(
+      eligible
+        ? [
+            ["union", "difference"],
+            ["union", "difference"],
+          ]
+        : [["union"], ["union"]],
+    );
+    if (!eligible) {
+      const suppressed = elements.map((element) =>
+        element.id === "cut"
+          ? { ...cut, semantic: { ...cut.semantic, suppressed: true } }
+          : element,
+      );
+      const twin = buildCadCaptureModel(suppressed, CAD_TEST_PAGE.id, options);
+      const request = {
+        width: 320,
+        height: 240,
+        theme: "dark",
+        camera: { view: "iso" },
+        ...options,
+      } as const;
+      expect(
+        prepareCadCapture(elements, CAD_TEST_PAGE.id, request).scene,
+      ).toEqual(prepareCadCapture(suppressed, CAD_TEST_PAGE.id, request).scene);
+      expect(twin.bodies).toHaveLength(2);
+    }
+  }
+});
+
+test("point overflow switches the remaining construction walk to metadata", async () => {
+  const triangle = (
+    await Bun.file(
+      new URL(
+        "../../../../crates/capture/tests/fixtures/triangle.nmesh.txt",
+        import.meta.url,
+      ),
+    ).text()
+  ).trim();
+  const tetrahedron = (
+    await Bun.file(
+      new URL(
+        "../../../../crates/capture/tests/fixtures/tetrahedron.nmesh.txt",
+        import.meta.url,
+      ),
+    ).text()
+  ).trim();
+  const seed = cadElement("seed", "cad.mesh", "a1", {
+    name: "Seed",
+    data: tetrahedron,
+  });
+  const target = cadElement("target", "cad.mesh", "d1", {
+    name: "Target",
+    data: triangle,
+  });
+  const elements = [
+    seed,
+    sketch("tail-profile", "b1"),
+    ...rectangle("tail-profile", 0, 0, 2, 2),
+    ...Array.from({ length: 1001 }, (_, i) =>
+      extrude(`tail-${i}`, `c${String(i).padStart(4, "0")}1`, {
+        sketch: "tail-profile",
+        distance: 1,
+        op: "new",
+      }),
+    ),
+    target,
+    extrude("target-cut", "e1", {
+      sketch: "tail-profile",
+      distance: 1,
+      op: "cut",
+      bodies: ["target"],
+    }),
+  ];
+  const allocations: string[] = [];
+  const limits: number[] = [];
+  const decodeMesh: Parameters<typeof buildCadCaptureModel>[2]["decodeMesh"] = (
+    data,
+    options,
+  ) => {
+    limits.push(options.maxVertices ?? -1);
+    if (data === tetrahedron)
+      return {
+        vertexCount: 3_999_999,
+        triangleCount: 1,
+        bounds: { min: [0, 0, 0], max: [1, 1, 1] },
+        positions: new Float64Array(3),
+        triangles: new Uint32Array(3),
+      };
+    return decodeCaptureMeshWith(data, {
+      ...options,
+      onAllocate: (kind) => allocations.push(kind),
+    });
+  };
+  const stats = { captureVisits: 0, toolArrays: 0, metadataVisits: 0 };
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    decodeMesh,
+    stats,
+  });
+  expect(model.overLimit).toBe(
+    "Capture scene total point count must be an integer in 0..4000000.",
+  );
+  expect(stats).toEqual({
+    captureVisits: 2,
+    toolArrays: 1,
+    metadataVisits: 1001,
+  });
+  expect(limits).toEqual([4_000_000, 0]);
+  expect(allocations.length).toBeGreaterThan(0);
+  expect(new Set(allocations)).toEqual(new Set(["target"]));
+  expect(model.errors).toContainEqual({
+    id: "target-cut",
+    code: "cad.body.missing",
+  });
+  const admitted = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    decodeMesh: decodeCaptureMeshWith,
+  });
+  expect(admitted.overLimit).toBeUndefined();
+  expect(model.errors.filter(({ id }) => id === "target-cut")).toEqual(
+    admitted.errors.filter(({ id }) => id === "target-cut"),
+  );
+  expect(model.bodies.some(({ id }) => id === "tail-1000")).toBe(true);
+
+  const request = {
+    width: 320,
+    height: 240,
+    theme: "dark",
+    camera: { view: "iso" },
+    decodeMesh,
+  } as const;
+  expect(() =>
+    prepareCadCapture(elements, CAD_TEST_PAGE.id, {
+      ...request,
+      interference: { cellMm: 0.25, bodies: ["unknown", "tail-1000"] },
+    }),
+  ).toThrow('Body query "unknown" is unknown or ambiguous');
+  expect(() =>
+    prepareCadCapture(elements, CAD_TEST_PAGE.id, {
+      ...request,
+      interference: { cellMm: 0.25, bodies: ["Seed", "tail-1000"] },
+    }),
+  ).toThrow(
+    "Capture scene total point count must be an integer in 0..4000000.",
+  );
+});
+
+test("overflowing and subsequent untargeted meshes allocate no geometry", async () => {
+  const fixture = async (name: string) =>
+    (
+      await Bun.file(
+        new URL(
+          `../../../../crates/capture/tests/fixtures/${name}.nmesh.txt`,
+          import.meta.url,
+        ),
+      ).text()
+    ).trim();
+  const seedData = await fixture("tetrahedron");
+  const triangle = await fixture("triangle");
+  const allocations: string[] = [];
+  const limits: number[] = [];
+  const decodeMesh: Parameters<typeof buildCadCaptureModel>[2]["decodeMesh"] = (
+    data,
+    options,
+  ) => {
+    limits.push(options.maxVertices ?? -1);
+    if (data === seedData)
+      return {
+        vertexCount: 3_999_999,
+        triangleCount: 1,
+        bounds: { min: [0, 0, 0], max: [1, 1, 1] },
+        positions: new Float64Array(3),
+        triangles: new Uint32Array(3),
+      };
+    return decodeCaptureMeshWith(data, {
+      ...options,
+      onAllocate: (kind) => allocations.push(kind),
+    });
+  };
+  const elements = [
+    cadElement("seed", "cad.mesh", "a1", { name: "Seed", data: seedData }),
+    cadElement("overflow", "cad.mesh", "a2", {
+      name: "Overflow",
+      data: triangle,
+    }),
+    cadElement("sentinel", "cad.mesh", "a3", {
+      name: "Sentinel",
+      data: triangle,
+    }),
+  ];
+  const stats = { captureVisits: 0, toolArrays: 0, metadataVisits: 0 };
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    decodeMesh,
+    stats,
+  });
+  expect(model.overLimit).toBe(
+    "Capture scene total point count must be an integer in 0..4000000.",
+  );
+  expect(stats).toEqual({ captureVisits: 2, toolArrays: 1, metadataVisits: 1 });
+  expect(limits).toEqual([4_000_000, 1, 0]);
+  expect(allocations).toEqual([]);
+  expect(model.bodies.map(({ id }) => id)).toEqual([
+    "seed",
+    "overflow",
+    "sentinel",
+  ]);
+
+  const hidden = elements.map((element) => ({
+    ...element,
+    visual: { hidden: true },
+  }));
+  expect(() =>
+    prepareCadCapture(hidden, CAD_TEST_PAGE.id, {
+      width: 320,
+      height: 240,
+      theme: "dark",
+      camera: { view: "iso" },
+      decodeMesh,
+    }),
+  ).toThrow("has no solid body yet (0 sketches, 0 features failed)");
+});
+
+test("exactly four million points retain the original NCS1 bytes", () => {
+  const point = (index: number): CadXY => {
+    const i = index % 2000;
+    if (i < 500) return [i, 0];
+    if (i < 1000) return [500, i - 500];
+    if (i < 1500) return [1500 - i, 500];
+    return [0, 2000 - i];
+  };
+  const elements = [
+    sketch("large-profile", "a1"),
+    ...Array.from({ length: 2000 }, (_, i) =>
+      cadElement(`edge-${i}`, "cad.line", "a1", {
+        sketch: "large-profile",
+        a: point(i),
+        b: point(i + 1),
+      }),
+    ),
+    ...Array.from({ length: 2000 }, (_, i) =>
+      extrude(`solid-${i}`, `b${String(i).padStart(5, "0")}`, {
+        sketch: "large-profile",
+        distance: 1,
+        op: "new",
+      }),
+    ),
+  ];
+  const stats = { captureVisits: 0, toolArrays: 0, metadataVisits: 0 };
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, { stats });
+  expect(model.errors).toEqual([]);
+  expect(model.tools).toHaveLength(2000);
+  expect(
+    model.tools.reduce(
+      (sum, tool) =>
+        sum +
+        (tool.kind === "prism"
+          ? tool.loops.reduce((n, loop) => n + loop.points.length / 2, 0)
+          : tool.positions.length / 3),
+      0,
+    ),
+  ).toBe(4_000_000);
+  expect(stats.metadataVisits).toBe(0);
+  const bytes = writeCaptureScene(model, {
+    width: 64,
+    height: 128,
+    supersample: 2,
+    camera: {
+      right: [1, 0, 0],
+      up: [0, 1, 0],
+      forward: [0, 0, -1],
+      centre: [1, 2, 0],
+      mmPerPixel: 0.5,
+      view: "top",
+    },
+    colours: CAPTURE_THEMES.light,
+    referenceOpacity: 0.5,
+    interference: null,
+  });
+  expect(createHash("sha256").update(bytes).digest("hex")).toBe(
+    "82d5ae99cce242a6503702b85e0e508cb2a1ff6b5b5a644f07d31907f43933b3",
+  );
 });

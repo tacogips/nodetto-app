@@ -6,6 +6,7 @@ import {
   cadElement,
   extrude,
   plateElements,
+  rectangle,
   sketch,
 } from "./testing/documents.ts";
 import { generateCadDocument } from "./testing/generate.ts";
@@ -109,4 +110,98 @@ test("projects 20,000 elements within one second", () => {
     `CAD construction projection, 20,000 elements: ${elapsed.toFixed(1)} ms`,
   );
   expect(elapsed).toBeLessThan(1_000);
+});
+
+test("invalid and empty meshes do not admit dependent cuts", () => {
+  const valid = cadElement("import", "cad.mesh", "a2", {
+    name: "Mesh",
+    data: toInline(
+      encodeNmesh(
+        canonicalize({
+          positions: new Float64Array([0, 0, 0, 4, 0, 0, 0, 6, 0, 0, 0, 3]),
+          triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+        }),
+      ),
+    ),
+  });
+  const cut = [
+    sketch("cut", "a3"),
+    ...rectangle("cut", 1, 1, 2, 2),
+    extrude("cut-feature", "a4", {
+      sketch: "cut",
+      distance: 1,
+      op: "cut",
+      bodies: ["import"],
+    }),
+  ];
+  const empty = toInline(
+    encodeNmesh(
+      canonicalize({
+        positions: new Float64Array(),
+        triangles: new Uint32Array(),
+      }),
+    ),
+  );
+  for (const data of ["nmesh1:AAAA", empty]) {
+    const result = cadPageWireframe(
+      [{ ...valid, semantic: { ...valid.semantic, data } }, ...cut],
+      page,
+    );
+    expect(result.segments).toHaveLength(0);
+    expect(result.bounds).toBeNull();
+  }
+  const alone = cadPageWireframe([valid], page);
+  expect(alone.segments.length / 4).toBe(12);
+  expect(
+    cadPageWireframe([valid, ...cut], page).segments.length,
+  ).toBeGreaterThan(alone.segments.length);
+});
+
+test("bounds hook matches decoded asymmetric mesh and rejects failures", () => {
+  const data = toInline(
+    encodeNmesh(
+      canonicalize({
+        positions: new Float64Array([
+          -4, -2, -3, 7, -2, -3, -4, 6, -3, -4, -2, 5,
+        ]),
+        triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+      }),
+    ),
+  );
+  const mesh = cadElement("import", "cad.mesh", "a2", { name: "Mesh", data });
+  const stats = { decodes: 0 };
+  const fallback = cadPageWireframe([mesh], page, { stats });
+  expect(stats.decodes).toBe(1);
+  let calls = 0;
+  stats.decodes = 0;
+  const result = cadPageWireframe([mesh], page, {
+    stats,
+    meshBounds: () => {
+      calls++;
+      return { min: [-4, -2, -3], max: [7, 6, 5] };
+    },
+  });
+  expect(result).toEqual(fallback);
+  expect(stats.decodes).toBe(0);
+  expect(calls).toBe(1);
+  const cut = [
+    sketch("cut", "a3"),
+    ...rectangle("cut", 1, 1, 2, 2),
+    extrude("cut-feature", "a4", {
+      sketch: "cut",
+      distance: 1,
+      op: "cut",
+      bodies: ["import"],
+    }),
+  ];
+  for (const meshBounds of [
+    () => null,
+    () => {
+      throw new Error("invalid");
+    },
+  ]) {
+    const failed = cadPageWireframe([mesh, ...cut], page, { meshBounds });
+    expect(failed.segments).toHaveLength(0);
+    expect(failed.bounds).toBeNull();
+  }
 });

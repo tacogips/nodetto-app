@@ -12,7 +12,11 @@ import {
 } from "solid-js";
 import { stepMenuIndex } from "../menu-navigation.ts";
 import { Tool, type ToolKind } from "../tools.ts";
-import { pcbBoardChoices, pcbBoardOptions } from "./pcb-insert.ts";
+import {
+  isPcbBoardChoice,
+  pcbBoardChoices,
+  pcbBoardOptions,
+} from "./pcb-insert.ts";
 import { cadAuthoringIds, lastElementIndex } from "./sketch-authoring.ts";
 
 /**
@@ -37,7 +41,15 @@ export function createBoardPicker(options: {
   readonly Menu: () => JSX.Element;
 } {
   const { editor, pageId } = options;
-  const [notice, setNotice] = createSignal<string>();
+  const [noticeState, setNoticeState] = createSignal<{
+    text: string;
+    revision: number;
+  }>();
+  const notice = () => noticeState()?.text;
+  const setNotice = (text: string | undefined) =>
+    setNoticeState(
+      text === undefined ? undefined : { text, revision: options.revision() },
+    );
   const [picker, setPicker] = createSignal<{ revision: number }>();
   let menu: HTMLDivElement | undefined;
 
@@ -77,8 +89,13 @@ export function createBoardPicker(options: {
   }
 
   function insert(boardId: ElementId, version: number): void {
-    if (canInsert(version) && editor.store.get(boardId)?.type === "pcb.board") {
+    if (canInsert(version)) {
       const elements = editor.store.getPageElements(pageId);
+      if (!isPcbBoardChoice(editor.getSnapshot(), boardId)) {
+        setNotice("Could not insert the PCB board.");
+        close();
+        return;
+      }
       const commands = pcbReferenceCommands(
         pageId,
         boardId,
@@ -133,9 +150,14 @@ export function createBoardPicker(options: {
   });
 
   createEffect(
-    on([options.selection, options.revision], () => setNotice(undefined), {
-      defer: true,
-    }),
+    on(
+      [options.selection, options.revision],
+      ([selection, revision], previous) => {
+        if (selection !== previous?.[0] || revision !== noticeState()?.revision)
+          setNotice(undefined);
+      },
+      { defer: true },
+    ),
   );
 
   function menuKey(

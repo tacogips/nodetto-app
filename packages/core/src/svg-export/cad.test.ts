@@ -8,6 +8,12 @@ import {
   rectangle,
   sketch,
 } from "../cad/testing/documents.ts";
+import {
+  boardReference,
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../cad/testing/pcb.ts";
 import { document, element } from "../test-helpers.ts";
 import { renderElementsSvg } from "./document.ts";
 
@@ -68,4 +74,23 @@ test("the non-CAD page entry point preserves the existing renderer's bytes", () 
   );
   expect(expected).toContain("<rect ");
   expect(editor.exportPageSvg()).toBe(expected);
+});
+
+test("CAD SVG follows PCB page eligibility through conversion and undo", () => {
+  const editor = new Editor({
+    document: document(
+      [
+        boardReference(),
+        testBoard(),
+        edge("rim", { kind: "rect", start: [0, 0], end: [20, 10] }),
+      ],
+      [CAD_TEST_PAGE, PCB_TEST_PAGE],
+    ),
+  });
+  const original = editor.exportPageSvg();
+  expect(original).toContain("<svg");
+  expect(editor.setPageKind(PCB_TEST_PAGE.id, "freeform")).toBe(true);
+  expect(editor.exportPageSvg()).toBeNull();
+  editor.undo();
+  expect(editor.exportPageSvg()).toBe(original);
 });

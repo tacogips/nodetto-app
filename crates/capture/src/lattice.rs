@@ -598,7 +598,7 @@ pub fn sample_axis(request: &LatticeRequest, axis: usize) -> AxisSample {
     }
     let loops = tool_loops(request.scene);
     let tools = scene_tool_bounds(request.scene);
-    let cache = ViewCache::new(request.scene.tools.len());
+    let cache = ViewCache::new(crate::tool_view::classify(request.scene));
     let [result] = sample_axes(
         request,
         [axis],
@@ -631,6 +631,22 @@ pub fn sample_body_axis(
     liveness: &mut crate::census::Liveness,
     budget_left: &mut u64,
 ) -> AxisSample {
+    sample_body_axis_with(
+        request,
+        axis,
+        liveness,
+        budget_left,
+        &crate::tool_view::classify(request.scene),
+    )
+}
+
+pub(crate) fn sample_body_axis_with(
+    request: &LatticeRequest,
+    axis: usize,
+    liveness: &mut crate::census::Liveness,
+    budget_left: &mut u64,
+    solid: &[bool],
+) -> AxisSample {
     if axis > 2
         || request.bodies.1.is_some()
         || !request.cell.is_finite()
@@ -651,7 +667,7 @@ pub fn sample_body_axis(
         .map(|&id| {
             let tool = request.scene.tools.get(id as usize);
             let bounds = tool
-                .filter(|tool| crate::tool_view::is_solid(tool))
+                .filter(|_| solid.get(id as usize).copied().unwrap_or(false))
                 .and_then(crate::tool_view::tool_bounds);
             (tool, bounds, std::sync::OnceLock::<ToolView>::new())
         })
@@ -702,7 +718,11 @@ pub fn sample_body_axis(
                         && origin[a] <= hi[a]
                         && lo[b] <= origin[b]
                         && origin[b] <= hi[b])
-                        .then(|| cache.get_or_init(|| ToolView::new(tool, index as u32, &family)))
+                        .then(|| {
+                            cache.get_or_init(|| {
+                                ToolView::classified(tool, index as u32, &family, solid[index])
+                            })
+                        })
                 });
             if let Some(view) = view {
                 view.intervals(&ray, &mut scratch.crossings, &mut scratch.tool);

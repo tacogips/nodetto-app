@@ -1,13 +1,20 @@
 import { expect, test } from "bun:test";
+import { createHash } from "node:crypto";
+import {
+  canonicalize,
+  encodeNmesh,
+  toInline,
+} from "../../../packages/nmesh/src/index.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { capturePlateDocument } from "../../../packages/core/src/capture/testing/plate.ts";
 import {
   CAD_TEST_PAGE,
+  cadElement,
   extrude,
   sketch,
 } from "../../../packages/core/src/cad/testing/documents.ts";
 import { serializeDocument } from "@nodetto/io";
-import { decodeCaptureMesh } from "@nodetto/io/nmesh";
+import { decodeCaptureMeshWith } from "@nodetto/io/nmesh";
 import { DEFAULT_CAD_INTERFERENCE, prepareCadCapture } from "@nodetto/core";
 import { captureCommand, type CaptureBackend } from "./capture-command.ts";
 import { cadCommand } from "./cad-command.ts";
@@ -216,7 +223,7 @@ test("the default CLI request matches the committed Plate document and NCS1 byte
       height: 768,
       theme: "light",
       interference: DEFAULT_CAD_INTERFERENCE,
-      decodeMesh: decodeCaptureMesh,
+      decodeMesh: decodeCaptureMeshWith,
     }).scene,
   );
   expect(scene).toEqual(
@@ -418,3 +425,36 @@ test.each(["width", "height", "bodies"] as const)(
     expect(files.size).toBe(0);
   },
 );
+
+test("asymmetric mesh capture retains camera and scene bytes", () => {
+  const data = toInline(
+    encodeNmesh(
+      canonicalize({
+        positions: new Float64Array([
+          -7, -3, -5, 4, -3, -5, -7, 8, -5, -7, -3, 2,
+        ]),
+        triangles: new Uint32Array([0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2]),
+      }),
+    ),
+  );
+  const mesh = cadElement("mesh", "cad.mesh", "a0", { name: "Mesh", data });
+  const result = prepareCadCapture([mesh], CAD_TEST_PAGE.id, {
+    width: 320,
+    height: 240,
+    theme: "dark",
+    camera: { view: "iso" },
+    decodeMesh: decodeCaptureMeshWith,
+  });
+  expect(result.frame).toBe("complete");
+  expect(result.camera).toEqual({
+    right: [-0.7071067811865475, 0.7071067811865475, 0],
+    up: [-0.408248290463863, -0.408248290463863, 0.816496580927726],
+    forward: [-0.5773502691896258, -0.5773502691896258, -0.5773502691896258],
+    centre: [-1.333333333333333, 2.666666666666666, -1.333333333333333],
+    mmPerPixel: 0.06613622305514581,
+    view: "iso",
+  });
+  expect(createHash("sha256").update(result.scene).digest("hex")).toBe(
+    "9cc84237cb037857c7a9065bb7e68df6873d037c8c346837dc47fbe604438161",
+  );
+});

@@ -3,7 +3,7 @@ use crate::interval::{Boundary, Intervals};
 use crate::lattice::{empty_bounds, extend, valid_bounds, Bounds};
 use crate::mesh::{is_closed, mesh_bounds, MeshView};
 use crate::prism::PrismView;
-use crate::scene::Tool;
+use crate::scene::{Scene, Tool};
 use crate::view::{Ray, RayFamily};
 use std::sync::OnceLock;
 
@@ -14,20 +14,32 @@ pub enum ToolView {
 }
 impl ToolView {
     pub fn new(tool: &Tool, index: u32, family: &RayFamily) -> Self {
-        match tool {
-            Tool::Prism(prism) => Self::Prism(PrismView::new(prism, index, family)),
-            Tool::Mesh(mesh) => Self::Mesh(MeshView::new(mesh, index, family, None)),
-        }
+        Self::classified(tool, index, family, is_solid(tool))
     }
+    pub(crate) fn classified(tool: &Tool, index: u32, family: &RayFamily, closed: bool) -> Self {
+        Self::picture_classified(tool, index, family, None, closed)
+    }
+    #[allow(dead_code)]
     pub(crate) fn picture(
         tool: &Tool,
         index: u32,
         family: &RayFamily,
         window: Option<([f64; 2], [f64; 2])>,
     ) -> Self {
+        Self::picture_classified(tool, index, family, window, is_solid(tool))
+    }
+    pub(crate) fn picture_classified(
+        tool: &Tool,
+        index: u32,
+        family: &RayFamily,
+        window: Option<([f64; 2], [f64; 2])>,
+        closed: bool,
+    ) -> Self {
         match tool {
             Tool::Prism(prism) => Self::Prism(PrismView::new(prism, index, family)),
-            Tool::Mesh(mesh) => Self::Mesh(MeshView::new(mesh, index, family, window)),
+            Tool::Mesh(mesh) => {
+                Self::Mesh(MeshView::with_closure(mesh, index, family, window, closed))
+            }
         }
     }
     pub(crate) fn surface_intervals(
@@ -79,6 +91,9 @@ pub fn is_solid(tool: &Tool) -> bool {
         Tool::Mesh(mesh) => is_closed(mesh),
     }
 }
+pub(crate) fn classify(scene: &Scene) -> Vec<bool> {
+    scene.tools.iter().map(is_solid).collect()
+}
 pub fn tool_bounds(tool: &Tool) -> Option<Bounds> {
     if let Tool::Mesh(mesh) = tool {
         let bounds = mesh_bounds(mesh);
@@ -119,20 +134,29 @@ pub fn tool_loops(tool: &Tool) -> Vec<Bounds> {
         })
         .collect()
 }
-pub(crate) struct ViewCache(Vec<[OnceLock<ToolView>; 3]>);
+pub(crate) struct ViewCache {
+    views: Vec<[OnceLock<ToolView>; 3]>,
+    solid: Vec<bool>,
+}
 impl ViewCache {
-    pub fn new(count: usize) -> Self {
-        Self(
-            (0..count)
+    pub fn new(solid: Vec<bool>) -> Self {
+        Self {
+            views: (0..solid.len())
                 .map(|_| std::array::from_fn(|_| OnceLock::new()))
                 .collect(),
-        )
+            solid,
+        }
     }
     pub fn get(&self, tool: &Tool, index: usize, axis: usize) -> &ToolView {
-        self.0[index][axis].get_or_init(|| {
+        self.views[index][axis].get_or_init(|| {
             let mut forward = [0.0; 3];
             forward[axis] = 1.0;
-            ToolView::new(tool, index as u32, &RayFamily { forward })
+            ToolView::classified(
+                tool,
+                index as u32,
+                &RayFamily { forward },
+                self.solid[index],
+            )
         })
     }
 }

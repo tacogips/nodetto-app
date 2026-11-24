@@ -445,7 +445,7 @@ impl Raster<'_> {
 impl<'a> Raster<'a> {
     /// Project the tools, refuse a picture over the work limit and build
     /// the per-tile body lists.
-    fn prepare(scene: &'a Scene) -> Result<Self, CaptureError> {
+    fn prepare(scene: &'a Scene, solid_tools: &[bool]) -> Result<Self, CaptureError> {
         let (width, height, factor) = (scene.width, scene.height, scene.supersample);
         if !(64..=2048).contains(&width)
             || !(64..=2048).contains(&height)
@@ -465,12 +465,17 @@ impl<'a> Raster<'a> {
             .enumerate()
             .map(|(index, tool)| {
                 let bounds = tool_view::tool_bounds(tool)?;
-                let view = ToolView::picture(tool, index as u32, &family, None);
+                let view = ToolView::picture_classified(
+                    tool,
+                    index as u32,
+                    &family,
+                    None,
+                    solid_tools[index],
+                );
                 let rect = ScreenRect::new(bounds, [0.0; 3], camera);
                 Some(ProjectedPrism { view, rect })
             })
             .collect();
-        let solid_tools: Vec<bool> = scene.tools.iter().map(tool_view::is_solid).collect();
         let open_bodies: Vec<bool> = scene
             .bodies
             .iter()
@@ -526,7 +531,7 @@ impl<'a> Raster<'a> {
             scene,
             tools,
             weights,
-            solid_tools,
+            solid_tools: solid_tools.to_vec(),
             open_bodies,
             tiles,
             light: shade::light(camera),
@@ -649,7 +654,8 @@ fn render_with(
     let mut census_out = census::CensusStats::default();
     let result = (|| {
         let (width, height) = (scene.width, scene.height);
-        let raster = Raster::prepare(scene)?;
+        let solid = tool_view::classify(scene);
+        let raster = Raster::prepare(scene, &solid)?;
         let mut output = vec![0; width as usize * 3 * height as usize];
         let threads = if threads == 0 {
             thread::available_parallelism().map_or(1, usize::from)
@@ -662,7 +668,7 @@ fn render_with(
             return Err(CaptureError(format!("The scene is too heavy for this picture size (picture boundary scans over {allowance}). Use a smaller --size.")));
         }
         let (liveness, mut bodies) = raster.body_states(visibility);
-        let census = census::resolve(
+        let census = census::resolve_with(
             scene,
             &mut bodies,
             &liveness,
@@ -672,17 +678,18 @@ fn render_with(
             } else {
                 24_000_000
             },
+            &solid,
         );
         drop(raster);
         let (analysis, mut pairs) = if scene.analyse {
-            let (analysis, pairs) = interference::analyse_scene(scene, threads)?;
+            let (analysis, pairs) = interference::analyse_scene_with(scene, threads, &solid)?;
             (Some(analysis), pairs)
         } else {
             (None, Vec::new())
         };
         if scene.analyse && scene.draw_interference {
             let seen = marks.picture_only(&pairs)?;
-            interference::add_view_pairs(scene, &mut pairs, &seen, scene.target_cell);
+            interference::add_view_pairs_with(scene, &mut pairs, &seen, scene.target_cell, &solid);
         }
         liveness_out = liveness;
         census_out = census;

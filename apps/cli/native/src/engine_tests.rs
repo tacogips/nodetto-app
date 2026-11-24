@@ -450,3 +450,265 @@ fn capture_encode_preserves_png_and_composites_the_host_rgb_in_order() {
         transcode_png(&png, format, [0xc3, 0xb2, 0xa1]).unwrap()
     );
 }
+
+#[test]
+fn nmesh_capture_and_bounds_packets_preserve_legacy_geometry() {
+    let mesh =
+        include_str!("../../../../crates/capture/tests/fixtures/translated-thin-bar.nmesh.txt");
+    let script = format!(
+        r#"(() => {{
+        const data = {};
+        const packet = native.nmeshCapture(data, Infinity, true);
+        const view = new DataView(packet.buffer);
+        const vertices = view.getUint32(0, true), triangles = view.getUint32(4, true), flags = view.getUint32(8, true);
+        const positions = new Float64Array(packet.buffer, 64, vertices * 3);
+        const indices = new Uint32Array(packet.buffer, 64 + vertices * 24, triangles * 3);
+        const legacy = native.nmeshDecode(data), oldView = new DataView(legacy.buffer);
+        const oldPositions = new Float64Array(legacy.buffer, 8, vertices * 3);
+        const oldIndices = new Uint32Array(legacy.buffer, 8 + vertices * 24, triangles * 3);
+        const bounds = Array.from(new Float64Array(native.nmeshBounds(data).buffer));
+        const extrema = [0, 1, 2].map(axis => Math.min(...Array.from(positions).filter((_, i) => i % 3 === axis))).concat([0, 1, 2].map(axis => Math.max(...Array.from(positions).filter((_, i) => i % 3 === axis))));
+        const limited = native.nmeshCapture(data, 0, true), limitedView = new DataView(limited.buffer);
+        return [vertices > 0, triangles > 0, flags === 15 || flags === 11,
+          JSON.stringify(bounds) === JSON.stringify(extrema),
+          JSON.stringify(bounds) === JSON.stringify(Array.from(new Float64Array(packet.buffer, 16, 6))),
+          JSON.stringify(Array.from(positions)) === JSON.stringify(Array.from(oldPositions)),
+          indices[0] === oldIndices[0], oldView.getUint32(0, true) === vertices,
+          limited.length === 64, (limitedView.getUint32(8, true) & 1) === 0,
+          native.nmeshBounds('invalid') === null];
+    }})()"#,
+        serde_json::to_string(mesh.trim()).unwrap()
+    );
+    assert_eq!(
+        evaluate(&script, Input::Mcp(None), None),
+        json!([true, true, true, true, true, true, true, true, true, true, true])
+    );
+}
+
+#[test]
+fn capture_and_cad_check_route_to_distinct_mesh_decoders() {
+    let folder = tempfile::tempdir().unwrap();
+    let mesh =
+        include_str!("../../../../crates/capture/tests/fixtures/tetrahedron.nmesh.txt").trim();
+    let lines = [
+        json!({"kind":"document","schemaVersion":1,"id":"doc-1","title":"Test"}),
+        json!({"kind":"page","id":"cad","name":"Mesh","pageKind":"cad3d"}),
+        json!({"kind":"element","id":"mesh","page":"cad","type":"cad.mesh","index":"a0","semantic":{"name":"Mesh","data":mesh}}),
+    ];
+    std::fs::write(
+        folder.path().join("mesh.jsonl"),
+        lines.iter().map(|v| format!("{v}\n")).collect::<String>(),
+    )
+    .unwrap();
+    let mut ctx = context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+    ctx.eval(Source::from_bytes(
+        r#"{
+      globalThis.captureCount = 0; globalThis.decodeCount = 0;
+      const capture = native.nmeshCapture; const decode = native.nmeshDecode;
+      native.nmeshCapture = (...args) => { globalThis.captureCount++; return capture(...args); };
+      native.nmeshDecode = (...args) => { globalThis.decodeCount++; return decode(...args); };
+    }"#,
+    ))
+    .unwrap();
+    let capture = execute(
+        &mut ctx,
+        ["capture", "mesh.jsonl", "--output", "mesh.png"]
+            .map(str::to_owned)
+            .to_vec(),
+    )
+    .unwrap();
+    assert_eq!(capture.exit_code, 0, "{}", capture.stderr);
+    let counts = ctx
+        .eval(Source::from_bytes(
+            "JSON.stringify([captureCount, decodeCount])",
+        ))
+        .unwrap();
+    assert_eq!(counts.as_string().unwrap().to_std_string_lossy(), "[1,0]");
+    let check = execute(
+        &mut ctx,
+        ["cad", "check", "mesh.jsonl"].map(str::to_owned).to_vec(),
+    )
+    .unwrap();
+    assert_eq!(check.exit_code, 0, "{}", check.stderr);
+    let counts = ctx
+        .eval(Source::from_bytes(
+            "JSON.stringify([captureCount, decodeCount])",
+        ))
+        .unwrap();
+    assert_eq!(counts.as_string().unwrap().to_std_string_lossy(), "[1,1]");
+}
+
+#[test]
+fn capture_requests_target_eligibility_for_meshes() {
+    let folder = tempfile::tempdir().unwrap();
+    for (name, mesh, eligible) in [
+        (
+            "triangle",
+            include_str!("../../../../crates/capture/tests/fixtures/triangle.nmesh.txt").trim(),
+            false,
+        ),
+        (
+            "tetrahedron",
+            include_str!("../../../../crates/capture/tests/fixtures/tetrahedron.nmesh.txt").trim(),
+            true,
+        ),
+    ] {
+        let lines = [
+            json!({"kind":"document","schemaVersion":1,"id":"doc-1","title":"Test"}),
+            json!({"kind":"page","id":"cad","name":"Mesh","pageKind":"cad3d"}),
+            json!({"kind":"element","id":"mesh","page":"cad","type":"cad.mesh","index":"a0","semantic":{"name":"Mesh","data":mesh}}),
+            json!({"kind":"element","id":"profile","page":"cad","type":"cad.sketch","index":"a1","semantic":{"name":"Profile","plane":{"base":"xy"}}}),
+            json!({"kind":"element","id":"line1","page":"cad","type":"cad.line","index":"a1","semantic":{"sketch":"profile","a":[0,0],"b":[1,0]}}),
+            json!({"kind":"element","id":"line2","page":"cad","type":"cad.line","index":"a2","semantic":{"sketch":"profile","a":[1,0],"b":[0,1]}}),
+            json!({"kind":"element","id":"line3","page":"cad","type":"cad.line","index":"a3","semantic":{"sketch":"profile","a":[0,1],"b":[0,0]}}),
+            json!({"kind":"element","id":"cut","page":"cad","type":"cad.extrude","index":"a2","semantic":{"name":"Cut","sketch":"profile","distance":1,"op":"cut","bodies":["mesh"]}}),
+        ];
+        let path = format!("{name}.jsonl");
+        std::fs::write(
+            folder.path().join(&path),
+            lines.iter().map(|v| format!("{v}\n")).collect::<String>(),
+        )
+        .unwrap();
+        let mut ctx = context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+        ctx.eval(Source::from_bytes(r#"{
+          globalThis.meshEvidence = [];
+          const capture = native.nmeshCapture;
+          native.nmeshCapture = (...args) => {
+            const packet = capture(...args);
+            const flags = new DataView(packet.buffer, packet.byteOffset, packet.byteLength).getUint32(8, true);
+            meshEvidence.push([args[2], (flags & 2) !== 0, (flags & 4) !== 0]);
+            return packet;
+          };
+        }"#)).unwrap();
+        let result = execute(
+            &mut ctx,
+            ["capture", &path, "--output", &format!("{name}.png")]
+                .map(str::to_owned)
+                .to_vec(),
+        )
+        .unwrap();
+        assert_eq!(result.exit_code, 0, "{}", result.stderr);
+        let evidence = ctx
+            .eval(Source::from_bytes("JSON.stringify(meshEvidence)"))
+            .unwrap();
+        assert_eq!(
+            evidence.as_string().unwrap().to_std_string_lossy(),
+            format!("[[true,true,{eligible}]]")
+        );
+    }
+}
+
+#[test]
+fn capture_point_budget_rejects_before_native_render() {
+    fn varint(bytes: &mut Vec<u8>, mut n: u64) {
+        while n >= 128 {
+            bytes.push((n as u8 & 127) | 128);
+            n >>= 7;
+        }
+        bytes.push(n as u8);
+    }
+    fn mesh_data() -> String {
+        let mut bytes = b"NMSH\x01\x00\x03\x00".to_vec();
+        for n in [20_000, 6_667, 1, 0, 6_667] {
+            varint(&mut bytes, n);
+        }
+        for i in 0..20_000 {
+            varint(&mut bytes, if i == 0 { 0 } else { 2 });
+            varint(
+                &mut bytes,
+                if i == 0 {
+                    0
+                } else if i % 2 == 1 {
+                    2
+                } else {
+                    1
+                },
+            );
+            varint(&mut bytes, 0);
+        }
+        bytes.extend(std::iter::repeat_n(0, 19_998));
+        bytes.extend([1, 0, 0]);
+        let mut crc = !0u32;
+        for &byte in &bytes {
+            crc ^= u32::from(byte);
+            for _ in 0..8 {
+                crc = (crc >> 1) ^ (0xedb8_8320u32 & 0u32.wrapping_sub(crc & 1));
+            }
+        }
+        bytes.extend((!crc).to_le_bytes());
+        format!("nmesh1:{}", STANDARD.encode(bytes))
+    }
+    let mesh = mesh_data();
+    let folder = tempfile::tempdir().unwrap();
+    for (count, name) in [(200, "admitted"), (201, "overflow")] {
+        let mut document = String::new();
+        for line in [
+            json!({"kind":"document","schemaVersion":1,"id":"doc-1","title":"Test"}),
+            json!({"kind":"page","id":"cad","name":"Mesh","pageKind":"cad3d"}),
+        ] {
+            document.push_str(&format!("{line}\n"));
+        }
+        for i in 0..count {
+            let id = format!("mesh-{i:03}");
+            let line = json!({"kind":"element","id":id,"page":"cad","type":"cad.mesh","index":"a1","semantic":{"name":id,"data":mesh},"visual":{"hidden":i != 0}});
+            document.push_str(&format!("{line}\n"));
+        }
+        let path = format!("{name}.jsonl");
+        std::fs::write(folder.path().join(&path), document).unwrap();
+        let mut ctx = context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+        ctx.eval(Source::from_bytes(r#"{
+          globalThis.captureCalls = 0;
+          const original = native.captureSolid;
+          native.captureSolid = (...args) => { captureCalls++; globalThis.budgetScene = args[0]; return original(...args); };
+        }"#)).unwrap();
+        let start = std::time::Instant::now();
+        let output = execute(
+            &mut ctx,
+            [
+                "capture",
+                &path,
+                "--output",
+                &format!("{name}.png"),
+                "--size",
+                "64x64",
+                "--no-interference",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+        )
+        .unwrap();
+        eprintln!("{name} duration: {:?}", start.elapsed());
+        let calls = ctx
+            .eval(Source::from_bytes("captureCalls"))
+            .unwrap()
+            .as_number()
+            .unwrap();
+        if name == "admitted" {
+            assert_eq!(output.exit_code, 0, "{}", output.stderr);
+            assert_eq!(calls, 1.0);
+            let scene = ctx
+                .global_object()
+                .get(js_string!("budgetScene"), &mut ctx)
+                .unwrap();
+            let scene = bytes(&scene, &mut ctx).unwrap();
+            let image = std::fs::read(folder.path().join("admitted.png")).unwrap();
+            assert_eq!(files::digest(&scene), "3d2b86dc1d7c4be6");
+            assert_eq!(files::digest(&image), "783ff56857da9294");
+            eprintln!(
+                "admitted scene FNV={} image FNV={}",
+                files::digest(&scene),
+                files::digest(&image)
+            );
+        } else {
+            assert_eq!(output.exit_code, 2);
+            assert!(
+                output
+                    .stderr
+                    .contains("Capture scene total point count must be an integer in 0..4000000."),
+                "{}",
+                output.stderr
+            );
+            assert_eq!(calls, 0.0);
+        }
+    }
+}

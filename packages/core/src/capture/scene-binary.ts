@@ -38,7 +38,7 @@ interface CaptureSceneModel {
 
 const HEADER_BYTES = 176;
 const MAX_U32 = 0xffffffff;
-const MAX_POINTS = 4_000_000;
+export const MAX_POINTS = 4_000_000;
 const OP = { union: 0, difference: 1, intersection: 2 } as const;
 
 function boundedInteger(
@@ -69,42 +69,73 @@ function colour(value: string): number {
   return Number.parseInt(value.slice(1), 16);
 }
 
+export interface PointCharge {
+  points: number;
+}
+
+export function chargeTool(
+  state: PointCharge,
+  tool:
+    | { kind: "prism"; loopCounts: readonly number[] }
+    | { kind: "mesh"; vertices: number; triangles: number },
+): string | undefined {
+  let points = state.points;
+  try {
+    if (tool.kind === "prism") {
+      for (const count of tool.loopCounts) {
+        boundedInteger("loop point count", count, 3, 20_000);
+        points += count;
+      }
+    } else {
+      boundedInteger("mesh vertex count", tool.vertices, 0, MAX_POINTS);
+      boundedInteger("mesh triangle count", tool.triangles, 0, 2_000_000);
+      points += tool.vertices;
+    }
+    boundedInteger("total point count", points, 0, MAX_POINTS);
+  } catch (error) {
+    if (error instanceof RangeError) return error.message;
+    throw error;
+  }
+  state.points = points;
+  return undefined;
+}
+
 function byteLength({ tools, bodies }: CaptureSceneModel): number {
-  boundedInteger("tool count", tools.length, 0, 20_000);
-  boundedInteger("body count", bodies.length, 0, 20_000);
   let length = HEADER_BYTES;
-  let points = 0;
+  const state: PointCharge = { points: 0 };
   for (const tool of tools) {
+    const error = chargeTool(
+      state,
+      tool.kind === "prism"
+        ? {
+            kind: "prism",
+            loopCounts: tool.loops.map((loop) => loop.faces.length),
+          }
+        : {
+            kind: "mesh",
+            vertices: tool.positions.length / 3,
+            triangles: tool.triangles.length / 3,
+          },
+    );
+    if (error !== undefined) throw new RangeError(error);
     if (tool.kind === "prism") {
       length += 120;
       for (const loop of tool.loops) {
         const count = loop.faces.length;
-        boundedInteger("loop point count", count, 3, 20_000);
         if (loop.points.length !== count * 2)
           throw new RangeError(
             "Capture scene loop points and faces do not match.",
           );
-        points += count;
         length +=
           8 + loop.points.byteLength + loop.faces.byteLength + (count % 2) * 4;
       }
     } else {
-      const vertices = tool.positions.length / 3;
-      boundedInteger("mesh vertex count", vertices, 0, MAX_POINTS);
-      boundedInteger(
-        "mesh triangle count",
-        tool.triangles.length / 3,
-        0,
-        2_000_000,
-      );
-      points += vertices;
       length +=
         16 +
         tool.positions.byteLength +
         tool.triangles.byteLength +
         (tool.triangles.length % 2) * 4;
     }
-    boundedInteger("total point count", points, 0, MAX_POINTS);
   }
   for (const { steps } of bodies) {
     boundedInteger("body step count", steps.length, 1, MAX_U32);
@@ -173,6 +204,36 @@ class SceneWriter {
   }
 }
 
+export function checkScenePreTool(
+  {
+    width,
+    height,
+    supersample,
+    camera,
+    referenceOpacity,
+    interference,
+  }: CaptureSceneOptions,
+  counts: { tools: number; bodies: number },
+): void {
+  boundedInteger("width", width, 64, 2048);
+  boundedInteger("height", height, 64, 2048);
+  boundedInteger("supersample", supersample, 1, 3);
+  boundedReal("reference opacity", referenceOpacity, 0, 1);
+  boundedReal("camera scale", camera.mmPerPixel, 0, 1e7);
+  if (camera.mmPerPixel === 0)
+    throw new RangeError("Capture scene camera scale must be positive.");
+  const selected = interference?.bodies;
+  if (interference) {
+    boundedInteger("analysis budget", interference.budgetMillionRays, 1, 256);
+    boundedReal("tolerance", interference.toleranceMm, 1e-6, 1);
+    boundedReal("target cell", interference.cellMm, 0.01, 10);
+    for (const index of selected ?? [])
+      boundedInteger("analysis body index", index, 0, counts.bodies - 1);
+  }
+  boundedInteger("tool count", counts.tools, 0, 20_000);
+  boundedInteger("body count", counts.bodies, 0, 20_000);
+}
+
 /** Write the little-endian NCS1 scene. The native reader validates the geometry. */
 export function writeCaptureScene(
   model: CaptureSceneModel,
@@ -188,21 +249,19 @@ export function writeCaptureScene(
 ): Uint8Array {
   if (new Uint8Array(new Uint16Array([1]).buffer)[0] !== 1)
     throw new RangeError("Capture scenes require a little-endian platform.");
-  boundedInteger("width", width, 64, 2048);
-  boundedInteger("height", height, 64, 2048);
-  boundedInteger("supersample", supersample, 1, 3);
-  boundedReal("reference opacity", referenceOpacity, 0, 1);
-  boundedReal("camera scale", camera.mmPerPixel, 0, 1e7);
-  if (camera.mmPerPixel === 0)
-    throw new RangeError("Capture scene camera scale must be positive.");
+  checkScenePreTool(
+    {
+      width,
+      height,
+      supersample,
+      camera,
+      colours,
+      referenceOpacity,
+      interference,
+    },
+    { tools: model.tools.length, bodies: model.bodies.length },
+  );
   const selected = interference?.bodies;
-  if (interference) {
-    boundedInteger("analysis budget", interference.budgetMillionRays, 1, 256);
-    boundedReal("tolerance", interference.toleranceMm, 1e-6, 1);
-    boundedReal("target cell", interference.cellMm, 0.01, 10);
-    for (const index of selected ?? [])
-      boundedInteger("analysis body index", index, 0, model.bodies.length - 1);
-  }
   const analysed = selected === undefined ? undefined : new Set(selected);
   const writer = new SceneWriter(byteLength(model));
 
