@@ -348,6 +348,31 @@ fn production_touching_caps() {
 }
 
 #[test]
+fn production_touching_mesh_caps() {
+    for back in [false, true] {
+        production_touching(super::reference::fixtures::mesh_under_prism(back, 0.0));
+    }
+}
+
+#[test]
+fn production_touching_tall_mesh() {
+    for back in [false, true] {
+        production_touching(super::reference::fixtures::tall_mesh_under_prism(back, 0.0));
+    }
+}
+
+#[test]
+fn production_tall_mesh_penetration() {
+    for back in [false, true] {
+        let report = compare_every_thread_count(
+            &super::reference::fixtures::tall_mesh_under_prism(back, 0.01),
+        );
+        assert_eq!(report.pairs.len(), 1);
+        assert_eq!((report.pairs[0].a, report.pairs[0].b), (0, 1));
+    }
+}
+
+#[test]
 fn production_touching_opposed_side() {
     production_touching(super::reference::fixtures::shared_side(true, 0.0));
 }
@@ -359,8 +384,13 @@ fn production_touching_same_side() {
 
 #[test]
 fn production_overlap_witness() {
-    use super::reference::fixtures::{shared_side, stacked_caps};
-    for mut scene in [stacked_caps(0.01), shared_side(true, 0.01)] {
+    use super::reference::fixtures::{mesh_under_prism, shared_side, stacked_caps};
+    for mut scene in [
+        stacked_caps(0.01),
+        shared_side(true, 0.01),
+        mesh_under_prism(true, 0.01),
+        mesh_under_prism(false, 0.01),
+    ] {
         let report = compare_every_thread_count(&scene);
         assert_eq!(report.pairs.len(), 1);
         let rgb = render_rgb(&scene, 0).unwrap().0;

@@ -9,6 +9,8 @@ import {
   toWorld,
 } from "./index.ts";
 import { coordinate } from "./vec.ts";
+import { buildProfileLoops } from "./loops.ts";
+import { generateCadDocument } from "./testing/generate.ts";
 
 function line(id: string, a: CadXY, b: CadXY, construction = false) {
   const semantic = { a, b, construction };
@@ -543,4 +545,176 @@ test("nested chains derive depth from immediate parents", () => {
       (values[2] ?? Number.POSITIVE_INFINITY) / (values[1] ?? 1),
     ).toBeLessThanOrEqual(2.5);
   }
+});
+
+function strips(n: number) {
+  return Array.from({ length: n }, (_, i) => {
+    const b = i / 64;
+    const w = 1 / 256;
+    const pts: CadXY[] = [
+      [0, b],
+      [100, 100 + b],
+      [100, 100 + b + w],
+      [0, b + w],
+    ];
+    const name = `strip-${String(i).padStart(4, "0")}`;
+    return pts.map((p, j) => line(`${name}-${j}`, p, pts[(j + 1) % 4] ?? p));
+  });
+}
+
+test("diagonal strips search disjointness subquadratically", () => {
+  const work: number[] = [];
+  const tests: number[] = [];
+  for (const n of [64, 128, 256]) {
+    const groups = strips(n);
+    const stats = {
+      segmentPairs: 0,
+      containmentPairs: 0,
+      segmentTests: 0,
+      segmentFallbacks: 0,
+      sweep: { events: 0, steps: 0, tests: 0, collapsed: 0 },
+    };
+    const result = buildLoops(groups.flat(), undefined, stats);
+    const expected = groups.map((group) => ({
+      points: group.flatMap((edge) => edge.semantic.a),
+      sources: group.map((edge) => edge.id),
+      reversed: [false, false, false, false],
+      members: group.map((edge) => edge.id),
+      depth: 0,
+    }));
+    expect(result).toEqual({ loops: expected });
+    work.push(
+      stats.segmentPairs +
+        stats.sweep.events +
+        stats.sweep.steps +
+        stats.sweep.tests,
+    );
+    tests.push(stats.segmentTests);
+    console.log("strip", n, JSON.stringify(stats));
+  }
+  for (let i = 1; i < work.length; i++) {
+    expect(work[i] ?? 0).toBeLessThanOrEqual((work[i - 1] ?? 0) * 2.5);
+    expect(tests[i] ?? 0).toBeLessThanOrEqual((tests[i - 1] ?? 0) * 2.5);
+  }
+});
+
+test("crowded repeated vertex retains its first error", () => {
+  const paths = strips(64).map((group, i) => ({
+    id: `strip-${i}`,
+    points: group.flatMap((e) => e.semantic.a),
+    closed: true,
+  }));
+  paths.push({
+    id: "repeated-vertex",
+    points: [200, 0, 204, 0, 204, 0, 204, 4, 200, 4],
+    closed: true,
+  });
+  const stats = {
+    segmentPairs: 0,
+    containmentPairs: 0,
+    segmentTests: 0,
+    segmentFallbacks: 0,
+    sweep: { events: 0, steps: 0, tests: 0, collapsed: 0 },
+  };
+  expect(buildProfileLoops(paths, undefined, stats)).toEqual({
+    error: "cad.profile.intersect",
+    at: "repeated-vertex",
+  });
+  expect(stats.segmentFallbacks).toBe(1);
+  expect(stats.sweep.collapsed).toBe(1);
+});
+
+test("ordinary profile segment work stays on sparse path", () => {
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  const groups = new Map<string, Element[]>();
+  for (const entity of doc.elements) {
+    if (
+      entity.type !== "cad.line" &&
+      entity.type !== "cad.circle" &&
+      entity.type !== "cad.arc"
+    )
+      continue;
+    const sketch = (entity.semantic as { sketch: string }).sketch;
+    const group = groups.get(sketch) ?? [];
+    group.push(entity);
+    groups.set(sketch, group);
+  }
+  const stats = {
+    segmentPairs: 0,
+    containmentPairs: 0,
+    segmentTests: 0,
+    segmentFallbacks: 0,
+    sweep: { events: 0, steps: 0, tests: 0, collapsed: 0 },
+  };
+  for (const entities of groups.values())
+    expect(buildLoops(entities, undefined, stats)).toHaveProperty("loops");
+  console.log("ordinary", JSON.stringify(stats));
+  expect(stats.segmentTests).toBe(164000);
+  expect(stats.segmentFallbacks).toBe(0);
+  expect(stats.sweep).toEqual({ events: 0, steps: 0, tests: 0, collapsed: 0 });
+});
+
+test("crowded crossing retains the all-pairs first source", () => {
+  const groups = strips(256);
+  const triangle = [
+    line("triangle-0", [50, 50.15], [51, 51.2]),
+    line("triangle-1", [51, 51.2], [52, 52.15]),
+    line("triangle-2", [52, 52.15], [50, 50.15]),
+  ];
+  const all = [...groups, triangle];
+  const edges = all
+    .flatMap((group, profile) => {
+      const result = buildLoops(group);
+      if (!("loops" in result)) throw new Error(result.error);
+      return result.loops.flatMap((loop) =>
+        loop.sources.map((id, i) => {
+          const j = (i + 1) % loop.sources.length;
+          const x = Math.round(coordinate(loop.points, i * 2) * 1_000_000);
+          const y = Math.round(coordinate(loop.points, i * 2 + 1) * 1_000_000);
+          const u = Math.round(coordinate(loop.points, j * 2) * 1_000_000);
+          const v = Math.round(coordinate(loop.points, j * 2 + 1) * 1_000_000);
+          return { id, profile, i, j, x, y, u, v };
+        }),
+      );
+    })
+    .sort(
+      (a, b) =>
+        Math.min(a.x, a.u) - Math.min(b.x, b.u) ||
+        Math.min(a.y, a.v) - Math.min(b.y, b.v),
+    );
+  const cross = (a: (typeof edges)[number], x: number, y: number) =>
+    (BigInt(a.u) - BigInt(a.x)) * (BigInt(y) - BigInt(a.y)) -
+    (BigInt(a.v) - BigInt(a.y)) * (BigInt(x) - BigInt(a.x));
+  let first = edges.length;
+  for (let i = 0; i < edges.length; i++)
+    for (let j = i + 1; j < edges.length; j++) {
+      const a = edges[i];
+      const b = edges[j];
+      if (!a || !b || (a.profile === b.profile && (a.j === b.i || b.j === a.i)))
+        continue;
+      if (
+        Math.max(Math.min(a.x, a.u), Math.min(b.x, b.u)) >
+          Math.min(Math.max(a.x, a.u), Math.max(b.x, b.u)) ||
+        Math.max(Math.min(a.y, a.v), Math.min(b.y, b.v)) >
+          Math.min(Math.max(a.y, a.v), Math.max(b.y, b.v))
+      )
+        continue;
+      const a1 = cross(a, b.x, b.y);
+      const a2 = cross(a, b.u, b.v);
+      const b1 = cross(b, a.x, a.y);
+      const b2 = cross(b, a.u, a.v);
+      if (
+        ((a1 <= 0n && a2 >= 0n) || (a1 >= 0n && a2 <= 0n)) &&
+        ((b1 <= 0n && b2 >= 0n) || (b1 >= 0n && b2 <= 0n))
+      )
+        first = Math.min(first, i, j);
+    }
+  const expected = edges[first];
+  if (!expected) throw new Error("Oracle found no crossing");
+  const stats = { segmentPairs: 0, containmentPairs: 0, segmentFallbacks: 0 };
+  expect(buildLoops(all.flat(), undefined, stats)).toEqual({
+    error: "cad.profile.intersect",
+    at: expected.id,
+  });
+  expect(stats.segmentFallbacks).toBe(1);
 });

@@ -7,7 +7,7 @@ import {
 } from "@nodetto/core";
 import { stlToInlineMesh } from "@nodetto/io/cad-mesh";
 import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
-import { readStl } from "@nodetto/io/stl";
+import { readStl, writeBinaryStl } from "@nodetto/io/stl";
 import {
   CAD_TEST_PAGE,
   cadElement,
@@ -468,5 +468,105 @@ test("the real worker agrees with capture mesh eligibility fixtures", async () =
         ? { ok: true }
         : expect.objectContaining({ code: "cad.reference.failed" }),
     ]);
+  }
+});
+
+function contactBox(
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  crossed = false,
+) {
+  return {
+    positions: Float64Array.of(
+      x0,
+      y0,
+      0,
+      x1,
+      y0,
+      0,
+      x1,
+      y1,
+      0,
+      x0,
+      y1,
+      0,
+      x0,
+      y0,
+      5,
+      x1,
+      y0,
+      5,
+      x1,
+      y1,
+      5,
+      x0,
+      y1,
+      5,
+    ),
+    triangles: Uint32Array.from([
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      ...(crossed ? [3, 0, 7, 0, 4, 7] : [3, 0, 4, 3, 4, 7]),
+    ]),
+  };
+}
+
+test("the real worker cuts touching shell meshes and the plate", async () => {
+  const evaluate = evaluator(createWorkerHost(createManifoldKernel()));
+  for (const [name, other] of [
+    ["edge", contactBox(10, 20, 10, 20)],
+    ["face", contactBox(10, 20, 0, 10)],
+    ["crossed", contactBox(10, 20, 0, 10, true)],
+  ] as const) {
+    const data = stlToInlineMesh(
+      writeBinaryStl([contactBox(0, 10, 0, 10), other]),
+    );
+    const elements = [
+      cadElement("mesh", "cad.mesh", "a0", { name, data }),
+      sketch("base", "a1", { base: "xy", offset: 5 }),
+      ...rectangle("base", 0, 0, 10, 10),
+      extrude("plate", "a2", { sketch: "base", distance: 5, op: "new" }),
+      sketch("opening", "a3"),
+      ...rectangle("opening", 1, 1, 2, 2),
+      extrude("cut", "a4", {
+        sketch: "opening",
+        distance: 10,
+        op: "cut",
+        bodies: ["mesh", "plate"],
+      }),
+    ];
+    const result = await evaluate(elements, { bodyIds: ["plate"] });
+    expect(result.status, name).toContainEqual(["cut", { ok: true }]);
+    expect(volumeOfStl(result.stl), name).toBeCloseTo(480, 6);
   }
 });

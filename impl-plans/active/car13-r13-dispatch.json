@@ -1,0 +1,225 @@
+{
+  "taskId": "car13-r13",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "25b4e97901f2d4188a824c9fdd1be2ec8b266157",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car13-r13",
+  "waves": [
+    ["car13-p1-touching-witness", "car13-p2-profile-side-index", "car13-p3-shared-ancestry-cache", "car13-p4a-contact-module"],
+    ["car13-p4b-contact-closure"],
+    ["car13-p4c-contact-eligibility"],
+    ["car13-p5-native-parity"]
+  ],
+  "reviewContext": {
+    "issueReference": "round-13-audit:feat/ai-capture@25b4e97901f2d4188a824c9fdd1be2ec8b266157 (base 0a35708); findings: function-capture-mesh-prism-touching-face, performance-cad-side-face-member-rescans, performance-capture-shared-profile-ancestry-rebuilds, maintainability-capture-touching-shell-mesh-eligibility; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car13-00-overview.md",
+    "userProblem": "The round-13 audit found four defects in AI capture and 3D CAD pages. (1) A tall extrusion seated flush on a closed imported STL box gets a false picture-only interference pair, because the prism cap band (crates/capture/src/prism.rs:237) and the mesh edge band (mesh.rs:309-344) both claim the joint ray and the picture witness enters the report (interference.rs:585-597); --fail-on-interference exits 1. (2) Side-face membership is re-scanned per extrusion because R12-4 keys its scan budget and set by a fresh ExtrudeGeometry (packages/core/src/cad/history.ts:482), so K extrusions of an M-member outline cost M x K. (3) Capture re-normalizes contour ancestry for every whole-sketch extrusion of one shared loop array (packages/core/src/capture/scene.ts:494). (4) Rust closed_by and target_eligible reject welded edge-contact and face-contact STL shells (crates/capture/src/mesh.rs:61, nmesh.rs:257/266) that the CAD worker cuts, so the native CLI drops the cut with cad.body.missing and the desktop renderer treats the mesh as open.",
+    "requiredOutcomes": [
+      "function-capture-mesh-prism-touching-face (R13-1; car13-p1, car13-p5): the raster and reference renderer drop a picture witness whose conservative body boxes (lattice::body_boxes, moved from interference.rs:325-339) share no positive extent (lattice::shares_extent, strictly > 0.0). The tall flush fixture gives zero pairs and zero candidates with RGB equal to the overlay-disabled render in front and back views; the 0.01 mm penetration keeps one (0,1) pair. Natively the tall contact exits 0 with PNG equal to --no-interference, and the penetration exits 1.",
+      "performance-cad-side-face-member-rescans (R13-2; car13-p2): side queries use memberIndices through history.typed. A whole-profile query is one has (sideMemberVisits === K for K extrusions). An explicit selection builds a lazy per-tool Set<CadLoop> (sideSelectionEntries) with at most 3 visits per query. Omitted-loop lines give cad.reference.missing, frames are unchanged, R12-4 stays for PCB tools and unregistered tools, and the ordinary 500-feature fixture has zero side work.",
+      "performance-capture-shared-profile-ancestry-rebuilds (R13-3; car13-p3): a walk-local cache keyed by loop-array identity, admitted only for whole-sketch extrusions with prepared + searched >= PROFILE_CACHE_MIN_WORK (4096). The slanted-rim N=1024 and sparse high-vertex fixtures give equal ancestry work and prepared coordinates for K=32 and K=1, with admitted 1 and hits 31. Scene bytes equal the oracle. Explicit subsets do no cache work. The ordinary fixture has 0 lookups, admissions and hits, with 5000/5500/0 unchanged and maxDirectWork * 4 <= 4096.",
+      "maintainability-capture-touching-shell-mesh-eligibility (R13-4; car13-p4a, p4b, p4c, p5): Rust mesh_contact::contact_closed implements the R12-6 C1-C5 checks on bit-exact NMESH-grid integers with checked i128 arithmetic. closed_by delegates to it on a third edge use, and target_eligible is contact-aware by edge-group size with C6 emptiness. The nine fixtures match the TS decoder, off-grid raw meshes return false without a panic, and welded_edge_contact_is_closed passes. Native top-view captures of the three welded fixtures show background through the hole at (2,2,10), material at the same point in the uncut twin, and open === false."
+    ],
+    "nonGoals": [
+      "No change to prism.rs, mesh.rs volume and facet rules, shading, the lattice analysis, report types, CLI flags, Tauri, MCP, NCS1 or goldens.",
+      "No change to the ExtrudeGeometry type, history.ts:579 array reuse, construction.ts, loop-forest.ts, cad-request.ts or the R12-3 fallback budget.",
+      "No TypeScript decoder change, no docs edits, no design-doc edits by workers, and no new dependency."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, noUncheckedIndexedAccess-safe reads without non-null assertions, Biome clean on touched files, CARGO_TERM_QUIET=true, and packages/io must not import @nodetto/core.",
+      "artifactRoots are exactly [\"target\", \"tmp/cad3d\"]. Evidence goes under tmp/car13-r13/<planId>/. Each plan uses CARGO_TARGET_DIR=target/car13-<plan>. No *.test.ts or *.test.tsx file may be left under target/ or tmp/.",
+      "Per-plan gates are focused. bun run typecheck, bun run lint, mise run verify and the release parity plus MCP run happen once at integration. welded_edge_contact_is_closed fails until p4b. p1 therefore runs the full crate with -- --skip welded_edge_contact_is_closed (stricter than design 30.2, because p1 changes code covered by the crate integration tests), and p4a uses --lib mesh_contact.",
+      "Shared files are chained: lib.rs (p4a then p4b) and nmesh.rs (p4a then p4c). Workers follow the SHA-256 pre/post hash and drift-stop rule of car13-00-overview.md.",
+      "The 26.2 timing rule applies. Work counters only. At most two bun test or cargo test processes at once. Never relax existing assertions, except the specified nmesh.rs:532 replacement."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R13-1 filters picture witnesses by conservative body boxes with a strict zero threshold instead of aligning the tolerance bands.", "rationale": "Disjoint boxes prove zero shared volume, the check is exact and cheap, and every positive-extent thin penetration keeps its witness."},
+      {"decision": "R13-2 reads the sketch through history.typed and the existing memberIndices, with a per-tool selected-loop set for explicit selections.", "rationale": "The ExtrudeGeometry type is unchanged, work is linear in queries plus the selection input, and the ordinary path adds nothing."},
+      {"decision": "R13-3 admits on prepared + searched >= 4096, for whole-sketch extrusions only, with a lazy walk-local map.", "rationale": "Searched units alone miss sparse high-vertex profiles. Ordinary profiles cost at most about 775, so ordinary documents do no cache work."},
+      {"decision": "R13-4 puts the contact path in a new mesh_contact.rs, registered under cfg(test) in p4a and for production in p4b together with its caller.", "rationale": "Each gate passes independently under -D warnings, the closed_by fast path stays allocation-free, and the TS and Rust implementations stay independent."},
+      {"decision": "R13-5 proves the welded cut with a through-hole pixel, an uncut twin and adjacent material samples.", "rationale": "Image inequality alone passes when only the plate is cut."}
+    ],
+    "intentionalTradeoffs": [
+      "The Rust tall fixture is the on-grid raw mesh with probed default-fit camera literals, because Rust has no STL reader; the real import is covered natively.",
+      "The 0.01 mm penetration in Rust asserts the pair, not a visible hatch.",
+      "Shared whole profiles under 4096 admission units still normalize once per tool, bounded at under 4096 units per tool.",
+      "R13-4 is split into three chained plans. car13-p5 replaces car12-p7 and carries R12-7."
+    ],
+    "supportedEdgeCases": [
+      "Flush mesh and prism contact on each world axis; thin 0.01 mm penetration; empty body boxes.",
+      "Whole-profile, explicit-selection and omitted-loop side queries; PCB and unregistered tools on the R12-4 path.",
+      "Shared slanted-rim and sparse high-vertex profiles; explicit subsets; the ordinary 500-feature document.",
+      "Edge, face and crossed-diagonal welded contacts; separated shells; open triangle, unbalanced edge, welded overlap, double-sided fin and coincident shells; off-grid and overflow-scale inputs."
+    ],
+    "outOfScopeEdgeCases": [
+      "Oblique, partial or rotated contacts whose boxes overlap; other named views.",
+      "Boa latency, native peak memory, allocator bytes, desktop WebGL and frame time, Tauri IPC, MCP delivery and cross-platform byte determinism."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car13-00-overview.md",
+      "impl-plans/active/car13-p1-touching-witness.md",
+      "impl-plans/active/car13-p2-profile-side-index.md",
+      "impl-plans/active/car13-p3-shared-ancestry-cache.md",
+      "impl-plans/active/car13-p4a-contact-module.md",
+      "impl-plans/active/car13-p4b-contact-closure.md",
+      "impl-plans/active/car13-p4c-contact-eligibility.md",
+      "impl-plans/active/car13-p5-native-parity.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car13-p1-touching-witness",
+      "planPath": "impl-plans/active/car13-p1-touching-witness.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/lattice.rs", "crates/capture/src/interference.rs", "crates/capture/src/raster.rs", "crates/capture/src/raster/reference.rs", "crates/capture/src/raster/tests.rs", "impl-plans/active/car13-p1-touching-witness.md", "impl-plans/progress/car13-p1-touching-witness.md", "tmp/car13-r13/car13-p1-touching-witness", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/interference.rs", "intendedEdit": "Move only: replace the inline body-box code at :325-339 with lattice::body_boxes."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "lattice.rs adds pub(crate) body_boxes (moved unchanged from interference.rs:325-339) and shares_extent (true only if min(max) - max(min) > 0.0 on all three axes). interference.rs calls body_boxes with behaviour unchanged.",
+        "raster.rs stores body_boxes once per render and drops overlap pairs that fail shares_extent before marks.record and before marked is set. reference.rs applies the identical filter.",
+        "The fixture tall_mesh_under_prism(back, overlap) uses probed default-fit camera literals. production_touching_tall_mesh passes in both views (at least one view fails before the fix), production_tall_mesh_penetration gives exactly one (0,1) pair in both views, the shares_extent unit cases pass, and the reference witness touching passes in both views.",
+        "All existing raster, interference, witness, golden and determinism tests pass unedited, including the integration tests in tests/interference.rs, overlay*.rs, census.rs and render.rs (full-crate gate skipping only welded_edge_contact_is_closed). fmt and clippy -D warnings are clean. The fail-before and camera probe logs are saved."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p1 cargo clippy -p nodetto-capture --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p1 cargo test -p nodetto-capture -- --skip welded_edge_contact_is_closed"
+      ]
+    },
+    {
+      "planId": "car13-p2-profile-side-index",
+      "planPath": "impl-plans/active/car13-p2-profile-side-index.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/history.ts", "packages/core/src/cad/history.test.ts", "impl-plans/active/car13-p2-profile-side-index.md", "impl-plans/progress/car13-p2-profile-side-index.md", "tmp/car13-r13/car13-p2-profile-side-index", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "cadGeometryWork gains sideSelectionEntries. Side queries on a history cad.extrude with a valid profile use memberIndices: a whole profile (tool.loops === profile.loops) costs one visit and no allocation; an explicit selection builds one lazy Set<CadLoop> per tool and costs 1 + inspected indices per query. Everything else uses the unchanged R12-4 path.",
+        "The shared whole-profile checkCadPage test at M = K = 256/512/1024 gives sideMemberVisits === K with no builds and no entries, and fails before the fix. The explicit-selection test gives K cad.reference.missing errors naming the rectangle line, sideSelectionEntries === K, no builds and visits <= 16K. Frames equal faceFrame.",
+        "The ordinary 500-feature check has zero side visits, builds and entries. The existing side tests (history.test.ts:582-713) pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/history.ts packages/core/src/cad/history.test.ts",
+        "bun test packages/core/src/cad/history.test.ts"
+      ]
+    },
+    {
+      "planId": "car13-p3-shared-ancestry-cache",
+      "planPath": "impl-plans/active/car13-p3-shared-ancestry-cache.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/scene.ts", "packages/core/src/capture/scene.test.ts", "impl-plans/active/car13-p3-shared-ancestry-cache.md", "impl-plans/progress/car13-p3-shared-ancestry-cache.md", "tmp/car13-r13/car13-p3-shared-ancestry-cache", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "normaliseToolLoops accepts an optional work {prepared, searched}: prepared is the sum of loop.points.length (0 on the early return), searched is the local work counter. The fallback budget is unchanged. PROFILE_CACHE_MIN_WORK = 4096 is exported. CaptureWalkStats gains optional profileCache {lookups, admitted, hits, prepared, maxDirectWork}.",
+        "buildCadCaptureModel caches only whole-sketch extrusions, by loop-array identity, in a lazily created walk-local map, admitting when prepared + searched >= 4096. Other tools normalize directly. Per-tool charge, makeTool, bounds and bytes are unchanged.",
+        "Slanted-rim N=1024 and sparse high-vertex fixtures: K=32 equals K=1 in ancestry totals, forestFallbacks and prepared, with admitted 1, lookups 31 and hits 31 (fails before the fix). K=32 scene bytes equal the oracle. Explicit subsets give 0/0/0 cache counts and keep their own ancestry.",
+        "The ordinary 500-feature guard gives lookups, admitted and hits 0, ancestorProbes 5000, indexEntries 5500, forestFallbacks 0 and maxDirectWork * 4 <= PROFILE_CACHE_MIN_WORK. Existing scene tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts",
+        "bun test packages/core/src/capture/scene.test.ts packages/core/src/cad/loop-forest.test.ts"
+      ]
+    },
+    {
+      "planId": "car13-p4a-contact-module",
+      "planPath": "impl-plans/active/car13-p4a-contact-module.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/mesh_contact.rs", "crates/capture/src/lib.rs", "crates/capture/src/nmesh.rs", "impl-plans/active/car13-p4a-contact-module.md", "impl-plans/progress/car13-p4a-contact-module.md", "tmp/car13-r13/car13-p4a-contact-module", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/lib.rs", "intendedEdit": "Add #[cfg(test)] mod mesh_contact; only. car13-p4b later switches it to mod mesh_contact;."},
+        {"path": "crates/capture/src/nmesh.rs", "intendedEdit": "Make UNITS_PER_MILLIMETRE and COORDINATE_LIMIT pub(crate) only. car13-p4c later edits target_eligible and tests."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "New mesh_contact.rs exports pub(crate) contact_closed(vertex_count, triangles, position) -> bool. It implements the bit-exact grid domain check, then C1-C5 in R12-6 order, on i64/i128 integers with checked arithmetic and no panic path.",
+        "lib.rs declares #[cfg(test)] mod mesh_contact;. nmesh.rs changes only the two visibilities.",
+        "The 8 module tests pass: edge, face and crossed-diagonal contact give true; welded overlap and coincident shells give false; the on-grid zero-normal fixture (edge contact plus collinear (30,0,0), (31,0,0), (32,0,0) mm in triangles (p,q,r) and (p,r,q)) gives false at C2 without a panic; a 0.0004 mm off-grid shift gives false at the grid check; the overflow-scale input completes without a panic. fmt and clippy --all-targets -D warnings are clean."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p4a cargo clippy -p nodetto-capture --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p4a cargo test -p nodetto-capture --lib mesh_contact"
+      ]
+    },
+    {
+      "planId": "car13-p4b-contact-closure",
+      "planPath": "impl-plans/active/car13-p4b-contact-closure.md",
+      "dependsOn": ["car13-p4a-contact-module"],
+      "writePaths": ["crates/capture/src/mesh.rs", "crates/capture/src/lib.rs", "crates/capture/tests/mesh.rs", "impl-plans/active/car13-p4b-contact-closure.md", "impl-plans/progress/car13-p4b-contact-closure.md", "tmp/car13-r13/car13-p4b-contact-closure", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/lib.rs", "intendedEdit": "Re-read fresh after p4a and change #[cfg(test)] mod mesh_contact; to mod mesh_contact;."},
+        {"path": "crates/capture/src/mesh.rs", "intendedEdit": "Only the third-use branch of closed_by delegates to mesh_contact::contact_closed. car12-p1 volume and facet code is untouched."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "closed_by delegates to mesh_contact::contact_closed when a sorted edge has a third use. Its fast path, other early returns and the single CLOSURE_EVALUATIONS increment are unchanged.",
+        "tests/mesh.rs: closed_by and is_closed are true for edge, face, crossed-diagonal and separated, and false for open triangle, unbalanced, welded overlap, double-sided fin and coincident shells. The off-grid raw mesh gives false with no panic. welded_edge_contact_is_closed passes unedited.",
+        "The full nodetto-capture test suite, including closure_count.rs, passes. fmt and clippy are clean. The fail-before log is saved."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p4b cargo clippy -p nodetto-capture --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p4b cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car13-p4c-contact-eligibility",
+      "planPath": "impl-plans/active/car13-p4c-contact-eligibility.md",
+      "dependsOn": ["car13-p4b-contact-closure"],
+      "writePaths": ["crates/capture/src/nmesh.rs", "impl-plans/active/car13-p4c-contact-eligibility.md", "impl-plans/progress/car13-p4c-contact-eligibility.md", "tmp/car13-r13/car13-p4c-contact-eligibility", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/nmesh.rs", "intendedEdit": "Re-read fresh after p4a. Make target_eligible contact-aware by edge-group size, run the duplicate-triple check only on the fast path, add the nine-fixture boolean_target unit tests and replace the :532 tautological assertion."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "target_eligible: groups of 2 keep the opposite-direction rule, groups of 4 or more are accepted, other sizes are rejected. The duplicate-triple check runs only when all groups have size 2. Emptiness (d) runs unchanged on the original triangles. Fast-path decisions and stats.target are unchanged.",
+        "A test-only encoder in nmesh.rs mod tests (8-byte header, minimal LEB128, G=1, zigzag deltas, first-use vertex codes, CRC32 LE, base64 nmesh1:) passes a decode_inline round-trip guard for all nine fixtures. decode_inline_with(need_target=true) gives boolean_target true for edge, face, crossed-diagonal and separated, and false for the five controls, matching capture-decoder.test.ts. No fixture files are added.",
+        "The :532 assertion compares is_closed with a new per-fixture closed literal (all true except triangle), separate from expected. No other assertion changes.",
+        "The full nodetto-capture suite and the unedited TS capture-decoder and budget tests pass."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p4c cargo clippy -p nodetto-capture --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p4c cargo test -p nodetto-capture",
+        "bun test packages/io/src/nmesh/capture-decoder.test.ts packages/io/src/nmesh/capture-decoder-budget.test.ts"
+      ]
+    },
+    {
+      "planId": "car13-p5-native-parity",
+      "planPath": "impl-plans/active/car13-p5-native-parity.md",
+      "dependsOn": ["car13-p1-touching-witness", "car13-p2-profile-side-index", "car13-p3-shared-ancestry-cache", "car13-p4c-contact-eligibility"],
+      "writePaths": ["apps/cli/src/native-parity/capture.test.ts", "impl-plans/active/car13-p5-native-parity.md", "impl-plans/progress/car13-p5-native-parity.md", "tmp/car13-r13/car13-p5-native-parity", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Tests only. Tall flush STL plus extrusion at default fit, 64x64, front and back: exit 0, zero pairs and candidates in JSON, PNG equal to --no-interference. The -0.01 mm penetration exits 1 with one pair naming both bodies.",
+        "The R12-7 short contact (zoom 1.08, target 0,0,0.25) exits 0 with interference: 0 and PNG equal to --no-interference. The overlap control exits 1 with interference: 1, in both views.",
+        "The edge, face and crossed-diagonal welded documents at --view top --size 160x160 --json give: exit 0, no cad.body.missing, mesh open === false, PNG different from the uncut twin, mmPerPixel <= 0.25, background at (2,2,10) where the uncut twin is not background, and material at (6,6,10) and at the shell-B top centre in both.",
+        "The gate log built against target/car13-p5/release/nodetto-cli lists every new test as passed, not skipped. Existing tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check apps/cli/src/native-parity/capture.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p5 cargo build --release -p nodetto-cli && test -x \"$PWD/target/car13-p5/release/nodetto-cli\" && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car13-p5/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    }
+  ],
+  "integration": [
+    "bun run typecheck",
+    "bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p5 cargo build --release -p nodetto-cli && test -x \"$PWD/target/car13-p5/release/nodetto-cli\" && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car13-p5/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" \\( -name \"*.test.ts\" -o -name \"*.test.tsx\" \\) -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

@@ -13,6 +13,7 @@ import {
   type EdgeYIndex,
 } from "./edge-y-index.ts";
 import { loopForest, type ForestStats } from "./loop-forest.ts";
+import { provesDisjoint, type SweepStats } from "./segment-sweep.ts";
 import { tessellateArc, tessellateCircle } from "./tessellate.ts";
 import { coordinate, gridCross, NM_PER_MM, orientation } from "./vec.ts";
 
@@ -215,6 +216,9 @@ function segmentIntersection(a: Segment, b: Segment): boolean {
 
 interface LoopStats {
   segmentPairs: number;
+  segmentTests?: number;
+  segmentFallbacks?: number;
+  sweep?: SweepStats;
   containmentPairs: number;
   edges?: EdgeIndexStats;
   forest?: ForestStats;
@@ -235,6 +239,7 @@ function overlappingPairs(
   visit: (i: number, j: number) => void,
   count: () => void,
   stop?: () => boolean,
+  crowded?: () => boolean,
 ): void {
   const sorted = (axis: "X" | "Y") =>
     boxes
@@ -284,6 +289,7 @@ function overlappingPairs(
     }
     return;
   }
+  if (crowded?.() === false) return;
   const indices = boxes.map((_, i) => i);
   const byMinX = indices
     .slice()
@@ -398,17 +404,57 @@ function intersection(
   }
   segments.sort((a, b) => a.minX - b.minX || a.minY - b.minY);
   let first = segments.length;
+  const touches = (i: number, j: number): boolean => {
+    const a = segments[i];
+    const b = segments[j];
+    if (a === undefined || b === undefined) return false;
+    if (stats !== undefined) stats.segmentTests = (stats.segmentTests ?? 0) + 1;
+    return segmentIntersection(a, b);
+  };
   overlappingPairs(
     segments,
     (i, j) => {
-      const a = segments[i];
-      const b = segments[j];
-      if (a !== undefined && b !== undefined && segmentIntersection(a, b)) {
-        first = Math.min(first, i, j);
-      }
+      if (touches(i, j)) first = Math.min(first, i, j);
     },
     () => {
       if (stats !== undefined) stats.segmentPairs += 1;
+    },
+    undefined,
+    () => {
+      if (stats !== undefined)
+        stats.segmentFallbacks = (stats.segmentFallbacks ?? 0) + 1;
+      const sweep: SweepStats = { events: 0, steps: 0, tests: 0, collapsed: 0 };
+      const disjoint = provesDisjoint(
+        segments.length,
+        (i) => {
+          const segment = segments[i];
+          if (segment === undefined) throw new Error("Missing segment");
+          const grid = segment.profile.grid;
+          return [
+            coordinate(grid, segment.start),
+            coordinate(grid, segment.start + 1),
+            coordinate(grid, segment.end),
+            coordinate(grid, segment.end + 1),
+          ];
+        },
+        touches,
+        sweep,
+      );
+      if (stats !== undefined) {
+        stats.segmentPairs += sweep.tests;
+        stats.sweep ??= {
+          events: 0,
+          steps: 0,
+          tests: 0,
+          collapsed: 0,
+        };
+        const total = stats.sweep;
+        total.events += sweep.events;
+        total.steps += sweep.steps;
+        total.tests += sweep.tests;
+        total.collapsed += sweep.collapsed;
+      }
+      return !disjoint;
     },
   );
   return segments[first];

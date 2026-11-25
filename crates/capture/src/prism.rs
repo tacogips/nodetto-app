@@ -114,7 +114,7 @@ pub(crate) fn orthonormal([u, v, n]: [[f64; 3]; 3]) -> bool {
 }
 
 // Choose a common infinitesimal world direction ordered by X, Y, Z.
-fn increases_in_world(gradient: [f64; 3]) -> bool {
+pub(crate) fn increases_in_world(gradient: [f64; 3]) -> bool {
     let scale = gradient.into_iter().map(f64::abs).fold(0.0, f64::max);
     gradient
         .into_iter()

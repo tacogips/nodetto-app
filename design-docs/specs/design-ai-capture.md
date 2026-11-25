@@ -42,6 +42,12 @@ Revision 17 (audit round 10 of `0a35708..43197ca`, 4 findings) is section
 crowded profile depths from immediate parents, and decides capture
 ancestry on the nanometre grid (section 6.1). Section 28 wins over earlier
 sections.
+Revision 18 (audit round 12 of `0a35708..73f73b8`, 6 findings) is section
+29. Revision 19 (audit round 13 of `0a35708..25b4e97` plus the uncommitted
+round-12 tree, 4 findings) is section 30; it filters picture witnesses of
+bodies whose boxes only touch, finishes the Rust welded-shell contact
+path of R12-6, and removes repeated side-face and ancestry work across
+extrusions of one sketch. Section 30 wins over earlier sections.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -2290,6 +2296,9 @@ Capture now decides this before a feature is committed to any target:
   - (c) No two triangles use the same three vertex indices in any order.
     This rejects paired coincident faces, including a double-sided
     triangle.
+  - Revision 18 (29.1 R12-6) replaces (a) to (c) for edges used by more
+    than two triangles and for coincident faces between touching closed
+    shells. Edges used by exactly two triangles keep the rules above.
   - (d) Not empty by the editor's own emptiness test.
     `packages/cad-kernel/src/manifold-kernel.ts:155-165` treats a solid as
     empty when `volume === 0 || 2 * |volume| < area * 5e-7`: its
@@ -2915,7 +2924,9 @@ B's precedence calls C's resolver); E after D; I after G and H.
   no duplicate vertex triple, and the kernel's own emptiness test
   `V != 0 && 2|V| >= A * 5e-7` from `manifold-kernel.ts:155-165`). Its
   agreement with the Manifold worker is claimed only for the nine tested
-  fixtures.
+  fixtures. Revision 18 (29.1 R12-6) adds touching closed shells (edge
+  contact and face contact, with either shared-face triangulation) and
+  extends the claim to those three fixtures.
 - Tauri transport: raw request body with headers and an `ipc::Response`
   carrying the existing reply framing (F10).
 - MCP capture runs the CLI capture command; F2 needs no MCP change.
@@ -7778,3 +7789,1616 @@ Integration runs once after all plans land, in this order and under the
   cross-process write races, and real VFAT, exFAT or network-filesystem
   publication. The per-backend boundary follows from the primitives'
   documented behaviour; no such filesystem was run.
+
+## 29. Revision 18: audit round 12 corrections
+
+Source: audit round 12 of the 3D CAD pages and AI capture, base `0a35708`
+to `73f73b8`. Six findings (four high, two medium), none deferred. No
+GitHub issue exists; the round-12 workflow input is the issue body. Where
+an earlier section and this one disagree, this section wins. The common
+rules of section 24, the timing rule of 26.2 and the plan rules of 28.2
+still apply. Each fix needs a regression test that fails before the change
+and passes after it in this tree. Performance is asserted with
+deterministic work counters, never clocks. Bytes, goldens, error codes,
+NCS1 layout, first-error identity, loop order and the CLI, MCP and desktop
+contracts stay unchanged unless a rule below says otherwise.
+
+Every new heavier path keeps the existing path for ordinary input and
+engages only past a work threshold. A work-count test pins the ordinary
+case, so the round-8 regression (39% slower ordinary checks) cannot repeat.
+
+### 29.1 Rules
+
+R12-1 `function-capture-mesh-prism-touching-face` (high).
+
+Cause. `MeshView::facet_depth` (`crates/capture/src/mesh.rs:273-305`)
+decides a ray that lies exactly on a projected triangle edge with the
+view-dependent top-left rule `inclusive` (`mesh.rs:110-112`). Volume
+queries (`intervals`, `hits`, `first_hit`) share that rule with shading.
+For the back view (forward `[0,-1,0]`) the rim edge of a mesh box's top
+face is a right-hand edge in view coordinates, so the mesh owns a ray in
+its top plane. The prism above owns the same ray through its world-space
+cap rule (`prism.rs:226-243`). Both bodies then hold `[-8, 0]` mm, the
+picture records a witness pair (`raster.rs:301`, kept by
+`interference.rs:585`), and `--fail-on-interference` exits 1. The front
+view happens to agree with the prism. `MeshView::surface_intervals`
+always returns `false`, so the raster never rechecks a mesh with its
+volume rule.
+
+Rule. Closed-mesh volume queries use the prism's world-space ownership:
+a ray on a shared boundary belongs to the side that an infinitesimal world
+displacement (+X first, then +Y, then +Z) moves it into. That is the
+`increases_in_world` decision of `prism.rs:117-123`, used for caps at
+`prism.rs:237-238` and for sides at `prism.rs:317-322` and `:343-347`.
+Shading keeps today's rule.
+
+1. Volume membership (`hits_impl::<false>`, reached by `intervals`,
+   `hits` and `first_hit`, so by lattice sampling, pair analysis and the
+   picture recheck). Triangle setup is unchanged: the same bin, the same
+   zero-area skip, and the same order that makes the projected triangle
+   counter-clockwise. For each oriented edge `(a, b)` of that order:
+   - Canonical value. Let `c0, c1` be the edge's two vertices ordered by
+     vertex index, lower first. `e' = edge(proj[c0], proj[c1], q)` and
+     `e = e'` when `a` is `c0`, else `e = -e'`. The two triangles that
+     share an edge therefore see exactly opposite values.
+   - Band. `err = 8 * f64::EPSILON * (|dx| + |dy|) * S`, where
+     `(dx, dy) = proj[c1] - proj[c0]` and `S` is the sum of the absolute
+     projected coordinates of `c0`, `c1` and `q`. The value is the same
+     for both orientations.
+   - Decision. `e > err` admits the edge and `e < -err` rejects it.
+     Otherwise the edge admits only when `increases_in_world(g)`, where
+     `g[k] = -(b.y - a.y) * u[k] + (b.x - a.x) * v[k]` is the world
+     gradient of `e` for this orientation, from projected coordinates and
+     the view basis `[u, v]`. The reverse orientation has exactly `-g`, so
+     exactly one of two triangles that share an edge owns a ray on it.
+   - A triangle contains the ray when all three edges admit it. Depth
+     `s` is computed as today.
+2. Facet membership (`hits_impl::<true>`, `first_surface_hit`, `surface`)
+   is unchanged bit for bit, so shading, edges, first hits and goldens
+   keep today's output.
+3. Sensitivity flag. For a closed mesh, `surface_intervals` returns
+   `true` when some listed triangle has an edge with `|e| <= err` (using
+   today's facet value of `e`) and its volume membership from step 1
+   differs from its facet membership. Otherwise it returns `false`, as
+   today. Outside the band the two rules cannot disagree, because `err`
+   bounds the rounding difference between the facet value and the
+   canonical value. Flags occur only at near-ties where the answers
+   really differ, so ordinary pixels gain no recast.
+4. The raster's existing recheck (`raster.rs:225-241`) and the reference
+   renderer (`raster/reference.rs:81-85`) then recast the mesh with
+   `intervals`. Neither file changes. `increases_in_world` becomes
+   `pub(crate)` in `prism.rs`, with its body unchanged.
+5. Unchanged: the CLI, Tauri, MCP, the NCS1 format, the report types,
+   `interference.rs`, prism rules, open-mesh handling and mesh
+   eligibility. The oblique-contact band is a conservative bound, not a
+   proof. Only the axis-aligned fixtures below are tested.
+
+Tests (each new test fails before the fix unless marked as a guard):
+
+- `mesh.rs` unit test `contact_plane_rays_follow_prism_ownership`:
+  - Lower box: the `cube()` topology at z in [-1, 0]. Upper box: z in
+    [0, 1]. Rays lie in the plane z = 0 at x = 0.25. Back view: forward
+    `[0,-1,0]`, origin y = 3. Front view: forward `[0,1,0]`, origin
+    y = -2.
+  - Lower box: `intervals` is empty in both views. This fails before the
+    fix in the back view. `surface_intervals` returns two boundaries and
+    `true` in the back view, and nothing and `false` in the front view.
+  - Upper box: `intervals` has two boundaries one unit apart in both
+    views. `surface_intervals` flags the back view (the facet rule
+    excludes) and not the front view.
+- `mesh.rs` unit test `volume_ties_are_watertight_for_oblique_rays`:
+  - Use the cube with forward `normalize([1, 2, 3])`.
+  - Take rays through a point of the bottom face's internal diagonal,
+    displaced along the view-plane normal of the diagonal by
+    `k * 1e-15` mm for k in -4..=4, plus rays through the cube's corner
+    vertices projected into the face.
+  - Every ray has an even number of volume hits. Every interior ray has
+    exactly 2, and corner rays have an even count.
+  - Each ray's two boundaries are compared with that ray's own analytic
+    oracle, not with other rays: the slab entry and exit parameters
+    `t_enter` and `t_exit` of the unit cube for the same origin and the
+    same forward direction, with `|s - t| <= 1e-12` mm. Depths differ
+    between rays, because the offset direction has a world Z component
+    (step-3 review r12-mesh-oblique-depth-oracle).
+  - This is a guard, because the old rule is also watertight inside one
+    mesh.
+- The existing test `cube_surface_casts_are_not_ownership_sensitive` is
+  renamed `cube_surface_and_volume_casts_differ_only_at_ownership_ties`.
+  All five points stay:
+  - Points `[0.25,0.25]`, `[0.5,0.5]`, `[0.75,0.25]` and `[1.5,0.5]` keep
+    the equal-depth assertion and the `false` flag.
+  - Point `[0,0]` is a corner tie where the rules now differ by design.
+    It asserts: facet output empty and unchanged; flag `true`; volume
+    depths `[1, 2]`, because the world displacement moves the ray into
+    the cube.
+- `raster/reference.rs` fixture `mesh_under_prism(back: bool, overlap)`:
+  - Tools and bodies as in `stacked_caps(overlap)`, except that tool 0 is
+    a closed 12-triangle mesh box of the same extent (16 x 8 x 0.9375,
+    outward winding). Tool 1 is unchanged.
+  - Camera as `stacked_caps`. With `back`: forward `[0,-1,0]`, right
+    `[-1,0,0]`, and the centre at y = 12 instead of -4.
+- `raster/tests.rs`:
+  - `production_touching_mesh_caps` runs `production_touching` on
+    `mesh_under_prism(false, 0.0)` and `mesh_under_prism(true, 0.0)`.
+    That means zero pairs, zero candidates, identical RGB at threads
+    0..=8 and against the reference, and RGB equal to the
+    `draw_interference = false` render. The back variant fails before the
+    fix.
+  - `production_overlap_witness` adds `mesh_under_prism(true, 0.01)` and
+    `mesh_under_prism(false, 0.01)`, each with exactly one pair. This is a
+    guard.
+- Every other `mesh.rs`, raster, interference, lattice, census and golden
+  test stays unedited and passes. If an existing exact work count moves
+  only because of a step-3 recast, the plan reports both values and the
+  tie that caused it. It never relaxes a bound.
+
+R12-2 `performance-sketch-profile-pair-scans` (high).
+
+Cause. `intersection()` (`packages/core/src/cad/loops.ts:373-414`) lists
+every overlapping box pair through `overlappingPairs`. Past
+`SWEEP_PAIRS_PER_BOX` (`:230`), the indexed path (`:285-370`) emits all
+overlapping pairs, which is quadratic for parallel diagonal strips that
+never touch.
+
+Rule.
+
+1. New module `packages/core/src/cad/segment-sweep.ts`, which imports only
+   `./vec.ts`. It exports:
+
+   ```text
+   provesDisjoint(count, endpoints(i) -> [x0, y0, x1, y1],
+                  touches(i, j) -> boolean, stats?) -> boolean
+   ```
+
+   The function returns `true` only when it has proved that `touches`
+   holds for no pair. `false` means "not proved": either it found a pair
+   for which `touches` is true, or the input is outside what the sweep
+   handles. The caller must then run its exhaustive search. This one-sided
+   contract means the sweep can never let an invalid profile through.
+   - Contract on `touches`: it is called only for pairs whose bounding
+     boxes overlap (closed intervals on both axes). It returns true for
+     every such pair that shares a point, except pairs that share exactly
+     one common endpoint and no other point; it may return false for
+     those. The module enforces the box precondition itself before every
+     call, because `segmentIntersection` alone reports collinear disjoint
+     segments as touching. `segmentIntersection` meets the contract under
+     that precondition.
+   - Collapsed segments. Before building any event or treap node, the
+     function scans the input. If any segment has identical endpoints (a
+     zero-length segment, which grid construction keeps for repeated
+     vertices), it returns `false` (not proved) without sweeping. Every
+     segment the sweep handles therefore has distinct lower and upper
+     endpoints, so no segment can be in both `L` and `U` at one event
+     (step-3 review r12-sweep-collapsed-grid-segment).
+2. Algorithm: a Shamos-Hoey sweep on exact grid integers, run only when
+   no segment is collapsed.
+   - Events are ordered lexicographically by `(y, x)`, the order
+     `loop-forest.ts` already uses. A segment's lower endpoint is its
+     lexicographically smaller endpoint.
+   - The status is a treap with the deterministic hashed priorities of
+     `loop-forest.ts`. Its order is the order along the sweep line just
+     after the event point, decided by exact `gridCross` orientations.
+     Segments that share a lower endpoint are ordered by the orientation
+     of their upper endpoints, then by index.
+   - Each distinct event point `p` is processed in four steps:
+     - (a) Let `L` be the segments whose upper endpoint is `p` and `U`
+       those whose lower endpoint is `p`. `U` and `L` are disjoint
+       because no segment is collapsed. Take the members of `U ∪ L` in
+       index order and test the first member against each of the others
+       with `touches`, stopping at the first true test. A non-collapsed
+       segment's endpoint at `p` is one vertex index, which is shared
+       with at most one other segment, so the first member has at most
+       one exempt partner. When three or more segments meet at `p`, a
+       true test therefore occurs within two tests. When exactly two
+       meet, the one test decides that pair.
+     - (b) Remove each segment of `L`, then test its former predecessor
+       against its former successor.
+     - (c) Descend the treap with the sign of `gridCross(segment, p)`. An
+       active segment with orientation 0 contains `p` in its interior.
+       That is a contact, so the function returns `false` (not proved)
+       and the caller runs its exhaustive search. Binary search for an
+       equal key finds such a segment whenever one exists. Every contact
+       branch, (a) to (d), returns `false`. Only reaching the end of the
+       events returns `true`.
+     - (d) Insert each segment of `U`, testing it against its predecessor
+       and its successor. Each pair is tested when it becomes adjacent.
+   - At the first true test, or the first contact found in step (c), the
+     function returns `false` (not proved). It returns `true` (proved)
+     only after the last event.
+   - Correctness rests on the standard argument. The status order is
+     valid before the lexicographically smallest contact point `X`, and
+     some pair that meets at `X` is either adjacent and tested before `X`
+     or handled by steps (a) and (c) at `X`. Because every segment has
+     two distinct endpoints, each segment is inserted exactly once and
+     removed exactly once, after its insertion.
+   - Counters: `stats.events`, `stats.steps` (treap and comparator steps),
+     `stats.tests` (`touches` calls) and `stats.collapsed` (inputs
+     rejected by the collapsed-segment scan).
+3. Integration in `loops.ts`:
+   - `overlappingPairs` gains an optional `crowded?: () => boolean`. It is
+     called once, only where the indexed path would start. If it returns
+     false the function returns without listing pairs. Containment search
+     does not pass it, so containment is unchanged.
+   - `intersection()` passes a `crowded` that increments
+     `stats.segmentFallbacks` and runs `provesDisjoint` over the same
+     sorted `segments`, with `touches = segmentIntersection` (the module
+     applies the box precondition before each call).
+   - If the sweep proves disjointness, the result is "no crossing". If it
+     does not (a contact or a collapsed segment), the existing indexed
+     enumeration runs unchanged, so the first reported source ID (the
+     minimum sorted index) is identical.
+   - `LoopStats` gains optional `segmentTests` (every exact
+     `segmentIntersection` call, on either path), `segmentFallbacks` and
+     `sweep?: { events; steps; tests; collapsed }`.
+   - `segmentPairs` keeps meaning "candidate segment pairs examined". On
+     the crowded path it also counts the sweep's `touches` calls, so
+     existing positive and ratio assertions stay meaningful.
+   - `SWEEP_PAIRS_PER_BOX` stays 8. The measured threshold is the
+     existing switch point. The plan records `segmentPairs`,
+     `segmentTests` and `segmentFallbacks` for the ordinary fixture and
+     for the strip fixture at each size.
+4. Unchanged: the sparse sweep, containment, depth, the forest fallback,
+   error codes, and loop order and orientation.
+
+Tests:
+
+- `segment-sweep.test.ts`, differential:
+  - 3,000 seeded closed polylines, each with 3 to 7 vertices, on the
+    integer grid 0..6. This produces many vertical, horizontal,
+    collinear, T-touch, shared-vertex and repeated-coordinate cases.
+  - Adjacency means consecutive in the same loop. `touches` is a local
+    exact closed-segment test that excludes an adjacent pair sharing only
+    their common vertex. The all-pairs oracle applies the same
+    box-overlap precondition and the same `touches`.
+  - Soundness on every case: whenever `provesDisjoint` returns true, the
+    oracle finds no touching pair.
+  - Completeness on every case without a collapsed segment:
+    `provesDisjoint` returns true exactly when the oracle finds no
+    touching pair.
+  - The plan states its seed and four counts: proved, not proved with
+    contact, not proved because of collapse, and oracle-disjoint. Each
+    must be non-zero.
+  - Before the module exists the import fails, so the test fails.
+- `segment-sweep.test.ts`, deterministic collapsed case: the closed
+  polyline (0,0), (4,0), (4,0), (4,4), (0,4). The segment (4,0)-(4,0)
+  makes the function return false with `stats.collapsed === 1`, and no
+  event is processed.
+- `segment-sweep.test.ts`, deterministic T-touch case (no collapse):
+  segments (0,0)-(0,4) and (0,2)-(1,3), not adjacent. The endpoint (0,2)
+  lies inside the active vertical segment. Step (c) finds it and the
+  function returns `false`, with `stats.collapsed === 0`. A swapped
+  input order gives the same result.
+- `segment-sweep.test.ts`, work: for N disjoint parallel diagonal
+  segments at N = 1024, 2048 and 4096, `events + steps + tests` grows by
+  at most 2.5x per doubling and `tests <= 3 * N`.
+- `loops.test.ts` "diagonal strips search disjointness subquadratically":
+  - N closed four-line strips with corners (0,b), (100,100+b),
+    (100,100+b+w) and (0,b+w), where b = i/64 mm and w = 1/256 mm, at
+    N = 64, 128 and 256.
+  - Work `W = segmentPairs + sweep.events + sweep.steps + sweep.tests`.
+    Each doubling at most 2.5x both `W` and `segmentTests`.
+  - The ordered loops equal an oracle built from the strip vertex lists:
+    every strip, in input order, at depth 0, counter-clockwise.
+  - Before the fix, `segmentTests` grows about 4x (16,448 to 65,664 to
+    262,400 in the audit).
+- `loops.test.ts` crossing control: the 256-strip fixture plus one closed
+  three-line triangle whose edges cross strips 10 and 11.
+  - The result is `cad.profile.intersect`, with `at` equal to the source
+    ID that an in-test BigInt all-pairs oracle selects. The oracle sorts
+    segments by `(minX, minY)` exactly as `intersection()` does and takes
+    the minimum sorted index of any intersecting pair.
+  - `segmentFallbacks === 1`. This is a guard for first-error identity.
+- `loops.test.ts` crowded repeated-vertex control (step-3 review
+  r12-sweep-collapsed-grid-segment):
+  - The fixture calls `buildProfileLoops(paths, undefined, stats)`
+    directly with closed `CadProfilePath` records:
+    - the 64 strips, each as one closed path with its four corners;
+    - one closed path with ID `repeated-vertex` and points
+      `[200,0, 204,0, 204,0, 204,4, 200,4]`, `closed: true`.
+    `buildProfileLoops` gives a closed path a single source ID
+    (`loops.ts:519-535`). Separate line entities would not work: an
+    open line with equal endpoints fails with `cad.profile.empty` before
+    the intersection search.
+  - The 64 strips take the crowded path. The repeated vertex makes one
+    collapsed segment, and the two non-zero segments that meet at
+    (204,0) are not adjacent.
+  - Assert the result is `cad.profile.intersect` with `at ===
+    "repeated-vertex"`, `segmentFallbacks === 1` and
+    `sweep.collapsed === 1`.
+  - This is a guard: the existing path already reports this (the
+    reviewer's probe needed 52,891 pair visits). The test pins it so the
+    sweep cannot regress it.
+- `loops.test.ts` ordinary baseline:
+  - Build every sketch of
+    `generateCadDocument({ features: 500, entitiesPerSketch: 18 })` with
+    `buildLoops(entities, undefined, stats)` and one shared `stats`.
+  - Assert `segmentFallbacks === 0`, `sweep` absent or all zero, and
+    `segmentTests` equal to the value measured before the change. The
+    audit's 164,000 is expected and the plan records the measured value.
+- The existing doubling, two-row, tangent and `pcb-outline` tests stay
+  unedited and pass.
+
+R12-3 `performance-capture-selected-loop-ancestry-work` (high).
+
+Cause. `normaliseToolLoops` (`packages/core/src/capture/scene.ts:213-276`)
+searches every lower depth for each contour. Missing depth buckets are
+looked up uncounted (D lookups each, so D x S in total). Every probe also
+merges the oversized list, so N rims and N holes cost N^2 / 2 probes.
+
+Rule.
+
+1. Keep the all-depth-zero early return and the existing search as the
+   first path. Count new `depthLookups` (every `k` iteration, including
+   missing buckets) and keep `ancestorProbes`, `indexEntries` and the
+   edge-index counters.
+2. Linear budget: `ANCESTRY_WORK_PER_VERTEX = 32` times the total vertex
+   count of `loops`. Work is `depthLookups + ancestorProbes +
+   indexEntries + edge builds, visits, inspections and bulk`. It is
+   counted internally even without `stats`.
+3. When the work exceeds the budget, abandon the first path, increment
+   `forestFallbacks`, and call `loopForest(grids, windings, stats.forest)`
+   once over the rounded grids of `loops`. All windings are `1`, because
+   every `CadLoop` is counter-clockwise: `buildProfileLoops` emits only
+   `counterClockwise(...)` (`loops.ts:447-449`, `:648`), and PCB outlines
+   come through it too (`pcb-outline.ts:179`).
+   - The nearest selected ancestor is `parents[i]`, and its depth is
+     `loops[parents[i]].depth`, or -1 when there is none.
+   - Keep a loop when its depth is 0, or when
+     `(depth - ancestorDepth) % 2 === 1`. The filter and the result order
+     are unchanged.
+   - The selected contours come from a validated profile on identical
+     integers (R10-4) and do not touch. The parent from the minimum
+     vertex therefore equals the parent from the first vertex.
+4. `CaptureWalkStats` gains an optional
+   `ancestry?: { ancestorProbes; indexEntries?; edges?; depthLookups?;
+   forestFallbacks?; forest? }`, and `buildCadCaptureModel` passes it to
+   `normaliseToolLoops`. The call order of normalization and `chargeTool`
+   (`:435-438`) stays as it is. Normalization is now near-linear, and its
+   loops determine the bounds and the charge.
+5. Unchanged: the serialized scene bytes, retained loops, contour order
+   and the original sketch depths.
+
+Tests (`packages/core/src/capture/scene.test.ts`). Both shapes run as
+real CAD documents through the production path (step-3 review
+r12-ancestry-full-scene-oracle):
+
+- Document fixtures (all within the 20,000-record page limit):
+  - Deep. One XY sketch with D nested axis-aligned squares of `cad.line`
+    entities and S unit-square islands in a grid inside the innermost
+    square, with D even. One `new` extrusion of 5 mm selects only the
+    islands' member IDs through `loops`, so every selected loop has
+    sketch depth D and its D ancestors are omitted. Sizes: D = S = 256,
+    512 and 1024 (at most 8,194 records). Every size takes the forest
+    path, because D x S depth lookups exceed the budget 32 x 4S whenever
+    D > 128.
+  - Deep variant. The same document at D = S = 256, with the outermost
+    square's members also selected. Only the outermost square is
+    retained, because the islands are an even distance below it.
+  - Shallow. One XY sketch with N disjoint slanted quadrilateral rims,
+    each wide enough to be an oversized index entry, and one square hole
+    inside each rim. One `new` extrusion selects every loop. Sizes:
+    N = 1024 and 2048 (at most 16,386 records). Both take the forest
+    path, because about N^2 / 2 probes exceed the budget 32 x 8N
+    whenever N > 512.
+- Work through production construction. For each size, call
+  `buildCadCaptureModel(elements, page, { stats })` with
+  `stats.ancestry` set. Total work is `depthLookups + ancestorProbes +
+  indexEntries + edge work + forest.events + forest.steps`, which
+  includes the abandoned first-path work. Each doubling at most 2.5x
+  (deep: 256 to 512 to 1024; shallow: 1024 to 2048). Before the fix the
+  deep total grows about 4x per doubling and the shallow probes grow
+  about 4x.
+- Helper doubling. `normaliseToolLoops` on the shallow raw loops at N =
+  1024, 2048 and 4096 also stays within 2.5x per doubling, because 4096
+  rims exceed the page limit as a document.
+- Full-scene oracle. For each deep size, the deep variant and both
+  shallow sizes:
+  - Run `prepareCadCapture` with a fixed request (top view, 256 x 256,
+    no interference) and keep its `scene` bytes and `model`.
+  - Independently derive the retained contours. Call `buildLoops` on the
+    sketch entities with the extrusion's `loops` selection, then the test
+    file's existing brute-force `oracleNormalise`.
+  - Build the expected model as the actual `model`, with the same bodies,
+    feature and source IDs, bounds, camera and request metadata, but each
+    prism tool's `loops` rebuilt in the test from the oracle contours in
+    order: points copied into a `Float64Array`, and face IDs assigned
+    `2 + n` in first-appearance order of the source IDs. This
+    re-implements `makeTool` independently.
+  - Assert that `writeCaptureScene(expected, options)`
+    (`scene-binary.ts:244`) equals the prepared `scene` bytes byte for
+    byte. `options` is rebuilt exactly as `prepareCadCapture` builds it
+    (`cad-request.ts:190-198`): `width: request.width`,
+    `height: request.height`, the literal `supersample: 2` (the
+    production constant; `CadCaptureRequest`, `cad-request.ts:47-56`,
+    has no supersample field), the returned `camera`,
+    `colours: CAPTURE_THEMES[request.theme]`, `referenceOpacity: 0.45`
+    and `interference: null`. The request API is unchanged.
+  - Also assert that each body's bounds equal the bounds the test
+    computes from the oracle contours: XY min and max of the points, and
+    Z from 0 to 5 mm. A change in retained contours or their order
+    therefore changes the expected bytes.
+  - The existing `indexedSceneBytes` helper stays for the raw-loop
+    checks only.
+- Ordinary baseline: `buildCadCaptureModel` on
+  `generateCadDocument({ features: 500, entitiesPerSketch: 18 })` with
+  `stats.ancestry`. Assert `forestFallbacks === 0`, and `ancestorProbes`
+  and `indexEntries` equal to the pre-change measured values (the audit
+  measured 5,000 and 5,500). The plan records `depthLookups`.
+- The existing ancestry, grid, slotted and ray-origin tests, including
+  their exact `ancestorProbes` counts, stay unedited and pass. If one
+  crosses the budget, the plan reports it and does not raise the
+  constant past a linear bound.
+
+R12-4 `performance-cad-side-face-member-rescans` (medium).
+
+Cause. `createCadGeometry().sketch` (`history.ts:470-474`) runs
+`tool.loops.some(loop => loop.members.includes(line.id))` for every
+side-face sketch.
+
+Rule.
+
+1. The cap-face path and the base-plane path are unchanged and allocate
+   nothing. A tool that is never queried for a side allocates nothing.
+2. Each `createCadGeometry` instance keeps a lazily created
+   `Map<ExtrudeGeometry, SideMembers>`. It creates an entry on a tool's
+   first side query, as `{ budget: 4 * memberTotal, scanned: 0,
+   members?: Set<ElementId> }`, where `memberTotal` sums
+   `loop.members.length` over `tool.loops`.
+3. Without `members`, a query scans as today, counting each comparison in
+   `scanned` and in `cadGeometryWork.sideMemberVisits`. Once `scanned`
+   reaches `budget`, the next query builds `members` from `tool.loops`
+   once. That costs `memberTotal` visits and increments
+   `cadGeometryWork.sideMemberIndexBuilds`. After that each query is one
+   `has`, counted as one visit.
+4. Because only the extrusion's selected loops are in `tool.loops`, lines
+   that belong only to omitted loops are still rejected with
+   `cad.reference.missing`. Per tool, total work is at most
+   `7 * memberTotal + queries`: scans up to `budget + memberTotal`, one
+   build, and the loop-count sum.
+
+Tests (`packages/core/src/cad/history.test.ts`; counters reset before
+each measurement):
+
+- Three cases, each at M = S = 256, 512 and 1024:
+  - Repeated: S sketches on the side of the last member of a closed
+    M-line profile.
+  - Distinct: S = M sketches, one per side.
+  - Omitted: a profile with a 4-line rectangle and a disjoint M-line
+    loop. The extrusion selects only the rectangle, and S sketches
+    reference lines of the omitted loop.
+- Each doubling at most 2.5x `sideMemberVisits`. Before the fix the
+  repeated case grows about 4x.
+- Frames for repeated and distinct sides equal the `faceFrame(...)`
+  expectation for each line, and every omitted case returns
+  `cad.reference.missing` with that line's ID.
+- Ordinary baseline: checking
+  `generateCadDocument({ features: 500, entitiesPerSketch: 18 })` gives
+  `sideMemberIndexBuilds === 0`. The plan records `sideMemberVisits` and
+  the largest per-tool ratio of `scanned` to `memberTotal`, which is the
+  measured threshold margin.
+
+R12-5 `performance-cad-inspector-target-membership` (medium).
+
+Rule.
+
+1. `packages/ui-solid/src/cad/extrude-targets.ts` adds:
+   - `selectTargets(value: unknown): { ids: readonly ElementId[]; has(id): boolean }`.
+     It validates the stored `bodies` the way `CadSection.tsx:83-88`
+     does and builds one `Set`.
+   - `orderExtrudeTargets(listed, stored)`, which makes the same two
+     passes as `displayedExtrudeTargets` but tests membership with sets.
+     Duplicates and missing stored IDs keep their order.
+   - `displayedExtrudeTargets` keeps its signature and delegates, so
+     `extrude-authoring.ts` is unchanged.
+   - The exported counter `targetSelectionWork = { builds, visits, queries }`.
+2. `CadSection.tsx`:
+   - `selection = createMemo(() => selectTargets(semantic().bodies))`,
+     with `targets = () => selection().ids`.
+   - `listedIds = createMemo(() => earlierBodies().map(b => b.id))`.
+   - `orderedTargets` becomes a memo over
+     `orderExtrudeTargets(listedIds(), targets())`, keeping the
+     `cad.extrude` and `new` guard.
+   - Rows use `selection().has(body.id)` for `checked` and for the click
+     guard.
+   - Display order, the add-operation single target and every edit
+     command are unchanged.
+
+Tests:
+
+- `extrude-targets.test.ts`: the exact existing order assertions stay.
+  New assertions:
+  - At N = 500 and 1000 selected bodies, one `selectTargets` call builds
+    once, makes N visits, and answers N `has` queries with N queries.
+  - `orderExtrudeTargets` visits equal `listed + stored`, so the work
+    exactly doubles at 2N.
+  - The exact order for selected, unselected and missing IDs.
+- `test-dom/cad-inspector.dom.tsx`. It is launched by the existing test
+  "CAD layers and inspector share selection, edits and statuses in light
+  and dark" in `packages/ui-solid/src/inspector/cad-edits.test.ts:132-147`
+  (browser conditions, `test-dom/setup.ts` preload, and output that must
+  contain `ok light` and `ok dark`). `cad/viewport.test.tsx` does not run
+  this file (step-3 review r12-inspector-regression-gate).
+  - Render a mounted cut that targets N = 16 earlier bodies, and a second
+    one that targets 2N = 32. For each, reset `targetSelectionWork` and
+    uncheck one body through the real checkbox.
+  - Assert, per size, that `builds === 1` for that one selection change
+    and `queries > 0`. Across sizes, assert
+    `queries(2N) === 2 * queries(N)`.
+  - Assert the stored `bodies` order after the change, and that the
+    single-target `add` behaviour is unchanged (checking another body
+    replaces the target).
+  - Before the fix there is no `selectTargets`, so the test fails.
+
+R12-6 `maintainability-capture-touching-shell-mesh-eligibility` (high).
+
+Cause. Welding (`canonical.ts:101`) makes two closed shells that touch
+share vertices. An edge contact gives an edge used by four triangles. A
+face contact also gives rim edges with four uses and, when both shells
+triangulate the shared face alike, one opposite-oriented duplicate vertex
+triple per shared triangle. The TypeScript `eligible`
+(`capture-decoder.ts:37-122`), the Rust `closed_by` (`mesh.rs:56-66`) and
+`target_eligible` (`nmesh.rs:229-288`) reject these meshes, but Manifold
+pairs the halfedges and accepts them.
+
+Rule. Balanced halfedge pairing (Manifold's condition) is necessary but
+not enough. Two welded boxes [0,10]x[0,10]x[0,5] and [0,6]x[0,6]x[0,5]
+share one balanced four-use edge and overlap by 180 mm^3. Ray parity then
+cancels the shared volume, giving depths 0, 0, 5, 5 at x=2, y=3 (step-3
+review r12-balanced-edge-overlap-eligibility). The new rule therefore
+admits a welded contact only when it can show that the touching shells'
+interiors are disjoint. Otherwise it keeps today's classification
+(rejected).
+
+- Fast path, unchanged. When no undirected edge has three or more uses,
+  `closed_by`, the TypeScript `eligible` and the Rust `target_eligible`
+  run exactly as today. Edges with one use still fail. That includes
+  today's opposite-direction and duplicate-triple checks in eligibility,
+  and no direction or duplicate check in `closed_by`. Previously eligible and previously closed meshes
+  keep their classification, and the ordinary path allocates nothing new.
+- Contact path. It runs only when some undirected edge has three or more
+  uses, which today always fails. It runs the same steps, in this order,
+  in `closed_by` (the picture closure, and step 1 of Rust eligibility)
+  and in the TypeScript `eligible`. It returns false at the first failed
+  step:
+  - C1 Balance. Every edge's use count is even, and an edge with three
+    or more uses has equal `(u, v)` and `(v, u)` counts. Eligibility, as
+    today, also requires edges with two uses to have opposite directions.
+  - C2 Cancelling patches. This step works on exact integer coordinates.
+    Plane arithmetic uses `BigInt` in TypeScript and `i128` in Rust, and
+    only on this path. Sub-steps:
+    - Integer domain. TypeScript uses the NMESH quantized integers
+      directly. Rust `closed_by` also serves raw NCS1 scene meshes
+      (`scene.rs:117-122`, `:227-255`, via `tool_view.rs:120-127`), whose
+      positions need not lie on the NMESH grid. For every vertex
+      coordinate `v`, it computes `k = round(v * UNITS_PER_MILLIMETRE)`
+      and requires all three of:
+      - `k` is finite;
+      - `|k|` is within the NMESH coordinate limit;
+      - `k as f64 / UNITS_PER_MILLIMETRE` equals `v` bit for bit. This is
+        the decoder's own expression, so decoded NMESH positions always
+        pass.
+
+      If any coordinate fails, the contact path returns false, which is
+      today's result for any edge with three or more uses. So an off-grid
+      raw scene keeps its prior open classification and cannot reach the
+      plane arithmetic (step-3 review r12-contact-grid-domain).
+    - Zero normals. If a triangle's integer normal
+      `n = (b - a) x (c - a)` is the zero vector, the contact path
+      returns false before any gcd is taken. The integer triangle is
+      collinear even if its floating-point normal was not.
+    - Plane key. For each triangle, its integer normal `n` is divided by
+      the gcd of its components.
+      The key is the reduced normal with its first non-zero component
+      made positive, plus the offset `n . a`. The triangle's side is `+1`
+      when the sign was kept and `-1` when it was flipped.
+    - Patches. Within one (plane key, side) group, a patch is a connected
+      component of triangles joined across an edge that exactly two
+      triangles of the group use in opposite directions (union-find).
+      The patch boundary is the multiset of its directed edges that are
+      not cancelled inside the patch.
+    - Matching. Two patches of the same plane key with opposite sides,
+      whose boundaries are exact reverses of each other, form a
+      cancelling pair: the shared face of a face contact, whatever its
+      triangulation on either side. In a plane, a triangle 2-chain is
+      determined by its boundary, so the two patches sum to the zero
+      chain and cancel exactly. Coplanarity is required, because
+      non-coplanar spans of one loop (two halves of a closed shell) do
+      not cancel. Matching uses a sorted canonical boundary key, and
+      each patch matches at most one other, in patch order.
+    - A matched pair is cancelled only when every edge of its boundary
+      has at least four uses in the input, so the shared face lies on
+      contact edges. A matched pair with a boundary edge of two uses (a
+      free double-sided triangle, sheet or fin, with any triangulation)
+      fails.
+    - Attachment. After all cancellations, every boundary edge of every
+      cancelled patch must have exactly two remaining uses, one in each
+      direction. Those are the two surviving shell faces that close the
+      surface across the removed junction, as the rim edges of a face
+      contact do. If any boundary edge has zero (or any other number of)
+      remaining uses, the contact path returns false. So cancellation can
+      never erase whole coincident shells: an outward cube and an
+      identical inside-out cube cancel face by face and leave their edges
+      with no remaining uses. This holds even when an unrelated valid
+      shell survives elsewhere (step-3 review
+      r12-contact-patches-erase-shells).
+    - After cancellation, any vertex triple that still occurs more than
+      once fails (a same-orientation copy or an unmatched duplicate), as
+      today.
+  - C3 Shells. Remove the cancelled patches and recount edge uses. Shells
+    are the connected components of the remaining triangles, joined only
+    across edges that have exactly two remaining uses (union-find over
+    triangle indices). An edge with four or more remaining uses is a
+    contact edge.
+  - C4 Each shell closes on its own. At every contact edge, each shell
+    that uses the edge uses it exactly once in each direction. A shell
+    that uses a contact edge once (an open sheet, such as a shared face
+    left uncancelled) or more than twice (a pinch) fails. Every shell's
+    signed volume (the C6 sum over its triangles, on integers) must be
+    non-zero, and all shells must have the same sign, so a zero-volume
+    or inside-out shell fails.
+  - C5 Disjoint interiors. For every contact edge and every two distinct
+    shells using it, their axis-aligned bounding boxes, taken over the
+    shells' vertex positions, must have disjoint interiors: on at least
+    one axis `maxA <= minB` or `maxB <= minA`. Each shell's solid lies
+    inside its box, so disjoint box interiors prove that the shells share
+    no volume and that parity gives their union. Comparisons use the
+    same exact integers as C2 in both languages, so both decide
+    identically. A safe contact whose
+    boxes overlap (for example, a box nested in an L-shaped notch) keeps
+    today's rejection. This is conservative.
+  - C6 Eligibility only: emptiness (d) runs unchanged on the original
+    triangle list. A cancelled patch pair adds zero net signed volume.
+- Results for the fixtures below:
+  - Edge contact: one contact edge; shells A and B; boxes meet only on
+    the line x = 10, y = 10, so the mesh is accepted.
+  - Face contact with coinciding diagonals: A's and B's shared-face
+    patches have reversed rim boundaries and cancel. The rim edges drop
+    to two uses, and A and B form one closed shell, so the mesh is
+    accepted.
+  - Face contact with crossed diagonals: the same two patches (now with
+    different interior diagonals) have the same reversed rim boundaries
+    and cancel, so the mesh is accepted exactly as above (step-3 review
+    r12-face-contact-triangulation-parity).
+  - Double-sided fin: the fin's two sides match, but three of their
+    boundary edges have two uses, so the mesh is rejected as today.
+  - Welded overlap: C5 fails, because the boxes [0,10]^2 and [0,6]^2
+    overlap in their interiors, so it is rejected as today in both
+    decoders and in Rust closure.
+  - Unbalanced edge: C1 fails. Open triangle: odd use counts fail as
+    today.
+  - Coincident shells: all six face pairs of the two coincident cubes
+    match and cancel, and their boundary edges keep no remaining uses, so
+    the Attachment check fails and the mesh is rejected as today. The
+    disjoint third cube cannot mask this.
+  - Off-grid raw scene (Rust closure only): the grid check fails before
+    any plane arithmetic, so `closed_by` returns false without a panic,
+    as today.
+- Cost. The contact path is O(T log T) for T triangles: one plane key
+  per triangle, two union-finds, sorted boundary keys, and one box and
+  one volume per shell. Its extra allocations happen only on the contact
+  path. The allocation counts asserted in
+  `capture-decoder-budget.test.ts` and `AllocStats` therefore stay the
+  same for every existing fixture.
+- `target_eligible` keeps calling `closed_by` first. `closed_by`
+  already applies C2's duplicate rule on the contact path. On the
+  contact path, `target_eligible` then applies only C1's two-use
+  direction rule in place of today's duplicate rejection, followed by
+  (d).
+- The TypeScript and Rust implementations stay independent and follow
+  the same steps in the same order. `packages/io` imports nothing new.
+  `tool_view.rs:123` and `scene.ts:428` need no change, because they
+  consume these results.
+- A genuinely ineligible target still makes the whole operation fail
+  with `cad.body.missing`.
+
+Fixtures (binary STL bytes built in each test, never copied from
+issues):
+
+- Edge contact: box A at x 0..10, y 0..10, z 0..5 and box B at x 10..20,
+  y 10..20, z 0..5.
+- Face contact: box A as above and box B at x 10..20, y 0..10, z 0..5.
+- In both, each box has 12 outward triangles from one shared corner
+  order, so the shared face's diagonals coincide.
+- Plate: a 10 x 10 mm sketch rectangle at z = 5, extruded 5 mm as a new
+  body.
+- Cut: a 2 x 2 mm rectangle at x 1..3, y 1..3, extruded from z = 0 to
+  10, targeting the mesh and the plate.
+- Controls:
+  - the uncut document;
+  - separated shells: box B moved to x 12..22;
+  - an open triangle: box A plus one extra triangle on an edge of box A;
+  - an unbalanced edge: the edge-contact mesh with the winding of one
+    box-B triangle at the shared edge reversed, so that edge has 4 uses
+    with 3 in one direction;
+  - a welded overlap: outward boxes [0,10]x[0,10]x[0,5] and
+    [0,6]x[0,6]x[0,5], sharing the edge at x = 0, y = 0;
+  - a double-sided fin: the edge-contact mesh plus a fin hanging from the
+    shared edge into the empty quadrant x > 10, y < 10, with corners
+    (10,10,0), (10,10,5), (13,7,5) and (13,7,0). One side is two
+    triangles; the other side is two triangles with the other diagonal
+    and opposite winding. The shared edge then has six balanced uses,
+    and the fin's three free edges have two each;
+  - coincident shells: an outward unit cube at [0,1]^3, an identical cube
+    with every triangle's winding reversed, and a disjoint outward unit
+    cube at x = 2..3. Today's decoder returns false for it, with 36
+    triangles and 18 four-use edges (reviewer probe);
+  - off-grid raw scene (Rust `closed_by` and `is_closed` only, built as a
+    raw `Mesh`, not through NMESH): two closed boxes 0.0004 mm wide
+    sharing a vertical edge. Their triangles round to collinear integer
+    points, for example (0,0,0), (0,0.0004,0), (0.0004,0,0).
+- Crossed-diagonal face contact, an acceptance fixture: the face-contact
+  boxes, with box B's shared face split along the other diagonal and
+  outward winding kept. The reviewer's real-worker probe exported a
+  480 mm^3 plate for both triangulations.
+
+Tests:
+
+- `capture-decoder.test.ts`:
+  - `booleanTarget` is true for edge contact, face contact,
+    crossed-diagonal face contact and the separated control.
+  - It is false for the open-triangle, unbalanced, welded-overlap,
+    double-sided-fin and coincident-shell controls.
+  - Edge, face and crossed-diagonal contact fail before the fix. The
+    false controls are guards that keep today's classification.
+- Rust:
+  - `crates/capture/tests/mesh.rs`: `closed_by` on the same index and
+    position arrays. It is true for edge, face and crossed-diagonal face
+    contact, and false for the open-triangle, unbalanced,
+    welded-overlap, double-sided-fin and coincident-shell controls. The
+    separated control stays true.
+  - Also in `crates/capture/tests/mesh.rs`: `is_closed` on the off-grid
+    raw `Mesh` returns false without a panic, and so does `closed_by`
+    with the same positions.
+  - `nmesh.rs` unit tests: `target_eligible` through the decoder gives
+    the same booleans as TypeScript for all nine NMESH meshes.
+  - `closure_count.rs` stays unedited.
+- Picture agreement: for the welded-overlap and coincident-shell
+  controls, `is_closed` stays false, so the mesh still draws as open and
+  is not checked, as today.
+- `packages/core/src/capture/scene.test.ts`:
+  - For edge, face and crossed-diagonal face contact,
+    `buildCadCaptureModel` reports no `cad.body.missing`. Both the mesh
+    body and the plate body end with a `difference` step, and the
+    `prepareCadCapture` scene bytes differ from the uncut control.
+  - The open-triangle and welded-overlap controls keep
+    `cad.body.missing`, with bytes equal to the uncut control, and the
+    separated control applies the cut. These are guards.
+- `packages/cad-kernel/src/worker-host.test.ts`: the real worker cuts
+  edge, face and crossed-diagonal face contact, and each exported plate
+  is 480 mm^3 within the file's existing volume tolerance. This is a
+  guard; the audit and the step-3 review observed the worker accepting
+  these meshes.
+- Native (R12-7 plan): the edge-contact, face-contact and
+  crossed-diagonal top-view captures exit 0 without `cad.body.missing`,
+  and each PNG differs from its uncut control.
+- Docs: `docs/capture.md` (the closed-mesh paragraph after line 87) and
+  `docs/cad3d.md:39` gain one sentence each: a closed mesh may consist
+  of several closed shells, including shells that touch along an edge or
+  a face when their bounding boxes do not overlap. Other touching shells
+  stay display-only.
+
+R12-7 Native parity for R12-1 and R12-6 (`apps/cli/src/native-parity/capture.test.ts`).
+
+- Contact fixture from the finding:
+  - Mesh: a closed binary-STL box at X -32..32, Y 0..8, Z -4..0, through
+    `stlToInlineMesh`.
+  - Upper body: the rectangle (-32,0)..(32,8) on `xy`, extruded 4 mm as
+    a new body.
+  - Run
+    `capture <doc> --view back|front --size 64x64 --zoom 1.08 --target 0,0,0.25 --fail-on-interference --output <png> --force`.
+  - Expect exit 0, stdout containing `interference: 0`, and PNG bytes
+    equal to the same view captured with `--no-interference` (no
+    hatch).
+  - Overlap control: the sketch at base `xy` offset -0.01 with distance
+    4.01. Expect exit 1 and `interference: 1` in both views.
+  - Before R12-1, the back view exits 1.
+- Touching shells: see R12-6. The test fails before R12-6, because the
+  native decoder used `closed_by`.
+
+### 29.2 Plan grouping
+
+Plans `car12-*` follow the 28.2 rules, with evidence under
+`tmp/car12-r12/<planId>/` and `CARGO_TARGET_DIR=target/car12-<plan>`.
+Every plan sets `artifactRoots ["target", "tmp/cad3d"]` exactly and has
+a non-empty `acceptanceCriteria`. Its `writePaths` include its own plan
+and progress files. This revision already updates sections 19.1, 19.3
+and 29, so no plan edits this document.
+
+| Plan | Rule | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car12-p1-mesh-volume-ownership | R12-1 | `crates/capture/src/mesh.rs`, `crates/capture/src/prism.rs` (visibility only), `crates/capture/src/raster/reference.rs`, `crates/capture/src/raster/tests.rs` | - |
+| car12-p2a-segment-sweep | R12-2 module | new `packages/core/src/cad/segment-sweep.ts`, new `packages/core/src/cad/segment-sweep.test.ts` | - |
+| car12-p2b-profile-sweep | R12-2 integration | `packages/core/src/cad/loops.ts`, `packages/core/src/cad/loops.test.ts` | p2a |
+| car12-p3-selected-ancestry | R12-3 | `packages/core/src/capture/scene.ts`, `packages/core/src/capture/scene.test.ts` | - |
+| car12-p4-side-face-members | R12-4 | `packages/core/src/cad/history.ts`, `packages/core/src/cad/history.test.ts` | - |
+| car12-p5-inspector-targets | R12-5 | `packages/ui-solid/src/cad/extrude-targets.ts`, `packages/ui-solid/src/cad/extrude-targets.test.ts`, `packages/ui-solid/src/inspector/CadSection.tsx`, `packages/ui-solid/src/test-dom/cad-inspector.dom.tsx` | - |
+| car12-p6a-ts-shell-eligibility | R12-6 TS and docs | `packages/io/src/nmesh/capture-decoder.ts`, `packages/io/src/nmesh/capture-decoder.test.ts`, `docs/capture.md`, `docs/cad3d.md` | - |
+| car12-p6b-rust-shell-eligibility | R12-6 Rust | `crates/capture/src/mesh.rs`, `crates/capture/src/nmesh.rs`, `crates/capture/tests/mesh.rs` | p1 |
+| car12-p6c-shell-capture-tests | R12-6 scene and worker | `packages/core/src/capture/scene.test.ts`, `packages/cad-kernel/src/worker-host.test.ts` | p3, p6a |
+| car12-p7-native-parity | R12-7 | `apps/cli/src/native-parity/capture.test.ts` | p1, p2b, p3, p4, p5, p6a, p6b, p6c |
+
+Waves:
+
+- First wave: p1, p2a, p3, p4, p5 and p6a.
+- Second wave: p2b, p6b and p6c.
+- Last: p7.
+
+p7 depends on every plan for two reasons. The release binary bundles the
+TypeScript core, so it must build from a settled tree. And it is the only
+plan that edits `capture.test.ts`.
+
+Gates (each exits 0 and runs the plan's new tests):
+
+- p1 and p6b:
+  `CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-<plan> cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-<plan> cargo test -p nodetto-capture`.
+- p2a: `bunx biome check packages/core/src/cad/segment-sweep.ts packages/core/src/cad/segment-sweep.test.ts && bun test packages/core/src/cad/segment-sweep.test.ts`.
+- p2b: `bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/segment-sweep.test.ts packages/core/src/cad/pcb-outline.test.ts packages/core/src/cad/loop-forest.test.ts`.
+- p3: `bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts packages/core/src/cad/loop-forest.test.ts`.
+- p4: `bunx biome check packages/core/src/cad/history.ts packages/core/src/cad/history.test.ts && bun test packages/core/src/cad/history.test.ts`.
+- p5: `bunx biome check packages/ui-solid/src/cad/extrude-targets.ts packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/inspector/CadSection.tsx packages/ui-solid/src/test-dom/cad-inspector.dom.tsx && bun test packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/inspector/cad-edits.test.ts`.
+  `cad-edits.test.ts` is run but not edited. Its inspector test launches
+  the edited DOM file.
+- p6a: `bunx biome check packages/io/src/nmesh/capture-decoder.ts packages/io/src/nmesh/capture-decoder.test.ts && bun test packages/io/src/nmesh/capture-decoder.test.ts packages/io/src/nmesh/capture-decoder-budget.test.ts`.
+- p6c: `bunx biome check packages/core/src/capture/scene.test.ts packages/cad-kernel/src/worker-host.test.ts && bun test packages/core/src/capture/scene.test.ts packages/cad-kernel/src/worker-host.test.ts`.
+- p7: `bunx biome check apps/cli/src/native-parity/capture.test.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p7 cargo build --release -p nodetto-cli && test -x "$PWD/target/car12-p7/release/nodetto-cli" && NODETTO_CLI_TEST_BINARY="$PWD/target/car12-p7/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`.
+  Without the variable, `native-parity/harness.ts:6-13` selects
+  `test.skip`, so the gate log must list the new R12-7 tests as passed,
+  not skipped.
+
+At most two `bun test` or `cargo test` processes run at once.
+
+Integration runs once after all plans land, in this order and under the
+26.2 timing rule:
+
+1. `bun run typecheck`, `bun run lint`, then `CARGO_TERM_QUIET=true mise
+   run verify`. Goldens are checked and never regenerated.
+2. Run this self-contained command from the repository root, in the same
+   shell or a fresh one (step-3 review r12-final-native-binary-binding):
+   `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p7 cargo build --release -p nodetto-cli && test -x "$PWD/target/car12-p7/release/nodetto-cli" && NODETTO_CLI_TEST_BINARY="$PWD/target/car12-p7/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts`.
+   The build is a no-op if p7's binary is current. The saved log must
+   show the native capture tests (including every R12-7 case) and the
+   native MCP case of `mcp-stdio.test.ts:19-26` as passed, not skipped.
+   A log in which they are skipped does not count as a pass.
+3. Check that no `*.test.ts` remains under `target/` or `tmp/`.
+
+### 29.3 Decisions
+
+- R12-1 changes only the volume path. Shading keeps the top-left rule, so
+  goldens and determinism are untouched. The picture rechecks a mesh only
+  where the two rules disagree, through the existing prism recheck seam.
+- R12-1 uses canonical (vertex-index-ordered) edge evaluation and a
+  symmetric band. Two triangles sharing an edge then see opposite values
+  and one tie decision. Without that, a band could double-count or drop a
+  ray at its edge.
+- R12-2 uses the sweep only to prove disjointness, with a one-sided
+  contract (`provesDisjoint`). When a contact exists, or the input has a
+  collapsed segment, the old enumeration runs and chooses the reported
+  ID, so first-error identity cannot drift. Collapsed segments are handed
+  off instead of being modelled in the sweep, because grid construction
+  keeps them only for repeated vertices, which ordinary disjoint sketches
+  lack. The sweep checks the bounding-box precondition itself before
+  calling `segmentIntersection`. Degenerate cases are guarded by a
+  3,000-case differential test (soundness on every case, completeness
+  without collapse) and by the crowded repeated-vertex profile.
+- R12-2 keeps `SWEEP_PAIRS_PER_BOX`, so ordinary sketches never reach the
+  new code. That is pinned by `segmentFallbacks === 0` and the unchanged
+  `segmentTests` on the 500-feature fixture.
+- R12-3 reuses `loopForest` (R10-3) instead of a new structure, with a
+  linear budget like R10-3's `DEPTH_WORK_PER_VERTEX`. Windings are all
+  positive by the `counterClockwise` invariant, so `loops.ts` is not
+  edited and p3 does not wait for p2b.
+- R12-3 keeps normalization before `chargeTool`. With near-linear work,
+  reordering would change diagnostics for no measurable gain.
+- R12-4 builds a lazy per-tool set behind a `4 * memberTotal` scan budget.
+  It does not reuse the profile member index (`history.ts:526-536`),
+  because that index covers all profile loops, including omitted ones,
+  and would need a selected-loop filter per query. So p4 edits only
+  `history.ts` and is independent of p2b.
+- R12-5 keeps `displayedExtrudeTargets` as a delegating wrapper, so
+  `extrude-authoring.ts` and its tests are unchanged.
+- R12-3's full-scene oracle reuses the real model's bodies and metadata,
+  rebuilds only the tool loops from `oracleNormalise`, and serializes
+  with `writeCaptureScene`. Real documents measure the production
+  builder at sizes within the page limit. The raw helper covers the one
+  shallow size that exceeds it.
+- R12-6 admits a welded contact only on the contact path, C1 to C6:
+  balanced halfedges; cancelling coplanar patch pairs with exactly
+  reversed boundaries, so any triangulation of a shared face cancels;
+  shells that each close with same-sign non-zero volume; and shells
+  whose bounding boxes have disjoint interiors. Patch cancellation is
+  exact because a planar triangle chain is determined by its boundary,
+  and it needs no polygon overlay. It is guarded in two ways. It runs
+  only on coordinates that round-trip losslessly through the NMESH grid,
+  so off-grid raw scenes keep their prior open classification. And
+  every cancelled boundary must stay attached to exactly two surviving
+  opposite uses, so whole coincident shells cannot vanish. Box
+  disjointness is the simplest exact, linear test that rules out shared
+  volume. It is identical on integers in both languages, and it keeps
+  today's rejection for every contact it cannot prove safe, including
+  the reviewer's welded overlap. A full surface-intersection test was
+  rejected as disproportionate.
+- R12-6 leaves the fast path for meshes whose edges all have two uses
+  untouched, in all three implementations. Previously eligible meshes
+  therefore keep their classification and allocation counts.
+- No user decision is pending, so there is no `design-docs/user-qa/`
+  file.
+
+### 29.4 Intentional differences from the workflow input
+
+- The intake's suggested P6b/P6c split is regrouped. Worker and scene
+  tests move to p6c, after p3. Every native parity assertion of R12-1 and
+  R12-6 moves to one final plan, p7, so the release build runs once on a
+  settled tree. p1 is verified by Rust raster tests, and its native
+  assertions land in p7.
+- R12-2 becomes two plans (p2a module, p2b integration), to respect the
+  limits of about four files and about 150 lines per plan.
+- The existing Rust test `cube_surface_casts_are_not_ownership_sensitive`
+  is renamed and its `[0,0]` point asserts the new volume result. The
+  finding requires the volume rule to differ from the facet rule at
+  exactly such ties. The other four points keep their assertions, and the
+  facet output at `[0,0]` is still pinned.
+- In the native contact test, "no hatch" is asserted as PNG equality
+  with the `--no-interference` capture. That is the CLI counterpart of
+  the Rust `draw_interference = false` equality.
+- The 0.01 mm overlap control requires a pair and exit 1, not a visible
+  hatch. A 64 x 64 image need not have a sample row inside a 0.01 mm
+  slab; the lattice analysis reports the pair either way.
+- Per-plan gates leave out `bun run typecheck` and `mise run verify`.
+  Those run once at integration.
+- R12-6 is narrower than "accept whatever Manifold accepts". It admits
+  only contacts it can prove safe (C1 to C6). It keeps today's rejection
+  for the welded overlap, double-sided fins, and touching shells with
+  overlapping boxes. The finding's edge and face fixtures, with either
+  shared-face triangulation, are admitted.
+- p5 runs `inspector/cad-edits.test.ts` without editing it, because that
+  file is the only launcher of `cad-inspector.dom.tsx`.
+
+### 29.5 Risks
+
+- R12-1: a recast at a near-tie charges `recast` and `traverse` budget.
+  Axis-aligned mesh fixtures whose pixel centres fall exactly on rim
+  edges may change exact census counts in a test. The plan reports any
+  such change and the tie that caused it; it never relaxes a bound.
+- R12-1: the band is a bound, not a proof, for oblique and curved
+  contacts. Only axis-aligned contacts and the oblique watertightness
+  guard are tested.
+- R12-2: a Shamos-Hoey degeneracy bug in the dangerous direction (missing
+  a contact) would accept an invalid sketch. Guards: the one-sided
+  contract, the collapsed-segment handoff, the box precondition, and the
+  differential test on a small grid that is dense in degeneracies. The
+  plan must report all four case counts as non-zero.
+- R12-2: a crowded sketch that does contain a contact or a repeated
+  vertex still pays the old quadratic enumeration on its error path. The
+  finding's input is valid, and such a sketch is rejected either way.
+- R12-3: if an existing fixture crosses the 32-per-vertex budget, its
+  exact `ancestorProbes` assertion could change. The plan records each
+  fixture's work.
+- R12-6: the box test is conservative. Touching shells with overlapping
+  bounding boxes but disjoint solids (an L-shape with a box in its
+  notch), and partial face contacts whose two shared-face patches have
+  different boundaries, stay display-only in capture, while the desktop
+  worker may accept them. That is today's behaviour, and capture still
+  reports it with `cad.body.missing`.
+- R12-6: the contact path adds about 100 to 150 lines per language,
+  including exact plane keys (`BigInt`, `i128`). p6a and p6b are at the
+  upper plan-size limit. If either exceeds it, the plan may split the
+  helper and its tests into a chained follow-up plan that owns the same
+  files, recorded before dispatch.
+- R12-6: Manifold's handling of the welded-overlap control was not
+  measured. Capture keeps today's rejection for it.
+- R12-6: shells that overlap without sharing any edge were already
+  eligible, and still are. Only the edge-contact and face-contact
+  fixtures, including the crossed-diagonal variant, are claimed (19.3).
+- Not measured: Boa elapsed time, desktop frame time, native peak memory,
+  Tauri IPC, MCP delivery and desktop WebGL.
+
+## 30. Revision 19: audit round 13 corrections
+
+Source: audit round 13 of the 3D CAD pages and AI capture, base `0a35708`
+to `25b4e97` plus the uncommitted round-12 tree (28 modified tracked
+files, 11 untracked). Four findings (three high, one medium), none
+deferred. No GitHub issue exists; the round-13 workflow input is the issue
+body. Where an earlier section and this one disagree, this section wins.
+The common rules of section 24, the timing rule of 26.2, the plan rules of
+28.2 and the ordinary-input rule of section 29 still apply. Each fix needs
+a regression test that fails before the change and passes after it in
+this tree. Performance is asserted with deterministic work counters, never
+clocks. Bytes, goldens, error codes, NCS1 layout, report formats and the
+CLI, MCP and desktop contracts stay unchanged unless a rule below says
+otherwise.
+
+Round-12 status carried in: car12-p1 to p6a and p6c are implemented.
+car12-p6b (Rust welded-shell closure) is in progress: it added the
+failing regression `welded_edge_contact_is_closed`
+(`crates/capture/tests/mesh.rs`) but no implementation. car12-p7 (native
+parity) never started. R13-4 finishes R12-6 in Rust, and R13-5 replaces
+car12-p7. The rules of R12-6 (C1 to C6) and R12-7 stay valid; this
+section only adds what the audit found missing.
+
+### 30.1 Rules
+
+R13-1 `function-capture-mesh-prism-touching-face` (high).
+
+Cause. R12-1 aligned mesh and prism ownership only at an exact tie. A
+prism cap admits a ray within a band that scales with extrusion height
+(`prism.rs:211-240`); a closed mesh admits a ray within a band that
+scales with its projected edge (`mesh.rs:309-344`). For a tall extrusion
+seated on a short STL box the two bands differ by about two orders of
+magnitude. At the fitted front or back view (3.24 mm/px, 64 x 64, 2x
+supersampling) a sample row lands at Z = -7.1e-15 mm: outside the mesh
+band, inside the prism band, so both bodies own an 8 mm depth interval.
+The 3D candidate test (`interference.rs:131`) correctly rejects the
+zero-thickness joint, but the picture witness (`raster.rs:299-318`)
+records the pair, the hatch is drawn and `marks.picture_only` adds it to
+the report (`interference.rs:585-597`). `--fail-on-interference` then
+exits 1.
+
+Rule.
+
+1. Conservative body boxes. A body's box is the union of the bounds of
+   the tools of its `Op::Union` steps, exactly as
+   `interference.rs:325-339` computes the candidate boxes today. That
+   code moves unchanged into `lattice::body_boxes(scene, tools) ->
+   Vec<Bounds>`, and `interference.rs` calls it. Difference and
+   intersection steps only remove volume, so the box contains the body.
+   A body without a valid union tool gets the empty box.
+2. Shared extent. `lattice::shares_extent(a, b) -> bool` is true when,
+   on every axis, `min(maxA, maxB) - max(minA, minB) > 0.0`. The empty
+   box shares extent with nothing. The threshold is exactly zero, not
+   `scene.tolerance`: only pairs proven to have no common open interval
+   on some world axis are dropped.
+3. Witness filter. The production raster computes `body_boxes` once per
+   render (stored next to `solid_tools`). In the sample loop, after
+   `overlay::overlapping_pairs_iter` fills `scratch.overlaps`, a pair
+   `(a, b, s0, s1)` whose boxes do not share extent is skipped before
+   `marks.record` and before `marked` is set. The sample is not hatched
+   and the pair never reaches `picture_only` or the report. The reference
+   renderer (`raster/reference.rs:124-140`) applies the same filter at
+   the same point, so the production-versus-reference comparisons stay
+   exact.
+4. Unchanged: facet shading, volume intervals, the lattice analysis and
+   its candidate test, witness budgets and charges for kept pairs, the
+   report types, the CLI, Tauri and MCP. Pairs whose boxes share any
+   positive extent keep today's picture-only witness, including thin
+   penetrations.
+5. Why it is safe. Two bodies whose boxes share no positive extent on
+   one axis cannot share volume, because each body lies inside its box.
+   A dropped pair can only be a band artefact. Box rounding can hide at
+   most a rounding-sized true overlap, far below the 0.001 mm
+   interference tolerance (`docs/capture.md:105`).
+
+Tests (each new test fails before the fix unless marked as a guard):
+
+- `raster/reference.rs` fixture `tall_mesh_under_prism(back: bool,
+  overlap: f64)`:
+  - Tool 0: a closed 12-triangle outward mesh box at X -1..1, Y 0..8,
+    Z -35.25..0. These are the positions the STL import produces for the
+    finding's box (all values lie on the NMESH grid). Rust has no STL
+    reader, so the end-to-end STL path is covered by R13-5.
+  - Tool 1: a prism of the rectangle (-1,0)..(1,8) from
+    Z = 0 - overlap to 156.75, so the top stays fixed.
+  - Two `new` bodies, width and height 64, supersample 2.
+  - Camera: the default-fit camera that `prepareCadCapture` returns for
+    the finding's document in the front view and in the back view. The
+    plan gets the exact f64 values from a one-off probe under its
+    evidence directory (never a `*.test.ts` file) and copies them as
+    literals with a comment naming the probe log.
+- `raster/tests.rs`:
+  - `production_touching_tall_mesh`: `production_touching` on
+    `tall_mesh_under_prism(false, 0.0)` and `(true, 0.0)`. That means zero
+    pairs, zero candidates, identical RGB at threads 0..=8 and against the
+    reference, and RGB equal to the `draw_interference = false` render.
+    The plan records the fail-before log. If neither view fails before
+    the fix with the probed camera, the fixture is wrong and the plan
+    fixes the camera, not the assertion.
+  - `production_tall_mesh_penetration`: `tall_mesh_under_prism(back,
+    0.01)` for both views, through `compare_every_thread_count`, gives
+    exactly one pair `(0, 1)`. No RGB-difference assertion: at 3.24 mm/px
+    no sample row need fall inside a 0.01 mm slab. This is a guard.
+  - `shares_extent` unit cases: touching boxes on each axis (false),
+    0.01 mm overlap (true), an empty box (false).
+- `raster/reference.rs` `witness_tests`: `touching` on both tall views.
+- Every existing raster, interference, witness, golden and determinism
+  test stays unedited and passes, including `production_touching_*`,
+  `production_overlap_witness` and
+  `stacked_caps_witness_charge_is_the_delta`. If a census or charge count
+  moves, the plan reports both values and the dropped pair that caused
+  it; it never relaxes a bound.
+- Native: see R13-5.
+
+R13-2 `performance-cad-side-face-member-rescans` (high).
+
+Cause. R12-4 keys the side scan budget and the lazy member set by the
+`ExtrudeGeometry` object (`history.ts:482-513`). `extrude()` returns a
+fresh object per extrusion (`history.ts:607`), even when its `loops` is
+the shared whole-profile array (`history.ts:579`). K whole-sketch
+extrusions of one M-member profile, each queried once for a late member,
+cost M x K comparisons, and repeated queries build K copies of the same
+member set.
+
+Rule. Side queries resolve membership from the profile member index that
+`extrude()` already builds once per sketch (`history.ts:565-575`,
+`memberIndices`). No new work is added to ordinary documents.
+
+1. The cap-face and base-plane paths are unchanged and allocate nothing.
+2. Source lookup. For a side query on `feature`, let
+   `source = history.byId.get(feature)`. When `source` is a
+   `cad.extrude`, its `semantic.sketch` has a non-error entry in
+   `profiles`, and `memberIndices` holds that sketch's index, the query
+   uses rule 3 or 4. Otherwise (a `cad.pcb` tool, or a tool registered
+   under an ID that is not in history, as some unit tests do) the R12-4
+   budgeted path runs unchanged.
+3. Whole profile: `tool.loops === profile.loops`. The answer is
+   `index.has(line.id)`, counted as one `sideMemberVisits`. Nothing is
+   allocated.
+4. Explicit selection: `tool.loops !== profile.loops`. On the tool's
+   first side query, build `Set<CadLoop>` from `tool.loops` once, kept in
+   a lazily created `Map<ExtrudeGeometry, Set<CadLoop>>`. That costs
+   `tool.loops.length` visits and adds the same number to the new counter
+   `cadGeometryWork.sideSelectionEntries`. A query then reads
+   `indices = index.get(line.id) ?? []` (one visit) and checks
+   `selected.has(profile.loops[i])` for each index (one visit each). The
+   selected loops are the same `CadLoop` objects as the profile's
+   (`history.ts:584-589`), so identity is exact. A line that belongs only
+   to an omitted loop finds no selected loop and returns
+   `cad.reference.missing`, as today.
+5. Bounds. A line borders at most two profile loops, so a query costs at
+   most three visits. Per explicit tool the set costs at most the number
+   of selected loops, which is at most twice the distinct IDs in its own
+   `semantic.loops`. Total work is therefore at most `3 * queries` plus
+   the selection input size, never M x K. Whole-profile tools retain no
+   set.
+6. `sideMemberIndexBuilds` keeps counting R12-4 member-set builds only.
+   The frame for a hit is `faceFrame(tool.frame, tool.span, role, line)`
+   as today.
+7. This reverses the round-12 decision not to reuse the member index
+   (29.3): the selected-loop set answers the omitted-loop objection with
+   linear work.
+
+Tests (`packages/core/src/cad/history.test.ts`; counters reset before
+each measurement):
+
+- Shared whole profile, through `checkCadPage` on real documents: one
+  closed M-line profile, K whole-sketch `new` extrusions of distinct
+  distances, and one side sketch per extrusion on the profile's last
+  member. Sizes M = K = 256, 512 and 1024 (at most 3,073 records).
+  Assert no errors, `sideMemberVisits === K`, `sideMemberIndexBuilds ===
+  0` and `sideSelectionEntries === 0`. Before the fix visits are M x K.
+- Shared explicit selection, through `checkCadPage`: a 4-line rectangle
+  and a disjoint M-line loop in one sketch, K extrusions that each select
+  the M-line loop by one member ID, and per extrusion four side sketches
+  on M-loop members plus one on a rectangle line. Same sizes with
+  K = M / 4. Assert exactly K `cad.reference.missing` errors, each with
+  the rectangle line's ID, `sideSelectionEntries === K`,
+  `sideMemberIndexBuilds === 0` and `sideMemberVisits <= K * (1 + 3 * 5)`.
+- Frames: for the smallest size of each workload, drive
+  `createCadGeometry(scanCadPage(elements))` with the extrusions
+  registered under their real feature IDs, and assert each hit equals
+  the `faceFrame(...)` expectation for its line.
+- Ordinary baseline: the existing test on
+  `generateCadDocument({ features: 500, entitiesPerSketch: 18 })` also
+  asserts `sideSelectionEntries === 0`; `sideMemberVisits` and
+  `sideMemberIndexBuilds` stay 0. That document has one extrusion per
+  sketch and no side sketches (`cad/testing/generate.ts:100-113`), and
+  its `profileBuilds` and `loopProbes` stay as measured before the
+  change (the plan records both).
+- The existing side-member tests (`history.test.ts:582-713`) stay
+  unedited and pass. They register tools under IDs absent from history,
+  so they keep exercising the R12-4 path and its exact counts.
+
+R13-3 `performance-capture-shared-profile-ancestry-rebuilds` (medium).
+
+Cause. `buildCadCaptureModel` calls `normaliseToolLoops(geometry.loops,
+stats?.ancestry)` for every tool (`scene.ts:494`). K whole-sketch
+extrusions share one loop array (`history.ts:579`), but each call
+rebuilds the indexes and restarts the 32-per-vertex budget, so ancestry
+work is K times one normalization.
+
+Rule. The cache is threshold-gated, so ordinary single-use profiles and
+explicit subsets take the direct path and pay no cache work (step-3
+review r13-ancestry-cache-ordinary-work). Only `scene.ts` changes; no
+caller or shared file is edited.
+
+1. Direct path. Every tool whose feature is not a whole-sketch extrusion
+   (a `cad.pcb` tool, or a `cad.extrude` with `semantic.loops` defined)
+   calls `normaliseToolLoops` exactly as today, with no lookup and no
+   insertion. Such arrays are fresh per extrusion and can never hit.
+2. Work report (step-3 review r13-ancestry-cache-admission-undercount).
+   `normaliseToolLoops` gains an optional third parameter
+   `work?: { prepared: number; searched: number }`. When it is given,
+   the function stores two separate measures. Neither changes the R12-3
+   fallback budget, which still compares only the local `work` counter
+   that starts at `scene.ts:243`.
+   - `prepared` is the number of coordinates it rounded to the grid and
+     scanned for bounds before that counter starts (`scene.ts:220-226`),
+     that is the sum of `loop.points.length` over the input loops. It is
+     0 for the all-depth-zero early return (`scene.ts:218`), which
+     prepares nothing.
+   - `searched` is the local `work` total at return. After a forest
+     fallback it is the abandoned first-path total, which already exceeds
+     the 32-per-vertex budget.
+   Its result and its `stats` behaviour are unchanged.
+   `buildCadCaptureModel` allocates one such object per walk and reuses
+   it.
+3. Admission. The admission cost of a normalization is
+   `prepared + searched`. For a whole-sketch extrusion (`cad.extrude`,
+   `semantic.loops === undefined`):
+   - If the walk's cache exists, look up `geometry.loops` by identity.
+     A hit reuses the stored loops and skips normalization, including
+     preparation.
+   - Otherwise normalize. Store the result under `geometry.loops` only
+     when its admission cost is at least `PROFILE_CACHE_MIN_WORK = 4096`.
+     The `Map<readonly CadLoop[], readonly CadLoop[]>` is created lazily
+     at the first admission and is local to the walk, so nothing is
+     shared between captures.
+   - Calibration. On the ordinary fixture each sketch is an 8-line
+     outline with 10 radius-1 circles (`cad/testing/generate.ts:54-99`).
+     That is about 328 vertices (656 prepared coordinates; the reviewer's
+     sparse probe implies 32 vertices per radius-1 circle), plus at most
+     119 searched units as measured by the reviewer. The estimated cost
+     of at most about 775 is below `4096 / 4`. The reviewer's sparse
+     high-vertex profile costs 32,840 + 238 = 33,078, and one slanted-rim
+     tool at N = 1024 costs over 500,000. Both are admitted.
+   - The ordinary path therefore creates no map, makes no lookup and
+     stores nothing. A sub-threshold whole profile shared by K
+     extrusions costs below 4,096 units per tool, about 2,048 prepared
+     coordinates at most. The remaining repeated work is therefore at
+     most 4,096 units per tool, and those points are already charged
+     against the point limit.
+4. The key is array identity only. The rule depends only on the
+   whole-profile reuse already present at `history.ts:579`, not on any
+   R13-2 change (R13-2 does not alter that array or its identity).
+5. Per tool, unchanged: `chargeTool` with the normalized loop counts (so
+   each tool is charged its own points), `makeTool`, `sweptBounds` with
+   the tool's own frame and span, face IDs and the body or step it
+   creates. Cached loops are typed `readonly` and are never mutated.
+6. Counters. `CaptureWalkStats` gains an optional
+   `profileCache?: { lookups: number; admitted: number; hits: number;
+   prepared: number; maxDirectWork: number }`. They are updated only
+   when `stats.profileCache` is set:
+   - `lookups` counts map lookups;
+   - `admitted` counts stored entries;
+   - `hits` counts reused results;
+   - `prepared` sums the `prepared` coordinates of every normalization
+     actually performed, for every tool kind;
+   - `maxDirectWork` is the largest admission cost of a whole-sketch
+     normalization that was not admitted (the threshold margin).
+
+Tests (`packages/core/src/capture/scene.test.ts`):
+
+- Shared fixture: the R12-3 shallow sketch at N = 1024 (slanted rims
+  with one hole each) with K = 32 `new` extrusions of distinct distances,
+  each selecting the whole sketch (no `loops`): at most 8,225 records and
+  262,144 emitted points. Run `buildCadCaptureModel` with
+  `stats.ancestry` and `stats.profileCache` on it and on the same sketch
+  with K = 1. Assert that the total ancestry work (`depthLookups +
+  ancestorProbes + indexEntries + edge work + forest.events +
+  forest.steps`), `forestFallbacks` and `profileCache.prepared` are
+  equal for K = 32 and K = 1, and that K = 32 gives `admitted === 1`,
+  `lookups === 31` and `hits === 31`. Before the fix the ancestry work is
+  32 times larger.
+- Sparse high-vertex fixture (the reviewer's probe): one XY sketch with
+  a 10 x 10 mm rectangle at the origin, a radius-1 circle hole at (5, 5)
+  and 64 disjoint radius-100 circles on an 8 x 8 grid starting at
+  (300, 300) with 300 mm spacing; K = 1 and K = 32 whole-sketch `new`
+  extrusions with distances 1..K (at most 102 records). Assert no
+  errors, no point-limit failure and zero `forestFallbacks`. Assert that
+  ancestry work and `profileCache.prepared` are equal for K = 32 and
+  K = 1, with `prepared` equal to the measured K = 1 value (the
+  reviewer measured 32,840 coordinates), and that K = 32 gives
+  `admitted === 1`, `lookups === 31` and `hits === 31`. A rule that
+  admits on the searched units alone (238 here) fails this test.
+- Scene oracle for the sparse fixture: the K = 32 scene bytes equal the
+  oracle built as for the slanted-rim fixture.
+- Scene oracle: for the K = 32 fixture, compare the prepared scene bytes
+  with the R12-3 full-scene oracle (each tool's loops rebuilt from
+  `oracleNormalise`, serialized with `writeCaptureScene`), and assert
+  each body's bounds from its own distance.
+- Explicit subsets: the same N = 1024 sketch with two extrusions that
+  select different heavy subsets through `loops`. Each keeps its own
+  retained contours (bytes equal the oracle), the ancestry work equals
+  the sum of the two separate single-extrusion runs, and
+  `profileCache` reports `lookups === 0`, `admitted === 0` and
+  `hits === 0`.
+- Ordinary guard: `buildCadCaptureModel` on
+  `generateCadDocument({ features: 500, entitiesPerSketch: 18 })` with
+  `stats.ancestry` and `stats.profileCache`. Assert `lookups === 0`,
+  `admitted === 0` and `hits === 0`, the unchanged 5,000
+  `ancestorProbes`, 5,500 `indexEntries` and 0 `forestFallbacks`, and
+  `maxDirectWork * 4 <= PROFILE_CACHE_MIN_WORK`. The plan records
+  `maxDirectWork` and `prepared`. The calibration above predicts at
+  most about 775. If the measured value breaks the 4x margin, the plan
+  sets the constant to the smallest power of two that is at least four
+  times the measured value, provided it stays at most 32,768, so the
+  sparse fixture (33,078) is still admitted. It records the change and
+  never weakens an assertion. A measured value above 8,192 cannot meet
+  both conditions, and the plan reports it as a design defect.
+- The deep omitted-ancestor and shallow R12-3 tests, the existing
+  ordinary baseline at `scene.test.ts:1727-1737` and the touching-shell
+  scene tests stay unedited and pass.
+
+R13-4 `maintainability-capture-touching-shell-mesh-eligibility` (high).
+
+Cause. R12-6 landed in TypeScript only. Rust `closed_by` still rejects
+any third use of an undirected edge (`mesh.rs:56-66`), and
+`target_eligible` still requires every sorted edge pair to match with
+opposite directions and every vertex triple to be unique
+(`nmesh.rs:257-268`). The native decoder therefore reports the welded
+mesh as not a boolean target, scene preparation marks it display-only and
+`construction.ts:115-120` skips the whole cut (`cad.body.missing`). On
+desktop, `tool_view.rs:123` classifies the mesh as open and the raster
+takes the open-surface path. The `nmesh.rs:532` unit test compares
+`is_closed` with the `closed_by` it calls, so it cannot catch this.
+
+Rule. Implement R12-6 C1 to C6 in Rust exactly as specified there, with
+these placement and wiring decisions:
+
+1. New module `crates/capture/src/mesh_contact.rs` with
+   `pub(crate) fn contact_closed(vertex_count, triangles, position) ->
+   bool`. It runs the grid domain check, then C1 to C5, and returns false
+   at the first failed step. It allocates only when called.
+   - Staging (step-3 review r13-contact-module-independent-gate). In
+     p4a, `lib.rs` declares the module as `#[cfg(test)] mod
+     mesh_contact;`. Only the test build compiles it, where its unit
+     tests are the callers. The non-test library has no unused item, so
+     `cargo clippy --all-targets -- -D warnings` passes on its own.
+   - In p4b, the same change that makes `closed_by` call
+     `contact_closed` turns the declaration into `mod mesh_contact;`.
+     The production registration and its first production caller
+     therefore land together.
+   - Grid domain (R12-6 C2): for every vertex coordinate `v` from
+     `position`, `k = (v * UNITS_PER_MILLIMETRE).round()`; require `k`
+     finite, `|k| <= COORDINATE_LIMIT` and `(k as i64) as f64 /
+     UNITS_PER_MILLIMETRE == v` bit for bit. Those two constants in
+     `nmesh.rs` become `pub(crate)`; no value changes.
+   - Exact arithmetic: integer vertices as `i64`; normals, plane
+     offsets, gcd, box comparisons and shell volumes in `i128` with
+     `checked_*` operations. Any overflow returns false. A zero integer
+     normal returns false before any gcd.
+2. `closed_by` (`mesh.rs`) keeps its signature, its
+   `CLOSURE_EVALUATIONS` increment and its fast path. When the sorted
+   undirected edges contain a group of three or more uses, it returns
+   `mesh_contact::contact_closed(...)` instead of false; C1 rejects any
+   odd count. Meshes whose edges all have two uses never reach the new
+   module, so their result and allocations are unchanged. `is_closed`
+   gains the contact path through `closed_by`.
+3. `target_eligible` (`nmesh.rs`) keeps calling `closed_by` first and
+   then groups its sorted directed edges by undirected edge:
+   - a group of two uses: today's rule (same pair, opposite directions);
+   - a group of four or more: accepted here, because `closed_by` already
+     proved C1 balance and C4 per-shell closure;
+   - any other size: false.
+   The vertex-triple duplicate check runs only when every group has two
+   uses (the fast path). On the contact path `closed_by` has already
+   applied C2's post-cancellation duplicate rule. The emptiness test (d)
+   then runs unchanged on the original triangles (C6). `AllocStats` and
+   the existing allocation and closure-count assertions stay the same
+   for every existing fixture.
+4. Unchanged: the TypeScript decoder (independent, no shared code),
+   `tool_view.rs`, `scene.ts`, the atomic rejection in `construction.ts`
+   and the worker.
+
+Tests (fixtures are the nine R12-6 meshes, built in each test; the
+expected booleans are written literally in each language, never
+imported):
+
+- `mesh_contact.rs` unit tests: edge contact true; welded overlap,
+  coincident shells and a zero-normal integer triangle false; an
+  overflow-scale input returns false without a panic.
+- `crates/capture/tests/mesh.rs`: `welded_edge_contact_is_closed` (from
+  car12-p6b) passes unedited. `closed_by` and `is_closed` are true for
+  edge contact, face contact, crossed-diagonal face contact and the
+  separated control, and false for the open triangle, unbalanced edge,
+  welded overlap, double-sided fin and coincident shells. The off-grid
+  raw mesh returns false through both entry points without a panic.
+- `nmesh.rs` unit tests: each of the nine meshes is NMESH-encoded and
+  decoded; `boolean_target` equals the expected boolean (the same table
+  as `capture-decoder.test.ts`). The tautological assertion at
+  `nmesh.rs:532` is replaced by an assertion against the expected closed
+  classification of that fixture; its other assertions stay.
+- Guards that stay unedited and pass: `closure_count.rs`, the
+  `capture-decoder` and `capture-decoder-budget` tests, the scene
+  touching-shell tests, and the worker 480 mm^3 export and atomic
+  open-mesh rejection (`worker-host.test.ts:544`, `:568`).
+- Native: see R13-5.
+
+R13-5 Native parity for R13-1, R13-4 and the unlanded R12-7
+(`apps/cli/src/native-parity/capture.test.ts`).
+
+- Tall flush fixture: binary STL bytes of the outward 12-triangle box
+  X -1..1, Y 0..8, Z -35.25..0, built in the test and imported with
+  `stlToInlineMesh`; the rectangle (-1,0)..(1,8) on `xy` extruded
+  156.75 mm as a new body. Run
+  `capture <doc> --view front|back --size 64x64 --fail-on-interference --json --output <png> --force`
+  with default framing. Expect exit 0, zero pairs and zero candidates in
+  the JSON, and PNG bytes equal to the same capture with
+  `--no-interference`.
+- Tall penetration control: the sketch at base `xy` offset -0.01 with
+  distance 156.76. Expect exit 1 and exactly one pair naming the two
+  body IDs, in both views.
+- R12-7 short mixed contact and its 0.01 mm overlap control, exactly as
+  R12-7 specifies (it never landed).
+- Welded shells: the R12-6 edge-contact, face-contact and
+  crossed-diagonal documents (mesh plus plate plus cut), each with its own
+  uncut control. Each is captured with
+  `--view top --size 160x160 --json`. For every cut document:
+  - exit 0 and no `cad.body.missing`;
+  - the mesh body's existing report field `open` is `false`;
+  - PNG bytes differ from the uncut control's.
+- Through-hole proof for the welded shells (step-3 review
+  r13-welded-native-both-target-proof). It uses the existing
+  `cadPixels(...).world` helper (`capture.test.ts:270-289`), as the plate
+  through-hole test does (`:390-400`):
+  - First assert `camera.mmPerPixel <= 0.25` from the JSON. The pixel
+    containing the hole centre then has every supersample within
+    0.125 mm of it, inside the 2 x 2 mm opening (1 mm from each edge).
+  - The hole centre `(2, 2, 10)` must equal the background colour in
+    each cut capture. Only a cut through both the plate (z 5..10) and the
+    mesh box (z 0..5) shows background there. If only the plate is cut,
+    the mesh top shows.
+  - The same point must not equal the background in each uncut control.
+  - Adjacent solid samples must not equal the background in both the cut
+    and the uncut capture: the plate at `(6, 6, 10)`, and the uncut mesh
+    shell B at its top-face centre (`(15, 15, 5)` for edge contact,
+    `(15, 5, 5)` for both face contacts). These check framing and
+    visibility.
+- The existing open-triangle and tetrahedron cases stay and keep the
+  atomic open-mesh rejection.
+- Before R13-1 the tall contact case exits 1; before R13-4 the welded
+  cases report `cad.body.missing`.
+
+### 30.2 Plan grouping
+
+Plans `car13-*` follow the 28.2 rules, with evidence under
+`tmp/car13-r13/<planId>/` and `CARGO_TARGET_DIR=target/car13-<plan>`.
+Every plan sets `artifactRoots ["target", "tmp/cad3d"]` exactly, has a
+non-empty `acceptanceCriteria`, and lists its own plan and progress files
+in `writePaths`. This revision already updates this document, and
+`docs/capture.md:87`, `:105` and `docs/cad3d.md:40` already state the
+required behaviour, so no plan edits documentation.
+
+| Plan | Rule | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car13-p1-touching-witness | R13-1 | `crates/capture/src/lattice.rs`, `crates/capture/src/interference.rs` (move of the box code only), `crates/capture/src/raster.rs`, `crates/capture/src/raster/reference.rs`, `crates/capture/src/raster/tests.rs` | - |
+| car13-p2-profile-side-index | R13-2 | `packages/core/src/cad/history.ts`, `packages/core/src/cad/history.test.ts` | - |
+| car13-p3-shared-ancestry-cache | R13-3 | `packages/core/src/capture/scene.ts`, `packages/core/src/capture/scene.test.ts` | - |
+| car13-p4a-contact-module | R13-4 module | new `crates/capture/src/mesh_contact.rs`, `crates/capture/src/lib.rs` (`#[cfg(test)]` registration), `crates/capture/src/nmesh.rs` (constant visibility only) | - |
+| car13-p4b-contact-closure | R13-4 closure | `crates/capture/src/mesh.rs`, `crates/capture/src/lib.rs` (production registration), `crates/capture/tests/mesh.rs` | p4a |
+| car13-p4c-contact-eligibility | R13-4 eligibility | `crates/capture/src/nmesh.rs` | p4b |
+| car13-p5-native-parity | R13-5 | `apps/cli/src/native-parity/capture.test.ts` | p1, p2, p3, p4c |
+
+Waves: p1, p2, p3 and p4a; then p4b; then p4c; then p5. The p4 chain is a
+real contract: each step needs the previous API, p4a and p4b share
+`lib.rs`, and p4a and p4c share `nmesh.rs`. Those shared files are
+already ordered by the existing dependencies p4b -> p4a and p4c -> p4b.
+p3 edits only `scene.ts` and its test; the R13-3 admission needs no
+caller change. p5 needs a settled tree because the release binary bundles
+the TypeScript core, and it is the only plan that edits
+`capture.test.ts`. car12-p6b and car12-p7 are superseded: car13-p4b
+adopts the existing `welded_edge_contact_is_closed` test, and car13-p5
+carries R12-7.
+
+Gates (each exits 0 and runs the plan's new tests). The Rust gates of p1
+and p4a use `--lib`, because the integration test
+`welded_edge_contact_is_closed` fails until p4b lands:
+
+- p1 and p4a:
+  `CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-<plan> cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-<plan> cargo test -p nodetto-capture --lib`.
+- p4b and p4c: the same with the full `cargo test -p nodetto-capture`.
+  p4c adds
+  `bun test packages/io/src/nmesh/capture-decoder.test.ts packages/io/src/nmesh/capture-decoder-budget.test.ts`
+  (run, not edited) as the cross-language guard.
+- p2: `bunx biome check packages/core/src/cad/history.ts packages/core/src/cad/history.test.ts && bun test packages/core/src/cad/history.test.ts`.
+- p3: `bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts packages/core/src/cad/loop-forest.test.ts`.
+- p5: `bunx biome check apps/cli/src/native-parity/capture.test.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p5 cargo build --release -p nodetto-cli && test -x "$PWD/target/car13-p5/release/nodetto-cli" && NODETTO_CLI_TEST_BINARY="$PWD/target/car13-p5/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`.
+  The log must list the R13-5 tests as passed, not skipped
+  (`native-parity/harness.ts:6-13`).
+
+At most two `bun test` or `cargo test` processes run at once. p1 and p4a
+edit the same crate in parallel; if a sibling's in-progress edit stops
+the crate from compiling, the plan reruns its gate once the sibling's
+save compiles and records both logs.
+
+Integration runs once after all plans land, under the 26.2 timing rule:
+
+1. `bun run typecheck`, `bun run lint`, then `CARGO_TERM_QUIET=true mise
+   run verify`. Goldens are checked and never regenerated.
+2. From the repository root:
+   `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car13-p5 cargo build --release -p nodetto-cli && test -x "$PWD/target/car13-p5/release/nodetto-cli" && NODETTO_CLI_TEST_BINARY="$PWD/target/car13-p5/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts`.
+   A log in which the native cases are skipped does not count.
+3. Check that no `*.test.ts` remains under `target/` or `tmp/`.
+
+### 30.3 Decisions
+
+- R13-1 filters picture witnesses with conservative body boxes instead
+  of aligning the two tolerance bands. The bands protect watertightness
+  inside each body and differ for good reasons. A box test is exact and
+  cheap (one per witness pair), and it cannot drop a pair with shared
+  volume. The threshold is strictly zero, so every positive-extent thin
+  penetration keeps its witness.
+- R13-1 reuses the candidate-box definition (moved, not copied), so the
+  analysis and the picture agree on what a body's box is.
+- R13-2 resolves the extrusion's sketch through `history.byId` instead
+  of adding a field to `ExtrudeGeometry`, so the geometry type, its
+  equality-based tests and every consumer stay unchanged.
+- R13-2 builds a per-tool set of selected loops, not members. It is
+  bounded by the extrusion's own selection input, so explicit subsets
+  stay linear without a new budget.
+- R13-3 caches by array identity for one walk only. It cannot leak across
+  captures and cannot merge different selections. Admission is gated in
+  two ways: only whole-sketch extrusions (the only arrays that can
+  recur), and only normalizations whose admission cost (prepared
+  coordinates plus searched units) is at least 4,096. The cost counts
+  the per-coordinate rounding and bounds pass, because the searched
+  units alone miss sparse high-vertex profiles (238 units for 32,840
+  coordinates in the reviewer's probe). The R12-3 fallback budget is
+  unchanged. This follows the section 29 rule of a heavier path only
+  past a work threshold. Ordinary documents create no map, make no lookup and store
+  nothing, and `profileCache` pins that. A reuse pre-pass over the
+  features was rejected: it would add per-sketch entries to every
+  ordinary capture to find reuse that only heavy profiles benefit from.
+- R13-4 registers `mesh_contact` under `#[cfg(test)]` in p4a and for
+  production in p4b, together with its first caller. Each gate then
+  passes on its own under `-D warnings`.
+- R13-5 proves the welded cut reaches both targets with a through-hole
+  pixel and an uncut twin, not image inequality alone.
+- R13-4 keeps the contact path in its own module, so the fast path in
+  `mesh.rs` stays allocation-free and readable, and the TypeScript and
+  Rust implementations stay independent.
+- R13-4 makes `target_eligible` contact-aware by edge-group size instead
+  of exposing a closure-kind enum. `closed_by` keeps its public
+  signature, and `closure_count.rs` keeps its call count.
+- No user decision is pending, so there is no `design-docs/user-qa/`
+  file.
+
+### 30.4 Intentional differences from the workflow input
+
+- The finding asks for the tall fixture "imported through binary STL" in
+  the Rust renderer tests. Rust has no STL reader, so the Rust fixture is
+  the mesh the import produces (on-grid positions) with the probed
+  default-fit camera. The real STL import and fit are exercised by
+  R13-5.
+- The tall 0.01 mm penetration in Rust asserts the pair, not a visible
+  hatch, as in 29.4.
+- No documentation edits: the user docs already state that touching
+  faces do not interfere and that touching shells with disjoint boxes
+  participate.
+- R13-4 is split into three chained plans to respect the plan-size
+  limit; R13-5 also carries the unlanded R12-7 cases.
+- Per-plan gates leave out `bun run typecheck` and `mise run verify`;
+  those run at integration.
+
+### 30.5 Risks
+
+- R13-1: the filter removes only pairs with zero box overlap. Oblique
+  contacts whose boxes overlap (for example on a rotated sketch plane)
+  keep today's band behaviour and may still report a picture-only pair.
+  Untested: oblique and partial contacts, rotated frames and other named
+  views.
+- R13-1: the Rust fixture's camera literals come from a TS probe. If the
+  TS fit changes later, the Rust test still guards the filter but may no
+  longer reproduce the original sample; R13-5 remains the end-to-end
+  guard.
+- R13-2: a tool registered under an ID absent from history falls back to
+  R12-4. Production registers every tool under its feature ID, so only
+  unit tests take that path.
+- R13-3: if any consumer mutated a normalized loop array, sharing would
+  leak between tools. The plan checks `chargeTool`, `makeTool` and
+  `sweptBounds` for mutation and types the cached value `readonly`.
+- R13-3: whole profiles below the 4,096-unit admission cost that are
+  shared by many extrusions still normalize once per tool. Each such
+  call costs under 4,096 units and its points are already charged
+  against the point limit, so the remaining repetition is bounded and
+  linear in tools.
+- R13-3: the ordinary calibration (at most about 775) is derived from
+  source and the reviewer's measurements, not from a run in this step.
+  The plan measures `maxDirectWork` and applies the bounded constant
+  rule in R13-3 if needed.
+- R13-4: complex exact geometry (i128, grid conversion, shell
+  reconstruction). Misclassification could admit an open mesh. The nine
+  fixtures in both languages, the off-grid control and the worker and
+  atomic-rejection guards are the defence.
+- Parallel Rust plans share one crate; see 30.2.
+- Not measured: Boa elapsed time, native peak memory, allocator bytes,
+  desktop frame time, desktop WebGL, Tauri IPC and MCP delivery, and
+  encoded-byte determinism across platforms for the new fixtures.

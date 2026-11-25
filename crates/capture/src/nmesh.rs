@@ -7,8 +7,8 @@
 
 const PREFIX: &str = "nmesh1:";
 const MAX_CHARS: usize = 1_048_576;
-const COORDINATE_LIMIT: i64 = 10_000_000;
-const UNITS_PER_MILLIMETRE: f64 = 1_000.0;
+pub(crate) const COORDINATE_LIMIT: i64 = 10_000_000;
+pub(crate) const UNITS_PER_MILLIMETRE: f64 = 1_000.0;
 
 /// A decoded mesh: millimetre positions and vertex indices, three per triangle.
 #[derive(Debug, PartialEq)]
@@ -254,17 +254,26 @@ fn target_eligible(q: &[i64], triangles: &[u32], stats: &mut AllocStats) -> bool
         faces.push(face);
     }
     edges.sort_unstable();
-    if edges
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .any(|pair| pair[0].0 != pair[1].0 || pair[0].1 != pair[1].1 || pair[0].2 == pair[1].2)
-    {
-        return false;
+    let mut contact = false;
+    let mut start = 0;
+    while start < edges.len() {
+        let mut end = start + 1;
+        while end < edges.len() && edges[end].0 == edges[start].0 && edges[end].1 == edges[start].1
+        {
+            end += 1;
+        }
+        match end - start {
+            2 if edges[start].2 != edges[start + 1].2 => {}
+            4.. => contact = true,
+            _ => return false,
+        }
+        start = end;
     }
-    faces.sort_unstable();
-    if faces.windows(2).any(|pair| pair[0] == pair[1]) {
-        return false;
+    if !contact {
+        faces.sort_unstable();
+        if faces.windows(2).any(|pair| pair[0] == pair[1]) {
+            return false;
+        }
     }
     let origin = point(0);
     let mut volume = 0.;
@@ -463,41 +472,285 @@ mod tests {
             assert_eq!(decode_inline(bad), None, "{bad}");
         }
     }
+
+    #[derive(Default)]
+    struct ContactFixture {
+        points: Vec<[i64; 3]>,
+        triangles: Vec<u32>,
+    }
+    impl ContactFixture {
+        fn vertex(&mut self, point: [i64; 3]) -> u32 {
+            match self.points.iter().position(|p| *p == point) {
+                Some(i) => i as u32,
+                None => {
+                    self.points.push(point);
+                    (self.points.len() - 1) as u32
+                }
+            }
+        }
+        fn cube(&mut self, min: [i64; 3], max: [i64; 3], crossed: bool, reverse: bool) {
+            let [x, y, z] = min;
+            let [a, b, c] = max;
+            let ids = [
+                [x, y, z],
+                [a, y, z],
+                [a, b, z],
+                [x, b, z],
+                [x, y, c],
+                [a, y, c],
+                [a, b, c],
+                [x, b, c],
+            ]
+            .map(|p| self.vertex(p));
+            let faces = [
+                [0, 3, 2, 1],
+                [4, 5, 6, 7],
+                [0, 1, 5, 4],
+                [1, 2, 6, 5],
+                [2, 3, 7, 6],
+                [3, 0, 4, 7],
+            ];
+            for (index, f) in faces.iter().enumerate() {
+                let triangles = if !crossed && index == 5 {
+                    [[f[0], f[1], f[3]], [f[1], f[2], f[3]]]
+                } else {
+                    [[f[0], f[1], f[2]], [f[0], f[2], f[3]]]
+                };
+                for mut triangle in triangles {
+                    if reverse {
+                        triangle.swap(1, 2);
+                    }
+                    self.triangles.extend(triangle.map(|i| ids[i]));
+                }
+            }
+        }
+        fn pair(min: [i64; 3], max: [i64; 3], crossed: bool) -> Self {
+            let mut f = Self::default();
+            f.cube([0, 0, 0], [10000, 10000, 5000], false, false);
+            f.cube(min, max, crossed, false);
+            f
+        }
+    }
+    fn contact_fixtures() -> Vec<(&'static str, ContactFixture, bool)> {
+        let edge = || ContactFixture::pair([10000, 10000, 0], [20000, 20000, 5000], false);
+        let mut open = ContactFixture::default();
+        open.cube([0, 0, 0], [10000, 10000, 5000], false, false);
+        let extra = open.vertex([5000, -1000, 0]);
+        open.triangles.extend([0, 1, extra]);
+        let mut unbalanced = edge();
+        let a = unbalanced.vertex([10000, 10000, 0]);
+        let b = unbalanced.vertex([10000, 10000, 5000]);
+        let triangle = unbalanced.triangles[36..]
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .find(|t| t.contains(&a) && t.contains(&b))
+            .unwrap();
+        triangle.swap(1, 2);
+        let mut fin = edge();
+        let p = [
+            [10000, 10000, 0],
+            [10000, 10000, 5000],
+            [13000, 7000, 5000],
+            [13000, 7000, 0],
+        ]
+        .map(|v| fin.vertex(v));
+        fin.triangles.extend([
+            p[0], p[1], p[2], p[0], p[2], p[3], p[0], p[3], p[1], p[1], p[3], p[2],
+        ]);
+        let mut coincident = ContactFixture::default();
+        coincident.cube([0, 0, 0], [1000, 1000, 1000], false, false);
+        coincident.cube([0, 0, 0], [1000, 1000, 1000], false, true);
+        coincident.cube([2000, 0, 0], [3000, 1000, 1000], false, false);
+        vec![
+            ("edge", edge(), true),
+            (
+                "face",
+                ContactFixture::pair([10000, 0, 0], [20000, 10000, 5000], false),
+                true,
+            ),
+            (
+                "crossed",
+                ContactFixture::pair([10000, 0, 0], [20000, 10000, 5000], true),
+                true,
+            ),
+            (
+                "separated",
+                ContactFixture::pair([12000, 0, 0], [22000, 10000, 5000], false),
+                true,
+            ),
+            ("triangle", open, false),
+            ("unbalanced", unbalanced, false),
+            (
+                "overlap",
+                ContactFixture::pair([0, 0, 0], [6000, 6000, 5000], false),
+                false,
+            ),
+            ("fin", fin, false),
+            ("coincident", coincident, false),
+        ]
+    }
+    fn encode_text(f: &ContactFixture) -> (String, InlineMesh) {
+        fn varint(mut n: u64, out: &mut Vec<u8>) {
+            while n >= 128 {
+                out.push((n as u8 & 127) | 128);
+                n >>= 7;
+            }
+            out.push(n as u8);
+        }
+        let mut map = vec![None; f.points.len()];
+        let mut points = Vec::new();
+        let mut indices = Vec::new();
+        let mut codes = Vec::new();
+        for &old in &f.triangles {
+            let index = match map[old as usize] {
+                Some(i) => {
+                    codes.push(points.len() as u64 - i as u64);
+                    i
+                }
+                None => {
+                    let i = points.len() as u32;
+                    points.push(f.points[old as usize]);
+                    map[old as usize] = Some(i);
+                    codes.push(0);
+                    i
+                }
+            };
+            indices.push(index);
+        }
+        let mut bytes = vec![b'N', b'M', b'S', b'H', 1, 0, 3, 0];
+        for n in [
+            points.len() as u64,
+            (indices.len() / 3) as u64,
+            1,
+            0,
+            (indices.len() / 3) as u64,
+        ] {
+            varint(n, &mut bytes);
+        }
+        let mut prev = [0; 3];
+        for point in &points {
+            for axis in 0..3 {
+                let d = point[axis] - prev[axis];
+                varint(
+                    if d >= 0 {
+                        (d * 2) as u64
+                    } else {
+                        (-d * 2 - 1) as u64
+                    },
+                    &mut bytes,
+                );
+                prev[axis] = point[axis];
+            }
+        }
+        for code in codes {
+            varint(code, &mut bytes);
+        }
+        bytes.extend(crc32(&bytes).to_le_bytes());
+        let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut text = String::from(PREFIX);
+        for chunk in bytes.chunks(3) {
+            let v = (u32::from(chunk[0]) << 16)
+                | (u32::from(*chunk.get(1).unwrap_or(&0)) << 8)
+                | u32::from(*chunk.get(2).unwrap_or(&0));
+            text.push(alphabet[((v >> 18) & 63) as usize] as char);
+            text.push(alphabet[((v >> 12) & 63) as usize] as char);
+            text.push(if chunk.len() > 1 {
+                alphabet[((v >> 6) & 63) as usize] as char
+            } else {
+                '='
+            });
+            text.push(if chunk.len() > 2 {
+                alphabet[(v & 63) as usize] as char
+            } else {
+                '='
+            });
+        }
+        (
+            text,
+            InlineMesh {
+                positions: points
+                    .iter()
+                    .flatten()
+                    .map(|&v| v as f64 / UNITS_PER_MILLIMETRE)
+                    .collect(),
+                triangles: indices,
+            },
+        )
+    }
+    #[test]
+    fn contact_encoder_round_trip() {
+        for (name, fixture, _) in contact_fixtures() {
+            let (text, expected) = encode_text(&fixture);
+            assert_eq!(decode_inline(&text), Some(expected), "{name}");
+        }
+    }
+    #[test]
+    fn contact_decoder_target_eligibility() {
+        for (name, fixture, expected) in contact_fixtures() {
+            let (text, mesh) = encode_text(&fixture);
+            assert_eq!(decode_inline(&text), Some(mesh), "round trip: {name}");
+            let decoded = decode_inline_with(
+                &text,
+                DecodeOptions {
+                    max_vertices: u64::MAX,
+                    need_target: true,
+                },
+            )
+            .unwrap();
+            assert_eq!(decoded.boolean_target, Some(expected), "{name}");
+        }
+    }
     #[test]
     fn budgeted_fixture_contract() {
         let fixtures = [
             (
                 include_str!("../tests/fixtures/tetrahedron.nmesh.txt"),
                 true,
+                true,
             ),
             (
                 include_str!("../tests/fixtures/tetrahedron-reversed.nmesh.txt"),
+                true,
                 true,
             ),
             (
                 include_str!("../tests/fixtures/tetrahedron-mixed.nmesh.txt"),
                 false,
+                true,
             ),
-            (include_str!("../tests/fixtures/triangle.nmesh.txt"), false),
+            (
+                include_str!("../tests/fixtures/triangle.nmesh.txt"),
+                false,
+                false,
+            ),
             (
                 include_str!("../tests/fixtures/double-sided-triangle.nmesh.txt"),
                 false,
+                true,
             ),
             (
                 include_str!("../tests/fixtures/coplanar-tetrahedron.nmesh.txt"),
                 false,
+                true,
             ),
-            (include_str!("../tests/fixtures/thin-bar.nmesh.txt"), true),
+            (
+                include_str!("../tests/fixtures/thin-bar.nmesh.txt"),
+                true,
+                true,
+            ),
             (
                 include_str!("../tests/fixtures/translated-flat-shell.nmesh.txt"),
                 false,
+                true,
             ),
             (
                 include_str!("../tests/fixtures/translated-thin-bar.nmesh.txt"),
                 true,
+                true,
             ),
         ];
-        for (text, expected) in fixtures {
+        for (text, expected, closed) in fixtures {
             let text = text.trim();
             let original = decode_inline(text).unwrap();
             let result = decode_inline_with(
@@ -523,19 +776,7 @@ mod tests {
                 positions: original.positions.clone(),
                 triangles: original.triangles.clone(),
             };
-            let quantized: Vec<i64> = mesh
-                .positions
-                .iter()
-                .map(|p| (p * UNITS_PER_MILLIMETRE).round() as i64)
-                .collect();
-            assert_eq!(
-                crate::mesh::closed_by(mesh.positions.len() / 3, &mesh.triangles, |i| [
-                    quantized[3 * i] as f64 / UNITS_PER_MILLIMETRE,
-                    quantized[3 * i + 1] as f64 / UNITS_PER_MILLIMETRE,
-                    quantized[3 * i + 2] as f64 / UNITS_PER_MILLIMETRE
-                ]),
-                crate::mesh::is_closed(&mesh)
-            );
+            assert_eq!(crate::mesh::is_closed(&mesh), closed);
             let (limited, stats) = decode_with_stats(
                 text,
                 DecodeOptions {

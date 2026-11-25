@@ -1,6 +1,15 @@
 import { expect, test } from "bun:test";
-import type { CadFaceRef, Element as IrElement } from "@nodetto/ir";
-import { analyzeCadPage, faceBody, faceOutwardSign } from "./index.ts";
+import type {
+  CadFaceRef,
+  CadLineSemantic,
+  Element as IrElement,
+} from "@nodetto/ir";
+import {
+  analyzeCadPage,
+  checkCadPage,
+  faceBody,
+  faceOutwardSign,
+} from "./index.ts";
 import { visitCadConstruction } from "./construction.ts";
 import {
   cadFailure,
@@ -10,6 +19,8 @@ import {
   scanCadPage,
   sketchFrameLookup,
 } from "./history.ts";
+import { faceFrame } from "./frames.ts";
+import { generateCadDocument } from "./testing/generate.ts";
 import { buildLoops, type CadLoop } from "./loops.ts";
 import {
   cadElement,
@@ -566,4 +577,263 @@ test("extent boundary and entity failure precedence are preserved", () => {
     ok: false,
     code: "cad.profile.invalid",
   });
+});
+
+test("side membership work stays linear and preserves frames and omitted errors", () => {
+  for (const mode of ["repeated", "distinct", "omitted"] as const) {
+    const series: number[] = [];
+    for (const count of [256, 512, 1024]) {
+      const vertices = Array.from({ length: count }, (_, i) => {
+        const angle = (i * 2 * Math.PI) / count;
+        return [
+          Math.round(5000 * Math.cos(angle)),
+          Math.round(5000 * Math.sin(angle)),
+        ] as const;
+      });
+      const edges = vertices.map((a, i) =>
+        cadElement(`edge-${i}`, "cad.line", "a1", {
+          sketch: "profile",
+          a,
+          b: vertices[(i + 1) % count],
+        }),
+      );
+      const selected = rectangle("profile", 7000, 7000, 4, 4);
+      const entities = mode === "omitted" ? [...edges, ...selected] : edges;
+      const geometry = createCadGeometry(
+        scanCadPage([sketch("profile", "a"), ...entities]),
+      );
+      const frame = geometry.sketch({ base: "xy" });
+      if ("ok" in frame) throw new Error("invalid frame");
+      geometry.frames.set("profile", frame);
+      const tool = geometry.extrude({
+        name: "tool",
+        sketch: "profile",
+        distance: 1,
+        op: "new",
+        ...(mode === "omitted" ? { loops: ["profile-edge-0"] } : {}),
+      });
+      if ("ok" in tool) throw new Error("invalid tool");
+      geometry.extrudes.set("ex", tool);
+      cadGeometryWork.sideMemberVisits = 0;
+      cadGeometryWork.sideMemberIndexBuilds = 0;
+      geometry.sketch({ base: "xy" });
+      geometry.sketch({ face: { feature: "ex", role: "end" } });
+      expect(cadGeometryWork.sideMemberVisits).toBe(0);
+      expect(cadGeometryWork.sideMemberIndexBuilds).toBe(0);
+      for (let i = 0; i < count; i++) {
+        const edge = edges[mode === "repeated" ? count - 1 : i];
+        if (!edge) throw new Error("missing edge");
+        const result = geometry.sketch({
+          face: { feature: "ex", role: "side", entity: edge.id },
+        });
+        if (mode === "omitted")
+          expect(result).toEqual(cadFailure("cad.reference.missing", edge.id));
+        else
+          expect(result).toEqual(
+            faceFrame(
+              tool.frame,
+              tool.span,
+              "side",
+              edge.semantic as CadLineSemantic,
+            ),
+          );
+      }
+      series.push(cadGeometryWork.sideMemberVisits);
+      expect(cadGeometryWork.sideMemberIndexBuilds).toBe(1);
+    }
+    console.log(`side ${mode}: ${series.join(", ")}`);
+    for (let i = 1; i < series.length; i++) {
+      expect(series[i] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+        2.5 * (series[i - 1] ?? 0),
+      );
+    }
+  }
+});
+
+test("ordinary CAD check does not build side member indexes", () => {
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  const page = doc.pages[0];
+  if (!page) throw new Error("missing page");
+  cadGeometryWork.sideMemberVisits = 0;
+  cadGeometryWork.sideMemberIndexBuilds = 0;
+  expect(checkCadPage(doc.elements, page.id).errors).toEqual([]);
+  console.log(
+    `ordinary side visits: ${cadGeometryWork.sideMemberVisits}; max scanned/memberTotal: 0 (no side queries)`,
+  );
+  expect(cadGeometryWork.sideMemberVisits).toBe(0);
+  expect(cadGeometryWork.sideMemberIndexBuilds).toBe(0);
+});
+
+test("side member index builds on the query after the scan budget", () => {
+  const first = rectangle("profile", 0, 0, 4, 4);
+  const second = rectangle("other", 10, 0, 4, 4).map((edge) => ({
+    ...edge,
+    semantic: { ...edge.semantic, sketch: "profile" },
+  }));
+  const geometry = createCadGeometry(
+    scanCadPage([sketch("profile", "a"), ...first, ...second]),
+  );
+  const frame = geometry.sketch({ base: "xy" });
+  if ("ok" in frame) throw new Error("invalid frame");
+  geometry.frames.set("profile", frame);
+  const semantic = {
+    name: "tool",
+    sketch: "profile",
+    distance: 1,
+    op: "new" as const,
+  };
+  const tool = geometry.extrude({ ...semantic, loops: ["profile-edge-0"] });
+  const other = geometry.extrude({ ...semantic, loops: ["other-edge-0"] });
+  if ("ok" in tool || "ok" in other) throw new Error("invalid tool");
+  geometry.extrudes.set("ex", tool);
+  geometry.extrudes.set("other", other);
+  cadGeometryWork.sideMemberVisits = 0;
+  cadGeometryWork.sideMemberIndexBuilds = 0;
+  for (let i = 0; i < 4; i++) {
+    expect(
+      geometry.sketch({
+        face: { feature: "ex", role: "side", entity: "other-edge-0" },
+      }),
+    ).toEqual(cadFailure("cad.reference.missing", "other-edge-0"));
+  }
+  expect(cadGeometryWork.sideMemberVisits).toBe(16);
+  expect(cadGeometryWork.sideMemberIndexBuilds).toBe(0);
+  expect(
+    geometry.sketch({
+      face: { feature: "ex", role: "side", entity: "other-edge-0" },
+    }),
+  ).toEqual(cadFailure("cad.reference.missing", "other-edge-0"));
+  expect(cadGeometryWork.sideMemberVisits).toBe(21);
+  expect(cadGeometryWork.sideMemberIndexBuilds).toBe(1);
+  expect(
+    geometry.sketch({
+      face: { feature: "other", role: "side", entity: "other-edge-0" },
+    }),
+  ).not.toHaveProperty("ok");
+});
+
+test("shared profile side queries use the sketch index", () => {
+  for (const explicit of [false, true]) {
+    for (const count of [256, 512, 1024]) {
+      const vertices = Array.from({ length: count }, (_, i) => {
+        const angle = (i * 2 * Math.PI) / count;
+        return [
+          Math.round(5000 * Math.cos(angle)),
+          Math.round(5000 * Math.sin(angle)),
+        ] as const;
+      });
+      const edges = vertices.map((a, i) =>
+        cadElement(`shared-edge-${i}`, "cad.line", "a1", {
+          sketch: "profile",
+          a,
+          b: vertices[(i + 1) % count],
+        }),
+      );
+      const rectangleEdges = rectangle("profile", 7000, 7000, 4, 4);
+      const total = explicit ? count / 4 : count;
+      const features = Array.from({ length: total }, (_, i) =>
+        extrude(`shared-ex-${i}`, "b", {
+          sketch: "profile",
+          distance: i + 1,
+          op: "new",
+          ...(explicit ? { loops: ["shared-edge-0"] } : {}),
+        }),
+      );
+      const sides = features.flatMap((feature, i) =>
+        (explicit ? [0, 1, 2, 3, -1] : [count - 1]).map((edge, j) =>
+          sketch(`side-${i}-${j}`, "c", {
+            face: {
+              feature: feature.id,
+              role: "side",
+              entity: edge < 0 ? "profile-edge-0" : `shared-edge-${edge}`,
+            },
+          }),
+        ),
+      );
+      const elements = [
+        sketch("profile", "a"),
+        ...edges,
+        ...(explicit ? rectangleEdges : []),
+        ...features,
+        ...sides,
+      ];
+      cadGeometryWork.sideMemberVisits = 0;
+      cadGeometryWork.sideMemberIndexBuilds = 0;
+      cadGeometryWork.sideSelectionEntries = 0;
+      const result = checkCadPage(elements, "cad");
+      if (explicit) {
+        expect(result.errors).toHaveLength(total);
+        expect(result.errors.map(({ id }) => id).sort()).toEqual(
+          features.map((_, i) => `side-${i}-4`).sort(),
+        );
+        for (const error of result.errors)
+          expect(error).toMatchObject({ code: "cad.reference.missing" });
+        expect(cadGeometryWork.sideSelectionEntries).toBe(total);
+        expect(cadGeometryWork.sideMemberVisits).toBeLessThanOrEqual(
+          total * 16,
+        );
+      } else {
+        expect(result.errors).toEqual([]);
+        expect(cadGeometryWork.sideMemberVisits).toBe(total);
+        expect(cadGeometryWork.sideSelectionEntries).toBe(0);
+      }
+      expect(cadGeometryWork.sideMemberIndexBuilds).toBe(0);
+      console.log(
+        `shared side explicit=${explicit} count=${count} visits=${cadGeometryWork.sideMemberVisits} entries=${cadGeometryWork.sideSelectionEntries}`,
+      );
+      if (count === 256) {
+        const geometry = createCadGeometry(scanCadPage(elements));
+        const frame = geometry.sketch({ base: "xy" });
+        if ("ok" in frame) throw new Error("invalid frame");
+        geometry.frames.set("profile", frame);
+        for (const feature of features) {
+          const tool = geometry.extrude(feature.semantic);
+          if ("ok" in tool) throw new Error("invalid tool");
+          geometry.extrudes.set(feature.id, tool);
+          if (explicit)
+            expect(
+              geometry.sketch({
+                face: {
+                  feature: feature.id,
+                  role: "side",
+                  entity: "profile-edge-0",
+                },
+              }),
+            ).toEqual(cadFailure("cad.reference.missing", "profile-edge-0"));
+          for (const edge of explicit ? edges.slice(0, 4) : edges.slice(-1)) {
+            expect(
+              geometry.sketch({
+                face: { feature: feature.id, role: "side", entity: edge.id },
+              }),
+            ).toEqual(
+              faceFrame(
+                tool.frame,
+                tool.span,
+                "side",
+                edge.semantic as CadLineSemantic,
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+});
+
+test("ordinary CAD check performs no side selection work", () => {
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  const page = doc.pages[0];
+  if (!page) throw new Error("missing page");
+  cadGeometryWork.sideMemberVisits = 0;
+  cadGeometryWork.sideMemberIndexBuilds = 0;
+  cadGeometryWork.sideSelectionEntries = 0;
+  cadGeometryWork.profileBuilds = 0;
+  cadGeometryWork.loopProbes = 0;
+  expect(checkCadPage(doc.elements, page.id).errors).toEqual([]);
+  expect(cadGeometryWork.sideMemberVisits).toBe(0);
+  expect(cadGeometryWork.sideMemberIndexBuilds).toBe(0);
+  expect(cadGeometryWork.sideSelectionEntries).toBe(0);
+  console.log(
+    `ordinary profile builds=${cadGeometryWork.profileBuilds} loop probes=${cadGeometryWork.loopProbes}`,
+  );
 });

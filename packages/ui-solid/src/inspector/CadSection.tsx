@@ -11,8 +11,9 @@ import {
 } from "solid-js";
 import { createEditorSignals } from "../adapter.ts";
 import {
-  displayedExtrudeTargets,
   earlierExtrudeBodies,
+  orderExtrudeTargets,
+  selectTargets,
 } from "../cad/extrude-targets.ts";
 import { pcbBoardChoices, pcbBoardOptions } from "../cad/pcb-insert.ts";
 import { useCadStatus } from "../cad/status-store.ts";
@@ -77,12 +78,8 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
     const value = semantic().op;
     return typeof value === "string" ? value : "";
   };
-  const targets = () => {
-    const value = semantic().bodies;
-    return Array.isArray(value)
-      ? value.filter((id): id is string => typeof id === "string")
-      : [];
-  };
+  const selection = createMemo(() => selectTargets(semantic().bodies));
+  const targets = () => selection().ids;
   const earlierBodies = createMemo(() => {
     if (type() !== "cad.extrude" || operation() === "new") return [];
     signals.rev();
@@ -92,16 +89,11 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
       element,
     );
   });
-  const orderedTargets = () => {
-    earlierBodies();
+  const listedIds = createMemo(() => earlierBodies().map((body) => body.id));
+  const orderedTargets = createMemo(() => {
     if (type() !== "cad.extrude" || operation() === "new") return targets();
-    const element = current();
-    return displayedExtrudeTargets(
-      props.editor.store.getPageElements(element.page),
-      element,
-      targets(),
-    );
-  };
+    return orderExtrudeTargets(listedIds(), targets());
+  });
   const status = () => statusFor(current().id);
   const board = () => {
     const id = semantic().board;
@@ -220,13 +212,13 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
                 {(body) => (
                   <span
                     onClick={(event) => {
-                      if (operation() === "add" && targets().includes(body.id))
+                      if (operation() === "add" && selection().has(body.id))
                         event.preventDefault();
                     }}
                   >
                     <Checkbox
                       label={layerName(body)}
-                      checked={targets().includes(body.id)}
+                      checked={selection().has(body.id)}
                       disabled={readOnly()}
                       onCommit={(checked) => {
                         if (operation() === "add" && !checked) return;

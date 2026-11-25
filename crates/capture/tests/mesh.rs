@@ -7,6 +7,48 @@ use nodetto_capture::scene::{Op, Tool};
 use support::{body, box_prism, cube_mesh, pixel, scene};
 
 #[test]
+fn welded_edge_contact_is_closed() {
+    let corners = [
+        [0., 0., 0.],
+        [10., 0., 0.],
+        [10., 10., 0.],
+        [0., 10., 0.],
+        [0., 0., 5.],
+        [10., 0., 5.],
+        [10., 10., 5.],
+        [0., 10., 5.],
+    ];
+    let faces = [
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6,
+        3, 0, 4, 3, 4, 7,
+    ];
+    let mut points: Vec<[f64; 3]> = Vec::new();
+    let mut triangles = Vec::new();
+    for offset in [0., 10.] {
+        let mut indices = [0_u32; 8];
+        for (i, p) in corners.iter().enumerate() {
+            let p = [p[0] + offset, p[1] + offset, p[2]];
+            let index = points.iter().position(|v| *v == p).unwrap_or_else(|| {
+                points.push(p);
+                points.len() - 1
+            });
+            indices[i] = index as u32;
+        }
+        triangles.extend(faces.iter().map(|&i| indices[i]));
+    }
+    let mesh = nodetto_capture::scene::Mesh {
+        positions: points.iter().flatten().copied().collect(),
+        triangles,
+    };
+    assert!(nodetto_capture::mesh::closed_by(
+        points.len(),
+        &mesh.triangles,
+        |i| points[i]
+    ));
+    assert!(nodetto_capture::mesh::is_closed(&mesh));
+}
+
+#[test]
 fn mesh_cut_and_open_mesh_are_drawn_with_correct_solid_status() {
     let mut s = scene(
         vec![cube_mesh(), box_prism([-1.0, -1.0, -1.0], 2.0, 2.0, 6.0)],
@@ -223,4 +265,125 @@ fn sphere_mesh_edges_are_confined_to_its_outline() {
         }
     }
     assert!(edge_count > 0);
+}
+
+#[derive(Default)]
+struct ContactFixture {
+    points: Vec<[f64; 3]>,
+    triangles: Vec<u32>,
+}
+
+impl ContactFixture {
+    fn vertex(&mut self, point: [f64; 3]) -> u32 {
+        match self.points.iter().position(|p| *p == point) {
+            Some(index) => index as u32,
+            None => {
+                self.points.push(point);
+                (self.points.len() - 1) as u32
+            }
+        }
+    }
+
+    fn cube(&mut self, min: [f64; 3], max: [f64; 3], crossed: bool, reverse: bool) {
+        let [x, y, z] = min;
+        let [a, b, c] = max;
+        let ids = [
+            [x, y, z],
+            [a, y, z],
+            [a, b, z],
+            [x, b, z],
+            [x, y, c],
+            [a, y, c],
+            [a, b, c],
+            [x, b, c],
+        ]
+        .map(|point| self.vertex(point));
+        let faces = [
+            [0, 3, 2, 1],
+            [4, 5, 6, 7],
+            [0, 1, 5, 4],
+            [1, 2, 6, 5],
+            [2, 3, 7, 6],
+            [3, 0, 4, 7],
+        ];
+        for (index, f) in faces.iter().enumerate() {
+            let triangles = if !crossed && index == 5 {
+                [[f[0], f[1], f[3]], [f[1], f[2], f[3]]]
+            } else {
+                [[f[0], f[1], f[2]], [f[0], f[2], f[3]]]
+            };
+            for mut triangle in triangles {
+                if reverse {
+                    triangle.swap(1, 2);
+                }
+                self.triangles.extend(triangle.map(|i| ids[i]));
+            }
+        }
+    }
+
+    fn pair(min: [f64; 3], max: [f64; 3], crossed: bool) -> Self {
+        let mut fixture = Self::default();
+        fixture.cube([0., 0., 0.], [10., 10., 5.], false, false);
+        fixture.cube(min, max, crossed, false);
+        fixture
+    }
+
+    fn assert_closed(&self, expected: bool, name: &str) {
+        let mesh = nodetto_capture::scene::Mesh {
+            positions: self.points.iter().flatten().copied().collect(),
+            triangles: self.triangles.clone(),
+        };
+        assert_eq!(
+            nodetto_capture::mesh::closed_by(self.points.len(), &self.triangles, |i| self.points
+                [i]),
+            expected,
+            "closed_by: {name}"
+        );
+        assert_eq!(
+            nodetto_capture::mesh::is_closed(&mesh),
+            expected,
+            "is_closed: {name}"
+        );
+    }
+}
+
+#[test]
+fn contact_closure_fixture_classifications() {
+    let edge = || ContactFixture::pair([10., 10., 0.], [20., 20., 5.], false);
+    edge().assert_closed(true, "edge");
+    ContactFixture::pair([10., 0., 0.], [20., 10., 5.], false).assert_closed(true, "face");
+    ContactFixture::pair([10., 0., 0.], [20., 10., 5.], true).assert_closed(true, "crossed face");
+    ContactFixture::pair([12., 0., 0.], [22., 10., 5.], false).assert_closed(true, "separated");
+    let mut open = ContactFixture::default();
+    open.cube([0., 0., 0.], [10., 10., 5.], false, false);
+    let extra = open.vertex([5., -1., 0.]);
+    open.triangles.extend([0, 1, extra]);
+    open.assert_closed(false, "open triangle");
+    let mut unbalanced = edge();
+    let a = unbalanced.vertex([10., 10., 0.]);
+    let b = unbalanced.vertex([10., 10., 5.]);
+    let triangle = unbalanced.triangles[36..]
+        .as_chunks_mut::<3>()
+        .0
+        .iter_mut()
+        .find(|t| t.contains(&a) && t.contains(&b))
+        .unwrap();
+    triangle.swap(1, 2);
+    unbalanced.assert_closed(false, "unbalanced");
+    ContactFixture::pair([0., 0., 0.], [6., 6., 5.], false).assert_closed(false, "overlap");
+    let mut fin = edge();
+    let p = [[10., 10., 0.], [10., 10., 5.], [13., 7., 5.], [13., 7., 0.]].map(|v| fin.vertex(v));
+    fin.triangles.extend([
+        p[0], p[1], p[2], p[0], p[2], p[3], p[0], p[3], p[1], p[1], p[3], p[2],
+    ]);
+    fin.assert_closed(false, "fin");
+    let mut coincident = ContactFixture::default();
+    coincident.cube([0., 0., 0.], [1., 1., 1.], false, false);
+    coincident.cube([0., 0., 0.], [1., 1., 1.], false, true);
+    coincident.cube([2., 0., 0.], [3., 1., 1.], false, false);
+    coincident.assert_closed(false, "coincident");
+    let mut off_grid = ContactFixture::default();
+    off_grid.cube([0., 0., 0.], [0.0004, 0.0004, 5.], false, false);
+    off_grid.cube([0.0004, 0.0004, 0.], [0.0008, 0.0008, 5.], false, false);
+    off_grid.assert_closed(false, "off grid");
 }

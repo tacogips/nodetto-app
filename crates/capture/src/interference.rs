@@ -4,7 +4,7 @@ use std::thread;
 
 use crate::lattice::{self, Bounds, LatticeRequest};
 use crate::report::{Analysis, PairReport};
-use crate::scene::{Op, Scene};
+use crate::scene::Scene;
 use crate::tool_view::ViewCache;
 use crate::CaptureError;
 
@@ -322,22 +322,7 @@ pub(crate) fn analyse_scene_with(
     let budget = u64::from(scene.budget_million_rays) * 1_000_000;
     let loops = lattice::tool_loops(scene);
     let tools = lattice::scene_tool_bounds(scene);
-    let boxes = scene
-        .bodies
-        .iter()
-        .map(|body| {
-            let mut bounds = lattice::empty_bounds();
-            for step in body.steps.iter().filter(|step| step.op == Op::Union) {
-                if let Some(&tool) = tools
-                    .get(step.tool as usize)
-                    .filter(|&&tool| lattice::valid_bounds(tool))
-                {
-                    lattice::extend(&mut bounds, tool);
-                }
-            }
-            bounds
-        })
-        .collect::<Vec<_>>();
+    let boxes = lattice::body_boxes(scene, &tools);
     let keep = (budget / MIN_RAYS) as usize + UNCHECKED_LIST_LIMIT;
     let (candidates, total) = collect_candidates(scene, &boxes, &tools, keep, solid);
     let (cell, checked) = plan(&candidates, total, scene.target_cell, budget);

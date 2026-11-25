@@ -3,6 +3,9 @@ import { cadElement } from "../../../core/src/cad/testing/documents.ts";
 import {
   displayedExtrudeTargets,
   earlierExtrudeBodies,
+  orderExtrudeTargets,
+  selectTargets,
+  targetSelectionWork,
   targetsForOperation,
 } from "./extrude-targets.ts";
 
@@ -36,4 +39,25 @@ test("extrude targets follow displayed history and operation rules", () => {
     "right",
     "detached",
   ]);
+});
+
+test("target selection and ordering do linear work", () => {
+  const visits: number[] = [];
+  for (const n of [500, 1000]) {
+    const ids = Array.from({ length: n }, (_, index) => `body-${index}`);
+    Object.assign(targetSelectionWork, { builds: 0, visits: 0, queries: 0 });
+    const selection = selectTargets(ids);
+    expect(selection.ids).toEqual(ids);
+    for (const id of ids) expect(selection.has(id)).toBe(true);
+    expect(targetSelectionWork).toEqual({ builds: 1, visits: n, queries: n });
+    targetSelectionWork.visits = 0;
+    expect(orderExtrudeTargets(ids, ids)).toEqual(ids);
+    expect(targetSelectionWork.visits).toBe(2 * n);
+    visits.push(targetSelectionWork.visits);
+  }
+  expect(visits[1]).toBe(2 * (visits[0] ?? 0));
+  expect(selectTargets(["a", 7, null, "b"]).ids).toEqual(["a", "b"]);
+  expect(
+    orderExtrudeTargets(["a", "b", "c"], ["c", "missing", "a", "missing"]),
+  ).toEqual(["a", "c", "missing", "missing"]);
 });

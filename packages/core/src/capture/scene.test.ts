@@ -6,6 +6,7 @@ import {
   encodeNmesh,
   toInline,
 } from "@nodetto/io/nmesh";
+import { readStl, writeBinaryStl } from "@nodetto/io/stl";
 import type { CadXY, Element, PageId } from "@nodetto/ir";
 import { checkCadPage } from "../cad/check.ts";
 import { buildLoops, type CadLoop } from "../cad/loops.ts";
@@ -27,6 +28,7 @@ import {
   buildCadCaptureModel,
   CAPTURE_THEMES,
   normaliseToolLoops,
+  PROFILE_CACHE_MIN_WORK,
   writeCaptureScene,
 } from "./index.ts";
 
@@ -1501,3 +1503,530 @@ test("a sparse nested-chain selection keeps the 400-byte outer prism", () => {
     [0, 0, size, 0, size, size, 0, size],
   ]);
 });
+
+interface AncestryFixture {
+  entities: Element[];
+  selected: string[];
+  elements: Element[];
+}
+
+function ancestryFixture(
+  shape: "deep" | "shallow",
+  n: number,
+  outer = false,
+): AncestryFixture {
+  const entities: Element[] = [];
+  const selected: string[] = [];
+  const polygon = (id: string, points: CadXY[], pick: boolean) => {
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      if (!a || !b) throw new Error("Missing fixture vertex");
+      entities.push(
+        cadElement(`${id}-${i}`, "cad.line", "a1", {
+          sketch: "ancestry",
+          a,
+          b,
+        }),
+      );
+    }
+    if (pick) selected.push(`${id}-0`);
+  };
+  const square = (
+    id: string,
+    x: number,
+    y: number,
+    size: number,
+    pick: boolean,
+  ) =>
+    polygon(
+      id,
+      [
+        [x, y],
+        [x + size, y],
+        [x + size, y + size],
+        [x, y + size],
+      ],
+      pick,
+    );
+  if (shape === "deep") {
+    const size = 2 * n + 70;
+    for (let i = 0; i < n; i++)
+      square(`rim-${i}`, i, i, size - 2 * i, outer && i === 0);
+    for (let i = 0; i < n; i++)
+      square(
+        `island-${i}`,
+        n + 2 + 2 * (i % 32),
+        n + 2 + 2 * Math.floor(i / 32),
+        1,
+        true,
+      );
+  } else {
+    for (let i = 0; i < n; i++) {
+      const y = i * 2;
+      polygon(
+        `rim-${i}`,
+        [
+          [0, y],
+          [1000, y + 1000],
+          [1000, y + 1001],
+          [0, y + 1],
+        ],
+        true,
+      );
+      square(`hole-${i}`, 500, y + 500.5, 0.125, true);
+    }
+  }
+  return {
+    entities,
+    selected,
+    elements: [
+      sketch("ancestry", "a1"),
+      ...entities,
+      extrude("solid", "a2", {
+        sketch: "ancestry",
+        loops: selected,
+        distance: 5,
+        op: "new",
+      }),
+    ],
+  };
+}
+
+function ancestryStats() {
+  return {
+    ancestorProbes: 0,
+    indexEntries: 0,
+    depthLookups: 0,
+    forestFallbacks: 0,
+    edges: { builds: 0, visits: 0, inspections: 0, bulk: 0 },
+    forest: { events: 0, steps: 0 },
+  };
+}
+
+function ancestryWork(stats: ReturnType<typeof ancestryStats>): number {
+  const { edges, forest } = stats;
+  return (
+    stats.ancestorProbes +
+    stats.indexEntries +
+    stats.depthLookups +
+    edges.builds +
+    edges.visits +
+    edges.inspections +
+    edges.bulk +
+    forest.events +
+    forest.steps
+  );
+}
+
+function checkAncestryFixture(fixture: AncestryFixture) {
+  const ancestry = ancestryStats();
+  const model = buildCadCaptureModel(fixture.elements, CAD_TEST_PAGE.id, {
+    stats: { captureVisits: 0, toolArrays: 0, metadataVisits: 0, ancestry },
+  });
+  expect(model.errors).toEqual([]);
+  expect(ancestry.forestFallbacks).toBeGreaterThanOrEqual(1);
+  const request = {
+    width: 256,
+    height: 256,
+    theme: "light" as const,
+    camera: { view: "top" as const },
+    interference: null,
+  };
+  const capture = prepareCadCapture(
+    fixture.elements,
+    CAD_TEST_PAGE.id,
+    request,
+  );
+  const oracle = oracleNormalise(
+    selectedLoops(fixture.entities, fixture.selected),
+  );
+  const sourceFaces = new Map<string, number>();
+  const oracleLoops = oracle.map(({ points, sources }) => ({
+    points: new Float64Array(points),
+    faces: new Uint32Array(
+      sources.map((source) => {
+        let face = sourceFaces.get(source);
+        if (face === undefined) {
+          face = 2 + sourceFaces.size;
+          sourceFaces.set(source, face);
+        }
+        return face;
+      }),
+    ),
+  }));
+  const expected = {
+    ...capture.model,
+    tools: capture.model.tools.map((tool) =>
+      tool.kind === "prism" ? { ...tool, loops: oracleLoops } : tool,
+    ),
+  };
+  expect(capture.scene).toEqual(
+    writeCaptureScene(expected, {
+      width: request.width,
+      height: request.height,
+      supersample: 2,
+      camera: capture.camera,
+      colours: CAPTURE_THEMES[request.theme],
+      referenceOpacity: 0.45,
+      interference: null,
+    }),
+  );
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const loop of oracle) {
+    const bounds = loopBounds(loop.points);
+    minX = Math.min(minX, bounds.minX);
+    minY = Math.min(minY, bounds.minY);
+    maxX = Math.max(maxX, bounds.maxX);
+    maxY = Math.max(maxY, bounds.maxY);
+  }
+  expect(capture.model.bodies.map(({ bounds }) => bounds)).toEqual([
+    { min: [minX, minY, 0], max: [maxX, maxY, 5] },
+  ]);
+  return ancestryWork(ancestry);
+}
+
+test("capture ancestry work stays bounded for omitted deep and shallow selections", () => {
+  for (const [shape, sizes] of [
+    ["deep", [256, 512, 1024]],
+    ["shallow", [1024, 2048]],
+  ] as const) {
+    let previous = 0;
+    for (const n of sizes) {
+      const work = checkAncestryFixture(ancestryFixture(shape, n));
+      console.log(`ancestry document ${shape} ${n}: ${work}`);
+      if (previous) expect(work).toBeLessThanOrEqual(previous * 2.5);
+      previous = work;
+    }
+  }
+  checkAncestryFixture(ancestryFixture("deep", 256, true));
+}, 120_000);
+
+test("shallow raw ancestry work and ordinary baseline remain bounded", () => {
+  let previous = 0;
+  for (const n of [1024, 2048, 4096]) {
+    const loops: CadLoop[] = [];
+    for (let i = 0; i < n; i++) {
+      const y = i * 2;
+      loops.push(
+        indexedLoop([0, y, 1000, y + 1000, 1000, y + 1001, 0, y + 1], 0),
+      );
+      loops.push(rectangleLoop(500, y + 500.5, 0.125, 1));
+    }
+    const stats = ancestryStats();
+    const actual = normaliseToolLoops(loops, stats);
+    expect(actual).toHaveLength(loops.length);
+    expect(stats.forestFallbacks).toBeGreaterThanOrEqual(1);
+    const work = ancestryWork(stats);
+    console.log(`ancestry raw shallow ${n}: ${work}`);
+    if (previous) expect(work).toBeLessThanOrEqual(previous * 2.5);
+    previous = work;
+  }
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  const page = doc.pages[0];
+  if (!page) throw new Error("Missing fixture page");
+  const ancestry = ancestryStats();
+  buildCadCaptureModel(doc.elements, page.id, {
+    stats: { captureVisits: 0, toolArrays: 0, metadataVisits: 0, ancestry },
+  });
+  console.log(`ancestry ordinary: ${JSON.stringify(ancestry)}`);
+  expect(ancestry.forestFallbacks).toBe(0);
+  expect(ancestry.ancestorProbes).toBe(5000);
+  expect(ancestry.indexEntries).toBe(5500);
+}, 120_000);
+
+function contactBox(
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  crossed = false,
+) {
+  return {
+    positions: Float64Array.of(
+      x0,
+      y0,
+      0,
+      x1,
+      y0,
+      0,
+      x1,
+      y1,
+      0,
+      x0,
+      y1,
+      0,
+      x0,
+      y0,
+      5,
+      x1,
+      y0,
+      5,
+      x1,
+      y1,
+      5,
+      x0,
+      y1,
+      5,
+    ),
+    triangles: Uint32Array.from([
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      ...(crossed ? [3, 0, 7, 0, 4, 7] : [3, 0, 4, 3, 4, 7]),
+    ]),
+  };
+}
+
+test("touching shell cuts survive capture as a whole", () => {
+  const a = contactBox(0, 10, 0, 10);
+  const triangle = {
+    positions: Float64Array.of(0, 0, 0, 10, 0, 0, 5, -2, 0),
+    triangles: Uint32Array.of(0, 1, 2),
+  };
+  const cases = [
+    ["edge", contactBox(10, 20, 10, 20), true],
+    ["face", contactBox(10, 20, 0, 10), true],
+    ["crossed", contactBox(10, 20, 0, 10, true), true],
+    ["separated", contactBox(12, 22, 0, 10), true],
+    ["open", triangle, false],
+    ["overlap", contactBox(0, 6, 0, 6), false],
+  ] as const;
+  for (const [name, other, eligible] of cases) {
+    const data = toInline(
+      encodeNmesh(canonicalize(readStl(writeBinaryStl([a, other])))),
+    );
+    const uncut = [
+      cadElement("mesh", "cad.mesh", "a0", { name, data }),
+      sketch("base", "a1", { base: "xy", offset: 5 }),
+      ...rectangle("base", 0, 0, 10, 10),
+      extrude("plate", "a2", { sketch: "base", distance: 5, op: "new" }),
+      sketch("opening", "a3"),
+      ...rectangle("opening", 1, 1, 2, 2),
+    ];
+    const elements = [
+      ...uncut,
+      extrude("cut", "a4", {
+        sketch: "opening",
+        distance: 10,
+        op: "cut",
+        bodies: ["mesh", "plate"],
+      }),
+    ];
+    const options = { decodeMesh: decodeCaptureMeshWith };
+    const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, options);
+    expect(
+      model.errors.some((error) => error.code === "cad.body.missing"),
+      name,
+    ).toBe(!eligible);
+    expect(
+      model.bodies.map((body) => body.steps.at(-1)?.op),
+      name,
+    ).toEqual(eligible ? ["difference", "difference"] : ["union", "union"]);
+    const request = {
+      width: 320,
+      height: 240,
+      theme: "dark",
+      camera: { view: "iso" },
+      ...options,
+    } as const;
+    const bytes = prepareCadCapture(elements, CAD_TEST_PAGE.id, request).scene;
+    const control = prepareCadCapture(uncut, CAD_TEST_PAGE.id, request).scene;
+    if (eligible) expect(bytes, name).not.toEqual(control);
+    else expect(bytes, name).toEqual(control);
+  }
+});
+
+function profileCacheStats() {
+  return { lookups: 0, admitted: 0, hits: 0, prepared: 0, maxDirectWork: 0 };
+}
+
+function sharedProfileRun(
+  entities: Element[],
+  selections: (string[] | undefined)[],
+) {
+  const elements = [
+    sketch("ancestry", "a1"),
+    ...entities,
+    ...selections.map((loops, i) =>
+      extrude(`shared-${i}`, `b${String(i).padStart(3, "0")}`, {
+        sketch: "ancestry",
+        distance: i + 1,
+        op: "new",
+        ...(loops === undefined ? {} : { loops }),
+      }),
+    ),
+  ];
+  const ancestry = ancestryStats();
+  const profileCache = profileCacheStats();
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    stats: {
+      captureVisits: 0,
+      toolArrays: 0,
+      metadataVisits: 0,
+      ancestry,
+      profileCache,
+    },
+  });
+  expect(model.errors).toEqual([]);
+  expect(model.overLimit).toBeUndefined();
+  return { elements, model, ancestry, profileCache };
+}
+
+function checkSharedOracle(
+  run: ReturnType<typeof sharedProfileRun>,
+  entities: Element[],
+  selections: (string[] | undefined)[],
+) {
+  const request = {
+    width: 256,
+    height: 256,
+    theme: "light" as const,
+    camera: { view: "top" as const },
+    interference: null,
+  };
+  const capture = prepareCadCapture(run.elements, CAD_TEST_PAGE.id, request);
+  const tools = capture.model.tools.map((tool, i) => {
+    if (tool.kind !== "prism") throw new Error("Expected prism");
+    const sourceFaces = new Map<string, number>();
+    const loops = oracleNormalise(selectedLoops(entities, selections[i])).map(
+      ({ points, sources }) => ({
+        points: new Float64Array(points),
+        faces: new Uint32Array(
+          sources.map((source) => {
+            let face = sourceFaces.get(source);
+            if (face === undefined) {
+              face = 2 + sourceFaces.size;
+              sourceFaces.set(source, face);
+            }
+            return face;
+          }),
+        ),
+      }),
+    );
+    return { ...tool, loops };
+  });
+  expect(capture.scene).toEqual(
+    writeCaptureScene(
+      { ...capture.model, tools },
+      {
+        width: request.width,
+        height: request.height,
+        supersample: 2,
+        camera: capture.camera,
+        colours: CAPTURE_THEMES[request.theme],
+        referenceOpacity: 0.45,
+        interference: null,
+      },
+    ),
+  );
+  for (let i = 0; i < selections.length; i++) {
+    expect(capture.model.bodies[i]?.bounds.max[2]).toBe(i + 1);
+    expect(capture.model.bodies[i]?.bounds.min[2]).toBe(0);
+  }
+}
+
+test("shared whole profiles reuse ancestry and preserve scene bytes", () => {
+  const shallow = ancestryFixture("shallow", 1024);
+  const sparse = [
+    ...rectangle("ancestry", 0, 0, 10, 10),
+    circle("inner", "ancestry", [5, 5], 1),
+    ...Array.from({ length: 64 }, (_, i) =>
+      circle(
+        `far-${i}`,
+        "ancestry",
+        [300 + 300 * (i % 8), 300 + 300 * Math.floor(i / 8)],
+        100,
+      ),
+    ),
+  ];
+  for (const entities of [shallow.entities, sparse]) {
+    const one = sharedProfileRun(entities, [undefined]);
+    const many = sharedProfileRun(entities, Array(32).fill(undefined));
+    expect(ancestryWork(many.ancestry)).toBe(ancestryWork(one.ancestry));
+    expect(many.ancestry.forestFallbacks).toBe(one.ancestry.forestFallbacks);
+    expect(many.profileCache.prepared).toBe(one.profileCache.prepared);
+    expect(many.profileCache).toMatchObject({
+      admitted: 1,
+      lookups: 31,
+      hits: 31,
+    });
+    console.log(`shared profile prepared: ${many.profileCache.prepared}`);
+    if (entities === sparse) {
+      expect(many.ancestry.forestFallbacks).toBe(0);
+      expect(many.profileCache.prepared).toBeGreaterThanOrEqual(
+        PROFILE_CACHE_MIN_WORK,
+      );
+    }
+    checkSharedOracle(many, entities, Array(32).fill(undefined));
+  }
+  const subsets = [
+    shallow.selected.filter((_, i) => i < shallow.selected.length / 2),
+    shallow.selected.filter((_, i) => i >= shallow.selected.length / 2),
+  ];
+  const both = sharedProfileRun(shallow.entities, subsets);
+  const first = sharedProfileRun(shallow.entities, [subsets[0]]);
+  const second = sharedProfileRun(shallow.entities, [subsets[1]]);
+  expect(ancestryWork(both.ancestry)).toBe(
+    ancestryWork(first.ancestry) + ancestryWork(second.ancestry),
+  );
+  expect(both.profileCache).toMatchObject({ lookups: 0, admitted: 0, hits: 0 });
+  checkSharedOracle(both, shallow.entities, subsets);
+}, 120_000);
+
+test("ordinary capture avoids profile cache work", () => {
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  const page = doc.pages[0];
+  if (!page) throw new Error("Missing fixture page");
+  const ancestry = ancestryStats();
+  const profileCache = profileCacheStats();
+  buildCadCaptureModel(doc.elements, page.id, {
+    stats: {
+      captureVisits: 0,
+      toolArrays: 0,
+      metadataVisits: 0,
+      ancestry,
+      profileCache,
+    },
+  });
+  console.log(`ordinary profile cache: ${JSON.stringify(profileCache)}`);
+  expect(profileCache).toMatchObject({ lookups: 0, admitted: 0, hits: 0 });
+  expect(profileCache.maxDirectWork * 4).toBeLessThanOrEqual(
+    PROFILE_CACHE_MIN_WORK,
+  );
+  expect(ancestry).toMatchObject({
+    ancestorProbes: 5000,
+    indexEntries: 5500,
+    forestFallbacks: 0,
+  });
+}, 120_000);

@@ -14,6 +14,7 @@ pub(super) struct ReferenceRaster<'a> {
     scene: &'a Scene,
     tools: Vec<Option<ProjectedPrism>>,
     solid_tools: Vec<bool>,
+    body_boxes: Vec<crate::lattice::Bounds>,
     open_bodies: Vec<bool>,
     light: [f64; 3],
     samples_wide: usize,
@@ -128,6 +129,14 @@ impl ReferenceRaster<'_> {
                 &mut scratch.overlaps,
             );
             for &(a, b, s0, s1) in &scratch.overlaps {
+                if !self
+                    .body_boxes
+                    .get(a as usize)
+                    .zip(self.body_boxes.get(b as usize))
+                    .is_some_and(|(&a, &b)| crate::lattice::shares_extent(a, b))
+                {
+                    continue;
+                }
                 let (min, max) = overlay::stretch_box(
                     &ray,
                     camera.forward,
@@ -364,6 +373,7 @@ pub(super) fn render_reference_full(scene: &Scene) -> (Vec<u8>, Report, Vec<cens
         scene,
         tools,
         solid_tools,
+        body_boxes: crate::lattice::body_boxes(scene, &crate::lattice::scene_tool_bounds(scene)),
         open_bodies,
         light: shade::light(camera),
         samples_wide: (width * factor) as usize,
@@ -579,6 +589,63 @@ pub(in crate::raster) mod fixtures {
         scene
     }
 
+    pub(in crate::raster) fn mesh_under_prism(back: bool, overlap: f64) -> Scene {
+        let mut scene = stacked_caps(overlap);
+        scene.tools[0] = Tool::Mesh(crate::scene::Mesh {
+            positions: vec![
+                0., 0., 0., 16., 0., 0., 16., 8., 0., 0., 8., 0., 0., 0., 0.9375, 16., 0., 0.9375,
+                16., 8., 0.9375, 0., 8., 0.9375,
+            ],
+            triangles: vec![
+                0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2,
+                7, 6, 3, 0, 4, 3, 4, 7,
+            ],
+        });
+        if back {
+            scene.camera.forward = [0., -1., 0.];
+            scene.camera.right = [-1., 0., 0.];
+            scene.camera.centre[1] = 12.;
+        }
+        scene
+    }
+
+    pub(in crate::raster) fn tall_mesh_under_prism(back: bool, overlap: f64) -> Scene {
+        let mut scene = stacked_caps(overlap);
+        scene.width = 64;
+        scene.height = 64;
+        scene.supersample = 2;
+        scene.tools = vec![
+            Tool::Mesh(crate::scene::Mesh {
+                positions: vec![
+                    -1., 0., -35.25, 1., 0., -35.25, 1., 8., -35.25, -1., 8., -35.25, -1., 0., 0.,
+                    1., 0., 0., 1., 8., 0., -1., 8., 0.,
+                ],
+                triangles: vec![
+                    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3,
+                    7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+                ],
+            }),
+            box_tool([-1.0, 0.0, -overlap], 2.0, 8.0, 156.75 + overlap, false),
+        ];
+        // Default-fit camera from tmp/car13-r13/car13-p1-touching-witness/camera-probe.log.
+        scene.camera = Camera {
+            right: if back {
+                [-1.0, 0.0, 0.0]
+            } else {
+                [1.0, 0.0, 0.0]
+            },
+            up: [0.0, 0.0, 1.0],
+            forward: if back {
+                [0.0, -1.0, 0.0]
+            } else {
+                [0.0, 1.0, 0.0]
+            },
+            centre: [0.0, 0.0, 60.75],
+            mm_per_pixel: 3.24,
+        };
+        scene
+    }
+
     pub(in crate::raster) fn shared_side(opposed: bool, overlap: f64) -> Scene {
         let mut scene = blank();
         let origin = if opposed {
@@ -621,6 +688,15 @@ mod witness_tests {
         assert_eq!(report.pairs.len(), 1);
         plain.draw_interference = false;
         assert_ne!(rgb, render_reference(&plain).0);
+    }
+    #[test]
+    fn tall_mesh_touch() {
+        for back in [false, true] {
+            touching(
+                fixtures::tall_mesh_under_prism(back, 0.0),
+                fixtures::tall_mesh_under_prism(back, 0.0),
+            );
+        }
     }
     #[test]
     fn stacked_caps_touch() {

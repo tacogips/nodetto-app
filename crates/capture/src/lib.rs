@@ -7,6 +7,7 @@ pub mod interference;
 pub mod interval;
 pub mod lattice;
 pub mod mesh;
+mod mesh_contact;
 pub mod nmesh;
 pub mod overlay;
 pub mod prism;

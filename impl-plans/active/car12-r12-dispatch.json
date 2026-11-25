@@ -1,0 +1,281 @@
+{
+  "taskId": "car12-r12",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "73f73b81dfd6ef8e48f4f1125e1f51cbdca94b4d",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car12-r12",
+  "waves": [
+    ["car12-p1-mesh-volume-ownership", "car12-p2a-segment-sweep", "car12-p3-selected-ancestry", "car12-p4-side-face-members", "car12-p5-inspector-targets", "car12-p6a-ts-shell-eligibility"],
+    ["car12-p2b-profile-sweep", "car12-p6b-rust-shell-eligibility", "car12-p6c-shell-capture-tests"],
+    ["car12-p7-native-parity"]
+  ],
+  "reviewContext": {
+    "issueReference": "audit-round-12 feat/ai-capture@73f73b81dfd6ef8e48f4f1125e1f51cbdca94b4d (base 0a35708): function-capture-mesh-prism-touching-face, performance-sketch-profile-pair-scans, performance-capture-selected-loop-ancestry-work, performance-cad-side-face-member-rescans, performance-cad-inspector-target-membership, maintainability-capture-touching-shell-mesh-eligibility; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car12-00-overview.md",
+    "userProblem": "The round-12 audit found six major defects in AI capture and the 3D CAD pages. (1) A closed STL mesh and an extrusion that only share a face are reported as interfering, because the mesh volume query uses the view-dependent top-left edge rule (crates/capture/src/mesh.rs:110, :286) while the prism uses world-space ownership, so a flush fit fails --fail-on-interference with exit 1. (2) The crowded fallback of the sketch-profile segment check (packages/core/src/cad/loops.ts:406) lists every overlapping box pair: 4N^2+N exact tests for disjoint diagonal strips. (3) Capture preparation (packages/core/src/capture/scene.ts:233) searches every lower depth for each selected contour, quadratic for deep omitted ancestors and for shallow rim/hole profiles, before the point limit is charged. (4) Every side-face sketch rescans its extrusion's loop members (packages/core/src/cad/history.ts:474), M x S work. (5) The multi-target inspector re-filters and re-searches the target list for every checkbox (packages/ui-solid/src/inspector/CadSection.tsx:229, extrude-targets.ts:29-30). (6) An imported STL of two closed shells touching at an edge or face is rejected by the TS and Rust capture eligibility checks (packages/io/src/nmesh/capture-decoder.ts:120, crates/capture/src/mesh.rs:59-63) although the desktop Manifold worker accepts it, so capture drops the whole multi-body cut and reports cad.body.missing.",
+    "requiredOutcomes": [
+      "function-capture-mesh-prism-touching-face (R12-1; car12-p1, car12-p7): closed-mesh volume queries use canonical edge evaluation with a symmetric band and the prism's increases_in_world tie rule; shading (facet path) is unchanged. Rust raster tests and native CLI parity give zero pairs, no hatch and exit 0 for the flush STL/extrusion contact in front and back views; a 0.01 mm overlap gives a pair and exit 1. Goldens and determinism are unchanged.",
+      "performance-sketch-profile-pair-scans (R12-2; car12-p2a, car12-p2b): a one-sided Shamos-Hoey provesDisjoint module, used only past the existing SWEEP_PAIRS_PER_BOX threshold, makes segmentTests and total work grow at most 2.5x per doubling for the diagonal-strip fixture; ordered loops are identical; the crossing and repeated-vertex controls report the same first ID as the old enumeration; the ordinary 500-feature fixture keeps segmentFallbacks === 0 and its pinned segmentTests (audit: 164,000).",
+      "performance-capture-selected-loop-ancestry-work (R12-3; car12-p3): normaliseToolLoops counts depth lookups, probes and edge work against a 32-per-vertex budget and falls back to loopForest once; deep and shallow fixtures grow at most 2.5x per doubling; scene bytes equal a full-scene oracle; the ordinary 500-feature baseline pins ancestorProbes and indexEntries (audit: 5,000 and 5,500) with zero forest fallbacks.",
+      "performance-cad-side-face-member-rescans (R12-4; car12-p4): a lazy per-tool member set behind a 4 * memberTotal scan budget makes side-face membership linear for repeated, distinct and omitted-loop queries; frames and cad.reference.missing errors are unchanged; the cap path allocates nothing; the ordinary 500-feature fixture has zero index builds.",
+      "performance-cad-inspector-target-membership (R12-5; car12-p5): selectTargets builds one validated array and set per selection change, orderExtrudeTargets uses sets with listed + stored visits, and checkbox rows use selection().has; queries double exactly from N to 2N; display order for selected, unselected and missing IDs and the single-target add behaviour are unchanged.",
+      "maintainability-capture-touching-shell-mesh-eligibility (R12-6; car12-p6a, car12-p6b, car12-p6c, car12-p7): TS and Rust eligibility and Rust picture closure keep the all-two-use fast path and add a contact path (C1-C6: balanced halfedges, exact coplanar patch cancellation with attachment check, per-shell same-sign non-zero volume, disjoint integer boxes) that admits edge, face and crossed-diagonal contact fixtures; open-triangle, unbalanced, welded-overlap, double-sided-fin and coincident-shell controls stay rejected; capture keeps the difference step on both bodies, the worker exports a 480 mm^3 plate, and the release-native cut image differs from its uncut control."
+    ],
+    "nonGoals": [
+      "No change to raster.rs, interference.rs, lattice.rs, tool_view.rs, scene.rs, NCS1 layout, CLI flags, Tauri, report types or goldens.",
+      "No change to SWEEP_PAIRS_PER_BOX, the containment/depth passes of loops.ts, loop-forest.ts, cad-request.ts, the CadCaptureRequest API, the history.ts profile member index, extrude-authoring.ts, cad-edits.ts or inspector/cad-edits.test.ts.",
+      "No reordering of normalization and chargeTool in scene.ts; no edits to design docs, impl-plans/README.md, package.json or lockfiles by workers; no new dependency."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, indexed reads safe under noUncheckedIndexedAccess with no non-null assertions, Biome clean on touched files, CARGO_TERM_QUIET=true, packages/io must not import @nodetto/core.",
+      "artifactRoots exactly [\"target\", \"tmp/cad3d\"]; evidence under tmp/car12-r12/<planId>/; each plan uses CARGO_TARGET_DIR=target/car12-<plan>; no *.test.ts or *.test.tsx left under target/ or tmp/.",
+      "Per-plan gates are focused; bun run typecheck, bun run lint, mise run verify and the release-binary parity plus MCP run happen once at integration.",
+      "Workers follow the SHA-256 pre/post hash and drift-stop rule of car12-00-overview.md; shared files (mesh.rs: p1 then p6b; scene.test.ts: p3 then p6c) are re-read fresh.",
+      "The design 26.2 timing rule applies; new performance behaviour is asserted with work counters only; at most two bun test or cargo test processes at once; never relax or delete existing assertions except the documented p1 rename."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R12-1 changes only the volume path, with canonical vertex-index-ordered edge evaluation, a symmetric band and the prism's increases_in_world tie rule; shading keeps the top-left rule.", "rationale": "Adjacent triangles then see one tie decision (watertight), and goldens and determinism stay untouched; rechecks reuse the existing prism recheck seam."},
+      {"decision": "R12-2 uses the sweep only to prove disjointness (one-sided provesDisjoint), handing off collapsed segments and any contact to the old enumeration.", "rationale": "First-error identity cannot drift, and ordinary sketches never reach the new code because SWEEP_PAIRS_PER_BOX is unchanged."},
+      {"decision": "R12-3 reuses loopForest behind a 32-per-vertex work budget, with all windings positive.", "rationale": "Every CadLoop is counter-clockwise, so loops.ts is not edited and p3 does not wait for p2b; ordinary inputs stay on the sparse path."},
+      {"decision": "R12-4 builds a lazy per-tool set behind a 4 * memberTotal scan budget instead of reusing the profile member index.", "rationale": "The profile index covers omitted loops and would need a per-query filter; p4 stays within history.ts."},
+      {"decision": "R12-5 keeps displayedExtrudeTargets as a delegating wrapper.", "rationale": "extrude-authoring.ts and its tests remain unchanged."},
+      {"decision": "R12-6 admits welded contacts only on a separate contact path (C1-C6) with exact integer plane keys and disjoint integer bounding boxes, implemented independently in TS and Rust.", "rationale": "It is exact and linear, identical on integers in both languages, keeps every contact it cannot prove safe rejected, and leaves the fast path and its allocation counts untouched."},
+      {"decision": "All native parity assertions for R12-1 and R12-6 move to one final plan p7 that depends on every other plan.", "rationale": "The release binary bundles the TypeScript core and must build once from a settled tree; p7 is the only editor of capture.test.ts."}
+    ],
+    "intentionalTradeoffs": [
+      "The existing Rust test cube_surface_casts_are_not_ownership_sensitive is renamed and its [0,0] point asserts the new volume result; the other four points keep their assertions.",
+      "A crowded sketch that does contain a contact or repeated vertex still pays the old quadratic enumeration on its error path.",
+      "R12-6 is narrower than Manifold: touching shells with overlapping bounding boxes, partial face contacts with differing patch boundaries, welded overlaps and double-sided fins stay display-only with cad.body.missing.",
+      "In the native contact test, no hatch is asserted as PNG equality with the --no-interference capture; the 0.01 mm overlap control requires a pair and exit 1, not a visible hatch.",
+      "R12-2 is split into p2a (module) and p2b (integration), and R12-6 into p6a, p6b and p6c, to respect plan-size limits."
+    ],
+    "supportedEdgeCases": [
+      "Axis-aligned flush mesh/prism contact in front and back views; oblique ray watertightness at shared triangle edges; projected-corner rays.",
+      "Horizontal, collinear, T-touching and collapsed segments in the sweep (3,000-case differential test); crossing and repeated-vertex controls.",
+      "Deep omitted-ancestor selections, the outermost-square variant and shallow rim/hole selections; existing ancestry, grid, slotted and ray-origin fixtures.",
+      "Repeated last-member, distinct-side and omitted-loop side-face queries.",
+      "Selected, unselected and missing stored target IDs; single-target add.",
+      "Edge, face and crossed-diagonal touching shells; separated shells; off-grid raw NCS1 meshes classified as before without panic."
+    ],
+    "outOfScopeEdgeCases": [
+      "Oblique or curved mesh/prism contacts beyond the band guard; mesh topologies with more than two triangles per edge other than the claimed fixtures.",
+      "Boa elapsed time, desktop frame time, native peak memory, Tauri IPC, MCP delivery and desktop WebGL."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car12-00-overview.md",
+      "impl-plans/active/car12-p1-mesh-volume-ownership.md",
+      "impl-plans/active/car12-p2a-segment-sweep.md",
+      "impl-plans/active/car12-p2b-profile-sweep.md",
+      "impl-plans/active/car12-p3-selected-ancestry.md",
+      "impl-plans/active/car12-p4-side-face-members.md",
+      "impl-plans/active/car12-p5-inspector-targets.md",
+      "impl-plans/active/car12-p6a-ts-shell-eligibility.md",
+      "impl-plans/active/car12-p6b-rust-shell-eligibility.md",
+      "impl-plans/active/car12-p6c-shell-capture-tests.md",
+      "impl-plans/active/car12-p7-native-parity.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car12-p1-mesh-volume-ownership",
+      "planPath": "impl-plans/active/car12-p1-mesh-volume-ownership.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/mesh.rs", "crates/capture/src/prism.rs", "crates/capture/src/raster/reference.rs", "crates/capture/src/raster/tests.rs", "impl-plans/active/car12-p1-mesh-volume-ownership.md", "impl-plans/progress/car12-p1-mesh-volume-ownership.md", "tmp/car12-r12/car12-p1-mesh-volume-ownership", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/mesh.rs", "intendedEdit": "p1 adds the volume-membership test, shared depth helper and sensitivity flag; p6b later edits closed_by after re-reading the file fresh."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "prism.rs only makes increases_in_world pub(crate). mesh.rs hits_impl::<false> uses a separate volume test with canonical (lower-index-first) edge values, band err = 8 * EPSILON * (|dx|+|dy|) * S and the increases_in_world tie rule; facet_depth and first_surface_hit shading are unchanged; surface_intervals flags only near-tie triangles whose volume and facet membership differ.",
+        "New contact_plane_rays_follow_prism_ownership and volume_ties_are_watertight_for_oblique_rays pass; cube_surface_casts_are_not_ownership_sensitive is renamed to cube_surface_and_volume_casts_differ_only_at_ownership_ties, keeps four points and asserts [0,0] facet empty, flag true, volume depths [1.0, 2.0].",
+        "New fixture mesh_under_prism(back, overlap) in raster/reference.rs; new production_touching_mesh_caps passes front and back (back fails before); production_overlap_witness gains both 0.01 mm variants with 1 pair each.",
+        "All existing nodetto-capture tests, goldens and exact counts pass unedited; fmt and clippy -D warnings are clean; fail-before log saved."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p1 cargo clippy -p nodetto-capture --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p1 cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car12-p2a-segment-sweep",
+      "planPath": "impl-plans/active/car12-p2a-segment-sweep.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/segment-sweep.ts", "packages/core/src/cad/segment-sweep.test.ts", "impl-plans/active/car12-p2a-segment-sweep.md", "impl-plans/progress/car12-p2a-segment-sweep.md", "tmp/car12-r12/car12-p2a-segment-sweep", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "New segment-sweep.ts imports only ./vec.ts and exports SweepStats {events, steps, tests, collapsed} and provesDisjoint(count, endpoints, touches, stats?), which returns true only when disjointness is proved: collapse scan first, closed-box precondition before every touches call, (y, x) events, exact gridCross treap status with a Math-free priority hash, and every contact branch returning false.",
+        "New segment-sweep.test.ts: the seeded 3,000-case differential test shows soundness on every case and completeness without collapse, with all four case counts non-zero and logged; the collapsed polyline gives false, collapsed 1, events 0; the T-touch gives false in both orders; N disjoint diagonals at 1024/2048/4096 return true with events + steps + tests at most 2.5x per doubling and tests <= 3N."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/segment-sweep.ts packages/core/src/cad/segment-sweep.test.ts",
+        "bun test packages/core/src/cad/segment-sweep.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p2b-profile-sweep",
+      "planPath": "impl-plans/active/car12-p2b-profile-sweep.md",
+      "dependsOn": ["car12-p2a-segment-sweep"],
+      "writePaths": ["packages/core/src/cad/loops.ts", "packages/core/src/cad/loops.test.ts", "impl-plans/active/car12-p2b-profile-sweep.md", "impl-plans/progress/car12-p2b-profile-sweep.md", "tmp/car12-r12/car12-p2b-profile-sweep", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "overlappingPairs gains an optional crowded callback called once where the indexed path would begin; intersection() counts segmentTests on both paths and skips the listing only when provesDisjoint returns true; LoopStats gains optional segmentTests, segmentFallbacks and sweep; the segment sort, first selection and SWEEP_PAIRS_PER_BOX (8) are unchanged.",
+        "New diagonal-strip test at N = 64/128/256 has W and segmentTests at most 2.5x per doubling and loops equal to the vertex-list oracle; it fails before (about 4x).",
+        "Crossing control reports cad.profile.intersect with the BigInt all-pairs oracle's ID and segmentFallbacks 1; the repeated-vertex control reports at === \"repeated-vertex\", segmentFallbacks 1, sweep.collapsed 1.",
+        "The ordinary 500-feature baseline has segmentFallbacks 0, zero sweep work and segmentTests pinned to the pre-change measured value (audit 164,000); existing loops tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts",
+        "bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/segment-sweep.test.ts packages/core/src/cad/pcb-outline.test.ts packages/core/src/cad/loop-forest.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p3-selected-ancestry",
+      "planPath": "impl-plans/active/car12-p3-selected-ancestry.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/scene.ts", "packages/core/src/capture/scene.test.ts", "impl-plans/active/car12-p3-selected-ancestry.md", "impl-plans/progress/car12-p3-selected-ancestry.md", "tmp/car12-r12/car12-p3-selected-ancestry", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/capture/scene.test.ts", "intendedEdit": "p3 adds ancestry work and full-scene oracle tests; p6c later appends touching-shell capture tests after re-reading the file fresh."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "normaliseToolLoops stats gain optional depthLookups, forestFallbacks and forest; ANCESTRY_WORK_PER_VERTEX = 32 bounds depth lookups (missing buckets included) plus probes, index entries and edge work; past the budget the old path is abandoned and loopForest runs once with windings all 1, keeping the same parity filter in input order. CaptureWalkStats gains optional ancestry, passed by buildCadCaptureModel.",
+        "Deep (D = S = 256/512/1024) and shallow (N = 1024/2048) document fixtures and the raw shallow helper (N up to 4096) do at most 2.5x work per doubling with forestFallbacks >= 1; they fail before (about 4x).",
+        "prepareCadCapture scene bytes equal writeCaptureScene of the oracleNormalise-rebuilt model for every deep size, the deep variant and every shallow size; body bounds match.",
+        "The ordinary 500-feature baseline has forestFallbacks 0 and pins ancestorProbes and indexEntries (audit 5,000 and 5,500); existing scene tests and exact counts pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts",
+        "bun test packages/core/src/capture/scene.test.ts packages/core/src/cad/loop-forest.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p4-side-face-members",
+      "planPath": "impl-plans/active/car12-p4-side-face-members.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/history.ts", "packages/core/src/cad/history.test.ts", "impl-plans/active/car12-p4-side-face-members.md", "impl-plans/progress/car12-p4-side-face-members.md", "tmp/car12-r12/car12-p4-side-face-members", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "cadGeometryWork gains sideMemberVisits and sideMemberIndexBuilds; createCadGeometry keeps a lazily allocated per-ExtrudeGeometry entry with budget 4 * memberTotal and builds a member Set only after the budget is scanned; membership stays over the selected tool.loops; cap and base paths allocate nothing.",
+        "Repeated, distinct and omitted-loop tests at M = S = 256/512/1024 have sideMemberVisits at most 2.5x per doubling (fail before, about 4x); omitted-loop lines give cad.reference.missing with the line ID; frames equal the expected faceFrame result.",
+        "The ordinary 500-feature fixture gives sideMemberIndexBuilds 0; existing history tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/history.ts packages/core/src/cad/history.test.ts",
+        "bun test packages/core/src/cad/history.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p5-inspector-targets",
+      "planPath": "impl-plans/active/car12-p5-inspector-targets.md",
+      "dependsOn": [],
+      "writePaths": ["packages/ui-solid/src/cad/extrude-targets.ts", "packages/ui-solid/src/cad/extrude-targets.test.ts", "packages/ui-solid/src/inspector/CadSection.tsx", "packages/ui-solid/src/test-dom/cad-inspector.dom.tsx", "impl-plans/active/car12-p5-inspector-targets.md", "impl-plans/progress/car12-p5-inspector-targets.md", "tmp/car12-r12/car12-p5-inspector-targets", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "extrude-targets.ts exports targetSelectionWork, selectTargets(value) (one validated array and Set per call) and orderExtrudeTargets(listed, stored) using sets with listed + stored visits; displayedExtrudeTargets delegates with an unchanged signature.",
+        "CadSection.tsx memoizes selection, listedIds and orderedTargets and uses selection().has for checked state and the click guard.",
+        "extrude-targets.test.ts asserts builds 1, visits N and queries N at N = 500/1000, visits doubling exactly at 2N, and exact order for selected, unselected and missing IDs.",
+        "cad-inspector.dom.tsx (launched by unedited cad-edits.test.ts) asserts builds 1 per change, queries(2N) === 2 * queries(N), the stored order after unchecking, single-target add replacement, and still prints ok light and ok dark."
+      ],
+      "verification": [
+        "bunx biome check packages/ui-solid/src/cad/extrude-targets.ts packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/inspector/CadSection.tsx packages/ui-solid/src/test-dom/cad-inspector.dom.tsx",
+        "bun test packages/ui-solid/src/cad/extrude-targets.test.ts packages/ui-solid/src/inspector/cad-edits.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p6a-ts-shell-eligibility",
+      "planPath": "impl-plans/active/car12-p6a-ts-shell-eligibility.md",
+      "dependsOn": [],
+      "writePaths": ["packages/io/src/nmesh/capture-decoder.ts", "packages/io/src/nmesh/capture-decoder.test.ts", "docs/capture.md", "docs/cad3d.md", "impl-plans/active/car12-p6a-ts-shell-eligibility.md", "impl-plans/progress/car12-p6a-ts-shell-eligibility.md", "tmp/car12-r12/car12-p6a-ts-shell-eligibility", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "capture-decoder.ts keeps today's number-only fast path when no edge has three or more uses; a separate contact path applies C1 balance, zero-normal rejection, BigInt plane keys, patch cancellation with the at-least-4-uses rule, the post-cancellation Attachment check, the remaining-duplicate check, C3 shells, C4 per-shell use and same-sign non-zero volume, C5 disjoint integer boxes and C6 emptiness. packages/io does not import @nodetto/core.",
+        "Edge, face and crossed-diagonal contact give booleanTarget true (fail before); separated gives true; open triangle, unbalanced, welded overlap, double-sided fin and coincident shells give false.",
+        "capture-decoder-budget.test.ts passes unedited; docs/capture.md and docs/cad3d.md gain one sentence each on touching closed shells."
+      ],
+      "verification": [
+        "bunx biome check packages/io/src/nmesh/capture-decoder.ts packages/io/src/nmesh/capture-decoder.test.ts",
+        "bun test packages/io/src/nmesh/capture-decoder.test.ts packages/io/src/nmesh/capture-decoder-budget.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p6b-rust-shell-eligibility",
+      "planPath": "impl-plans/active/car12-p6b-rust-shell-eligibility.md",
+      "dependsOn": ["car12-p1-mesh-volume-ownership"],
+      "writePaths": ["crates/capture/src/mesh.rs", "crates/capture/src/nmesh.rs", "crates/capture/tests/mesh.rs", "impl-plans/active/car12-p6b-rust-shell-eligibility.md", "impl-plans/progress/car12-p6b-rust-shell-eligibility.md", "tmp/car12-r12/car12-p6b-rust-shell-eligibility", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "crates/capture/src/mesh.rs", "intendedEdit": "After p1 lands, re-read fresh and add the closed_by contact path only; do not change p1's volume rule."},
+        {"path": "crates/capture/src/nmesh.rs", "intendedEdit": "Adapt target_eligible's contact path and, if needed, make UNITS_PER_MILLIMETRE pub(crate) here rather than moving it to another file."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "closed_by keeps the fast path for all-two-use meshes; a separate contact path first requires the lossless NMESH integer domain, then applies the same C1-C6 steps as p6a in i128 without panics; CLOSURE_EVALUATIONS is counted once per call.",
+        "target_eligible keeps calling closed_by first; on the contact path it uses C1's direction rule and drops the duplicate-face rejection; the fast path is byte-for-byte today's logic and AllocStats counting.",
+        "crates/capture/tests/mesh.rs: closed_by true for edge, face, crossed-diagonal and separated; false for open triangle, unbalanced, welded overlap, double-sided fin and coincident shells; the off-grid raw mesh gives false for is_closed and closed_by with no panic. nmesh.rs unit tests give the same nine booleans as TypeScript.",
+        "All existing capture tests, p1's tests and closure_count.rs pass; fmt and clippy -D warnings clean; fail-before log saved."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture -- --check",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p6b cargo clippy -p nodetto-capture --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p6b cargo test -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car12-p6c-shell-capture-tests",
+      "planPath": "impl-plans/active/car12-p6c-shell-capture-tests.md",
+      "dependsOn": ["car12-p3-selected-ancestry", "car12-p6a-ts-shell-eligibility"],
+      "writePaths": ["packages/core/src/capture/scene.test.ts", "packages/cad-kernel/src/worker-host.test.ts", "impl-plans/active/car12-p6c-shell-capture-tests.md", "impl-plans/progress/car12-p6c-shell-capture-tests.md", "tmp/car12-r12/car12-p6c-shell-capture-tests", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "packages/core/src/capture/scene.test.ts", "intendedEdit": "After p3 lands, re-read fresh and append touching-shell capture tests; do not edit p3's tests."}
+      ],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Tests only, no production edits. scene.test.ts: for edge, face and crossed-diagonal contact with a plate and a 2 x 2 mm cut, buildCadCaptureModel reports no cad.body.missing, both the mesh and the plate body end with a difference step, and prepareCadCapture bytes differ from the uncut control.",
+        "Open-triangle and welded-overlap meshes keep cad.body.missing with scene bytes equal to the uncut control; the separated mesh applies the cut.",
+        "worker-host.test.ts: the real worker applies the cut for edge, face and crossed-diagonal contact and exports a 480 mm^3 plate within the file's tolerance; p3's and all existing tests pass."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/capture/scene.test.ts packages/cad-kernel/src/worker-host.test.ts",
+        "bun test packages/core/src/capture/scene.test.ts packages/cad-kernel/src/worker-host.test.ts"
+      ]
+    },
+    {
+      "planId": "car12-p7-native-parity",
+      "planPath": "impl-plans/active/car12-p7-native-parity.md",
+      "dependsOn": ["car12-p1-mesh-volume-ownership", "car12-p2a-segment-sweep", "car12-p2b-profile-sweep", "car12-p3-selected-ancestry", "car12-p4-side-face-members", "car12-p5-inspector-targets", "car12-p6a-ts-shell-eligibility", "car12-p6b-rust-shell-eligibility", "car12-p6c-shell-capture-tests"],
+      "writePaths": ["apps/cli/src/native-parity/capture.test.ts", "impl-plans/active/car12-p7-native-parity.md", "impl-plans/progress/car12-p7-native-parity.md", "tmp/car12-r12/car12-p7-native-parity", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Tests only, no production edits. Flush contact (mesh box X -32..32, Y 0..8, Z -4..0 under a 4 mm extrusion) in back and front views with --fail-on-interference gives exit 0 and interference: 0, and PNG bytes equal the --no-interference capture; the -0.01 mm offset control gives exit 1 and interference: 1.",
+        "Edge, face and crossed-diagonal touching-shell documents with plate and cut give exit 0 in --view top, no cad.body.missing, and PNG bytes that differ from each uncut control.",
+        "The gate log built against target/car12-p7/release/nodetto-cli lists the new tests as passed, not skipped; existing parity tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check apps/cli/src/native-parity/capture.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p7 cargo build --release -p nodetto-cli && test -x \"$PWD/target/car12-p7/release/nodetto-cli\" && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car12-p7/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    }
+  ],
+  "integration": [
+    "bun run typecheck",
+    "bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car12-p7 cargo build --release -p nodetto-cli && test -x \"$PWD/target/car12-p7/release/nodetto-cli\" && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car12-p7/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" \\( -name \"*.test.ts\" -o -name \"*.test.tsx\" \\) -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

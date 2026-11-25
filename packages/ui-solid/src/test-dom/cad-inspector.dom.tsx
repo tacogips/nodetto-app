@@ -16,6 +16,10 @@ import {
   PCB_TEST_PAGE,
   testBoard,
 } from "../../../core/src/cad/testing/pcb.ts";
+import {
+  earlierExtrudeBodies,
+  targetSelectionWork,
+} from "../cad/extrude-targets.ts";
 import { NodettoCanvas } from "../Canvas.tsx";
 import { Inspector } from "../Inspector.tsx";
 import { Layers } from "../Layers.tsx";
@@ -44,8 +48,61 @@ function change(
   control.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function countTargetQueries(n: number): number {
+  const editor = new Editor({ document: plateWithHoles(1) });
+  editor.setCurrentPage("cad");
+  const bodies = Array.from({ length: n - 1 }, (_, i) =>
+    cadElement(`extra-${i}`, "cad.extrude", "a2", {
+      sketch: "base",
+      name: `extra-${i}`,
+      distance: 5,
+      op: "new",
+    }),
+  );
+  for (const body of bodies)
+    editor.apply([{ type: "createElement", element: body }]);
+  const cut = editor.store.get("ex2");
+  assert.ok(cut);
+  assert.ok(isPlainObject(cut.semantic));
+  const listed = earlierExtrudeBodies(
+    editor.store.getPageElements("cad"),
+    cut,
+  ).map((body) => body.id);
+  assert.equal(listed.length, n);
+  editor.apply([
+    {
+      type: "updateSemantic",
+      id: cut.id,
+      semantic: { ...cut.semantic, bodies: [...listed].reverse() },
+    },
+  ]);
+  editor.selection.set([cut.id]);
+  const root = document.createElement("main");
+  document.body.append(root);
+  const dispose = render(() => <Inspector editor={editor} simple />, root);
+  const switches = root.querySelectorAll<HTMLInputElement>(
+    '[aria-label="Target bodies"] input[role="switch"]',
+  );
+  assert.equal(switches.length, n);
+  Object.assign(targetSelectionWork, { builds: 0, visits: 0, queries: 0 });
+  const first = switches[0];
+  assert.ok(first);
+  first.click();
+  assert.equal(targetSelectionWork.builds, 1);
+  assert.ok(targetSelectionWork.queries > 0);
+  const semantic = editor.store.get(cut.id)?.semantic;
+  assert.ok(isPlainObject(semantic));
+  assert.deepEqual(semantic.bodies, listed.slice(1));
+  const queries = targetSelectionWork.queries;
+  dispose();
+  root.remove();
+  return queries;
+}
+
 for (const theme of ["light", "dark"] as const) {
   document.documentElement.dataset.nodettoTheme = theme;
+  const smallQueries = countTargetQueries(16);
+  assert.equal(countTargetQueries(32), 2 * smallQueries);
   const model = plateWithHoles(1);
   const editor = new Editor({
     document: {

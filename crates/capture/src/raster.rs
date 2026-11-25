@@ -139,6 +139,7 @@ struct Raster<'a> {
     tools: Vec<Option<ProjectedPrism>>,
     weights: Vec<u64>,
     solid_tools: Vec<bool>,
+    body_boxes: Vec<crate::lattice::Bounds>,
     open_bodies: Vec<bool>,
     tiles: TileLists,
     light: [f64; 3],
@@ -305,6 +306,14 @@ impl Raster<'_> {
                 &mut scratch.overlaps,
             );
             for &(a, b, s0, s1) in &scratch.overlaps {
+                if !self
+                    .body_boxes
+                    .get(a as usize)
+                    .zip(self.body_boxes.get(b as usize))
+                    .is_some_and(|(&a, &b)| crate::lattice::shares_extent(a, b))
+                {
+                    continue;
+                }
                 let (min, max) = overlay::stretch_box(
                     &ray,
                     camera.forward,
@@ -716,6 +725,10 @@ impl<'a> Raster<'a> {
             tools,
             weights,
             solid_tools: solid_tools.to_vec(),
+            body_boxes: crate::lattice::body_boxes(
+                scene,
+                &crate::lattice::scene_tool_bounds(scene),
+            ),
             open_bodies,
             tiles,
             light: shade::light(camera),

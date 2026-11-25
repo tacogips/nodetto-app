@@ -37,7 +37,7 @@ board detaches the reference, and Undo restores the link.
 
 - Drop one STL file into the viewport or use **Import STL**. Nodetto reads
   binary and ASCII STL in millimetres. A closed mesh can participate in
-  solid operations. An open mesh can be viewed as reference geometry.
+  solid operations. In capture, closed shells may touch along an edge or face when their bounding boxes have disjoint interiors; other touching shells stay display-only. An open mesh can be viewed as reference geometry.
 - Choose **Export > STL (3D model)** to save visible solid bodies as binary
   STL. PCB references and open mesh references are excluded.
 - Whole-page SVG, PNG and PDF exports show a labelled **Construction view**.

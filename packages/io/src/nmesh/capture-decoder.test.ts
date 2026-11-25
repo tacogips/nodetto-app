@@ -230,3 +230,125 @@ test("multi-byte vertex counts respect the geometry budget", async () => {
   expect(omitted.bounds).toEqual(kept.bounds);
   expect(calls).toEqual([]);
 });
+
+// Construct binary STL as imported meshes are welded by canonicalization.
+test("touching shell eligibility preserves invalid mesh rejection", async () => {
+  const { readStl, writeBinaryStl } = await import("../stl/index.ts");
+  const { decodeCaptureMeshWith } = await import("./capture-decoder.ts");
+  const box = (
+    x0: number,
+    x1: number,
+    y0: number,
+    y1: number,
+    z0 = 0,
+    z1 = 5,
+    crossed = false,
+  ) => ({
+    positions: Float64Array.of(
+      x0,
+      y0,
+      z0,
+      x1,
+      y0,
+      z0,
+      x1,
+      y1,
+      z0,
+      x0,
+      y1,
+      z0,
+      x0,
+      y0,
+      z1,
+      x1,
+      y0,
+      z1,
+      x1,
+      y1,
+      z1,
+      x0,
+      y1,
+      z1,
+    ),
+    triangles: Uint32Array.from([
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      ...(crossed ? [3, 0, 7, 0, 4, 7] : [3, 0, 4, 3, 4, 7]),
+    ]),
+  });
+  const a = box(0, 10, 0, 10);
+  const edge = box(10, 20, 10, 20);
+  const face = box(10, 20, 0, 10);
+  const reversed = box(10, 20, 10, 20);
+  // Reverse the triangle incident on the shared vertical edge.
+  [reversed.triangles[30], reversed.triangles[31]] = [
+    reversed.triangles[31] as number,
+    reversed.triangles[30] as number,
+  ];
+  const triangle = {
+    positions: Float64Array.of(0, 0, 0, 10, 0, 0, 5, -2, 0),
+    triangles: Uint32Array.of(0, 1, 2),
+  };
+  const fin = {
+    positions: Float64Array.of(10, 10, 0, 10, 10, 5, 13, 7, 5, 13, 7, 0),
+    triangles: Uint32Array.of(0, 1, 2, 0, 2, 3, 0, 3, 1, 1, 3, 2),
+  };
+  const inverse = box(0, 1, 0, 1, 0, 1);
+  for (let i = 0; i < inverse.triangles.length; i += 3) {
+    [inverse.triangles[i], inverse.triangles[i + 1]] = [
+      inverse.triangles[i + 1] as number,
+      inverse.triangles[i] as number,
+    ];
+  }
+  const cases = [
+    ["edge", [a, edge], true],
+    ["face", [a, face], true],
+    ["crossed diagonal", [a, box(10, 20, 0, 10, 0, 5, true)], true],
+    ["separated", [a, box(12, 22, 0, 10)], true],
+    ["open triangle", [a, triangle], false],
+    ["unbalanced", [a, reversed], false],
+    ["welded overlap", [a, box(0, 6, 0, 6)], false],
+    ["double-sided fin", [a, edge, fin], false],
+    [
+      "coincident shells",
+      [box(0, 1, 0, 1, 0, 1), inverse, box(2, 3, 0, 1, 0, 1)],
+      false,
+    ],
+  ] as const;
+  for (const [name, meshes, expected] of cases) {
+    const canonical = canonicalize(readStl(writeBinaryStl(meshes)));
+    const data = toInline(encodeNmesh(canonical));
+    expect(
+      decodeCaptureMeshWith(data, { needTarget: true }).booleanTarget,
+      name,
+    ).toBe(expected);
+  }
+});

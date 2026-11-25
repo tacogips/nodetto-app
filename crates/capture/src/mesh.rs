@@ -56,11 +56,11 @@ pub fn closed_by(
     edges.sort_unstable();
     let mut i = 0;
     while i < edges.len() {
-        if i + 1 >= edges.len()
-            || edges[i] != edges[i + 1]
-            || (i + 2 < edges.len() && edges[i] == edges[i + 2])
-        {
+        if i + 1 >= edges.len() || edges[i] != edges[i + 1] {
             return false;
+        }
+        if i + 2 < edges.len() && edges[i] == edges[i + 2] {
+            return crate::mesh_contact::contact_closed(vertex_count, triangles, &position);
         }
         i += 2;
     }
@@ -291,6 +291,9 @@ impl MeshView {
         if !inside {
             return None;
         }
+        self.depth(corners, ray)
+    }
+    fn depth(&self, corners: [usize; 3], ray: &Ray) -> Option<f64> {
         let p = corners.map(|vertex| self.points[vertex]);
         let n = cross(
             std::array::from_fn(|k| p[1][k] - p[0][k]),
@@ -303,13 +306,72 @@ impl MeshView {
         let s = dot(n, std::array::from_fn(|k| p[0][k] - ray.origin[k])) / d;
         s.is_finite().then_some(s)
     }
+    fn edge_band(&self, a: usize, b: usize, q: [f64; 2]) -> (f64, f64) {
+        let c0 = a.min(b);
+        let c1 = a.max(b);
+        let p = self.projected[c0];
+        let r = self.projected[c1];
+        let value = edge(p, r, q);
+        let scale = p[0].abs() + p[1].abs() + r[0].abs() + r[1].abs() + q[0].abs() + q[1].abs();
+        let err = 8.0 * f64::EPSILON * ((r[0] - p[0]).abs() + (r[1] - p[1]).abs()) * scale;
+        (if a == c0 { value } else { -value }, err)
+    }
+    fn volume_contains(&self, i: u32, q: [f64; 2]) -> bool {
+        let corners = self.triangles[i as usize].map(|v| v as usize);
+        let p = corners.map(|v| self.projected[v]);
+        let area = edge(p[0], p[1], p[2]);
+        if area == 0.0 || !area.is_finite() {
+            return false;
+        }
+        let order = if area > 0.0 { [0, 1, 2] } else { [0, 2, 1] };
+        for j in 0..3 {
+            let a = corners[order[j]];
+            let b = corners[order[(j + 1) % 3]];
+            let (e, err) = self.edge_band(a, b, q);
+            if e < -err {
+                return false;
+            }
+            if e <= err {
+                let dx = self.projected[b][0] - self.projected[a][0];
+                let dy = self.projected[b][1] - self.projected[a][1];
+                let gradient =
+                    std::array::from_fn(|k| -dy * self.basis[0][k] + dx * self.basis[1][k]);
+                if !crate::prism::increases_in_world(gradient) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+    fn near_tie(&self, i: u32, q: [f64; 2]) -> bool {
+        let corners = self.triangles[i as usize].map(|v| v as usize);
+        let p = corners.map(|v| self.projected[v]);
+        let area = edge(p[0], p[1], p[2]);
+        if area == 0.0 || !area.is_finite() {
+            return false;
+        }
+        let order = if area > 0.0 { [0, 1, 2] } else { [0, 2, 1] };
+        (0..3).any(|j| {
+            let a = corners[order[j]];
+            let b = corners[order[(j + 1) % 3]];
+            let (_, err) = self.edge_band(a, b, q);
+            edge(self.projected[a], self.projected[b], q).abs() <= err
+        })
+    }
     fn hits_impl<const FACETS: bool>(&self, ray: &Ray, scratch: &mut Vec<Boundary>) {
         scratch.clear();
         let Some((q, bin)) = self.bin(ray) else {
             return;
         };
         for &i in bin {
-            if let Some(s) = self.facet_depth(i, q, ray) {
+            let depth = if FACETS {
+                self.facet_depth(i, q, ray)
+            } else if self.volume_contains(i, q) {
+                self.depth(self.triangles[i as usize].map(|v| v as usize), ray)
+            } else {
+                None
+            };
+            if let Some(s) = depth {
                 scratch.push(Boundary {
                     s,
                     tool: self.tool,
@@ -322,7 +384,7 @@ impl MeshView {
     fn hits(&self, ray: &Ray, scratch: &mut Vec<Boundary>) {
         self.hits_impl::<false>(ray, scratch);
     }
-    /// Facet and volume hits differ only in face identity, never ownership.
+    /// Flag near-ties where facet and volume ownership differ.
     pub(crate) fn surface_intervals(
         &self,
         ray: &Ray,
@@ -333,6 +395,12 @@ impl MeshView {
         if self.closed {
             self.hits_impl::<true>(ray, scratch);
             out.extend_from_slice(&scratch[..scratch.len() / 2 * 2]);
+            if let Some((q, bin)) = self.bin(ray) {
+                return bin.iter().any(|&i| {
+                    self.near_tie(i, q)
+                        && self.volume_contains(i, q) != self.facet_depth(i, q, ray).is_some()
+                });
+            }
         }
         false
     }
@@ -407,7 +475,7 @@ mod tests {
         }
     }
     #[test]
-    fn cube_surface_casts_are_not_ownership_sensitive() {
+    fn cube_surface_and_volume_casts_differ_only_at_ownership_ties() {
         let view = MeshView::new(
             &cube(),
             0,
@@ -423,12 +491,96 @@ mod tests {
             let mut scratch = Vec::new();
             let mut surface = Vec::new();
             let mut volume = Vec::new();
-            assert!(!view.surface_intervals(&ray, &mut scratch, &mut surface));
+            let sensitive = view.surface_intervals(&ray, &mut scratch, &mut surface);
             view.intervals(&ray, &mut scratch, &mut volume);
+            if x == 0.0 && y == 0.0 {
+                assert!(sensitive);
+                assert!(surface.is_empty());
+                assert_eq!(
+                    volume.iter().map(|b| b.s).collect::<Vec<_>>(),
+                    vec![1.0, 2.0]
+                );
+                continue;
+            }
+            assert!(!sensitive);
             assert_eq!(
                 surface.iter().map(|b| b.s).collect::<Vec<_>>(),
                 volume.iter().map(|b| b.s).collect::<Vec<_>>()
             );
+        }
+    }
+    #[test]
+    fn contact_plane_rays_follow_prism_ownership() {
+        for (forward, y, back) in [([0., -1., 0.], 3., true), ([0., 1., 0.], -2., false)] {
+            for lower in [true, false] {
+                let mut mesh = cube();
+                if lower {
+                    for p in mesh.positions.as_chunks_mut::<3>().0 {
+                        p[2] -= 1.;
+                    }
+                }
+                let view = MeshView::new(&mesh, 0, &RayFamily { forward }, None);
+                let ray = Ray {
+                    origin: [0.25, y, 0.],
+                };
+                let mut scratch = Vec::new();
+                let mut surface = Vec::new();
+                let mut volume = Vec::new();
+                let sensitive = view.surface_intervals(&ray, &mut scratch, &mut surface);
+                view.intervals(&ray, &mut scratch, &mut volume);
+                assert_eq!(sensitive, back);
+                assert_eq!(surface.len(), if lower == back { 2 } else { 0 });
+                assert_eq!(volume.len(), if lower { 0 } else { 2 });
+                if !lower {
+                    assert!((volume[1].s - volume[0].s - 1.).abs() < 1e-12);
+                }
+            }
+        }
+    }
+    #[test]
+    fn volume_ties_are_watertight_for_oblique_rays() {
+        let f = [1. / 14_f64.sqrt(), 2. / 14_f64.sqrt(), 3. / 14_f64.sqrt()];
+        let view = MeshView::new(&cube(), 0, &RayFamily { forward: f }, None);
+        let diagonal = [1., 1., 0.];
+        let mut normal = cross(f, diagonal);
+        let length = dot(normal, normal).sqrt();
+        normal = normal.map(|v| v / length);
+        let mut points = Vec::new();
+        for k in -4..=4 {
+            points.push(([0.5, 0.5, 0.], k as f64 * 1e-15, true));
+        }
+        for p in [
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [1., 1., 0.],
+            [0., 1., 0.],
+            [0., 0., 1.],
+            [1., 0., 1.],
+            [1., 1., 1.],
+            [0., 1., 1.],
+        ] {
+            points.push((p, 0., false));
+        }
+        for (p, offset, interior) in points {
+            let ray = Ray {
+                origin: std::array::from_fn(|i| p[i] + offset * normal[i] - f[i] * 2.),
+            };
+            let mut hits = Vec::new();
+            view.hits(&ray, &mut hits);
+            assert_eq!(hits.len() % 2, 0);
+            if interior {
+                assert_eq!(hits.len(), 2);
+            }
+            if hits.len() == 2 {
+                let enter = (0..3)
+                    .map(|i| -ray.origin[i] / f[i])
+                    .fold(f64::NEG_INFINITY, f64::max);
+                let exit = (0..3)
+                    .map(|i| (1. - ray.origin[i]) / f[i])
+                    .fold(f64::INFINITY, f64::min);
+                assert!((hits[0].s - enter).abs() < 1e-12);
+                assert!((hits[1].s - exit).abs() < 1e-12);
+            }
         }
     }
     #[test]

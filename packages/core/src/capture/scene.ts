@@ -13,6 +13,7 @@ import {
 } from "../cad/edge-y-index.ts";
 import type { CadFrame } from "../cad/frames.ts";
 import type { ExtrudeGeometry } from "../cad/history.ts";
+import { loopForest, type ForestStats } from "../cad/loop-forest.ts";
 import type { CadLoop } from "../cad/loops.ts";
 import { coordinate, gridCross, NM_PER_MM } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
@@ -196,18 +197,36 @@ function indexBucket(entries: LoopEntry[], stats?: { indexEntries?: number }) {
   };
 }
 
+const ANCESTRY_WORK_PER_VERTEX = 32;
+export const PROFILE_CACHE_MIN_WORK = 4096;
+
+export interface AncestryStats {
+  ancestorProbes: number;
+  indexEntries?: number;
+  edges?: EdgeIndexStats;
+  depthLookups?: number;
+  forestFallbacks?: number;
+  forest?: ForestStats;
+}
+
 /** Keep a loop when its parity differs from its nearest selected ancestor's.
  * A loop with no selected ancestor is kept only at an even depth.
  */
 export function normaliseToolLoops(
   loops: readonly CadLoop[],
-  stats?: {
-    ancestorProbes: number;
-    indexEntries?: number;
-    edges?: EdgeIndexStats;
-  },
+  stats?: AncestryStats,
+  measured?: { prepared: number; searched: number },
 ): readonly CadLoop[] {
+  if (measured) {
+    measured.prepared = 0;
+    measured.searched = 0;
+  }
   if (loops.every(({ depth }) => depth === 0)) return loops;
+  if (measured)
+    measured.prepared = loops.reduce(
+      (sum, loop) => sum + loop.points.length,
+      0,
+    );
   const buckets = new Map<number, LoopEntry[]>();
   const entries = loops.map((loop) => {
     const grid = loop.points.map((v) => Math.round(v * NM_PER_MM));
@@ -217,61 +236,113 @@ export function normaliseToolLoops(
     buckets.set(loop.depth, bucket);
     return entry;
   });
+  const indexStats = { indexEntries: 0 };
+  const edges: EdgeIndexStats = {
+    builds: 0,
+    visits: 0,
+    inspections: 0,
+    bulk: 0,
+  };
   const indexes = new Map(
     [...buckets].map(([depth, entries]) => [
       depth,
-      indexBucket(entries, stats),
+      indexBucket(entries, indexStats),
     ]),
   );
-  return entries
-    .filter(({ loop, grid }) => {
-      const { depth } = loop;
-      if (depth === 0) return true;
-      const x = coordinate(grid, 0);
-      const y = coordinate(grid, 1);
-      let ancestorDepth = -1;
-      for (let k = depth - 1; k >= 0; k -= 1) {
-        const index = indexes.get(k);
-        if (!index) continue;
-        const inside =
-          x >= index.minX &&
-          x <= index.maxX &&
-          y >= index.minY &&
-          y <= index.maxY;
-        const key =
-          index.cell(y, index.minY, index.height, index.rows) * index.cols +
-          index.cell(x, index.minX, index.width, index.cols);
-        const local = inside ? (index.cells.get(key) ?? []) : [];
-        let i = 0;
-        let j = 0;
-        while (i < local.length || j < index.oversized.length) {
-          const a = local[i];
-          const b = index.oversized[j];
-          let entry: LoopEntry;
-          if (a !== undefined && (b === undefined || a.position < b.position)) {
-            entry = a;
-            i += 1;
-          } else if (b !== undefined) {
-            entry = b;
-            j += 1;
-          } else break;
-          if (stats) stats.ancestorProbes += 1;
-          if (
-            x >= entry.minX &&
-            x <= entry.maxX &&
-            y >= entry.minY &&
-            y <= entry.maxY &&
-            containsPoint(entry, x, y, stats?.edges)
-          ) {
-            ancestorDepth = k;
-            break;
+  if (stats?.indexEntries !== undefined)
+    stats.indexEntries += indexStats.indexEntries;
+  let work = indexStats.indexEntries;
+  const budget =
+    ANCESTRY_WORK_PER_VERTEX *
+    loops.reduce((n, loop) => n + loop.points.length / 2, 0);
+  const fallback = () => {
+    if (measured) measured.searched = work;
+    if (stats?.forestFallbacks !== undefined) stats.forestFallbacks += 1;
+    const { parents } = loopForest(
+      entries.map(({ grid }) => grid),
+      entries.map(() => 1),
+      stats?.forest,
+    );
+    return loops.filter((loop, i) => {
+      const parent = parents[i] ?? -1;
+      const ancestorDepth = parent < 0 ? -1 : (loops[parent]?.depth ?? -1);
+      return loop.depth === 0 || (loop.depth - ancestorDepth) % 2 === 1;
+    });
+  };
+  if (work > budget) return fallback();
+  const retained: CadLoop[] = [];
+  for (const { loop, grid } of entries) {
+    const { depth } = loop;
+    if (depth === 0) {
+      retained.push(loop);
+      continue;
+    }
+    const x = coordinate(grid, 0);
+    const y = coordinate(grid, 1);
+    let ancestorDepth = -1;
+    for (let k = depth - 1; k >= 0; k -= 1) {
+      work += 1;
+      if (stats?.depthLookups !== undefined) stats.depthLookups += 1;
+      if (work > budget) return fallback();
+      const index = indexes.get(k);
+      if (!index) continue;
+      const inside =
+        x >= index.minX &&
+        x <= index.maxX &&
+        y >= index.minY &&
+        y <= index.maxY;
+      const key =
+        index.cell(y, index.minY, index.height, index.rows) * index.cols +
+        index.cell(x, index.minX, index.width, index.cols);
+      const local = inside ? (index.cells.get(key) ?? []) : [];
+      let i = 0;
+      let j = 0;
+      while (i < local.length || j < index.oversized.length) {
+        const a = local[i];
+        const b = index.oversized[j];
+        let entry: LoopEntry;
+        if (a !== undefined && (b === undefined || a.position < b.position)) {
+          entry = a;
+          i += 1;
+        } else if (b !== undefined) {
+          entry = b;
+          j += 1;
+        } else break;
+        if (stats) stats.ancestorProbes += 1;
+        work += 1;
+        if (work > budget) return fallback();
+        if (
+          x >= entry.minX &&
+          x <= entry.maxX &&
+          y >= entry.minY &&
+          y <= entry.maxY
+        ) {
+          const builds = edges.builds;
+          const visits = edges.visits;
+          const inspections = edges.inspections;
+          const bulk = edges.bulk ?? 0;
+          if (containsPoint(entry, x, y, edges)) ancestorDepth = k;
+          const built = edges.builds - builds;
+          const visited = edges.visits - visits;
+          const inspected = edges.inspections - inspections;
+          const bulkWork = (edges.bulk ?? 0) - bulk;
+          work += built + visited + inspected + bulkWork;
+          if (stats?.edges) {
+            stats.edges.builds += built;
+            stats.edges.visits += visited;
+            stats.edges.inspections += inspected;
+            if (stats.edges.bulk !== undefined) stats.edges.bulk += bulkWork;
           }
         }
+        if (work > budget) return fallback();
         if (ancestorDepth !== -1) break;
       }
-      return (depth - ancestorDepth) % 2 === 1;
-    })
-    .map(({ loop }) => loop);
+      if (ancestorDepth !== -1) break;
+    }
+    if ((depth - ancestorDepth) % 2 === 1) retained.push(loop);
+  }
+  if (measured) measured.searched = work;
+  return retained;
 }
 
 type BuildingBody = Omit<CaptureBody, "steps" | "bounds"> & {
@@ -318,6 +389,14 @@ export interface CaptureWalkStats {
   captureVisits: number;
   toolArrays: number;
   metadataVisits: number;
+  ancestry?: AncestryStats;
+  profileCache?: {
+    lookups: number;
+    admitted: number;
+    hits: number;
+    prepared: number;
+    maxDirectWork: number;
+  };
 }
 
 export function buildCadCaptureModel(
@@ -353,6 +432,8 @@ export function buildCadCaptureModel(
   let overLimit: string | undefined;
   const charge = { points: 0 };
   const stats = options?.stats;
+  const work = { prepared: 0, searched: 0 };
+  let profileCache: Map<readonly CadLoop[], readonly CadLoop[]> | undefined;
 
   /** Register a tool as a new body, unless the feature is hidden. */
   function addBody(
@@ -432,7 +513,29 @@ export function buildCadCaptureModel(
     tool(feature, geometry, targets) {
       // The walk keeps the original loops for later face references, even
       // for a loop omitted from the capture tool.
-      const loops = normaliseToolLoops(geometry.loops);
+      const whole =
+        feature.type === "cad.extrude" && feature.semantic.loops === undefined;
+      const counters = stats?.profileCache;
+      let loops: readonly CadLoop[] | undefined;
+      if (whole && profileCache) {
+        if (counters) counters.lookups++;
+        loops = profileCache.get(geometry.loops);
+        if (loops && counters) counters.hits++;
+      }
+      if (!loops) {
+        loops = normaliseToolLoops(geometry.loops, stats?.ancestry, work);
+        if (counters) counters.prepared += work.prepared;
+        if (whole) {
+          const total = work.prepared + work.searched;
+          if (total >= PROFILE_CACHE_MIN_WORK) {
+            profileCache ??= new Map();
+            profileCache.set(geometry.loops, loops);
+            if (counters) counters.admitted++;
+          } else if (counters) {
+            counters.maxDirectWork = Math.max(counters.maxDirectWork, total);
+          }
+        }
+      }
       if (!overLimit) {
         if (stats) stats.captureVisits++;
         overLimit = chargeTool(charge, {

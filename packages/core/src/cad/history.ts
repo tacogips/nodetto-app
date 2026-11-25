@@ -442,6 +442,9 @@ export const cadGeometryWork = {
   statusVisits: 0,
   loopProbes: 0,
   featureUpdates: 0,
+  sideMemberVisits: 0,
+  sideMemberIndexBuilds: 0,
+  sideSelectionEntries: 0,
 };
 
 export function createCadGeometry(
@@ -454,6 +457,13 @@ export function createCadGeometry(
   const points = stats ? new Set<CadLoop["points"]>() : undefined;
   const frames = new Map<ElementId, CadFrame>();
   const extrudes = new Map<ElementId, ExtrudeGeometry>();
+  let selectedSides: Map<ExtrudeGeometry, Set<CadLoop>> | undefined;
+  let sideMembers:
+    | Map<
+        ExtrudeGeometry,
+        { budget: number; scanned: number; members?: Set<ElementId> }
+      >
+    | undefined;
   return {
     frames,
     extrudes,
@@ -468,12 +478,85 @@ export function createCadGeometry(
         return cadFailure("cad.reference.failed", feature);
       if (role !== "side") return faceFrame(tool.frame, tool.span, role);
       const line = entity === undefined ? undefined : history.byId.get(entity);
-      if (
-        !line ||
-        line.type !== "cad.line" ||
-        !tool.loops.some((loop) => loop.members.includes(line.id))
-      )
+      if (!line || line.type !== "cad.line")
         return cadFailure("cad.reference.missing", entity);
+      const source =
+        feature === undefined ? undefined : history.typed.get(feature);
+      if (source?.type === "cad.extrude") {
+        const sketchId = source.semantic.sketch;
+        const profile =
+          sketchId === undefined ? undefined : profiles.get(sketchId);
+        const index =
+          sketchId === undefined ? undefined : memberIndices.get(sketchId);
+        if (
+          profile !== undefined &&
+          !("error" in profile) &&
+          index !== undefined
+        ) {
+          let found: boolean;
+          if (tool.loops === profile.loops) {
+            cadGeometryWork.sideMemberVisits += 1;
+            found = index.has(line.id);
+          } else {
+            selectedSides ??= new Map();
+            let selected = selectedSides.get(tool);
+            if (selected === undefined) {
+              selected = new Set(tool.loops);
+              selectedSides.set(tool, selected);
+              cadGeometryWork.sideMemberVisits += tool.loops.length;
+              cadGeometryWork.sideSelectionEntries += tool.loops.length;
+            }
+            cadGeometryWork.sideMemberVisits += 1;
+            found = (index.get(line.id) ?? []).some((i) => {
+              cadGeometryWork.sideMemberVisits += 1;
+              const loop = profile.loops[i];
+              return loop !== undefined && selected.has(loop);
+            });
+          }
+          if (!found) return cadFailure("cad.reference.missing", entity);
+          return faceFrame(
+            tool.frame,
+            tool.span,
+            role,
+            line.semantic as CadLineSemantic,
+          );
+        }
+      }
+      sideMembers ??= new Map();
+      let entry = sideMembers.get(tool);
+      if (entry === undefined) {
+        const memberTotal = tool.loops.reduce(
+          (total, loop) => total + loop.members.length,
+          0,
+        );
+        entry = { budget: 4 * memberTotal, scanned: 0 };
+        sideMembers.set(tool, entry);
+      }
+      if (entry.members === undefined && entry.scanned >= entry.budget) {
+        entry.members = new Set();
+        for (const loop of tool.loops) {
+          for (const id of loop.members) {
+            cadGeometryWork.sideMemberVisits += 1;
+            entry.members.add(id);
+          }
+        }
+        cadGeometryWork.sideMemberIndexBuilds += 1;
+      }
+      const currentEntry = entry;
+      let found = false;
+      if (entry.members !== undefined) {
+        cadGeometryWork.sideMemberVisits += 1;
+        found = entry.members.has(line.id);
+      } else {
+        found = tool.loops.some((loop) =>
+          loop.members.some((id) => {
+            currentEntry.scanned += 1;
+            cadGeometryWork.sideMemberVisits += 1;
+            return id === line.id;
+          }),
+        );
+      }
+      if (!found) return cadFailure("cad.reference.missing", entity);
       return faceFrame(
         tool.frame,
         tool.span,

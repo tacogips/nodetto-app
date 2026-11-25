@@ -126,6 +126,42 @@ pub(crate) fn extend((min, max): &mut Bounds, (lo, hi): Bounds) {
     }
 }
 
+pub(crate) fn body_boxes(scene: &Scene, tools: &[Bounds]) -> Vec<Bounds> {
+    scene
+        .bodies
+        .iter()
+        .map(|body| {
+            let mut bounds = empty_bounds();
+            for step in body.steps.iter().filter(|step| step.op == Op::Union) {
+                if let Some(&tool) = tools
+                    .get(step.tool as usize)
+                    .filter(|&&tool| valid_bounds(tool))
+                {
+                    extend(&mut bounds, tool);
+                }
+            }
+            bounds
+        })
+        .collect()
+}
+
+pub(crate) fn shares_extent(a: Bounds, b: Bounds) -> bool {
+    (0..3).all(|axis| a.1[axis].min(b.1[axis]) - a.0[axis].max(b.0[axis]) > 0.0)
+}
+
+#[cfg(test)]
+#[test]
+fn shared_extent_requires_positive_overlap_on_every_axis() {
+    let a = ([0.0; 3], [1.0; 3]);
+    for axis in 0..3 {
+        let mut min = [0.0; 3];
+        min[axis] = 1.0;
+        assert!(!shares_extent(a, (min, [2.0; 3])));
+    }
+    assert!(shares_extent(a, ([0.99; 3], [2.0; 3])));
+    assert!(!shares_extent(a, empty_bounds()));
+}
+
 pub(crate) fn scene_tool_bounds(scene: &Scene) -> Vec<Bounds> {
     scene
         .tools

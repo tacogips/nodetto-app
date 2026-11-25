@@ -84,7 +84,7 @@ and bodies whose capture differs from the app. Failed features are listed and
 skipped. A `cad.result.empty (sampled)` error identifies a feature the app
 rejects but the picture applies, even with `--no-interference`.
 
-Closed imported meshes participate like solids; open meshes are translucent
+Closed imported meshes participate like solids; closed shells may touch along an edge or face when their bounding boxes have disjoint interiors, while other touching shells stay display-only. Open meshes are translucent
 and marked not checked. As in the app, a feature with an open mesh among its
 targets fails with `cad.body.missing` and changes none of its targets; the
 open mesh stays drawn. Reference bodies are drawn at 45% over what is behind
