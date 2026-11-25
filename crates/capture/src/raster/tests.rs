@@ -261,7 +261,10 @@ fn boundary_read_counts_and_refusal_are_bounded() {
         let (result, stats) = render_with(&s, threads, 10_000_000);
         assert_eq!(stats.workers, threads);
         assert!(stats.reads <= 10_000_000 + threads as u64 * CHUNK);
-        assert_eq!(result.unwrap_err().to_string(), "The scene is too heavy for this picture size (picture boundary scans over 10000000). Use a smaller --size.");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "The scene is too heavy for this picture size (picture boundary scans over 10000000). Use a smaller --size."
+        );
         assert!(stats.liveness.is_empty());
         assert_eq!(stats.census.rays, 0);
     }
@@ -340,6 +343,45 @@ fn production_touching(mut scene: Scene) {
     let rgb = render_rgb(&scene, 0).unwrap().0;
     scene.draw_interference = false;
     assert_eq!(rgb, render_rgb(&scene, 0).unwrap().0);
+}
+
+fn production_touching_with_candidates(mut scene: Scene, candidates: usize) {
+    let report = compare_every_thread_count(&scene);
+    assert!(report.pairs.is_empty());
+    assert_eq!(report.analysis.unwrap().candidates as usize, candidates);
+    let rgb = render_rgb(&scene, 0).unwrap().0;
+    scene.draw_interference = false;
+    assert_eq!(rgb, render_rgb(&scene, 0).unwrap().0);
+}
+
+#[test]
+fn production_touching_tall_mesh_boss() {
+    for back in [false, true] {
+        production_touching_with_candidates(
+            super::reference::fixtures::tall_mesh_with_boss(back, 0.0, true),
+            1,
+        );
+    }
+}
+
+#[test]
+fn production_touching_tall_mesh_boss_suppressed() {
+    for back in [false, true] {
+        production_touching(super::reference::fixtures::tall_mesh_with_boss(
+            back, 0.0, false,
+        ));
+    }
+}
+
+#[test]
+fn production_tall_mesh_boss_penetration() {
+    for back in [false, true] {
+        let report = compare_every_thread_count(&super::reference::fixtures::tall_mesh_with_boss(
+            back, 0.01, true,
+        ));
+        assert_eq!(report.pairs.len(), 1);
+        assert_eq!((report.pairs[0].a, report.pairs[0].b), (0, 1));
+    }
 }
 
 #[test]
@@ -492,7 +534,10 @@ fn layers_storage_cap_refuses() {
                 ..Tuning::PRODUCTION
             },
         );
-        assert_eq!(result.unwrap_err().to_string(), "The scene is too heavy for this picture size (picture boundary scans over 16000000000). Use a smaller --size.");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "The scene is too heavy for this picture size (picture boundary scans over 16000000000). Use a smaller --size."
+        );
         assert!(stats.liveness.is_empty());
         assert_eq!(stats.census.rays, 0);
     }
@@ -622,7 +667,12 @@ fn picture_triangle_audit_refused() {
     for threads in [1, 5] {
         let (result, stats) = render_with(&scene, threads, SCAN_ALLOWANCE);
         let actual = result.unwrap_err().to_string();
-        assert_eq!(actual, format!("The scene is too heavy for this picture size (picture boundary scans over {SCAN_ALLOWANCE}). Use a smaller --size."));
+        assert_eq!(
+            actual,
+            format!(
+                "The scene is too heavy for this picture size (picture boundary scans over {SCAN_ALLOWANCE}). Use a smaller --size."
+            )
+        );
         if let Some(ref previous) = error {
             assert_eq!(&actual, previous);
         }
@@ -649,7 +699,12 @@ fn picture_triangle_five_workers_refused() {
     for threads in [1, 5] {
         let (result, stats) = render_with(&scene, threads, SCAN_ALLOWANCE);
         let actual = result.unwrap_err().to_string();
-        assert_eq!(actual, format!("The scene is too heavy for this picture size (picture boundary scans over {SCAN_ALLOWANCE}). Use a smaller --size."));
+        assert_eq!(
+            actual,
+            format!(
+                "The scene is too heavy for this picture size (picture boundary scans over {SCAN_ALLOWANCE}). Use a smaller --size."
+            )
+        );
         if let Some(ref previous) = error {
             assert_eq!(&actual, previous);
         }

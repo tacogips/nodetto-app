@@ -488,6 +488,25 @@ mod tests {
                 }
             }
         }
+        fn prism(&mut self, outline: &[[i64; 2]], tops: &[[usize; 3]], z0: i64, z1: i64) {
+            let bottom: Vec<_> = outline
+                .iter()
+                .map(|p| self.vertex([p[0], p[1], z0]))
+                .collect();
+            let top: Vec<_> = outline
+                .iter()
+                .map(|p| self.vertex([p[0], p[1], z1]))
+                .collect();
+            for &[a, b, c] in tops {
+                self.triangles
+                    .extend([top[a], top[b], top[c], bottom[c], bottom[b], bottom[a]]);
+            }
+            for a in 0..outline.len() {
+                let b = (a + 1) % outline.len();
+                self.triangles
+                    .extend([bottom[a], bottom[b], top[b], bottom[a], top[b], top[a]]);
+            }
+        }
         fn cube(&mut self, min: [i64; 3], max: [i64; 3], crossed: bool, reverse: bool) {
             let [x, y, z] = min;
             let [a, b, c] = max;
@@ -699,6 +718,48 @@ mod tests {
             )
             .unwrap();
             assert_eq!(decoded.boolean_target, Some(expected), "{name}");
+        }
+    }
+    #[test]
+    fn bracket_contact_is_not_a_target() {
+        let outline = [
+            [0, 0],
+            [10000, 0],
+            [10000, 2000],
+            [2000, 2000],
+            [2000, 5000],
+            [15000, 5000],
+            [15000, 1000],
+            [18000, 1000],
+            [18000, 7000],
+            [0, 7000],
+        ];
+        let tops = [
+            [0, 1, 2],
+            [0, 2, 3],
+            [0, 3, 4],
+            [0, 4, 9],
+            [9, 4, 5],
+            [9, 5, 8],
+            [5, 6, 7],
+            [5, 7, 8],
+        ];
+        // false uses the bracket's shared-face diagonal; true uses the opposite diagonal.
+        for crossed in [false, true] {
+            let mut fixture = ContactFixture::default();
+            fixture.prism(&outline, &tops, 0, 5000);
+            fixture.cube([10000, 0, 0], [20000, 2000, 5000], crossed, false);
+            let (text, mesh) = encode_text(&fixture);
+            assert_eq!(decode_inline(&text), Some(mesh));
+            let decoded = decode_inline_with(
+                &text,
+                DecodeOptions {
+                    max_vertices: u64::MAX,
+                    need_target: true,
+                },
+            )
+            .unwrap();
+            assert_eq!(decoded.boolean_target, Some(false), "crossed={crossed}");
         }
     }
     #[test]

@@ -228,6 +228,12 @@ impl PrismView {
             let inside = if FACETS {
                 (lo..=hi).contains(&z)
             } else {
+                // The stored slab is exact; proof bounds only rounding of z.
+                let proof =
+                    8.0 * f64::EPSILON * dot(self.basis[2].map(f64::abs), offset.map(f64::abs));
+                if z < lo - proof || z > hi + proof {
+                    return None;
+                }
                 // Resolve coplanar volume rays consistently even if adjoining
                 // prisms use opposite normals. Shading retains its closed slab.
                 let normal = self.basis[2];
@@ -393,6 +399,49 @@ impl PrismView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cap_parallel_rays_outside_the_slab_are_rejected() {
+        let prism = Prism {
+            o: [-1., 0., 0.],
+            u: [1., 0., 0.],
+            v: [0., 1., 0.],
+            n: [0., 0., 1.],
+            t0: 0.,
+            t1: 156.75,
+            loops: vec![Loop {
+                points: vec![0., 0., 2., 0., 2., 10., 0., 10.],
+                faces: vec![2, 3, 4, 5],
+            }],
+        };
+        let view = PrismView::new(
+            &prism,
+            0,
+            &RayFamily {
+                forward: [0., 1., 0.],
+            },
+        );
+        for (z, expected) in [
+            (-7.105427357601002e-15, 0),
+            (0., 2),
+            (156.75, 0),
+            (7.105427357601002e-15, 2),
+            (78., 2),
+        ] {
+            let ray = Ray {
+                origin: [0., -1., z],
+            };
+            let mut scratch = Vec::new();
+            let mut volume = Vec::new();
+            view.intervals(&ray, &mut scratch, &mut volume);
+            assert_eq!(volume.len(), expected, "z={z:?}");
+            if z < 0. {
+                let mut surface = Vec::new();
+                assert!(view.surface_intervals(&ray, &mut scratch, &mut surface));
+                assert!(surface.is_empty());
+            }
+        }
+    }
 
     #[test]
     fn ownership_sensitive_surface_casts() {

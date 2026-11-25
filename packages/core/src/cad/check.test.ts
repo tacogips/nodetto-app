@@ -3,7 +3,14 @@ import type { Element } from "@nodetto/ir";
 import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import { isFractionalKey } from "../fractional.ts";
 import { isElementIdFormat } from "../ids.ts";
-import { cadBoundsWork, sweptBounds } from "./bounds.ts";
+import {
+  cadBoundsWork,
+  emptyBounds,
+  includeBounds,
+  loopExtents,
+  sweptBounds,
+} from "./bounds.ts";
+import { visitCadConstruction } from "./construction.ts";
 import type { CadFrame } from "./frames.ts";
 import { checkCadPage } from "./check.ts";
 import { createCadMemo, evaluateCadPage, releaseCadMemo } from "./evaluate.ts";
@@ -399,4 +406,208 @@ test("swept bounds retain the original projection formula", () => {
       }
       expect<unknown>(sweptBounds(frame, t0, t1, loops)).toEqual({ min, max });
     }
+});
+
+test("shared multi-loop extrema work scales with profile size", () => {
+  const counts: number[] = [];
+  for (const size of [128, 256, 512, 1024]) {
+    const run = (count: number) => {
+      cadBoundsWork.extremaReads = 0;
+      cadBoundsWork.vertexProjections = 0;
+      const result = report([
+        sketch("profile", "a"),
+        ...Array.from({ length: size }, (_, i) =>
+          cadElement(`circle-${i}`, "cad.circle", "a1", {
+            sketch: "profile",
+            c: [3 * i, 0],
+            r: 1,
+          }),
+        ),
+        ...Array.from({ length: count }, (_, i) =>
+          extrude(`tool-${i}`, "b", {
+            sketch: "profile",
+            distance: i + 1,
+            op: "new",
+          }),
+        ),
+      ]);
+      expect(result.errors).toEqual([]);
+      return { ...cadBoundsWork };
+    };
+    const single = run(1);
+    const repeated = run(size);
+    console.log(
+      `extrema size=${size}: single=${single.extremaReads} repeated=${repeated.extremaReads} projections=${repeated.vertexProjections}`,
+    );
+    expect(repeated.vertexProjections).toBe(single.vertexProjections);
+    counts.push(repeated.extremaReads);
+  }
+  expect(counts).toEqual([128, 256, 512, 1024]);
+});
+
+test("ordinary document extrema work is pinned", () => {
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  cadBoundsWork.extremaReads = 0;
+  cadBoundsWork.vertexProjections = 0;
+  checkCadPage(doc.elements, doc.pages[0]?.id ?? "");
+  expect(cadBoundsWork.extremaReads).toBe(5500);
+  expect(cadBoundsWork.extremaReads).toBeLessThanOrEqual(16500);
+  expect(cadBoundsWork.vertexProjections).toBe(164000);
+});
+
+test("profile bounds and limit decisions match per-loop oracles", () => {
+  const loops = [
+    { points: [0, 0, 1, 0, 1, 1, 0, 1] },
+    { points: [9999.5, 0, 9999.9, 0, 9999.9, 1, 9999.5, 1] },
+  ];
+  const frame: CadFrame = {
+    o: [0, 0, 0],
+    u: [1, 0, 0],
+    v: [0, 1, 0],
+    n: [0, 0, 1],
+  };
+  const oracleWithin = (
+    selected: typeof loops,
+    f: CadFrame,
+    t0: number,
+    t1: number,
+  ) =>
+    selected.every(({ points }) => {
+      const { min, max } = loopExtents(points, f);
+      return ([0, 1, 2] as const).every((axis) =>
+        [min[axis], max[axis]].every((base) =>
+          [t0, t1].every((t) => Math.abs(base + f.n[axis] * t) <= 10000 + 1e-9),
+        ),
+      );
+    });
+  const oracleSwept = (
+    selected: readonly { readonly points: ArrayLike<number> }[],
+    f: CadFrame,
+    t0: number,
+    t1: number,
+  ) => {
+    const box = emptyBounds();
+    for (const axis of [0, 1, 2] as const) {
+      let lower = f.o[axis];
+      let upper = lower;
+      if (f.u[axis] !== 0 || f.v[axis] !== 0) {
+        lower = Number.POSITIVE_INFINITY;
+        upper = Number.NEGATIVE_INFINITY;
+        for (const loop of selected) {
+          const extents = loopExtents(loop.points, f);
+          lower = Math.min(lower, extents.min[axis]);
+          upper = Math.max(upper, extents.max[axis]);
+        }
+      }
+      box.min[axis] = lower + Math.min(f.n[axis] * t0, f.n[axis] * t1);
+      box.max[axis] = upper + Math.max(f.n[axis] * t0, f.n[axis] * t1);
+    }
+    return box;
+  };
+  const circles = [
+    cadElement("near", "cad.circle", "a1", {
+      sketch: "profile",
+      c: [0, 0],
+      r: 1,
+    }),
+    cadElement("far", "cad.circle", "a1", {
+      sketch: "profile",
+      c: [4, 0],
+      r: 1,
+    }),
+  ];
+  const cases = [
+    [
+      sketch("profile", "a"),
+      ...circles,
+      extrude("tool", "b", { sketch: "profile", distance: 3, op: "new" }),
+    ],
+    [
+      sketch("profile", "a"),
+      ...circles,
+      extrude("tool", "b", {
+        sketch: "profile",
+        loops: ["near"],
+        distance: -3,
+        op: "new",
+      }),
+    ],
+    [
+      sketch("profile", "a"),
+      ...circles,
+      extrude("tool", "b", {
+        sketch: "profile",
+        distance: 4,
+        symmetric: true,
+        op: "new",
+      }),
+    ],
+    [
+      ...bossOnFace().elements,
+      sketch("side", "a5", {
+        face: { feature: "ex1", role: "side", entity: "base-edge-0" },
+      }),
+      ...rectangle("side", 1, 1, 2, 2),
+      extrude("side-tool", "a6", { sketch: "side", distance: -8, op: "new" }),
+    ],
+  ];
+  for (const elements of cases) {
+    const expected = emptyBounds();
+    const visited = visitCadConstruction(elements, CAD_TEST_PAGE.id, {
+      tool(feature, { frame: f, span, loops: selected }) {
+        if (feature.type === "cad.extrude")
+          includeBounds(expected, oracleSwept(selected, f, span.t0, span.t1));
+      },
+    });
+    expect(visited.errors).toEqual([]);
+    expect(report(elements).bounds).toEqual(expected);
+  }
+  const square = (id: string, x: number) =>
+    rectangle("limit-profile", x, 0, id === "far" ? 0.4 : 1, 1).map((e, i) => ({
+      ...e,
+      id: `${id}-${i}`,
+    }));
+  for (const subset of [false, true]) {
+    const elements = [
+      sketch("base", "a"),
+      ...rectangle("base", 1, 0, 2, 2),
+      extrude("base-tool", "b", { sketch: "base", distance: 1, op: "new" }),
+      sketch("limit-profile", "c", {
+        face: { feature: "base-tool", role: "side", entity: "base-edge-0" },
+      }),
+      ...square("near", 0),
+      ...square("far", 9999.5),
+      extrude("limit-tool", "d", {
+        sketch: "limit-profile",
+        ...(subset ? { loops: ["near-0"] } : {}),
+        distance: 1,
+        op: "new",
+      }),
+    ];
+    const actual = report(elements);
+    const selected = subset ? loops.slice(0, 1) : loops;
+    expect(actual.errors.some((e) => e.code === "cad.limit")).toBe(
+      !oracleWithin(
+        selected,
+        { o: [1, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
+        0,
+        1,
+      ),
+    );
+  }
+  const rotated: CadFrame = {
+    o: [2, -3, 4],
+    u: [0, 1, 0],
+    v: [0, 0, 1],
+    n: [1, 0, 0],
+  };
+  for (const f of [frame, rotated, frame])
+    for (const [t0, t1] of [
+      [0, 3],
+      [-3, 0],
+      [-2, 2],
+    ] as const)
+      expect(sweptBounds(f, t0, t1, loops)).toEqual(
+        oracleSwept(loops, f, t0, t1),
+      );
 });

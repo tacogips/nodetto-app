@@ -233,9 +233,58 @@ function contactEligible(q: Int32Array, indices: Uint32Array): boolean {
     if (faces.has(face)) return false;
     faces.add(face);
   }
-  for (const uses of remaining.values())
-    if (uses.length === 2)
+  for (const [key, uses] of remaining)
+    if (uses.length === 2 && !attachment.has(key))
       join((uses[0] as ContactUse).triangle, (uses[1] as ContactUse).triangle);
+  const sides = new Map<number, { min: number[]; max: number[] }>();
+  for (let i = 0; i < count; i++) {
+    if (cancelled.has(i)) continue;
+    const root = find(i);
+    let box = sides.get(root);
+    if (!box) {
+      box = {
+        min: [
+          Number.POSITIVE_INFINITY,
+          Number.POSITIVE_INFINITY,
+          Number.POSITIVE_INFINITY,
+        ],
+        max: [
+          Number.NEGATIVE_INFINITY,
+          Number.NEGATIVE_INFINITY,
+          Number.NEGATIVE_INFINITY,
+        ],
+      };
+      sides.set(root, box);
+    }
+    for (const vertex of (triangles[i] as ContactTriangle).vertices)
+      for (let axis = 0; axis < 3; axis++) {
+        const value = q[vertex * 3 + axis] as number;
+        box.min[axis] = Math.min(box.min[axis] as number, value);
+        box.max[axis] = Math.max(box.max[axis] as number, value);
+      }
+  }
+  for (const key of attachment) {
+    const uses = remaining.get(key) as ContactUse[];
+    const x = find((uses[0] as ContactUse).triangle);
+    const y = find((uses[1] as ContactUse).triangle);
+    const a = sides.get(x);
+    const b = sides.get(y);
+    if (
+      x === y ||
+      !a ||
+      !b ||
+      ![0, 1, 2].some(
+        (axis) =>
+          (a.max[axis] as number) <= (b.min[axis] as number) ||
+          (b.max[axis] as number) <= (a.min[axis] as number),
+      )
+    )
+      return false;
+  }
+  for (const key of attachment) {
+    const uses = remaining.get(key) as ContactUse[];
+    join((uses[0] as ContactUse).triangle, (uses[1] as ContactUse).triangle);
+  }
   const shells = new Map<
     number,
     { min: number[]; max: number[]; volume: bigint }

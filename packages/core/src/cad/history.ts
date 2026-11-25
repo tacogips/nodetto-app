@@ -12,7 +12,7 @@ import {
   isCadTypeName,
   isPlainObject,
 } from "@nodetto/ir";
-import { loopExtents } from "./bounds.ts";
+import { profileExtents } from "./bounds.ts";
 import { compareFractional } from "../fractional.ts";
 import {
   baseFrame,
@@ -418,15 +418,14 @@ function withinExtent(
   const withinAxis = (base: number, normal: number) =>
     Math.abs(base + normal * t0) <= bound &&
     Math.abs(base + normal * t1) <= bound;
-  for (const loop of loops) {
-    const { min, max } = loopExtents(loop.points, frame);
-    for (const axis of [0, 1, 2] as const) {
-      if (
-        !withinAxis(min[axis], frame.n[axis]) ||
-        !withinAxis(max[axis], frame.n[axis])
-      )
-        return false;
-    }
+  if (loops.length === 0) return true;
+  const { min, max } = profileExtents(loops, frame);
+  for (const axis of [0, 1, 2] as const) {
+    if (
+      !withinAxis(min[axis], frame.n[axis]) ||
+      !withinAxis(max[axis], frame.n[axis])
+    )
+      return false;
   }
   return true;
 }
@@ -457,6 +456,7 @@ export function createCadGeometry(
   const points = stats ? new Set<CadLoop["points"]>() : undefined;
   const frames = new Map<ElementId, CadFrame>();
   const extrudes = new Map<ElementId, ExtrudeGeometry>();
+  let pcbFrame: CadFrame | undefined;
   let selectedSides: Map<ExtrudeGeometry, Set<CadLoop>> | undefined;
   let sideMembers:
     | Map<
@@ -570,7 +570,8 @@ export function createCadGeometry(
         semantic.board ?? "",
       );
       if ("error" in outline) return cadFailure(outline.error, outline.at);
-      const frame = baseFrame("xy");
+      pcbFrame ??= baseFrame("xy");
+      const frame = pcbFrame;
       const span = { t0: 0, t1: semantic.thickness ?? outline.thickness };
       if (!withinExtent(outline.loops, frame, span))
         return cadFailure(

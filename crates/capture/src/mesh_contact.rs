@@ -250,8 +250,8 @@ fn contact_checked(
             )
         })
         .collect();
-    for edge in attachment {
-        let uses = remaining.get(&edge)?;
+    for edge in &attachment {
+        let uses = remaining.get(edge)?;
         if uses.len() != 2 || uses[0].1 == uses[1].1 {
             return Some(false);
         }
@@ -267,10 +267,45 @@ fn contact_checked(
         }
     }
     parent = (0..tris.len()).collect();
-    for uses in remaining.values() {
-        if uses.len() == 2 {
+    for (edge, uses) in &remaining {
+        if uses.len() == 2 && !attachment.contains(edge) {
             join(&mut parent, uses[0].0, uses[1].0);
         }
+    }
+    // C2b: retain the two sides until their component boxes prove disjoint.
+    let mut boxes: BTreeMap<usize, (Point, Point)> = BTreeMap::new();
+    for (i, triangle) in tris.iter().enumerate() {
+        if cancelled[i] {
+            continue;
+        }
+        let root = find(&mut parent, i);
+        let bounds = boxes
+            .entry(root)
+            .or_insert(([i128::MAX; 3], [i128::MIN; 3]));
+        for vertex in triangle.vertices {
+            let point = points.get(&vertex)?;
+            for (axis, value) in point.iter().enumerate() {
+                bounds.0[axis] = bounds.0[axis].min(*value);
+                bounds.1[axis] = bounds.1[axis].max(*value);
+            }
+        }
+    }
+    for edge in &attachment {
+        let uses = remaining.get(edge)?;
+        let x = find(&mut parent, uses[0].0);
+        let y = find(&mut parent, uses[1].0);
+        if x == y {
+            return Some(false);
+        }
+        let a = boxes.get(&x)?;
+        let b = boxes.get(&y)?;
+        if !(0..3).any(|axis| a.1[axis] <= b.0[axis] || b.1[axis] <= a.0[axis]) {
+            return Some(false);
+        }
+    }
+    for edge in &attachment {
+        let uses = remaining.get(edge)?;
+        join(&mut parent, uses[0].0, uses[1].0);
     }
     let mut shells: BTreeMap<usize, Shell> = BTreeMap::new();
     for (i, t) in tris.iter().enumerate() {
@@ -387,6 +422,25 @@ mod tests {
                 }
             }
         }
+        fn prism(&mut self, outline: &[[f64; 2]], tops: &[[usize; 3]], z0: f64, z1: f64) {
+            let bottom: Vec<_> = outline
+                .iter()
+                .map(|p| self.vertex([p[0], p[1], z0]))
+                .collect();
+            let top: Vec<_> = outline
+                .iter()
+                .map(|p| self.vertex([p[0], p[1], z1]))
+                .collect();
+            for &[a, b, c] in tops {
+                self.indices
+                    .extend([top[a], top[b], top[c], bottom[a], bottom[c], bottom[b]]);
+            }
+            for a in 0..outline.len() {
+                let b = (a + 1) % outline.len();
+                self.indices
+                    .extend([bottom[a], bottom[b], top[b], bottom[a], top[b], top[a]]);
+            }
+        }
         fn closed(&self) -> bool {
             contact_closed(self.points.len(), &self.indices, |i| self.points[i])
         }
@@ -396,6 +450,86 @@ mod tests {
         m.cube([0., 0., 0.], [10., 10., 5.], false, false);
         m.cube(min, max, crossed, false);
         m
+    }
+    fn bracket() -> Mesh {
+        let mut m = Mesh::default();
+        m.prism(
+            &[
+                [0., 0.],
+                [10., 0.],
+                [10., 2.],
+                [2., 2.],
+                [2., 5.],
+                [15., 5.],
+                [15., 1.],
+                [18., 1.],
+                [18., 7.],
+                [0., 7.],
+            ],
+            &[
+                [0, 1, 2],
+                [0, 2, 3],
+                [0, 3, 4],
+                [0, 4, 9],
+                [9, 4, 5],
+                [9, 5, 8],
+                [5, 6, 7],
+                [5, 7, 8],
+            ],
+            0.,
+            5.,
+        );
+        m
+    }
+    #[test]
+    fn bracket_overlap_contact_is_not_closed() {
+        for crossed in [false, true] {
+            let mut m = bracket();
+            // false matches the bracket face diagonal; true uses the other diagonal.
+            m.cube([10., 0., 0.], [20., 2., 5.], crossed, false);
+            assert!(!m.closed(), "crossed={crossed}");
+        }
+    }
+    #[test]
+    fn slit_ring_is_not_closed() {
+        let mut m = Mesh::default();
+        m.prism(
+            &[
+                [0., 0.],
+                [10., 0.],
+                [10., 10.],
+                [0., 10.],
+                [0., 5.],
+                [3., 5.],
+                [3., 7.],
+                [7., 7.],
+                [7., 3.],
+                [3., 3.],
+                [3., 5.],
+                [0., 5.],
+            ],
+            &[
+                [0, 1, 8],
+                [0, 8, 9],
+                [1, 2, 7],
+                [1, 7, 8],
+                [2, 3, 6],
+                [2, 6, 7],
+                [3, 4, 5],
+                [3, 5, 6],
+                [4, 0, 9],
+                [4, 9, 5],
+            ],
+            0.,
+            5.,
+        );
+        assert!(!m.closed());
+    }
+    #[test]
+    fn separated_bracket_and_block_are_closed() {
+        let mut m = bracket();
+        m.cube([20., 0., 0.], [30., 2., 5.], false, false);
+        assert!(m.closed());
     }
     #[test]
     fn strip_contact_is_near_linear() {

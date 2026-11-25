@@ -646,6 +646,22 @@ pub(in crate::raster) mod fixtures {
         scene
     }
 
+    pub(in crate::raster) fn tall_mesh_with_boss(back: bool, overlap: f64, boss: bool) -> Scene {
+        let mut scene = tall_mesh_under_prism(back, overlap);
+        scene.tools[1] = box_tool([-1.0, 0.0, -overlap], 2.0, 10.0, 156.75 + overlap, false);
+        if boss {
+            scene
+                .tools
+                .push(box_tool([-0.5, 8.5, -1.0], 1.0, 1.0, 2.0, false));
+            scene.bodies[1].steps.push(Step {
+                op: Op::Union,
+                tool: 2,
+            });
+        }
+        // Camera confirmed by tmp/car14-r14/car14-p1-prism-slab-proof/camera-probe.log.
+        scene
+    }
+
     pub(in crate::raster) fn shared_side(opposed: bool, overlap: f64) -> Scene {
         let mut scene = blank();
         let origin = if opposed {
@@ -682,6 +698,31 @@ mod witness_tests {
         assert_eq!(report.analysis.unwrap().candidates, 0);
         plain.draw_interference = false;
         assert_eq!(rgb, render_reference(&plain).0);
+    }
+    fn touching_with_candidates(scene: Scene, mut plain: Scene, candidates: usize) {
+        let (rgb, report) = render_reference(&scene);
+        assert!(
+            report.pairs.is_empty(),
+            "unexpected pairs: {:?}",
+            report.pairs
+        );
+        assert_eq!(report.analysis.unwrap().candidates as usize, candidates);
+        plain.draw_interference = false;
+        assert_eq!(rgb, render_reference(&plain).0);
+    }
+    #[test]
+    fn tall_mesh_boss_touch() {
+        for back in [false, true] {
+            touching_with_candidates(
+                fixtures::tall_mesh_with_boss(back, 0.0, true),
+                fixtures::tall_mesh_with_boss(back, 0.0, true),
+                1,
+            );
+            touching(
+                fixtures::tall_mesh_with_boss(back, 0.0, false),
+                fixtures::tall_mesh_with_boss(back, 0.0, false),
+            );
+        }
     }
     fn overlap(scene: Scene, mut plain: Scene) {
         let (rgb, report) = render_reference(&scene);

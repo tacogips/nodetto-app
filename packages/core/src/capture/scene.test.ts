@@ -9,6 +9,8 @@ import {
 import { readStl, writeBinaryStl } from "@nodetto/io/stl";
 import type { CadXY, Element, PageId } from "@nodetto/ir";
 import { checkCadPage } from "../cad/check.ts";
+import { collectCadInput } from "../cad/engine.ts";
+import { pcbBoardOutline } from "../cad/pcb-outline.ts";
 import { buildLoops, type CadLoop } from "../cad/loops.ts";
 import {
   bossOnFace,
@@ -20,7 +22,12 @@ import {
   sketch,
 } from "../cad/testing/documents.ts";
 import { generateCadDocument } from "../cad/testing/generate.ts";
-import { boardReference, edge, testBoard } from "../cad/testing/pcb.ts";
+import {
+  boardReference,
+  edge,
+  PCB_TEST_PAGE,
+  testBoard,
+} from "../cad/testing/pcb.ts";
 import { coordinate } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
 import { prepareCadCapture } from "./cad-request.ts";
@@ -1867,6 +1874,91 @@ test("touching shell cuts survive capture as a whole", () => {
   }
 });
 
+test("touching bracket with a second overlap stays display-only", () => {
+  const outline = [
+    [0, 0],
+    [10, 0],
+    [10, 2],
+    [2, 2],
+    [2, 5],
+    [15, 5],
+    [15, 1],
+    [18, 1],
+    [18, 7],
+    [0, 7],
+  ] as const;
+  const tops = [
+    [0, 1, 2],
+    [0, 2, 3],
+    [0, 3, 4],
+    [0, 4, 9],
+    [9, 4, 5],
+    [9, 5, 8],
+    [5, 6, 7],
+    [5, 7, 8],
+  ] as const;
+  const positions = Float64Array.from(
+    outline.flatMap(([x, y]) => [x, y, 0, x, y, 5]),
+  );
+  const triangles: number[] = [];
+  for (const [a, b, c] of tops) {
+    triangles.push(a * 2 + 1, b * 2 + 1, c * 2 + 1);
+    triangles.push(c * 2, b * 2, a * 2);
+  }
+  for (let a = 0; a < outline.length; a++) {
+    const b = (a + 1) % outline.length;
+    triangles.push(a * 2, b * 2, b * 2 + 1, a * 2, b * 2 + 1, a * 2 + 1);
+  }
+  const bracket = { positions, triangles: Uint32Array.from(triangles) };
+  for (const [name, crossed] of [
+    ["A", true],
+    ["B", false],
+  ] as const) {
+    const block = contactBox(10, 20, 0, 2, crossed);
+    const data = toInline(
+      encodeNmesh(canonicalize(readStl(writeBinaryStl([bracket, block])))),
+    );
+    const uncut = [
+      cadElement("mesh", "cad.mesh", "a0", { name, data }),
+      sketch("base", "a1", { base: "xy", offset: 5 }),
+      ...rectangle("base", 0, 0, 10, 10),
+      extrude("plate", "a2", { sketch: "base", distance: 5, op: "new" }),
+      sketch("opening", "a3"),
+      ...rectangle("opening", 1, 1, 2, 2),
+    ];
+    const elements = [
+      ...uncut,
+      extrude("cut", "a4", {
+        sketch: "opening",
+        distance: 10,
+        op: "cut",
+        bodies: ["mesh", "plate"],
+      }),
+    ];
+    const options = { decodeMesh: decodeCaptureMeshWith };
+    const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, options);
+    expect(
+      model.errors.some((error) => error.code === "cad.body.missing"),
+      name,
+    ).toBe(true);
+    expect(
+      model.bodies.map((body) => body.steps.at(-1)?.op),
+      name,
+    ).toEqual(["union", "union"]);
+    const request = {
+      width: 320,
+      height: 240,
+      theme: "dark",
+      camera: { view: "iso" },
+      ...options,
+    } as const;
+    expect(
+      prepareCadCapture(elements, CAD_TEST_PAGE.id, request).scene,
+      name,
+    ).toEqual(prepareCadCapture(uncut, CAD_TEST_PAGE.id, request).scene);
+  }
+});
+
 function profileCacheStats() {
   return { lookups: 0, admitted: 0, hits: 0, prepared: 0, maxDirectWork: 0 };
 }
@@ -2029,4 +2121,147 @@ test("ordinary capture avoids profile cache work", () => {
     indexEntries: 5500,
     forestFallbacks: 0,
   });
+}, 120_000);
+
+function sharedBoardRun(n: number, k: number) {
+  const graphics = Array.from({ length: n }, (_, i) => {
+    const y = 2 * i;
+    return [
+      edge(`rim-${i}`, {
+        kind: "polygon",
+        points: [
+          [0, y],
+          [1000, y + 1000],
+          [1000, y + 1001],
+          [0, y + 1],
+          [0, y],
+        ],
+      }),
+      edge(`hole-${i}`, {
+        kind: "polygon",
+        points: [
+          [500, y + 500.5],
+          [500.125, y + 500.5],
+          [500.125, y + 500.625],
+          [500, y + 500.625],
+          [500, y + 500.5],
+        ],
+      }),
+    ];
+  }).flat();
+  const references = Array.from({ length: k }, (_, i) =>
+    cadElement(`ref-${i}`, "cad.pcb", `b${String(i).padStart(3, "0")}`, {
+      name: `ref-${i}`,
+      board: "board",
+      thickness: 1 + i / 8,
+    }),
+  );
+  const elements = collectCadInput(
+    {
+      pages: [CAD_TEST_PAGE, PCB_TEST_PAGE],
+      elements: [testBoard(), ...graphics, ...references],
+    },
+    CAD_TEST_PAGE.id,
+    0,
+  ).elements;
+  const ancestry = ancestryStats();
+  const profileCache = profileCacheStats();
+  const model = buildCadCaptureModel(elements, CAD_TEST_PAGE.id, {
+    stats: {
+      captureVisits: 0,
+      toolArrays: 0,
+      metadataVisits: 0,
+      ancestry,
+      profileCache,
+    },
+  });
+  expect(model.errors).toEqual([]);
+  expect(model.overLimit).toBeUndefined();
+  return { elements, ancestry, profileCache, model };
+}
+
+test("shared PCB outlines reuse ancestry and preserve scene bytes", () => {
+  for (const [n, k] of [
+    [256, 8],
+    [512, 16],
+    [1024, 32],
+  ] as const) {
+    const one = sharedBoardRun(n, 1);
+    const many = sharedBoardRun(n, k);
+    console.log(
+      `shared PCB ${n},${k}: work=${ancestryWork(many.ancestry)} baseline=${ancestryWork(one.ancestry)} index=${many.ancestry.indexEntries} forests=${many.ancestry.forestFallbacks} prepared=${many.profileCache.prepared}`,
+    );
+    expect(ancestryWork(many.ancestry)).toBe(ancestryWork(one.ancestry));
+    expect(many.ancestry.indexEntries).toBe(one.ancestry.indexEntries);
+    expect(many.ancestry.forestFallbacks).toBe(one.ancestry.forestFallbacks);
+    expect(many.profileCache.prepared).toBe(one.profileCache.prepared);
+    expect(many.profileCache).toMatchObject({
+      admitted: 1,
+      lookups: k - 1,
+      hits: k - 1,
+    });
+    if (n !== 256) continue;
+    const request = {
+      width: 256,
+      height: 256,
+      theme: "light" as const,
+      camera: { view: "top" as const },
+      interference: null,
+    };
+    const capture = prepareCadCapture(many.elements, CAD_TEST_PAGE.id, request);
+    const outline = pcbBoardOutline(many.elements, "board");
+    if ("error" in outline) throw new Error(outline.error);
+    const tools = capture.model.tools.map((tool) => {
+      if (tool.kind !== "prism") throw new Error("Expected prism");
+      const sourceFaces = new Map<string, number>();
+      const loops = oracleNormalise(outline.loops).map(
+        ({ points, sources }) => ({
+          points: new Float64Array(points),
+          faces: new Uint32Array(
+            sources.map((source) => {
+              let face = sourceFaces.get(source);
+              if (face === undefined) {
+                face = 2 + sourceFaces.size;
+                sourceFaces.set(source, face);
+              }
+              return face;
+            }),
+          ),
+        }),
+      );
+      return { ...tool, loops };
+    });
+    expect(capture.scene).toEqual(
+      writeCaptureScene(
+        { ...capture.model, tools },
+        {
+          width: request.width,
+          height: request.height,
+          supersample: 2,
+          camera: capture.camera,
+          colours: CAPTURE_THEMES[request.theme],
+          referenceOpacity: 0.45,
+          interference: null,
+        },
+      ),
+    );
+    for (let i = 0; i < k; i++) {
+      expect(many.model.bodies[i]?.reference).toBe(true);
+      expect(many.model.bodies[i]?.bounds.min[2]).toBe(0);
+      expect(many.model.bodies[i]?.bounds.max[2]).toBe(1 + i / 8);
+    }
+    const points = (model: typeof many.model) =>
+      model.tools.reduce(
+        (sum, tool) =>
+          sum +
+          (tool.kind === "prism"
+            ? tool.loops.reduce(
+                (total, loop) => total + loop.points.length / 2,
+                0,
+              )
+            : 0),
+        0,
+      );
+    expect(points(many.model)).toBe(k * points(one.model));
+  }
 }, 120_000);

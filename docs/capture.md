@@ -102,8 +102,11 @@ nodetto-cli capture plate.jsonl --view front --output front.png
 
 ## Interference
 
-Interference is shared volume above 0.001 mm; touching faces do not interfere.
-Text gives the number of pairs, candidate count and cell, then each pair's
+Interference is shared volume above 0.001 mm; touching faces do not interfere,
+even when another feature of either body, such as a locating boss, makes the
+two bodies' bounding boxes overlap. A candidate pair with only touching
+material reports no pair, draws no hatch and leaves the image identical to
+`--no-interference`. Text gives the number of pairs, candidate count and cell, then each pair's
 volume and box. The printed cell is the largest used. Interference is always
 found when its projection along X, Y or Z contains an axis-aligned square of
 that side over which overlap is longer than the tolerance. Refinement may be

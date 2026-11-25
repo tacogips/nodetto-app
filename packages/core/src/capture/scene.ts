@@ -512,9 +512,12 @@ export function buildCadCaptureModel(
     },
     tool(feature, geometry, targets) {
       // The walk keeps the original loops for later face references, even
-      // for a loop omitted from the capture tool.
+      // for a loop omitted from the capture tool. PCB references share the
+      // memoized outline array.
       const whole =
-        feature.type === "cad.extrude" && feature.semantic.loops === undefined;
+        feature.type === "cad.pcb" ||
+        (feature.type === "cad.extrude" &&
+          feature.semantic.loops === undefined);
       const counters = stats?.profileCache;
       let loops: readonly CadLoop[] | undefined;
       if (whole && profileCache) {

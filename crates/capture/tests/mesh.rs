@@ -284,6 +284,26 @@ impl ContactFixture {
         }
     }
 
+    fn prism(&mut self, outline: &[[f64; 2]], tops: &[[usize; 3]], z0: f64, z1: f64) {
+        let lower: Vec<_> = outline
+            .iter()
+            .map(|p| self.vertex([p[0], p[1], z0]))
+            .collect();
+        let upper: Vec<_> = outline
+            .iter()
+            .map(|p| self.vertex([p[0], p[1], z1]))
+            .collect();
+        for &[a, b, c] in tops {
+            self.triangles.extend([upper[a], upper[b], upper[c]]);
+            self.triangles.extend([lower[a], lower[c], lower[b]]);
+        }
+        for a in 0..outline.len() {
+            let b = (a + 1) % outline.len();
+            self.triangles
+                .extend([lower[a], lower[b], upper[b], lower[a], upper[b], upper[a]]);
+        }
+    }
+
     fn cube(&mut self, min: [f64; 3], max: [f64; 3], crossed: bool, reverse: bool) {
         let [x, y, z] = min;
         let [a, b, c] = max;
@@ -344,6 +364,39 @@ impl ContactFixture {
             expected,
             "is_closed: {name}"
         );
+    }
+}
+
+#[test]
+fn bracket_contact_with_overlap_is_not_closed() {
+    let outline = [
+        [0., 0.],
+        [10., 0.],
+        [10., 2.],
+        [2., 2.],
+        [2., 5.],
+        [15., 5.],
+        [15., 1.],
+        [18., 1.],
+        [18., 7.],
+        [0., 7.],
+    ];
+    let tops = [
+        [0, 1, 2],
+        [0, 2, 3],
+        [0, 3, 4],
+        [0, 4, 9],
+        [9, 4, 5],
+        [9, 5, 8],
+        [5, 6, 7],
+        [5, 7, 8],
+    ];
+    for crossed in [false, true] {
+        let mut fixture = ContactFixture::default();
+        fixture.prism(&outline, &tops, 0., 5.);
+        // false matches the bracket face diagonal; true uses the opposite diagonal.
+        fixture.cube([10., 0., 0.], [20., 2., 5.], crossed, false);
+        fixture.assert_closed(false, &format!("bracket crossed={crossed}"));
     }
 }
 

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import type { Element, Page } from "@nodetto/ir";
 import { prepareCadCapture } from "../capture/cad-request.ts";
+import { cadBoundsWork } from "./bounds.ts";
+import { checkCadPage } from "./check.ts";
+import { visitCadConstruction } from "./construction.ts";
+import { faceFrame } from "./frames.ts";
 import { collectCadInput } from "./engine.ts";
 import { createCadMemo, evaluateCadPage, releaseCadMemo } from "./evaluate.ts";
 import { CAD_TEST_PAGE, cadElement } from "./testing/documents.ts";
@@ -278,4 +282,69 @@ test("closed board widening invalidates capture and the evaluator memo", () => {
   } finally {
     releaseCadMemo(memo);
   }
+});
+
+function projectionFixture(m: number, k: number, invalid = false) {
+  const board = testBoard();
+  const points: [number, number][] = Array.from({ length: m }, (_, i) => {
+    const angle = (2 * Math.PI * i) / m;
+    return [
+      Math.round(100000 * Math.cos(angle)) / 1000,
+      Math.round(100000 * Math.sin(angle)) / 1000,
+    ];
+  });
+  if (invalid) points[0] = [10001, 0];
+  const rim = edge("projection-rim", { kind: "polygon", points });
+  const refs = Array.from({ length: k }, (_, i) =>
+    cadElement(`projection-${String(i).padStart(4, "0")}`, "cad.pcb", "a0", {
+      name: `projection-${i}`,
+      board: board.id,
+      thickness: i % 2 ? 1.8 : 1,
+    }),
+  );
+  return collectCadInput(
+    {
+      pages: [CAD_TEST_PAGE, { id: "pcb", name: "PCB", kind: "pcb" }],
+      elements: [board, rim, ...refs],
+    },
+    CAD_TEST_PAGE.id,
+    0,
+  ).elements;
+}
+
+test("shared PCB references project vertices once and retain individual spans", () => {
+  for (const m of [128, 256, 512, 1024]) {
+    for (const k of [1, m]) {
+      const input = projectionFixture(m, k);
+      cadBoundsWork.vertexProjections = 0;
+      expect(checkCadPage(input, CAD_TEST_PAGE.id).errors).toEqual([]);
+      expect(cadBoundsWork.vertexProjections).toBe(m);
+    }
+  }
+  const spans: number[] = [];
+  const report = visitCadConstruction(
+    projectionFixture(128, 128),
+    CAD_TEST_PAGE.id,
+    {
+      tool(_feature, geometry) {
+        const thickness = spans.length % 2 ? 1.8 : 1;
+        expect(geometry.span).toEqual({ t0: 0, t1: thickness });
+        expect(faceFrame(geometry.frame, geometry.span, "start").o[2]).toBe(0);
+        expect(faceFrame(geometry.frame, geometry.span, "end").o[2]).toBe(
+          thickness,
+        );
+        spans.push(thickness);
+      },
+    },
+  );
+  expect(report.errors).toEqual([]);
+  expect(spans).toHaveLength(128);
+  const errors = checkCadPage(
+    projectionFixture(128, 2, true),
+    CAD_TEST_PAGE.id,
+  ).errors;
+  expect(errors).toEqual([
+    { id: "projection-0000", code: "cad.limit" },
+    { id: "projection-0001", code: "cad.limit" },
+  ]);
 });

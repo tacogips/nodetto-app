@@ -180,6 +180,46 @@ suite. The [overview](active/car10-00-overview.md) and
 values name the pre-archive `active/` locations, and it must not be
 dispatched again.
 
+### AI capture audit round 14 (car14-r14)
+
+These eight plans fix the five findings of the fourteenth audit of
+`feat/ai-capture` (base 0a35708, head 83d5152):
+function-capture-mesh-prism-touching-face (R14-1),
+maintainability-capture-face-contact-hides-shell-overlap (R14-2),
+performance-cad-shared-multiloop-extent-rescans (R14-3),
+performance-cad-repeated-pcb-outline-projections (R14-4) and
+performance-capture-shared-pcb-outline-ancestry-rebuilds (R14-5). See the
+[design](../design-docs/specs/design-ai-capture.md) and the
+[capture guide](../docs/capture.md). There is no GitHub issue. Evidence is
+under `tmp/car14-r14/<planId>/`; progress logs remain in `progress/`.
+
+| Plan | Scope |
+| --- | --- |
+| [car14-p1-prism-slab-proof](completed/car14-p1-prism-slab-proof.md) | `PrismView::slab` rejects a cap-parallel ray proven outside the prism's world-space slab, so a boss-widened body box keeps no false witness at a flush joint (R14-1) |
+| [car14-p2a-rust-attachment-sides](completed/car14-p2a-rust-attachment-sides.md) | Rust `mesh_contact.rs` C2b checks each attachment edge's two sides are distinct components with disjoint box interiors before joining them (R14-2) |
+| [car14-p2b-ts-attachment-sides](completed/car14-p2b-ts-attachment-sides.md) | Same attachment-side check in the independent TypeScript `nmesh/capture-decoder.ts` (R14-2) |
+| [car14-p2c-bracket-scene-control](completed/car14-p2c-bracket-scene-control.md) | Bracket cut reports `cad.body.missing` with scene bytes equal to the uncut control (R14-2) |
+| [car14-p3-profile-extents](completed/car14-p3-profile-extents.md) | `bounds.ts` `profileExtents` cached by loop-array and frame identity; `extremaReads` is M instead of 3MK (R14-3) |
+| [car14-p4-pcb-frame-reuse](completed/car14-p4-pcb-frame-reuse.md) | One lazily created PCB XY frame per `createCadGeometry` walk; K references project M vertices once (R14-4) |
+| [car14-p5-pcb-profile-cache](completed/car14-p5-pcb-profile-cache.md) | Capture profile-cache admission includes `cad.pcb`; K references build one containment forest (R14-5) |
+| [car14-p6-native-parity](completed/car14-p6-native-parity.md) | Release CLI parity for boss contact and penetration, R13-5 tall contact, R12-7 short contact and welded cuts; supersedes the unstarted car13-p5 |
+
+Integration: native capture parity (22 pass,
+`tmp/car14-r14/reconcile-wave-005/native-parity.log`) and
+`CARGO_TERM_QUIET=true mise run verify` (cargo 330 pass, bun 4886 pass,
+`tmp/car14-r14/reconcile-wave-005/mise-verify.log`), typecheck and lint
+exited 0. There is no browser E2E suite. The
+[overview](active/car14-00-overview.md) and `active/car14-r14-dispatch.json`
+stay in `active/`; the manifest's `planPath` values name the pre-archive
+`active/` locations, and it must not be dispatched again.
+
+The round-12 (`car12-*`) and round-13 (`car13-*`) plans stay in `active/`.
+Their implementations are in the same combined tree that passed the round-14
+integration gates, but their progress logs still record formal review and
+integration as pending for those rounds. `car13-p5-native-parity` never
+started and is superseded by car14-p6; `car12-p7-native-parity` has no
+progress log.
+
 ### iPhone app design
 
 Precise layers, iOS kit, layout, prototyping, lint and comparison are implemented

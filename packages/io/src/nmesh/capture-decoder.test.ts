@@ -352,3 +352,184 @@ test("touching shell eligibility preserves invalid mesh rejection", async () => 
     ).toBe(expected);
   }
 });
+
+test("face contact with a second overlap and self-touching shells are not targets", async () => {
+  const { readStl, writeBinaryStl } = await import("../stl/index.ts");
+  const { decodeCaptureMeshWith } = await import("./capture-decoder.ts");
+  const box = (
+    x0: number,
+    x1: number,
+    y0: number,
+    y1: number,
+    z0 = 0,
+    z1 = 5,
+    crossed = false,
+  ) => ({
+    positions: Float64Array.of(
+      x0,
+      y0,
+      z0,
+      x1,
+      y0,
+      z0,
+      x1,
+      y1,
+      z0,
+      x0,
+      y1,
+      z0,
+      x0,
+      y0,
+      z1,
+      x1,
+      y0,
+      z1,
+      x1,
+      y1,
+      z1,
+      x0,
+      y1,
+      z1,
+    ),
+    triangles: Uint32Array.from([
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      ...(crossed ? [3, 0, 7, 0, 4, 7] : [3, 0, 4, 3, 4, 7]),
+    ]),
+  });
+  const prism = (
+    outline: number[][],
+    sequence: number[],
+    tops: number[][],
+    z0: number,
+    z1: number,
+  ) => {
+    const positions = Float64Array.from(
+      outline.flatMap(([x, y]) => [
+        x as number,
+        y as number,
+        z0,
+        x as number,
+        y as number,
+        z1,
+      ]),
+    );
+    const triangles: number[] = [];
+    for (const [a, b, c] of tops) {
+      triangles.push(
+        (a as number) * 2 + 1,
+        (b as number) * 2 + 1,
+        (c as number) * 2 + 1,
+      );
+      triangles.push((c as number) * 2, (b as number) * 2, (a as number) * 2);
+    }
+    for (let i = 0; i < sequence.length; i++) {
+      const a = sequence[i] as number;
+      const b = sequence[(i + 1) % sequence.length] as number;
+      triangles.push(a * 2, b * 2, b * 2 + 1, a * 2, b * 2 + 1, a * 2 + 1);
+    }
+    return { positions, triangles: Uint32Array.from(triangles) };
+  };
+  const bracket = prism(
+    [
+      [0, 0],
+      [10, 0],
+      [10, 2],
+      [2, 2],
+      [2, 5],
+      [15, 5],
+      [15, 1],
+      [18, 1],
+      [18, 7],
+      [0, 7],
+    ],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [
+      [0, 1, 2],
+      [0, 2, 3],
+      [0, 3, 4],
+      [0, 4, 9],
+      [9, 4, 5],
+      [9, 5, 8],
+      [5, 6, 7],
+      [5, 7, 8],
+    ],
+    0,
+    5,
+  );
+  const slit = prism(
+    [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+      [0, 5],
+      [3, 5],
+      [3, 7],
+      [7, 7],
+      [7, 3],
+      [3, 3],
+    ],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 5, 4],
+    [
+      [0, 1, 8],
+      [0, 8, 9],
+      [1, 2, 7],
+      [1, 7, 8],
+      [2, 3, 6],
+      [2, 6, 7],
+      [3, 4, 5],
+      [3, 5, 6],
+      [4, 0, 9],
+      [4, 9, 5],
+    ],
+    0,
+    5,
+  );
+  // crossed=true uses the bracket's (10,0,0)-(10,2,5) diagonal.
+  const cases = [
+    ["bracket A", [bracket, box(10, 20, 0, 2, 0, 5, true)], false],
+    ["bracket B", [bracket, box(10, 20, 0, 2)], false],
+    ["slit ring", [slit], false],
+    ["separated guard", [bracket, box(20, 30, 0, 2)], true],
+    ["bracket guard", [bracket], true],
+  ] as const;
+  const results = cases.map(([name, meshes, expected]) => {
+    const canonical = canonicalize(readStl(writeBinaryStl(meshes)));
+    const actual = decodeCaptureMeshWith(toInline(encodeNmesh(canonical)), {
+      needTarget: true,
+    }).booleanTarget;
+    return { name, actual, expected };
+  });
+  expect(results).toEqual(
+    cases.map(([name, , expected]) => ({ name, actual: expected, expected })),
+  );
+});

@@ -1,0 +1,108 @@
+{
+  "taskId": "car14-r14",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "83d5152a651a9bd0adb272194ac20fed7c62ca54",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car14-r14",
+  "waves": [
+    ["car14-p6-native-parity"]
+  ],
+  "acceptedDependencies": [
+    {"planId": "car14-p1-prism-slab-proof", "planPath": "impl-plans/active/car14-p1-prism-slab-proof.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-1 prism cap-parallel slab proof in crates/capture/src/prism.rs with boss, suppressed and penetration raster tests; fail-before log under tmp/car14-r14/car14-p1-prism-slab-proof/. Implementation accepted in wave 1 and present in the working tree."},
+    {"planId": "car14-p2a-rust-attachment-sides", "planPath": "impl-plans/active/car14-p2a-rust-attachment-sides.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-2 Rust C2b attachment-side check in crates/capture/src/mesh_contact.rs with bracket and slit-ring tests. Implementation accepted in wave 1 and present in the working tree."},
+    {"planId": "car14-p2b-ts-attachment-sides", "planPath": "impl-plans/active/car14-p2b-ts-attachment-sides.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-2 TypeScript C2b attachment-side check in packages/io/src/nmesh/capture-decoder.ts with bracket tests. Implementation accepted in wave 1 and present in the working tree."},
+    {"planId": "car14-p3-profile-extents", "planPath": "impl-plans/active/car14-p3-profile-extents.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-3 profileExtents cache by loop-array and frame identity in packages/core/src/cad/bounds.ts and history.ts. Implementation accepted in wave 1 and present in the working tree."},
+    {"planId": "car14-p5-pcb-profile-cache", "planPath": "impl-plans/active/car14-p5-pcb-profile-cache.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-5 cad.pcb admission to the capture profile cache in packages/core/src/capture/scene.ts. Implementation accepted in wave 1 and present in the working tree."},
+    {"planId": "car14-p4-pcb-frame-reuse", "planPath": "impl-plans/active/car14-p4-pcb-frame-reuse.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-4 one lazily created PCB XY frame per createCadGeometry walk in packages/core/src/cad/history.ts. Implementation accepted in wave 2 and present in the working tree."},
+    {"planId": "car14-p2c-bracket-scene-control", "planPath": "impl-plans/active/car14-p2c-bracket-scene-control.md", "commit": "fca6ae2df54162a234f44623169e68ab9e57e0aa", "provides": "R14-2 scene cut control (cad.body.missing, union-only steps, bytes equal to uncut) in packages/core/src/capture/scene.test.ts. Implementation accepted in wave 2 and present in the working tree."}
+  ],
+  "reviewContext": {
+    "issueReference": "round-14-audit:feat/ai-capture@83d5152a651a9bd0adb272194ac20fed7c62ca54 (base 0a35708); findings: function-capture-mesh-prism-touching-face, maintainability-capture-face-contact-hides-shell-overlap, performance-cad-shared-multiloop-extent-rescans, performance-cad-repeated-pcb-outline-projections, performance-capture-shared-pcb-outline-ancestry-rebuilds; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car14-00-overview.md",
+    "userProblem": "The round-14 audit found five defects in AI capture and 3D CAD pages. (1) A locating boss clear of a flush STL widens the upper body's box, so the R13-1 filter keeps a false picture witness. The main prism's cap-parallel volume band (crates/capture/src/prism.rs:225-240, cap_error scaled by max(|lo|,|hi|)) admits a ray at Z=-7.1e-15 below its base, and --fail-on-interference exits 1. (2) Face-patch cancellation joins the rim edges before the disjoint-interior check (crates/capture/src/mesh_contact.rs:270, packages/io/src/nmesh/capture-decoder.ts:236), so a bracket and block that touch at X=10 and also overlap by 15 mm^3 are accepted as a boolean target. (3) K whole-sketch extrusions of one M-loop profile cost 3MK extrema reads in checkCadPage (bounds.ts:101, history.ts:421). (4) Every PCB reference creates a fresh XY frame (history.ts:573), so K references reproject M outline vertices each. (5) Capture's profile cache excludes cad.pcb (scene.ts:516), so K references rebuild the same containment forest.",
+    "requiredOutcomes": [
+      "function-capture-mesh-prism-touching-face (R14-1; car14-p1, car14-p6): PrismView::slab::<false>, cap-parallel branch only, returns None when z < lo - proof or z > hi + proof, with proof = 8*EPS*dot(|n|,|offset|). The flag, cap_error, tie rule and facet path are unchanged. The boss fixture gives zero pairs, one candidate and RGB equal to the overlay-disabled render in front and back views, production and reference. The suppressed control gives zero candidates. 0.01 mm penetration gives one (0,1) pair. Natively, boss contact exits 0 with PNG equal to --no-interference, and penetration exits 1.",
+      "maintainability-capture-face-contact-hides-shell-overlap (R14-2; car14-p2a, p2b, p2c): C2b in both independent decoders joins non-attachment two-use edges first, requires each attachment edge's two sides to be distinct components with disjoint integer box interiors, then joins the attachment edges. Both bracket triangulations and the slit ring are rejected. The nine R12-6 classifications are unchanged. The scene cut reports cad.body.missing with union-only steps and bytes equal to the uncut control.",
+      "performance-cad-shared-multiloop-extent-rescans (R14-3; car14-p3): bounds.ts profileExtents is cached by loop-array and frame identity, with a direct single-loop path. sweptBounds and withinExtent use it. cadBoundsWork.extremaReads === M for M=K in 128..1024 (was 3MK). Oracle equality holds for whole, subset, rotated, negative and symmetric cases and the extent limit. The ordinary 500-feature extremaReads is pinned and does not exceed the before value; vertexProjections is unchanged.",
+      "performance-cad-repeated-pcb-outline-projections (R14-4; car14-p4): one lazily created XY frame per createCadGeometry walk for PCB references. vertexProjections === M for K and for 1 references. Spans, cap frames, cad.limit and the PCB digest are unchanged.",
+      "performance-capture-shared-pcb-outline-ancestry-rebuilds (R14-5; car14-p5): the profile-cache admission predicate includes cad.pcb. Ancestry work, indexEntries, forestFallbacks and prepared for K references equal the K=1 values; admitted 1, lookups and hits K-1. Bytes equal the oracle; reference flags, per-reference Z bounds and K-fold point totals hold. The R13-3 tests and the ordinary guard are unchanged."
+    ],
+    "nonGoals": [
+      "No change to raster.rs, lattice.rs, interference.rs, mesh.rs, cap_error, the prism tie rule, the cap_band flag, shading, report types, CLI flags, Tauri, MCP, NCS1 or goldens.",
+      "No change to the R12-6 fast path, C1/C2/Attachment/C4/C5/C6, target_eligible production code, tool_view.rs or construction.ts; no shared code between the TS and Rust decoders.",
+      "No change to loopExtents, frames.ts, pcb-outline.ts, check.ts, PROFILE_CACHE_MIN_WORK, normaliseToolLoops or the R12-3 budget. No docs or design-doc edits by workers. No new dependency."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, noUncheckedIndexedAccess-safe reads without non-null assertions, Biome clean on touched files, CARGO_TERM_QUIET=true, cargo fmt after Rust edits. packages/io must not import @nodetto/core.",
+      "artifactRoots are exactly [\"target\", \"tmp/cad3d\"]. Evidence goes under tmp/car14-r14/<planId>/. Each plan uses CARGO_TARGET_DIR=target/car14-<plan>. No *.test.ts or *.test.tsx file may be left under target/ or tmp/.",
+      "Per-plan gates are focused. The p1 and p2a cargo tests are module-filtered, because sibling fail-before tests share the crate. bun run typecheck, bun run lint, mise run verify and the release parity plus MCP run happen once at integration.",
+      "Shared files are chained: history.ts (p3 then p4) and scene.test.ts (p5 then p2c). Workers follow the SHA-256 pre/post hash, intent snapshot and drift-stop rules of car14-00-overview.md.",
+      "Fail-before ownership (design 31.2): p1, p2a, p2b, p3, p4 and p5 record fail-before and pass-after logs. p2c cites p2b, and p6 cites p1; both record only passing runs, with no rollback and no pre-fix binary.",
+      "The 26.2 timing rule applies. Work counters only. At most two bun test or cargo test processes at once. Never relax existing assertions or helpers."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R14-1 adds a proven-outside rejection in the prism volume path and keeps the flag and cap_error.", "rationale": "This fixes ownership at the contributing prism, as the finding recommends, at one comparison per cast. Witness charge census and the existing flag test stay unchanged."},
+      {"decision": "R14-1 boss tests expect one broad-phase candidate.", "rationale": "interference.rs:131-136 counts body-box overlaps before sampling, and the boss legitimately overlaps by [2,8,1] mm."},
+      {"decision": "R14-2 C2b checks the attachment sides before the final join and rejects same-component sides.", "rationale": "C4 and C5 keep their R12-6 meaning. A box cannot prove a self-touching shell disjoint, consistent with docs/capture.md:87."},
+      {"decision": "R14-3 caches by loop-array and frame identity; R14-4 scopes one PCB frame per walk; R14-5 widens the R13-3 predicate.", "rationale": "Subsets, rotated frames and documents never share entries. The ordinary path does fewer reads and no cache admissions."},
+      {"decision": "Amendment 2026-11-26 round 1: authorize the generated files tmp/capture/m09/timing.json and tmp/capture/m23/timing.json in car14-p6-native-parity writePaths with sharedPathNotes; artifactRoots, dependsOn, verification and plan scope are unchanged.", "rationale": "Blocked plan car14-p6-native-parity (blocked-wave-scope-or-contract): the required release native parity gate runs the existing M09 and M23 tests in apps/cli/src/native-parity/capture.test.ts (:180/:319 and :1002-1006), which rewrite these two git-ignored files outside the artifact roots. The decision is recorded in impl-plans/active/car14-p6-native-parity.md (Amendment 2026-11-26). The seven completed plans are recorded as acceptedDependencies, and only car14-p6-native-parity remains."},
+      {"decision": "Amendment 2026-11-26 round 2: car14-p6-native-parity dependsOn is [] and the plan entry carries acceptedPlanIds (all seven accepted plans) plus a dependencyAdmission readback rule (acceptedDependencies listing, wave2-tree.sha256 all OK, combined-tree.sha256 OK except history.ts and scene.test.ts); writePaths, artifactRoots, verification and acceptance criteria are unchanged.", "rationale": "Blocked plan car14-p6-native-parity (blocked-wave-scope-or-contract, implementation-dependency): the runtime dispatch item carried empty dependsOn and acceptedPlanIds while the manifest listed four prerequisites (p1, p2a, p2c, p4) that had moved to acceptedDependencies, so Step 6 admission refused to start. Admission now rests on the committed acceptedDependencies and the hash readbacks, verified by the reviewer. Decision recorded in impl-plans/active/car14-p6-native-parity.md (Amendment 2026-11-26, round 2). Final amendment round (2 of 2)."}
+    ],
+    "intentionalTradeoffs": [
+      "The Rust boss fixture uses the on-grid mesh and a probed default-fit camera; real STL import is covered natively in p6.",
+      "Self-touching shells and touching shells with overlapping boxes become display-only (conservative).",
+      "car14-p6 supersedes the unstarted car13-p5 and carries R13-5 and R12-7."
+    ],
+    "supportedEdgeCases": [
+      "Cap-parallel rays at, just below and just above a cap plane, and inside the slab; boss present or suppressed; 0.01 mm penetration.",
+      "Bracket face contact with a second overlap (both diagonals); slit ring; separated guard; nine R12-6 fixtures.",
+      "Whole profiles, explicit subsets, rotated frames, negative and symmetric spans, and the 10,000 mm limit; PCB thickness per reference; invalid extents.",
+      "Shared PCB slanted rims with holes at three sizes; the ordinary 500-feature document."
+    ],
+    "outOfScopeEdgeCases": [
+      "Oblique, rotated or partial contacts; caps far from the prism origin; other named views.",
+      "Boa latency, native peak memory, allocator bytes, desktop WebGL and frame time, Tauri IPC, MCP delivery and cross-platform byte determinism."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car14-00-overview.md",
+      "impl-plans/active/car14-p1-prism-slab-proof.md",
+      "impl-plans/active/car14-p2a-rust-attachment-sides.md",
+      "impl-plans/active/car14-p2b-ts-attachment-sides.md",
+      "impl-plans/active/car14-p2c-bracket-scene-control.md",
+      "impl-plans/active/car14-p3-profile-extents.md",
+      "impl-plans/active/car14-p4-pcb-frame-reuse.md",
+      "impl-plans/active/car14-p5-pcb-profile-cache.md",
+      "impl-plans/active/car14-p6-native-parity.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car14-p6-native-parity",
+      "planPath": "impl-plans/active/car14-p6-native-parity.md",
+      "dependsOn": [],
+      "acceptedPlanIds": ["car14-p1-prism-slab-proof", "car14-p2a-rust-attachment-sides", "car14-p2b-ts-attachment-sides", "car14-p3-profile-extents", "car14-p5-pcb-profile-cache", "car14-p4-pcb-frame-reuse", "car14-p2c-bracket-scene-control"],
+      "dependencyAdmission": "Amendment round 2: every prerequisite (car14-p1, p2a, p2c, p4, plus p2b, p3, p5) was accepted by integration review (waves 1 and 2) and is recorded under top-level acceptedDependencies. dependsOn is therefore empty by design and the runtime may project empty dependsOn/acceptedPlanIds. Admission is established by readback: (1) acceptedDependencies in this committed manifest lists all seven plans; (2) shasum -a 256 -c tmp/car14-r14/reconcile-wave-002/wave2-tree.sha256 reports OK for every file; (3) shasum -a 256 -c tmp/car14-r14/reconcile-wave-001/combined-tree.sha256 reports OK for every file except packages/core/src/cad/history.ts and packages/core/src/capture/scene.test.ts, which are covered by (2). If any check fails, stop as blocked with the failing path; otherwise proceed. Do not block on empty runtime dependsOn or acceptedPlanIds.",
+      "writePaths": ["apps/cli/src/native-parity/capture.test.ts", "impl-plans/active/car14-p6-native-parity.md", "impl-plans/progress/car14-p6-native-parity.md", "tmp/car14-r14/car14-p6-native-parity", "tmp/capture/m09/timing.json", "tmp/capture/m23/timing.json", "target", "tmp/cad3d"],
+      "sharedPathNotes": [
+        {"path": "tmp/capture/m09/timing.json", "intendedEdit": "Amendment round 1: generated measurement file rewritten by the existing M09 native parity test (capture.test.ts:180, :319) during the required gate. Authorized as a gate side effect only; never hand-edited."},
+        {"path": "tmp/capture/m23/timing.json", "intendedEdit": "Amendment round 1: generated measurement file rewritten by the existing M23 native parity test (capture.test.ts:1002-1006) during the required gate. Authorized as a gate side effect only; never hand-edited."}
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Boss contact via real STL import exits 0 in front and back views with zero pairs and PNG equal to --no-interference. Boss penetration exits 1 with one mesh/upper pair.",
+        "The R13-5 tall flush contact and penetration, the R12-7 short contact and overlap, and the welded edge, face and crossed cut documents with through-hole proof all pass as specified.",
+        "The gate log shows every new case as passed (not skipped) against a fresh release build of the current tree. The progress log cites p1's fail-before log."
+      ],
+      "verification": [
+        "bunx biome check apps/cli/src/native-parity/capture.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car14-p6 cargo build --release -p nodetto-cli && test -x \"$PWD/target/car14-p6/release/nodetto-cli\" && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car14-p6/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    }
+  ]
+}

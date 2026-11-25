@@ -1274,3 +1274,277 @@ nativeTest(
   },
   30_000,
 );
+
+function parityBox(
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  z0: number,
+  z1: number,
+  crossed = false,
+) {
+  return {
+    positions: Float64Array.from([
+      x0,
+      y0,
+      z0,
+      x1,
+      y0,
+      z0,
+      x1,
+      y1,
+      z0,
+      x0,
+      y1,
+      z0,
+      x0,
+      y0,
+      z1,
+      x1,
+      y0,
+      z1,
+      x1,
+      y1,
+      z1,
+      x0,
+      y1,
+      z1,
+    ]),
+    triangles: Uint32Array.from([
+      0,
+      2,
+      1,
+      0,
+      3,
+      2,
+      4,
+      5,
+      6,
+      4,
+      6,
+      7,
+      0,
+      1,
+      5,
+      0,
+      5,
+      4,
+      1,
+      2,
+      6,
+      1,
+      6,
+      5,
+      2,
+      3,
+      7,
+      2,
+      7,
+      6,
+      ...(crossed ? [3, 0, 7, 0, 4, 7] : [3, 0, 4, 3, 4, 7]),
+    ]),
+  };
+}
+
+for (const kind of ["boss", "tall", "short"] as const) {
+  nativeTest(
+    `native imported STL ${kind} contact and penetration parity`,
+    () => {
+      const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-contact-"));
+      try {
+        const short = kind === "short";
+        const mesh = short
+          ? parityBox(-32, 32, 0, 8, -4, 0)
+          : parityBox(-1, 1, 0, 8, -35.25, 0);
+        const data = stlToInlineMesh(writeBinaryStl([mesh]));
+        for (const overlap of [false, true]) {
+          const elements = [
+            cadElement("mesh", "cad.mesh", "a0", { name: "Mesh", data }),
+            sketch("upper-sketch", "a1", {
+              base: "xy",
+              offset: overlap ? -0.01 : 0,
+            }),
+            ...rectangle(
+              "upper-sketch",
+              short ? -32 : -1,
+              0,
+              short ? 64 : 2,
+              kind === "boss" ? 10 : 8,
+            ),
+            extrude("upper", "a2", {
+              sketch: "upper-sketch",
+              distance: (short ? 4 : 156.75) + (overlap ? 0.01 : 0),
+              op: "new",
+            }),
+            ...(kind === "boss"
+              ? [
+                  sketch("boss-sketch", "a3", { base: "xy", offset: -1 }),
+                  ...rectangle("boss-sketch", -0.5, 8.5, 1, 1),
+                  extrude("boss", "a4", {
+                    sketch: "boss-sketch",
+                    distance: 2,
+                    op: "add",
+                    bodies: ["upper"],
+                  }),
+                ]
+              : []),
+          ];
+          const path = join(cwd, `${kind}-${overlap}.jsonl`);
+          writeFileSync(
+            path,
+            serializeDocument(document(elements, [CAD_TEST_PAGE])),
+          );
+          for (const view of ["front", "back"]) {
+            const args = [
+              "capture",
+              path,
+              "--view",
+              view,
+              "--size",
+              "64x64",
+              ...(short ? ["--zoom", "1.08", "--target", "0,0,0.25"] : []),
+              "--json",
+              "--output",
+              "result.png",
+              "--force",
+            ];
+            const result = Bun.spawnSync(
+              [binary as string, ...args, "--fail-on-interference"],
+              { cwd },
+            );
+            expect(
+              result.exitCode,
+              `${kind} ${overlap} ${view}: ${result.stderr}`,
+            ).toBe(overlap ? 1 : 0);
+            const report = JSON.parse(result.stdout.toString()) as {
+              interference: {
+                pairs: { a: string; b: string }[];
+                candidates: number;
+              };
+            };
+            if (short) {
+              const textArgs = args.filter((arg) => arg !== "--json");
+              const textResult = Bun.spawnSync(
+                [binary as string, ...textArgs, "--fail-on-interference"],
+                { cwd },
+              );
+              expect(textResult.exitCode).toBe(overlap ? 1 : 0);
+              expect(textResult.stdout.toString()).toContain(
+                `interference: ${overlap ? 1 : 0}`,
+              );
+            }
+            expect(report.interference.pairs).toHaveLength(overlap ? 1 : 0);
+            if (overlap)
+              expect(report.interference.pairs[0]).toMatchObject({
+                a: "mesh",
+                b: "upper",
+              });
+            if (!overlap) {
+              if (kind === "tall")
+                expect(report.interference.candidates).toBe(0);
+              const image = readFileSync(join(cwd, "result.png"));
+              const plain = Bun.spawnSync(
+                [binary as string, ...args, "--no-interference"],
+                { cwd },
+              );
+              expect(plain.exitCode).toBe(0);
+              expect(readFileSync(join(cwd, "result.png"))).toEqual(image);
+            }
+          }
+        }
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+    120_000,
+  );
+}
+
+for (const kind of ["edge", "face", "crossed"] as const) {
+  nativeTest(
+    `native welded ${kind} shell cuts preserve through holes`,
+    () => {
+      const cwd = mkdtempSync(join(tmpdir(), "nodetto-native-welded-"));
+      try {
+        const data = stlToInlineMesh(
+          writeBinaryStl([
+            parityBox(0, 10, 0, 10, 0, 5),
+            parityBox(
+              10,
+              20,
+              kind === "edge" ? 10 : 0,
+              kind === "edge" ? 20 : 10,
+              0,
+              5,
+              kind === "face",
+            ),
+          ]),
+        );
+        const base = [
+          cadElement("mesh", "cad.mesh", "a0", { name: "Mesh", data }),
+          sketch("base", "a1", { base: "xy", offset: 5 }),
+          ...rectangle("base", 0, 0, 10, 10),
+          extrude("plate", "a2", { sketch: "base", distance: 5, op: "new" }),
+          sketch("opening", "a3"),
+          ...rectangle("opening", 1, 1, 2, 2),
+        ];
+        const captures = [false, true].map((cut) => {
+          const elements = cut
+            ? [
+                ...base,
+                extrude("cut", "a4", {
+                  sketch: "opening",
+                  distance: 10,
+                  op: "cut",
+                  bodies: ["mesh", "plate"],
+                }),
+              ]
+            : base;
+          const path = join(cwd, `${kind}-${cut}.jsonl`);
+          writeFileSync(
+            path,
+            serializeDocument(document(elements, [CAD_TEST_PAGE])),
+          );
+          return runCad(
+            cwd,
+            path,
+            ["--view", "top", "--size", "160x160", "--json"],
+            `${kind}-${cut}.png`,
+          );
+        });
+        const uncut = captures[0];
+        const cut = captures[1];
+        if (!uncut || !cut) throw new Error("Missing captures");
+        const report = JSON.parse(cut.stdout) as {
+          camera: { mmPerPixel: number };
+          bodies: { id: string; open: boolean }[];
+          errors: { code: string }[];
+        };
+        expect(
+          report.errors.some((error) => error.code === "cad.body.missing"),
+        ).toBe(false);
+        expect(report.bodies.find((body) => body.id === "mesh")?.open).toBe(
+          false,
+        );
+        expect(report.camera.mmPerPixel).toBeLessThanOrEqual(0.25);
+        expect(cut.bytes).not.toEqual(uncut.bytes);
+        const a = cadPixels(uncut);
+        const b = cadPixels(cut);
+        const background = [0xf6, 0xf4, 0xee];
+        expect(b.world([2, 2, 10])).toEqual(background);
+        expect(a.world([2, 2, 10])).not.toEqual(background);
+        for (const point of [
+          [6, 6, 10],
+          kind === "edge" ? ([15, 15, 5] as const) : ([15, 5, 5] as const),
+        ] as const) {
+          expect(a.world(point)).not.toEqual(background);
+          expect(b.world(point)).not.toEqual(background);
+        }
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+    120_000,
+  );
+}

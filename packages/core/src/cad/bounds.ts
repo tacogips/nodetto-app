@@ -39,7 +39,7 @@ export function includeBounds(
   }
 }
 
-export const cadBoundsWork = { vertexProjections: 0 };
+export const cadBoundsWork = { vertexProjections: 0, extremaReads: 0 };
 
 const extremaCache = new WeakMap<
   object,
@@ -78,6 +78,36 @@ export function loopExtents(
   return result;
 }
 
+const profileExtremaCache = new WeakMap<
+  object,
+  { frame: CadFrame; min: Vec3; max: Vec3 }
+>();
+
+export function profileExtents(
+  loops: readonly { readonly points: ArrayLike<number> }[],
+  frame: CadFrame,
+): { readonly min: Vec3; readonly max: Vec3 } {
+  const single = loops.length === 1 ? loops[0] : undefined;
+  if (single) {
+    cadBoundsWork.extremaReads += 1;
+    return loopExtents(single.points, frame);
+  }
+  const cached = profileExtremaCache.get(loops);
+  if (cached?.frame === frame) return cached;
+  const { min, max } = emptyBounds();
+  for (const { points } of loops) {
+    cadBoundsWork.extremaReads += 1;
+    const extents = loopExtents(points, frame);
+    for (const axis of AXES) {
+      min[axis] = Math.min(min[axis], extents.min[axis]);
+      max[axis] = Math.max(max[axis], extents.max[axis]);
+    }
+  }
+  const result = { frame, min, max };
+  profileExtremaCache.set(loops, result);
+  return result;
+}
+
 /** Bounds of profile loops swept from `t0` to `t1` along the frame normal. */
 export function sweptBounds(
   frame: CadFrame,
@@ -88,6 +118,7 @@ export function sweptBounds(
   const { o, u, v, n } = frame;
   const min: MutableVec3 = [0, 0, 0];
   const max: MutableVec3 = [0, 0, 0];
+  const extents = profileExtents(loops, frame);
   for (const axis of AXES) {
     const origin = o[axis];
     const alongX = u[axis];
@@ -96,13 +127,8 @@ export function sweptBounds(
     let upper = origin;
     // On a constant axis all profile vertices have the same projection.
     if (alongX !== 0 || alongY !== 0) {
-      lower = Number.POSITIVE_INFINITY;
-      upper = Number.NEGATIVE_INFINITY;
-      for (const { points } of loops) {
-        const extents = loopExtents(points, frame);
-        lower = Math.min(lower, extents.min[axis]);
-        upper = Math.max(upper, extents.max[axis]);
-      }
+      lower = extents.min[axis];
+      upper = extents.max[axis];
     }
     // The same endpoint offsets apply to every vertex on this axis.
     const start = n[axis] * t0;
