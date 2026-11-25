@@ -25,22 +25,45 @@ use budget::{ScanBudget, WorkerBudget};
 
 const BAND_ROWS: usize = 32;
 const MAX_THREADS: usize = 8;
+const MAX_LAYER_WINDOW: usize = 262_144;
 const SCAN_ALLOWANCE: u64 = 16_000_000_000;
 
 #[cfg_attr(not(test), allow(dead_code))]
 struct RenderStats {
     reads: u64,
+    charged: u64,
+    witness: u64,
     workers: usize,
+    layer_capacity: usize,
     liveness: Vec<Liveness>,
     census: census::CensusStats,
+}
+
+#[derive(Clone, Copy)]
+struct Tuning {
+    never_flag: bool,
+    layer_cap: usize,
+}
+
+impl Tuning {
+    const PRODUCTION: Self = Self {
+        never_flag: false,
+        layer_cap: MAX_LAYER_WINDOW,
+    };
 }
 
 type Visibility = Vec<(bool, bool, Vec<usize>)>;
 
 #[derive(Clone, Copy, Default)]
+struct LayerSpan {
+    offset: u32,
+    count: u32,
+}
+
+#[derive(Clone, Copy, Default)]
 struct Sample {
     solid: Option<Hit>,
-    translucent: Option<Hit>,
+    layers: LayerSpan,
     marked: bool,
 }
 
@@ -92,16 +115,22 @@ struct ProjectedPrism {
 
 #[derive(Default)]
 struct RayScratch {
+    candidates: Vec<(usize, Boundary)>,
+    kept: Vec<Hit>,
     crossings: Vec<Boundary>,
     tool: Intervals,
     current: Intervals,
     next: Intervals,
+    volume: Intervals,
+    witness: Intervals,
+    witness_next: Intervals,
     body_intervals: Vec<Intervals>,
     visited: Vec<u32>,
     overlaps: Vec<(u32, u32, f64, f64)>,
 }
 
 struct Raster<'a> {
+    tuning: Tuning,
     scene: &'a Scene,
     tools: Vec<Option<ProjectedPrism>>,
     weights: Vec<u64>,
@@ -116,6 +145,7 @@ struct Raster<'a> {
 }
 
 impl Raster<'_> {
+    #[allow(clippy::too_many_arguments)]
     fn sample(
         &self,
         position: [f64; 2],
@@ -124,6 +154,7 @@ impl Raster<'_> {
         visibility: &mut Visibility,
         marks: &mut MarkTable,
         budget: &mut WorkerBudget<'_>,
+        arena: &mut Vec<Hit>,
     ) -> Sample {
         let camera = &self.scene.camera;
         let [x, y] = position;
@@ -133,7 +164,7 @@ impl Raster<'_> {
             }),
         };
         let mut nearest: Option<(usize, Boundary)> = None;
-        let mut translucent: Option<(usize, Boundary)> = None;
+        scratch.candidates.clear();
         scratch
             .body_intervals
             .resize_with(self.scene.bodies.len(), Vec::new);
@@ -159,14 +190,14 @@ impl Raster<'_> {
                     }
                     if let Some(hit) = projected.view.first_surface_hit(&ray) {
                         *present = true;
-                        if translucent.is_none_or(|(_, old)| hit.s < old.s - MERGE_EPS) {
-                            translucent = Some((index, hit));
-                        }
+                        scratch.candidates.push((index, hit));
                     }
                 }
                 continue;
             }
             scratch.current.clear();
+            let track = body.analysed && self.scene.draw_interference;
+            let mut diverged = false;
             for (offset, &step_index) in steps.iter().enumerate() {
                 let step = &body.steps[step_index as usize];
                 let projected = self.tools.get(step.tool as usize).and_then(Option::as_ref);
@@ -181,9 +212,37 @@ impl Raster<'_> {
                     if !budget.scan(prism.view.scan_cost(&ray), admitted) {
                         return Sample::default();
                     }
-                    prism
-                        .view
-                        .surface_intervals(&ray, &mut scratch.crossings, &mut scratch.tool);
+                    let flagged = prism.view.surface_intervals(
+                        &ray,
+                        &mut scratch.crossings,
+                        &mut scratch.tool,
+                    ) && !self.tuning.never_flag;
+                    if track && (flagged || diverged) {
+                        if flagged {
+                            prism
+                                .view
+                                .intervals(&ray, &mut scratch.crossings, &mut scratch.volume);
+                            if !budget.recast(prism.view.scan_cost(&ray)) {
+                                return Sample::default();
+                            }
+                        }
+                        let source = if diverged {
+                            &scratch.witness
+                        } else {
+                            &scratch.current
+                        };
+                        let tool = if flagged {
+                            &scratch.volume
+                        } else {
+                            &scratch.tool
+                        };
+                        if !budget.charge_witness((source.len() + tool.len()) as u64) {
+                            return Sample::default();
+                        }
+                        combine(source, tool, step.op, &mut scratch.witness_next);
+                        std::mem::swap(&mut scratch.witness, &mut scratch.witness_next);
+                        diverged = true;
+                    }
                     if !budget.charge((scratch.current.len() + scratch.tool.len()) as u64) {
                         return Sample::default();
                     }
@@ -191,6 +250,9 @@ impl Raster<'_> {
                     std::mem::swap(&mut scratch.current, &mut scratch.next);
                 } else if step.op == Op::Intersection {
                     scratch.current.clear();
+                    if diverged {
+                        scratch.witness.clear();
+                    }
                 }
                 if !scratch.current.is_empty() {
                     let end = steps
@@ -201,18 +263,18 @@ impl Raster<'_> {
                     live[start] = live[start].max(end);
                 }
             }
+            if diverged {
+                scratch.body_intervals[index].clone_from(&scratch.witness);
+            }
             if let Some(&first) = scratch.current.first() {
                 *present = true;
-                if body.analysed {
+                if body.analysed && !diverged {
                     scratch.body_intervals[index].clone_from(&scratch.current);
                 }
-                let target = if body.reference {
-                    &mut translucent
-                } else {
-                    &mut nearest
-                };
-                if target.is_none_or(|(_, hit)| first.s < hit.s - MERGE_EPS) {
-                    *target = Some((index, first));
+                if body.reference {
+                    scratch.candidates.push((index, first));
+                } else if nearest.is_none_or(|(_, hit)| first.s < hit.s - MERGE_EPS) {
+                    nearest = Some((index, first));
                 }
             }
         }
@@ -259,22 +321,54 @@ impl Raster<'_> {
             })
         };
         let solid = nearest.and_then(make_hit);
-        let translucent = translucent
-            .and_then(make_hit)
-            .filter(|hit| solid.is_none_or(|s| hit.depth < s.depth - MERGE_EPS));
+        scratch.kept.clear();
+        scratch.kept.extend(
+            scratch
+                .candidates
+                .iter()
+                .copied()
+                .filter_map(make_hit)
+                .filter(|hit| solid.is_none_or(|s| hit.depth < s.depth - MERGE_EPS)),
+        );
+        let k = scratch.kept.len();
+        if k >= 2 {
+            if !budget.charge((k + k * (k - 1) / 2) as u64) {
+                return Sample::default();
+            }
+            scratch
+                .kept
+                .sort_unstable_by(|a, b| a.depth.total_cmp(&b.depth).then(a.body.cmp(&b.body)));
+        }
+        let needed = arena.len() + k;
+        if needed > self.tuning.layer_cap {
+            budget.stop();
+            return Sample::default();
+        }
+        if needed > arena.capacity() {
+            let capacity = (arena.capacity().saturating_mul(2))
+                .max(needed)
+                .min(self.tuning.layer_cap);
+            arena.reserve_exact(capacity - arena.len());
+        }
+        let layers = LayerSpan {
+            offset: arena.len() as u32,
+            count: k as u32,
+        };
+        arena.extend_from_slice(&scratch.kept);
         if let Some(hit) = solid {
             visibility[hit.body].1 = true;
         }
-        if let Some(hit) = translucent {
+        for hit in &scratch.kept {
             visibility[hit.body].1 = true;
         }
         Sample {
             solid,
-            translucent,
+            layers,
             marked,
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn sample_row(
         &self,
         y: usize,
@@ -283,6 +377,7 @@ impl Raster<'_> {
         visibility: &mut Visibility,
         marks: &mut MarkTable,
         budget: &mut WorkerBudget<'_>,
+        arena: &mut Vec<Hit>,
     ) {
         let up = (self.samples_high as f64 / 2.0 - (y as f64 + 0.5)) * self.step;
         for (x, hit) in row.iter_mut().enumerate() {
@@ -294,6 +389,7 @@ impl Raster<'_> {
                 visibility,
                 marks,
                 budget,
+                arena,
             );
             if budget.stopped() {
                 return;
@@ -325,7 +421,14 @@ impl Raster<'_> {
         // Keep the rows for one output row plus its lower neighbor. At the
         // band boundary that neighbor is sampled again by the next band.
         let mut samples = vec![Sample::default(); self.samples_wide * (self.factor + 1)];
+        let mut arena = Vec::new();
+        let mut sampled = vec![false; self.factor + 1];
+        let mut multi = vec![false; self.factor + 1];
         for (band, pixels) in output.chunks_mut(stride * BAND_ROWS).enumerate() {
+            arena.clear();
+            samples.fill(Sample::default());
+            sampled.fill(false);
+            multi.fill(false);
             let first_row = (first_pixel_row + band * BAND_ROWS) * self.factor;
             self.sample_row(
                 first_row,
@@ -334,7 +437,15 @@ impl Raster<'_> {
                 &mut visibility,
                 &mut marks,
                 &mut budget,
+                &mut arena,
             );
+            sampled[0] = true;
+            multi[0] = samples[..self.samples_wide]
+                .iter()
+                .any(|s| s.layers.count >= 2);
+            debug_assert!(samples[..self.samples_wide]
+                .iter()
+                .all(|s| s.layers.offset as usize + s.layers.count as usize <= arena.len()));
             if shared.stopped() {
                 break;
             }
@@ -354,7 +465,18 @@ impl Raster<'_> {
                             &mut visibility,
                             &mut marks,
                             &mut budget,
+                            &mut arena,
                         );
+                        sampled[offset] = true;
+                        multi[offset] = sample_row.iter().any(|s| s.layers.count >= 2);
+                        debug_assert!(sample_row
+                            .iter()
+                            .all(|s| s.layers.offset as usize + s.layers.count as usize
+                                <= arena.len()));
+                    } else {
+                        sample_row.fill(Sample::default());
+                        sampled[offset] = false;
+                        multi[offset] = false;
                     }
                 }
                 if shared.stopped() {
@@ -384,18 +506,37 @@ impl Raster<'_> {
                             } else {
                                 palette.background
                             };
-                            if let Some(reference) = sample.translucent {
+                            let span = sample.layers;
+                            for reference in arena
+                                [span.offset as usize..(span.offset + span.count) as usize]
+                                .iter()
+                                .rev()
+                            {
+                                let mut neighbour = |index: usize| {
+                                    let span = samples[index].layers;
+                                    for hit in &arena
+                                        [span.offset as usize..(span.offset + span.count) as usize]
+                                    {
+                                        if sample.layers.count >= 2 && !budget.charge(1) {
+                                            return None;
+                                        }
+                                        if hit.body == reference.body {
+                                            return Some(*hit);
+                                        }
+                                    }
+                                    None
+                                };
                                 let ref_edge = (x + 1 < self.samples_wide
                                     && shade::is_edge(
-                                        sample.translucent,
-                                        samples[i + 1].translucent,
+                                        Some(*reference),
+                                        neighbour(i + 1),
                                         right,
                                         forward,
                                     ))
                                     || (sample_y + dy + 1 < self.samples_high
                                         && shade::is_edge(
-                                            sample.translucent,
-                                            samples[i + self.samples_wide].translucent,
+                                            Some(*reference),
+                                            neighbour(i + self.samples_wide),
                                             down,
                                             forward,
                                         ));
@@ -433,11 +574,36 @@ impl Raster<'_> {
                     }
                 }
                 samples.copy_within(self.samples_wide * self.factor.., 0);
+                if sampled[self.factor] {
+                    let mut dest = 0;
+                    for sample in &mut samples[..self.samples_wide] {
+                        let start = sample.layers.offset as usize;
+                        let count = sample.layers.count as usize;
+                        if count > 0 {
+                            arena.copy_within(start..start + count, dest);
+                        }
+                        sample.layers.offset = dest as u32;
+                        dest += count;
+                    }
+                    if multi[self.factor] && !budget.charge(dest as u64) {
+                        break;
+                    }
+                    arena.truncate(dest);
+                } else {
+                    arena.clear();
+                    samples[..self.samples_wide].fill(Sample::default());
+                }
+                sampled[0] = sampled[self.factor];
+                multi[0] = multi[self.factor];
+                samples[self.samples_wide..].fill(Sample::default());
+                sampled[1..].fill(false);
+                multi[1..].fill(false);
             }
             if !budget.flush() {
                 break;
             }
         }
+        shared.record_layer_capacity(arena.capacity());
         (visibility, marks)
     }
 }
@@ -445,7 +611,11 @@ impl Raster<'_> {
 impl<'a> Raster<'a> {
     /// Project the tools, refuse a picture over the work limit and build
     /// the per-tile body lists.
-    fn prepare(scene: &'a Scene, solid_tools: &[bool]) -> Result<Self, CaptureError> {
+    fn prepare(
+        scene: &'a Scene,
+        solid_tools: &[bool],
+        tuning: Tuning,
+    ) -> Result<Self, CaptureError> {
         let (width, height, factor) = (scene.width, scene.height, scene.supersample);
         if !(64..=2048).contains(&width)
             || !(64..=2048).contains(&height)
@@ -528,6 +698,7 @@ impl<'a> Raster<'a> {
             return Err(tiles::work_error(work));
         }
         Ok(Raster {
+            tuning,
             scene,
             tools,
             weights,
@@ -649,13 +820,22 @@ fn render_with(
     threads: usize,
     allowance: u64,
 ) -> (Result<(Vec<u8>, Report), CaptureError>, RenderStats) {
+    render_tuned(scene, threads, allowance, Tuning::PRODUCTION)
+}
+
+fn render_tuned(
+    scene: &Scene,
+    threads: usize,
+    allowance: u64,
+    tuning: Tuning,
+) -> (Result<(Vec<u8>, Report), CaptureError>, RenderStats) {
     let shared = ScanBudget::new(allowance);
     let mut liveness_out = Vec::new();
     let mut census_out = census::CensusStats::default();
     let result = (|| {
         let (width, height) = (scene.width, scene.height);
         let solid = tool_view::classify(scene);
-        let raster = Raster::prepare(scene, &solid)?;
+        let raster = Raster::prepare(scene, &solid, tuning)?;
         let mut output = vec![0; width as usize * 3 * height as usize];
         let threads = if threads == 0 {
             thread::available_parallelism().map_or(1, usize::from)
@@ -706,7 +886,10 @@ fn render_with(
     })();
     let stats = RenderStats {
         reads: shared.reads(),
+        charged: shared.charged(),
+        witness: shared.witness(),
         workers: shared.workers(),
+        layer_capacity: shared.layer_capacity(),
         liveness: liveness_out,
         census: census_out,
     };

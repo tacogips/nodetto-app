@@ -47,7 +47,7 @@ impl ToolView {
         ray: &Ray,
         scratch: &mut Vec<Boundary>,
         out: &mut Intervals,
-    ) {
+    ) -> bool {
         match self {
             Self::Prism(view) => view.surface_intervals(ray, scratch, out),
             Self::Mesh(view) => view.surface_intervals(ray, scratch, out),

@@ -9,7 +9,9 @@ pub(super) struct ScanBudget {
     allowance: u64,
     charged: AtomicU64,
     reads: AtomicU64,
+    witness: AtomicU64,
     workers: AtomicUsize,
+    layer_capacity: AtomicUsize,
     stopped: AtomicBool,
 }
 
@@ -19,7 +21,9 @@ impl ScanBudget {
             allowance,
             charged: AtomicU64::new(0),
             reads: AtomicU64::new(0),
+            witness: AtomicU64::new(0),
             workers: AtomicUsize::new(0),
+            layer_capacity: AtomicUsize::new(0),
             stopped: AtomicBool::new(false),
         }
     }
@@ -34,8 +38,24 @@ impl ScanBudget {
         self.reads.load(Ordering::Relaxed)
     }
 
+    pub(super) fn charged(&self) -> u64 {
+        self.charged.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn witness(&self) -> u64 {
+        self.witness.load(Ordering::Relaxed)
+    }
+
     pub(super) fn workers(&self) -> usize {
         self.workers.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn record_layer_capacity(&self, capacity: usize) {
+        self.layer_capacity.fetch_max(capacity, Ordering::Relaxed);
+    }
+
+    pub(super) fn layer_capacity(&self) -> usize {
+        self.layer_capacity.load(Ordering::Relaxed)
     }
 
     /// Register one worker and return its local account.
@@ -45,6 +65,7 @@ impl ScanBudget {
             shared: self,
             pending: 0,
             reads: 0,
+            witness: 0,
         }
     }
 }
@@ -53,9 +74,15 @@ pub(super) struct WorkerBudget<'a> {
     shared: &'a ScanBudget,
     pending: u64,
     reads: u64,
+    witness: u64,
 }
 
 impl WorkerBudget<'_> {
+    /// Stop all workers when bounded sample storage is exhausted.
+    pub(super) fn stop(&mut self) {
+        self.shared.stopped.store(true, Ordering::Relaxed);
+    }
+
     /// Publish pending charges. False when the picture must stop.
     pub(super) fn flush(&mut self) -> bool {
         let total = self
@@ -93,6 +120,22 @@ impl WorkerBudget<'_> {
         self.pending < CHUNK || self.flush()
     }
 
+    pub(super) fn recast(&mut self, tested: usize) -> bool {
+        if !self.scan(tested, 0) {
+            return false;
+        }
+        self.witness += tested as u64;
+        true
+    }
+
+    pub(super) fn charge_witness(&mut self, count: u64) -> bool {
+        if !self.charge(count) {
+            return false;
+        }
+        self.witness += count;
+        true
+    }
+
     pub(super) fn stopped(&self) -> bool {
         self.shared.stopped()
     }
@@ -102,5 +145,8 @@ impl Drop for WorkerBudget<'_> {
     fn drop(&mut self) {
         self.flush();
         self.shared.reads.fetch_add(self.reads, Ordering::Relaxed);
+        self.shared
+            .witness
+            .fetch_add(self.witness, Ordering::Relaxed);
     }
 }

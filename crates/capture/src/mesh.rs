@@ -319,17 +319,19 @@ impl MeshView {
     fn hits(&self, ray: &Ray, scratch: &mut Vec<Boundary>) {
         self.hits_impl::<false>(ray, scratch);
     }
+    /// Facet and volume hits differ only in face identity, never ownership.
     pub(crate) fn surface_intervals(
         &self,
         ray: &Ray,
         scratch: &mut Vec<Boundary>,
         out: &mut Intervals,
-    ) {
+    ) -> bool {
         out.clear();
         if self.closed {
             self.hits_impl::<true>(ray, scratch);
             out.extend_from_slice(&scratch[..scratch.len() / 2 * 2]);
         }
+        false
     }
     pub(crate) fn first_surface_hit(&self, ray: &Ray) -> Option<Boundary> {
         let mut scratch = Vec::new();
@@ -388,6 +390,31 @@ mod tests {
                 0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2,
                 7, 6, 3, 0, 4, 3, 4, 7,
             ],
+        }
+    }
+    #[test]
+    fn cube_surface_casts_are_not_ownership_sensitive() {
+        let view = MeshView::new(
+            &cube(),
+            0,
+            &RayFamily {
+                forward: [0., 0., 1.],
+            },
+            None,
+        );
+        for [x, y] in [[0., 0.], [0.25, 0.25], [0.5, 0.5], [0.75, 0.25], [1.5, 0.5]] {
+            let ray = Ray {
+                origin: [x, y, -1.],
+            };
+            let mut scratch = Vec::new();
+            let mut surface = Vec::new();
+            let mut volume = Vec::new();
+            assert!(!view.surface_intervals(&ray, &mut scratch, &mut surface));
+            view.intervals(&ray, &mut scratch, &mut volume);
+            assert_eq!(
+                surface.iter().map(|b| b.s).collect::<Vec<_>>(),
+                volume.iter().map(|b| b.s).collect::<Vec<_>>()
+            );
         }
     }
     #[test]

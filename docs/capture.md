@@ -75,7 +75,11 @@ Closed imported meshes participate like solids; open meshes are translucent
 and marked not checked. As in the app, a feature with an open mesh among its
 targets fails with `cad.body.missing` and changes none of its targets; the
 open mesh stays drawn. Reference bodies are drawn at 45% over what is behind
-and participate in interference. 2D artwork options do not apply to CAD.
+and participate in interference. Every translucent body in front of the nearest
+solid, including open meshes and reference bodies, is mixed in depth order; a
+body visible through them counts as drawn. A picture whose stacked translucent
+layers exceed the per-worker storage bound is refused as "too heavy for this
+picture size". 2D artwork options do not apply to CAD.
 `export` draws a CAD page as a construction wireframe; `capture` renders the shaded solids.
 
 ```bash

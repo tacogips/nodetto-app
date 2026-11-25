@@ -1,0 +1,352 @@
+{
+  "taskId": "car3-r3b",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "3f9ce78b9599d35945a7e29fb449a5ca3e89b431",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car3-r3b",
+  "supersedes": {
+    "manifest": "impl-plans/active/car3-r3-dispatch.json",
+    "plan": "impl-plans/active/car3-g1-capture-raster.md",
+    "reason": "car3-g1-capture-raster was attempted twice and left unfinished (impl-plans/progress/car3-g1-capture-raster.md); design-ai-capture.md 21.5 splits it into seven chained plans."
+  },
+  "checkpointPrerequisites": [
+    {
+      "id": "archive-stray-tests",
+      "owner": "dispatch checkpoint (before wave 1)",
+      "command": "sh tmp/car3-r3b/checkpoint/archive-stray-tests.sh",
+      "inventory": "tmp/car3-r3b/checkpoint/archived-inventory.txt",
+      "authorizedWritePaths": [
+        "tmp/car1-r1/car1-c-body-selection",
+        "tmp/car1-r1/car1-d-pcb-page-kind",
+        "tmp/car3-r3b/checkpoint"
+      ],
+      "effect": "Reversible rename of exactly the 753 inventoried *.test.ts copies (7 + 746) to *.test.ts.archived; contents kept; reverse by stripping the suffix.",
+      "check": "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'",
+      "checkLog": "tmp/car3-r3b/checkpoint/stray-scan.log",
+      "status": "pending",
+      "blocker": {
+        "kind": "operator-execution-required",
+        "reason": "The step4-impl-plan-create sandbox refused execution approval for `sh tmp/car3-r3b/checkpoint/archive-stray-tests.sh` on four attempts (plan creation, the Step 5 repair rerun, and the 2026-11-25 blocked-wave amendment rounds 1 and 2; round 2 refused with 'A variable in this command can't be checked before it runs'). No rename happened and the inventoried files are unchanged. Amendment round 1 evidence: tmp/car3-r3b/checkpoint/stray-scan-pre-archive.log lists exactly 753 paths, and every one is in the inventory (the plan-delta scan against tmp/car3-r3b/checkpoint/inventory-sorted.txt found 0 extra paths).",
+        "operatorActions": [
+          "From the repository root: sh tmp/car3-r3b/checkpoint/archive-stray-tests.sh > tmp/car3-r3b/checkpoint/archive.log 2>&1; echo $? > tmp/car3-r3b/checkpoint/archive.exit  (expect exit 0 and 'renamed: 753')",
+          "Run the check command above > tmp/car3-r3b/checkpoint/stray-scan.log 2>&1; echo $? >> tmp/car3-r3b/checkpoint/stray-scan.log  (expect exit 0 and no listed paths)",
+          "find tmp/car1-r1 -name '*.test.ts.archived' | wc -l  (expect 753)",
+          "Set status to done and record the exit codes and both log paths here"
+        ],
+        "mustNotBeAssumedComplete": true,
+        "noPlanOwnsTheseFiles": true,
+        "noScanExclusions": true,
+        "gatesBlockedUntilDone": ["integrationGates[0]", "integrationGates[4]"]
+      }
+    }
+  ],
+  "amendments": [
+    {
+      "date": "2026-11-25",
+      "reason": "blocked-wave-scope-or-contract",
+      "round": 1,
+      "blockedPlanIds": ["car3-g1a-cast-flag", "car3-g1b-reference-witness"],
+      "decision": "The 753 inventoried round-1 copies are a checkpoint prerequisite (design 21.5), not a per-plan deliverable, so no plan can clear them and no plan gets tmp/car1-r1/* in writePaths. The per-plan stray-test condition becomes 'this plan added no *.test.ts under target/ or tmp/': the plan-delta scan (perPlanStrayCheck) must print nothing and exit 0. The absolute scan is unchanged; it remains integrationGates[0] and [4] and stays blocked on the operator-run archive in checkpointPrerequisites[0].",
+      "perPlanStrayCheck": "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/<planId>/stray-delta.txt && test ! -s tmp/car3-r3b/<planId>/stray-delta.txt",
+      "perPlanStrayCheckInput": "tmp/car3-r3b/checkpoint/inventory-sorted.txt is archived-inventory.txt sorted with LC_ALL=C (753 lines). It is read-only for every plan.",
+      "resumeForBlockedPlans": "g1a and g1b keep their source edits; each reruns only its existing crate gate and the perPlanStrayCheck, records both in its progress log, and sets status done. Neither reimplements anything."
+    },
+    {
+      "date": "2026-11-25",
+      "reason": "blocked-wave-scope-or-contract",
+      "round": 2,
+      "blockedPlanIds": ["car3-g1e-production-layers"],
+      "decision": "The g1e fail-before run (tmp/car3-r3b/car3-g1e-production-layers/fail-before.log, exit 101) aborted on 'Option quiet given more than once' before any assertion, and a pre-fix rebuild is a non-goal. The criterion is kept, with substitute evidence instead of a historical rerun. S1: the preserved pre-edit raster.rs copy (raster-before-edit.txt line 54 'translucent: Option<Hit>,') shows the single-slot production model. S2: tmp/car3-r3b/car3-g1d-reference-layers/fail-before.log shows the identical single-slot model failing the identical sheets_over_board pixel assertion ('board interior', 1 passed, 2 failed, exit 101). S3: tests.rs layers_check_sheets uses the same coordinates and all-Drawn check, and compare_every_thread_count compares production with the composited reference. No source edits, and no change to plan IDs, writePaths, dependsOn or waves.",
+      "resumeForBlockedPlans": "g1e follows its plan section 'Amendment 2026-11-25 (blocked-wave-scope-or-contract, round 2)': write fail-before-substitute.log from three greps, rerun its three verification commands into gate-r2.log, focused-r2.log and stray-r2.log (exit 0, tests > 0, never add -q because CARGO_TERM_QUIET=true already sets quiet), and set its progress status done.",
+      "amendmentBudget": "This is the second and last amendment (maxAmendmentRounds 2)."
+    }
+  ],
+  "waves": [
+    ["car3-g1a-cast-flag", "car3-g1b-reference-witness"],
+    ["car3-g1c-production-witness", "car3-g1d-reference-layers"],
+    ["car3-g1e-production-layers"],
+    ["car3-g1f-layer-capacity", "car3-g1g-native-docs"]
+  ],
+  "reviewContext": {
+    "issueReference": "round-3-audit:feat/ai-capture@a964ad5 (findings function-capture-touching-cap-interference and function-capture-translucent-layer-visibility); no GitHub issue",
+    "overview": "impl-plans/active/car3-00-overview.md",
+    "requiredOutcomes": [
+      "R3-1 (g1a-g1c, g1g): stacked caps and opposed-frame shared side give zero candidates, zero pairs and no hatch in both rasterizers at threads 0 and 1-8; 0.01 mm controls give one pair; disjoint_scene(50) keeps pre-edit reads and charged with witness 0; stacked-cap charged equals never-flag charged plus witness; native touching cases exit 0, controls exit 1.",
+      "R3-2 (g1d-g1g): every translucent layer in front of the nearest opaque hit is composited in (depth, body) order and marked drawn in both rasterizers; opaque foreground hides the board; single-layer bytes and reads unchanged; capped worker arena refuses over-cap input with the existing message from its first checkpoint; layer_capacity <= C on staggered and band-boundary stripes; native PCB plus STL sheet lists the board drawn.",
+      "Integration: stray-test scan, bun run typecheck, bun run lint, CARGO_TERM_QUIET=true mise run verify, CARGO_TERM_QUIET=true mise run test-cli and the stray-test scan again all exit 0."
+    ],
+    "nonGoals": [
+      "Editing interference.rs, overlay.rs, capture-interference-options.ts, capture-help.ts, NCS1 readers or writers, or any TypeScript scene code.",
+      "Changing messages, exit codes, limits, or goldens other than the R3-1 touching-contact and R3-2 overlap-condition cases.",
+      "Building an older commit or a pre-fix binary; re-dispatching the other car3 plans.",
+      "Editing impl-plans/README.md, lockfiles or indexes, workspace-wide formatting, git commits, branches or worktrees during plan execution."
+    ],
+    "constraints": [
+      "Work only in this working tree on feat/ai-capture; no push, no history rewrite, no other worktrees; no server, auth, secrets or deployment config.",
+      "AGENTS.md: English only, no emojis, strict typing; cargo with CARGO_TERM_QUIET=true and CARGO_TARGET_DIR=target/<planId>.",
+      "Per-pixel and per-byte work stays in Rust; captures deterministic.",
+      "Never relax or delete existing tests or deadlines; timing tests may be retried up to three times.",
+      "Per-plan verification focused; workspace typecheck, lint, verify and test-cli only at integration.",
+      "No plan adds a *.test.ts under target/ or tmp/: each plan's perPlanStrayCheck (amendments[0]) must print nothing and exit 0. The absolute no-*.test.ts scan is integrationGates[0] and [4]."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Cast flag (g1a) separate from the production witness (g1c).",
+        "rationale": "Folding it in exceeds the four-file limit; it is the semantic core of R3-1 (design 21.5)."
+      },
+      {
+        "decision": "Reference plans (g1b, g1d) precede their production counterparts (g1c, g1e).",
+        "rationale": "The reference is the oracle; production then adds equality at every thread count."
+      },
+      {
+        "decision": "The storage cap and its refusal land with the arena in g1e; g1f adds only the layer_capacity statistic and lifecycle tests.",
+        "rationale": "No checkpoint or native build has an uncapped arena (R3B-CAP-AT-ACTIVATION)."
+      },
+      {
+        "decision": "g1c records disjoint_scene(50) reads and charged literals after a telemetry-only step and before the witness edit.",
+        "rationale": "An independent baseline catches charges added to both flag paths (R3B-CHARGE-BASELINE)."
+      },
+      {
+        "decision": "render_with keeps its signature; a new render_tuned(scene, threads, allowance, Tuning) carries the never-flag switch and the layer cap.",
+        "rationale": "Existing exact-count tests stay byte-identical; production passes Tuning::PRODUCTION."
+      },
+      {
+        "decision": "Amendment 2026-11-25 round 1: the per-plan stray-test condition becomes the plan-delta scan (no *.test.ts added under target/ or tmp/ beyond the 753-line tmp/car3-r3b/checkpoint/inventory-sorted.txt); the absolute scan stays integrationGates[0] and [4], blocked on the operator-run archive in checkpointPrerequisites[0].",
+        "rationale": "Blocked plans car3-g1a-cast-flag and car3-g1b-reference-witness: both failed only the absolute stray-test scan on 753 pre-existing tmp/car1-r1 copies outside their writePaths. Resolved gap: no plan owns tmp/car1-r1 and no scan exclusions are added; g1a and g1b keep their source edits and resume by rerunning the crate gate and the delta scan. Plan IDs, dependsOn, waves and writePaths are unchanged."
+      },
+      {
+        "decision": "Amendment 2026-11-25 round 2: car3-g1e-production-layers keeps its fail-before acceptance criterion but proves it with substitute evidence S1-S3 (the pre-edit raster.rs copy with the single-slot translucent model, the g1d reference fail-before on identical sheet assertions, and the production/reference compare_every_thread_count check), recorded in tmp/car3-r3b/car3-g1e-production-layers/fail-before-substitute.log. The invalid fail-before.log stays byte-unchanged, and -q is never combined with CARGO_TERM_QUIET=true.",
+        "rationale": "Blocked plan car3-g1e-production-layers: its fail-before.log exited 101 on a duplicate quiet option before any assertion ran, and a pre-fix rebuild is a non-goal. Resolved gap: amendments[1] and plans[g1e].acceptanceCriteria[1] define the substitute evidence, and the resume needs no source edits. Plan IDs, dependsOn, waves, writePaths and verification are unchanged. This is the last amendment round (maxAmendmentRounds 2)."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Seven plans instead of the five-plan example, to keep one aspect and about four files per plan.",
+      "Sibling compile races in the shared tree are handled by rerun after the sibling is done (worker rule 10).",
+      "Native cases are regression guards; fail-before evidence is the Rust tests."
+    ],
+    "supportedEdgeCases": [
+      "Shared cap and shared side with opposed frames at every thread count; 0.01 mm overlaps still reported.",
+      "One to five translucent layers per sample; opaque foreground; single-layer scenes byte-identical.",
+      "Band restart, rotation and unsampled bottom row of the layer arena; over-cap refusal."
+    ],
+    "outOfScopeEdgeCases": [
+      "Desktop pixels, cross-platform determinism and Boa elapsed time (unmeasured residual risks)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car3-00-overview.md",
+      "impl-plans/active/car3-g1a-cast-flag.md",
+      "impl-plans/active/car3-g1b-reference-witness.md",
+      "impl-plans/active/car3-g1c-production-witness.md",
+      "impl-plans/active/car3-g1d-reference-layers.md",
+      "impl-plans/active/car3-g1e-production-layers.md",
+      "impl-plans/active/car3-g1f-layer-capacity.md",
+      "impl-plans/active/car3-g1g-native-docs.md",
+      "crates/capture/src/raster.rs",
+      "crates/capture/src/raster/reference.rs",
+      "crates/capture/src/prism.rs"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car3-g1a-cast-flag",
+      "planPath": "impl-plans/active/car3-g1a-cast-flag.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/prism.rs",
+        "crates/capture/src/mesh.rs",
+        "crates/capture/src/tool_view.rs",
+        "tmp/car3-r3b/car3-g1a-cast-flag",
+        "impl-plans/progress/car3-g1a-cast-flag.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "PrismView, MeshView and ToolView surface_intervals return bool; intervals written are unchanged.",
+        "Prism flag true for a ray in a cap plane (z = 0 and z = 0.9375, front family), at x = 8 of an opposed-frame box (top family) and at a profile vertex row (side family); false for interior and oblique rays with s values equal to intervals().",
+        "Mesh flag false for every cube ray, with s values equal to intervals().",
+        "All existing nodetto-capture tests and goldens pass unedited."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1a-cast-flag cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1a-cast-flag cargo test --release -p nodetto-capture",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1a-cast-flag/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1a-cast-flag/stray-delta.txt"
+      ]
+    },
+    {
+      "planId": "car3-g1b-reference-witness",
+      "planPath": "impl-plans/active/car3-g1b-reference-witness.md",
+      "dependsOn": [],
+      "writePaths": [
+        "crates/capture/src/raster/reference.rs",
+        "tmp/car3-r3b/car3-g1b-reference-witness",
+        "impl-plans/progress/car3-g1b-reference-witness.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "render_reference builds the witness from ToolView::intervals for analysed bodies while draw_interference is on.",
+        "stacked_caps(0.0), shared_side(true, 0.0) and shared_side(false, 0.0): pairs empty, candidates 0, RGB equal to the draw_interference=false render; the first two fail before the edit (recorded).",
+        "stacked_caps(0.01) and shared_side(true, 0.01): one pair and a hatch.",
+        "fixtures module (stacked_caps, shared_side) visible to crate::raster; all existing tests pass."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1b-reference-witness cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1b-reference-witness cargo test --release -p nodetto-capture",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1b-reference-witness/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1b-reference-witness/stray-delta.txt"
+      ]
+    },
+    {
+      "planId": "car3-g1c-production-witness",
+      "planPath": "impl-plans/active/car3-g1c-production-witness.md",
+      "dependsOn": ["car3-g1a-cast-flag", "car3-g1b-reference-witness"],
+      "writePaths": [
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/raster/budget.rs",
+        "crates/capture/src/raster/tests.rs",
+        "crates/capture/tests/render.rs",
+        "crates/capture/tests/overlay.rs",
+        "tmp/car3-r3b/car3-g1c-production-witness",
+        "impl-plans/progress/car3-g1c-production-witness.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Step 1 literals for disjoint_scene(50) analysis-on reads and charged recorded before the witness edit; after the change witness == 0 and both literals hold at threads 0 and 1-8.",
+        "Touching fixtures: production equals reference at threads 0 and 1-8, pairs empty, candidates 0, RGB equal to the draw_interference=false render; they fail before the edit (recorded).",
+        "0.01 mm controls: one pair and hatch at every thread count.",
+        "stacked caps: witness > 0 and charged == never-flag charged + witness at threads 0 and 1-8.",
+        "disjoint_boundary_reads_follow_formula, boundary_read_counts_and_refusal_are_bounded, boundary_fold.rs, overlay_alloc.rs and goldens pass unedited (or a touching-contact golden recorded with reason)."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1c-production-witness cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1c-production-witness cargo test --release -p nodetto-capture",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1c-production-witness/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1c-production-witness/stray-delta.txt"
+      ]
+    },
+    {
+      "planId": "car3-g1d-reference-layers",
+      "planPath": "impl-plans/active/car3-g1d-reference-layers.md",
+      "dependsOn": ["car3-g1b-reference-witness"],
+      "writePaths": [
+        "crates/capture/src/raster/reference.rs",
+        "tmp/car3-r3b/car3-g1d-reference-layers",
+        "impl-plans/progress/car3-g1d-reference-layers.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The reference uses its own ReferenceSample with all layers in (depth, body) order; colour, per-layer edge and drawn marks follow design 21.1 R3-2.",
+        "Sheet over board and four sheets: board interior differs from sheets alone, outline differs from interior and sheet-alone, all bodies Drawn; both fail before the edit (recorded).",
+        "Opaque foreground: board Hidden and RGB equal to the render without the board.",
+        "fixtures sheets_over_board and opaque_over_board exist and are used; existing production-versus-reference tests pass."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1d-reference-layers cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1d-reference-layers cargo test --release -p nodetto-capture",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1d-reference-layers/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1d-reference-layers/stray-delta.txt"
+      ]
+    },
+    {
+      "planId": "car3-g1e-production-layers",
+      "planPath": "impl-plans/active/car3-g1e-production-layers.md",
+      "dependsOn": ["car3-g1c-production-witness", "car3-g1d-reference-layers"],
+      "writePaths": [
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/raster/budget.rs",
+        "crates/capture/src/raster/tests.rs",
+        "crates/capture/src/shade.rs",
+        "crates/capture/tests/render.rs",
+        "crates/capture/tests/overlay.rs",
+        "tmp/car3-r3b/car3-g1e-production-layers",
+        "impl-plans/progress/car3-g1e-production-layers.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Sample stores solid, LayerSpan and marked; one capped Vec<Hit> arena per worker with band-restart reset, lookahead clearing, rotation compaction and a debug invariant.",
+        "Sheet over board, four sheets and opaque fixtures: production equals reference at threads 0 and 1-8 with the g1d pixel and state assertions; fail-before is established by the amendments[1] substitute evidence S1-S3 recorded in tmp/car3-r3b/car3-g1e-production-layers/fail-before-substitute.log (the invalid fail-before.log is kept unchanged and disclosed).",
+        "Board-alone scene: RGB digest, body states and reads equal literals measured before the edit.",
+        "layer_cap 4 on the four-sheet scene refuses with the existing too-heavy message at threads 0 and 1-8, liveness empty and census rays 0.",
+        "All existing crate tests and goldens pass (or an overlap-condition golden recorded with reason)."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1e-production-layers cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1e-production-layers cargo test --release -p nodetto-capture",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1e-production-layers cargo test -p nodetto-capture layers_",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1e-production-layers/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1e-production-layers/stray-delta.txt"
+      ]
+    },
+    {
+      "planId": "car3-g1f-layer-capacity",
+      "planPath": "impl-plans/active/car3-g1f-layer-capacity.md",
+      "dependsOn": ["car3-g1e-production-layers"],
+      "writePaths": [
+        "crates/capture/src/raster.rs",
+        "crates/capture/src/raster/budget.rs",
+        "crates/capture/src/raster/tests.rs",
+        "tmp/car3-r3b/car3-g1f-layer-capacity",
+        "impl-plans/progress/car3-g1f-layer-capacity.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "RenderStats.layer_capacity reports the largest worker arena capacity; no behaviour change.",
+        "Staggered stripes (rows 100, 201, 302, 403; 8 sheets; C = L + 192) succeed, equal the reference and have layer_capacity <= C at threads 0 and 1-8.",
+        "Band-boundary stripe (row 96; C = L + 192 < 2L) succeeds, equals the reference and has layer_capacity <= C at threads 0 and 1-8.",
+        "Final-row stripe (row 191 of a 64-pixel-high picture) equals the reference at every thread count, including a debug run."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1f-layer-capacity cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1f-layer-capacity cargo test --release -p nodetto-capture",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1f-layer-capacity cargo test -p nodetto-capture layer_window_final_row",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1f-layer-capacity/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1f-layer-capacity/stray-delta.txt"
+      ]
+    },
+    {
+      "planId": "car3-g1g-native-docs",
+      "planPath": "impl-plans/active/car3-g1g-native-docs.md",
+      "dependsOn": ["car3-g1e-production-layers"],
+      "writePaths": [
+        "apps/cli/src/native-parity/capture.test.ts",
+        "docs/capture.md",
+        "apps/cli/src/capture-docs.test.ts",
+        "tmp/capture/m09/timing.json",
+        "tmp/capture/m23/timing.json",
+        "tmp/car3-r3b/car3-g1g-native-docs",
+        "impl-plans/progress/car3-g1g-native-docs.md",
+        "target",
+        "tmp/cad3d"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Native stacked caps (--view front) and shared side (--view top) with --size 64x64 --zoom 1.08 --fail-on-interference exit 0 with interference: 0; their 0.01 mm overlap controls exit 1 with interference: 1.",
+        "Native PCB plus STL sheet (production STL importer), top view: exit 0, Controller board and Cover sheet listed, board line without hidden behind other bodies.",
+        "docs/capture.md states depth-ordered mixing of every translucent body in front of the nearest solid, drawn-through counting and the storage-bound refusal.",
+        "Existing native parity, timing and docs tests pass unchanged; Biome clean on capture.test.ts."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1g-native-docs cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car3-g1g-native-docs/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/capture-docs.test.ts && bunx biome check --diagnostic-level=warn apps/cli/src/native-parity/capture.test.ts",
+        "find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1g-native-docs/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1g-native-docs/stray-delta.txt"
+      ]
+    }
+  ],
+  "integrationGates": [
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'",
+    "bun run typecheck && bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true mise run test-cli",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

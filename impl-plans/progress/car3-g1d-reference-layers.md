@@ -1,0 +1,10 @@
+# car3-g1d-reference-layers
+
+Status: done (implementation; formal reviews pending).
+
+- `crates/capture/src/raster/reference.rs`: pre-edit SHA-256 `454c9f3d5756bdddd031e9ba316ebb32943c0c050cd55bff259f05d7ca2d5a8a`; post-edit `a97b071583933e2e79b0b022f9ecfe4dda4a4f5292ed0116489bf03f4ef8be98`. Preserved the g1b witness. Reference samples retain sorted layers, blend them back to front, find matching-body edges and mark each drawn. Added the requested fixtures and three tests.
+- Fail-before: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1d-reference-layers cargo test --release -p nodetto-capture --lib layer_tests`, exit 101, 1 passed and 2 failed; `tmp/car3-r3b/car3-g1d-reference-layers/fail-before.log`.
+- Final gate: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1d-reference-layers cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1d-reference-layers cargo test --release -p nodetto-capture`, exit 0, 177 passed; `tmp/car3-r3b/car3-g1d-reference-layers/gate.log`. Shared tree included evolving g1c changes; integration must verify the settled tree.
+- Focused reference tests: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1d-reference-layers cargo test --release -p nodetto-capture --lib raster::reference::`, exit 0, 8 passed; `tmp/car3-r3b/car3-g1d-reference-layers/focused.log`.
+- Delta scan: `find target tmp -name '*.test.ts' -print | LC_ALL=C sort | LC_ALL=C comm -23 - tmp/car3-r3b/checkpoint/inventory-sorted.txt > tmp/car3-r3b/car3-g1d-reference-layers/stray-delta.txt && test ! -s tmp/car3-r3b/car3-g1d-reference-layers/stray-delta.txt`, exit 0; `tmp/car3-r3b/car3-g1d-reference-layers/stray-check.log` and empty `stray-delta.txt`.
+- Earlier shared-tree test attempt `tmp/car3-r3b/car3-g1d-reference-layers/test.log` failed two g1c production tests while that sibling was in progress; the final gate above passed after those edits progressed. No goldens changed.

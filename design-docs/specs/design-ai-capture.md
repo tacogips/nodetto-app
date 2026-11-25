@@ -3691,6 +3691,11 @@ R3-7) and the plan grouping of all seven. The CAD editor and core rules
 The common rules of sections 19 and 20 apply unchanged:
 
 - Every fix ships a test that fails on `a964ad5` and passes after it.
+  `crates/capture` and `apps/cli/src/native-parity/capture.test.ts` are
+  byte-identical between `a964ad5` and `3f9ce78`, so for R3-1 and R3-2 that
+  evidence is the new test failing in the working tree before the owning
+  plan's edit and passing after it. No R3-1 or R3-2 plan builds an older
+  commit or needs a pre-fix binary (revision 10a, section 21.5).
 - A performance test asserts a deterministic count, never a wall clock.
 - NCS1 bytes, PNG and SVG bytes, goldens, digests, error codes and messages
   do not change, except the pixels R3-2 names. Diagnostic precedence is
@@ -3800,17 +3805,21 @@ count 0 (auto, the production default) and at every explicit count 1 to
     material to both boxes. With identically oriented frames, the old rule
     already assigns the ray to one box only, and that case cannot fail
     before the fix.
-  - Fail-before evidence. The plan writes this case first and runs it on
-    `a964ad5` before any raster edit. It must report one pair and marked
-    samples. The pair and marked-sample count are recorded as the
-    baseline. After the fix, the same assertions as the stacked caps hold.
+  - Fail-before evidence. The owning plan writes this case first and runs
+    it in the working tree before its rasterizer edit. It must report one
+    pair and marked samples. The pair and marked-sample count are recorded
+    as the baseline. After the fix, the same assertions as the stacked caps hold.
   - An identically oriented copy is kept as an unchanged control.
 - Positive controls. Lowering the upper box by 0.01 mm, or overlapping the
   opposed side boxes by 0.01 mm, gives one pair and marked samples.
 - Work accounting:
   - `disjoint_scene(50)` rendered with the analysis on has `witness == 0`,
     and its `reads` and `charged` equal the analysis-on values before the
-    fix, recorded in the plan as literals.
+    witness change. Those values are measured in the working tree: the
+    owning plan first exposes the published charge as the test-only
+    `charged` statistic, with no behaviour change, and records `reads` and
+    `charged` at threads 0 and 1 to 8 as literals. Only then does it edit
+    the witness path.
   - In the stacked-cap scene, `witness > 0` and `charged` equals the
     `charged` of the same render with the flag treated as never set (a
     test-only switch on `render_with`) plus `witness`.
@@ -3819,16 +3828,11 @@ count 0 (auto, the production default) and at every explicit count 1 to
   capture uses `--size 64x64 --zoom 1.08 --fail-on-interference`.
   - Stacked caps: the stacked rectangle extrusions as a CAD document,
     captured with `--view front`. Expect exit 0 and `interference: 0`.
-  - Shared side: two rectangle extrusions touching at x = 8, captured with
-    `--view top`. Expect exit 0 and `interference: 0`.
-    - The plan first looks for a document construction whose frames are
-      opposed in X. One candidate is a left box sketched on a start (back)
-      face, whose frame is mirrored. If such a construction gives exit 1
-      on the `a964ad5` binary, it is used and that result is recorded as
-      the native baseline.
-    - Otherwise, an ordinary construction is used and the plan records
-      that the native side case is a regression guard only. In that case
-      the fail-before evidence comes from the Rust opposed-frame case.
+  - Shared side: two ordinary rectangle extrusions touching at x = 8,
+    captured with `--view top`. Expect exit 0 and `interference: 0`.
+  - The native cases are regression guards on the fixed binary. Their
+    fail-before evidence is the Rust cases above, which share the
+    rasterizer the binary links. No pre-fix binary is built or run.
   - Each case has a 0.01 mm overlap control that gives exit 1 and one
     pair.
 
@@ -3959,9 +3963,11 @@ Tests:
     board. The board is reported `hidden` and the pixels inside the
     opaque box equal the sheet-over-opaque render.
   - Single layer: a scene with one reference body and no other
-    translucent body gives RGB, report and `reads` identical to the
-    pre-fix values, recorded in the plan as literals measured on
-    `a964ad5` before the edit.
+    translucent body, and no touching contact, gives RGB, report and
+    `reads` identical to the values before the layer change. The owning
+    plan measures them in the working tree before its `raster.rs` edit and
+    records them as literals. The scene has no ownership-sensitive ray, so
+    the earlier witness plan does not change them.
   - Storage cap: the four-sheet scene with `render_with`'s layer cap set
     below one window's layer count is refused with the existing message
     at every thread count, and no partial result is returned.
@@ -4094,8 +4100,8 @@ Tests:
     - the PNG bytes are identical and their SHA-256 equals the literal
       `MULTI_MIB_CAPTURE_SHA256`, recorded from run B.
 - New file `apps/cli/src/native-parity/capture-attachments.test.ts`. It is
-  a separate file so that it shares nothing with plan
-  `car3-g1-capture-raster`, and it runs against the release binary:
+  a separate file so that it shares nothing with the `car3-g1*` plans
+  (section 21.5), and it runs against the release binary:
   - It generates `MULTI_MIB_PNG`, captures the same page with the same
     options, and expects exit 0. The PNG's SHA-256 equals
     `MULTI_MIB_CAPTURE_SHA256`, the legacy-oracle literal. This ties the
@@ -4120,12 +4126,14 @@ Plans are named `car3-*`. Each plan:
 - runs only focused verification: `bun test <paths>`, `cargo test -p
   <crate>`, clippy on the touched crate, and biome on touched files.
 
-`bun run typecheck` and `mise run verify` run once, at integration. All
-five plans run in one wave, and no two plans own the same file:
+`bun run typecheck` and `mise run verify` run once, at integration. The
+first dispatch ran its five plans in one wave, and no two plans owned the
+same file. Revision 10a (section 21.5) replaces the first row with seven
+chained plans:
 
 | Plan | Findings | Owns |
 | --- | --- | --- |
-| car3-g1-capture-raster | R3-1, R3-2 | `crates/capture/src/{raster.rs,raster/budget.rs,raster/reference.rs,raster/tests.rs,prism.rs,mesh.rs,tool_view.rs,shade.rs}` (`budget.rs` holds the `charged` and `witness` statistics and the shared stop used by the layer cap), `crates/capture/tests/{render.rs,overlay.rs}` (only if a golden assertion must be extended), `apps/cli/src/native-parity/capture.test.ts`, `docs/capture.md`, `apps/cli/src/capture-help.ts` and `apps/cli/src/capture-docs.test.ts` (only if the help text mirrors the changed doc sentence) |
+| car3-g1-capture-raster (superseded by `car3-g1a` to `car3-g1g`, section 21.5) | R3-1, R3-2 | see section 21.5 |
 | car3-cad-drag | R3-3 | see design-cad3d section 20 |
 | car3-cad-evaluate | R3-4 | see design-cad3d section 20 |
 | car3-g2-cad-history | R3-5, R3-6 | see design-cad3d section 20 |
@@ -4144,11 +4152,7 @@ editing the sibling's files.
 Gates. Each entry is one command that runs tests; lint and build
 prerequisites are chained with `&&` into the test-bearing command:
 
-- car3-g1-capture-raster:
-  1. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo test --release -p nodetto-capture`.
-     The test run includes the release-only reference comparisons and
-     `boundary_read_counts_and_refusal_are_bounded`.
-  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1-capture-raster cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car3-g1-capture-raster/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/capture-docs.test.ts`
+- car3-g1a to car3-g1g: see section 21.5.
 - car3-native-attachment:
   1. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo clippy -p nodetto-cli --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-native-attachment cargo test --release -p nodetto-cli`.
      The test run includes the release-only legacy-versus-new oracle.
@@ -4157,7 +4161,8 @@ prerequisites are chained with `&&` into the test-bearing command:
 
 `cargo fmt --manifest-path` runs after Rust changes.
 
-Integration gates. Each runs once, after all five plans land, must exit 0,
+Integration gates. Each runs once, after all plans land (for revision 10a,
+after g1f and g1g), must exit 0,
 and records its command, exit status and complete log path:
 
 1. `bun run typecheck` and `bun run lint`;
@@ -4221,3 +4226,138 @@ and records its command, exit status and complete log path:
   bytes and exit codes for the fixtures. They replace Boa elapsed time with
   host-call counts. Desktop pixels and cross-platform determinism stay
   unmeasured.
+
+### 21.5 Revision 10a: split of the capture raster plan
+
+`car3-g1-capture-raster` carried R3-1 and R3-2 in one plan. It was attempted
+twice and left unfinished: its Rust gate still failed both production
+regressions (`impl-plans/progress/car3-g1-capture-raster.md`). The rules of
+section 21.1 are unchanged, except that no R3-1 or R3-2 step needs an older
+commit or a pre-fix binary (the clauses edited in this revision). Only the
+plan grouping changes. `tmp/audit/r3/g1-partial.patch`, the earlier attempt
+at the reference witness, is a reference only and is not applied as is.
+
+Contracts between plans:
+
+- C1, ownership flag (g1a to g1c). `PrismView::surface_intervals`,
+  `MeshView::surface_intervals` and `ToolView::surface_intervals` return a
+  `bool`. It is true exactly when the cast hit one of the three
+  ownership-band cases of R3-1, or for a mesh any case that
+  `hits_impl::<false>` resolves differently. The intervals they write are
+  unchanged.
+- C2, reference witness (g1b to g1c). `render_reference` builds every
+  witness from `ToolView::intervals`. The stacked-caps and shared-side
+  builders, with their 0.01 mm controls, live in a `#[cfg(test)]` module of
+  `raster/reference.rs`, visible to `crate::raster`, so g1c reuses them.
+- C3, reference layers (g1d to g1e). `render_reference` composites every
+  layer by the R3-2 rule. The sheet-over-board, four-sheet,
+  opaque-foreground and final-row builders live next to the C2 builders.
+- C4, production layers (g1e to g1f and g1g). The arena g1e activates is
+  bounded from its first checkpoint: `MAX_LAYER_WINDOW`, capped growth
+  through `reserve_exact`, refusal through the shared stop, and the cap
+  argument of `render_with` all land in g1e. g1f adds only the test-only
+  `layer_capacity` statistic and the retained-capacity and lifecycle
+  cases. No checkpoint and no native build has an uncapped production
+  arena.
+
+| Plan | Aspect | Owns | dependsOn | Wave |
+| --- | --- | --- | --- | --- |
+| car3-g1a-cast-flag | R3-1 flag at the cast, with inline tests: a ray in a cap plane, at an edge endpoint and along a parallel side gives true; a generic ray gives false with identical intervals | `crates/capture/src/{prism.rs,mesh.rs,tool_view.rs}` | none | 1 |
+| car3-g1b-reference-witness | R3-1 reference witness; tests: reference-only stacked caps and opposed-frame side give no pair and RGB equal to the analysis-off render; both 0.01 mm controls give one pair | `crates/capture/src/raster/reference.rs` | none | 1 |
+| car3-g1c-production-witness | R3-1 production witness. Step 1, before any witness edit: add the test-only `charged` statistic (the published charge, no behaviour change) and record the analysis-on `disjoint_scene(50)` `reads` and `charged` literals at threads 0 and 1 to 8. Step 2: witness, recast and combine charges, `witness` statistic, never-flag test switch; all R3-1 tests of 21.1 against the reference at threads 0 and 1 to 8, including both disjoint literals with `witness == 0` and the stacked-cap delta `charged == never-flag charged + witness` | `crates/capture/src/{raster.rs,raster/budget.rs,raster/tests.rs}`; `crates/capture/tests/{render.rs,overlay.rs}` only for a golden shown to be a touching contact | g1a, g1b | 2 |
+| car3-g1d-reference-layers | R3-2 reference compositing, colour, per-layer edges and drawn marks; reference-only sheet-over-board, four-sheet and opaque-foreground assertions | `crates/capture/src/raster/reference.rs` | g1b | 2 |
+| car3-g1e-production-layers | R3-2 production layers with bounded storage: one worker arena, row lifecycle with its debug invariant, colour, per-layer edges, visibility, multi-layer charges, `MAX_LAYER_WINDOW`, capped growth, refusal through the shared stop, cap argument of `render_with`. Cases: sheet-over-board, four-sheet, opaque and single-layer against the reference at threads 0 and 1 to 8, plus the storage-cap refusal (existing message, no partial result) at every thread count | `crates/capture/src/{raster.rs,raster/budget.rs,raster/tests.rs,shade.rs}` (`shade.rs` only if a helper must change); `crates/capture/tests/{render.rs,overlay.rs}` only for a golden that meets the overlap condition | g1c, g1d | 3 |
+| car3-g1f-layer-capacity | R3-2 retained-capacity instrumentation: test-only `RenderStats.layer_capacity`; staggered-stripes, band-boundary and final-row cases of 21.1 at threads 0 and 1 to 8. No behaviour change | `crates/capture/src/{raster.rs,raster/budget.rs,raster/tests.rs}` | g1e | 4 |
+| car3-g1g-native-docs | Native parity cases of R3-1 and R3-2 and the `docs/capture.md` paragraph of R3-2, including the refusal sentence for the storage bound that g1e delivers | `apps/cli/src/native-parity/capture.test.ts`, `docs/capture.md`; `apps/cli/src/capture-docs.test.ts` only if it asserts the changed paragraph; gate outputs `tmp/capture/m09/timing.json` and `tmp/capture/m23/timing.json` (written by the existing timing cases at `capture.test.ts:178,317` and `749`) | g1e | 4 |
+
+Every plan also owns its plan file and its progress file. Dependencies
+exist only for a contract (C1 to C4) or a shared file:
+
+- g1c and g1e share `raster.rs`, `budget.rs` and `tests.rs`;
+- g1b and g1d share `reference.rs`;
+- g1e and g1f share `raster.rs`, `budget.rs` and `tests.rs`.
+
+g1g depends on g1e, because its parity cases need both fixes and the
+storage bound in the binary. g1f changes no behaviour, so g1g runs beside
+it. `capture-help.ts`
+does not describe translucent bodies, so no plan edits it.
+`interference.rs`, `overlay.rs` and `capture-interference-options.ts` stay
+unedited, as in section 21.2.
+
+Per-plan size. Each plan is one implementer sitting: one aspect, at most
+four owned files, at most about 120 plan lines. Each plan's own regression
+cases are written first and run in the working tree before its edit. A
+case that already passes before the edit is reported as a control, not as
+fail-before evidence.
+
+Gates. Each plan uses `CARGO_TARGET_DIR=target/car3-<plan>` and sets
+`artifactRoots ["target", "tmp/cad3d"]` exactly. Evidence goes to
+`tmp/car3-r3b/<plan>`, outside both artifact roots.
+
+- g1a to g1f, one command:
+  `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-<plan> cargo clippy -p nodetto-capture --all-targets -- -D warnings && cargo fmt -p nodetto-capture --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-<plan> cargo test --release -p nodetto-capture`.
+  The release run includes the reference comparisons and the round-1 and
+  round-2 protections (`boundary_fold.rs`, `overlay_alloc.rs`,
+  `boundary_read_counts_and_refusal_are_bounded`) unchanged. Each plan's
+  new cases are named, and the plan's result names the passing count.
+- g1g:
+  `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car3-g1g cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car3-g1g/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/capture-docs.test.ts && bunx biome check apps/cli/src/native-parity/capture.test.ts`.
+- A compile failure caused by a sibling's in-progress edit is rerun after
+  the sibling finishes. It is never fixed by editing the sibling's files.
+- `maintainability-capture-raster-rounding` (`capture-artwork.ts`) is not
+  touched by these plans, and the integration gates run its tests.
+
+Dispatch. One new manifest, `impl-plans/active/car3-r3b-dispatch.json`
+(task `car3-r3b`), lists only the seven plans, in the waves above.
+The checkpoint that creates it also:
+
+- deletes `impl-plans/active/car3-r3-dispatch.json` and
+  `impl-plans/active/car3-g1-capture-raster.md`;
+- updates the plan index in `impl-plans/active/car3-00-overview.md`;
+- archives the stray test copies (below) before any plan starts.
+
+The manifest carries `tmp/capture/m09/timing.json` and
+`tmp/capture/m23/timing.json` in g1g's `writePaths`, as
+`car3-r3-dispatch.json` did for the superseded plan.
+
+Stray test copies. 753 round-1 `*.test.ts` copies already fail gate 4 of
+section 21.2: 7 under `tmp/car1-r1/car1-c-body-selection` and 746 under
+`tmp/car1-r1/car1-d-pcb-page-kind`, exactly the list in
+`tmp/car2-r2b/reconcile-wave-005/stray-tests.txt` (the open item in
+`impl-plans/README.md:101-102`). The checkpoint owner that writes the
+manifest handles them once, as a prerequisite of the dispatch:
+
+- Scope: only the paths in that list, only in those two directories. The
+  manifest records both directories as the checkpoint's authorized write
+  paths. No plan owns them.
+- Action: a reversible rename that appends `.archived`
+  (`x.test.ts` to `x.test.ts.archived`). Contents and logs are kept. Bun
+  does not discover the new names. Stripping the suffix restores them.
+- Check: the scan of gate 4 exits 0 after the rename, before any plan
+  starts. The command, exit status and log path are recorded under
+  `tmp/car3-r3b/checkpoint`.
+
+The other car3 plans are not dispatched again. Integration runs the gates
+of section 21.2 once after g1f and g1g land. Integration runs the gate-4
+scan twice: before `mise run verify` and after the last gate. Both scans
+must exit 0.
+
+Decisions:
+
+- The cast flag is its own plan (g1a). It is the semantic core of R3-1,
+  and folding it into the production witness gave six files, more than
+  the size limit.
+- Each reference rasterizer plan comes before the matching production
+  plan. The reference is the oracle, so a reference-only test proves its
+  rule first. The production plan then adds the equality tests at every
+  thread count.
+- The storage cap lands with the arena that needs it (g1e). Only the
+  retained-capacity statistic and the stripe, band-boundary and final-row
+  cases follow in g1f. These are test instrumentation on a bounded arena,
+  so no intermediate checkpoint or native build is uncapped.
+- The disjoint-scene charge baseline is an independent working-tree
+  measurement taken before the witness edit. A comparison with the
+  never-flag switch alone cannot see a charge added to both paths. The
+  never-flag switch is kept only for the stacked-cap witness delta.
+- The native cases are regression guards. Fail-before evidence is the Rust
+  cases, so no older commit or pre-fix binary is built.

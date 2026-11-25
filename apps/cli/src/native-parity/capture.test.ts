@@ -14,6 +14,8 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { Editor } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
+import { stlToInlineMesh } from "@nodetto/io/cad-mesh";
+import { writeBinaryStl } from "@nodetto/io/stl";
 import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import {
   CAD_TEST_PAGE,
@@ -650,6 +652,170 @@ nativeTest(
       expect(runCad(cwd, pcbPath, ["--size", "320x240"]).stdout).toContain(
         "Controller board",
       );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "native capture ignores touching bodies and fails 0.01 mm overlaps",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-touching-"));
+    try {
+      for (const { name, view, offset, distance, side, status } of [
+        {
+          name: "caps",
+          view: "front",
+          offset: 0.9375,
+          distance: 1.0625,
+          side: false,
+          status: 0,
+        },
+        {
+          name: "caps-overlap",
+          view: "front",
+          offset: 0.9275,
+          distance: 1.0725,
+          side: false,
+          status: 1,
+        },
+        {
+          name: "side",
+          view: "top",
+          offset: 8,
+          distance: 8,
+          side: true,
+          status: 0,
+        },
+        {
+          name: "side-overlap",
+          view: "top",
+          offset: 7.99,
+          distance: 8.01,
+          side: true,
+          status: 1,
+        },
+      ]) {
+        const elements = side
+          ? [
+              sketch("lower", "a1"),
+              ...rectangle("lower", 0, 0, 8, 8),
+              extrude("lower-x", "a2", {
+                sketch: "lower",
+                distance: 2,
+                op: "new",
+              }),
+              sketch("upper", "a3"),
+              ...rectangle("upper", offset, 0, distance, 8),
+              extrude("upper-x", "a4", {
+                sketch: "upper",
+                distance: 2,
+                op: "new",
+              }),
+            ]
+          : [
+              sketch("lower", "a1"),
+              ...rectangle("lower", 0, 0, 16, 8),
+              extrude("lower-x", "a2", {
+                sketch: "lower",
+                distance: 0.9375,
+                op: "new",
+              }),
+              sketch("upper", "a3", { base: "xy", offset }),
+              ...rectangle("upper", 0, 0, 16, 8),
+              extrude("upper-x", "a4", {
+                sketch: "upper",
+                distance,
+                op: "new",
+              }),
+            ];
+        const path = join(cwd, `${name}.jsonl`);
+        writeFileSync(
+          path,
+          serializeDocument(document(elements, [CAD_TEST_PAGE])),
+        );
+        const result = Bun.spawnSync(
+          [
+            binary as string,
+            "capture",
+            path,
+            "--view",
+            view,
+            "--size",
+            "64x64",
+            "--zoom",
+            "1.08",
+            "--fail-on-interference",
+            "--output",
+            `${name}.png`,
+            "--force",
+          ],
+          { cwd },
+        );
+        expect(result.exitCode).toBe(status);
+        expect(result.stdout.toString()).toContain(`interference: ${status}`);
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
+  "native capture keeps a PCB board visible through an imported sheet",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-sheet-"));
+    try {
+      const data = stlToInlineMesh(
+        writeBinaryStl([
+          {
+            positions: new Float64Array([
+              -5, -5, 5, 35, -5, 5, 35, 45, 5, -5, 45, 5,
+            ]),
+            triangles: new Uint32Array([0, 1, 2, 0, 2, 3]),
+          },
+        ]),
+      );
+      const path = join(cwd, "board-sheet.jsonl");
+      writeFileSync(
+        path,
+        serializeDocument(
+          document(
+            [
+              boardReference(),
+              testBoard(1.2),
+              edge("rim", { kind: "rect", start: [0, 0], end: [30, 40] }),
+              cadElement("sheet", "cad.mesh", "a5", {
+                name: "Cover sheet",
+                data,
+              }),
+            ],
+            [CAD_TEST_PAGE, PCB_TEST_PAGE],
+          ),
+        ),
+      );
+      const result = runCad(cwd, path, [
+        "--view",
+        "top",
+        "--size",
+        "64x64",
+        "--zoom",
+        "1.08",
+      ]);
+      expect(result.stdout).toContain("Controller board");
+      expect(result.stdout).toContain("Cover sheet");
+      const boardLine = result.stdout
+        .split("\n")
+        .find((line) => line.includes("Controller board"));
+      const sheetLine = result.stdout
+        .split("\n")
+        .find((line) => line.includes("Cover sheet"));
+      expect(boardLine).toBeDefined();
+      expect(boardLine).not.toContain("hidden behind other bodies");
+      expect(sheetLine).not.toContain("hidden behind other bodies");
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

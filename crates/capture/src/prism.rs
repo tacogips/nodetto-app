@@ -208,6 +208,11 @@ impl PrismView {
         self.buckets.at(self.dx * y - self.dy * x).len()
     }
 
+    fn cap_error(&self, offset: [f64; 3], lo: f64, hi: f64) -> f64 {
+        8.0 * f64::EPSILON
+            * (dot(self.basis[2].map(f64::abs), offset.map(f64::abs)) + lo.abs().max(hi.abs()))
+    }
+
     fn slab<const FACETS: bool>(&self, z: f64, offset: [f64; 3]) -> Option<[Boundary; 2]> {
         let [start, end] = self.span;
         if !z.is_finite() {
@@ -226,9 +231,7 @@ impl PrismView {
                 // Resolve coplanar volume rays consistently even if adjoining
                 // prisms use opposite normals. Shading retains its closed slab.
                 let normal = self.basis[2];
-                let error = 8.0
-                    * f64::EPSILON
-                    * (dot(normal.map(f64::abs), offset.map(f64::abs)) + lo.abs().max(hi.abs()));
+                let error = self.cap_error(offset, lo, hi);
                 let near_lo = (z - lo).abs();
                 let near_hi = (z - hi).abs();
                 if near_lo.min(near_hi) <= error {
@@ -255,8 +258,8 @@ impl PrismView {
         ray: &Ray,
         scratch: &mut Vec<Boundary>,
         out: &mut Intervals,
-    ) {
-        self.cast::<true>(ray, scratch, out);
+    ) -> bool {
+        self.cast::<true>(ray, scratch, out)
     }
 
     pub(crate) fn surface(&self, index: u32) -> Option<(u32, [f64; 3])> {
@@ -284,14 +287,23 @@ impl PrismView {
         ray: &Ray,
         scratch: &mut Vec<Boundary>,
         out: &mut Intervals,
-    ) {
+    ) -> bool {
         scratch.clear();
         out.clear();
         let offset = std::array::from_fn(|axis| ray.origin[axis] - self.origin[axis]);
         let [x, y, z] = self.basis.map(|axis| dot(offset, axis));
+        let [start, end] = self.span;
+        let (lo, hi) = (start.min(end), start.max(end));
+        let cap_band = FACETS
+            && self.dz.abs() <= 1e-12
+            && z.is_finite()
+            && (z - lo).abs().min((z - hi).abs()) <= self.cap_error(offset, lo, hi);
         let Some([near, far]) = self.slab::<FACETS>(z, offset) else {
-            return;
+            return cap_band;
         };
+        let mut sensitive = cap_band;
+        let error_v = 8.0 * f64::EPSILON * offset.into_iter().map(f64::abs).sum::<f64>();
+        let c_error_v = (self.dx.abs() + self.dy.abs()) * error_v;
         let c = self.dx * y - self.dy * x;
         let mut inside = false;
         // Resolve crossings on a shared side using the same infinitesimal
@@ -311,6 +323,9 @@ impl PrismView {
         };
         for &index in self.buckets.at(c) {
             let edge = &self.edges[index];
+            if FACETS && ((edge.ca - c).abs() <= c_error_v || (edge.cb - c).abs() <= c_error_v) {
+                sensitive = true;
+            }
             if after_ray(edge.ca) == after_ray(edge.cb) {
                 continue;
             }
@@ -322,6 +337,9 @@ impl PrismView {
             };
             let qx = edge.a[0] + fraction * (edge.b[0] - edge.a[0]);
             if self.parallel {
+                if FACETS && (qx - x).abs() <= error_v {
+                    sensitive = true;
+                }
                 let side = if !FACETS && (qx - x).abs() <= error {
                     let rise = edge.b[1] - edge.a[1];
                     let slope = (edge.b[0] - edge.a[0]) / rise;
@@ -349,7 +367,7 @@ impl PrismView {
             if inside && near.s.is_finite() && far.s.is_finite() && far.s - near.s >= MERGE_EPS {
                 out.extend([near, far]);
             }
-            return;
+            return sensitive;
         }
         scratch.sort_unstable_by(|a, b| {
             a.s.partial_cmp(&b.s)
@@ -368,12 +386,81 @@ impl PrismView {
                 out.extend([start, end]);
             }
         }
+        sensitive
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ownership_sensitive_surface_casts() {
+        let mut prism = Prism {
+            o: [0., 0., 0.],
+            u: [1., 0., 0.],
+            v: [0., 1., 0.],
+            n: [0., 0., 1.],
+            t0: 0.,
+            t1: 0.9375,
+            loops: vec![Loop {
+                points: vec![0., 0., 16., 0., 16., 8., 0., 8.],
+                faces: vec![2, 3, 4, u32::MAX],
+            }],
+        };
+        let check = |prism: &Prism, forward, origin, expected| {
+            let view = PrismView::new(prism, 0, &RayFamily { forward });
+            let ray = Ray { origin };
+            let mut scratch = Vec::new();
+            let mut surface = Vec::new();
+            let mut volume = Vec::new();
+            let flag = view.surface_intervals(&ray, &mut scratch, &mut surface);
+            assert_eq!(flag, expected, "forward={forward:?} origin={origin:?}");
+            if !expected {
+                view.intervals(&ray, &mut scratch, &mut volume);
+                assert_eq!(
+                    surface.iter().map(|b| b.s).collect::<Vec<_>>(),
+                    volume.iter().map(|b| b.s).collect::<Vec<_>>()
+                );
+            }
+        };
+        for z in [0., 0.9375] {
+            check(&prism, [0., 1., 0.], [4., -1., z], true);
+        }
+        for z in [-1e-16, 0.9375 + 1e-15] {
+            let view = PrismView::new(
+                &prism,
+                0,
+                &RayFamily {
+                    forward: [0., 1., 0.],
+                },
+            );
+            let ray = Ray {
+                origin: [4., -1., z],
+            };
+            let mut scratch = Vec::new();
+            let mut surface = Vec::new();
+            let flag = view.surface_intervals(&ray, &mut scratch, &mut surface);
+            assert!(surface.is_empty());
+            assert!(flag, "z={z:?}");
+        }
+        check(&prism, [0., 1., 0.], [4., -1., 0.5], false);
+        check(&prism, [1., 0., 0.], [-1., 0., 0.5], true);
+        check(&prism, [1., 0., 0.], [-1., 4., 0.5], false);
+        let scale = (0.3_f64 * 0.3 + 0.4 * 0.4 + 0.866 * 0.866).sqrt();
+        check(
+            &prism,
+            [0.3 / scale, 0.4 / scale, -0.866 / scale],
+            [8., 4., 0.5],
+            false,
+        );
+        prism.o = [8., 8., 0.];
+        prism.u = [-1., 0., 0.];
+        prism.v = [0., -1., 0.];
+        prism.loops[0].points = vec![0., 0., 8., 0., 8., 8., 0., 8.];
+        check(&prism, [0., 0., -1.], [8., 4., 2.], true);
+        check(&prism, [0., 0., -1.], [4., 4., 2.], false);
+    }
 
     #[test]
     fn long_crossing_edges_fit_the_bucket_budget() {

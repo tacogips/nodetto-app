@@ -302,3 +302,244 @@ fn off_view_liveness_matches_reference_and_census_rays() {
     s.bodies = vec![body(&[(Op::Union, 0)])];
     assert_eq!(render_with(&s, 1, SCAN_ALLOWANCE).1.census.rays, 0);
 }
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn disjoint_witness_keeps_reads_and_charges() {
+    let mut s = disjoint_scene(50);
+    s.analyse = true;
+    s.draw_interference = true;
+    for threads in 0..=8 {
+        let (result, stats) = render_with(&s, threads, SCAN_ALLOWANCE);
+        result.unwrap();
+        assert_eq!(stats.reads, 53_692_800);
+        assert_eq!(stats.charged, 53_692_800);
+        assert_eq!(stats.witness, 0);
+    }
+}
+
+fn compare_every_thread_count(s: &Scene) -> Report {
+    let (rgb, report) = render_reference(s);
+    for threads in 0..=8 {
+        let (actual_rgb, actual_report) = render_rgb(s, threads).unwrap();
+        assert_eq!(
+            actual_report.pairs.len(),
+            report.pairs.len(),
+            "pairs at threads {threads}"
+        );
+        assert_eq!(actual_rgb, rgb, "RGB at threads {threads}");
+        assert_eq!(actual_report, report, "report at threads {threads}");
+    }
+    report
+}
+
+fn production_touching(mut scene: Scene) {
+    let report = compare_every_thread_count(&scene);
+    assert!(report.pairs.is_empty());
+    assert_eq!(report.analysis.unwrap().candidates, 0);
+    let rgb = render_rgb(&scene, 0).unwrap().0;
+    scene.draw_interference = false;
+    assert_eq!(rgb, render_rgb(&scene, 0).unwrap().0);
+}
+
+#[test]
+fn production_touching_caps() {
+    production_touching(super::reference::fixtures::stacked_caps(0.0));
+}
+
+#[test]
+fn production_touching_opposed_side() {
+    production_touching(super::reference::fixtures::shared_side(true, 0.0));
+}
+
+#[test]
+fn production_touching_same_side() {
+    production_touching(super::reference::fixtures::shared_side(false, 0.0));
+}
+
+#[test]
+fn production_overlap_witness() {
+    use super::reference::fixtures::{shared_side, stacked_caps};
+    for mut scene in [stacked_caps(0.01), shared_side(true, 0.01)] {
+        let report = compare_every_thread_count(&scene);
+        assert_eq!(report.pairs.len(), 1);
+        let rgb = render_rgb(&scene, 0).unwrap().0;
+        scene.draw_interference = false;
+        assert_ne!(rgb, render_rgb(&scene, 0).unwrap().0);
+    }
+}
+
+#[test]
+fn stacked_caps_witness_charge_is_the_delta() {
+    let scene = super::reference::fixtures::stacked_caps(0.0);
+    for threads in 0..=8 {
+        let (actual, stats) = render_tuned(&scene, threads, SCAN_ALLOWANCE, Tuning::PRODUCTION);
+        let (baseline, never) = render_tuned(
+            &scene,
+            threads,
+            SCAN_ALLOWANCE,
+            Tuning {
+                never_flag: true,
+                ..Tuning::PRODUCTION
+            },
+        );
+        actual.unwrap();
+        baseline.unwrap();
+        assert!(stats.witness > 0);
+        assert_eq!(stats.charged, never.charged + stats.witness);
+    }
+}
+
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf29ce484222325u64, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+    })
+}
+
+#[test]
+fn layers_board_baseline() {
+    let scene = super::reference::fixtures::sheets_over_board(&[], true);
+    for threads in 0..=8 {
+        let (result, stats) = render_with(&scene, threads, SCAN_ALLOWANCE);
+        let (rgb, report) = result.unwrap();
+        assert_eq!(fnv1a(&rgb), 8_838_539_948_900_981_082);
+        assert_eq!(report.bodies.len(), 1);
+        assert_eq!(report.bodies[0].state, BodyState::Drawn);
+        assert_eq!(stats.reads, 3360);
+    }
+}
+
+fn layers_check_sheets(sheets: &[f64]) {
+    use super::reference::fixtures::sheets_over_board;
+    let scene = sheets_over_board(sheets, true);
+    let report = compare_every_thread_count(&scene);
+    let rgb = render_rgb(&scene, 0).unwrap().0;
+    let plain = render_rgb(&sheets_over_board(sheets, false), 0).unwrap().0;
+    let pixel = |bytes: &[u8], x: usize, y: usize| -> [u8; 3] {
+        bytes[(y * 96 + x) * 3..][..3].try_into().unwrap()
+    };
+    assert_ne!(pixel(&rgb, 48, 48), pixel(&plain, 48, 48));
+    assert_ne!(pixel(&rgb, 67, 48), pixel(&rgb, 48, 48));
+    assert_ne!(pixel(&rgb, 67, 48), pixel(&plain, 67, 48));
+    assert!(report
+        .bodies
+        .iter()
+        .all(|body| body.state == BodyState::Drawn));
+}
+
+#[test]
+fn layers_sheet_over_board() {
+    layers_check_sheets(&[3.0]);
+}
+
+#[test]
+fn layers_four_sheets() {
+    layers_check_sheets(&[3.0, 4.0, 5.0, 6.0]);
+}
+
+#[test]
+fn layers_opaque_hides_board() {
+    use super::reference::fixtures::opaque_over_board;
+    let scene = opaque_over_board(true);
+    let report = compare_every_thread_count(&scene);
+    assert_eq!(report.bodies[0].state, BodyState::Hidden);
+    assert_eq!(
+        render_rgb(&scene, 0).unwrap().0,
+        render_rgb(&opaque_over_board(false), 0).unwrap().0
+    );
+}
+
+#[test]
+fn layers_storage_cap_refuses() {
+    let scene = super::reference::fixtures::sheets_over_board(&[3.0, 4.0, 5.0, 6.0], true);
+    for threads in 0..=8 {
+        let (result, stats) = render_tuned(
+            &scene,
+            threads,
+            SCAN_ALLOWANCE,
+            Tuning {
+                layer_cap: 4,
+                ..Tuning::PRODUCTION
+            },
+        );
+        assert_eq!(result.unwrap_err().to_string(), "The scene is too heavy for this picture size (picture boundary scans over 16000000000). Use a smaller --size.");
+        assert!(stats.liveness.is_empty());
+        assert_eq!(stats.census.rays, 0);
+    }
+}
+
+fn stripe_scene(rows: &[usize], sheets: usize, height: u32) -> Scene {
+    let mut scene = base();
+    scene.width = 64;
+    scene.height = height;
+    scene.supersample = 3;
+    let h = 0.25 / 3.0;
+    for &row in rows {
+        let y = (f64::from(height * 3) / 2.0 - (row as f64 + 0.5)) * h;
+        for sheet in 0..sheets {
+            let z = 3.0 + sheet as f64;
+            let tool = scene.tools.len() as u32;
+            scene.tools.push(Tool::Mesh(crate::scene::Mesh {
+                positions: vec![
+                    -9.0,
+                    y - h / 4.0,
+                    z,
+                    9.0,
+                    y - h / 4.0,
+                    z,
+                    9.0,
+                    y + h / 4.0,
+                    z,
+                    -9.0,
+                    y + h / 4.0,
+                    z,
+                ],
+                triangles: vec![0, 1, 2, 0, 2, 3],
+            }));
+            scene.bodies.push(body(&[(Op::Union, tool)]));
+        }
+    }
+    scene
+}
+
+fn compare_capped(scene: &Scene, cap: usize) -> usize {
+    let reference = render_reference(scene);
+    let mut maximum = 0;
+    for threads in 0..=8 {
+        let (result, stats) = render_tuned(
+            scene,
+            threads,
+            SCAN_ALLOWANCE,
+            Tuning {
+                layer_cap: cap,
+                ..Tuning::PRODUCTION
+            },
+        );
+        assert_eq!(result.unwrap(), reference, "threads {threads}");
+        assert!(
+            stats.layer_capacity <= cap,
+            "threads {threads}: capacity {} > {cap}",
+            stats.layer_capacity
+        );
+        maximum = maximum.max(stats.layer_capacity);
+    }
+    maximum
+}
+
+#[test]
+fn layer_window_staggered_stripes() {
+    let cap = 192 * 8 + 192;
+    assert!(compare_capped(&stripe_scene(&[100, 201, 302, 403], 8, 512), cap) > 0);
+}
+
+#[test]
+fn layer_window_band_boundary() {
+    let cap = 192 * 8 + 192;
+    assert!(cap < 2 * 192 * 8);
+    assert!(compare_capped(&stripe_scene(&[96], 8, 512), cap) > 0);
+}
+
+#[test]
+fn layer_window_final_row() {
+    assert!(compare_capped(&stripe_scene(&[191], 2, 64), MAX_LAYER_WINDOW) > 0);
+}
