@@ -66,12 +66,16 @@ export interface CadViewportProps {
 function fitBodies(
   bodies: readonly CadDisplayBody[],
   aspect: number,
+  lines: readonly { segments: Float32Array }[] = [],
 ): Camera3d {
   const high = Number.POSITIVE_INFINITY;
   const low = Number.NEGATIVE_INFINITY;
   const min: [number, number, number] = [high, high, high];
   const max: [number, number, number] = [low, low, low];
-  for (const { positions } of bodies) {
+  for (const positions of [
+    ...bodies.map((body) => body.positions),
+    ...lines.map((line) => line.segments),
+  ]) {
     for (let i = 0; i < positions.length; i += 3) {
       for (let axis = 0; axis < 3; axis++) {
         const value = positions[i + axis];
@@ -103,6 +107,7 @@ export function CadViewport(props: CadViewportProps) {
   );
   const [size, setSize] = createSignal<ViewportSize>({ width: 0, height: 0 });
   let fitted = props.initialCamera !== undefined;
+  let provisional = false;
   let sketchPointer: { id: number; x: number; y: number } | undefined;
   let drag:
     | {
@@ -153,7 +158,14 @@ export function CadViewport(props: CadViewportProps) {
   function fit(): void {
     const { width, height } = size();
     if (sketch.drawing()) return;
-    changeCamera(fitBodies(drawnBodies(), width / height));
+    const bodies = drawnBodies();
+    changeCamera(
+      fitBodies(
+        bodies,
+        width / height,
+        bodies.length ? [] : sketch.entityLines(),
+      ),
+    );
   }
 
   onMount(() => {
@@ -248,13 +260,17 @@ export function CadViewport(props: CadViewportProps) {
   );
   createEffect(() => renderer()?.setBodies(drawnBodies()));
   createEffect(() => {
-    if (
-      !fitted &&
-      drawnBodies().length > 0 &&
-      size().width > 0 &&
-      size().height > 0
-    )
+    const { width, height } = size();
+    if (fitted || width <= 0 || height <= 0 || sketch.drawing()) return;
+    if (drawnBodies().length > 0) {
       fit();
+    } else if (!provisional) {
+      const lines = sketch.entityLines();
+      if (lines.some((line) => line.segments.length > 0)) {
+        provisional = true;
+        setCamera(fitBodies([], width / height, lines));
+      }
+    }
   });
   createEffect(() => {
     const view = renderer();

@@ -1960,7 +1960,15 @@ test("touching bracket with a second overlap stays display-only", () => {
 });
 
 function profileCacheStats() {
-  return { lookups: 0, admitted: 0, hits: 0, prepared: 0, maxDirectWork: 0 };
+  return {
+    lookups: 0,
+    admitted: 0,
+    hits: 0,
+    prepared: 0,
+    maxDirectWork: 0,
+    depthVisits: 0,
+    pendingUpdates: 0,
+  };
 }
 
 function sharedProfileRun(
@@ -2048,6 +2056,69 @@ function checkSharedOracle(
   }
 }
 
+function depthZeroGrid(n: number) {
+  return Array.from({ length: n }, (_, i) =>
+    circle(`c${i}`, "ancestry", [3 * (i % 64), 3 * Math.floor(i / 64)], 1),
+  );
+}
+
+test("depth-zero whole profiles admit single and cumulative work", () => {
+  const largeEntities = depthZeroGrid(4096);
+  const two = Array(2).fill(undefined);
+  const large = sharedProfileRun(largeEntities, two);
+  expect(large.profileCache).toMatchObject({
+    depthVisits: 4096,
+    admitted: 1,
+    lookups: 1,
+    hits: 1,
+  });
+  checkSharedOracle(large, largeEntities, two);
+
+  const entities = depthZeroGrid(256);
+  const thirtyTwo = Array(32).fill(undefined);
+  const cumulative = sharedProfileRun(entities, thirtyTwo);
+  expect(cumulative.profileCache).toMatchObject({
+    depthVisits: 4096,
+    admitted: 1,
+    lookups: 16,
+    hits: 16,
+  });
+  expect(cumulative.profileCache.pendingUpdates).toBeGreaterThan(0);
+  checkSharedOracle(cumulative, entities, thirtyTwo);
+  const sixtyFour = sharedProfileRun(entities, Array(64).fill(undefined));
+  expect(sixtyFour.profileCache).toMatchObject({ depthVisits: 4096, hits: 48 });
+}, 120_000);
+
+test("depth-zero pending work floor and one-use profiles", () => {
+  const small = sharedProfileRun(depthZeroGrid(63), Array(2).fill(undefined));
+  expect(small.profileCache).toMatchObject({
+    pendingUpdates: 0,
+    depthVisits: 126,
+    admitted: 0,
+  });
+  const eligible = sharedProfileRun(
+    depthZeroGrid(64),
+    Array(2).fill(undefined),
+  );
+  expect(eligible.profileCache.pendingUpdates).toBeGreaterThan(0);
+  expect(eligible.profileCache.admitted).toBe(0);
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 1 });
+  const page = doc.pages[0];
+  if (!page) throw new Error("Missing fixture page");
+  const profileCache = profileCacheStats();
+  buildCadCaptureModel(doc.elements, page.id, {
+    stats: { captureVisits: 0, toolArrays: 0, metadataVisits: 0, profileCache },
+  });
+  expect(profileCache).toMatchObject({
+    pendingUpdates: 0,
+    lookups: 0,
+    admitted: 0,
+    hits: 0,
+    depthVisits: 500,
+    maxDirectWork: 1,
+  });
+}, 120_000);
+
 test("shared whole profiles reuse ancestry and preserve scene bytes", () => {
   const shallow = ancestryFixture("shallow", 1024);
   const sparse = [
@@ -2113,6 +2184,7 @@ test("ordinary capture avoids profile cache work", () => {
   });
   console.log(`ordinary profile cache: ${JSON.stringify(profileCache)}`);
   expect(profileCache).toMatchObject({ lookups: 0, admitted: 0, hits: 0 });
+  expect(profileCache).toMatchObject({ pendingUpdates: 0, depthVisits: 500 });
   expect(profileCache.maxDirectWork * 4).toBeLessThanOrEqual(
     PROFILE_CACHE_MIN_WORK,
   );

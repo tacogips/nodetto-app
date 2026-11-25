@@ -213,6 +213,33 @@ exited 0. There is no browser E2E suite. The
 stay in `active/`; the manifest's `planPath` values name the pre-archive
 `active/` locations, and it must not be dispatched again.
 
+### AI capture audit round 16 (car16-r16)
+
+These three plans fix the three medium findings of the sixteenth audit of
+`feat/ai-capture` (base 0a35708):
+function-cad-fit-ignores-visible-sketches (R16-1),
+performance-cad-shared-perforated-profile-depth-rescans (R16-2) and
+performance-capture-shared-depth-zero-profile-rescans (R16-3). See the
+[design](../design-docs/specs/design-ai-capture.md) section 32 and the
+[CAD guide](../docs/cad3d.md). There is no GitHub issue. Evidence is under
+`tmp/car16-r16/<planId>/`; progress logs remain in `progress/`.
+
+| Plan | Scope |
+| --- | --- |
+| [car16-p1-viewport-sketch-fit](completed/car16-p1-viewport-sketch-fit.md) | With no drawn body, Fit and the initial fit frame the visible `sketch.entityLines()` endpoints. The provisional sketch fit is never published, so the first body arrival still publishes the body fit (R16-1) |
+| [car16-p2-cad-even-depth-search](completed/car16-p2-cad-even-depth-search.md) | The extrude even-depth search runs only for explicit `semantic.loops` selections; whole profiles record `evenDepthVisits` 0 (was 8,224 for a 256-hole plate with 32 extrusions) (R16-2) |
+| [car16-p3-capture-depth-zero-cache](completed/car16-p3-capture-depth-zero-cache.md) | An all-depth-zero capture profile scan charges `loops.length` and is admitted to the per-build profile cache on the 4,096 threshold, or cumulatively per array at 64 loops or more; scene bytes are unchanged (R16-3) |
+
+Integration: `bun run typecheck`, `bun run lint`
+(`tmp/car16-r16/reconcile-wave-001/lint.log`) and
+`CARGO_TERM_QUIET=true mise run verify` (bun 4892 pass, 104 skip, 0 fail,
+`tmp/car16-r16/reconcile-wave-001/verify.log`) exited 0. There is no
+browser E2E suite; the viewport change is covered by the headless DOM test
+`packages/ui-solid/src/cad/viewport.test.tsx`. The
+[overview](active/car16-00-overview.md) and `active/car16-r16-dispatch.json`
+stay in `active/`; the manifest's `planPath` values name the pre-archive
+`active/` locations, and it must not be dispatched again.
+
 The round-12 (`car12-*`) and round-13 (`car13-*`) plans stay in `active/`.
 Their implementations are in the same combined tree that passed the round-14
 integration gates, but their progress logs still record formal review and

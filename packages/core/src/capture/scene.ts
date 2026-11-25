@@ -199,6 +199,7 @@ function indexBucket(entries: LoopEntry[], stats?: { indexEntries?: number }) {
 
 const ANCESTRY_WORK_PER_VERTEX = 32;
 export const PROFILE_CACHE_MIN_WORK = 4096;
+export const PROFILE_CACHE_PENDING_MIN_WORK = PROFILE_CACHE_MIN_WORK / 64;
 
 export interface AncestryStats {
   ancestorProbes: number;
@@ -215,13 +216,25 @@ export interface AncestryStats {
 export function normaliseToolLoops(
   loops: readonly CadLoop[],
   stats?: AncestryStats,
-  measured?: { prepared: number; searched: number },
+  measured?: { prepared: number; searched: number; scanned: number },
 ): readonly CadLoop[] {
   if (measured) {
     measured.prepared = 0;
     measured.searched = 0;
+    measured.scanned = 0;
   }
-  if (loops.every(({ depth }) => depth === 0)) return loops;
+  let allZero = true;
+  for (const loop of loops) {
+    if (measured) measured.scanned++;
+    if (loop.depth !== 0) {
+      allZero = false;
+      break;
+    }
+  }
+  if (allZero) {
+    if (measured) measured.searched = loops.length;
+    return loops;
+  }
   if (measured)
     measured.prepared = loops.reduce(
       (sum, loop) => sum + loop.points.length,
@@ -396,6 +409,8 @@ export interface CaptureWalkStats {
     hits: number;
     prepared: number;
     maxDirectWork: number;
+    depthVisits: number;
+    pendingUpdates: number;
   };
 }
 
@@ -432,8 +447,9 @@ export function buildCadCaptureModel(
   let overLimit: string | undefined;
   const charge = { points: 0 };
   const stats = options?.stats;
-  const work = { prepared: 0, searched: 0 };
+  const work = { prepared: 0, searched: 0, scanned: 0 };
   let profileCache: Map<readonly CadLoop[], readonly CadLoop[]> | undefined;
+  let pendingWork: Map<readonly CadLoop[], number> | undefined;
 
   /** Register a tool as a new body, unless the feature is hidden. */
   function addBody(
@@ -527,15 +543,38 @@ export function buildCadCaptureModel(
       }
       if (!loops) {
         loops = normaliseToolLoops(geometry.loops, stats?.ancestry, work);
-        if (counters) counters.prepared += work.prepared;
+        if (counters) {
+          counters.prepared += work.prepared;
+          counters.depthVisits += work.scanned;
+        }
         if (whole) {
           const total = work.prepared + work.searched;
           if (total >= PROFILE_CACHE_MIN_WORK) {
             profileCache ??= new Map();
             profileCache.set(geometry.loops, loops);
             if (counters) counters.admitted++;
-          } else if (counters) {
-            counters.maxDirectWork = Math.max(counters.maxDirectWork, total);
+          } else {
+            if (counters)
+              counters.maxDirectWork = Math.max(counters.maxDirectWork, total);
+            if (
+              loops === geometry.loops &&
+              loops.length >= PROFILE_CACHE_PENDING_MIN_WORK
+            ) {
+              if (!pendingWork) {
+                pendingWork = new Map();
+                if (counters) counters.pendingUpdates++;
+              }
+              const cumulative = (pendingWork.get(geometry.loops) ?? 0) + total;
+              if (cumulative >= PROFILE_CACHE_MIN_WORK) {
+                pendingWork.delete(geometry.loops);
+                profileCache ??= new Map();
+                profileCache.set(geometry.loops, loops);
+                if (counters) counters.admitted++;
+              } else {
+                pendingWork.set(geometry.loops, cumulative);
+              }
+              if (counters) counters.pendingUpdates++;
+            }
           }
         }
       }

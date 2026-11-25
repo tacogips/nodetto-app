@@ -1,0 +1,116 @@
+{
+  "taskId": "car16-r16",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "3a00fb8736e013086f5364e08c246b1545b29ac0",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car16-r16",
+  "waves": [
+    ["car16-p1-viewport-sketch-fit", "car16-p2-cad-even-depth-search", "car16-p3-capture-depth-zero-cache"]
+  ],
+  "acceptedDependencies": [],
+  "reviewContext": {
+    "issueReference": "round16-audit/feat-ai-capture@0a357086e71f252f35c6639f755d28551f772517 (findings: function-cad-fit-ignores-visible-sketches, performance-cad-shared-perforated-profile-depth-rescans, performance-capture-shared-depth-zero-profile-rescans); no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car16-00-overview.md",
+    "userProblem": "The round-16 audit of feat/ai-capture found three medium defects. (1) CadViewport.tsx:153-157 fits only drawnBodies() on double-click (:531), and the initial-fit effect (:250-258) requires bodies. A sketch-only page with a visible rectangle near (600,-600) mm is framed on the origin, so the drawing is off-screen (corner NDC X -7.21 to -6.47). (2) history.ts:639 re-runs the even-depth some() over the shared whole-profile loop array on every whole-sketch extrusion. Holes come first, so a 256-hole plate with 32 extrusions costs 8,224 visits through checkCadPage. (3) scene.ts:220-224 charges an all-depth-zero scan 0 work, so the 4096-work profile-cache admission (scene.ts:528-536) is never reached. 256 circles x 32 extrusions and 4096 circles x 2 extrusions each cost 8,192 depth checks.",
+    "requiredOutcomes": [
+      "function-cad-fit-ignores-visible-sketches (R16-1; car16-p1): with no drawn body, Fit and the initial fit frame the visible sketch.entityLines() endpoints. Body pages keep the body-only fit, and empty pages keep the [-50,50] fallback. The provisional sketch-only initial fit is local, not published, and not marked fitted, so the first body arrival runs the published body fit, including after a page switch. A DOM test at 800x600 shows the corners in NDC [-1,1] after the initial fit and after pan plus dblclick. A hidden distant sketch does not change the fit. viewport.test.tsx asserts 'ok sketch fit'.",
+      "performance-cad-shared-perforated-profile-depth-rescans (R16-2; car16-p2): the even-depth search runs only when semantic.loops is present; whole profiles keep an O(1) loops.length===0 check. With the new cadGeometryWork.evenDepthVisits counter: 0 for K=1 and K=32 (before: 257 and 8,224), errors [] and bounds [0,0,0]-[200,200,K]. Hole-only and loops:[] selections give cad.profile.empty, and a boundary selection still searches. The ordinary 500-feature document gives 0.",
+      "performance-capture-shared-depth-zero-profile-rescans (R16-3; car16-p3): the all-zero scan charges searched=loops.length (prepared unchanged). It is admitted on the single 4096 threshold, or cumulatively per array only when loops.length >= PROFILE_CACHE_PENDING_MIN_WORK (64); the cached value is the same array. 4096 circles x 2: depthVisits 4096, admitted 1, hits 1. 256 x 32: depthVisits 4096, lookups and hits 16. 256 x 64: hits 48. 63 x 2: pendingUpdates 0. One-use entitiesPerSketch 1: pendingUpdates 0, depthVisits 500, maxDirectWork 1. Oracle bytes are equal, and the ordinary pins are kept with pendingUpdates 0."
+    ],
+    "nonGoals": [
+      "No change to the low findings at packages/ui-solid/src/cad/sketch-overlay.ts:306 and packages/core/src/capture/cad-request.ts:209.",
+      "No change to Canvas.tsx, apps/desktop/src/App.tsx, camera3d.ts, sketch-authoring.ts, picking, loops.ts, construction.ts, check.ts, bounds.ts, history.test.ts, PROFILE_CACHE_MIN_WORK, the mixed-depth normalization path, explicit-selection capture behaviour, goldens or capture bytes.",
+      "No docs or design-doc edits by workers. No new dependency. No Rust changes."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, noUncheckedIndexedAccess-safe reads without non-null assertions, Biome clean on touched files.",
+      "artifactRoots are exactly [\"target\", \"tmp/cad3d\"]. Evidence goes under tmp/car16-r16/<planId>/. Each gate exports its own CARGO_TARGET_DIR (target/r16-viewport-fit, target/r16-cad-depth, target/r16-capture-depth). No *.test.ts or *.test.tsx file may be left under target/ or tmp/.",
+      "Per-plan gates are focused. bun run typecheck, bun run lint and mise run verify run once at integration.",
+      "Workers follow the SHA-256 pre/post hash, intent snapshot and drift-stop rules of car16-00-overview.md. Each plan records a fail-before log and a passing gate log.",
+      "The 26.2 timing rule applies. Work counters only. At most two bun test processes at once. Never relax existing assertions or helpers."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R16-1 uses sketch lines only when no body is drawn.", "rationale": "Adding them alongside bodies would move the camera on body pages with visible sketches and break the existing centre-pick and dblclick-equality assertions (cad-viewport.dom.tsx:222-238)."},
+      {"decision": "The R16-1 provisional fit uses setCamera only and runs at most once per mount.", "rationale": "NodettoCanvas caches every published camera as the next initialCamera (Canvas.tsx:144, :186-190), so a published provisional camera would suppress the body fit after a page switch."},
+      {"decision": "R16-2 relies on the depth-0 invariant of successful whole profiles.", "rationale": "buildLoops returns cad.profile.empty for no loops (loops.ts:696), depths count containment within the set, and crossings are rejected (loops.ts:610-612). Explicit selections keep the search."},
+      {"decision": "R16-3 charges into searched and gates the pending map with a 64-loop floor.", "rationale": "The existing prepared pins stay unchanged. Ordinary, mixed-depth and one-use small profiles allocate nothing new, and above the floor bookkeeping costs at most 1/64 of the scan it amortizes."}
+    ],
+    "intentionalTradeoffs": [
+      "On a page with bodies, a visible sketch far from them is still not framed by Fit (today's behaviour).",
+      "All-zero profiles below 64 loops keep rescanning at fewer than 64 visits per extrusion.",
+      "The one-use guard's maxDirectWork 1 holds only after the fix; it is a guard, not fail-before evidence."
+    ],
+    "supportedEdgeCases": [
+      "A sketch-only page, a hidden distant sketch, an empty page, a body page with visible sketches, a page switch before the first body response, and initialCamera restoration.",
+      "Whole-profile 256-hole plates with K=1 and K=32; hole-only, empty and boundary explicit selections; the ordinary 500-feature document.",
+      "All-zero profiles of 63, 64, 256 and 4096 circles; one-use one-circle profiles; mixed-depth and explicit-subset regressions; the shared PCB test."
+    ],
+    "outOfScopeEdgeCases": [
+      "GPU and WebGL rendering, packaged desktop, Boa latency, native rendering and image bytes, Tauri IPC, MCP delivery and cross-platform byte determinism."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car16-00-overview.md",
+      "impl-plans/active/car16-p1-viewport-sketch-fit.md",
+      "impl-plans/active/car16-p2-cad-even-depth-search.md",
+      "impl-plans/active/car16-p3-capture-depth-zero-cache.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car16-p1-viewport-sketch-fit",
+      "planPath": "impl-plans/active/car16-p1-viewport-sketch-fit.md",
+      "dependsOn": [],
+      "writePaths": ["packages/ui-solid/src/cad/CadViewport.tsx", "packages/ui-solid/src/test-dom/cad-viewport.dom.tsx", "packages/ui-solid/src/cad/viewport.test.tsx", "impl-plans/active/car16-p1-viewport-sketch-fit.md", "impl-plans/progress/car16-p1-viewport-sketch-fit.md", "tmp/car16-r16/car16-p1-viewport-sketch-fit", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Sketch-only page at 800x600: all four rectangle corners project inside NDC [-1,1] after the initial fit, and again after a middle-button pan followed by a real dblclick. This fails before the fix.",
+        "A hidden sketch near (5000,5000) does not change the initial camera. An empty page's dblclick equals fitBounds([-50,-50,-50],[50,50,50],800/600).",
+        "Page switch before the first body response: after remount and body arrival, the last camera equals fitBounds([-20,-20,0],[20,20,0],1), and the first published camera is that body fit. The provisional camera is never published.",
+        "Existing body fit, centre pick, dblclick equality and savedCamera remount assertions are unedited and pass. The gate output contains ok light, ok dark and ok sketch fit."
+      ],
+      "verification": [
+        "export CARGO_TARGET_DIR=target/r16-viewport-fit && bunx biome check packages/ui-solid/src/cad/CadViewport.tsx packages/ui-solid/src/test-dom/cad-viewport.dom.tsx packages/ui-solid/src/cad/viewport.test.tsx && bun test packages/ui-solid/src/cad/viewport.test.tsx -t 'CAD viewport mounts'",
+        "bun test packages/ui-solid/src/cad/viewport.test.tsx"
+      ]
+    },
+    {
+      "planId": "car16-p2-cad-even-depth-search",
+      "planPath": "impl-plans/active/car16-p2-cad-even-depth-search.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/history.ts", "packages/core/src/cad/check.test.ts", "impl-plans/active/car16-p2-cad-even-depth-search.md", "impl-plans/progress/car16-p2-cad-even-depth-search.md", "tmp/car16-r16/car16-p2-cad-even-depth-search", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "checkCadPage on the 256-hole 200 mm plate with K=1 and K=32 whole-profile extrusions records cadGeometryWork.evenDepthVisits === 0 (before: 257 and 8,224), errors [] and bounds {min:[0,0,0],max:[200,200,K]}.",
+        "Explicit hole-only and loops:[] selections report cad.profile.empty on the extrude. A boundary selection reports no error and evenDepthVisits > 0.",
+        "generateCadDocument({features: 500, entitiesPerSketch: 18}) records evenDepthVisits === 0. Existing check.test.ts and history.test.ts tests are unedited and pass."
+      ],
+      "verification": [
+        "export CARGO_TARGET_DIR=target/r16-cad-depth && bunx biome check packages/core/src/cad/history.ts packages/core/src/cad/check.test.ts && bun test packages/core/src/cad/check.test.ts packages/core/src/cad/history.test.ts"
+      ]
+    },
+    {
+      "planId": "car16-p3-capture-depth-zero-cache",
+      "planPath": "impl-plans/active/car16-p3-capture-depth-zero-cache.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/scene.ts", "packages/core/src/capture/scene.test.ts", "impl-plans/active/car16-p3-capture-depth-zero-cache.md", "impl-plans/progress/car16-p3-capture-depth-zero-cache.md", "tmp/car16-r16/car16-p3-capture-depth-zero-cache", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "4096 disjoint circles with K=2: depthVisits 4096, admitted 1, lookups 1, hits 1. Scene bytes equal checkSharedOracle. Before the fix: 8192 visits, no admission.",
+        "256 circles: K=32 gives depthVisits 4096, admitted 1, lookups 16, hits 16, pendingUpdates > 0 and oracle bytes equal; K=64 gives depthVisits 4096 and hits 48.",
+        "63 circles K=2: pendingUpdates 0 and depthVisits 126. 64 circles K=2: pendingUpdates > 0 and admitted 0. One-use generateCadDocument({features: 500, entitiesPerSketch: 1}): pendingUpdates 0, lookups 0, admitted 0, hits 0, depthVisits 500, maxDirectWork 1.",
+        "The ordinary 500-feature pin keeps lookups, admitted and hits at 0, the maxDirectWork bound and the ancestry counts, and adds pendingUpdates 0. The mixed-depth, explicit-subset, shared-PCB and oracle tests are unedited and pass."
+      ],
+      "verification": [
+        "export CARGO_TARGET_DIR=target/r16-capture-depth && bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts"
+      ]
+    }
+  ]
+}

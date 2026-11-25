@@ -55,6 +55,10 @@ identities apart when a cancelled face is checked, aggregates profile
 extrema once per profile and frame, reuses one PCB frame per walk, and
 admits shared PCB outlines to the capture profile cache. Section 31 wins
 over earlier sections.
+Revision 21 (audit round 16 of `0a35708..3a00fb8`, 3 medium findings) is
+section 32; it fits sketch-only CAD pages to their visible sketch lines,
+skips the even-depth search for whole CAD profiles, and charges and caches
+all-depth-zero capture profiles. Section 32 wins over earlier sections.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -10053,3 +10057,400 @@ Integration runs once after all plans land, under the 26.2 timing rule:
 - Not measured: Boa elapsed time, native peak memory, allocator bytes,
   desktop frame time, desktop WebGL, Tauri IPC and MCP delivery, and
   cross-platform byte determinism for the new fixtures.
+
+## 32. Revision 21: audit round 16 corrections
+
+Source: audit round 16 of the 3D CAD pages and AI capture, base `0a35708`
+to `3a00fb8`, clean tree. Three medium findings, none deferred. No GitHub
+issue exists; the round-16 workflow input is the issue body (reference
+`round16-audit/feat-ai-capture@0a357086e71f252f35c6639f755d28551f772517`).
+R16-2 and R16-3 are round-15 findings that were never fixed and still
+reproduce; no section was written for round 15. Where an earlier section
+and this one disagree, this section wins. The common rules of section 24,
+the timing rule of 26.2, the plan rules of 28.2, the ordinary-input rule
+of section 29 and the plan rules of 30.2 and 31.2 still apply. Each fix
+needs a regression test that fails before the change and passes after it
+in this tree. Performance is asserted with deterministic work counters,
+never clocks. Bytes, goldens, error codes, report formats and the CLI, MCP
+and desktop contracts stay unchanged. The two low findings of round 16
+(`sketch-overlay.ts:306`, `cad-request.ts:209`) are out of scope and stay
+unchanged.
+
+### 32.1 Rules
+
+R16-1 `function-cad-fit-ignores-visible-sketches` (medium).
+
+Cause. `fit()` (`CadViewport.tsx:153-157`, bound to double-click at
+`:531`) passes only `drawnBodies()` to `fitBodies`. With no body vertices,
+`fitBounds` (`camera3d.ts:107-116`) falls back to the origin-centred
+[-50, 50] box. The initial-fit effect (`CadViewport.tsx:250-258`) also
+requires `drawnBodies().length > 0`. A sketch-only page with a visible
+sketch away from the origin is therefore framed on the origin, and the
+drawing is off-screen (probe: corner NDC X -7.21 to -6.47).
+
+Rule. Fit uses the visible sketch lines only when no body is drawn.
+
+1. Fit source. `fit()` keeps its early return while drawing. Then:
+   - If `drawnBodies()` is non-empty, it fits exactly as today, from the
+     body positions only. Body pages, including pages that also show
+     sketches, keep today's camera.
+   - Otherwise, if `sketch.entityLines()` has segments, it fits the
+     bounds of every segment endpoint. Segments are world-space xyz
+     triples, the same arrays the renderer receives
+     (`sketch-authoring.ts:185-205`). `entityLines()` already skips
+     hidden sketches, hidden entities and sketches without a resolved
+     frame, so hidden geometry never enlarges the bounds.
+   - Otherwise it fits the empty bounds, which gives today's fallback.
+   The bounds computation is today's per-axis min/max loop extended to
+   the segment arrays. It uses `fitBounds` and the viewport aspect
+   unchanged.
+2. Initial fit. The effect runs when the camera has not been fitted or
+   changed (`fitted === false`), the size is non-zero, and either bodies
+   are drawn or visible sketch segments exist.
+   - A fit made by the effect while no body is drawn is provisional. It
+     moves the camera but leaves the viewport eligible for the initial
+     body fit. The first time `drawnBodies()` becomes non-empty, the
+     effect fits once from the bodies, exactly as today.
+   - Any camera change by the user (orbit, pan, zoom, double-click,
+     `alignToFrame`) ends the provisional state, as `changeCamera`
+     already does for `fitted`. A later body arrival then does not move
+     the camera.
+   - A page opened with `initialCamera` keeps today's behaviour: no
+     initial fit.
+   Reason: bodies arrive asynchronously from the CAD engine, after the
+   sketch lines are known. Without the provisional rule, a page with
+   bodies and visible sketches would lock on the sketch-only fit, and
+   the existing body-fit test (`cad-viewport.dom.tsx:222-238`) would
+   change.
+3. Camera publication (step-3 review r16-viewport-provisional-camera-remount).
+   `NodettoCanvas` stores every camera passed to `onCameraChange` in its
+   per-page map (`Canvas.tsx:144`, `:186-190`) and hands it back as
+   `initialCamera` to the next keyed viewport, which then skips the
+   initial fit (`CadViewport.tsx:105`). The provisional fit must not
+   reach that map:
+   - The provisional fit is local to the mounted viewport. It sets the
+     viewport's camera signal only. It does not call `onCameraChange`
+     and does not set `fitted`. So neither the `Canvas.tsx` map nor the
+     desktop `cadCameras` map (`apps/desktop/src/App.tsx:1015`) receives
+     it.
+   - Everything that today goes through `changeCamera` is still
+     published there, unchanged: the initial body fit, user orbit, pan
+     and zoom, double-click `fit()` (including a sketch-only or empty
+     fit, because the user asked for it), and frame alignment.
+   - A genuine supplied `initialCamera` (a published camera) is restored
+     exactly as today, with no initial fit.
+   - Effect on a page switch: if the user leaves a page before its first
+     body response and before any camera input, nothing was published,
+     so the remounted viewport has no `initialCamera`. It makes its own
+     provisional fit, then the body fit when its body arrives.
+   - No file outside the p1 ownership changes: `Canvas.tsx` and
+     `App.tsx` keep their callbacks as they are.
+4. Nothing else changes: `fitBodies` on bodies, `fitBounds`, the
+   empty-page fallback, picking, the renderer contract and the saved
+   per-page camera of published changes.
+
+Tests (`packages/ui-solid/src/test-dom/cad-viewport.dom.tsx`; each new
+assertion fails before the fix unless marked as a guard):
+
+- Sketch-only page, 800 x 600. The `getBoundingClientRect` stub takes its
+  size from a variable, so this case uses 800 x 600 and the existing
+  cases keep 400 x 400. The page holds one XY sketch with a visible
+  20 x 20 mm rectangle with corners (590, -610) and (610, -590) mm, no
+  extrusion and no body. The engine stub answers with no bodies.
+  - After mount and paint, all four corners, projected with
+    `viewProjection(camera, 800 / 600)` from `camera3d.ts`, lie inside
+    NDC [-1, 1] in X and Y (fails before: the camera stays on the
+    origin).
+  - A middle-button pan moves the camera. A real `dblclick` on the
+    surface then restores a camera whose projected corners again lie
+    inside NDC [-1, 1].
+- Hidden sketch. The same page plus a second sketch with
+  `visual.hidden: true` holding a rectangle near (5000, 5000) mm. The
+  fitted camera deep-equals the camera of the first case (fails before
+  only through the first case; it guards the hidden filter).
+- Guards, unchanged and passing:
+  - the existing body case: `fitted` after the body response, the
+    centre pick of `ex1`, and `dblclick` back to `fitted`;
+  - an empty CAD page (no bodies, no visible sketch): `dblclick` gives
+    `fitBounds([-50, -50, -50], [50, 50, 50], aspect)`;
+  - the existing committed-camera restoration
+    (`cad-viewport.dom.tsx:273-285`, `savedCamera` on remount) is
+    unedited.
+- Page switch with a deferred body (guard for rule 3; it rejects a design
+  that publishes the provisional camera). This runs in a fresh
+  `NodettoCanvas` render, so the per-page camera map starts empty. Use
+  `plateWithHoles()` with its visible sketches, the extra `drawing` page,
+  400 x 400, and an `onCadCameraChange` spy.
+  1. Mount on `cad` and leave the first engine request unanswered. After
+     paint, the drawn camera is the provisional sketch fit, and it
+     differs from the body-only fit. The spy has recorded nothing.
+  2. Switch to `drawing`, then back to `cad`. A new viewport mounts and
+     sends a new request. The first request stays unanswered or is
+     rejected with `CadSupersededError`.
+  3. Resolve the new request with `body`. After paint, the last drawn
+     camera deep-equals the body-only fit of the existing case
+     (`fitBounds([-20, -20, 0], [20, 20, 0], 1)` through `fitBodies`).
+     The first camera the spy records is that body fit.
+- The new cases log `ok sketch fit`, and `viewport.test.tsx` asserts that
+  line, so the gate proves that they ran.
+
+R16-2 `performance-cad-shared-perforated-profile-depth-rescans` (medium).
+
+Cause. `createCadGeometry().extrude` builds and indexes each sketch
+profile once (`history.ts:604-621`) and reuses the same loop array for
+every whole-sketch extrusion (`semantic.loops` omitted). The even-depth
+check `loops.some(({ depth }) => depth % 2 === 0)` (`history.ts:639`)
+still runs for every extrusion. `buildLoops` emits closed circles before
+the connected line boundary (`loops.ts:568`, `:601`, `:685-696`), so a
+plate with H holes costs H + 1 visits per extrusion, and K extrusions
+cost K x (H + 1) (probe: 257 for K = 1, 8,224 for K = 32, H = 256).
+
+Rule. The even-depth search runs only for explicit selections.
+
+1. `semantic.loops !== undefined`: unchanged. The selected subset is
+   searched, and a subset with no even-depth loop (only holes, or empty)
+   fails with `cad.profile.empty`.
+2. `semantic.loops === undefined`: no search. The profile is `profile.loops`
+   from a successful `buildLoops(entities)` call. `buildLoops` returns
+   `cad.profile.empty` when it has no loops (`loops.ts:696`). Depths count
+   the containing loops of the same set (`loops.ts:615-683`, or
+   `loopForest` depths), and contours do not cross (`loops.ts:610-612`).
+   So a loop that no other loop contains has depth 0. A whole profile
+   always has a depth-0 loop, and the search cannot fail. An O(1)
+   `loops.length === 0` check keeps `cad.profile.empty` if that invariant
+   is ever broken.
+3. Callers and interfaces are unchanged: `construction.ts`,
+   `checkCadPage`, the CLI and the scene walk already pass whole profiles
+   by omitting `semantic.loops`.
+4. Counter. `cadGeometryWork` gains `evenDepthVisits`, incremented once
+   per predicate evaluation of the even-depth search. The plan proceeds
+   in two steps, as in 31.1 R14-3:
+   1. Add the counter to today's search for all paths, run the new
+      tests, and record the before values (K x (H + 1), and the ordinary
+      value).
+   2. Make the change.
+
+Tests (`packages/core/src/cad/check.test.ts`; counters reset before each
+measurement):
+
+- Perforated plate through `checkCadPage`: one XY sketch with a 200 mm
+  square of four lines and a 16 x 16 grid of radius-1 circles inside it
+  (256 holes; closed circles come before the boundary, `loops.ts:568`), and K
+  whole-sketch `new` extrusions with distances 1..K, for K = 1 and
+  K = 32.
+  - `evenDepthVisits === 0` for both (before: 257 and 8,224).
+  - No diagnostics, and bounds exactly X [0, 200], Y [0, 200], Z [0, K]
+    (guards: identical before and after).
+- Explicit selections on the same sketch (guards, also before the fix):
+  - `loops` listing only hole circle IDs gives `cad.profile.empty`.
+  - `loops: []` gives `cad.profile.empty`.
+  - `loops` listing one boundary line ID gives no diagnostic, and
+    `evenDepthVisits > 0`, so the subset search still runs.
+- Ordinary pin: `checkCadPage` on
+  `generateCadDocument({ features: 500, entitiesPerSketch: 18 })` gives
+  `evenDepthVisits === 0` (before: about 11 per extrusion), and the
+  existing ordinary extrema and projection pins stay unedited.
+- `history.test.ts` and the existing `check.test.ts` cases stay unedited
+  and pass.
+
+R16-3 `performance-capture-shared-depth-zero-profile-rescans` (medium).
+
+Cause. `normaliseToolLoops` resets `measured` to zero and returns its
+input when every loop has depth 0 (`scene.ts:220-224`). Admission to the
+walk-local profile cache costs `prepared + searched` against
+`PROFILE_CACHE_MIN_WORK = 4096` (`scene.ts:528-536`). An all-depth-zero
+scan therefore costs 0, is never admitted, and is repeated for every
+extrusion: M disjoint contours and K whole-profile extrusions cost M x K
+depth checks (probe: 8,192 for M = 256, K = 32 and for M = 4,096, K = 2).
+
+Rule. Charge the all-zero scan and admit it on a single or cumulative
+threshold.
+
+1. Charge. `measured` (passed only by `buildCadCaptureModel`) gains
+   `scanned`: the number of depth predicate evaluations of the leading
+   all-depth-zero check, on every path. When the check succeeds, the call
+   sets `searched = loops.length` and `prepared = 0`, and still returns
+   its input array unchanged. The mixed-depth path keeps today's
+   `prepared` and `searched`, so its admission cost does not change.
+   `counters.prepared` therefore does not change on any path.
+2. Single threshold. Today's rule, unchanged: a whole profile (`cad.pcb`,
+   or `cad.extrude` with `semantic.loops === undefined`) whose
+   `prepared + searched` reaches 4,096 is admitted to the identity cache.
+   With rule 1, an all-zero profile of at least 4,096 loops is admitted
+   on its first scan.
+3. Cumulative threshold (step-3 review
+   r16-capture-pending-map-small-profile-regression). Pending bookkeeping
+   applies only to a whole profile that meets all three conditions:
+   - its call returned its input array (the all-depth-zero path);
+   - rule 2 did not admit it;
+   - its charge `loops.length` is at least
+     `PROFILE_CACHE_PENDING_MIN_WORK = 64` (exported from `scene.ts`,
+     defined as `PROFILE_CACHE_MIN_WORK / 64`).
+   For such a profile, a lazily created walk-local
+   `Map<readonly CadLoop[], number>` adds the charge per array. When the
+   sum reaches 4,096, the array is admitted (cache value = the same
+   array) and its pending entry is removed.
+   - A profile below the floor stays on today's direct path: no map
+     allocation and no map operation. Its rescan costs fewer than 64
+     depth visits per extrusion. That is bounded by the O(`loops.length`)
+     work that every tool already does in `chargeTool`, `makeTool` and
+     `sweptBounds`.
+   - A profile at or above the floor pays one map operation per scan
+     of at least 64 visits, so the bookkeeping costs at most 1/64 of the
+     scan it amortizes. This is the measured-threshold switch that
+     section 29 requires.
+   - The map is created on the first eligible scan. A walk with no
+     eligible scan allocates nothing new. That covers the ordinary
+     fixture, whose plates have holes and take the mixed path, and
+     one-use small all-zero profiles.
+   - The accepted fixtures are unaffected: 256 circles (charge 256) and
+     4,096 circles (admitted by rule 2) are both eligible.
+4. Bytes. A cached all-zero profile maps to its own array, so tools,
+   contour order and face numbering are identical to today's. Explicit
+   selections stay independent: their arrays are fresh per feature and
+   never enter either map.
+5. Counters. `CaptureWalkStats.profileCache` gains two fields:
+   - `depthVisits`, which adds `scanned` after every normalization call;
+   - `pendingUpdates`, incremented once for every pending-map operation
+     (creation, add or delete).
+   `maxDirectWork` keeps its meaning (the largest single-call cost not
+   admitted) and now includes all-zero charges.
+
+Tests (`packages/core/src/capture/scene.test.ts`; `profileCacheStats()`
+gains `depthVisits: 0` and `pendingUpdates: 0`):
+
+- Large disjoint profile: one XY sketch of 4,096 disjoint radius-1
+  circles at 3 mm spacing (64 x 64), run through `sharedProfileRun` with
+  K = 2 whole extrusions.
+  - `depthVisits === 4096`, `admitted === 1`, `lookups === 1`,
+    `hits === 1` (before: 8,192 visits and no admission).
+  - Scene bytes equal the oracle through `checkSharedOracle`.
+- Cumulative admission: 256 such circles (16 x 16), K = 32.
+  - `depthVisits === 4096` (16 scans of 256), `admitted === 1`,
+    `lookups === 16`, `hits === 16` (before: 8,192, no admission).
+  - With K = 64, `depthVisits` is still 4,096 and `hits === 48`, so
+    visits stop growing after admission.
+  - Scene bytes equal the oracle through `checkSharedOracle`.
+- Guards, unedited and passing: the shared whole-profile test (mixed
+  depth, `admitted 1, lookups 31, hits 31`, unchanged `prepared`), the
+  explicit-subset test (`lookups 0, admitted 0, hits 0`), the shared-PCB
+  test of 31.1 R14-5, and every `normaliseToolLoops` oracle test.
+- Ordinary pin: the existing "ordinary capture avoids profile cache work"
+  test keeps `lookups`, `admitted` and `hits` at 0, the `maxDirectWork`
+  bound and the ancestry counts. It also asserts `pendingUpdates === 0`
+  and the measured `depthVisits` (expected 500: each plate profile starts
+  with a depth-1 hole, so the scan stops after one visit).
+- One-use small all-zero profiles (new guard):
+  `buildCadCaptureModel` on
+  `generateCadDocument({ features: 500, entitiesPerSketch: 1 })`. Each
+  sketch is one circle with one whole extrusion.
+  - `pendingUpdates === 0`, `lookups === 0`, `admitted === 0`,
+    `hits === 0`, `depthVisits === 500` and `maxDirectWork === 1`.
+  - This test passes before the fix too. It fails for any rule that
+    books one-use small profiles.
+- Floor boundary: 63 disjoint circles with K = 2 give
+  `pendingUpdates === 0` and `depthVisits === 126`. 64 circles with K = 2
+  give `pendingUpdates > 0` and `admitted === 0` (cumulative 128 is
+  below 4,096). These pin the eligibility rule.
+- The 256-circle cumulative case also asserts `pendingUpdates > 0`.
+
+### 32.2 Plan grouping
+
+Plans `car16-*` follow 28.2, 30.2 and 31.2, with evidence under
+`tmp/car16-r16/<planId>/`. Every plan sets `artifactRoots ["target",
+"tmp/cad3d"]` exactly, has a non-empty `acceptanceCriteria`, and lists its
+own plan and progress files in `writePaths`. No plan edits documentation.
+The three plans edit disjoint files and run in one wave with no
+`dependsOn`.
+
+| Plan | Rule | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car16-p1-viewport-sketch-fit | R16-1 | `packages/ui-solid/src/cad/CadViewport.tsx`, `packages/ui-solid/src/test-dom/cad-viewport.dom.tsx`, `packages/ui-solid/src/cad/viewport.test.tsx` | - |
+| car16-p2-cad-even-depth-search | R16-2 | `packages/core/src/cad/history.ts`, `packages/core/src/cad/check.test.ts` | - |
+| car16-p3-capture-depth-zero-cache | R16-3 | `packages/core/src/capture/scene.ts`, `packages/core/src/capture/scene.test.ts` | - |
+
+Each plan writes its regression first, runs it before its production
+edit, and records the complete failing log and exit status, then the
+passing log. For p2 and p3 the first step adds only the counter.
+
+Gates (each exits 0 and runs the plan's new tests):
+
+- p1: `export CARGO_TARGET_DIR=target/r16-viewport-fit && bunx biome check packages/ui-solid/src/cad/CadViewport.tsx packages/ui-solid/src/test-dom/cad-viewport.dom.tsx packages/ui-solid/src/cad/viewport.test.tsx && bun test packages/ui-solid/src/cad/viewport.test.tsx -t 'CAD viewport mounts'`.
+  This filter runs the test that spawns `cad-viewport.dom.tsx`
+  (`viewport.test.tsx:3-19`), so the new case runs in it. Any assertion
+  failure exits non-zero, and the `ok sketch fit` line proves the case
+  ran.
+- p2: `export CARGO_TARGET_DIR=target/r16-cad-depth && bunx biome check packages/core/src/cad/history.ts packages/core/src/cad/check.test.ts && bun test packages/core/src/cad/check.test.ts packages/core/src/cad/history.test.ts`.
+- p3: `export CARGO_TARGET_DIR=target/r16-capture-depth && bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts`.
+
+At most two `bun test` processes run at once. Integration runs once after
+all plans land, under the 26.2 timing rule: `bun run typecheck`,
+`bun run lint`, then `CARGO_TERM_QUIET=true mise run verify`. Goldens are
+checked and never regenerated. A final check confirms that no
+`*.test.ts` remains under `target/` or `tmp/`.
+
+### 32.3 Decisions
+
+- R16-1 uses sketch lines only when no body is drawn, instead of adding
+  them to the body vertices. Adding them would move the camera on every
+  page that shows a sketch next to its body. The existing body test would
+  break: its centre pick of `ex1` and its double-click equality both
+  depend on the body-only fit. That conflicts with the acceptance rule
+  that solid-body fitting is unchanged.
+- R16-1's provisional initial fit avoids waiting for an engine "settled"
+  signal, which the viewport does not have. It uses only the existing
+  `fitted` flag semantics.
+- R16-1 keeps the provisional camera unpublished rather than marking
+  published cameras as provisional in `Canvas.tsx`. The fix then stays
+  inside `CadViewport.tsx`, and the camera-cache contract between
+  `NodettoCanvas`, the desktop app and the viewport is unchanged.
+- R16-2 relies on the depth-0 invariant of complete profiles rather than
+  caching the search result per profile. That needs no new state and is
+  O(1) per extrusion.
+- R16-3 charges the all-zero scan into `searched`, not `prepared`, so the
+  `prepared` counter pinned by existing tests stays unchanged. The
+  cumulative map covers only all-zero whole profiles of at least 64
+  loops. The mixed-depth admission rule of R13-3 and R14-5, the ordinary
+  walk and one-use small profiles are therefore untouched. A size floor
+  was chosen over predicting reuse in advance, because the construction
+  visitor exposes no per-sketch reference count. Adding one would touch
+  `construction.ts`, outside p3's ownership.
+- No user decision is pending, so there is no `design-docs/user-qa/`
+  file.
+
+### 32.4 Intentional differences from the workflow input
+
+- R16-1: the recommended fix adds sketch endpoints "together with the
+  visible body vertices". This design uses them only when no body is
+  drawn, for the reason in 32.3. The finding's trigger (a sketch-only
+  page) is fully fixed.
+- R16-1 adds `viewport.test.tsx` to the plan's files for one assertion
+  that proves the DOM case ran. This resolves the intake's open question
+  about the gate.
+- R16-3 applies cumulative admission only to all-depth-zero profiles of
+  at least 64 loops. The repeated sub-threshold mixed-depth case stays as
+  bounded in 30.5. All-zero profiles below 64 loops keep rescanning, at
+  fewer than 64 visits per extrusion.
+
+### 32.5 Risks
+
+- R16-1: on a page with bodies, a visible sketch away from them is still
+  not framed by Fit (today's behaviour). The DOM renderer stub stands in
+  for WebGL; packaged desktop and GPU rendering are not exercised.
+- R16-1: a provisional camera is never handed to the desktop
+  `cadCameras` map. A 3D image export taken before the first body
+  response or any camera input therefore uses the same camera source as
+  today for an unpublished page.
+- R16-2: if `buildLoops` ever returned a non-empty profile with no depth-0
+  loop, a whole-profile extrusion would no longer fail with
+  `cad.profile.empty`. The invariant follows from the containment depths
+  and the crossing check; the explicit-selection tests keep the failure
+  path covered.
+- R16-3: an eligible all-zero profile below 4,096 loops is still scanned
+  until its cumulative charge reaches the threshold, so at most 4,096
+  extra visits per distinct profile. A profile below the 64-loop floor
+  rescans on every extrusion, at fewer than 64 visits each. Point copying, tool construction and
+  serialization still scale with the emitted geometry.
+- Not measured: Boa elapsed time, native rendering and image bytes,
+  desktop frame time, Tauri IPC and MCP delivery, and cross-platform byte
+  determinism.

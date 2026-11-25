@@ -21,7 +21,10 @@ diagram canvas colour preference.
    apply to committed edits.
 
 Drag to orbit, Shift-drag or middle-drag to pan, scroll to zoom, and
-double-click the viewport to fit the model.
+double-click the viewport to fit the model. A page that has visible sketches
+but no solid body yet fits those sketches instead, both when it opens and on
+double-click. Hidden sketches do not affect the fit. A page with neither
+fits a default box around the origin.
 
 ## Reference a PCB
 

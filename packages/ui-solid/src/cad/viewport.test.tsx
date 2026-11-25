@@ -13,9 +13,11 @@ test("CAD viewport mounts, evaluates, selects, and fails safely in light and dar
     { cwd: `${import.meta.dir}/..`, stdout: "pipe", stderr: "pipe" },
   );
   const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+  console.log(output.trim());
   expect(result.exitCode, output).toBe(0);
   expect(output).toContain("ok light");
   expect(output).toContain("ok dark");
+  expect(output).toContain("ok sketch fit");
 });
 
 test("CAD sketch and extrude tools commit atomically in light and dark", () => {

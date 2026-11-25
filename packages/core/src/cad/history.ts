@@ -444,6 +444,7 @@ export const cadGeometryWork = {
   sideMemberVisits: 0,
   sideMemberIndexBuilds: 0,
   sideSelectionEntries: 0,
+  evenDepthVisits: 0,
 };
 
 export function createCadGeometry(
@@ -636,7 +637,14 @@ export function createCadGeometry(
             return loop === undefined ? [] : [loop];
           });
       }
-      if (!loops.some(({ depth }) => depth % 2 === 0))
+      if (
+        loops.length === 0 ||
+        (semantic.loops !== undefined &&
+          !loops.some(({ depth }) => {
+            cadGeometryWork.evenDepthVisits += 1;
+            return depth % 2 === 0;
+          }))
+      )
         return cadFailure("cad.profile.empty");
 
       const span = extrudeSpan(semantic);

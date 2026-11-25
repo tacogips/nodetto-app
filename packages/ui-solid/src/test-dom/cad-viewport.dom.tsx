@@ -7,11 +7,17 @@ import {
   CadSupersededError,
   Editor,
 } from "@nodetto/core";
-import { isPlainObject } from "@nodetto/ir";
+import { type Element, isPlainObject } from "@nodetto/ir";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
-import { plateWithHoles } from "../../../core/src/cad/testing/documents.ts";
-import type { Camera3d } from "../cad/camera3d.ts";
+import {
+  CAD_TEST_PAGE,
+  plateWithHoles,
+  rectangle,
+  sketch,
+} from "../../../core/src/cad/testing/documents.ts";
+import { document as makeDocument } from "../../../core/src/test-helpers.ts";
+import { type Camera3d, fitBounds, viewProjection } from "../cad/camera3d.ts";
 import type { CadRenderer } from "../cad/renderer.ts";
 import type { CadTheme } from "../cad/theme.ts";
 import { NodettoCanvas, type NodettoCanvasProps } from "../Canvas.tsx";
@@ -41,10 +47,12 @@ const body: CadDisplayBody = {
   reference: false,
 };
 
+let viewportWidth = 400;
+let viewportHeight = 400;
 const originalBounds = window.HTMLElement.prototype.getBoundingClientRect;
 window.HTMLElement.prototype.getBoundingClientRect = function () {
   return this.matches(".nodetto-canvas, .nodetto-cad-surface")
-    ? new window.DOMRect(0, 0, 400, 400)
+    ? new window.DOMRect(0, 0, viewportWidth, viewportHeight)
     : originalBounds.call(this);
 };
 
@@ -305,3 +313,159 @@ for (const theme of ["light", "dark"] as const) {
   root.remove();
   console.log(`ok ${theme}`);
 }
+
+viewportWidth = 800;
+viewportHeight = 600;
+const sketchElements = [
+  sketch("visible", "a1"),
+  ...rectangle("visible", 590, -610, 20, 20),
+];
+
+function fixture(elements: readonly Element[], withDrawing = false) {
+  const doc = makeDocument(elements, [CAD_TEST_PAGE]);
+  const editor = new Editor({
+    document: {
+      ...doc,
+      pages: withDrawing
+        ? [...doc.pages, { id: "drawing", name: "Drawing", kind: "freeform" }]
+        : doc.pages,
+    },
+  });
+  editor.setCurrentPage("cad");
+  const requests: {
+    input: CadEngineInput;
+    resolve: (result: CadEngineResult) => void;
+  }[] = [];
+  const mounts: Camera3d[][] = [];
+  const published: [string, Camera3d][] = [];
+  const engine: CadEngine = {
+    evaluate: (input) =>
+      new Promise((resolve) => requests.push({ input, resolve })),
+    dispose: () => {},
+  };
+  const root = document.createElement("main");
+  document.body.append(root);
+  const dispose = render(
+    () => (
+      <NodettoCanvas
+        editor={editor}
+        tool={Tool.Select}
+        showGrid={false}
+        snap={{ grid: false, objects: false }}
+        cadEngine={engine}
+        onCadCameraChange={(id, camera) => published.push([id, camera])}
+        createCadRenderer={() => {
+          const cameras: Camera3d[] = [];
+          mounts.push(cameras);
+          return {
+            diagnostics: { programsLinked: true, renderer: "DOM stub" },
+            setBodies: () => {},
+            setHighlight: () => {},
+            setTheme: () => {},
+            setOverlay: () => {},
+            draw: (camera) => cameras.push(camera),
+            dispose: () => {},
+          };
+        }}
+      />
+    ),
+    root,
+  );
+  const respond = (index: number, bodies: CadDisplayBody[]) => {
+    const request = requests[index];
+    assert.ok(request);
+    request.resolve({ revision: request.input.revision, status: [], bodies });
+  };
+  const canvas = () => {
+    const result = root.querySelector<HTMLCanvasElement>(surface);
+    assert.ok(result);
+    return result;
+  };
+  return {
+    editor,
+    requests,
+    mounts,
+    published,
+    respond,
+    canvas,
+    cleanup: () => {
+      dispose();
+      root.remove();
+    },
+  };
+}
+
+function assertCorners(camera: Camera3d) {
+  const matrix = viewProjection(camera, 800 / 600);
+  for (const [x, y] of [
+    [590, -610],
+    [610, -610],
+    [610, -590],
+    [590, -590],
+  ] as const) {
+    const w = (matrix[3] ?? 0) * x + (matrix[7] ?? 0) * y + (matrix[15] ?? 0);
+    const nx =
+      ((matrix[0] ?? 0) * x + (matrix[4] ?? 0) * y + (matrix[12] ?? 0)) / w;
+    const ny =
+      ((matrix[1] ?? 0) * x + (matrix[5] ?? 0) * y + (matrix[13] ?? 0)) / w;
+    assert.ok(
+      nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1,
+      `corner ${x},${y}: ${nx},${ny}`,
+    );
+  }
+}
+const visible = fixture(sketchElements);
+visible.respond(0, []);
+await painted();
+const initial = visible.mounts[0]?.at(-1);
+assert.ok(initial);
+assertCorners(initial);
+movePointer(visible.canvas(), 35, 35, 1);
+await painted();
+assert.notDeepEqual(visible.mounts[0]?.at(-1)?.target, initial.target);
+visible.canvas().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+await painted();
+const refitted = visible.mounts[0]?.at(-1);
+assert.ok(refitted);
+assertCorners(refitted);
+visible.cleanup();
+
+const hidden = fixture([
+  ...sketchElements,
+  { ...sketch("hidden", "a2"), visual: { hidden: true } },
+  ...rectangle("hidden", 5000, 5000, 20, 20),
+]);
+hidden.respond(0, []);
+await painted();
+assert.deepEqual(hidden.mounts[0]?.at(-1), initial);
+hidden.cleanup();
+
+const empty = fixture([]);
+empty.respond(0, []);
+empty.canvas().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+await painted();
+assert.deepEqual(
+  empty.mounts[0]?.at(-1),
+  fitBounds([-50, -50, -50], [50, 50, 50], 800 / 600),
+);
+empty.cleanup();
+
+viewportWidth = 400;
+viewportHeight = 400;
+const plate = plateWithHoles();
+const switched = fixture(plate.elements, true);
+await painted();
+const bodyFit = fitBounds([-20, -20, 0], [20, 20, 0], 1);
+assert.notDeepEqual(switched.mounts[0]?.at(-1), bodyFit);
+assert.deepEqual(switched.published, []);
+switched.editor.setCurrentPage("drawing");
+switched.editor.setCurrentPage("cad");
+await painted();
+assert.equal(switched.requests.length, 2);
+switched.respond(1, [body]);
+await painted();
+await painted();
+assert.deepEqual(switched.mounts[1]?.at(-1), bodyFit);
+assert.deepEqual(switched.published[0], ["cad", bodyFit]);
+switched.cleanup();
+console.log("ok sketch fit");

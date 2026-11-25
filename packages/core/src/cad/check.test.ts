@@ -14,6 +14,7 @@ import { visitCadConstruction } from "./construction.ts";
 import type { CadFrame } from "./frames.ts";
 import { checkCadPage } from "./check.ts";
 import { createCadMemo, evaluateCadPage, releaseCadMemo } from "./evaluate.ts";
+import { cadGeometryWork } from "./history.ts";
 import {
   CAD_TEST_PAGE,
   bossOnFace,
@@ -610,4 +611,64 @@ test("profile bounds and limit decisions match per-loop oracles", () => {
       expect(sweptBounds(f, t0, t1, loops)).toEqual(
         oracleSwept(loops, f, t0, t1),
       );
+});
+
+function perforatedPlate(count: number, loops?: string[]): Element[] {
+  return [
+    sketch("plate", "a"),
+    ...rectangle("plate", 0, 0, 200, 200),
+    ...Array.from({ length: 256 }, (_, i) =>
+      cadElement(`hole-${i}`, "cad.circle", "a1", {
+        sketch: "plate",
+        c: [10 + 12 * (i % 16), 10 + 12 * Math.floor(i / 16)],
+        r: 1,
+      }),
+    ),
+    ...Array.from({ length: count }, (_, i) =>
+      extrude(`tool-${i}`, "b", {
+        sketch: "plate",
+        distance: i + 1,
+        op: "new",
+        ...(loops !== undefined ? { loops } : {}),
+      }),
+    ),
+  ];
+}
+
+for (const count of [1, 32]) {
+  test(`whole perforated profile skips even-depth search with ${count} extrusions`, () => {
+    cadGeometryWork.evenDepthVisits = 0;
+    const result = report(perforatedPlate(count));
+    console.log(
+      `whole profile ${count}: evenDepthVisits=${cadGeometryWork.evenDepthVisits}`,
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.bounds).toEqual({ min: [0, 0, 0], max: [200, 200, count] });
+    expect(cadGeometryWork.evenDepthVisits).toBe(0);
+  });
+}
+
+test("explicit profile selections retain even-depth validation", () => {
+  for (const loops of [
+    Array.from({ length: 256 }, (_, i) => `hole-${i}`),
+    [],
+  ]) {
+    cadGeometryWork.evenDepthVisits = 0;
+    expect(report(perforatedPlate(1, loops)).errors).toEqual([
+      { id: "tool-0", code: "cad.profile.empty" },
+    ]);
+  }
+  cadGeometryWork.evenDepthVisits = 0;
+  expect(report(perforatedPlate(1, ["plate-edge-0"])).errors).toEqual([]);
+  expect(cadGeometryWork.evenDepthVisits).toBeGreaterThan(0);
+});
+
+test("ordinary whole profiles skip even-depth search", () => {
+  const doc = generateCadDocument({ features: 500, entitiesPerSketch: 18 });
+  cadGeometryWork.evenDepthVisits = 0;
+  checkCadPage(doc.elements, doc.pages[0]?.id ?? "");
+  console.log(
+    `ordinary profile evenDepthVisits=${cadGeometryWork.evenDepthVisits}`,
+  );
+  expect(cadGeometryWork.evenDepthVisits).toBe(0);
 });
