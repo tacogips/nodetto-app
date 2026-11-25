@@ -32,7 +32,7 @@ pub struct BodyReport {
     pub open: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Analysis {
     pub cell: f64,
     pub candidates: u32,
@@ -41,7 +41,27 @@ pub struct Analysis {
     pub unchecked_count: u32,
     pub capped_count: u32,
     pub capped_without_hit: Vec<(u32, u32)>,
+    pub incomplete: Vec<(u32, u32)>,
     pub budget: u64,
+}
+
+impl std::fmt::Debug for Analysis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug = f.debug_struct("Analysis");
+        debug
+            .field("cell", &self.cell)
+            .field("candidates", &self.candidates)
+            .field("checked", &self.checked)
+            .field("unchecked", &self.unchecked)
+            .field("unchecked_count", &self.unchecked_count)
+            .field("capped_count", &self.capped_count)
+            .field("capped_without_hit", &self.capped_without_hit)
+            .field("budget", &self.budget);
+        if !self.incomplete.is_empty() {
+            debug.field("incomplete", &self.incomplete);
+        }
+        debug.finish()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,7 +130,16 @@ impl Report {
                 comma(&mut json, index);
                 let _ = write!(json, "[{a},{b}]");
             }
-            json.push_str("]}");
+            json.push(']');
+            if !analysis.incomplete.is_empty() {
+                json.push_str(",\"incomplete\":[");
+                for (index, (a, b)) in analysis.incomplete.iter().enumerate() {
+                    comma(&mut json, index);
+                    let _ = write!(json, "[{a},{b}]");
+                }
+                json.push(']');
+            }
+            json.push('}');
         } else {
             json.push_str("null");
         }
@@ -208,6 +237,7 @@ mod tests {
                 unchecked_count: 2,
                 capped_count: 2,
                 capped_without_hit: vec![(1, 3)],
+                incomplete: Vec::new(),
                 budget: 24_000_000,
             }),
             pairs: vec![

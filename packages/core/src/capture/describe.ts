@@ -21,6 +21,7 @@ export interface CaptureInterferenceJson {
   readonly uncheckedCount: number;
   readonly cappedCount: number;
   readonly cappedWithoutHit: readonly (readonly [string, string])[];
+  readonly incomplete?: readonly (readonly [string, string])[];
   readonly budget: number;
   readonly pairs: readonly DescribedPair[];
 }
@@ -43,6 +44,7 @@ export function describeInterference(
 ): {
   readonly found: number;
   readonly unchecked: number;
+  readonly incomplete: number;
   readonly lines: readonly string[];
   readonly json: CaptureInterferenceJson | null;
 } {
@@ -51,6 +53,7 @@ export function describeInterference(
     return {
       found: 0,
       unchecked: 0,
+      incomplete: 0,
       lines: ["interference: not checked"],
       json: null,
     };
@@ -72,10 +75,14 @@ export function describeInterference(
       approximate: p.capped,
     }),
   );
+  const incomplete = analysis.incomplete ?? [];
+  const k = incomplete.length;
   const lines = [
     analysis.uncheckedCount > 0
       ? `interference: ${pairs.length} found, ${analysis.uncheckedCount} of ${analysis.candidates} candidate pairs not checked (cell ${decimal(analysis.cell)} mm)`
-      : `interference: ${pairs.length} (${analysis.checked} candidate ${analysis.checked === 1 ? "pair" : "pairs"} checked, cell ${decimal(analysis.cell)} mm)`,
+      : k > 0
+        ? `interference: ${pairs.length} found, ${k} of ${analysis.checked} checked candidate ${analysis.checked === 1 ? "pair" : "pairs"} incomplete (cell ${decimal(analysis.cell)} mm)`
+        : `interference: ${pairs.length} (${analysis.checked} candidate ${analysis.checked === 1 ? "pair" : "pairs"} checked, cell ${decimal(analysis.cell)} mm)`,
   ];
   for (const p of pairs)
     lines.push(
@@ -89,13 +96,24 @@ export function describeInterference(
     lines.push(
       `  ... and ${analysis.uncheckedCount - 20} more; narrow with --interference-bodies`,
     );
-  if (analysis.cappedCount > 0)
+  for (const [a, b] of incomplete.slice(0, 20)) {
+    const pictured = report.pairs.some((pair) => pair.a === a && pair.b === b);
     lines.push(
-      `  refinement capped on ${analysis.cappedCount} checked pairs (${analysis.cappedWithoutHit.length} without a hit); sub-cell parts of those pairs may be missed; narrow with --interference-bodies`,
+      `  incomplete: ${plain(body(a).name)} x ${plain(body(b).name)}; the coarse check stopped before covering this pair, ${pictured ? "the overlap listed above was found in the picture only" : "interference not determined"}`,
+    );
+  }
+  if (k > 20)
+    lines.push(
+      `  ... and ${k - 20} more incomplete; narrow with --interference-bodies`,
+    );
+  if (analysis.cappedCount - k > 0)
+    lines.push(
+      `  refinement capped on ${analysis.cappedCount - k} checked pairs (${Math.max(0, analysis.cappedWithoutHit.length - k)} without a hit); sub-cell parts of those pairs may be missed; narrow with --interference-bodies`,
     );
   return {
     found: pairs.length,
     unchecked: analysis.uncheckedCount,
+    incomplete: k,
     lines,
     json: {
       cellMm: analysis.cell,
@@ -105,6 +123,7 @@ export function describeInterference(
       uncheckedCount: analysis.uncheckedCount,
       cappedCount: analysis.cappedCount,
       cappedWithoutHit: analysis.cappedWithoutHit.map(ids),
+      ...(k > 0 ? { incomplete: incomplete.map(ids) } : {}),
       budget: analysis.budget,
       pairs,
     },
@@ -116,6 +135,7 @@ export function describeBodies(
   model: CadCaptureModel,
 ): {
   readonly line: string;
+  readonly notSampled: readonly string[];
   readonly errors: readonly {
     readonly id: string;
     readonly code: string;
@@ -131,6 +151,23 @@ export function describeBodies(
     unknown: " [not sampled]",
   } as const;
   const errors: { id: string; code: string; text: string }[] = [];
+  const sources = model.bodies.flatMap((body, i) => {
+    const state = report.bodies[i];
+    if (!state || state.open || state.emptiedByStep === -1) return [];
+    const hidden =
+      state.hiddenEmptiedByStep === undefined
+        ? undefined
+        : body.steps[state.hiddenEmptiedByStep];
+    if (hidden && model.tools[hidden.tool]) return [];
+    const step = body.steps[state.emptiedByStep];
+    if (
+      !step ||
+      !model.tools[step.tool] ||
+      (step.op !== "difference" && step.op !== "intersection")
+    )
+      return [];
+    return [{ i, body, step }];
+  });
   const names = model.bodies.map((body, i) => {
     const state = report.bodies[i];
     if (!state) return plain(body.name);
@@ -139,7 +176,41 @@ export function describeBodies(
         ? undefined
         : body.steps[state.hiddenEmptiedByStep];
     const hiddenTool = hiddenStep && model.tools[hiddenStep.tool];
-    if (hiddenTool) {
+    const ownStep =
+      state.emptiedByStep === -1 ? undefined : body.steps[state.emptiedByStep];
+    const ownTool = ownStep && model.tools[ownStep.tool];
+    const existingIndex = hiddenTool
+      ? state.hiddenEmptiedByStep
+      : ownTool
+        ? state.emptiedByStep
+        : undefined;
+    let sibling:
+      | { index: number; source: (typeof sources)[number] }
+      | undefined;
+    if (!state.open) {
+      for (const source of sources) {
+        if (source.i === i) continue;
+        const index = body.steps.findIndex(
+          (step) =>
+            step.tool === source.step.tool && step.op === source.step.op,
+        );
+        if (index !== -1 && (sibling === undefined || index < sibling.index))
+          sibling = { index, source };
+      }
+    }
+    const selectedSibling =
+      sibling && (existingIndex === undefined || sibling.index < existingIndex)
+        ? sibling
+        : undefined;
+    if (selectedSibling) {
+      const tool = model.tools[selectedSibling.source.step.tool];
+      if (tool)
+        errors.push({
+          id: tool.feature,
+          code: "cad.result.empty",
+          text: `(sampled): leaves no material in "${plain(selectedSibling.source.body.name)}"; the app rejects this feature and keeps "${plain(body.name)}" as it was, this picture applies it`,
+        });
+    } else if (hiddenTool) {
       errors.push({
         id: hiddenTool.feature,
         code: "cad.result.empty",
@@ -161,7 +232,9 @@ export function describeBodies(
       ((state.state === "drawn" ||
         state.state === "hidden" ||
         state.state === "outside") &&
-      (state.emptiedByStep !== -1 || state.hiddenEmptiedByStep !== undefined)
+      (state.emptiedByStep !== -1 ||
+        state.hiddenEmptiedByStep !== undefined ||
+        selectedSibling !== undefined)
         ? " [differs from the app, see errors]"
         : "") +
       (state.open ? " [open mesh, not checked]" : "")
@@ -170,5 +243,8 @@ export function describeBodies(
   return {
     line: `bodies: ${names.length} (${names.slice(0, 8).join(", ")}${names.length > 8 ? ", ..." : ""})`,
     errors,
+    notSampled: model.bodies.flatMap((body, i) =>
+      report.bodies[i]?.state === "unknown" ? [plain(body.name)] : [],
+    ),
   };
 }

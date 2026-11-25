@@ -270,43 +270,46 @@ impl MeshView {
     pub(crate) fn scan_cost(&self, ray: &Ray) -> usize {
         self.bin(ray).map_or(0, |(_, bin)| bin.len())
     }
+    fn facet_depth(&self, i: u32, q: [f64; 2], ray: &Ray) -> Option<f64> {
+        let corners = self.triangles[i as usize].map(|vertex| vertex as usize);
+        let tq = corners.map(|vertex| self.projected[vertex]);
+        let area = edge(tq[0], tq[1], tq[2]);
+        if area == 0.0 || !area.is_finite() {
+            return None;
+        }
+        let order = if area > 0.0 { [0, 1, 2] } else { [0, 2, 1] };
+        let mut inside = true;
+        for j in 0..3 {
+            let a = tq[order[j]];
+            let b = tq[order[(j + 1) % 3]];
+            let e = edge(a, b, q);
+            if e < 0.0 || (e == 0.0 && !inclusive(a, b)) {
+                inside = false;
+                break;
+            }
+        }
+        if !inside {
+            return None;
+        }
+        let p = corners.map(|vertex| self.points[vertex]);
+        let n = cross(
+            std::array::from_fn(|k| p[1][k] - p[0][k]),
+            std::array::from_fn(|k| p[2][k] - p[0][k]),
+        );
+        let d = dot(n, self.forward);
+        if d == 0.0 || !d.is_finite() {
+            return None;
+        }
+        let s = dot(n, std::array::from_fn(|k| p[0][k] - ray.origin[k])) / d;
+        s.is_finite().then_some(s)
+    }
     fn hits_impl<const FACETS: bool>(&self, ray: &Ray, scratch: &mut Vec<Boundary>) {
         scratch.clear();
         let Some((q, bin)) = self.bin(ray) else {
             return;
         };
         for &i in bin {
-            let corners = self.triangles[i as usize].map(|vertex| vertex as usize);
-            let tq = corners.map(|vertex| self.projected[vertex]);
-            let area = edge(tq[0], tq[1], tq[2]);
-            if area == 0.0 || !area.is_finite() {
-                continue;
-            }
-            let order = if area > 0.0 { [0, 1, 2] } else { [0, 2, 1] };
-            let mut inside = true;
-            for j in 0..3 {
-                let a = tq[order[j]];
-                let b = tq[order[(j + 1) % 3]];
-                let e = edge(a, b, q);
-                if e < 0.0 || (e == 0.0 && !inclusive(a, b)) {
-                    inside = false;
-                    break;
-                }
-            }
-            if !inside {
-                continue;
-            }
-            let p = corners.map(|vertex| self.points[vertex]);
-            let n = cross(
-                std::array::from_fn(|k| p[1][k] - p[0][k]),
-                std::array::from_fn(|k| p[2][k] - p[0][k]),
-            );
-            let d = dot(n, self.forward);
-            if d == 0.0 || !d.is_finite() {
-                continue;
-            }
-            let s = dot(n, std::array::from_fn(|k| p[0][k] - ray.origin[k])) / d;
-            if s.is_finite() {
+            if let Some(s) = self.facet_depth(i, q, ray) {
                 scratch.push(Boundary {
                     s,
                     tool: self.tool,
@@ -334,9 +337,20 @@ impl MeshView {
         false
     }
     pub(crate) fn first_surface_hit(&self, ray: &Ray) -> Option<Boundary> {
-        let mut scratch = Vec::new();
-        self.hits_impl::<true>(ray, &mut scratch);
-        scratch.first().copied()
+        let (q, bin) = self.bin(ray)?;
+        let mut best: Option<Boundary> = None;
+        for &i in bin {
+            if let Some(s) = self.facet_depth(i, q, ray) {
+                if best.as_ref().is_none_or(|hit| s.total_cmp(&hit.s).is_lt()) {
+                    best = Some(Boundary {
+                        s,
+                        tool: self.tool,
+                        face: i,
+                    });
+                }
+            }
+        }
+        best
     }
     pub(crate) fn surface(&self, facet: u32) -> Option<(u32, [f64; 3])> {
         let p = self
@@ -611,5 +625,88 @@ mod tests {
         let (face, normal) = view.surface(0).unwrap();
         assert_eq!(face, 0);
         assert_eq!(normal, [0., 0., -1.]);
+    }
+    #[test]
+    fn nearest_surface_matches_sorted_oracle() {
+        let family = RayFamily {
+            forward: [0., 0., 1.],
+        };
+        let square = Mesh {
+            positions: vec![-2., -2., 0., 2., -2., 0., 2., 2., 0., -2., 2., 0.],
+            triangles: vec![0, 1, 2, 0, 2, 3],
+        };
+        let view = MeshView::new(&square, 7, &family, None);
+        for x in -5..=5 {
+            for y in -5..=5 {
+                let ray = Ray {
+                    origin: [f64::from(x) / 2., f64::from(y) / 2., -1.],
+                };
+                let mut hits = Vec::new();
+                view.hits_impl::<true>(&ray, &mut hits);
+                let encode = |hit: Boundary| (hit.s.to_bits(), hit.tool, hit.face);
+                assert_eq!(
+                    view.first_surface_hit(&ray).map(encode),
+                    hits.first().copied().map(encode)
+                );
+            }
+        }
+        let zero_mesh = Mesh {
+            positions: vec![
+                -2., -2., 0., 2., -2., 0., 0., 2., 0., -2., -2., 0., 2., -2., 0., 0., 2., 0.,
+            ],
+            triangles: vec![0, 1, 2, 4, 3, 5],
+        };
+        let zero_view = MeshView::new(&zero_mesh, 7, &family, None);
+        let zero_ray = Ray {
+            origin: [0., 0., 0.],
+        };
+        let mut zero_hits = Vec::new();
+        zero_view.hits_impl::<true>(&zero_ray, &mut zero_hits);
+        assert_eq!(
+            zero_hits
+                .iter()
+                .map(|hit| hit.s.to_bits())
+                .collect::<Vec<_>>(),
+            vec![(-0.0_f64).to_bits(), 0.0_f64.to_bits()]
+        );
+        let hit = zero_view.first_surface_hit(&zero_ray).unwrap();
+        assert_eq!(
+            (hit.s.to_bits(), hit.tool, hit.face),
+            (
+                zero_hits[0].s.to_bits(),
+                zero_hits[0].tool,
+                zero_hits[0].face
+            )
+        );
+        for depths in [[0., 1.], [0., 0.], [-0., 0.], [0., -0.]] {
+            for reverse in [false, true] {
+                let mesh = Mesh {
+                    positions: vec![
+                        -2., -2., depths[0], 2., -2., depths[0], 0., 2., depths[0], -2., -2.,
+                        depths[1], 2., -2., depths[1], 0., 2., depths[1],
+                    ],
+                    triangles: if reverse {
+                        vec![3, 4, 5, 0, 1, 2]
+                    } else {
+                        vec![0, 1, 2, 3, 4, 5]
+                    },
+                };
+                let view = MeshView::new(&mesh, 7, &family, None);
+                for x in -4..=4 {
+                    for y in -4..=4 {
+                        let ray = Ray {
+                            origin: [f64::from(x) / 2., f64::from(y) / 2., 0.],
+                        };
+                        let mut hits = Vec::new();
+                        view.hits_impl::<true>(&ray, &mut hits);
+                        let encode = |hit: Boundary| (hit.s.to_bits(), hit.tool, hit.face);
+                        assert_eq!(
+                            view.first_surface_hit(&ray).map(encode),
+                            hits.first().copied().map(encode)
+                        );
+                    }
+                }
+            }
+        }
     }
 }

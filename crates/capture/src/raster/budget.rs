@@ -7,6 +7,9 @@ pub(super) const CHUNK: u64 = 1_048_576;
 
 pub(super) struct ScanBudget {
     allowance: u64,
+    triangle_limit: u64,
+    triangles: AtomicU64,
+    visited: AtomicU64,
     charged: AtomicU64,
     reads: AtomicU64,
     witness: AtomicU64,
@@ -16,9 +19,12 @@ pub(super) struct ScanBudget {
 }
 
 impl ScanBudget {
-    pub(super) fn new(allowance: u64) -> Self {
+    pub(super) fn new(allowance: u64, triangle_limit: u64) -> Self {
         Self {
             allowance,
+            triangle_limit,
+            triangles: AtomicU64::new(0),
+            visited: AtomicU64::new(0),
             charged: AtomicU64::new(0),
             reads: AtomicU64::new(0),
             witness: AtomicU64::new(0),
@@ -26,6 +32,14 @@ impl ScanBudget {
             layer_capacity: AtomicUsize::new(0),
             stopped: AtomicBool::new(false),
         }
+    }
+
+    pub(super) fn triangles(&self) -> u64 {
+        self.triangles.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn visited(&self) -> u64 {
+        self.visited.load(Ordering::Relaxed)
     }
 
     /// True once any worker has charged past the allowance.
@@ -63,6 +77,7 @@ impl ScanBudget {
         self.workers.fetch_add(1, Ordering::Relaxed);
         WorkerBudget {
             shared: self,
+            visited: 0,
             pending: 0,
             reads: 0,
             witness: 0,
@@ -72,12 +87,27 @@ impl ScanBudget {
 
 pub(super) struct WorkerBudget<'a> {
     shared: &'a ScanBudget,
+    visited: u64,
     pending: u64,
     reads: u64,
     witness: u64,
 }
 
 impl WorkerBudget<'_> {
+    pub(super) fn traverse(&mut self, entries: usize) -> bool {
+        if entries == 0 {
+            return true;
+        }
+        let entries = entries as u64;
+        let after = self.shared.triangles.fetch_add(entries, Ordering::Relaxed) + entries;
+        if after > self.shared.triangle_limit {
+            self.shared.stopped.store(true, Ordering::Relaxed);
+            return false;
+        }
+        self.visited += entries;
+        true
+    }
+
     /// Stop all workers when bounded sample storage is exhausted.
     pub(super) fn stop(&mut self) {
         self.shared.stopped.store(true, Ordering::Relaxed);
@@ -144,6 +174,9 @@ impl WorkerBudget<'_> {
 impl Drop for WorkerBudget<'_> {
     fn drop(&mut self) {
         self.flush();
+        self.shared
+            .visited
+            .fetch_add(self.visited, Ordering::Relaxed);
         self.shared.reads.fetch_add(self.reads, Ordering::Relaxed);
         self.shared
             .witness

@@ -291,13 +291,16 @@ export function createExportHandlers(
       );
       if (path === null) return;
       await source.exportBackend.writeBytes(path, result.image);
-      const errors = describeBodies(report, prepared.model).errors;
+      const { errors, notSampled } = describeBodies(report, prepared.model);
       const failed = prepared.model.errors.length;
       setExportError(
         [
           "Image saved.",
           ...describeInterference(report, prepared.model.bodies).lines,
           ...errors.map((error) => `${error.id}: ${error.code} ${error.text}`),
+          ...(notSampled.length > 0
+            ? [`not sampled (material unknown): ${notSampled.join(", ")}`]
+            : []),
           ...(failed > 0 ? [`${failed} features failed.`] : []),
         ].join("\n"),
       );

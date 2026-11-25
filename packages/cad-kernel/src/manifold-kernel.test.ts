@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import type { ToolMesh } from "@nodetto/core";
 import { fileURLToPath } from "node:url";
 import { createManifoldKernel } from "./index.ts";
+import { readManifoldMesh } from "./manifold-kernel.ts";
 
 function box(name: string, x = 0, y = 0, z = 0): ToolMesh {
   return {
@@ -159,4 +160,66 @@ test("rejects an open mesh with the native status and can build another solid", 
   const handle = kernel.solid(valid);
   expect(kernel.measure(handle).volume).toBe(1);
   kernel.release(handle);
+});
+
+test("validates Manifold mesh buffer coverage", () => {
+  const valid = {
+    numProp: 3,
+    vertProperties: Float32Array.of(0, 0, 0, 1, 0, 0, 0, 1, 0),
+    triVerts: Uint32Array.of(0, 1, 2),
+    runIndex: Uint32Array.of(0, 3),
+    runOriginalID: Uint32Array.of(1),
+    faceID: Uint32Array.of(0),
+  };
+  const malformed = [
+    { ...valid, vertProperties: new Float32Array(8) },
+    { ...valid, numProp: 4, vertProperties: new Float32Array(9) },
+    { ...valid, runOriginalID: new Uint32Array() },
+    { ...valid, runIndex: Uint32Array.of(0) },
+    { ...valid, faceID: new Uint32Array() },
+    { ...valid, triVerts: Uint32Array.of(0, 1, 3) },
+    { ...valid, runIndex: Uint32Array.of(0, 2) },
+  ];
+  for (const mesh of malformed) {
+    expect(() => readManifoldMesh(mesh, () => ["face"])).toThrow(
+      "Invalid Manifold mesh data",
+    );
+  }
+  expect(() => readManifoldMesh(valid, () => [])).toThrow(
+    "Missing Manifold face 1/0",
+  );
+});
+
+test("converts empty and ordered multi-run Manifold buffers", () => {
+  const empty = readManifoldMesh(
+    {
+      numProp: 4,
+      vertProperties: Float32Array.of(1, 2, 3, 9),
+      triVerts: new Uint32Array(),
+      runIndex: Uint32Array.of(7),
+      runOriginalID: Uint32Array.of(3),
+      faceID: new Uint32Array(),
+    },
+    () => undefined,
+  );
+  expect([...empty.positions]).toEqual([1, 2, 3]);
+  expect([...empty.triangles]).toEqual([]);
+  expect([...empty.triFace]).toEqual([]);
+  expect(empty.faceNames).toEqual([]);
+  const mesh = readManifoldMesh(
+    {
+      numProp: 4,
+      vertProperties: Float32Array.of(0, 0, 0, 8, 1, 0, 0, 8, 0, 1, 0, 8),
+      triVerts: Uint32Array.of(0, 1, 2, 2, 1, 0),
+      runIndex: Uint32Array.of(0, 3, 3, 6),
+      runOriginalID: Uint32Array.of(1, 99, 2),
+      faceID: Uint32Array.of(1, 0),
+    },
+    (id) =>
+      id === 1 ? ["unused", "first"] : id === 2 ? ["second"] : undefined,
+  );
+  expect([...mesh.positions]).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  expect([...mesh.triangles]).toEqual([0, 1, 2, 2, 1, 0]);
+  expect([...mesh.triFace]).toEqual([0, 1]);
+  expect(mesh.faceNames).toEqual(["first", "second"]);
 });

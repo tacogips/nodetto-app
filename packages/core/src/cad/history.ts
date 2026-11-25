@@ -23,7 +23,11 @@ import {
   sideOutwardSign,
 } from "./frames.ts";
 import { buildLoops, type CadLoop } from "./loops.ts";
-import { pcbBoardOutline } from "./pcb-outline.ts";
+import {
+  pcbBoardOutlineIndexed,
+  pcbOutlineIndex,
+  type PcbOutlineIndex,
+} from "./pcb-outline.ts";
 
 export type CadStatus =
   | { readonly ok: true }
@@ -53,6 +57,7 @@ export type CadFeature =
 
 interface HistoryDetails extends CadHistory {
   readonly pcbElements: readonly Element[];
+  readonly pcbOutline: PcbOutlineIndex;
   readonly boards: ReadonlyMap<ElementId, Element>;
   readonly byId: ReadonlyMap<ElementId, Element>;
   readonly typed: ReadonlyMap<ElementId, CadFeature>;
@@ -284,11 +289,8 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
   const pcbElements = elements.filter(
     ({ type }) => type === "pcb.board" || type === "pcb.graphic",
   );
-  const boards = new Map(
-    pcbElements
-      .filter(({ type }) => type === "pcb.board")
-      .map((element) => [element.id, element]),
-  );
+  const pcbOutline = pcbOutlineIndex(pcbElements);
+  const boards = pcbOutline.boards;
   const features = cad
     .filter(({ type }) => isFeatureType(type))
     .sort(compareCadHistoryOrder);
@@ -345,6 +347,7 @@ export function scanCadPage(elements: readonly Element[]): HistoryDetails {
     status,
     byId,
     pcbElements,
+    pcbOutline,
     boards,
     typed,
     dependencies,
@@ -479,8 +482,8 @@ export function createCadGeometry(
       );
     },
     pcb(semantic: CadPcbSemantic): ExtrudeGeometry | Failure {
-      const outline = pcbBoardOutline(
-        history.pcbElements,
+      const outline = pcbBoardOutlineIndexed(
+        history.pcbOutline,
         semantic.board ?? "",
       );
       if ("error" in outline) return cadFailure(outline.error, outline.at);

@@ -1,0 +1,117 @@
+{
+  "taskId": "car7-r7",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "2be9db17d22603cf1abe8e21bf0fa39a8b0e4769",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car7-r7",
+  "waves": [
+    ["car7-f1a-coarse-witness", "car7-f1b-incomplete-exit", "car7-f2-picture-triangle-bound"]
+  ],
+  "reviewContext": {
+    "issueReference": "round-7-audit:feat/ai-capture@2be9db17d22603cf1abe8e21bf0fa39a8b0e4769 (base 0a35708) plus uncommitted round 6 tree; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car7-00-overview.md",
+    "userProblem": "The round-7 audit found that when the interference scan budget runs out during the coarse pass, the Rust sampler drops overlap it has already observed in buffered rows and reports the pair as a refinement-only capped miss, and the CLI exit predicate ignores the incomplete list, so --fail-on-interference exits 0 for bodies that overlap substantially. It also found that native picture painting has no request-wide bound on mesh-bin facet traversal, so a 64x64 capture of three valid diagonal-strip slabs with interference disabled is admitted with over 1.6 billion facet tests. A typing error in packages/core/src/capture/report.test.ts:55 keeps bun run typecheck failing.",
+    "requiredOutcomes": [
+      "function-capture-coarse-scan-reported-as-refinement (R7-1; f1a, f1b): successful coarse casts in buffered rows are kept exactly once on exhaustion; coarse_complete from successful level-0 casts; analysis.incomplete emitted only when non-empty as a subset of cappedWithoutHit with checked unchanged; --fail-on-interference exits 1 for a non-empty incomplete list and 0 for refinement-only caps; help and docs state the contract; release CLI on the exact cropped audit pair exits 1 with the capped analysis hit; report and PNG bytes equal at threads 1 and 5 for buffered hit, abandoned miss and refinement-only control.",
+      "performance-capture-picture-mesh-triangle-scans (R7-2; f2): every non-empty mesh traversal in picture painting reserves its full bin length on one shared atomic before traversal against PICTURE_TRIANGLE_LIMIT (768,000,000, single fallback 1,536,000,000); visited entries never exceed the limit; the audit fixture and a five-worker fixture are refused with the existing message identically at threads 1 and 5; an admitted control is byte-identical at threads 1 and 5.",
+      "report.test.ts:55 fixture typed as const (f1b); integration typecheck exits 0."
+    ],
+    "nonGoals": [
+      "No golden regeneration, no NCS1 change, no error code change, no new message, no change to existing messages when the new states are absent.",
+      "No edits to mesh.rs, tool_view.rs, tiles.rs, census logic, describe.ts, report.ts, export-handlers.ts, capture-cad.ts or capture-command.ts; the multi-pair test at crates/capture/tests/interference.rs:989 is not loosened."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, CARGO_TERM_QUIET=true, rustfmt on touched Rust files.",
+      "Each plan uses its own CARGO_TARGET_DIR (target/car7-f1a, target/car7-f2) and artifactRoots [\"target\", \"tmp/cad3d\"].",
+      "Per-plan gates are focused; typecheck, lint and mise run verify run once at integration.",
+      "Timing failures: at most three full-gate attempts, then one exact single-test isolated run; both reported separately; deadlines never relaxed."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R7-1 reuses R6-2 rules; only tests are tightened (exact 0.25 mm3 one-cell volume, exact audit native fixture accepting only the analysis hit, thread parity for all three classifications).", "rationale": "R6-2 was accepted in round 6 but its Rust producer and exit rule never ran; tightened tests reject double accumulation and lost witnesses."},
+      {"decision": "R7-1 split into a Rust plan and a CLI plan in one wave.", "rationale": "Plan-size limits; injected reports make the CLI plan independent; no shared file."},
+      {"decision": "R7-2 reserves the full bin on one shared atomic before each traversal.", "rationale": "Chunked worker charges allow overshoot that a later flush cannot undo; fetch_add ordering gives an exact ceiling for any number of workers."},
+      {"decision": "R7-2 reuses the existing refusal string.", "rationale": "Identical error across thread counts whichever account stops; no docs change, so no file shared with R7-1."}
+    ],
+    "intentionalTradeoffs": [
+      "R7-2 may refuse dense-mesh pictures above 768M (or 1,536M) bin entries that were admitted before.",
+      "R7-1 witness preservation may turn an exhausted capped miss into a capped approximate hit."
+    ],
+    "supportedEdgeCases": [
+      "Exhaustion during the initial two-row preload, during a row y+1 preload and during refinement; refinement-only exhaustion after the final coarse cast; picture-only records for incomplete candidates; legacy reports without incomplete; prism tools (zero triangle cost); 64-pixel pictures limited to two workers and five-band pictures with five workers."
+    ],
+    "outOfScopeEdgeCases": [
+      "Native elapsed time and peak memory at the new ceiling; Tauri IPC, MCP delivery and mise run test-cli."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car7-00-overview.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car7-f1a-coarse-witness",
+      "planPath": "impl-plans/active/car7-f1a-coarse-witness.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/lattice.rs", "crates/capture/src/interference.rs", "crates/capture/src/report.rs", "crates/capture/tests/interference.rs", "crates/capture/tests/render.rs", "apps/cli/src/native-parity/capture.test.ts", "tmp/capture/m09/timing.json", "tmp/capture/m23/timing.json", "impl-plans/active/car7-f1a-coarse-witness.md", "impl-plans/progress/car7-f1a-coarse-witness.md", "tmp/car7-r7/car7-f1a-coarse-witness", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "AxisSample.coarse_complete is true exactly when every coarse cell was cast successfully; refinement-only exhaustion after the final coarse cast keeps it true.",
+        "On exhaustion every successfully cast but unaccumulated coarse cell is accumulated once: the buffered-hit unit test cut after the first cast has cell 0.25 and volume 0.25 mm3 (fails before with 0.0).",
+        "Analysis.incomplete lists capped pairs with no report and no complete axis, in candidate order, as a subset of cappedWithoutHit; JSON key written after cappedWithoutHit only when non-empty; checked unchanged.",
+        "render_parsed buffered-hit, abandoned-miss and refinement-only cases give equal report and PNG bytes at threads 1 and 5 with pairs (0,1) capped analysis, incomplete [(0,1)], and no incomplete key respectively.",
+        "Release CLI on the two-mesh audit fixture with --view top --size 64x64 --target 2000,2000,0 --zoom 10 --fail-on-interference exits 1 in text and JSON with exactly one capped approximate analysis pair and no incomplete or picture-only record."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 crates/capture/src/lattice.rs crates/capture/src/interference.rs crates/capture/src/report.rs crates/capture/tests/interference.rs crates/capture/tests/render.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f1a cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f1a cargo test --release -p nodetto-capture",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/native-parity/capture.test.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f1a cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car7-f1a/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    },
+    {
+      "planId": "car7-f1b-incomplete-exit",
+      "planPath": "impl-plans/active/car7-f1b-incomplete-exit.md",
+      "dependsOn": [],
+      "writePaths": ["apps/cli/src/capture-interference-options.ts", "apps/cli/src/capture-interference-options.test.ts", "apps/cli/src/capture-cad.test.ts", "apps/cli/src/capture-help.ts", "apps/cli/src/capture-help/interference.ts", "docs/capture.md", "packages/core/src/capture/report.test.ts", "impl-plans/active/car7-f1b-incomplete-exit.md", "impl-plans/progress/car7-f1b-incomplete-exit.md", "tmp/car7-r7/car7-f1b-incomplete-exit", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "interferenceExitCode returns 1 with the flag for pairs, unchecked candidates or a non-empty analysis.incomplete, and 0 otherwise, including refinement-only capped misses and legacy reports without the key.",
+        "capture-cad.test.ts: an injected incomplete report prints the incomplete headline and not-determined line, JSON interference.incomplete with body ids, and exits 1 flagged in text and JSON (fails before); unflagged and refinement-only cases exit 0.",
+        "Help text and docs/capture.md state the incomplete exit contract and JSON key; capture-docs.test.ts passes.",
+        "packages/core/src/capture/report.test.ts:55 declares const incomplete = [[0, 1]] as const and the file's tests pass."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn apps/cli/src/capture-interference-options.ts apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-help.ts apps/cli/src/capture-help/interference.ts packages/core/src/capture/report.test.ts",
+        "bun test apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-docs.test.ts packages/core/src/capture/report.test.ts"
+      ]
+    },
+    {
+      "planId": "car7-f2-picture-triangle-bound",
+      "planPath": "impl-plans/active/car7-f2-picture-triangle-bound.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/raster.rs", "crates/capture/src/raster/budget.rs", "crates/capture/src/raster/tests.rs", "impl-plans/active/car7-f2-picture-triangle-bound.md", "impl-plans/progress/car7-f2-picture-triangle-bound.md", "tmp/car7-r7/car7-f2-picture-triangle-bound", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Every non-empty mesh traversal in Raster::sample reserves ToolView::triangle_cost on the shared ScanBudget.triangles atomic before traversing; a reservation crossing PICTURE_TRIANGLE_LIMIT stops painting without traversing.",
+        "Audit case (8192 strips, 3 bodies, 64x64) and five-worker case (2 bodies, 64x160, stats.workers == 5) are refused with the existing message, identical at threads 1 and 5, with stats.visited <= PICTURE_TRIANGLE_LIMIT < stats.triangles and stats.charged <= SCAN_ALLOWANCE.",
+        "Measurement-only run records the audit case admitted with visited >= 1,610,612,736 before the check is added.",
+        "Admitted control (256 strips, 3 bodies, 64x160) gives equal RGB, PNG, report JSON and visited at threads 1 and 5 with 0 < visited == triangles <= limit.",
+        "All existing raster, mesh and render tests, goldens and the tiles.rs:444 deadline pass; the limit is 768,000,000 or the single fallback 1,536,000,000, recorded in the progress log."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 crates/capture/src/raster.rs crates/capture/src/raster/budget.rs crates/capture/src/raster/tests.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f2 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f2 cargo test --release -p nodetto-capture"
+      ]
+    }
+  ],
+  "integration": [
+    "bun run typecheck && bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

@@ -17,8 +17,8 @@ export const CAPTURE_HELP = [
   ].join("\n"),
   ...parts.map((part) => part.body).filter(Boolean),
   `Exit codes: 0 image written (including identical existing bytes); 1 only with
---fail-on-interference for an interfering pair or unchecked candidate; 2 for
-usage, input, output, refusal or work limit errors.`,
+--fail-on-interference for an interfering pair, an unchecked candidate or an
+incomplete coarse check; 2 for usage, input, output, refusal or work limit errors.`,
   `The desktop Export dialog offers PNG/JPG for 2D and "3D view image" for CAD;
 see docs/capture.md.`,
 ].join("\n\n");

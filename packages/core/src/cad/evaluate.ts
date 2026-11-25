@@ -10,7 +10,6 @@ import {
 import type { CadKernel, KernelHandle, ToolMesh } from "./kernel.ts";
 import { canonicalCadJson, contentKey } from "./keys.ts";
 import type { CadLoop } from "./loops.ts";
-import { pcbOutlineGraphics } from "./pcb-outline.ts";
 import {
   CAD_CHORD_TOLERANCE_MM,
   CAD_MAX_BISECTION_DEPTH,
@@ -613,6 +612,7 @@ function evaluateHistory(
   const bodies = new Map<ElementId, BodyState>();
   const displayOnly: { id: ElementId; mesh: ToolMesh }[] = [];
   const sketchKeys = new Map<ElementId, string>();
+  const pcbGraphicsKeys = new Map<string, string>();
   const successful = new Set<string>();
   const bodyHolds = new Map<ElementId, Solid>();
   const staged: Solid[] = [];
@@ -700,7 +700,17 @@ function evaluateHistory(
             status.set(id, cadFailure("cad.reference.missing", board));
             continue;
           }
-          const graphics = pcbOutlineGraphics(history.pcbElements, source.page);
+          let graphicsKey = pcbGraphicsKeys.get(source.page);
+          if (graphicsKey === undefined) {
+            const graphics = history.pcbOutline.graphics.get(source.page) ?? [];
+            graphicsKey = contentKey([
+              "pcb graphics",
+              canonicalCadJson(
+                graphics.map(({ id, semantic }) => [id, semantic]),
+              ),
+            ]);
+            pcbGraphicsKeys.set(source.page, graphicsKey);
+          }
           const contextKey = contentKey([
             "pcb prism",
             id,
@@ -717,9 +727,7 @@ function evaluateHistory(
               "pcb tool",
               contextKey,
               canonicalCadJson(item.semantic),
-              canonicalCadJson(
-                graphics.map(({ id, semantic }) => [id, semantic]),
-              ),
+              graphicsKey,
               canonicalCadJson(
                 source.semantic &&
                   typeof source.semantic === "object" &&

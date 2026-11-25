@@ -3,6 +3,7 @@
 // Output uses the shortest prefix of at least MIN_PREFIX characters that is
 // unique among the document's element ids (git-style). Input accepts a full
 // id, a unique prefix, or "@ref" for an element created earlier in a batch.
+// IDs beginning with name: or @ are emitted in full to avoid selector collisions.
 
 export const MIN_PREFIX = 6;
 
@@ -25,7 +26,10 @@ export function shortIds(ids: readonly string[]): ReadonlyMap<string, string> {
         common += 1;
       length = Math.max(length, Math.min(common + 1, id.length));
     }
-    result.set(id, id.slice(0, length));
+    result.set(
+      id,
+      id.startsWith("name:") || id.startsWith("@") ? id : id.slice(0, length),
+    );
   });
   return result;
 }

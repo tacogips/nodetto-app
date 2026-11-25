@@ -240,6 +240,7 @@ export async function captureCommand(
         return fail(`${warnings}3D CAD capture needs the native nodetto-cli.`);
       cad = renderCadCapture(
         collectCadInput(document, page.id, 0).elements,
+        document.elements,
         page,
         {
           camera,

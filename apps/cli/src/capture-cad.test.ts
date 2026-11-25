@@ -13,7 +13,9 @@ import {
   extrude,
   sketch,
 } from "../../../packages/core/src/cad/testing/documents.ts";
-import { serializeDocument } from "@nodetto/io";
+import { parseDocument, serializeDocument } from "@nodetto/io";
+import { element, TEST_PAGE } from "../../../packages/core/src/test-helpers.ts";
+import { editCommand } from "./edit-command.ts";
 import { decodeCaptureMeshWith } from "@nodetto/io/nmesh";
 import { DEFAULT_CAD_INTERFERENCE, prepareCadCapture } from "@nodetto/core";
 import { captureCommand, type CaptureBackend } from "./capture-command.ts";
@@ -180,6 +182,174 @@ test("reports cropped frame, body states and cad check errors in text and JSON",
     errors: [{ id: failed.id, code: issue?.split(" ").at(-1) }],
   });
 });
+
+test.each(["structural", "sampled"] as const)(
+  "%s diagnostic IDs resolve across pages",
+  async (kind) => {
+    const feature = kind === "structural" ? "collar-groove" : "sleeve-cut";
+    const other = kind === "structural" ? "collar" : "sleeve";
+    const elements = plate.elements.map((item) =>
+      kind === "sampled" && item.id === "drill"
+        ? { ...item, id: feature }
+        : item,
+    );
+    if (kind === "structural")
+      elements.push(
+        extrude(feature, "aZ", {
+          sketch: "missing-profile",
+          distance: 3,
+          op: "new",
+        }),
+      );
+    elements.push(
+      element({
+        id: other,
+        type: "node.generic",
+        page: TEST_PAGE.id,
+        semantic: { label: "Other" },
+      }),
+    );
+    const doc = { ...plate, pages: [...plate.pages, TEST_PAGE], elements };
+    const { run, io, backend } = harness(doc);
+    if (kind === "sampled") {
+      backend.renderSolid = () => ({
+        image,
+        report: JSON.stringify({
+          width: 1024,
+          height: 768,
+          bodies: [
+            { state: "empty", open: false, emptiedByStep: 1 },
+            { state: "hidden", open: false, emptiedByStep: -1 },
+            { state: "outside", open: false, emptiedByStep: -1 },
+          ],
+          analysis: null,
+          pairs: [],
+        }),
+      });
+    }
+    const result = await run("--page", "Plate", "--no-interference");
+    expect(result.exitCode).toBe(0);
+    const code =
+      kind === "structural" ? "cad.reference.missing" : "cad.result.empty";
+    const token = `${other}-`;
+    expect(result.stdout).toContain(`  ${token} ${code}`);
+    if (kind === "structural") {
+      const check = cadCommand(io, [
+        "check",
+        "capture-plate.jsonl",
+        "--page",
+        "Plate",
+      ]);
+      expect(check.stdout).toContain(`${token} ${code}`);
+    }
+    const json = await run("--page", "Plate", "--no-interference", "--json");
+    expect(JSON.parse(json.stdout).errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: feature, code })]),
+    );
+    let written = "";
+    const edit = editCommand(
+      {
+        ...io,
+        readStdin: () => JSON.stringify([{ op: "delete", id: token }]),
+        writeText: (_path, text) => {
+          written = text;
+        },
+      },
+      ["capture-plate.jsonl", "--ops", "-"],
+    );
+    expect(edit.exitCode).toBe(0);
+    const ids = parseDocument(written).elements.map(({ id }) => id);
+    expect(ids).not.toContain(feature);
+    expect(ids).toContain(other);
+  },
+);
+
+test.each([
+  ["structural", "label"],
+  ["structural", "reference"],
+  ["sampled", "label"],
+  ["sampled", "reference"],
+] as const)(
+  "%s diagnostic with %s selector round trips through edit",
+  async (kind, selector) => {
+    const feature = selector === "label" ? "name:latch-bore" : "@spindle-cut";
+    const elements = plate.elements.map((item) =>
+      kind === "sampled" && item.id === "drill"
+        ? { ...item, id: feature }
+        : item,
+    );
+    if (kind === "structural")
+      elements.push(
+        extrude(feature, "aZ", {
+          sketch: "missing-profile",
+          distance: 3,
+          op: "new",
+        }),
+      );
+    elements.push(
+      element({
+        id: "competing-element",
+        type: "node.generic",
+        page: TEST_PAGE.id,
+        semantic: { label: selector === "label" ? "l" : "Spindle cap" },
+      }),
+    );
+    const { run, io, backend } = harness({
+      ...plate,
+      pages: [...plate.pages, TEST_PAGE],
+      elements,
+    });
+    if (kind === "sampled")
+      backend.renderSolid = () => ({
+        image,
+        report: JSON.stringify({
+          width: 1024,
+          height: 768,
+          bodies: [
+            { state: "empty", open: false, emptiedByStep: 1 },
+            { state: "hidden", open: false, emptiedByStep: -1 },
+            { state: "outside", open: false, emptiedByStep: -1 },
+          ],
+          analysis: null,
+          pairs: [],
+        }),
+      });
+    const code =
+      kind === "structural" ? "cad.reference.missing" : "cad.result.empty";
+    const result = await run("--page", "Plate", "--no-interference");
+    expect(result.exitCode).toBe(0);
+    const token = result.stdout.match(
+      new RegExp(`^  (\\S+) ${code.replaceAll(".", "\\.")}(?: |$)`, "m"),
+    )?.[1];
+    expect(token).toBe(feature);
+    const json = await run("--page", "Plate", "--no-interference", "--json");
+    expect(JSON.parse(json.stdout).errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: feature, code })]),
+    );
+    let written = "";
+    const ops =
+      selector === "reference"
+        ? [
+            { op: "select", where: { name: "Spindle cap" }, ref: "spind" },
+            { op: "delete", id: token },
+          ]
+        : [{ op: "delete", id: token }];
+    const edit = editCommand(
+      {
+        ...io,
+        readStdin: () => JSON.stringify(ops),
+        writeText: (_path, text) => {
+          written = text;
+        },
+      },
+      ["capture-plate.jsonl", "--ops", "-"],
+    );
+    expect(edit.exitCode).toBe(0);
+    const ids = parseDocument(written).elements.map(({ id }) => id);
+    expect(ids).not.toContain(feature);
+    expect(ids).toContain("competing-element");
+  },
+);
 
 test("explains a sketch-only page and a host without CAD rendering", async () => {
   const { run } = harness({
@@ -371,6 +541,66 @@ test("unchecked and capped analysis control exit codes and list limits", async (
       )
     ).exitCode,
   ).toBe(0);
+});
+
+test("incomplete coarse checks control text and JSON exit codes", async () => {
+  const { io, backend } = harness();
+  let incomplete = true;
+  backend.renderSolid = () => ({
+    image,
+    report: JSON.stringify({
+      width: 1024,
+      height: 768,
+      bodies: Array.from({ length: 3 }, () => ({
+        state: "drawn",
+        open: false,
+        emptiedByStep: -1,
+      })),
+      analysis: {
+        cell: 0.25,
+        candidates: 1,
+        checked: 1,
+        unchecked: [],
+        uncheckedCount: 0,
+        cappedCount: 1,
+        cappedWithoutHit: [[0, 1]],
+        budget: 24,
+        ...(incomplete ? { incomplete: [[0, 1]] } : {}),
+      },
+      pairs: [],
+    }),
+  });
+  for (const flagged of [true, false]) {
+    const flags = flagged ? ["--fail-on-interference"] : [];
+    const text = await captureCommand(
+      io,
+      ["capture-plate.jsonl", ...flags],
+      backend,
+    );
+    expect(text.stdout).toContain("1 of 1 checked candidate pair incomplete");
+    expect(text.stdout).toContain(
+      "  incomplete: Plate x Block; the coarse check stopped before covering this pair, interference not determined",
+    );
+    expect(text.exitCode).toBe(flagged ? 1 : 0);
+    const json = await captureCommand(
+      io,
+      ["capture-plate.jsonl", "--json", ...flags],
+      backend,
+    );
+    expect(JSON.parse(json.stdout).interference.incomplete).toEqual([
+      ["plate", "block"],
+    ]);
+    expect(json.exitCode).toBe(flagged ? 1 : 0);
+  }
+  incomplete = false;
+  for (const format of [[], ["--json"]]) {
+    const result = await captureCommand(
+      io,
+      ["capture-plate.jsonl", "--fail-on-interference", ...format],
+      backend,
+    );
+    expect(result.exitCode).toBe(0);
+  }
 });
 
 test("body notes identify empty, refilled, hidden and outside bodies", async () => {

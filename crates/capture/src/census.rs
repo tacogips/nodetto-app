@@ -73,6 +73,7 @@ pub(crate) fn resolve_with(
 ) -> CensusStats {
     let mut stats = CensusStats::default();
     let mut budget = budget_rays;
+    let mut triangles_left = lattice::request_triangles(budget_rays) / 4;
     let mut suspects = 0usize;
     for (index, (body, report)) in scene.bodies.iter().zip(bodies.iter_mut()).enumerate() {
         report.emptied_by_step = -1;
@@ -94,6 +95,7 @@ pub(crate) fn resolve_with(
             index,
             cell,
             &mut budget,
+            &mut triangles_left,
             solid,
             &mut alive,
             &mut stats,
@@ -122,6 +124,7 @@ fn sample_body(
     index: usize,
     cell: f64,
     budget: &mut u64,
+    triangles_left: &mut u64,
     solid: &[bool],
     alive: &mut Liveness,
     stats: &mut CensusStats,
@@ -161,7 +164,14 @@ fn sample_body(
             incomplete = true;
             break;
         }
-        let result = lattice::sample_body_axis_with(&request, axis, alive, &mut raw_budget, solid);
+        let result = lattice::sample_body_axis_with(
+            &request,
+            axis,
+            alive,
+            &mut raw_budget,
+            triangles_left,
+            solid,
+        );
         incomplete |= result.capped;
     }
     let spent = (initial - raw_budget).saturating_mul(weight);
@@ -183,6 +193,7 @@ pub fn resolve_hidden(
 ) -> Vec<Option<i32>> {
     let mut result = vec![None; scene.bodies.len()];
     let mut budget = budget_rays;
+    let mut triangles_left = lattice::request_triangles(budget_rays) / 8;
     let mut stats = CensusStats::default();
     for (index, body) in scene.hidden.iter().take(CENSUS_LIMIT).enumerate() {
         if budget == 0
@@ -204,6 +215,7 @@ pub fn resolve_hidden(
             scene.bodies.len() + index,
             cell,
             &mut budget,
+            &mut triangles_left,
             solid,
             &mut alive,
             &mut stats,

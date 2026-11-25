@@ -42,6 +42,28 @@ test("reads interim and final Rust report shapes", () => {
   expect(parseSolidReport(JSON.stringify(analysed))).toEqual(analysed);
 });
 
+test("validates optional incomplete pairs", () => {
+  expect(
+    parseSolidReport(JSON.stringify({ ...report, analysis })).analysis
+      ?.incomplete,
+  ).toBeUndefined();
+  const incomplete = [[0, 1]] as const;
+  expect(
+    parseSolidReport(
+      JSON.stringify({ ...report, analysis: { ...analysis, incomplete } }),
+    ).analysis?.incomplete,
+  ).toEqual(incomplete);
+  for (const invalid of [[[0]], "x", [[0, 1.5]]])
+    expect(() =>
+      parseSolidReport(
+        JSON.stringify({
+          ...report,
+          analysis: { ...analysis, incomplete: invalid },
+        }),
+      ),
+    ).toThrow("Invalid solid capture report");
+});
+
 test("reads a hidden-target emptying step", () => {
   const value = { ...report, bodies: [{ ...body, hiddenEmptiedByStep: 1 }] };
   expect(parseSolidReport(JSON.stringify(value))).toEqual(value);

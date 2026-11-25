@@ -1,0 +1,13 @@
+# car5-f4-open-mesh-hit progress
+
+Implemented the shared facet-depth helper and a one-pass strict `total_cmp` minimum preserving first-in-bin ties. Added sorted-oracle coverage and open-square allocation and render-order regressions. Pre-change allocation was 2,600,064 for 4,194,304 samples; the pre-change ordering digests are pinned in the test. Evidence and logs: `tmp/car5-r5/car5-f4-open-mesh-hit/`.
+
+The focused oracle and render tests pass. The exact plan gate passed Clippy but its release suite failed the unrelated `tiles::tests::many_tools_exceed_limit_within_budget` deadline under shared load after three attempts; the same deadline passed in isolation. The serial release suite is being checked separately. The exact gate requires a successful retry on a sufficiently idle shared tree before implementation verification is complete. Formal review and integration remain downstream.
+
+The serial full suite passed 193 tests on the source before an experimental signed-zero assertion. That assertion showed the current signed-zero coordinate inputs both produced positive-zero hit depths; it was removed. The explicit negative/positive-zero depth fixture remains unverified and must be completed before accepting the plan. Exact gate failures and the successful isolated deadline log are preserved in the evidence directory.
+
+Subsequently rotated the first vertex of the reversed triangle: the oracle now asserts actual negative-zero and positive-zero depths and passes. On that final source Clippy and the complete 193-test release suite passed with `RUST_TEST_THREADS=1` (`clippy-final.log`, `serial-final.log`). The exact default-thread gate remains unresolved; serial results do not replace it.
+
+Continuation: the exact gate again passed formatting and Clippy but failed the tile deadline (1,237 ms; 79 passed, 1 failed). The same deadline passed in isolation at 757 ms. Logs: `continuation-gate.log` and `continuation-isolated.log` in the evidence directory. Rustfmt left both plan-owned Rust files byte-identical. The exact gate remains outstanding; no source-matched baseline comparison establishes a review disposition.
+
+Second continuation: the exact gate again passed formatting and Clippy but failed the tile deadline at 1,169 ms (79 passed, 1 failed); the isolated deadline passed at 870 ms. The current-source overlay suite passed 3/3 and the sorted oracle passed 1/1. Logs: `continuation2-gate.log`, `continuation2-isolated.log`, `continuation2-overlay.log`, and `continuation2-oracle.log`. Rustfmt preserved the two Rust file hashes (mesh `44488709...`, overlay `423718a1...`). The exact gate remains unresolved; no source-matched baseline comparison is available.

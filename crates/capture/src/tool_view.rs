@@ -7,6 +7,28 @@ use crate::scene::{Scene, Tool};
 use crate::view::{Ray, RayFamily};
 use std::sync::OnceLock;
 
+#[cfg(test)]
+thread_local! { static SCAN_VISITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
+#[cfg(test)]
+pub(crate) fn reset_scan_visits() {
+    SCAN_VISITS.with(|v| v.set(0));
+}
+#[cfg(test)]
+pub(crate) fn scan_visits() -> u64 {
+    SCAN_VISITS.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+thread_local! { static TRIANGLE_VISITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
+#[cfg(test)]
+pub(crate) fn reset_triangle_visits() {
+    TRIANGLE_VISITS.with(|v| v.set(0));
+}
+#[cfg(test)]
+pub(crate) fn triangle_visits() -> u64 {
+    TRIANGLE_VISITS.with(std::cell::Cell::get)
+}
+
 #[allow(clippy::large_enum_variant)]
 pub enum ToolView {
     Prism(PrismView),
@@ -60,6 +82,12 @@ impl ToolView {
             Self::Mesh(view) => view.scan_cost(ray),
         }
     }
+    pub(crate) fn triangle_cost(&self, ray: &Ray) -> usize {
+        match self {
+            Self::Prism(_) => 0,
+            Self::Mesh(view) => view.scan_cost(ray),
+        }
+    }
     pub(crate) fn surface(&self, facet: u32) -> Option<(u32, [f64; 3])> {
         match self {
             Self::Prism(view) => view.surface(facet),
@@ -73,6 +101,10 @@ impl ToolView {
         }
     }
     pub fn intervals(&self, ray: &Ray, scratch: &mut Vec<Boundary>, out: &mut Intervals) {
+        #[cfg(test)]
+        SCAN_VISITS.with(|v| v.set(v.get().saturating_add(self.scan_cost(ray) as u64)));
+        #[cfg(test)]
+        TRIANGLE_VISITS.with(|v| v.set(v.get().saturating_add(self.triangle_cost(ray) as u64)));
         match self {
             Self::Prism(view) => view.intervals(ray, scratch, out),
             Self::Mesh(view) => view.intervals(ray, scratch, out),

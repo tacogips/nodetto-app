@@ -431,6 +431,7 @@ fn references_meshes_and_interference_stay_out_of_the_m8_picture() {
             unchecked_count: 0,
             capped_count: 0,
             capped_without_hit: vec![],
+            incomplete: Vec::new(),
             budget: 1_000_000
         }
     );

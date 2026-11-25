@@ -21,6 +21,16 @@ sentence and section 19 disagree, section 19 wins. Revision 9 (audit round
 `0a35708..3f9ce78`, 8 findings) is section 22 here and section 21 of
 `design-docs/specs/design-cad3d.md`; it extends NCS1 (offset 36) and the
 reply JSON of section 6.3, and section 22 wins over earlier sections.
+Revision 12 (audit round 5 of `0a35708..70977f4`, 6 findings) is section
+23 here and section 22 of `design-docs/specs/design-cad3d.md`; it changes
+no NCS1 or report bytes, and section 23 wins over earlier sections.
+Revision 13 (audit round 6 of `0a35708..6f58a74` plus the uncommitted
+round 5 tree, 4 findings) is section 24; it adds one optional key to the
+report JSON of section 6.3 and wins over earlier sections.
+Revision 14 (audit round 7 of `0a35708..2be9db1` plus the uncommitted
+round 6 tree, 2 high findings and one fixture typing error) is section 25;
+it finishes the unlanded part of R6-2, bounds picture mesh-bin traversal,
+and wins over earlier sections.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -4966,3 +4976,1465 @@ command, its exit status and the path of its complete log:
 - Not measured by the audit or by these gates: native image bytes of real
   user documents, peak memory, Boa elapsed time, desktop latency, and full
   workspace verification before integration.
+
+## 23. Revision 12: audit round 5 corrections
+
+Source: audit round 5 of the 3D CAD pages and AI capture, base `0a35708`
+to `70977f4`. It has six blocking findings (three high, three medium),
+none deferred. No GitHub issue exists; the round-5 workflow input is the
+issue body. This section states the capture rules R5-1, R5-3, R5-4 and
+R5-6, and the plan grouping of all six findings. The core rules R5-2 and
+R5-5 are in `design-docs/specs/design-cad3d.md` section 22. Where an
+earlier section and this one disagree, this section wins.
+
+Common rules (those of sections 19 to 22, restated):
+
+- Every fix ships a test that fails on `70977f4` and passes after it, in
+  the working tree. A performance test asserts a deterministic operation,
+  visit, allocation or inspection counter, never a wall clock.
+- These do not change: NCS1 bytes, PNG, JPG and SVG bytes of every
+  existing fixture, goldens, error codes, existing messages and their
+  precedence, package boundaries (`packages/io` never imports
+  `@nodetto/core`; `packages/core/src/pcb` imports only itself) and strict
+  indexed typing. No golden is regenerated.
+- Untouched: `crates/capture/src/raster.rs`, `crates/capture/src/raster/**`,
+  `crates/capture/src/prism.rs`, `crates/capture/src/census.rs`,
+  `crates/capture/src/lib.rs`, `crates/capture/src/report.rs`, the capture
+  goldens and `docs/capture.md`. Every rule below is reachable without
+  them.
+- Per-pixel, per-vertex and per-byte work stays in Rust on the native CLI.
+
+### 23.1 Rules
+
+R5-1 `function-capture-visible-sibling-cut-report` (high; merges
+`maintainability-capture-visible-shared-cut-attribution`).
+
+Cause. The evaluator stages every target of a Boolean and rejects the
+whole feature when any target becomes empty
+(`packages/core/src/cad/evaluate.ts:827`). The capture model appends the
+shared step to every visible target (`packages/core/src/capture/scene.ts:441`).
+The census then records the emptying step only on the emptied body
+(`crates/capture/src/census.rs:106`). The R4-1 rule covers only hidden
+targets, so `describeBodies` (`packages/core/src/capture/describe.ts:164`)
+has nothing that marks the trimmed visible sibling. The app keeps that
+sibling whole while the picture shows it cut.
+
+Rule. Attribution is done in TypeScript, in `describeBodies`, from data the
+report and the model already carry. No Rust, NCS1 or report JSON change.
+
+- Existing attribution. This is exactly what `describeBodies` selects
+  today (`describe.ts:137-156`), and it is kept unchanged:
+  - first, the hidden attribution: `hiddenEmptiedByStep = h` is present
+    and `body.steps[h]` names a tool. Its step is `h` and its text is the
+    hidden-target text. It wins over the own emptying whatever the indices.
+    The test at `describe.test.ts:188` (`emptiedByStep 0`,
+    `hiddenEmptiedByStep 1`) expects the hidden text;
+  - otherwise, the own attribution: `emptiedByStep = e != -1` and
+    `body.steps[e]` names a tool. Its step is `e` and its text is the
+    existing own text;
+  - otherwise, none.
+- Sources. A visible body `a` is a source when all of these hold:
+  - its existing attribution is the own attribution, at step `j`;
+  - `report.bodies[a].open` is false;
+  - `model.bodies[a].steps[j]` is a `difference` or `intersection` step
+    with tool `t`.
+
+  This reuses the census claim already reported on `a`. A body whose
+  sampling was incomplete has `emptiedByStep = -1` and state `unknown`
+  (`census.rs:86-104`), so it is never a source, and the sibling note is
+  exactly as confident as the existing note on `a`.
+- Sibling candidate. For every other visible body `b` with `open` false,
+  let `k` be the index of the first step of `b` with the same tool `t` and
+  the same op. Among all sources, `b` takes the smallest `k`. A tie goes to
+  the source that comes first in `model.bodies`.
+- Selection. Each body still gets at most one sampled error. The sibling
+  candidate `k` replaces the existing attribution only when there is no
+  existing attribution, or when `k` is strictly smaller than the existing
+  attribution's step. On a tie, or when the existing step is earlier, the
+  existing attribution and its text are kept. So:
+  - a hidden attribution at step `h <= k` keeps the hidden text, and R4-1
+    output does not change;
+  - if `b`'s own emptying is step `k`, `b` was emptied by the same feature
+    and keeps its own text.
+- Text. With `e` the emptied source and `b` the sibling:
+  `{ id: tool.feature, code: "cad.result.empty", text: "(sampled): leaves no material in \"<e name>\"; the app rejects this feature and keeps \"<b name>\" as it was, this picture applies it" }`.
+  Names go through `plain()` as today. The emptied body `e` keeps its
+  existing error. Errors stay in `model.bodies` order.
+- Body note. `[differs from the app, see errors]` is also added when a
+  sibling candidate stands, under the existing state condition (`drawn`,
+  `hidden` or `outside`).
+- Sources are computed in one pass from the raw report values. A chain
+  (a source that is itself the sibling of an earlier rejected step) is not
+  resolved further. It is still reported at its first discrepancy.
+- Callers need no change. `apps/cli/src/capture-cad.ts:146-151` (CLI text
+  and JSON `errors` with `sampled: true`) and
+  `apps/desktop/src/shell/export-handlers.ts` both consume the
+  `describeBodies` errors.
+
+Tests.
+
+- `packages/core/src/capture/describe.test.ts`, with model and report
+  literals:
+  - `rail` (steps `[union 0, difference 2]`, `emptiedByStep -1`) and `tab`
+    (steps `[union 1, difference 2]`, `emptiedByStep 1`, state `empty`). The
+    result gives one sibling error on `rail` with id of tool 2, naming
+    `tab` and `rail`. It keeps `tab`'s existing error. `rail` gets
+    `[differs from the app, see errors]`.
+  - Control with `rail` only: no error and no note.
+  - `rail` with its own `emptiedByStep` 1: only the own text.
+  - Earlier sibling. `rail` has steps `[union 0, difference 2, difference
+    3]` and its own `emptiedByStep 2`, and `tab` is emptied by tool 2 at
+    step 1. `rail` gets the sibling text for tool 2 (step 1 < 2), not its
+    own text for tool 3.
+  - Equal-step hidden. `rail` has `hiddenEmptiedByStep 1`, and `tab` is
+    emptied by the same tool 2, so the sibling candidate is also step 1.
+    Only the hidden text appears on `rail`.
+  - Later sibling. `rail` has `hiddenEmptiedByStep 1`, and the sibling
+    candidate is step 2. Only the hidden text appears.
+  - An open sibling, or an open or incomplete (`unknown`, -1) source:
+    no sibling error.
+  - The existing hidden-target test, including the
+    `emptiedByStep 0` / `hiddenEmptiedByStep 1` assertion at `:188`,
+    passes unchanged.
+- New `packages/cad-kernel/src/shared-cut.test.ts` checks the editor side
+  with the real Manifold kernel, using the evaluator and worker host as in
+  `worker-host.test.ts:22`. On the native fixture below:
+  - with targets `[rail, tab]`, `slot` fails with `cad.result.empty`, and
+    the `rail` body keeps 800 mm^3;
+  - with targets `[rail]`, `slot` succeeds, and `rail` measures 600 mm^3.
+
+  This is the retained editor volume that the capture note refers to.
+- `apps/cli/src/native-parity/capture.test.ts`, native binary, with
+  `--view top --no-interference`. The fixture has a visible `rail`
+  (20 x 10 x 4 mm), a 2 x 2 x 4 mm `tab` and a cut `slot` (5 x 10 mm)
+  through `rail` that covers `tab`. These names are test data of this
+  design, not user data.
+  - Visible `tab` with targets `[rail, tab]`. Text lists `rail` with the
+    note, and one `slot` error naming `tab` and `rail`. `--json` has the same
+    error in `errors` with `sampled: true` and the full feature id.
+  - Hidden `tab`: the R4-1 output, unchanged.
+  - Targets `[rail]` only: `errors: 0` and no note.
+
+R5-3 `performance-interference-mesh-triangle-scans` (high).
+
+Cause. `AxisFold::cast` (`crates/capture/src/lattice.rs:256`) and the
+census cast (`:733`) call `ToolView::intervals` before charging anything.
+The boundary charge counts only `current.len()`, which is zero at the first
+step of each body. A mesh bin is scanned in full (`mesh.rs:278`), so a body
+made of one large mesh is never charged. Stacked plates admit more than
+1.31e9 triangle visits within the default ray budget.
+
+Rule. Charge the projected scan cost before every scan, against a
+deterministic allowance tied to the rays already cast.
+
+- `BoundaryBudget` gains `scans: u64` and
+  `charge_scan(&mut self, count: usize) -> bool`. The allowance is
+  `SCAN_ENTRIES_PER_WEIGHTED_RAY * weight * (rays + 16)`, with a new
+  constant `SCAN_ENTRIES_PER_WEIGHTED_RAY: u64 = 1_024`, saturating
+  arithmetic, and the `weight` of `BoundaryBudget::new`. Going over sets the
+  existing `exhausted` flag and returns false, as `charge` does.
+- Both casts call `view.scan_cost(&ray)` and `charge_scan` immediately
+  before `intervals`, for every view that passes the bounds test. That
+  includes a scan whose intervals turn out empty. On false they take the
+  existing boundary-exhaustion exit: `Stretch::default()` in the pair
+  sampler, `(false, false, true)` in the census.
+- Propagation is unchanged and already proven: an exhausted pair sample is
+  `capped` and `boundary_exhausted` (`interference.rs:257-281`), so it goes
+  to `cappedCount` or `cappedWithoutHit`, never to a clean result. An
+  exhausted census sets `budget_left` to 0, and the body becomes `unknown`
+  or makes no hidden claim. It never claims emptiness.
+- The charge happens in each pair's or body's own sequential ray order, so
+  the output does not depend on the worker count.
+- The constant is 1,024 entries per weighted ray on average, with 16 rays
+  of slack. The slack lets the first ray of a pair or body scan a bin of
+  up to 17,408 entries (`1_024 * (1 + 16)` at weight 1). A mesh bin sized by `MeshView::new` averages a
+  few entries, and prism buckets in the existing fixtures hold far fewer
+  than 1,024, so no existing fixture should reach the allowance. The gate
+  is the full crate test run, goldens included. If an existing test
+  changes, the plan stops and reports blocked. It never edits that test,
+  and it never raises the constant to a value at which the new regression
+  stops failing before the change.
+
+Tests.
+
+- Counter. `tool_view.rs` gets a `#[cfg(test)]` thread-local counter that
+  `ToolView::intervals` increases by `self.scan_cost(ray)`. That is the
+  number of bin or bucket entries the scan visits. It is independent of
+  the lattice charge.
+- New `#[cfg(test)] mod scan_tests` in `lattice.rs`, on the test thread:
+  - Fixture: two closed mesh tools, each a stack of 2,048 coincident 10 x
+    10 mm boxes 0.01 mm thick, so every Z-axis bin holds at least 8,192
+    entries. The request is sized so that the unbounded scan would visit
+    more than ten times the bound below.
+  - `sample_pair` on the two bodies: visited entries at most
+    `1_024 * weight * (rays + 16)` and below 1,000,000, and the result is
+    `capped`.
+  - `sample_body_axis_with` on one body: the same bound, and `capped`.
+  - Two 12-triangle cube meshes that overlap by a known box: not capped,
+    and the volume and bounds equal the expected values within the existing
+    interference tolerance.
+- `crates/capture/tests/interference.rs`, through `render_parsed`. Only an
+  interference run with at least two checked pairs and more than one
+  thread takes the worker path (`interference.rs:342`).
+  - Multi-pair scene. Two overlapping stacked-plate mesh bodies form the
+    dense pair. Two overlapping cube-mesh bodies, placed apart from them,
+    form an admitted pair. At least two pairs are checked.
+    - The complete report JSON and the encoded image bytes are equal for 1
+      and 5 threads.
+    - The dense pair is reported capped (`cappedCount` at least 1, with
+      the dense pair in `cappedWithoutHit` or a capped pair entry).
+    - The admitted pair is not capped.
+  - Admitted pin. A scene with only the cube-mesh pair. Its expected volume,
+    its complete report JSON string and `support::digest` of its RGB are
+    written into the test as literals. They are recorded by running that
+    case on the working tree before the lattice change, so it is the
+    plan's first step. After the change, 1 and 5 threads must still give
+    exactly those literals. No older binary or checkout is used.
+- Existing interference, census, golden and determinism tests pass
+  unchanged.
+
+R5-4 `performance-open-mesh-nearest-hit-allocation` (medium).
+
+Cause. `MeshView::first_surface_hit` (`crates/capture/src/mesh.rs:336`)
+builds a new `Vec`, collects every facet hit and sorts it, once per covered
+open-mesh sample (`raster.rs:191`, `raster/reference.rs:61`).
+
+Rule. A single pass with constant scratch space.
+
+- The per-facet test of `hits_impl` (`mesh.rs:278-315`: edge test, normal,
+  depth `s`, finiteness) moves into one private helper. `hits_impl` and
+  `first_surface_hit` both call it, so the arithmetic is identical.
+- `first_surface_hit` walks the bin in order and keeps the first candidate,
+  replacing it only when `s.total_cmp(&best.s)` is `Less`. `sort_by` is
+  stable, so this picks exactly today's first element. That includes
+  `-0.0` before `+0.0`, and the earliest facet in bin order on equal depth.
+  It returns `Boundary { s, tool, face: i }` as today.
+- `ToolView::first_surface_hit` and the raster callers are unchanged.
+
+Tests.
+
+- `mesh.rs` unit tests. An oracle in the test runs
+  `hits_impl::<true>` into a `Vec` and takes the first element. It must
+  equal `first_surface_hit` for overlapping triangles at different depths,
+  two triangles at equal depth in both stored orders, `-0.0` and `+0.0`
+  depths, and a grid of rays over an open square. The existing
+  `first_surface_hit` test passes.
+- `crates/capture/tests/overlay_alloc.rs`. Fixture: a 200 x 200 mm open
+  square mesh (two triangles, not closed), 1024 x 1024 pixels,
+  `supersample = 2`, field of view inside the square. With one thread, the
+  allocations of `render_rgb` stay below `samples / 16`, as in the existing
+  solid test. The RGB output for 1 and 4 threads is equal.
+- Rendered ordering cases, in the same `overlay_alloc.rs`. Shading uses the
+  facet normal (`mesh.rs:341-355`, `shade.rs:24-32`), and adjacent
+  triangles give a shared-edge sample one owner (`mesh.rs:287-294`). Both
+  fixtures therefore make several facets eligible for the same samples:
+  - Overlap. An open mesh of two triangles with different normals at
+    different depths. Their projections overlap on a large area, and each
+    triangle also has an area that the other does not cover.
+  - Equal depth. An open mesh of a horizontal triangle and a tilted
+    triangle whose planes cross along a line `x = x0`. All coordinates,
+    the camera and `x0` are dyadic and lie on sample centres, so the
+    depths there are exactly equal. The mesh is stored in both orders, AB
+    and BA. The test asserts that the AB and BA images differ, so the tie
+    winner is visible.
+  - For each fixture and order, `support::digest` of the RGB is a literal
+    in the test, recorded on the working tree before the change (the
+    plan's first step). After the change, 1 and 4 threads give exactly
+    those digests.
+
+R5-6 `maintainability-capture-diagnostic-id-scope` (high).
+
+Cause. `errorLines` and the sampled lines in
+`apps/cli/src/capture-cad.ts:108` and `:150` call `shortIds` over the
+page-scoped CAD input that `capture-command.ts:242` passes in. `cad check`
+(`cad-command.ts:72`) and `edit` (`edit/selectors.ts`, exact id first)
+work on the whole document. A capture token can therefore be the exact id
+of an unrelated element on another page.
+
+Rule. One document-wide short-id map serves both text diagnostic
+formatters.
+
+- `renderCadCapture` gains a required second parameter
+  `documentElements: readonly Element[]`. It builds
+  `shortIds(documentElements.map(({ id }) => id))` once. `errorLines`
+  takes that map instead of an element list, and the structural lines and
+  the sampled lines both use it. Geometry still comes from the page-scoped
+  `elements`.
+- `capture-command.ts` passes `document.elements`. `cadInputMessage`
+  already receives `document.elements` and builds its map the same way.
+- JSON `errors` keep full ids. Text format, order and counts are unchanged.
+
+Tests (`apps/cli/src/capture-cad.test.ts`, in-memory harness and fake
+`renderSolid`).
+
+- Structural. A cad3d page with a failing feature `collar-groove`
+  (`cad.reference.missing`) and an element `collar` on another page. These
+  ids are test data of this design; the audit's ids are not reused. The
+  colliding id has exactly `MIN_PREFIX` (6) characters. The page-scoped
+  map therefore shortens `collar-groove` to `collar`, the exact id of the
+  other element, while the document-wide map gives `collar-`. The capture
+  prints `collar- cad.reference.missing`, the same line as `cad check`.
+  `editCommand` deleting the printed token removes `collar-groove`, and
+  `collar` survives. JSON has `"id":"collar-groove"`.
+- Sampled. The fake report sets `emptiedByStep` on a body whose step tool
+  feature (for example `sleeve-cut`) collides by exact prefix with a
+  6-character element on another page (`sleeve`). The
+  sampled line's token equals the document-wide short id and resolves in
+  `editCommand` to the feature. JSON keeps the full id.
+- The existing comparison with `cad check` (`:118-150`) passes.
+
+### 23.2 Plan grouping
+
+Plans are named `car5-*`. Each plan:
+
+- covers one finding aspect, at most about four files and about 120 to
+  150 plan lines, and has a non-empty `acceptanceCriteria`;
+- uses its own `CARGO_TARGET_DIR=target/car5-<plan>`;
+- sets `artifactRoots ["target", "tmp/cad3d"]` exactly, with the evidence
+  root `tmp/<taskId>` outside both;
+- lists every edited file in `writePaths`, including its plan file;
+- runs only its focused gates (below), biome on its touched files, and
+  `cargo fmt` plus clippy after Rust changes.
+
+| Plan | Finding | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car5-f1-sibling-cut | R5-1 | `packages/core/src/capture/{describe.ts,describe.test.ts}`, `apps/cli/src/native-parity/capture.test.ts`, new `packages/cad-kernel/src/shared-cut.test.ts` | none |
+| car5-f2-kernel-strict | R5-2 | see design-cad3d section 22 | none |
+| car5-f3-lattice-scan | R5-3 | `crates/capture/src/{lattice.rs,tool_view.rs}`, `crates/capture/tests/interference.rs` | none |
+| car5-f4-open-mesh-hit | R5-4 | `crates/capture/src/mesh.rs`, `crates/capture/tests/overlay_alloc.rs` | none |
+| car5-f5-pcb-outline-index | R5-5 | see design-cad3d section 22 | none |
+| car5-f6-diagnostic-ids | R5-6 | `apps/cli/src/{capture-cad.ts,capture-command.ts,capture-cad.test.ts}` | none |
+
+There is one wave, with all six plans in parallel. The intake's possible
+overlaps are designed away:
+
+- R5-1 needs no Rust (`census.rs`, `lib.rs`) and no `capture-cad.ts`
+  change.
+- R5-3 counts visits in `tool_view.rs` and does not edit `mesh.rs`.
+
+No two plans share a file.
+
+Gates. Each exits 0 and runs at least one test that its plan makes pass:
+
+- f1:
+  1. `bun test packages/core/src/capture/describe.test.ts packages/cad-kernel/src/shared-cut.test.ts`;
+  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f1 cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car5-f1/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`
+- f3: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f3 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f3 cargo test --release -p nodetto-capture`
+- f4: the f3 command with `target/car5-f4`.
+- f6: `bun test apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts`
+- f2 and f5: see design-cad3d section 22.
+
+f1, f3 and f4 compile `nodetto-capture` from one working tree. A compile
+failure caused by a sibling's in-progress edit is rerun after the sibling
+finishes. It is never fixed by editing the sibling's files. Timing tests
+may be retried up to three times under load. A failure after that is
+compared in isolation before it is reported.
+
+Integration gates run once, after every plan lands. Each records its
+command, its exit status and the path of its complete log:
+
+1. `bun run typecheck` and `bun run lint` (biome);
+2. `CARGO_TERM_QUIET=true mise run verify`;
+3. `CARGO_TERM_QUIET=true mise run test-cli`;
+4. no `*.test.ts` file under `target/` or `tmp/` (the scan of section
+   20.3, gate 4).
+
+### 23.3 Decisions
+
+- R5-1 lives in `describeBodies` only. The report already carries the
+  emptying step of every visible body, and the model carries every body's
+  steps with tool identity. A Rust or report change would add a key that
+  duplicates derivable data. It would also force chaining with R5-3 on
+  `census.rs` and `lib.rs`.
+- R5-1 keeps today's precedence: a valid hidden attribution, else the own
+  emptying. The sibling candidate replaces that choice only when it is
+  strictly earlier, so every existing output is unchanged (step-3 review,
+  `describe.test.ts:188`).
+- R5-3 and R5-4 prove preservation of admitted output with literals pinned
+  from the unmodified working tree as the plan's first step: report JSON
+  and RGB digests. This needs no older binary or checkout. Worker paths are
+  reached only with at least two checked pairs (R5-3) or several render
+  threads (R5-4).
+- R5-1 inherits the emptied body's census claim instead of making a new
+  one. An incomplete census therefore yields no sibling note, as R4-1 does
+  for hidden bodies.
+- R5-3 reuses the `exhausted` flag of `BoundaryBudget`. Exhaustion thus
+  takes the capped and incomplete paths that rounds 2 to 4 already verified
+  never claim emptiness or a clean result. The allowance is per weighted
+  ray, like the boundary allowance, so it scales with the work the user's
+  ray budget admits, and it is deterministic.
+- R5-3 counts visits in `ToolView::intervals` under `cfg(test)` instead of
+  adding a field to `AxisSample`. The count is independent of the charge
+  it checks, and no public type changes.
+- R5-4 keeps `hits_impl` for closed meshes and as the test oracle. Only the
+  open-mesh nearest-hit path changes.
+- R5-6 passes the document's elements instead of a precomputed map, so the
+  single caller cannot pass a page-scoped map by mistake. `shortIds` is
+  reused unchanged.
+- No user decision is pending, so no `design-docs/user-qa/` file is
+  written for round 5.
+
+### 23.4 Intentional differences from the workflow input
+
+- The intake listed `crates/capture/src/census.rs`, `lib.rs` and
+  `apps/cli/src/capture-cad.ts` as possible R5-1 files, and
+  `crates/capture/src/mesh.rs`, `census.rs` and `interference.rs` as
+  possible R5-3 files. Neither fix needs them, so neither plan edits them.
+  This removes every chain and keeps one wave.
+- R5-1's CLI JSON check is in the native parity test, not in
+  `capture-cad.test.ts`. That file belongs to R5-6.
+
+### 23.5 Risks
+
+- R5-1. A sibling note depends on the census settling the emptied body. A
+  body that the census leaves `unknown` gives no note, as for R4-1 hidden
+  bodies.
+- R5-1. A chain of rejected shared steps across several visible bodies is
+  resolved only to each body's first discrepancy. This is the rule of
+  section 6.7.
+- R5-3. Average bin occupancy above 1,024 entries per weighted ray now caps
+  the pair or the census sample instead of scanning. A real dense mesh at
+  that occupancy reports `capped` or `unknown`, never a wrong claim.
+  Existing fixtures are expected to stay below it, and the full crate test
+  run is the check.
+- R5-3 and R5-4 pinned literals must be recorded before the code change.
+  A literal recorded after the change proves nothing, so the plan's
+  evidence must show the pin run first. R5-4's equal-depth fixture must
+  make the tie visible (AB differs from BA). If no dyadic fixture does, the
+  plan reports blocked instead of dropping the case.
+- R5-1, R5-3 and R5-4 build the same crate in one working tree. Sibling
+  compile failures are retried and not fixed across plans.
+- Not measured by the audit or by these gates: native elapsed time and RSS
+  for the stacked-plates and open-square cases, Boa and desktop timings,
+  and native image bytes of real user documents.
+
+## 24. Revision 13: audit round 6 corrections
+
+Source: audit round 6 of the 3D CAD pages and AI capture, base `0a35708`
+to `6f58a74` plus the uncommitted round 5 working tree. Four blocking
+findings (three high, one medium), none deferred. No GitHub issue exists;
+the round-6 workflow input is the issue body. Rules R6-1 to R6-4 below.
+Where an earlier section and this one disagree, this section wins. In
+particular the "untouched" list of section 23 no longer applies to
+`crates/capture/src/report.rs`, `crates/capture/src/census.rs` and
+`docs/capture.md`.
+
+Common rules (sections 19 to 23, restated):
+
+- Every fix ships a regression test that fails before the change and
+  passes after it, run in this working tree. No older binary or checkout.
+  A performance test asserts a deterministic visit counter, never a clock.
+- Unchanged: NCS1 bytes, PNG, JPG and SVG bytes of every existing fixture,
+  goldens, error codes, the JSON error shape, existing messages when the
+  new state is absent, the edit selector grammar, refinement-only cap
+  behaviour and exit status, hidden-target and sibling shared-cut
+  attribution (R4-1, R5-1), package boundaries and strict indexed typing.
+  No golden is regenerated. Every new report key is emitted only when it
+  is non-empty, so every existing report and CLI JSON string is
+  byte-identical.
+- Per-ray, per-entry and per-byte work stays in Rust.
+- The round 5 uncommitted changes are the baseline and are preserved.
+
+### 24.1 Rules
+
+R6-1 `function-capture-diagnostic-selector-prefix` (high; merges
+`maintainability-diagnostic-id-selector-collision`).
+
+Cause. `shortIds` (`apps/cli/src/ids.ts:10-31`) returns the shortest
+prefix of at least `MIN_PREFIX` (6) characters that is unique among ids.
+`resolveElementReference` (`apps/cli/src/edit/selectors.ts:60`) tries the
+exact id, then reads `name:` as a label selector and `@` as a batch
+reference, and only then a unique prefix. A stored id that starts with
+`name:` or `@` (CAD feature ids may) is therefore printed as a token that
+the editor resolves as a selector. Capture text (structural lines and
+sampled lines, `capture-cad.ts:150` and `:186`) and `cad check`
+(`cad-command.ts:73`) all use `shortIds`.
+
+Rule. In `shortIds`, an id that starts with `name:` or `@` maps to itself
+(the full stored id). Every other id keeps today's prefix. Because every
+prefix of such an id of length 6 or more also starts with the reserved
+text, the test is on the id, not on the computed prefix. The exact-id
+branch of the resolver then resolves the token to the stored element. The
+fix is in the shared formatter, so capture structural lines, capture
+sampled lines, `cadInputMessage`, `cad check` and every other `shortIds`
+consumer (inspect, diff, arrange, edit candidate lines) print a token that
+resolves to the element it names. Output of those other consumers changes
+only for ids that start with `name:` or `@`, which are the same hazard.
+`resolveId`, `selectors.ts`, `batch.ts` and the selector grammar are not
+changed. JSON keeps full ids, as today.
+
+Tests (test data of this design; the audit's ids and labels are not
+reused):
+
+- New `apps/cli/src/ids.test.ts`: `shortIds` over
+  `["name:latch-bore", "name:latch-pin", "@spindle-cut", "collar-groove", "collar"]`
+  maps the `name:` and `@` ids to themselves and keeps `collar-` and
+  `collar` exactly as today.
+- `apps/cli/src/capture-cad.test.ts`, in-memory harness and fake
+  `renderSolid`, four cases. The token is read from the actual text output
+  line and passed to `editCommand` as a delete target:
+  - structural, label: failing feature `name:latch-bore` on the cad3d page
+    and a text element labelled `l` on another page. Before the change the
+    token is `name:l` and the edit deletes the labelled element. After it,
+    the token is `name:latch-bore`, the feature is deleted, the labelled
+    element survives, the edit exits 0, and capture JSON has the full id.
+  - structural, batch reference: failing feature `@spindle-cut`. The edit
+    batch first binds ref `spind` to another element (the existing `select`
+    operation with `ref`), then deletes the printed token. Before: `@spind`
+    deletes the bound element. After: the feature is deleted and the bound
+    element survives.
+  - sampled, label and sampled, batch reference: the same two ids as the
+    step tool feature of a body whose fake report sets `emptiedByStep`, so
+    the token comes from the sampled error line.
+- `apps/cli/src/cad-command.test.ts`: `cad check` on the structural label
+  document prints `name:latch-bore`, never `name:l`.
+
+R6-2 `function-capture-coarse-scan-reported-as-refinement` (high; merges
+`maintainability-capture-coarse-exhaustion-reported-as-refinement`).
+
+Cause. `AxisSampler::sample` (`crates/capture/src/lattice.rs:396-502`)
+casts coarse rows one row ahead of accumulation (`:408-415`, `:424-436`)
+and stops at boundary or scan exhaustion (`:410`, `:421`, `:427`, `:433`,
+`:470`). `sample_axes` (`:573`) then returns empty samples for the axes
+that follow. Two things go wrong:
+
+- a coarse hit that was cast but not yet accumulated (rows `y` and `y + 1`
+  are buffered in `rows`) is dropped, because `hit` comes only from the
+  accumulated volume (`:485`);
+- the pair is only `capped` (`interference.rs:257`, `:373-378`), and the
+  hosts describe every cap as refinement-only (`describe.ts`,
+  `refinement capped ...` line). `interferenceExitCode`
+  (`capture-interference-options.ts:61-68`) fails only on hits or unchecked
+  pairs.
+
+So a pair whose coarse grid was abandoned reads as checked, a pair whose
+overlap was already observed can read as a miss, and
+`--fail-on-interference` exits 0.
+
+Rule (Rust, `lattice.rs`, `interference.rs`, `report.rs`). It applies to the
+analysis pair sampler only; the census sampler is unchanged.
+
+- Successful coarse cast. A level-0 cast (`divisions == 1`, sub `[0, 0]`)
+  is successful when `budget.exhausted` is still false after it returns. A
+  cast that exhausts the budget returns `Stretch::default()` and is not
+  successful. `AxisSampler` keeps a per-axis count `coarse_ok` of successful
+  coarse casts.
+- Coarse coverage. `AxisSample` gains `#[doc(hidden)] pub coarse_complete:
+  bool`, set to `coarse_ok == width * height` for the analysis sampler. It
+  depends only on the coarse casts. Exhaustion during refinement after the
+  final coarse cast leaves it true, and exhaustion before the final coarse
+  cast leaves it false. `empty_sample` sets false; the census sampler sets
+  true when its coarse loop ended without exhaustion (it is not read there).
+- Witness preservation. When the sampler leaves the row loop because the
+  budget ran out (any of the exits above, including the preload at
+  `:408-415`), it first accumulates the successful coarse casts that were
+  not yet accumulated:
+  - the remaining cells of row `y` (from the interrupted cell onward) and
+    every successfully cast cell of the preloaded rows (`y + 1`, and rows 0
+    and 1 when the preload itself was interrupted). Each is added at its
+    coarse weight (`result.add(grid, corner, grid.side, coarse)`), exactly
+    like an unrefined cell. Only hits add volume, so a failed cast (default
+    stretch, a miss) adds nothing;
+  - for the cell whose refinement was interrupted, refined sub-rays that
+    succeeded stay accumulated as today. If none of them hit, its coarse
+    stretch is added, which is the rule for a finished cell (`:479-481`).
+    Every cell is accumulated at most once.
+  So `hit` and `volume` include every observed overlap. The sample is
+  already `capped`, so the hosts call it approximate.
+- An uninterrupted sampler runs exactly as today, so every completed-run
+  report and image byte is unchanged.
+- `PairSample` gains `coarse_complete = axes.iter().any(|a| a.coarse_complete)`.
+  One axis whose coarse grid was fully cast gives the coverage that today's
+  refinement-only cap already promises: every coarse cell column was probed.
+- `report::Analysis` gains `incomplete: Vec<(u32, u32)>`. In
+  `analyse_scene_with`, a pair that is `capped`, has no report (no witnessed
+  hit, preserved witnesses included) and `!coarse_complete` is pushed to
+  `incomplete`, in candidate order. It also stays in `capped_count` and
+  `capped_without_hit`, so `incomplete` is a subset of `capped_without_hit`.
+  `checked` is unchanged. A pair with a hit keeps its capped `PairReport`
+  and is never incomplete.
+- JSON: inside `analysis`, after the `cappedWithoutHit` array, the key
+  `"incomplete":[[a,b],...]` is written only when the list is non-empty. No
+  list limit, like `cappedWithoutHit` (it is bounded by `checked`).
+- Picture-only pairs (`add_view_pairs_with`, `overlay.rs:111-118`) are
+  found pairs and are not classified. A pictured overlap for an incomplete
+  candidate keeps both records: the view-source pair in `pairs` and the
+  candidate in `incomplete`. The text rule below describes them
+  consistently.
+- The other `Analysis` literals get `incomplete: Vec::new()`:
+  `report.rs:203` (unit test), `crates/capture/tests/interference.rs:90`
+  and `crates/capture/tests/render.rs:426`.
+- Test instrumentation: `AxisSample` gains `#[cfg(test)] pub coarse_casts:
+  Vec<(u64, bool)>`, with the pair budget's `triangles` (R6-3) after each
+  successful coarse cast and whether it hit, in cast order. It is empty in
+  `empty_sample` and the census sampler.
+- Classification depends only on each pair's own sequential sampling and
+  its pre-dispatch allowance and share (R6-3), not on thread count.
+
+Rule (TypeScript).
+
+- `packages/core/src/capture/report.ts`: `SolidAnalysisReport` gains
+  `readonly incomplete?: readonly (readonly [number, number])[]`. The
+  parser accepts the key absent, or an array validated exactly like
+  `cappedWithoutHit`; any other value is rejected through the existing
+  parse error.
+- `describeInterference` (`describe.ts`), with `k` the length of
+  `analysis.incomplete ?? []` and `checked = analysis.checked`:
+  - headline when `uncheckedCount > 0`: unchanged;
+  - headline when `uncheckedCount === 0` and `k > 0`:
+    `interference: <found> found, <k> of <checked> checked candidate pair[s] incomplete (cell <cell> mm)`
+    ("pair" when `checked === 1`). `<found>` counts every pair record, view
+    pairs included, as today;
+  - after the not-checked lines, one line for each of the first 20
+    incomplete pairs. The line never calls interference unknown when a
+    record exists for the same bodies:
+    - when `report.pairs` has no record with the same `a` and `b`:
+      `  incomplete: <a name> x <b name>; the coarse check stopped before covering this pair, interference not determined`;
+    - when it has one (always a view-source record, since an analysis hit is
+      never incomplete):
+      `  incomplete: <a name> x <b name>; the coarse check stopped before covering this pair, the overlap listed above was found in the picture only`;
+    - then `  ... and <k - 20> more incomplete; narrow with --interference-bodies`
+      when `k > 20`;
+  - the refinement line counts only refinement caps. It is printed when
+    `cappedCount - k > 0` and shows `cappedCount - k` and
+    `max(0, cappedWithoutHit.length - k)`. With `k = 0` every line is
+    byte-identical to today;
+  - JSON (`CaptureInterferenceJson`): optional
+    `incomplete?: readonly (readonly [string, string])[]` (body ids), set
+    only when `k > 0`. `pairs` keeps every record unchanged;
+  - the return value gains `incomplete: number` (`k`).
+- `interferenceExitCode` returns 1 with `--fail-on-interference` also when
+  `(report.analysis?.incomplete?.length ?? 0) > 0`. A refinement-only cap
+  still exits 0.
+- The desktop save note already appends `describeInterference(...).lines`
+  (`export-handlers.ts:294-302`). It inherits the same text and needs no
+  code change for R6-2. Its test is in the car6-f4 plan (24.2).
+- `docs/capture.md`: the interference paragraph (lines 40-41 and 97)
+  describes the `incomplete` state, its JSON key, the picture-only wording
+  and the exit status.
+
+Tests.
+
+- `lattice.rs` `scan_tests`, unit level. Each test runs a pair twice through
+  `sample_axes` on the test thread: once with an unlimited triangle limit,
+  to read `coarse_casts` and the total `triangles`, and once with an exact
+  triangle limit (R6-3 `triangle_limit`) derived from that record. So every
+  cut point is based on the actual cast outcomes. The triangle limit is the
+  only cut used; the per-ray allowance does not trip in these fixtures:
+  - abandoned coarse miss: two disjoint plate meshes perpendicular to X
+    that both span the request's Y-Z extent, so every axis-0 ray scans
+    triangles of both and none overlaps. Axis 0, refinement 0. The limit is
+    the `triangles` of the second-to-last record, so the final coarse cast
+    fails (the test asserts from the record that this cast scans at least
+    one triangle). Assert no hit, `capped`, `coarse_complete` false.
+    Through `sample_pair` with the same limit, assert a pair sample that
+    `analyse_scene_with` would list in `incomplete` (no report and
+    `!coarse_complete`);
+  - buffered hit followed by exhaustion: two overlapping cube meshes, with
+    the request box equal to their overlap so every ray scans triangles of
+    both. Refinement 0. The limit is the `triangles` of the first record
+    with `hit == true`, so that cast succeeds and the next cast fails before
+    its row is accumulated. Assert `hit`, `capped` and a non-zero volume.
+    Before the change the sample has no hit;
+  - fully probed miss capped during refinement: body 0 is a small prism
+    cube whose loop is marked small (`SMALL_LOOP_CELLS`) and sits in the
+    last coarse row of axis 0, so its cells are refined after the final
+    coarse cast. Body 1 is a mesh slab, disjoint from the cube along X, that
+    spans the request's Y-Z extent, so every coarse and refined ray scans
+    its triangles. The prism marks the cells, and the mesh spends the
+    triangle allowance. The test first asserts the precondition from the
+    record: the last coarse record's `triangles` is below the unlimited
+    total, so triangle scans happen after the final coarse cast. The limit is
+    the unlimited total minus 1. Assert no hit, `capped`, `coarse_complete`
+    true, so the pair is not incomplete.
+- `crates/capture/tests/interference.rs`, through `render_parsed`, 64 x 64,
+  `target_cell = 0.25`, default budget, camera cropped away from the bodies
+  so no picture pair exists. In each case report and image bytes are equal
+  at 1 and 5 threads:
+  - buffered hit (the audit's cropped overlapping dense pair): two
+    coincident closed meshes, each 512 disjoint 1 x 10 x 10 mm boxes on a
+    2 mm X pitch (6,144 triangles). Assert `pairs` has `(0, 1)`, `capped`
+    and source `analysis`, and `incomplete` is empty. Before the change
+    `pairs` is empty;
+  - abandoned miss: two closed meshes of 512 boxes each, interleaved so
+    they never overlap (body 0 on even 2 mm slots, body 1 on odd slots),
+    plus one 1 mm cube present in both meshes in the cells of axis 0 that
+    are cast last. Assert `pairs` empty, `incomplete == [(0, 1)]`, and the
+    JSON contains `"cappedWithoutHit":[[0,1]],"incomplete":[[0,1]]`. Before
+    the change there is no such field or key;
+  - refinement-only control: the existing
+    `cap_without_a_hit_is_retained_in_the_report_and_json` gains
+    `analysis.incomplete.is_empty()` and asserts the JSON has no
+    `"incomplete"` key.
+  If a fixture does not reach the stated branch, the plan resizes the
+  fixture (box count, slot pitch) until it does. It never weakens an
+  assertion. The admitted-cube pin and every other test pass unchanged.
+- `packages/core/src/capture/report.test.ts`: the key absent, a valid list,
+  and a malformed list (rejected).
+- `packages/core/src/capture/describe.test.ts`:
+  - `k = 1` of 1 checked, no pair record: the new headline, the "not
+    determined" line, no refinement line;
+  - mixed state: `incomplete = [[0, 1]]` and a capped view-source pair
+    record for bodies 0 and 1. The found-pair line is today's picture-only
+    line, the incomplete line uses the picture-only wording and does not
+    contain "not determined", the headline counts 1 found, and the JSON has
+    both the `pairs` record and `incomplete`;
+  - `k = 1` with one further refinement-only cap: the refinement line
+    shows 1;
+  - `k = 0`: lines byte-equal to today's; no JSON `incomplete` key.
+- `apps/cli/src/capture-interference-options.test.ts`: exit 1 for an
+  incomplete pair with the flag, 0 without it, 0 for a refinement-only cap.
+- `apps/cli/src/capture-cad.test.ts`: a fake report shaped like the
+  abandoned-miss regression gives the incomplete lines, JSON
+  `interference.incomplete` with body ids and `exitCode` 1 with
+  `--fail-on-interference`. The existing ordinary-cap case (`:445-456`)
+  keeps exit 0.
+- `apps/cli/src/native-parity/capture.test.ts` (release binary, owned by
+  car6-f2c), a `nativeTest` case `native capture fails on a cropped dense
+  pair that the coarse check cannot finish`. The document is generated in
+  the test with the existing helpers (`encodeNmesh`, `canonicalize`,
+  `toInline`, `cadElement` with `cad.mesh`, as at `:706-721`): the two
+  coincident 512-box meshes above, plus a 1 mm cube body about 3,000 mm away
+  on X. The binary runs `capture <doc> --view top --size 64x64 --zoom 8
+  --fail-on-interference --output dense.png --force`, which centres the
+  frame between the bodies and crops both dense meshes out of the picture.
+  It runs once for text and once with `--json`. Assertions:
+  - exit status 1 in both runs;
+  - text contains no `(found in the picture only)`, and either the pair
+    line for the two dense bodies ending in `, approximate` or their
+    `incomplete:` line (the outcome the Rust regression proves is the
+    approximate hit);
+  - JSON agrees with the text: the matching `interference.pairs` record with
+    `approximate: true` and `source: "analysis"`, or the pair in
+    `interference.incomplete`.
+  The case is spawned directly (as at `:830-848`), not through `compare`,
+  and is skipped only when `NODETTO_CLI_TEST_BINARY` is unset. The car6-f2c
+  gate builds the binary first, so the case runs.
+
+R6-3 `performance-interference-mesh-triangle-scans` (high; recurrence).
+
+Cause. The round 5 allowance (`lattice.rs:32-44`) grows by 1,024 entries
+per weighted ray. A pair whose meshes see fewer than 1,024 entries per ray
+never runs out, so the total scan work grows with the lattice and the pair
+count (lower bound 2,013,265,920 visits for one 64 x 64 capture). The census
+has the same per-ray allowance and no total.
+
+Rule. A request-wide absolute ceiling on mesh triangle-bin entries, fixed
+before any sampling and split into fixed phase allowances. Every value is a
+pure function of the request, so outputs do not depend on threads. Prism
+edge-bucket visits are not charged against it. They keep only the round 5
+per-ray accounting, so a scene without meshes behaves exactly as today.
+
+- Triangle cost. `ToolView` gains `triangle_cost(&self, ray) -> usize`:
+  `MeshView::scan_cost(ray)` for a mesh view and 0 for a prism view
+  (`tool_view.rs:67-72` dispatches the same way). The round 5 combined
+  `scan_cost` is unchanged.
+- New constant `REQUEST_TRIANGLE_ENTRIES_PER_BUDGET_RAY: u64 = 32` in
+  `lattice.rs`. For a ray budget `B` (actual rays, as each phase already
+  receives it), the request ceiling is `R = 32 * B` triangle entries, with
+  saturating arithmetic (default `B = 24,000,000`, `R = 768,000,000`).
+  Phase allowances, each computed by the phase from its own `B`:
+  - analysis pairs (`interference::analyse_scene_with`,
+    `B = budget_million_rays * 1e6`): `R / 2`;
+  - visible census (`census::resolve_with`, its `budget_rays`): `R / 4`;
+  - hidden census (`census::resolve_hidden`, its `budget_rays`,
+    `lib.rs:68-79`): `R / 8`;
+  - picture-only pair sampling (`interference::add_view_pairs_with`,
+    `raster.rs:870-872`, scene `B`): `R / 8`.
+  The sum is at most `R`.
+- `BoundaryBudget` gains `triangles: u64` and `triangle_limit: u64`.
+  `charge_scan(count, triangles)` takes the combined `scan_cost` and the
+  `triangle_cost` of the same view and ray. It fails, sets `exhausted` and
+  returns false when the combined total would exceed the round 5 per-ray
+  allowance (unchanged, combined edges and triangles) or when the triangle
+  total would exceed `triangle_limit`. Otherwise it adds both. Both cast
+  paths (`lattice.rs:273` and `:753`) pass both costs immediately before
+  `intervals`. `BoundaryBudget::new` keeps `triangle_limit = u64::MAX`, so
+  `sample_axis`, `sample_body_axis` and `analyse_pair` (public single-call
+  APIs, not a request) are unchanged. `sample_axes` and `sample_pair` take
+  a `triangle_limit` argument and give it to the pair's one
+  `BoundaryBudget`, which spans its axes.
+- Pair shares, assigned before dispatch. `analyse_scene_with` computes
+  `shares: Vec<u64>` for `candidates[..checked]` before the serial path
+  and before `thread::scope` (`interference.rs:333-365`), with
+  `shares[i] = allocate(R / 2, pair.work(cell), work)`. Workers and the
+  serial path read the share by candidate index; no share is computed or
+  changed inside a worker. The sum is at most `R / 2`.
+- Picture-only pairs are sampled sequentially in `seen` order. Each takes
+  the remainder of the phase allowance as its limit, and the triangles it
+  spent are subtracted (`PairSample` gains `triangles: u64`, the pair
+  budget's `triangles`). An exhausted sample is reported `capped` with
+  `from_view`, as today (`interference.rs:529-544`). A picture witness is
+  never dropped.
+- Census. `sample_body_axis_with` gains `triangles_left: &mut u64`. Its
+  `BoundaryBudget` gets `triangle_limit = *triangles_left`, and
+  `*triangles_left` is reduced by the budget's `triangles` on return.
+  `census::sample_body` threads
+  one counter through all bodies and axes of one `resolve_with` or
+  `resolve_hidden` call, initialised to that phase's allowance, and never
+  resets it per body. Exhaustion takes the existing paths: the visible body
+  becomes `unknown` with `emptiedByStep -1`, and an incomplete hidden census
+  attributes nothing. Neither claims emptiness. `sample_body_axis` passes a
+  local `u64::MAX`.
+- Charging stays immediately before every `intervals` call, coarse and
+  refined, in both casts (round 5 rule), so the counted visits never exceed
+  the charged total.
+- Exhaustion of a share is an ordinary exhaustion: before car6-f2a lands it
+  is `capped`; after it, a capped hit, a refinement-only capped miss, or an
+  `incomplete` pair. Never a clean result.
+- Value selection by measurement. The plan implements 32 and runs the full
+  `nodetto-capture` test suite. If an existing pin, golden or assertion
+  changes, it raises the constant to 64 (the only other allowed value) and
+  reruns. If 64 still changes an existing test, it stops and reports
+  blocked; it never edits that test. The regression fixtures below are
+  sized against 64, so they fail before the change at either value. The
+  chosen value and the measured visits are recorded in the plan's progress
+  file.
+
+Tests.
+
+- Counter. `tool_view.rs` gains a second `#[cfg(test)]` thread-local
+  counter, `triangle_visits` with `reset_triangle_visits`, which
+  `ToolView::intervals` increases by `self.triangle_cost(ray)`, next to the
+  round 5 `scan_visits` counter (combined edges and triangles). It counts
+  only what the ceiling bounds.
+- Measurement, in `lattice.rs` `scan_tests`, on the test thread,
+  `budget_million_rays = 1` (`B = 1,000,000`, so `A = R / 4` for the
+  visible census and `R / 8` for the hidden census). Picture painting is
+  not run, so only lattice and census scans are counted. `A` names the
+  allowance of the phase under test. Mesh plate stacks keep every ray below
+  1,024 combined entries per pair, so the per-ray allowance never trips. The
+  four phase entry points are called in request order on one scene, the
+  triangle counter is read after each, and each phase must do non-zero
+  work:
+  1. Visible census, `census::resolve_with` with all liveness false, two
+     suspect bodies in this order:
+     - `E` (finisher): a union of a plate stack and a difference by a
+       coincident stack, on a small enough lattice that its census scans
+       the whole lattice and settles `empty` with `emptied_by_step == 1`.
+       A separate call with `E` as the only suspect measures its triangles
+       `e`; the test asserts `A / 4 <= e <= A / 2`, and that `E` used less
+       than half of the census ray budget, so rays remain for the next body;
+     - `N` (never settles): the same shape on a large lattice, whose
+       unbounded census alone needs more than `64 * B / 4` triangles.
+     Assert: phase triangles at most `A`; phase triangles greater than `e`
+     (so `N` scanned under the shared counter); `E` is `empty` with
+     `emptied_by_step == 1`; `N` is `unknown` with `emptied_by_step == -1`,
+     never `empty`. A per-body reset would give `N` a fresh `A`, which it
+     would spend in full (it needs more), so the phase total would be
+     `e + A > A` and the limit assertion fails.
+  2. `interference::analyse_scene_with(&scene, 1, &solid)` over four
+     coincident moderate-occupancy mesh bodies (fewer than 512 triangles per
+     mesh; six pairs together need more than `64 * B / 2` unbounded). Assert
+     triangles at most `R / 2`, at least one capped pair, and every capped
+     pair is a capped report or in `capped_without_hit`.
+  3. `interference::add_view_pairs_with` with at least two `ViewPair`s over
+     those coincident bodies, each of which alone would need more than
+     `64 * B / 8` unbounded. Each sample is called even when the remainder
+     is 0, so a per-pair reset breaches the limit. Assert triangles at most
+     `R / 8`, and every added record has `from_view` and `capped` (volume 0
+     or a capped estimate).
+  4. Hidden census, `census::resolve_hidden`, with the same two-body pattern
+     over `A = R / 8`: a finisher hidden body `HE` whose difference tool
+     `t1` matches a step of visible body `V1`, and a never-settling hidden
+     body `HN` whose difference tool `t2` matches a step of visible body
+     `V2`. `e` is measured with `HE` alone, with `A / 4 <= e <= A / 2`.
+     Assert: phase triangles at most `A` and greater than `e`; the result
+     attributes `V1` (from `HE`, which completed) and leaves `V2` `None` (no
+     attribution from the exhausted `HN`).
+  Then assert the sum of the four counts is at most `R`. Each phase
+  assertion fails before the change: unbounded, `N` settles `empty`, `HN`
+  attributes `V2`, and the counts exceed their allowances.
+- Prism-only control, in the same module. Two coincident prism bodies, each
+  32 disjoint 2 mm-wide rectangular loops on a 4 mm X pitch with 128 mm Y
+  and Z spans, `budget_million_rays = 1`, `target_cell = 0.25`. Through
+  `analyse_scene_with(&scene, 1, &solid)`: the combined `scan_visits` count
+  exceeds `64 * B / 2` (the control exceeds the numerical threshold in edge
+  visits), `triangle_visits` is 0, and the pair report's `min`, `max` and
+  `capped` equal literals recorded on the working tree before the change
+  (the plan's first step, as for the R5-3 pins). So prism work alone never
+  truncates the overlap bounds.
+- `crates/capture/tests/interference.rs`, through `render_parsed`: the
+  four-body scene. Complete report JSON and encoded image bytes are equal at
+  1 and 5 threads (six checked pairs take the worker path), and the report
+  has `cappedCount >= 1`.
+- Unchanged: `admitted_cube_mesh_pin` (volume, report and image literals),
+  `dense_and_admitted_pairs_are_deterministic`, the round 5 `scan_tests`
+  (their `sample_pair` and `sample_body_axis_with` calls pass `u64::MAX`
+  and a local `u64::MAX` counter), goldens and determinism tests.
+
+R6-4 `maintainability-desktop-omits-incomplete-body-census` (medium).
+
+Cause. `describeBodies` puts the `[not sampled]` note of an `unknown` body
+only into `line`, which the desktop does not show; the desktop save note
+(`export-handlers.ts:294-302`) appends only `errors`. The CLI prints the
+line and the JSON body state.
+
+Rule.
+
+- `describeBodies` returns a new field `notSampled: readonly string[]`:
+  the `plain` names of every body whose report state is `unknown`, in
+  `model.bodies` order, all of them (not limited by the eight-name
+  summary). `line`, `errors` and their order are unchanged. No error is
+  added for an unknown body; it never produces `cad.result.empty` on its
+  own account.
+- The desktop save note appends, after the error lines and before
+  `N features failed.`, one line when `notSampled` is non-empty:
+  `not sampled (material unknown): <name>, <name>, ...`.
+- The CLI is unchanged: its text keeps the body line and its JSON keeps
+  every body with `state: "unknown"`.
+
+Tests (test data of this design; the audit's body names are not reused).
+
+- `packages/core/src/capture/describe.test.ts`: ten bodies `Bracket`,
+  `Rib-1` ... `Rib-8`, `Gusset`; `Bracket` (index 0) and `Gusset` (index 9)
+  `unknown` with `emptiedByStep -1`, zero pairs, no feature errors.
+  `notSampled` is `["Bracket", "Gusset"]`; `errors` is empty.
+- `apps/desktop/src/shell/export-handlers.test.ts`, real handler with the
+  in-memory writer, fed that report: the message contains
+  `not sampled (material unknown): Bracket, Gusset` and no
+  `cad.result.empty`. A second case feeds the R6-2 mixed-state report and
+  asserts the incomplete headline, the picture-only incomplete line and the
+  picture-only pair line in the desktop message (R6-2 desktop acceptance).
+- New `apps/cli/src/capture-cad-census.test.ts` (a new file, so this plan
+  does not share `capture-cad.test.ts`): the same ten-body report through
+  `renderCadCapture` with a fake `renderSolid`. The text body line contains
+  `Bracket [not sampled]`, JSON `bodies[9]` is `Gusset` with
+  `state: "unknown"`, and no error has code `cad.result.empty`.
+
+### 24.2 Plan grouping
+
+Plans are named `car6-*`. Each plan covers one finding aspect, at most
+about four or five files and 120 to 150 plan lines, has a non-empty
+`acceptanceCriteria`, uses `CARGO_TARGET_DIR=target/car6-<plan>` for any
+cargo command, sets `artifactRoots ["target", "tmp/cad3d"]` exactly with the
+evidence root `tmp/<taskId>` outside both, lists every edited file
+(including its plan and progress files and docs) in `writePaths`, and runs
+biome on its touched files plus `cargo fmt` and clippy after Rust changes.
+
+| Plan | Rule | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car6-f1-diagnostic-tokens | R6-1 | `apps/cli/src/ids.ts`, new `apps/cli/src/ids.test.ts`, `apps/cli/src/capture-cad.test.ts`, `apps/cli/src/cad-command.test.ts` | none |
+| car6-f2b-incomplete-describe | R6-2 core | `packages/core/src/capture/{report.ts,report.test.ts,describe.ts,describe.test.ts}` | none |
+| car6-f3-request-scan-budget | R6-3 | `crates/capture/src/{lattice.rs,interference.rs,census.rs,tool_view.rs}`, `crates/capture/tests/interference.rs` | none |
+| car6-f2a-coarse-incomplete | R6-2 Rust | `crates/capture/src/{lattice.rs,interference.rs,report.rs}`, `crates/capture/tests/{interference.rs,render.rs}` | car6-f3 |
+| car6-f4-not-sampled-notes | R6-4, R6-2 desktop test | `packages/core/src/capture/{describe.ts,describe.test.ts}`, `apps/desktop/src/shell/{export-handlers.ts,export-handlers.test.ts}`, new `apps/cli/src/capture-cad-census.test.ts` | car6-f2b |
+| car6-f2c-incomplete-cli | R6-2 CLI and native | `apps/cli/src/{capture-interference-options.ts,capture-interference-options.test.ts,capture-cad.test.ts}`, `apps/cli/src/native-parity/capture.test.ts`, `docs/capture.md` | car6-f1, car6-f2b, car6-f2a |
+
+Waves: f1, f2b and f3 first; then f2a and f4; then f2c. Every chain is a
+real contract or a shared file:
+
+- f3 before f2a: shared `lattice.rs`, `interference.rs` and
+  `tests/interference.rs`, and the f2a unit tests use the f3
+  `triangle_limit`;
+- f2b before f4: shared `describe.ts` and `describe.test.ts`;
+- f1 before f2c: shared `capture-cad.test.ts`;
+- f2b and f2a before f2c: the report type, and the native case needs the
+  Rust producer.
+
+Gates. Each exits 0 and runs at least one test that its plan makes pass:
+
+- f1: `bun test apps/cli/src/ids.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/cad-command.test.ts`
+- f2b: `bun test packages/core/src/capture/report.test.ts packages/core/src/capture/describe.test.ts`
+- f3: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f3 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f3 cargo test --release -p nodetto-capture`
+- f2a: the f3 command with `target/car6-f2a`.
+- f4: `bun test packages/core/src/capture/describe.test.ts apps/desktop/src/shell/export-handlers.test.ts apps/cli/src/capture-cad-census.test.ts`
+- f2c:
+  1. `bun test apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts`;
+  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f2c cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car6-f2c/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`.
+  The evidence shows the new native case as passed, not skipped.
+
+The crate gate includes the release-only timing tests in
+`crates/capture/src/tiles.rs`, notably the `tiles.rs:444` deadline
+(1000 ms) in `tiles::tests::many_tools_exceed_limit_within_budget`, and
+`tiles::tests::many_sparse_bodies_build_within_budget` (`:339`). Rule for
+both Rust plans (f3 and f2a, each with its own target directory):
+
+1. A full crate gate that fails only on a timing assertion is retried, up to
+   three attempts in total. Each attempt records its command, exit status,
+   the reported elapsed time and the complete log path.
+2. If all three fail, the failing test alone is run once with its exact
+   name, never a module or substring filter:
+   `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-<plan> cargo test --release -p nodetto-capture --lib tiles::tests::many_tools_exceed_limit_within_budget -- --exact --nocapture`
+   (or `tiles::tests::many_sparse_bodies_build_within_budget` if that one
+   failed). The transcript must show `running 1 test` and one executed test.
+   The plan records the printed elapsed time, the exit status and the
+   complete log path next to the three full-gate attempts.
+3. The plan reports both results faithfully: the full-gate failures and the
+   isolated outcome. A passing isolated run does not turn the full gate into
+   a pass, and a failing one is reported as a failure.
+
+The deadlines, both timing tests, the full crate gates and the retry limit
+never change. A compile failure caused by a sibling's in-progress edit is
+rerun after the sibling finishes and is never fixed in the sibling's files.
+
+Integration gates, once, after every plan lands, each recording command,
+exit status and complete log path:
+
+1. `bun run typecheck` and `bun run lint`;
+2. `CARGO_TERM_QUIET=true mise run verify`;
+3. `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`, then
+   `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`,
+   which runs the new cropped dense case with the Rust producer and the CLI
+   consumer both landed, plus every existing native case;
+4. no `*.test.ts` file under `target/` or `tmp/`.
+
+### 24.3 Decisions
+
+- R6-1 fixes `shortIds` itself, the formatter the audit names
+  (`ids.ts:28`). A capture-only wrapper would leave `cad check`, inspect
+  and edit candidate lines printing selector-shaped tokens. Full ids are
+  already valid input through the exact-id-first resolver, so no grammar
+  change is needed.
+- R6-2 defines coverage from successful level-0 casts, not from the shared
+  exhaustion bit. That separates a genuinely unprobed grid from exhaustion
+  after the final coarse cast (step-3 review). Refinement-only caps
+  therefore keep their classification and exit 0.
+- R6-2 accumulates every successful coarse cast before leaving on
+  exhaustion. An observed overlap is a witness and is reported as a capped,
+  approximate hit, never dropped (step-3 review). Uninterrupted runs are
+  unchanged.
+- R6-2 marks a subset of the existing capped-without-hit list instead of
+  replacing the `capped` flag. Every existing count, list and report string
+  stays valid. `checked` is unchanged, because changing it would alter
+  budget-planning output and every headline.
+- R6-2 wording never calls a pictured overlap unknown. Both records stay in
+  JSON, and the incomplete line names the picture-only source (step-3
+  review). Both hosts inherit the text from `describeInterference`.
+- R6-2 is verified end to end with the release CLI on the cropped dense
+  pair (car6-f2c, integration gate 3), in addition to `render_parsed` and
+  the injected-report tests (step-3 review).
+- R6-3 uses fixed phase fractions of one request ceiling instead of passing
+  leftover budget between phases. Each phase stays self-contained (no
+  `lib.rs` or `raster.rs` change), the total is still bounded by `R`, and
+  every value is known before sampling. The ceiling scales with the ray
+  budget the user already controls (`1..=256` million rays). The
+  measurement covers all four phases (step-3 review).
+- R6-3 charges the ceiling in mesh triangle-bin entries only. The finding is
+  about triangle scans. Prism edge buckets are already bounded per ray by
+  the round 5 allowance, and charging them would truncate prism-only
+  scenes whose output must not change (step-3 review). The prism-only
+  control pins this.
+- R6-3 census measurement uses a finisher body followed by a
+  never-settling body in each census phase, so the second body actually
+  draws on what the first left. A per-body reset would breach the phase
+  limit (step-3 review).
+- R6-3 runs before R6-2's Rust plan so that the R6-2 unit tests can cut a
+  pair at an exact triangle count with `triangle_limit`. The R6-2
+  refinement-only cut uses a prism to mark small cells and a mesh to spend
+  triangles after the final coarse cast.
+- R6-3 keeps the round 5 per-ray allowance (combined edges and triangles)
+  and adds the triangle ceiling beside it. Public single-call APIs keep an
+  unlimited ceiling.
+- R6-4 adds a field instead of parsing `line`, so the desktop gets every
+  name, not the eight-name summary. Its CLI check is a new test file, so f4
+  waits only for f2b.
+- No user decision is pending, so no `design-docs/user-qa/` file is
+  written for round 6.
+
+### 24.4 Intentional differences from the workflow input
+
+- The intake listed `crates/capture/src/mesh.rs` for R6-3. The existing
+  `MeshView::scan_cost` is enough, so it is not edited. `tool_view.rs` is
+  edited only for `triangle_cost` and the test counter.
+- The intake's wording "request-wide absolute scan-entry budget" is
+  implemented as a budget on triangle-bin entries, as its acceptance
+  criterion says ("bounds total triangle bin entries"). Prism edges keep
+  only their per-ray bound.
+- R6-2 desktop text needs no `export-handlers.ts` change. Its desktop test
+  is in car6-f4, which owns `export-handlers.test.ts`.
+- The intake allowed the budget values to be chosen by measurement. This
+  design fixes the structure and allows exactly 32 or 64 triangle entries
+  per budget ray, with a blocked outcome beyond that. So the plan cannot
+  drift to a value at which the regression stops failing before the change.
+- The intake's ordering notes chained F2 before F3. This design runs F3
+  first, because the R6-2 unit tests need its `triangle_limit`.
+
+### 24.5 Risks
+
+- R6-3. A real pair or census body that needs more than its share now
+  reports `capped`, `incomplete` or `unknown` instead of an answer. That is
+  the intended trade. Existing mesh fixtures are expected to stay below 32
+  or 64 triangle entries per budget ray, and the full crate run is the
+  check. Prism-only scenes are not affected.
+- R6-3 bound at the default budget is 768 million (or 1,536 million at 64)
+  triangle-entry visits per request. Prism edge visits remain bounded only
+  per ray, as in round 5. Native elapsed time for the worst case is not
+  measured.
+- R6-3 census fixtures need a finisher body that settles within a quarter
+  to a half of the phase allowance. The test asserts that window from a
+  separate measurement, and the plan tunes the lattice size instead of
+  weakening the assertion.
+- R6-2 witness preservation can turn an existing capped miss under
+  exhaustion into a capped hit. The existing dense test accepts either
+  outcome. If any exact literal changes, the plan reports it rather than
+  editing the literal.
+- R6-2 fixtures (interleaved slots, small marked loops) must reach the
+  stated branch. The unit tests assert their preconditions from the cast
+  record, and the plan resizes a fixture instead of weakening it.
+- The native case adds a document with two 6,144-triangle meshes. It
+  stops early on the scan allowance, but its runtime is not yet measured;
+  it uses the file's existing 30 s per-test timeout pattern.
+- R6-1 changes `inspect`, `diff` and `arrange` output for ids starting with
+  `name:` or `@`. No existing test is expected to pin such an id.
+- The `tiles.rs:444` deadline failures under parallel load (round 5) have
+  no known cause. The f3 and f2a crate gates may hit them and follow the
+  retry-then-isolated rule.
+- Not run by these gates: Tauri IPC, MCP delivery and `mise run test-cli`.
+
+## 25. Revision 14: audit round 7 corrections
+
+Source: audit round 7 of the 3D CAD pages and AI capture, base `0a35708`
+to `2be9db1` plus the uncommitted round 6 working tree. Two high findings
+and one low fixture typing error, none deferred. No GitHub issue exists;
+the round-7 workflow input is the issue body. Where an earlier section and
+this one disagree, this section wins. The common rules of section 24
+(regression test that fails before and passes after in this tree,
+deterministic counters instead of clocks, unchanged bytes, goldens, error
+codes and existing messages, per-ray and per-entry work in Rust, the round
+6 tree preserved) apply unchanged.
+
+State of round 6. car6-f1, car6-f2b, car6-f3 and car6-f4 landed (progress
+logs under `impl-plans/progress/`). car6-f2a (R6-2 Rust producer) and
+car6-f2c (R6-2 exit rule, docs, native case) never ran. So the parser
+(`report.ts:25`, `:102-108`), the shared text (`describe.ts:78-126`) and the
+desktop note (`export-handlers.ts:299`, tested at
+`export-handlers.test.ts:719`) already handle `analysis.incomplete`, but
+nothing produces it and nothing exits on it. Round 7 plans `car7-*`
+supersede car6-f2a and car6-f2c; those two plan files stay as history and
+are not executed.
+
+### 25.1 Rules
+
+R7-1 `function-capture-coarse-scan-reported-as-refinement` (high, verified
+recurrence; merges
+`maintainability-capture-coarse-exhaustion-reported-as-refinement`).
+
+The rule is R6-2 of 24.1 ("Rule (Rust)", the exit and docs items of "Rule
+(TypeScript)", and its Rust and CLI tests), unchanged in substance.
+Amendments:
+
+- Current code positions (after car6-f3). `AxisSampler::sample` starts at
+  `lattice.rs:408`: preload of rows 0 and 1 at `:421-428`, the row-top exit
+  at `:434`, the row `y + 1` preload and its exits at `:437-448`, the
+  refined sub-ray exit `break 'sampling` at `:484`, and `hit` from
+  accumulated volume at `:498`. `sample_axes` is `:537`, `empty_sample`
+  `:616`, `sample_pair` `:651`. `PairSample` is `interference.rs:206`,
+  built in `sample` at `:243-275`; the classification loop is `:396-428`.
+  `Analysis` is `report.rs:36` and `cappedWithoutHit` is written at `:106`.
+  The `Analysis` literals to extend are `report.rs:203`,
+  `tests/interference.rs:90` and `tests/render.rs:426`.
+- Exit rule. `interferenceExitCode` (`capture-interference-options.ts`)
+  returns 1 when `failOnInterference` and any of: `report.pairs.length > 0`,
+  `uncheckedCount > 0`, `(report.analysis?.incomplete?.length ?? 0) > 0`.
+  Otherwise 0. A pair capped only during refinement (in `cappedWithoutHit`,
+  not in `incomplete`) keeps exit 0.
+- Help text (its exit contract would otherwise be false).
+  `capture-help.ts` exit paragraph: `1 only with --fail-on-interference for
+  an interfering pair, an unchecked candidate or an incomplete coarse
+  check`. `capture-help/interference.ts` flag line: `Exit 1 for
+  interference, unchecked or incomplete pairs.` Lines keep the existing wrap
+  width; `capture-docs.test.ts` keeps passing unchanged.
+- `docs/capture.md`. Line 33 table cell: `Exit 1 on interference, unchecked
+  candidates or incomplete coarse checks; default off.` The output
+  paragraph (`:38-43`) gains: an `incomplete:` line names a checked pair
+  whose coarse check stopped before covering it; it ends with `interference
+  not determined`, or with `the overlap listed above was found in the
+  picture only` when a picture-only record names the same bodies; JSON lists
+  such pairs as body ids in `interference.incomplete` (report key
+  `analysis.incomplete`, body indices), present only when non-empty. Line
+  104 says `interference, unchecked candidates or incomplete coarse checks`.
+  Exit line 109: `1: only with --fail-on-interference, when a pair
+  interferes, a candidate was not checked, or a checked pair's coarse check
+  is incomplete. A pair capped only during refinement does not change the
+  exit status.`
+- Fixture typing. `packages/core/src/capture/report.test.ts:55` becomes
+  `const incomplete = [[0, 1]] as const;`. Production types are unchanged.
+- Buffered-hit unit test (replaces the R6-2 "non-zero volume" assertion).
+  The two cubes overlap in a 4 x 4 x 4 mm cube, the request box equals that
+  overlap, the target cell is 1 mm and refinement is 0. `side_count`
+  (`lattice.rs:140-142`) clamps each transverse dimension to at least 16
+  cells, so `Grid::new` (`:159-163`) gives 16 x 16 cells of 4 / 16 = 0.25
+  mm. The test asserts that grid from the sample (`cell == 0.25`) and that
+  every unlimited coarse record is a hit. The cut is the `triangles` of the
+  first record, so exactly one coarse cast succeeds (`coarse_casts.len() ==
+  1` in the cut run) and the next fails. Assert `hit`, `capped`,
+  `coarse_complete == false` and `volume == 0.25` mm3 (one 0.25 x 0.25 mm
+  cell times the 4 mm stretch, tolerance 1e-9). A lost witness gives 0.0
+  and a duplicated one 0.50; both fail.
+- Native release case (replaces the R6-2 native case; owned by the Rust
+  plan). Name `native capture keeps the analysis hit of a cropped dense
+  pair`. The document is generated in the test with the existing helpers
+  (`encodeNmesh`, `canonicalize`, `toInline`, `cadElement` with
+  `cad.mesh`, as at `capture.test.ts:706-721`): exactly the audit trigger,
+  two coincident closed meshes of 512 disjoint 1 x 10 x 10 mm boxes on a
+  2 mm X pitch (6,144 triangles each), and no other body. The binary is
+  spawned directly (as at `:830-848`) with `capture <doc> --view top --size
+  64x64 --target 2000,2000,0 --zoom 10 --fail-on-interference --output
+  dense.png --force`, once plain and once with `--json`. Assertions, in
+  both runs: exit status 1. Text: the pair line for the two bodies ends in
+  `, approximate`, and the text has no `incomplete:` line and no `(found in
+  the picture only)`. JSON: `interference.pairs` has exactly one record,
+  for the two bodies, with `approximate: true` and `source: "analysis"`,
+  and `interference.incomplete` is absent. An incomplete outcome or a
+  picture-only record fails the case. Before the Rust change the run exits
+  0 with no pair. The outcome needs no exit-rule change, so the case does
+  not wait for the CLI plan.
+- Thread parity for all three Rust classifications. Each of the three
+  `crates/capture/tests/interference.rs` cases (buffered hit, abandoned
+  miss, refinement-only control) renders at requested threads 1 and 5 and
+  asserts equal `report.to_json()` and equal PNG bytes
+  (`nodetto_capture::encode::png::png_rgb8` of the RGB output). For the
+  refinement-only control, the existing
+  `cap_without_a_hit_is_retained_in_the_report_and_json` (`:571`, today
+  only `render_rgb(&scene, 5)`) gains the threads-1 render and the
+  comparison; its existing assertions are kept and it also asserts
+  `analysis.incomplete.is_empty()` and no `"incomplete"` key.
+- CLI tests, injected reports, flagged, text and `--json` each
+  (`capture-interference-options.test.ts` for the predicate,
+  `capture-cad.test.ts` for text, JSON and exit): a capped analysis hit
+  with no `incomplete` exits 1; `incomplete [[0,1]]` with
+  `cappedWithoutHit [[0,1]]` and no pairs exits 1, prints the "not
+  determined" line and JSON `interference.incomplete`; a refinement-only
+  capped miss exits 0; each case unflagged exits 0. A report without the
+  `incomplete` key keeps today's exit and text (legacy compatibility). The
+  existing ordinary-cap case is not edited.
+- `crates/capture/tests/interference.rs:989` (multi-pair, accepts hit or
+  miss) is neither loosened nor rewritten; the single-pair `render_parsed`
+  regressions of R6-2 carry the finding.
+- Not edited: `describe.ts`, `report.ts`, `export-handlers.ts`,
+  `capture-cad.ts`, `capture-command.ts`, the census sampler.
+
+R7-2 `performance-capture-picture-mesh-triangle-scans` (high, new).
+
+Cause. `Raster::sample` (`raster.rs:149`) calls `WorkerBudget::scan`
+(`raster/budget.rs:108-117`) before a mesh traversal, which charges only
+the bin length above the tool's admitted weight
+(`tiles::tool_weight(average_occupancy)`, `raster.rs:687-693`). Admission
+bounds weighted work at `tiles::WORK_LIMIT` (4,000,000,000) and the surplus
+at `SCAN_ALLOWANCE` (16,000,000,000), so a picture can traverse about 2e10
+mesh-bin entries. Three diagonal-strip slabs at 64 x 64 need at least
+1,610,612,736 and are admitted. Mesh traversals in painting are
+`first_surface_hit` for open bodies (around `:186-193`),
+`surface_intervals` for solid steps (around `:210-218`) and the witness
+recast `intervals` (around `:222-228`), each a full pass over one bin
+(`mesh.rs:307-321`, `:339-352`).
+
+Rule (Rust, `raster.rs` and `raster/budget.rs` only).
+
+- `const PICTURE_TRIANGLE_LIMIT: u64 = 768_000_000;` in `raster.rs`: the
+  round 6 request ceiling at the default 24 million ray budget
+  (`lattice::request_triangles(24_000_000)`), written as a literal so the
+  lattice constant stays uncoupled. It is absolute and request-wide: it
+  does not scale with `--size`, supersampling, threads or the interference
+  budget, and applies with or without `--no-interference`.
+- Value check. The plan runs the full `nodetto-capture` suite with 768M.
+  If any existing test, pin or golden changes, it uses 1,536,000,000 (the
+  only other allowed value) and reruns; if that still changes an existing
+  test, it stops and reports blocked. Both values are below the fixture's
+  lower bound 1,610,612,736. The chosen value is recorded in the progress
+  log.
+- Reservation before traversal. Immediately before each of the three mesh
+  traversals, `Raster::sample` calls the new
+  `WorkerBudget::traverse(entries)` with `ToolView::triangle_cost(&ray)` of
+  the same view and ray (full bin length for a mesh, 0 for a prism). The
+  full length is reserved, including the part covered by the admitted
+  weight. The traversal runs only when `traverse` returns true; on false,
+  `sample` returns `Sample::default()` as the existing budget failures do.
+  For the recast, the reservation precedes the `intervals` call; the
+  existing `recast` call after it stays. Existing `scan`, `charge`,
+  `recast`, `charge_witness` and `flush` accounting (the chunked surplus
+  account), `stats.charged` and `stats.reads` are unchanged.
+- Shared balance, not chunked. `ScanBudget::new(allowance, triangle_limit)`;
+  only `render_tuned` constructs it, passing `PICTURE_TRIANGLE_LIMIT`, so
+  the `render_with` and `render_tuned` signatures and every existing test
+  call stay. `ScanBudget` gains `triangle_limit`, `triangles: AtomicU64`
+  (every reservation request, granted or not) and `visited: AtomicU64`
+  (entries actually traversed). `traverse(entries)`:
+  1. `entries == 0` returns true and touches no counter;
+  2. otherwise `after = triangles.fetch_add(entries) + entries`, directly on
+     the shared atomic, never through a worker-local pending count;
+  3. `after > triangle_limit`: set `stopped` and return false (the bin is
+     not traversed, not even partly);
+  4. else add `entries` to the worker's local `visited` and return true.
+  `Drop` of `WorkerBudget` adds its local `visited` to the shared
+  `visited`; that is a measurement only and grants nothing. `RenderStats`
+  gains `triangles` and `visited`.
+- Hard ceiling, any number of simultaneous workers. All reservations are
+  ordered by the one atomic `fetch_add`, so each granted reservation ends at
+  a distinct cumulative total `after <= triangle_limit`, and the granted
+  entries are disjoint parts of that prefix. Their sum, which equals the
+  traversed entries, is therefore at most `triangle_limit` exactly, with no
+  per-worker or per-chunk slack. Rejected requests only raise `triangles`.
+- Refusal. The existing path after `paint` (`raster.rs:847-849`) returns
+  the existing string verbatim, `The scene is too heavy for this picture
+  size (picture boundary scans over <allowance>). Use a smaller --size.`,
+  as the layer-storage stop already does. No new message, error code, docs
+  line or help line.
+- Determinism. Band boundaries do not depend on the thread count and each
+  sample's requests are a pure function of that sample, so the demand `D`
+  (sum of all requests of a complete paint) is the same at any thread
+  count. If `D <= limit` no request is rejected, the picture is admitted
+  and `visited == triangles == D` at every thread count. If `D > limit`,
+  the paint cannot complete without the request that crosses the limit
+  being rejected, so the picture is refused. Other stop reasons refuse
+  with the same string, so the error text is identical at one and five
+  threads.
+- Scope. Census, analysis pairs and picture-only pair sampling keep the
+  round 6 phase shares; `lattice.rs`, `census.rs`, `interference.rs`,
+  `mesh.rs`, `tool_view.rs` and `tiles.rs` are not edited.
+
+Tests (`crates/capture/src/raster/tests.rs`, release only like the other
+heavy cases: `#[cfg_attr(debug_assertions, ignore = "release only")]`).
+
+- Builder `diagonal_strip_scene(strips, bodies, height)` (test data of this
+  design): for strip boundary `i` in `0..=strips`, points `(x, x + (i -
+  strips/2) * 32 / strips, z)` for `x = -128, 128` mm and `z = 0, 1`; two
+  triangles per strip on each broad face, and the two long sides and two
+  end quads close the slab (8,192 strips give 65,540 triangles; every edge
+  has two incident triangles). Scene from `base()`: width 64, the given
+  height, supersample 2, top view centred on the origin with
+  `mm_per_pixel` 0.0486, `bodies` coincident bodies, each one union step of
+  its own copy of the mesh, `analyse` and `draw_interference` false.
+- Audit case: `(8192, 3, 64)`, threads 1 and 5 through `render_with(&scene,
+  threads, SCAN_ALLOWANCE)`. A 64-pixel picture has two bands, so the
+  threads-5 run starts two workers; assert `stats.workers` is 1 and 2.
+  Assert: the error string above, equal at both thread counts;
+  `stats.visited <= PICTURE_TRIANGLE_LIMIT` (strict, no slack term);
+  `stats.triangles > PICTURE_TRIANGLE_LIMIT`; `stats.charged <=
+  SCAN_ALLOWANCE` (the new account refused it); empty liveness; zero census
+  rays.
+- Five-worker case: `(8192, 2, 160)`, five bands. Threads 1 and 5; assert
+  `stats.workers == 5` for the threads-5 run, the same error string at both,
+  `stats.visited <= PICTURE_TRIANGLE_LIMIT` and `stats.triangles >
+  PICTURE_TRIANGLE_LIMIT`. Its demand lower bound is 2 x 40,960 samples x
+  32,768 cap facets = 2,684,354,560, above both allowed limits. If the tile
+  work limit refuses the scene before painting (a `work` error, zero
+  workers), the plan lowers `strips` to 6,144 (lower bound 2,013,265,920)
+  and keeps every assertion.
+- Admitted control: `(256, 3, 160)`, threads 1 and 5. Both succeed; assert
+  `stats.workers == 5` for threads 5; RGB bytes,
+  `encode::png::png_rgb8` bytes, `report.to_json()` and `stats.visited` are
+  equal; `0 < stats.visited == stats.triangles <= PICTURE_TRIANGLE_LIMIT`.
+- Fail-before order: the plan first adds only the measurement (`traverse`
+  always returns true and counts `visited`; no limit, no refusal), runs the
+  audit case and records that the picture is admitted with `visited >=
+  1,610,612,736`, so the ceiling assertion fails. It then adds the
+  reservation check and records the passing run.
+- Unchanged and rerun: every raster test (including
+  `a_view_zoomed_onto_a_dense_bucket_is_refused_by_the_scan_budget`,
+  `boundary_read_counts_and_refusal_are_bounded`,
+  `layers_storage_cap_refuses`), mesh and render pins, goldens, and the
+  `tiles.rs:444` deadline.
+
+### 25.2 Plan grouping
+
+Plans `car7-*`, one wave, no `dependsOn`: no two plans share a file. Each
+plan has a non-empty `acceptanceCriteria`, uses
+`CARGO_TARGET_DIR=target/car7-<plan>`, sets `artifactRoots ["target",
+"tmp/cad3d"]` exactly with evidence under `tmp/car7-r7/<planId>/`, lists
+every edited file including its plan and progress files in `writePaths`,
+and runs biome on touched TypeScript plus rustfmt and clippy after Rust
+changes.
+
+| Plan | Rule | Owns |
+| --- | --- | --- |
+| car7-f1a-coarse-witness | R7-1 Rust producer and native case | `crates/capture/src/{lattice.rs,interference.rs,report.rs}`, `crates/capture/tests/interference.rs`, `crates/capture/tests/render.rs` (one literal), `apps/cli/src/native-parity/capture.test.ts` |
+| car7-f1b-incomplete-exit | R7-1 exit rule, help, docs, fixture | `apps/cli/src/{capture-interference-options.ts,capture-interference-options.test.ts,capture-cad.test.ts,capture-help.ts}`, `apps/cli/src/capture-help/interference.ts`, `docs/capture.md`, `packages/core/src/capture/report.test.ts` |
+| car7-f2-picture-triangle-bound | R7-2 | `crates/capture/src/raster.rs`, `crates/capture/src/raster/{budget.rs,tests.rs}` |
+
+Gate outputs that are not source edits but must be listed in `writePaths`:
+car7-f1a lists `tmp/capture/m09/timing.json` and
+`tmp/capture/m23/timing.json`, which the full native capture suite writes
+(`capture.test.ts:317-320` and `:1002-1007`), as car6-f2c did. Only these
+two exact files are added; `tmp` itself is never a write path or an
+artifact root, and `artifactRoots` stays exactly `["target", "tmp/cad3d"]`.
+No other plan runs the native suite.
+
+Gates (each exits 0 and runs at least one test the plan makes pass):
+
+- f1a: `rustfmt --edition 2021` on its Rust files, then
+  `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f1a cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f1a cargo test --release -p nodetto-capture`;
+  then `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car7-f1a cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car7-f1a/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`
+  (the new case listed as passed, not skipped; both timing files written).
+- f1b: `bunx biome check` on its TypeScript files, then
+  `bun test apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/capture-docs.test.ts packages/core/src/capture/report.test.ts`.
+- f2: the f1a crate command with `target/car7-f2`.
+
+The two Rust gates follow the 24.2 timing rule (three full attempts, then
+the failing timing test alone with `--exact`, both results reported). A
+compile or bundle failure caused by a sibling's in-progress edit in the
+shared tree is rerun after the sibling finishes, never fixed in the
+sibling's files.
+
+Integration, once after all three land: `bun run typecheck` (exit 0 once
+`report.test.ts:55` is typed), `bun run lint`, `CARGO_TERM_QUIET=true mise
+run verify`, the release CLI build with the native capture suite, and no
+`*.test.ts` under `target/` or `tmp/`.
+
+### 25.3 Decisions
+
+- R7-1 reuses the R6-2 rules; its design was accepted in round 6 and only
+  the Rust producer, exit rule and docs were never implemented. Only the
+  tests are tightened (below).
+- R7-1 is split into a Rust plan and a CLI plan so that each stays within
+  the plan-size limit and both run in the first wave. Injected reports make
+  the CLI plan independent of the Rust producer.
+- R7-1 updates the CLI help text with the docs because the exit contract it
+  states would otherwise be false.
+- R7-2 reserves the full bin length from one shared atomic balance before
+  each traversal instead of using the chunked worker accounting. Chunked
+  pending charges authorize traversals that a later flush cannot undo (a
+  one-worker overshoot of 667,260 entries at the 768M limit with 32,772-entry
+  bins, step-3 review). One `fetch_add` per mesh traversal is cheap next to
+  the traversal itself and gives an exact ceiling. Leaving the surplus
+  account untouched keeps every existing `charged` and `reads` assertion and
+  prism-only behaviour unchanged.
+- R7-2 tests a real five-worker run on a five-band picture, because a
+  64-pixel picture clamps to two workers (`raster.rs:726-727`).
+- R7-1 tightens the inherited R6-2 tests: an exact one-cell volume rejects
+  double accumulation, the native case uses exactly the audit fixture and
+  accepts only the retained analysis hit, and all three Rust
+  classifications compare report and PNG bytes at threads 1 and 5
+  (step-3 review).
+- R7-2 reuses the existing picture refusal string, as the layer-storage
+  stop does. The error is then identical across thread counts whichever
+  account crosses first, and no docs change is needed, so R7-2 shares no
+  file with R7-1.
+- R7-2 takes its ceiling from the round 6 request constant at the default
+  budget instead of a new scale, with one fallback value, so the plan
+  cannot drift to a value at which the regression stops failing.
+- No user decision is pending; no `design-docs/user-qa/` file.
+
+### 25.4 Intentional differences from the workflow input
+
+- The intake planned two plans; this design has three (R7-1 split), still
+  one wave with no shared file.
+- The intake listed `mesh.rs` for R7-2. `ToolView::triangle_cost` already
+  returns the bin length, so `mesh.rs` is not edited.
+- The intake listed `crates/capture/tests/render.rs` for R7-2. Its tests are
+  unit tests in `raster/tests.rs`, which can read `RenderStats`; this keeps
+  `render.rs` with the R7-1 plan only.
+- The intake listed `export-handlers.ts`, `describe.ts` and `report.ts`.
+  They already handle the field (car6-f2b, car6-f4) and are not edited; the
+  desktop delivery is covered by `export-handlers.test.ts:719`.
+
+### 25.5 Risks
+
+- R7-2 may refuse a real dense-mesh picture that was admitted before. That
+  is the intended trade; the full crate suite checks existing pins, with
+  one fallback value.
+- R7-2 tests traverse up to the limit (768M or 1,536M entries) per refused
+  run, four refused runs in all (release only), and the pre-change evidence
+  run about 1.6e9; they share the crate gate with
+  the `tiles.rs:444` deadline and may trigger the retry rule. Native
+  elapsed time and peak memory of the fixture are not measured.
+- R7-1 witness preservation can turn an existing capped miss under
+  exhaustion into a capped hit; the multi-pair test accepts either. An
+  exact literal that changes is reported, not edited.
+- The R7-1 native case accepts only the analysis hit. If the release run
+  yields `incomplete` instead, the case fails and the plan reports it as a
+  producer defect (the `render_parsed` buffered-hit test on the same meshes
+  must then fail too); it never relaxes the case.
+- Sibling Rust plans compile each other's in-progress edits in one tree.
+- Not run by these gates: Tauri IPC, MCP delivery and `mise run test-cli`.

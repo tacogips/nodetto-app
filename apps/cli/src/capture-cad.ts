@@ -101,11 +101,10 @@ export function cadCameraOptions(
 }
 
 function errorLines(
-  elements: readonly Element[],
+  ids: ReadonlyMap<string, string>,
   errors: readonly { id: string; code: string }[],
 ): string[] {
   if (errors.length === 0) return [];
-  const ids = shortIds(elements.map(({ id }) => id));
   return errors.map(({ id, code }) => `  ${ids.get(id) ?? id} ${code}`);
 }
 
@@ -115,6 +114,7 @@ function textVector(values: readonly number[]): string {
 
 export function renderCadCapture(
   elements: readonly Element[],
+  documentElements: readonly Element[],
   page: Page,
   request: CadCaptureRequest,
   renderSolid: NonNullable<CaptureBackend["renderSolid"]>,
@@ -147,7 +147,7 @@ export function renderCadCapture(
     text,
     sampled: true as const,
   }));
-  const ids = shortIds(elements.map(({ id }) => id));
+  const ids = shortIds(documentElements.map(({ id }) => id));
   const { view, forward: direction, right, up, centre, mmPerPixel } = camera;
   return {
     width: report.width,
@@ -166,7 +166,7 @@ export function renderCadCapture(
       `frame: ${frame}`,
       describedBodies.line,
       `errors: ${model.errors.length + sampledErrors.length}`,
-      ...errorLines(elements, model.errors),
+      ...errorLines(ids, model.errors),
       ...sampledErrors.map(
         ({ id, code, text }) => `  ${ids.get(id) ?? id} ${code} ${text}`,
       ),
@@ -183,6 +183,6 @@ export function cadInputMessage(
   if (!error.errors) return error.message;
   return [
     `Page ${JSON.stringify(page.name)} ${error.message}`,
-    ...errorLines(elements, error.errors),
+    ...errorLines(shortIds(elements.map(({ id }) => id)), error.errors),
   ].join("\n");
 }

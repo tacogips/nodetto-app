@@ -1,0 +1,159 @@
+{
+  "taskId": "car6-r6",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "6f58a74f717475d515122570804c9a63a7fd6bb8",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car6-r6",
+  "waves": [
+    ["car6-f1-diagnostic-tokens", "car6-f2b-incomplete-describe", "car6-f3-request-scan-budget"],
+    ["car6-f2a-coarse-incomplete", "car6-f4-not-sampled-notes"],
+    ["car6-f2c-incomplete-cli"]
+  ],
+  "reviewContext": {
+    "issueReference": "round-6-audit:feat/ai-capture@6f58a74f717475d515122570804c9a63a7fd6bb8 (base 0a35708) plus uncommitted round 5 fixes; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car6-00-overview.md",
+    "userProblem": "The round-6 audit found four defects in 3D CAD pages and AI capture: capture and cad check print diagnostic ids shortened to tokens such as name:a that the edit command reads as label or batch selectors, so reusing a printed token deletes an unrelated element; a dense-mesh scan that stops during the coarse interference pass is reported as a checked pair with only a sub-cell warning and --fail-on-interference exits 0; the round 5 scan allowance still admits billions of mesh triangle visits per capture because it never runs out below 1,024 entries per ray; and desktop export drops the not-sampled notice for bodies whose census is unknown.",
+    "requiredOutcomes": [
+      "function-capture-diagnostic-selector-prefix (R6-1; f1): shortIds maps ids starting with name: or @ to the full id; tokens taken from capture stdout (structural and sampled) delete the failed feature and keep the competing labelled or batch-referenced element; cad check prints the full id; JSON keeps full ids.",
+      "function-capture-coarse-scan-reported-as-refinement (R6-2; f2a, f2b, f2c, f4): coverage from successful level-0 casts; cast coarse hits preserved on exhaustion; analysis.incomplete (subset of cappedWithoutHit, key only when non-empty); text, CLI JSON and desktop show incomplete without calling a pictured overlap unknown; --fail-on-interference exits 1; refinement-only caps unchanged; 1 vs 5 threads identical; native release-CLI cropped dense case exits 1.",
+      "performance-interference-mesh-triangle-scans (R6-3; f3): request-wide triangle-entry ceiling R = 32 x B (64 fallback) split analysis R/2 (shares assigned before dispatch), visible census R/4, hidden census R/8, picture-only pairs R/8; prism edges not charged; four-phase triangle measurement with finisher and never-settling census bodies; prism-only control pinned; 1 vs 5 threads identical; existing pins unchanged.",
+      "maintainability-desktop-omits-incomplete-body-census (R6-4; f4): describeBodies.notSampled lists every unknown body; desktop note names them including after position eight; no cad.result.empty for unknown bodies; same report through CLI and desktop."
+    ],
+    "nonGoals": [
+      "No golden regeneration, no NCS1 change, no error code change, no change to existing messages when the new states are absent.",
+      "No edits to crates/capture/src/mesh.rs, prism.rs, raster.rs, raster/**, lib.rs; no edit to apps/cli/src/edit/selectors.ts, edit/batch.ts, capture-cad.ts or cad-command.ts."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, CARGO_TERM_QUIET=true, rustfmt on touched Rust files.",
+      "Each plan uses its own CARGO_TARGET_DIR (target/car6-f3, target/car6-f2a, target/car6-f2c) and artifactRoots [\"target\", \"tmp/cad3d\"].",
+      "Per-plan gates are focused; typecheck, lint, mise run verify and the full native capture suite run once at integration.",
+      "Timing failures: at most three full-gate attempts, then one exact single-test isolated run (--lib tiles::tests::<name> -- --exact --nocapture); both reported separately; deadlines never relaxed."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R6-1 fix inside shortIds.", "rationale": "The audited formatter; every consumer inherits a resolvable token; exact-id-first resolver needs no grammar change."},
+      {"decision": "R6-2 coverage from successful level-0 casts with witness preservation; incomplete as a subset list emitted only when non-empty.", "rationale": "Separates unprobed grids from refinement-only exhaustion, keeps observed overlaps and leaves every existing report byte-identical."},
+      {"decision": "R6-2 two incomplete wordings depending on a same-pair record.", "rationale": "A pictured overlap is never described as unknown."},
+      {"decision": "R6-3 ceiling counts mesh triangle entries only with fixed phase fractions.", "rationale": "Bounds the finding's triangle scans without truncating prism-only scenes; no plumbing between phases."},
+      {"decision": "R6-4 notSampled field.", "rationale": "Desktop gets every name, not the eight-name summary."}
+    ],
+    "intentionalTradeoffs": [
+      "R6-3 caps mesh pairs or census bodies above their share (capped, incomplete or unknown, never a wrong claim).",
+      "R6-2 witness preservation may turn an exhausted capped miss into a capped approximate hit."
+    ],
+    "supportedEdgeCases": [
+      "Ids starting with name: or @, sampled and structural diagnostics, picture-only pairs for incomplete candidates, refinement-only exhaustion after the final coarse cast, exhaustion during row preload, per-body census allowance carry-over, prism-only dense scenes, unknown bodies after position eight."
+    ],
+    "outOfScopeEdgeCases": [
+      "Native elapsed-time limits for the worst case at the new ceiling; Tauri IPC and MCP delivery."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car6-00-overview.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car6-f1-diagnostic-tokens",
+      "planPath": "impl-plans/active/car6-f1-diagnostic-tokens.md",
+      "dependsOn": [],
+      "writePaths": ["apps/cli/src/ids.ts", "apps/cli/src/ids.test.ts", "apps/cli/src/capture-cad.test.ts", "apps/cli/src/cad-command.test.ts", "impl-plans/active/car6-f1-diagnostic-tokens.md", "impl-plans/progress/car6-f1-diagnostic-tokens.md", "tmp/car6-r6/car6-f1-diagnostic-tokens", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "shortIds maps ids starting with name: or @ to themselves; collar-groove and collar keep collar- and collar.",
+        "Structural and sampled capture tokens for name:latch-bore and @spindle-cut, read from stdout, delete the feature via editCommand with exit 0 while the label-l element and the ref-bound element survive; JSON keeps full ids; the cases fail before the change.",
+        "cad check prints name:latch-bore, never name:l."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn apps/cli/src/ids.ts apps/cli/src/ids.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/cad-command.test.ts && bun test apps/cli/src/ids.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/cad-command.test.ts"
+      ]
+    },
+    {
+      "planId": "car6-f2b-incomplete-describe",
+      "planPath": "impl-plans/active/car6-f2b-incomplete-describe.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/report.ts", "packages/core/src/capture/report.test.ts", "packages/core/src/capture/describe.ts", "packages/core/src/capture/describe.test.ts", "impl-plans/active/car6-f2b-incomplete-describe.md", "impl-plans/progress/car6-f2b-incomplete-describe.md", "tmp/car6-r6/car6-f2b-incomplete-describe", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "parseSolidReport accepts analysis.incomplete absent or as integer pairs and rejects other shapes.",
+        "describeInterference prints the incomplete headline, the 'not determined' line without a same-pair record and the picture-only line with one, counts only refinement caps in the refinement line, returns incomplete and sets json.incomplete only when non-empty.",
+        "With no incomplete pairs, lines and JSON are identical to today."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/report.ts packages/core/src/capture/report.test.ts packages/core/src/capture/describe.ts packages/core/src/capture/describe.test.ts && bun test packages/core/src/capture/report.test.ts packages/core/src/capture/describe.test.ts"
+      ]
+    },
+    {
+      "planId": "car6-f3-request-scan-budget",
+      "planPath": "impl-plans/active/car6-f3-request-scan-budget.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/lattice.rs", "crates/capture/src/interference.rs", "crates/capture/src/census.rs", "crates/capture/src/tool_view.rs", "crates/capture/tests/interference.rs", "impl-plans/active/car6-f3-request-scan-budget.md", "impl-plans/progress/car6-f3-request-scan-budget.md", "tmp/car6-r6/car6-f3-request-scan-budget", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "charge_scan keeps the per-ray combined allowance and enforces triangle_limit on mesh triangle entries only, in both cast paths.",
+        "Four-phase triangle measurement: visible census <= R/4 and > e with finisher empty/1 and never-settling unknown/-1; analysis <= R/2 with a capped pair; view pairs <= R/8 all from_view and capped; hidden census <= R/8 and > e with V1 attributed and V2 None; sum <= R; each fails before the change.",
+        "Prism-only control: edge visits > 64 x B / 2, triangle visits 0, pair min, max and capped equal literals pinned before the change.",
+        "Analysis shares computed before dispatch; render_parsed report and image identical at 1 and 5 threads with cappedCount >= 1; admitted-cube pin and goldens unchanged; chosen constant (32 or 64) recorded."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 crates/capture/src/lattice.rs crates/capture/src/interference.rs crates/capture/src/census.rs crates/capture/src/tool_view.rs crates/capture/tests/interference.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f3 cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f3 cargo test --release -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car6-f2a-coarse-incomplete",
+      "planPath": "impl-plans/active/car6-f2a-coarse-incomplete.md",
+      "dependsOn": ["car6-f3-request-scan-budget"],
+      "writePaths": ["crates/capture/src/lattice.rs", "crates/capture/src/interference.rs", "crates/capture/src/report.rs", "crates/capture/tests/interference.rs", "crates/capture/tests/render.rs", "impl-plans/active/car6-f2a-coarse-incomplete.md", "impl-plans/progress/car6-f2a-coarse-incomplete.md", "tmp/car6-r6/car6-f2a-coarse-incomplete", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Unit cuts from coarse_casts: abandoned miss has coarse_complete false and no report; buffered hit followed by exhaustion yields a capped hit with volume > 0 (no hit before); refinement-only miss after the final coarse cast keeps coarse_complete true.",
+        "render_parsed: coincident 512-box pair gives a capped analysis hit and empty incomplete; interleaved pair gives incomplete [(0,1)] and JSON \"cappedWithoutHit\":[[0,1]],\"incomplete\":[[0,1]]; 1 and 5 threads identical.",
+        "cap_without_a_hit test: incomplete empty and no JSON key; admitted-cube pin, f3 tests and goldens unchanged."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 crates/capture/src/lattice.rs crates/capture/src/interference.rs crates/capture/src/report.rs crates/capture/tests/interference.rs crates/capture/tests/render.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f2a cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f2a cargo test --release -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car6-f4-not-sampled-notes",
+      "planPath": "impl-plans/active/car6-f4-not-sampled-notes.md",
+      "dependsOn": ["car6-f2b-incomplete-describe"],
+      "writePaths": ["packages/core/src/capture/describe.ts", "packages/core/src/capture/describe.test.ts", "apps/desktop/src/shell/export-handlers.ts", "apps/desktop/src/shell/export-handlers.test.ts", "apps/cli/src/capture-cad-census.test.ts", "impl-plans/active/car6-f4-not-sampled-notes.md", "impl-plans/progress/car6-f4-not-sampled-notes.md", "tmp/car6-r6/car6-f4-not-sampled-notes", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "describeBodies.notSampled is [\"Bracket\",\"Gusset\"] for the ten-body report; errors empty.",
+        "Desktop note contains 'not sampled (material unknown): Bracket, Gusset' and no cad.result.empty; the R6-2 mixed-state desktop note shows the incomplete headline, picture-only incomplete line and picture-only pair line.",
+        "renderCadCapture with the same report: text contains 'Bracket [not sampled]', metadata.bodies[9] is Gusset unknown, no cad.result.empty."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/describe.ts packages/core/src/capture/describe.test.ts apps/desktop/src/shell/export-handlers.ts apps/desktop/src/shell/export-handlers.test.ts apps/cli/src/capture-cad-census.test.ts && bun test packages/core/src/capture/describe.test.ts apps/desktop/src/shell/export-handlers.test.ts apps/cli/src/capture-cad-census.test.ts"
+      ]
+    },
+    {
+      "planId": "car6-f2c-incomplete-cli",
+      "planPath": "impl-plans/active/car6-f2c-incomplete-cli.md",
+      "dependsOn": ["car6-f1-diagnostic-tokens", "car6-f2b-incomplete-describe", "car6-f2a-coarse-incomplete"],
+      "writePaths": ["apps/cli/src/capture-interference-options.ts", "apps/cli/src/capture-interference-options.test.ts", "apps/cli/src/capture-cad.test.ts", "apps/cli/src/native-parity/capture.test.ts", "docs/capture.md", "tmp/capture/m09/timing.json", "tmp/capture/m23/timing.json", "impl-plans/active/car6-f2c-incomplete-cli.md", "impl-plans/progress/car6-f2c-incomplete-cli.md", "tmp/car6-r6/car6-f2c-incomplete-cli", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "interferenceExitCode returns 1 for incomplete pairs with --fail-on-interference, 0 without the flag and 0 for refinement-only caps.",
+        "CLI with an injected incomplete report prints the headline and 'not determined' line, JSON interference.incomplete [[\"plate\",\"block\"]], exit 1; the existing ordinary-cap case keeps exit 0.",
+        "Native release-CLI cropped dense pair: exit 1 in text and --json runs, no picture-only line, approximate analysis pair or incomplete record consistent across text and JSON; the case runs (not skipped).",
+        "docs/capture.md describes the incomplete state, keys, wording and exit status."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn apps/cli/src/capture-interference-options.ts apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts apps/cli/src/native-parity/capture.test.ts && bun test apps/cli/src/capture-interference-options.test.ts apps/cli/src/capture-cad.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car6-f2c cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car6-f2c/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    }
+  ]
+}

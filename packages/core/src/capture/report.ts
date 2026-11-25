@@ -22,6 +22,7 @@ interface SolidAnalysisReport {
   readonly cappedCount: number;
   readonly budget: number;
   readonly cappedWithoutHit: readonly (readonly [number, number])[];
+  readonly incomplete?: readonly (readonly [number, number])[];
 }
 
 interface SolidPairReport {
@@ -97,7 +98,15 @@ function analysis(value: unknown): value is SolidAnalysisReport | null {
           Array.isArray(pair) &&
           pair.length === 2 &&
           pair.every((index) => integer(index)),
-      ))
+      ) &&
+      (value.incomplete === undefined ||
+        (Array.isArray(value.incomplete) &&
+          value.incomplete.every(
+            (pair) =>
+              Array.isArray(pair) &&
+              pair.length === 2 &&
+              pair.every((index) => integer(index)),
+          ))))
   );
 }
 

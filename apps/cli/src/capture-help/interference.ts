@@ -10,7 +10,7 @@ interference. Reference bodies take part. Each pair reports volume and box.
   --no-interference      Skip the check and show an unobstructed view.
   --interference-cell    Set the sampling cell in mm.
   --interference-bodies  Limit the check to these body IDs.
-  --fail-on-interference Exit 1 for interference or unchecked candidates.
+  --fail-on-interference Exit 1 for interference, unchecked or incomplete pairs.
 
 The printed cell is the largest sampling cell used. Interference is always
 found when its projection along X, Y or Z contains an axis-aligned square of

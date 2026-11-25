@@ -207,7 +207,9 @@ struct PairSample {
     report: Option<PairReport>,
     cell: f64,
     capped: bool,
+    coarse_complete: bool,
     boundary_exhausted: bool,
+    triangles: u64,
     #[cfg(test)]
     rays: u64,
     #[cfg(test)]
@@ -225,15 +227,26 @@ pub fn analyse_pair(
     let loops = lattice::tool_loops(scene);
     let tools = lattice::scene_tool_bounds(scene);
     let cache = ViewCache::new(crate::tool_view::classify(scene));
-    let result = sample(scene, candidate, cell, refinement, &loops, &tools, &cache);
+    let result = sample(
+        scene,
+        candidate,
+        cell,
+        refinement,
+        u64::MAX,
+        &loops,
+        &tools,
+        &cache,
+    );
     (result.report, result.cell)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn sample(
     scene: &Scene,
     pair: &Candidate,
     cell: f64,
     refinement: u64,
+    triangle_limit: u64,
     loops: &[Vec<Bounds>],
     tools: &[Bounds],
     cache: &ViewCache,
@@ -251,6 +264,7 @@ fn sample(
         loops,
         tools,
         refinement / pair.weight.max(1),
+        triangle_limit,
         cache,
     );
     let cell = axes.iter().map(|sample| sample.cell).fold(0.0, f64::max);
@@ -278,7 +292,9 @@ fn sample(
         report,
         cell,
         capped,
+        coarse_complete: axes.iter().any(|axis| axis.coarse_complete),
         boundary_exhausted,
+        triangles: axes.iter().map(|axis| axis.triangles).sum(),
         #[cfg(test)]
         rays: axes.iter().map(|axis| axis.rays).sum(),
         #[cfg(test)]
@@ -329,24 +345,39 @@ pub(crate) fn analyse_scene_with(
         .iter()
         .map(|pair| pair.work(cell))
         .sum();
+    let shares: Vec<u64> = candidates[..checked]
+        .iter()
+        .map(|pair| {
+            allocate(
+                lattice::request_triangles(budget) / 2,
+                pair.work(cell),
+                work,
+            )
+        })
+        .collect();
     let cache = ViewCache::new(solid.to_vec());
-    let cast_pairs = |pairs: &[Candidate]| {
+    let cast_pairs = |pairs: &[Candidate], shares: &[u64]| {
         pairs
             .iter()
-            .map(|pair| {
+            .zip(shares)
+            .map(|(pair, &share)| {
                 let allowance = allocate(budget, pair.work(cell), work);
-                sample(scene, pair, cell, allowance, &loops, &tools, &cache)
+                sample(scene, pair, cell, allowance, share, &loops, &tools, &cache)
             })
             .collect::<Vec<_>>()
     };
     let results = if checked < 2 || threads == 1 {
-        cast_pairs(&candidates[..checked])
+        cast_pairs(&candidates[..checked], &shares)
     } else {
         thread::scope(|scope| {
             let mut workers = Vec::new();
-            for chunk in candidates[..checked].chunks(checked.div_ceil(threads)) {
+            let chunk_size = checked.div_ceil(threads);
+            for (chunk, share_chunk) in candidates[..checked]
+                .chunks(chunk_size)
+                .zip(shares.chunks(chunk_size))
+            {
                 let worker = thread::Builder::new()
-                    .spawn_scoped(scope, || cast_pairs(chunk))
+                    .spawn_scoped(scope, || cast_pairs(chunk, share_chunk))
                     .map_err(|err| {
                         CaptureError(format!("Cannot start interference worker: {err}."))
                     })?;
@@ -367,6 +398,7 @@ pub(crate) fn analyse_scene_with(
     let mut pairs = Vec::new();
     let mut capped_count = 0;
     let mut capped_without_hit = Vec::new();
+    let mut incomplete = Vec::new();
     let mut largest_cell: f64 = 0.0;
     for (candidate, result) in candidates.iter().zip(results) {
         largest_cell = largest_cell.max(result.cell);
@@ -374,6 +406,9 @@ pub(crate) fn analyse_scene_with(
             capped_count += 1;
             if result.report.is_none() {
                 capped_without_hit.push((candidate.a, candidate.b));
+                if !result.coarse_complete {
+                    incomplete.push((candidate.a, candidate.b));
+                }
             }
         }
         pairs.extend(result.report);
@@ -395,6 +430,7 @@ pub(crate) fn analyse_scene_with(
             unchecked_count: total as u32 - checked as u32,
             capped_count,
             capped_without_hit,
+            incomplete,
             budget,
         },
         pairs,
@@ -419,7 +455,7 @@ mod tests {
             max: [100.0, 60.0, 5.0],
             weight: 1,
         };
-        let sample = sample(&scene, &pair, 1.0, 128, &loops, &tools, &cache);
+        let sample = sample(&scene, &pair, 1.0, 128, u64::MAX, &loops, &tools, &cache);
         assert_eq!(
             sample.rays,
             lattice::level0_rays(pair.min, pair.max, 1.0) + 128
@@ -460,7 +496,16 @@ mod tests {
         for pair in &candidates {
             let level0 = pair.work(cell);
             let allowance = allocate(budget, level0, work);
-            let sample = sample(&scene, pair, cell, allowance, &loops, &tools, &cache);
+            let sample = sample(
+                &scene,
+                pair,
+                cell,
+                allowance,
+                u64::MAX,
+                &loops,
+                &tools,
+                &cache,
+            );
             let refined = sample.rays * pair.weight - level0;
             assert!(refined <= allowance);
             used += refined;
@@ -501,6 +546,12 @@ pub fn add_view_pairs_with(
     let loops = lattice::tool_loops(scene);
     let tools = lattice::scene_tool_bounds(scene);
     let cache = ViewCache::new(solid.to_vec());
+    let budget = if scene.analyse {
+        u64::from(scene.budget_million_rays) * 1_000_000
+    } else {
+        24_000_000
+    };
+    let mut triangles_left = lattice::request_triangles(budget) / 8;
     for (index, view) in seen.iter().enumerate() {
         let sampled = if index < VIEW_PAIR_SAMPLES {
             let min = view.min.map(|v| v - cell);
@@ -513,16 +564,18 @@ pub fn add_view_pairs_with(
                 max,
                 weight: 1,
             };
-            sample(
+            let sample = sample(
                 scene,
                 &candidate,
                 cell.min(side / 16.0),
                 0,
+                triangles_left,
                 &loops,
                 &tools,
                 &cache,
-            )
-            .into()
+            );
+            triangles_left = triangles_left.saturating_sub(sample.triangles);
+            Some(sample)
         } else {
             None
         };

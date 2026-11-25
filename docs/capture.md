@@ -30,7 +30,7 @@ Use `nodetto-cli capture <doc.jsonl> [options]` to inspect a page as a PNG or JP
 | `--no-interference` | Skip CAD interference checking; default checks it. |
 | `--interference-cell <mm>` | Set CAD sampling cell in mm; default 0.25 mm (range 0.01–10). |
 | `--interference-bodies <id,id,...>` | Limit checking to body IDs; default all eligible bodies. |
-| `--fail-on-interference` | Exit 1 on interference or unchecked candidates; default off. |
+| `--fail-on-interference` | Exit 1 on interference, unchecked candidates or incomplete coarse checks; default off. |
 
 ## Output and files
 
@@ -40,6 +40,11 @@ appear on stderr. `--json` returns these as structured fields, including
 `approximate` for capped pairs and exact `uncheckedCount` even when the
 `unchecked` list is truncated. A `refinement capped` line warns that sub-cell
 parts may be missed; unchecked candidates are listed with a narrowing hint.
+An `incomplete:` line names a checked pair whose coarse check stopped before
+covering it and ends with `interference not determined`, or `the overlap listed
+above was found in the picture only` when a picture-only record names the same
+bodies. JSON lists these pairs by body ID in `interference.incomplete`, present
+only when non-empty; the report key `analysis.incomplete` uses body indices.
 
 The default private per-user capture directory is under the system temporary
 directory, with a digest-based filename. Identical bytes succeed without a
@@ -101,12 +106,12 @@ A striped hatch replaces shading and remains visible through other bodies:
 light uses `#335c67` and `#fffdf8`, dark uses `#5fb4c7` and `#1f2427`.
 Use `--no-interference` for an unobstructed view, `--interference-cell` to
 set the cell, `--interference-bodies` to narrow candidates, and
-`--fail-on-interference` to signal interference or unchecked candidates.
+`--fail-on-interference` to signal interference, unchecked candidates or incomplete coarse checks.
 
 ## Exit codes
 
 - 0: image written, including an identical existing file.
-- 1: only with `--fail-on-interference`, when a pair interferes or a candidate was not checked.
+- 1: only with `--fail-on-interference`, when a pair interferes, a candidate was not checked, or a checked pair’s coarse check is incomplete. A pair capped only during refinement does not change the exit status.
 - 2: usage, input, output, refusal or work limit error. Empty pages, invalid options, unsafe output and a CAD page without a solid body are refused.
 
 The work refusals each suggest a smaller `--size`:

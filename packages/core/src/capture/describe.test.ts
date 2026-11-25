@@ -56,6 +56,96 @@ test("describes per-pair approximation, volume and picture-only results consiste
   ).toContain("volume 12 mm3");
 });
 
+test("describes incomplete coarse checks and preserves refinement-only counts", () => {
+  const incomplete = [[0, 1] as const];
+  const base = {
+    ...analysis,
+    candidates: 1,
+    checked: 1,
+    cappedCount: 1,
+    cappedWithoutHit: incomplete,
+    incomplete,
+  };
+  const missing = describeInterference(
+    { ...report, pairs: [], analysis: base },
+    bodies,
+  );
+  expect(missing.incomplete).toBe(1);
+  expect(missing.lines).toEqual([
+    "interference: 0 found, 1 of 1 checked candidate pair incomplete (cell 0.25 mm)",
+    "  incomplete: Alpha x Beta; the coarse check stopped before covering this pair, interference not determined",
+  ]);
+  expect(missing.json?.incomplete).toEqual([["a", "b"]]);
+  const pictured = describeInterference(
+    {
+      ...report,
+      pairs: [{ ...pair, source: "view", volume: 0 }],
+      analysis: base,
+    },
+    bodies,
+  );
+  expect(pictured.lines[0]).toBe(
+    "interference: 1 found, 1 of 1 checked candidate pair incomplete (cell 0.25 mm)",
+  );
+  expect(pictured.lines[1]).toContain("found in the picture only");
+  expect(pictured.lines[2]).toBe(
+    "  incomplete: Alpha x Beta; the coarse check stopped before covering this pair, the overlap listed above was found in the picture only",
+  );
+  expect(pictured.lines.join(" ")).not.toContain("interference not determined");
+  expect(pictured.json?.pairs).toHaveLength(1);
+  expect(pictured.json?.incomplete).toEqual([["a", "b"]]);
+  const mixed = describeInterference(
+    {
+      ...report,
+      pairs: [],
+      analysis: {
+        ...base,
+        checked: 2,
+        cappedCount: 2,
+        cappedWithoutHit: [
+          [0, 1],
+          [0, 2],
+        ],
+      },
+    },
+    bodies,
+  );
+  expect(mixed.lines.at(-1)).toContain(
+    "refinement capped on 1 checked pairs (1 without a hit)",
+  );
+  const many = describeInterference(
+    {
+      ...report,
+      pairs: [],
+      analysis: {
+        ...base,
+        checked: 22,
+        cappedCount: 22,
+        cappedWithoutHit: Array.from({ length: 22 }, () => [0, 1] as const),
+        incomplete: Array.from({ length: 22 }, () => [0, 1] as const),
+      },
+    },
+    bodies,
+  );
+  expect(
+    many.lines.filter((line) => line.startsWith("  incomplete:")),
+  ).toHaveLength(20);
+  expect(many.lines.at(-1)).toBe(
+    "  ... and 2 more incomplete; narrow with --interference-bodies",
+  );
+  const legacy = describeInterference(report, bodies);
+  const empty = describeInterference(
+    { ...report, analysis: { ...analysis, incomplete: [] } },
+    bodies,
+  );
+  expect(empty.lines).toEqual(legacy.lines);
+  expect(empty.json).toEqual(legacy.json);
+  expect(empty.json).not.toHaveProperty("incomplete");
+  expect(
+    describeInterference({ ...report, analysis: null }, bodies).incomplete,
+  ).toBe(0);
+});
+
 test("lists twenty unchecked pairs and exact remainder", () => {
   const result = describeInterference(
     {
@@ -104,10 +194,10 @@ test("reports all body states and the feature that emptied a refilled body", () 
       id: String(i),
       name: `B${i}`,
       reference: false,
-      steps: [{ op: "difference", tool: 0 }],
+      steps: [{ op: "difference", tool: i }],
       bounds: { min: [0, 0, 0], max: [1, 1, 1] },
     })),
-    tools: [{ feature: "feature" }],
+    tools: states.map(() => ({ feature: "feature" })),
   } as unknown as CadCaptureModel;
   const result = describeBodies(
     {
@@ -184,6 +274,7 @@ test("describes a hidden target emptied by a shared cut", () => {
   expect(describeBodies({ ...report, bodies: [state] }, model)).toEqual({
     line: "bodies: 1 (wide)",
     errors: [],
+    notSampled: [],
   });
   expect(
     describeBodies(
@@ -194,4 +285,126 @@ test("describes a hidden target emptied by a shared cut", () => {
       model,
     ).errors,
   ).toEqual(result.errors);
+});
+
+test("attributes an emptied visible target to its shared-cut sibling", () => {
+  const model = {
+    bodies: [
+      {
+        id: "rail",
+        name: "rail",
+        steps: [
+          { op: "union", tool: 0 },
+          { op: "difference", tool: 2 },
+        ],
+      },
+      {
+        id: "tab",
+        name: "tab",
+        steps: [
+          { op: "union", tool: 1 },
+          { op: "difference", tool: 2 },
+        ],
+      },
+    ],
+    tools: [
+      { feature: "base" },
+      { feature: "tabTool" },
+      { feature: "slot" },
+      { feature: "later" },
+    ],
+  } as unknown as CadCaptureModel;
+  const rail = { state: "drawn", open: false, emptiedByStep: -1 } as const;
+  const tab = { state: "empty", open: false, emptiedByStep: 1 } as const;
+  const describe = (
+    r: SolidReport["bodies"][number] = rail,
+    t: SolidReport["bodies"][number] = tab,
+    m = model,
+  ) => describeBodies({ ...report, bodies: [r, t] }, m);
+  const sibling =
+    '(sampled): leaves no material in "tab"; the app rejects this feature and keeps "rail" as it was, this picture applies it';
+  expect(describe().errors.map((e) => e.text)).toEqual([
+    sibling,
+    '(sampled): leaves no material in "tab"; the app rejects this feature and keeps the body, this picture applies it',
+  ]);
+  expect(describe().line).toContain("rail [differs from the app, see errors]");
+  expect(
+    describeBodies(
+      { ...report, bodies: [rail] },
+      { ...model, bodies: [model.bodies[0]!] },
+    ).errors,
+  ).toEqual([]);
+  expect(describe({ ...rail, emptiedByStep: 1 }).errors[0]?.text).toContain(
+    "keeps the body",
+  );
+  const laterModel = {
+    ...model,
+    bodies: [
+      {
+        ...model.bodies[0]!,
+        steps: [
+          ...model.bodies[0]!.steps,
+          { op: "difference" as const, tool: 3 },
+        ],
+      },
+      model.bodies[1]!,
+    ],
+  };
+  expect(
+    describe({ ...rail, emptiedByStep: 2 }, tab, laterModel).errors[0]?.text,
+  ).toBe(sibling);
+  expect(
+    describe({ ...rail, hiddenEmptiedByStep: 1 }).errors[0]?.text,
+  ).toContain("hidden target body");
+  const laterSiblingModel = {
+    ...model,
+    bodies: [
+      {
+        ...model.bodies[0]!,
+        steps: [
+          { op: "union" as const, tool: 0 },
+          { op: "difference" as const, tool: 3 },
+          { op: "difference" as const, tool: 2 },
+        ],
+      },
+      model.bodies[1]!,
+    ],
+  };
+  expect(
+    describe({ ...rail, hiddenEmptiedByStep: 1 }, tab, laterSiblingModel)
+      .errors[0]?.text,
+  ).toContain("hidden target body");
+  expect(describe({ ...rail, open: true }).errors).toHaveLength(1);
+  expect(describe(rail, { ...tab, open: true }).errors).toHaveLength(1);
+  expect(
+    describe(rail, { ...tab, state: "unknown", emptiedByStep: -1 }).errors,
+  ).toHaveLength(0);
+});
+
+test("lists every unknown body beyond the summary", () => {
+  const names = [
+    "Bracket",
+    ...Array.from({ length: 8 }, (_, i) => `Rib-${i + 1}`),
+    "Gusset",
+  ];
+  const model = {
+    bodies: names.map((name, i) => ({ id: String(i), name, steps: [] })),
+    tools: [],
+  } as unknown as CadCaptureModel;
+  const result = describeBodies(
+    {
+      ...report,
+      pairs: [],
+      analysis: null,
+      bodies: names.map((_, i) => ({
+        state: i === 0 || i === 9 ? "unknown" : "drawn",
+        open: false,
+        emptiedByStep: -1,
+      })),
+    },
+    model,
+  );
+  expect(result.notSampled).toEqual(["Bracket", "Gusset"]);
+  expect(result.errors).toEqual([]);
+  expect(result.line).toContain("Bracket [not sampled]");
 });

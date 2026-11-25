@@ -62,7 +62,9 @@ export function interferenceExitCode(
   failOnInterference: boolean,
 ): 0 | 1 {
   return failOnInterference &&
-    (report.pairs.length > 0 || (report.analysis?.uncheckedCount ?? 0) > 0)
+    (report.pairs.length > 0 ||
+      (report.analysis?.uncheckedCount ?? 0) > 0 ||
+      (report.analysis?.incomplete?.length ?? 0) > 0)
     ? 1
     : 0;
 }

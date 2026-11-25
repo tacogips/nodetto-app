@@ -15,6 +15,105 @@ interface OwnedSolid {
   readonly sources: ReadonlySet<FaceSource>;
 }
 
+interface ManifoldMeshBuffers {
+  readonly numProp: number;
+  readonly vertProperties: Float32Array;
+  readonly triVerts: Uint32Array;
+  readonly runIndex: Uint32Array;
+  readonly runOriginalID: Uint32Array;
+  readonly faceID: Uint32Array;
+}
+
+export function readManifoldMesh(
+  mesh: ManifoldMeshBuffers,
+  namesOf: (original: number) => readonly string[] | undefined,
+): KernelMesh {
+  const invalid = (detail: string): never => {
+    throw new Error(`Invalid Manifold mesh data: ${detail}`);
+  };
+  const at = (
+    array: Float32Array | Uint32Array,
+    index: number,
+    field: string,
+  ): number => {
+    const value = array[index];
+    return value === undefined
+      ? invalid(`missing ${field} at ${index}`)
+      : value;
+  };
+  if (
+    !Number.isInteger(mesh.numProp) ||
+    mesh.numProp < 3 ||
+    mesh.vertProperties.length % mesh.numProp !== 0
+  )
+    invalid("invalid vertex properties");
+  if (mesh.triVerts.length % 3 !== 0) invalid("invalid triangle indices");
+  for (const vertex of mesh.triVerts) {
+    if (vertex >= mesh.vertProperties.length / mesh.numProp)
+      invalid("vertex index out of bounds");
+  }
+  if (mesh.triVerts.length > 0) {
+    if (
+      mesh.runIndex.length !== mesh.runOriginalID.length + 1 ||
+      mesh.runIndex[0] !== 0 ||
+      mesh.runIndex[mesh.runIndex.length - 1] !== mesh.triVerts.length ||
+      mesh.faceID.length !== mesh.triVerts.length / 3
+    )
+      invalid("invalid run coverage");
+    let previous = 0;
+    for (const index of mesh.runIndex) {
+      if (index % 3 !== 0 || index < previous) invalid("invalid run boundary");
+      previous = index;
+    }
+  }
+  const faceNames: string[] = [];
+  const faceIndices = new Map<string, number>();
+  const triFace = new Uint32Array(mesh.triVerts.length / 3);
+  if (mesh.triVerts.length > 0) {
+    for (let run = 0; run < mesh.runOriginalID.length; run++) {
+      const start = at(mesh.runIndex, run, "runIndex") / 3;
+      const end = at(mesh.runIndex, run + 1, "runIndex") / 3;
+      if (start === end) continue;
+      const original = at(mesh.runOriginalID, run, "runOriginalID");
+      const names = namesOf(original);
+      for (let triangle = start; triangle < end; triangle++) {
+        const faceId = at(mesh.faceID, triangle, "faceID");
+        const name = names?.[faceId];
+        if (name === undefined)
+          throw new Error(`Missing Manifold face ${original}/${faceId}`);
+        let index = faceIndices.get(name);
+        if (index === undefined) {
+          index = faceNames.length;
+          faceIndices.set(name, index);
+          faceNames.push(name);
+        }
+        triFace[triangle] = index;
+      }
+    }
+  }
+  let positions = mesh.vertProperties;
+  if (mesh.numProp !== 3) {
+    positions = new Float32Array(
+      (mesh.vertProperties.length / mesh.numProp) * 3,
+    );
+    for (let vertex = 0; vertex < positions.length / 3; vertex++) {
+      const offset = vertex * mesh.numProp;
+      positions[vertex * 3] = at(mesh.vertProperties, offset, "vertProperties");
+      positions[vertex * 3 + 1] = at(
+        mesh.vertProperties,
+        offset + 1,
+        "vertProperties",
+      );
+      positions[vertex * 3 + 2] = at(
+        mesh.vertProperties,
+        offset + 2,
+        "vertProperties",
+      );
+    }
+  }
+  return { positions, triangles: mesh.triVerts, triFace, faceNames };
+}
+
 export async function createManifoldKernel(options?: {
   wasmUrl?: string;
 }): Promise<CadKernel> {
@@ -113,44 +212,10 @@ export async function createManifoldKernel(options?: {
       return retain({ solid, sources: originals });
     },
     mesh(handle): KernelMesh {
-      const mesh = get(handle).solid.getMesh();
-      const faceNames: string[] = [];
-      const faceIndices = new Map<string, number>();
-      const triFace = new Uint32Array(mesh.triVerts.length / 3);
-      for (let run = 0; run < mesh.runOriginalID.length; run++) {
-        const start = mesh.runIndex[run] / 3;
-        const end = mesh.runIndex[run + 1] / 3;
-        if (start === end) continue;
-        const original = mesh.runOriginalID[run];
-        const names = sources.get(original)?.names;
-        for (let triangle = start; triangle < end; triangle++) {
-          const faceId = mesh.faceID[triangle];
-          const name = names?.[faceId];
-          if (name === undefined)
-            throw new Error(`Missing Manifold face ${original}/${faceId}`);
-          let index = faceIndices.get(name);
-          if (index === undefined) {
-            index = faceNames.length;
-            faceIndices.set(name, index);
-            faceNames.push(name);
-          }
-          triFace[triangle] = index;
-        }
-      }
-
-      let positions = mesh.vertProperties;
-      if (mesh.numProp !== 3) {
-        positions = new Float32Array(
-          (mesh.vertProperties.length / mesh.numProp) * 3,
-        );
-        for (let vertex = 0; vertex < positions.length / 3; vertex++) {
-          const offset = vertex * mesh.numProp;
-          positions[vertex * 3] = mesh.vertProperties[offset];
-          positions[vertex * 3 + 1] = mesh.vertProperties[offset + 1];
-          positions[vertex * 3 + 2] = mesh.vertProperties[offset + 2];
-        }
-      }
-      return { positions, triangles: mesh.triVerts, triFace, faceNames };
+      return readManifoldMesh(
+        get(handle).solid.getMesh(),
+        (original) => sources.get(original)?.names,
+      );
     },
     measure(handle) {
       const { solid } = get(handle);

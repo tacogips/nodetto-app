@@ -78,6 +78,13 @@ test("exit code reflects pairs and unchecked candidates only when requested", ()
       true,
     ),
   ).toBe(1);
+  const incomplete = {
+    ...base,
+    analysis: { ...base.analysis!, incomplete: [[0, 1] as const] },
+  };
+  expect(interferenceExitCode(incomplete, true)).toBe(1);
+  expect(interferenceExitCode(incomplete, false)).toBe(0);
   expect(interferenceExitCode(base, true)).toBe(0);
+  expect(interferenceExitCode(base, false)).toBe(0);
   expect(interferenceExitCode({ ...base, pairs: [pair] }, false)).toBe(0);
 });

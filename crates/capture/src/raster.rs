@@ -26,10 +26,14 @@ use budget::{ScanBudget, WorkerBudget};
 const BAND_ROWS: usize = 32;
 const MAX_THREADS: usize = 8;
 const MAX_LAYER_WINDOW: usize = 262_144;
+// Equal to lattice::request_triangles(24_000_000), kept independent.
+const PICTURE_TRIANGLE_LIMIT: u64 = 768_000_000;
 const SCAN_ALLOWANCE: u64 = 16_000_000_000;
 
 #[cfg_attr(not(test), allow(dead_code))]
 struct RenderStats {
+    triangles: u64,
+    visited: u64,
     reads: u64,
     charged: u64,
     witness: u64,
@@ -188,6 +192,9 @@ impl Raster<'_> {
                     if !budget.scan(projected.view.scan_cost(&ray), admitted) {
                         return Sample::default();
                     }
+                    if !budget.traverse(projected.view.triangle_cost(&ray)) {
+                        return Sample::default();
+                    }
                     if let Some(hit) = projected.view.first_surface_hit(&ray) {
                         *present = true;
                         scratch.candidates.push((index, hit));
@@ -212,6 +219,9 @@ impl Raster<'_> {
                     if !budget.scan(prism.view.scan_cost(&ray), admitted) {
                         return Sample::default();
                     }
+                    if !budget.traverse(prism.view.triangle_cost(&ray)) {
+                        return Sample::default();
+                    }
                     let flagged = prism.view.surface_intervals(
                         &ray,
                         &mut scratch.crossings,
@@ -219,6 +229,9 @@ impl Raster<'_> {
                     ) && !self.tuning.never_flag;
                     if track && (flagged || diverged) {
                         if flagged {
+                            if !budget.traverse(prism.view.triangle_cost(&ray)) {
+                                return Sample::default();
+                            }
                             prism
                                 .view
                                 .intervals(&ray, &mut scratch.crossings, &mut scratch.volume);
@@ -829,7 +842,7 @@ fn render_tuned(
     allowance: u64,
     tuning: Tuning,
 ) -> (Result<(Vec<u8>, Report), CaptureError>, RenderStats) {
-    let shared = ScanBudget::new(allowance);
+    let shared = ScanBudget::new(allowance, PICTURE_TRIANGLE_LIMIT);
     let mut liveness_out = Vec::new();
     let mut census_out = census::CensusStats::default();
     let result = (|| {
@@ -885,6 +898,8 @@ fn render_tuned(
         ))
     })();
     let stats = RenderStats {
+        triangles: shared.triangles(),
+        visited: shared.visited(),
         reads: shared.reads(),
         charged: shared.charged(),
         witness: shared.witness(),

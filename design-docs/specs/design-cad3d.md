@@ -5,6 +5,7 @@ branch `feat/cad3d-pages`. Revision 4 (audit round 1 on `feat/ai-capture`,
 `0a35708..eb7d8c9`) adds the editor-side corrections of section 19.
 Revision 5 (audit round 3, `0a35708..a964ad5`) adds section 20.
 Revision 6 (audit round 4, `0a35708..3f9ce78`) adds section 21.
+Revision 7 (audit round 5, `0a35708..70977f4`) adds section 22.
 Implementation plan: `impl-plans/completed/cad3d-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[R-n]` are external sources listed in section 17. Measurements
@@ -2027,3 +2028,228 @@ Plans (one wave with the capture plans, except that f8 follows f4):
 | car4-f8-face-resolution (dependsOn f4) | `packages/core/src/cad/{history.ts,history.test.ts}` | `bun test packages/core/src/cad/history.test.ts packages/core/src/cad/preview.test.ts packages/core/src/cad/frames.test.ts` |
 
 Each plan also runs biome on its touched files.
+
+## 22. Audit round 5 corrections (core)
+
+Source: audit round 5 (`0a35708..70977f4`). The following live in
+`design-docs/specs/design-ai-capture.md` section 23:
+
+- the capture findings (R5-1, R5-3, R5-4 and R5-6);
+- the common test rule: a test that fails on `70977f4` and passes after
+  it, and deterministic counters for performance findings;
+- the byte rule: no change to golden, NCS1, error code or message bytes;
+- the plan table, the single wave and the integration gates.
+
+This section states R5-2 and R5-5. Where an earlier sentence of this
+document and this section disagree, this section wins.
+
+R5-2 `function-cad-kernel-strict-indexed-reads` (medium).
+
+Cause. `mesh()` in `packages/cad-kernel/src/manifold-kernel.ts:121-150`
+reads Manifold buffers by index: `runIndex`, `runOriginalID`, `faceID`,
+the face-name array and `vertProperties`. Both package entry points,
+`src/index.ts` and `src/worker.ts`, import the adapter. Rooted at them, a
+program with `noUncheckedIndexedAccess` gives seven diagnostics. The
+existing `packages/ui-solid/src/cad/strict-index.test.ts` roots only
+`cad-ui.tsx`.
+
+Rule. Every required indexed read is checked where the adapter reads it.
+
+- The buffer-to-`KernelMesh` conversion moves out of the closure into a
+  module-level function in `manifold-kernel.ts`:
+  `readManifoldMesh(mesh, namesOf)`.
+  - `mesh` has the structural type of the fields it reads (`numProp`,
+    `vertProperties`, `triVerts`, `runIndex`, `runOriginalID`, `faceID`).
+  - `namesOf(original)` returns the face names of a source.
+  - It is exported for tests only. `src/index.ts` does not re-export it.
+  - `mesh(handle)` calls it with `get(handle).solid.getMesh()` and
+    `(original) => sources.get(original)?.names`.
+- Coverage checks come first. A checked read alone is not enough: with
+  `numProp = 3` the buffer is returned without any read, other strides take
+  their loop bound from the possibly truncated buffer, and the run loop
+  takes its bound from `runOriginalID.length`. Before the `numProp === 3`
+  fast path and before any loop, `readManifoldMesh` checks:
+  - `numProp` is an integer >= 3, and `vertProperties.length` is a
+    multiple of `numProp`;
+  - `triVerts.length` is a multiple of 3, and every `triVerts` value is
+    below `vertProperties.length / numProp`, so every referenced vertex has
+    three coordinates;
+  - when `triVerts.length > 0`, the runs cover every triangle:
+    - `runIndex.length === runOriginalID.length + 1`;
+    - `runIndex[0] === 0`, and the last entry equals `triVerts.length`;
+    - the entries are non-decreasing multiples of 3;
+    - `faceID.length === triVerts.length / 3`.
+
+  This is the layout Manifold's `getMesh` documents for `MeshGL`. Zero-length
+  runs stay allowed and are skipped as today.
+- When `triVerts` is empty, the output is as today (`positions` converted
+  from the checked vertex buffer, empty `triangles`, `triFace` and
+  `faceNames`), and
+  the run arrays are not inspected, as the current loop reads nothing for
+  them.
+- A failed check throws
+  `Error("Invalid Manifold mesh data: <what failed>")`.
+- After the checks, a local helper still guards each indexed read (run
+  bounds, original ids, face ids, coordinates) for the compiler, and
+  throws `Error("Invalid Manifold mesh data: missing <field> at <index>")`
+  if a value is `undefined`.
+- A present face id with no name keeps today's
+  `Missing Manifold face <original>/<faceId>` error. Valid buffers give the
+  same `positions`, `triangles`, `triFace` and `faceNames` as today. Run
+  order and first-seen face order are unchanged.
+
+Tests.
+
+- `strict-index.test.ts`. The one program now roots `cad-ui.tsx`,
+  `packages/cad-kernel/src/index.ts` and `packages/cad-kernel/src/worker.ts`,
+  and expects zero diagnostics. It fails today with the seven diagnostics.
+- `manifold-kernel.test.ts`, on buffer literals passed to
+  `readManifoldMesh`:
+  - each of these throws `Invalid Manifold mesh data`:
+    - `triVerts [0, 1, 2]` with `numProp 3` and eight `vertProperties`
+      (the fast path today returns it unchanged);
+    - `triVerts [0, 1, 2]` with `numProp 4` and nine `vertProperties`
+      (today's loop silently yields six coordinates);
+    - nonempty `triVerts` with empty `runOriginalID` and `runIndex [0, 3]`
+      (today's run loop reads nothing);
+    - a `runIndex` one entry short;
+    - a short `faceID`;
+  - controls:
+    - a valid empty mesh gives empty outputs;
+    - a valid two-run buffer, including a zero-length run, gives the
+      expected positions, triangle order, `triFace` and `faceNames`;
+    - a present face id with no name still throws
+      `Missing Manifold face`;
+  - the existing provenance and measurement tests, which use real Manifold
+    meshes, pass unchanged. They show that real `getMesh` output meets
+    the coverage checks.
+
+R5-5 `performance-cad-pcb-outline-page-rescans` (medium).
+
+Cause. There are three per-reference traversals:
+
+- `geometry.pcb` (`packages/core/src/cad/history.ts:482`) calls
+  `pcbBoardOutline(history.pcbElements, board)` once per reference. Each
+  call finds the board by linear search and filters every linked graphic
+  before selecting its page (`pcb-outline.ts:47`, `:99`, `:102`).
+- It then rebuilds the outline from the whole page list (`:106`).
+- `evaluate.ts:703` repeats the filter. `:720` maps and serializes the
+  page's graphics into each reference's tool key.
+
+With R references and G linked graphics this is R x G. The audit measured
+2N^2 + N semantic reads with one board per page. The step-3 probe measured
+3,072 and 49,152 reads for N = 32 and 128 references sharing one board with
+an N-segment outline.
+
+Rule. Index the linked PCB elements once per scan, and resolve each page's
+outline and graphic key at most once per scan.
+
+- `pcb-outline.ts` adds `PcbOutlineIndex`:
+  `{ boards: ReadonlyMap<ElementId, Element>; graphics: ReadonlyMap<PageId, readonly Element[]> }`.
+  `pcbOutlineIndex(elements)` builds it in one pass:
+  - `boards` holds the `pcb.board` elements;
+  - `graphics` groups the `isPcbOutlineGraphic` elements by page, and each
+    list is sorted with `compareFractional` by id, which is today's order.
+- Page outline. The index also keeps a scan-local memo,
+  `Map<PageId, PageOutline | OutlineError>`, filled on first use.
+  - `PageOutline` is `{ loops, sources }`. It holds today's graphic loop,
+    paths, `minX`/`maxY` normalisation, `buildProfileLoops` and error
+    mapping, run over `index.graphics.get(page) ?? []`.
+  - The outline depends only on that page's graphics, so every reference
+    to a board on that page reuses it.
+- `pcbBoardOutlineIndexed(index, boardId)`:
+  1. looks up the board in `index.boards` and returns `cad.pcb.noBoard`
+     exactly as today;
+  2. takes the page outline (or its error) from the memo;
+  3. adds the board's default `thickness` (the 1.6 rule) to a new result
+     object.
+
+  The reference's own thickness is applied after that, in `geometry.pcb`
+  (`semantic.thickness ?? outline.thickness`), so references on one page
+  keep their own thickness. Validation, paths, the micrometre join, error
+  precedence and `at` ids are unchanged. Loop arrays are shared between
+  references and are never mutated.
+- `pcbBoardOutline(elements, boardId)` stays, as
+  `pcbBoardOutlineIndexed(pcbOutlineIndex(elements), boardId)`, so the
+  existing tests and any single-shot caller keep working.
+- `scanCadPage` (`history.ts:281`) builds `pcbOutline` once from
+  `pcbElements`, and `HistoryDetails.boards` becomes `pcbOutline.boards`.
+  - `geometry.pcb` calls `pcbBoardOutlineIndexed(history.pcbOutline, ...)`.
+  - `evaluate.ts:703` reads `history.pcbOutline.graphics.get(source.page) ?? []`.
+- Evaluator graphic key. `evaluateCadPage` keeps a call-local
+  `Map<PageId, string>`. For each page it computes once
+  `contentKey(["pcb graphics", canonicalCadJson(graphics.map(({ id, semantic }) => [id, semantic]))])`.
+  The `"pcb tool"` key takes that string in place of the inline
+  serialization (`:720`). The other key parts are unchanged.
+  - The key still covers every graphic id and semantic in order, so an
+    outline edit changes it.
+  - Only in-memory memo keys change form. Scene and STL bytes do not.
+- Reuse is scoped to one scan (`scanCadPage`) or one `evaluateCadPage`
+  call. An edit produces a new scan, so it is always reflected.
+
+Tests (`pcb-outline.test.ts`).
+
+- Measurements at N = 32 and 128. Each graphic's `semantic` is a counting
+  getter. Reads at 128 must be at most 4.5 times the reads at 32.
+  - Separate pages, through `prepareCadCapture`, with the counter reset
+    after `collectCadInput`. There are N boards, each on its own PCB page
+    with one rectangular Edge.Cuts graphic, and N `cad.pcb` references.
+    Today the ratio is 15.8 (2,080 and 32,896).
+  - Shared board, through `prepareCadCapture`, reset the same way. One
+    board has a closed outline of N line segments, and N references
+    alternate thickness 1 and 3. Today the ratio is 16 (3,072 and 49,152).
+  - Shared board, through `evaluateCadPage` with the core
+    `RecordingKernel` (`testing/recording-kernel.ts`). The same document,
+    with the counter reset before the call. This covers the evaluator key.
+- Unchanged scene bytes. A literal digest of the shared-board scene bytes
+  (N = 32) is written into the test. It is recorded on the working tree
+  before the change, as the plan's first step; no older checkout or
+  binary is used. After the change, two runs give exactly that digest. The
+  existing `packages/core/src/capture/determinism.test.ts` passes
+  unchanged.
+- In the shared-board document, the references' bodies have Z extents of
+  1 and 3 mm, alternating.
+- Reevaluation after a valid edit. Moving a single segment opens the loop
+  and gives `cad.pcb.openOutline`, because `buildProfileLoops` rejects an
+  endpoint with one incident segment (`loops.ts:418-424`). So the edit is
+  a closed widening:
+  - On a closed line-segment board (for example 4 x 4 mm), move the right
+    boundary from x = 4 to x = 5.
+  - Move every segment endpoint that shares a moved vertex with it: the
+    right edge and the adjoining ends of the top and bottom edges. The
+    outline stays closed.
+- After the closed widening:
+  - a new `prepareCadCapture` gives a maximum X 1 mm larger and no model
+    errors;
+  - with the same memo and `RecordingKernel`, `evaluateCadPage` returns
+    bodies whose `CadBodyResult.key` (`evaluate.ts:852-866`) differs from
+    the pre-edit keys;
+  - the `RecordingKernel` records a new `kind: "solid"` call
+    (`testing/recording-kernel.ts:12`) for the PCB body.
+
+  The internal PCB tool key is not asserted directly. The same memo
+  without the edit returns the old keys and records no new call.
+- The existing outline tests pass unchanged.
+
+Plans (in the single wave of design-ai-capture section 23.2):
+
+| Plan | Owns | Gate (each exits 0 and runs at least one test) |
+| --- | --- | --- |
+| car5-f2-kernel-strict | `packages/cad-kernel/src/{manifold-kernel.ts,manifold-kernel.test.ts}`, `packages/ui-solid/src/cad/strict-index.test.ts` | `bun test packages/ui-solid/src/cad/strict-index.test.ts packages/cad-kernel/src/manifold-kernel.test.ts packages/cad-kernel/src/worker-host.test.ts` |
+| car5-f5-pcb-outline-index | `packages/core/src/cad/{pcb-outline.ts,history.ts,evaluate.ts,pcb-outline.test.ts}` | `bun test packages/core/src/cad/pcb-outline.test.ts packages/core/src/cad/history.test.ts packages/core/src/cad/evaluate.test.ts packages/core/src/capture/determinism.test.ts` |
+
+Risks:
+
+- R5-5 shares outline loop arrays between references on one page. Nothing
+  mutates them, and the `loopExtents` memo benefits. A geometry-stats
+  count of distinct point arrays falls for repeated references. No
+  existing test may be edited for that: a change there is reported, not
+  absorbed.
+- R5-2's run-coverage checks follow the documented `MeshGL` layout. The
+  real-Manifold provenance tests are the check that `getMesh` output meets
+  it.
+
+Each plan also runs biome on its touched files. The f2 strict program
+compiles all of `@nodetto/core`. A diagnostic in a file that a sibling
+plan is still editing is rerun after that sibling finishes. It is never
+fixed in the sibling's file.

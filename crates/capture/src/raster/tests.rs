@@ -543,3 +543,124 @@ fn layer_window_band_boundary() {
 fn layer_window_final_row() {
     assert!(compare_capped(&stripe_scene(&[191], 2, 64), MAX_LAYER_WINDOW) > 0);
 }
+
+fn diagonal_strip_scene(strips: usize, bodies: usize, height: u32) -> Scene {
+    let mut scene = base();
+    scene.width = 64;
+    scene.height = height;
+    scene.supersample = 2;
+    scene.camera.mm_per_pixel = 0.0486;
+    let mut positions = Vec::new();
+    for i in 0..=strips {
+        let offset = (i as f64 - strips as f64 / 2.0) * 32.0 / strips as f64;
+        for z in [0.0, 1.0] {
+            for x in [-128.0, 128.0] {
+                positions.extend([x, x + offset, z]);
+            }
+        }
+    }
+    let mut triangles = Vec::new();
+    let mut quad = |a: u32, b: u32, c: u32, d: u32| {
+        triangles.extend([a, b, c, a, c, d]);
+    };
+    for i in 0..strips as u32 {
+        let a = i * 4;
+        let b = a + 4;
+        quad(a, b, b + 1, a + 1);
+        quad(a + 2, a + 3, b + 3, b + 2);
+        quad(a, a + 2, b + 2, b);
+        quad(a + 1, b + 1, b + 3, a + 3);
+    }
+    quad(0, 1, 3, 2);
+    let last = strips as u32 * 4;
+    quad(last, last + 2, last + 3, last + 1);
+    for index in 0..bodies {
+        scene.tools.push(Tool::Mesh(crate::scene::Mesh {
+            positions: positions.clone(),
+            triangles: triangles.clone(),
+        }));
+        scene.bodies.push(body(&[(Op::Union, index as u32)]));
+    }
+    scene
+}
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn picture_triangle_audit_refused() {
+    let scene = diagonal_strip_scene(8192, 3, 64);
+    let mut error = None;
+    for threads in [1, 5] {
+        let (result, stats) = render_with(&scene, threads, SCAN_ALLOWANCE);
+        let actual = result.unwrap_err().to_string();
+        assert_eq!(actual, format!("The scene is too heavy for this picture size (picture boundary scans over {SCAN_ALLOWANCE}). Use a smaller --size."));
+        if let Some(ref previous) = error {
+            assert_eq!(&actual, previous);
+        }
+        error = Some(actual);
+        assert_eq!(stats.workers, if threads == 1 { 1 } else { 2 });
+        assert!(
+            stats.visited <= PICTURE_TRIANGLE_LIMIT && stats.triangles > PICTURE_TRIANGLE_LIMIT
+        );
+        assert!(stats.charged <= SCAN_ALLOWANCE);
+        assert!(stats.liveness.is_empty());
+        assert_eq!(stats.census.rays, 0);
+        println!(
+            "audit threads={threads} visited={} triangles={}",
+            stats.visited, stats.triangles
+        );
+    }
+}
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn picture_triangle_five_workers_refused() {
+    let scene = diagonal_strip_scene(8192, 2, 160);
+    let mut error = None;
+    for threads in [1, 5] {
+        let (result, stats) = render_with(&scene, threads, SCAN_ALLOWANCE);
+        let actual = result.unwrap_err().to_string();
+        assert_eq!(actual, format!("The scene is too heavy for this picture size (picture boundary scans over {SCAN_ALLOWANCE}). Use a smaller --size."));
+        if let Some(ref previous) = error {
+            assert_eq!(&actual, previous);
+        }
+        error = Some(actual);
+        assert_eq!(stats.workers, threads);
+        assert!(
+            stats.visited <= PICTURE_TRIANGLE_LIMIT && stats.triangles > PICTURE_TRIANGLE_LIMIT
+        );
+        assert!(stats.charged <= SCAN_ALLOWANCE);
+        assert!(stats.liveness.is_empty());
+        assert_eq!(stats.census.rays, 0);
+        println!(
+            "five threads={threads} visited={} triangles={}",
+            stats.visited, stats.triangles
+        );
+    }
+}
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "release only")]
+fn picture_triangle_admitted_parity() {
+    let scene = diagonal_strip_scene(256, 3, 160);
+    let mut expected = None;
+    for threads in [1, 5] {
+        let (result, stats) = render_with(&scene, threads, SCAN_ALLOWANCE);
+        let (rgb, report) = result.unwrap();
+        let png = crate::encode::png_rgb8(&rgb, scene.width, scene.height).unwrap();
+        assert_eq!(stats.workers, threads);
+        assert!(
+            stats.visited > 0
+                && stats.visited == stats.triangles
+                && stats.visited <= PICTURE_TRIANGLE_LIMIT
+        );
+        let output = (rgb, png, report.to_json(), stats.visited);
+        if let Some(ref previous) = expected {
+            assert_eq!(&output, previous);
+        }
+        println!(
+            "control threads={threads} visited={} triangles={}",
+            stats.visited, stats.triangles
+        );
+        expected = Some(output);
+    }
+}

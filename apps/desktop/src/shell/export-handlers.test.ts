@@ -715,3 +715,86 @@ test.each(["width", "height", "bodies"] as const)(
     expect(writes).toBe(0);
   },
 );
+
+test("CAD capture notes all unknown bodies and incomplete picture-only pairs", async () => {
+  const editor = new Editor();
+  editor.createPage({ kind: "cad3d", name: "Census" });
+  const names = [
+    "Bracket",
+    ...Array.from({ length: 8 }, (_, i) => `Rib-${i + 1}`),
+    "Gusset",
+  ];
+  const data = stlToInlineMesh(writeBinaryStl([openTriangle]));
+  for (const name of names)
+    editor.createElement("cad.mesh", { semantic: { name, data } });
+  const bodies = names.map((_, i) => ({
+    state: i === 0 || i === 9 ? "unknown" : "drawn",
+    open: false,
+    emptiedByStep: -1,
+  }));
+  let report = {
+    width: 1024,
+    height: 768,
+    bodies,
+    analysis: null as unknown,
+    pairs: [] as unknown[],
+  };
+  const notes: (string | null)[] = [];
+  const backend: ExportBackend = {
+    available: true,
+    pickExportPath: async () => "/out/image.png",
+    writeBytes: async () => {},
+    writeText: async () => {},
+    captureSolid: async () => ({
+      image: Uint8Array.of(1),
+      report: JSON.stringify(report),
+    }),
+  };
+  const handlers = createExportHandlers(
+    { editor, exportBackend: backend },
+    (note) => notes.push(note),
+  );
+  const options = {
+    camera: { view: "iso" as const },
+    width: 1024,
+    height: 768,
+    theme: "light" as const,
+    format: "png" as const,
+  };
+  await handlers.captureCadImage(options);
+  expect(notes.at(-1)).toContain(
+    "not sampled (material unknown): Bracket, Gusset",
+  );
+  expect(notes.at(-1)).not.toContain("cad.result.empty");
+  report = {
+    ...report,
+    analysis: {
+      cell: 0.25,
+      candidates: 1,
+      checked: 1,
+      unchecked: [],
+      uncheckedCount: 0,
+      cappedCount: 1,
+      cappedWithoutHit: [[0, 1]],
+      incomplete: [[0, 1]],
+      budget: 100,
+    },
+    pairs: [
+      {
+        a: 0,
+        b: 1,
+        volume: 1,
+        min: [0, 0, 0],
+        max: [1, 1, 1],
+        source: "view",
+        capped: true,
+      },
+    ],
+  };
+  await handlers.captureCadImage(options);
+  expect(notes.at(-1)).toContain("1 of 1 checked candidate pair incomplete");
+  expect(notes.at(-1)).toContain(
+    "the overlap listed above was found in the picture only",
+  );
+  expect(notes.at(-1)).toContain("(found in the picture only)");
+});

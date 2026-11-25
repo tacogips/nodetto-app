@@ -95,6 +95,7 @@ fn fixture_reports_only_plate_and_block_and_crop_does_not_change_analysis() {
             unchecked_count: 0,
             capped_count: 0,
             capped_without_hit: vec![],
+            incomplete: Vec::new(),
             budget: 24_000_000
         }
     );
@@ -582,8 +583,15 @@ fn cap_without_a_hit_is_retained_in_the_report_and_json() {
     scene.budget_million_rays = 1;
     scene.target_cell = 1.0;
     let (_, report) = render_rgb(&scene, 5).unwrap();
+    let one = nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 1).unwrap();
+    let five =
+        nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 5).unwrap();
+    assert_eq!(one.report, five.report);
+    assert_eq!(one.image, five.image);
     assert!(report.pairs.is_empty());
     let analysis = report.analysis.as_ref().unwrap();
+    assert!(analysis.incomplete.is_empty());
+    assert!(!report.to_json().contains("\"incomplete\""));
     assert_eq!(
         (analysis.candidates, analysis.checked, analysis.capped_count),
         (66, 66, 66)
@@ -928,4 +936,200 @@ fn sweep_matches_exhaustive_candidates() {
             assert_eq!(values(actual), values(expected));
         }
     }
+}
+
+#[test]
+fn admitted_cube_mesh_pin() {
+    let scene = two(support::cube_mesh(), support::cube_mesh());
+    let (_, report) = render_rgb(&scene, 1).unwrap();
+    assert_eq!(report.pairs[0].volume, 256.0);
+    let expected = r#"{"width":64,"height":64,"bodies":[{"state":"drawn","emptiedByStep":-1,"open":false},{"state":"hidden","emptiedByStep":-1,"open":false}],"analysis":{"cell":0.250,"candidates":1,"checked":1,"unchecked":[],"uncheckedCount":0,"cappedCount":0,"budget":24000000,"cappedWithoutHit":[]},"pairs":[{"a":0,"b":1,"volume":256.000,"min":[-4.000,-4.000,0.000],"max":[4.000,4.000,4.000],"source":"analysis","capped":false}]}"#;
+    for threads in [1, 5] {
+        let output =
+            nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, threads)
+                .unwrap();
+        assert_eq!(output.report, expected);
+        assert_eq!(support::digest(&output.image), 12628891807842507440);
+    }
+}
+
+#[test]
+fn dense_and_admitted_pairs_are_deterministic() {
+    let Tool::Mesh(cube) = support::cube_mesh() else {
+        unreachable!()
+    };
+    let mut dense = nodetto_capture::scene::Mesh {
+        positions: Vec::new(),
+        triangles: Vec::new(),
+    };
+    for i in 0..2048 {
+        dense.positions.extend(
+            cube.positions
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .flat_map(|p| [(p[0] + 4.0) * 1.25, (p[1] + 4.0) * 1.25, p[2] * 0.0025]),
+        );
+        dense
+            .triangles
+            .extend(cube.triangles.iter().map(|v| v + i * 8));
+    }
+    let mut far = support::cube_mesh();
+    if let Tool::Mesh(mesh) = &mut far {
+        for p in mesh.positions.as_chunks_mut::<3>().0 {
+            p[0] += 40.0;
+        }
+    }
+    let mut scene = scene(
+        vec![Tool::Mesh(dense), far],
+        vec![
+            analysed(&[(Op::Union, 0)]),
+            analysed(&[(Op::Union, 0)]),
+            analysed(&[(Op::Union, 1)]),
+            analysed(&[(Op::Union, 1)]),
+        ],
+    );
+    scene.target_cell = 1.0;
+    let (analysis, pairs) = run(&scene, 1);
+    assert_eq!(analysis.checked, 2);
+    assert!(analysis.capped_count >= 1);
+    assert!(
+        analysis.capped_without_hit.contains(&(0, 1))
+            || pairs.iter().any(|p| p.a == 0 && p.b == 1 && p.capped)
+    );
+    assert!(pairs.iter().any(|p| p.a == 2 && p.b == 3 && !p.capped));
+    let one = nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 1).unwrap();
+    let five =
+        nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 5).unwrap();
+    assert_eq!(one.report, five.report);
+    assert_eq!(one.image, five.image);
+}
+
+#[test]
+fn request_triangle_ceiling_is_deterministic_across_render_threads() {
+    let Tool::Mesh(cube) = support::cube_mesh() else {
+        unreachable!()
+    };
+    let mut mesh = nodetto_capture::scene::Mesh {
+        positions: Vec::new(),
+        triangles: Vec::new(),
+    };
+    for i in 0..40 {
+        mesh.positions
+            .extend(cube.positions.as_chunks::<3>().0.iter().flat_map(|p| {
+                [
+                    (p[0] + 4.0) * 16.0,
+                    (p[1] + 4.0) * 16.0,
+                    p[2] * 0.03125 + i as f64 * 0.25,
+                ]
+            }));
+        mesh.triangles
+            .extend(cube.triangles.iter().map(|v| v + i * 8));
+    }
+    let mut scene = scene(
+        vec![Tool::Mesh(mesh)],
+        (0..4).map(|_| analysed(&[(Op::Union, 0)])).collect(),
+    );
+    scene.budget_million_rays = 1;
+    scene.target_cell = 0.25;
+    let one = nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 1).unwrap();
+    let five =
+        nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 5).unwrap();
+    assert_eq!(one.report, five.report);
+    assert_eq!(one.image, five.image);
+    let (analysis, _) = run(&scene, 1);
+    assert!(analysis.capped_count >= 1);
+}
+
+#[test]
+fn cropped_dense_pair_keeps_buffered_witness() {
+    let Tool::Mesh(cube) = support::cube_mesh() else {
+        unreachable!()
+    };
+    let mut mesh = nodetto_capture::scene::Mesh {
+        positions: Vec::new(),
+        triangles: Vec::new(),
+    };
+    for i in 0..512 {
+        mesh.positions
+            .extend(cube.positions.as_chunks::<3>().0.iter().flat_map(|p| {
+                [
+                    (p[0] + 4.0) / 8.0 + f64::from(i) * 2.0,
+                    (p[1] + 4.0) * 1.25,
+                    p[2] * 2.5,
+                ]
+            }));
+        mesh.triangles
+            .extend(cube.triangles.iter().map(|v| v + i * 8));
+    }
+    let other = nodetto_capture::scene::Mesh {
+        positions: mesh.positions.clone(),
+        triangles: mesh.triangles.clone(),
+    };
+    let mut scene = two(Tool::Mesh(mesh), Tool::Mesh(other));
+    scene.camera = camera([0.0, 0.0, -1.0], [2000.0, 2000.0, 0.0], 10.0);
+    scene.target_cell = 0.25;
+    let (analysis, pairs) = run(&scene, 1);
+    assert_eq!(analysis.capped_count, 1);
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(
+        (pairs[0].a, pairs[0].b, pairs[0].capped, pairs[0].from_view),
+        (0, 1, true, false)
+    );
+    let one = nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 1).unwrap();
+    let five =
+        nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 5).unwrap();
+    assert_eq!(one.report, five.report);
+    assert_eq!(one.image, five.image);
+}
+
+#[test]
+fn cropped_dense_disjoint_pair_reports_incomplete() {
+    let Tool::Mesh(cube) = support::cube_mesh() else {
+        unreachable!()
+    };
+    let make_mesh = |offset: f64| {
+        let mut mesh = nodetto_capture::scene::Mesh {
+            positions: Vec::new(),
+            triangles: Vec::new(),
+        };
+        for i in 0..512 {
+            mesh.positions
+                .extend(cube.positions.as_chunks::<3>().0.iter().flat_map(|p| {
+                    [
+                        (p[0] + 4.0) / 8.0 + f64::from(i) * 4.0 + offset,
+                        (p[1] + 4.0) * 1.25,
+                        p[2] * 2.5,
+                    ]
+                }));
+            mesh.triangles
+                .extend(cube.triangles.iter().map(|v| v + i * 8));
+        }
+        mesh.positions
+            .extend(cube.positions.as_chunks::<3>().0.iter().flat_map(|p| {
+                [
+                    (p[0] + 4.0) / 8.0,
+                    9.0 + (p[1] + 4.0) / 8.0,
+                    9.0 + p[2] / 4.0,
+                ]
+            }));
+        mesh.triangles
+            .extend(cube.triangles.iter().map(|v| v + 512 * 8));
+        Tool::Mesh(mesh)
+    };
+    let mut scene = two(make_mesh(0.0), make_mesh(2.0));
+    scene.camera = camera([0.0, 0.0, -1.0], [2000.0, 2000.0, 0.0], 10.0);
+    scene.target_cell = 0.25;
+    let (analysis, pairs) = run(&scene, 1);
+    assert!(pairs.is_empty());
+    assert_eq!(analysis.incomplete, vec![(0, 1)]);
+    assert_eq!(analysis.capped_without_hit, vec![(0, 1)]);
+    let one = nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 1).unwrap();
+    let five =
+        nodetto_capture::render_parsed(&scene, nodetto_capture::ImageFormat::Png, 5).unwrap();
+    assert!(one
+        .report
+        .contains(r#""cappedWithoutHit":[[0,1]],"incomplete":[[0,1]]"#));
+    assert_eq!(one.report, five.report);
+    assert_eq!(one.image, five.image);
 }

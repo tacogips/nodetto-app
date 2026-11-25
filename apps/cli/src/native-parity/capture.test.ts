@@ -572,7 +572,11 @@ nativeTest(
   () => {
     const cwd = mkdtempSync(join(tmpdir(), "nodetto-hidden-cut-"));
     try {
-      for (const shared of [true, false]) {
+      for (const [shared, visible] of [
+        [true, false],
+        [false, false],
+        [true, true],
+      ] as const) {
         const elements = [
           sketch("wide-sketch", "a1"),
           ...rectangle("wide-sketch", 0, 0, 20, 10),
@@ -589,7 +593,7 @@ nativeTest(
               distance: 4,
               op: "new",
             }),
-            visual: { hidden: true },
+            visual: { hidden: !visible },
           },
           sketch("trim-sketch", "a5"),
           ...rectangle("trim-sketch", 0, 0, 5, 10),
@@ -610,13 +614,35 @@ nativeTest(
           "top",
           "--no-interference",
         ]);
-        expect(stdout).toContain(`errors: ${shared ? 1 : 0}`);
+        expect(stdout).toContain(`errors: ${visible ? 2 : shared ? 1 : 0}`);
         const bodies = stdout
           .split("\n")
           .find((line) => line.startsWith("bodies:"));
-        expect(bodies).toContain("bodies: 1 (wide");
-        expect(bodies).not.toContain("hidden");
-        if (shared) {
+        expect(bodies).toContain(`bodies: ${visible ? 2 : 1} (wide`);
+        if (visible) {
+          expect(bodies).toContain("wide [differs from the app, see errors]");
+          const error = stdout
+            .split("\n")
+            .find((line) => line.includes('keeps "wide"'));
+          expect(error).toContain("trim");
+          expect(error).toContain('"hidden"');
+          const json = JSON.parse(
+            runCad(cwd, path, ["--view", "top", "--no-interference", "--json"])
+              .stdout,
+          );
+          expect(json.errors).toContainEqual(
+            expect.objectContaining({
+              id: "trim",
+              code: "cad.result.empty",
+              sampled: true,
+              text: expect.stringContaining('keeps "wide"'),
+            }),
+          );
+        } else {
+          expect(bodies).not.toContain("hidden");
+          if (!shared) expect(bodies).not.toContain("differs from the app");
+        }
+        if (shared && !visible) {
           const error = stdout
             .split("\n")
             .find((line) => line.includes("cad.result.empty"));
@@ -1154,4 +1180,97 @@ nativeTest(
     }
   },
   600_000,
+);
+
+nativeTest(
+  "native capture keeps the analysis hit of a cropped dense pair",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-dense-pair-"));
+    try {
+      const positions: number[] = [];
+      const triangles: number[] = [];
+      const vertices = [
+        0, 0, 0, 1, 0, 0, 1, 10, 0, 0, 10, 0, 0, 0, 10, 1, 0, 10, 1, 10, 10, 0,
+        10, 10,
+      ];
+      const faces = [
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5,
+        2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+      ];
+      for (let i = 0; i < 512; i++) {
+        for (let j = 0; j < vertices.length; j += 3) {
+          positions.push(
+            (vertices[j] ?? 0) + i * 2,
+            vertices[j + 1] ?? 0,
+            vertices[j + 2] ?? 0,
+          );
+        }
+        triangles.push(...faces.map((index) => index + i * 8));
+      }
+      const data = toInline(
+        encodeNmesh(
+          canonicalize({
+            positions: new Float64Array(positions),
+            triangles: new Uint32Array(triangles),
+          }),
+        ),
+      );
+      const path = join(cwd, "dense.jsonl");
+      writeFileSync(
+        path,
+        serializeDocument(
+          document(
+            [
+              cadElement("first", "cad.mesh", "a0", { name: "First", data }),
+              cadElement("second", "cad.mesh", "a1", { name: "Second", data }),
+            ],
+            [CAD_TEST_PAGE],
+          ),
+        ),
+      );
+      for (const json of [false, true]) {
+        const result = Bun.spawnSync(
+          [
+            binary as string,
+            "capture",
+            path,
+            "--view",
+            "top",
+            "--size",
+            "64x64",
+            "--target",
+            "2000,2000,0",
+            "--zoom",
+            "10",
+            "--fail-on-interference",
+            "--output",
+            "dense.png",
+            "--force",
+            ...(json ? ["--json"] : []),
+          ],
+          { cwd },
+        );
+        expect(result.exitCode).toBe(1);
+        const output = result.stdout.toString();
+        if (json) {
+          const report = JSON.parse(output);
+          expect(report.interference.pairs).toHaveLength(1);
+          expect(report.interference.pairs[0]).toMatchObject({
+            a: "first",
+            b: "second",
+            approximate: true,
+            source: "analysis",
+          });
+          expect(report.interference.incomplete).toBeUndefined();
+        } else {
+          expect(output).toMatch(/First.*Second.*, approximate/m);
+          expect(output).not.toContain("incomplete:");
+          expect(output).not.toContain("(found in the picture only)");
+        }
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
 );

@@ -39,6 +39,36 @@ export function isPcbOutlineGraphic(element: Element): boolean {
   );
 }
 
+type PageOutline = Pick<PcbOutline, "loops" | "sources">;
+
+export interface PcbOutlineIndex {
+  readonly boards: ReadonlyMap<ElementId, Element>;
+  readonly graphics: ReadonlyMap<PageId, readonly Element[]>;
+}
+
+const outlineMemos = new WeakMap<
+  PcbOutlineIndex,
+  Map<PageId, PageOutline | OutlineError>
+>();
+
+export function pcbOutlineIndex(elements: readonly Element[]): PcbOutlineIndex {
+  const boards = new Map<ElementId, Element>();
+  const graphics = new Map<PageId, Element[]>();
+  for (const element of elements) {
+    if (element.type === "pcb.board") boards.set(element.id, element);
+    else if (isPcbOutlineGraphic(element)) {
+      const page = graphics.get(element.page);
+      if (page) page.push(element);
+      else graphics.set(element.page, [element]);
+    }
+  }
+  for (const page of graphics.values())
+    page.sort((a, b) => compareFractional(a.id, b.id));
+  const index: PcbOutlineIndex = { boards, graphics };
+  outlineMemos.set(index, new Map());
+  return index;
+}
+
 export function pcbOutlineGraphics(
   elements: readonly Element[],
   page: PageId,
@@ -94,12 +124,37 @@ export function pcbBoardOutline(
   elements: readonly Element[],
   boardId: ElementId,
 ): PcbOutline | OutlineError {
-  const board = elements.find(
-    ({ id, type }) => id === boardId && type === "pcb.board",
-  );
+  return pcbBoardOutlineIndexed(pcbOutlineIndex(elements), boardId);
+}
+
+export function pcbBoardOutlineIndexed(
+  index: PcbOutlineIndex,
+  boardId: ElementId,
+): PcbOutline | OutlineError {
+  const board = index.boards.get(boardId);
   if (!board || !isPlainObject(board.semantic))
     return { error: "cad.pcb.noBoard" };
-  const graphics = pcbOutlineGraphics(elements, board.page);
+  const outlines = outlineMemos.get(index);
+  if (!outlines) throw new TypeError("Invalid PCB outline index");
+  let outline = outlines.get(board.page);
+  if (!outline) {
+    outline = pageOutline(index.graphics.get(board.page) ?? []);
+    outlines.set(board.page, outline);
+  }
+  if ("error" in outline) return outline;
+  const { thickness } = board.semantic;
+  return {
+    ...outline,
+    thickness:
+      typeof thickness === "number" &&
+      Number.isFinite(thickness) &&
+      thickness > 0
+        ? thickness
+        : 1.6,
+  };
+}
+
+function pageOutline(graphics: readonly Element[]): PageOutline | OutlineError {
   const paths: CadProfilePath[] = [];
   let minX = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
@@ -139,15 +194,8 @@ export function pcbBoardOutline(
       error: "cad.pcb.openOutline",
       ...(profile.at === undefined ? {} : { at: profile.at }),
     };
-  const { thickness } = board.semantic;
   return {
     loops: profile.loops,
-    thickness:
-      typeof thickness === "number" &&
-      Number.isFinite(thickness) &&
-      thickness > 0
-        ? thickness
-        : 1.6,
     sources: profile.loops.flatMap(({ sources }) => sources),
   };
 }

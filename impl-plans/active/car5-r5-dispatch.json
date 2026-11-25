@@ -1,0 +1,161 @@
+{
+  "taskId": "car5-r5",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "70977f468c57c5c34cc55c1cd1487e89b7a72bfe",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md",
+    "design-docs/specs/design-cad3d.md"
+  ],
+  "evidenceRoot": "tmp/car5-r5",
+  "waves": [
+    ["car5-f1-sibling-cut", "car5-f2-kernel-strict", "car5-f3-lattice-scan", "car5-f4-open-mesh-hit", "car5-f5-pcb-outline-index", "car5-f6-diagnostic-ids"]
+  ],
+  "reviewContext": {
+    "issueReference": "round-5-audit:feat/ai-capture@70977f468c57c5c34cc55c1cd1487e89b7a72bfe (base 0a35708); no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car5-00-overview.md",
+    "userProblem": "The round-5 audit found six defects in 3D CAD pages and AI capture: a shared cut that empties one visible target leaves the trimmed visible sibling without a discrepancy note; the CAD kernel and worker exports fail to compile under noUncheckedIndexedAccess; the interference lattice scans dense mesh bins before charging any work; open-mesh picture rays allocate and sort a vector per sample; PCB outline resolution rescans linked graphics for every reference; and capture diagnostics shorten ids against page scope, so a printed token can delete an unrelated element.",
+    "requiredOutcomes": [
+      "function-capture-visible-sibling-cut-report (R5-1; f1): the trimmed visible sibling gets a sampled cad.result.empty naming the failed feature, the emptied target and itself in CLI text, CLI JSON and desktop export; hidden-target precedence and text unchanged; rail-only control has no note; editor keeps rail at 800 mm^3.",
+      "function-cad-kernel-strict-indexed-reads (R5-2; f2): cad-ui.tsx, cad-kernel index.ts and worker.ts compile with zero diagnostics under noUncheckedIndexedAccess; truncated Manifold buffers throw Invalid Manifold mesh data; valid output unchanged.",
+      "performance-interference-mesh-triangle-scans (R5-3; f3): scan cost charged before intervals in pair sampler and census against 1,024 entries per weighted ray; stacked-plates visits bounded and capped; 1 and 5 threads identical on a multi-pair scene; admitted cube-mesh pair matches literals pinned before the change.",
+      "performance-open-mesh-nearest-hit-allocation (R5-4; f4): one-pass nearest facet; open-square allocations below samples/16; oracle equality incl. -0.0/+0.0 and bin-order ties; overlap and equal-depth digests pinned before the change hold at 1 and 4 threads.",
+      "performance-cad-pcb-outline-page-rescans (R5-5; f5): reads grow at most 4.5x for 4x input for separate pages and a shared N-segment board, via prepareCadCapture and evaluateCadPage; scene digest unchanged; per-reference thickness; closed widening updates bounds, body key and kernel calls.",
+      "maintainability-capture-diagnostic-id-scope (R5-6; f6): structural and sampled capture tokens match cad check; edit resolves them to the failed feature and the unrelated element survives; JSON keeps full ids."
+    ],
+    "nonGoals": [
+      "No edits to crates/capture/src/raster.rs, crates/capture/src/raster/**, crates/capture/src/prism.rs, crates/capture/src/census.rs, crates/capture/src/lib.rs, crates/capture/src/report.rs, capture goldens or docs/capture.md.",
+      "No NCS1 or report JSON change, no golden regeneration, no error code change, no package boundary change."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, CARGO_TERM_QUIET=true, rustfmt on touched Rust files.",
+      "Each plan uses CARGO_TARGET_DIR=target/<planId> and artifactRoots [\"target\", \"tmp/cad3d\"].",
+      "Per-plan gates are focused; typecheck, lint, mise run verify and mise run test-cli run once at integration."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R5-1 sibling attribution in describeBodies only; sibling replaces today's hidden-then-own attribution only when strictly earlier.", "rationale": "Report already carries emptiedByStep and the model carries tool identity; preserves R4-1 output and removes Rust chains."},
+      {"decision": "R5-2 coverage checks before the numProp-3 fast path, plus per-read guards.", "rationale": "Checked reads alone miss truncated buffers whose loop bounds skip required values."},
+      {"decision": "R5-3 charge_scan on BoundaryBudget reusing the exhausted flag; visits counted by a cfg(test) counter in ToolView::intervals.", "rationale": "Existing capped and unknown propagation never claims emptiness; mesh.rs stays with f4."},
+      {"decision": "R5-4 strict total_cmp Less in one pass sharing the facet helper with hits_impl.", "rationale": "Equals the stable sort's first element."},
+      {"decision": "R5-5 scan-local page outline memo and per-page graphics key.", "rationale": "Linear in shared-page and separate-page workloads; invalidation by new scan."},
+      {"decision": "R5-6 renderCadCapture takes document elements for short ids.", "rationale": "Single caller cannot pass a page-scoped map by mistake."}
+    ],
+    "intentionalTradeoffs": [
+      "R5-3 caps rather than scans meshes whose average bin occupancy exceeds 1,024 entries per weighted ray; the result is capped or unknown, never a wrong claim.",
+      "R5-1 does not resolve chains of rejected shared steps beyond each body's first discrepancy."
+    ],
+    "supportedEdgeCases": [
+      "Hidden and visible targets of one shared cut, open bodies, unknown census bodies, truncated Manifold buffers, empty meshes, zero-length runs, equal-depth and signed-zero facets, many references to one board, cross-page exact-prefix id collisions."
+    ],
+    "outOfScopeEdgeCases": [
+      "Reproducing the app's skip-and-fail-dependents behaviour in capture; dense real meshes above the scan allowance."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "design-docs/specs/design-cad3d.md",
+      "impl-plans/active/car5-00-overview.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car5-f1-sibling-cut",
+      "planPath": "impl-plans/active/car5-f1-sibling-cut.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/describe.ts", "packages/core/src/capture/describe.test.ts", "apps/cli/src/native-parity/capture.test.ts", "packages/cad-kernel/src/shared-cut.test.ts", "tmp/capture/m09/timing.json", "tmp/capture/m23/timing.json", "tmp/car5-r5/car5-f1-sibling-cut", "impl-plans/progress/car5-f1-sibling-cut.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "describeBodies gives the trimmed visible sibling one sampled cad.result.empty naming the emptied target and itself only when the sibling step is strictly earlier than today's attribution; describe.test.ts:188 unchanged.",
+        "shared-cut.test.ts: shared cut fails with cad.result.empty and rail keeps 800 mm^3; rail-only cut leaves 600 mm^3.",
+        "Native --no-interference: visible tab gives the sibling line and differs note in text and --json (sampled: true, full id); hidden tab unchanged; rail-only errors: 0."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/capture/describe.ts packages/core/src/capture/describe.test.ts packages/cad-kernel/src/shared-cut.test.ts apps/cli/src/native-parity/capture.test.ts && bun test packages/core/src/capture/describe.test.ts packages/cad-kernel/src/shared-cut.test.ts",
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f1-sibling-cut cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car5-f1-sibling-cut/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    },
+    {
+      "planId": "car5-f2-kernel-strict",
+      "planPath": "impl-plans/active/car5-f2-kernel-strict.md",
+      "dependsOn": [],
+      "writePaths": ["packages/cad-kernel/src/manifold-kernel.ts", "packages/cad-kernel/src/manifold-kernel.test.ts", "packages/ui-solid/src/cad/strict-index.test.ts", "tmp/car5-r5/car5-f2-kernel-strict", "impl-plans/progress/car5-f2-kernel-strict.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "strict-index.test.ts roots cad-ui.tsx, cad-kernel index.ts and worker.ts and reports zero diagnostics under noUncheckedIndexedAccess.",
+        "readManifoldMesh throws Invalid Manifold mesh data for stride-3 with 8 properties, stride-4 with 9, missing run ids, short runIndex and short faceID; valid empty and two-run buffers give expected output; missing face name keeps Missing Manifold face.",
+        "Existing Manifold provenance, measurement and worker-host tests pass."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/cad-kernel/src/manifold-kernel.ts packages/cad-kernel/src/manifold-kernel.test.ts packages/ui-solid/src/cad/strict-index.test.ts && bun test packages/ui-solid/src/cad/strict-index.test.ts packages/cad-kernel/src/manifold-kernel.test.ts packages/cad-kernel/src/worker-host.test.ts"
+      ]
+    },
+    {
+      "planId": "car5-f3-lattice-scan",
+      "planPath": "impl-plans/active/car5-f3-lattice-scan.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/lattice.rs", "crates/capture/src/tool_view.rs", "crates/capture/tests/interference.rs", "tmp/car5-r5/car5-f3-lattice-scan", "impl-plans/progress/car5-f3-lattice-scan.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Both casts charge scan_cost before intervals against SCAN_ENTRIES_PER_WEIGHTED_RAY = 1_024 * weight * (rays + 16); exhaustion uses the existing exhausted flag.",
+        "Stacked-plates sample_pair and sample_body_axis_with visit at most the allowance and fewer than 1,000,000 entries and report capped.",
+        "Multi-pair render_parsed output identical at 1 and 5 threads; dense pair capped, cube pair not; admitted cube-mesh literals pinned before the change still match; full nodetto-capture suite passes."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 crates/capture/src/lattice.rs crates/capture/src/tool_view.rs crates/capture/tests/interference.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f3-lattice-scan cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f3-lattice-scan cargo test --release -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car5-f4-open-mesh-hit",
+      "planPath": "impl-plans/active/car5-f4-open-mesh-hit.md",
+      "dependsOn": [],
+      "writePaths": ["crates/capture/src/mesh.rs", "crates/capture/tests/overlay_alloc.rs", "tmp/car5-r5/car5-f4-open-mesh-hit", "impl-plans/progress/car5-f4-open-mesh-hit.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "first_surface_hit selects in one pass with no allocation and equals the hits_impl-plus-first oracle for overlap, equal-depth (both orders), signed zero and grid rays.",
+        "Open 200 mm square at 1024x1024 supersample 2: allocations below samples/16 with one thread; RGB equal at 1 and 4 threads.",
+        "Overlap and equal-depth AB/BA render digests pinned before the change hold at 1 and 4 threads; AB differs from BA; full nodetto-capture suite passes."
+      ],
+      "verification": [
+        "rustfmt --edition 2021 crates/capture/src/mesh.rs crates/capture/tests/overlay_alloc.rs && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f4-open-mesh-hit cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car5-f4-open-mesh-hit cargo test --release -p nodetto-capture"
+      ]
+    },
+    {
+      "planId": "car5-f5-pcb-outline-index",
+      "planPath": "impl-plans/active/car5-f5-pcb-outline-index.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/pcb-outline.ts", "packages/core/src/cad/history.ts", "packages/core/src/cad/evaluate.ts", "packages/core/src/cad/pcb-outline.test.ts", "tmp/car5-r5/car5-f5-pcb-outline-index", "impl-plans/progress/car5-f5-pcb-outline-index.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Semantic reads at N=128 are at most 4.5x those at N=32 for separate pages and a shared N-segment board via prepareCadCapture, and for the shared board via evaluateCadPage.",
+        "Shared-board scene digest equals the literal pinned before the change; Z extents alternate 1 and 3 mm.",
+        "Closed widening: max X +1 mm, zero model errors, changed CadBodyResult.key and a new RecordingKernel solid call with the same memo; unchanged control keeps keys and makes no call."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn packages/core/src/cad/pcb-outline.ts packages/core/src/cad/history.ts packages/core/src/cad/evaluate.ts packages/core/src/cad/pcb-outline.test.ts && bun test packages/core/src/cad/pcb-outline.test.ts packages/core/src/cad/history.test.ts packages/core/src/cad/evaluate.test.ts packages/core/src/capture/determinism.test.ts"
+      ]
+    },
+    {
+      "planId": "car5-f6-diagnostic-ids",
+      "planPath": "impl-plans/active/car5-f6-diagnostic-ids.md",
+      "dependsOn": [],
+      "writePaths": ["apps/cli/src/capture-cad.ts", "apps/cli/src/capture-command.ts", "apps/cli/src/capture-cad.test.ts", "tmp/car5-r5/car5-f6-diagnostic-ids", "impl-plans/progress/car5-f6-diagnostic-ids.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Structural collar-groove/collar collision prints collar- equal to cad check; editCommand with it removes collar-groove and collar survives; JSON id collar-groove.",
+        "Sampled sleeve-cut/sleeve collision prints sleeve- which resolves to sleeve-cut; JSON id sleeve-cut.",
+        "Existing capture-cad and capture-command tests pass."
+      ],
+      "verification": [
+        "bunx biome check --diagnostic-level=warn apps/cli/src/capture-cad.ts apps/cli/src/capture-command.ts apps/cli/src/capture-cad.test.ts && bun test apps/cli/src/capture-cad.test.ts apps/cli/src/capture-command.test.ts"
+      ]
+    }
+  ]
+}

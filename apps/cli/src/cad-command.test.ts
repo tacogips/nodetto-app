@@ -81,6 +81,27 @@ test("cad check collects a foreign board outline and resolves its cap sketch", (
   });
 });
 
+test("cad check preserves reserved diagnostic IDs", () => {
+  const broken = serializeDocument({
+    ...document,
+    pages: [CAD_TEST_PAGE],
+    elements: [
+      extrude("name:latch-bore", "aZ", {
+        sketch: "missing-profile",
+        distance: 3,
+        op: "new",
+      }),
+    ],
+  });
+  const result = runCli(
+    ["cad", "check", "broken.jsonl"],
+    { ...io, readText: () => broken },
+    "test",
+  );
+  expect(result.stdout).toContain("name:latch-bore cad.reference.missing");
+  expect(result.stdout).not.toContain("name:l cad.reference.missing");
+});
+
 test("cad check reports every CAD page and its extrusion tool bounds", () => {
   expect(check()).toEqual({
     exitCode: 0,
