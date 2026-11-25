@@ -134,7 +134,18 @@ export function describeBodies(
   const names = model.bodies.map((body, i) => {
     const state = report.bodies[i];
     if (!state) return plain(body.name);
-    if (state.emptiedByStep !== -1) {
+    const hiddenStep =
+      state.hiddenEmptiedByStep === undefined
+        ? undefined
+        : body.steps[state.hiddenEmptiedByStep];
+    const hiddenTool = hiddenStep && model.tools[hiddenStep.tool];
+    if (hiddenTool) {
+      errors.push({
+        id: hiddenTool.feature,
+        code: "cad.result.empty",
+        text: `(sampled): leaves no material in a hidden target body; the app rejects this feature and keeps "${plain(body.name)}" as it was, this picture applies it`,
+      });
+    } else if (state.emptiedByStep !== -1) {
       const step = body.steps[state.emptiedByStep];
       const tool = step && model.tools[step.tool];
       if (tool)
@@ -150,7 +161,7 @@ export function describeBodies(
       ((state.state === "drawn" ||
         state.state === "hidden" ||
         state.state === "outside") &&
-      state.emptiedByStep !== -1
+      (state.emptiedByStep !== -1 || state.hiddenEmptiedByStep !== undefined)
         ? " [differs from the app, see errors]"
         : "") +
       (state.open ? " [open mesh, not checked]" : "")

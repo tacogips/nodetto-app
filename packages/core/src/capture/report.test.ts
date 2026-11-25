@@ -42,11 +42,20 @@ test("reads interim and final Rust report shapes", () => {
   expect(parseSolidReport(JSON.stringify(analysed))).toEqual(analysed);
 });
 
+test("reads a hidden-target emptying step", () => {
+  const value = { ...report, bodies: [{ ...body, hiddenEmptiedByStep: 1 }] };
+  expect(parseSolidReport(JSON.stringify(value))).toEqual(value);
+});
+
 test.each([
   { ...report, analysis: undefined },
   { ...report, analysis: { ...analysis, cappedCount: undefined } },
   { ...report, analysis: { ...analysis, budget: undefined } },
   { ...report, analysis: { ...analysis, cappedWithoutHit: undefined } },
+  ...[-1, 1.5, "1", null].map((hiddenEmptiedByStep) => ({
+    ...report,
+    bodies: [{ ...body, hiddenEmptiedByStep }],
+  })),
   { ...report, bodies: [null] },
   { ...report, bodies: [{ ...body, state: "occluded" }] },
   { ...report, bodies: [{ ...body, open: "false" }] },

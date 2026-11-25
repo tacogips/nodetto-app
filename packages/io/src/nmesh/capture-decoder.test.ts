@@ -198,3 +198,35 @@ test("budgeted decoding preserves explicit codec corruption errors", async () =>
     expect(allocations).toEqual([]);
   }
 });
+
+test("multi-byte vertex counts respect the geometry budget", async () => {
+  const { decodeCaptureMeshWith } = await import("./capture-decoder.ts");
+  const positions = new Float64Array(129 * 3);
+  const triangles = new Uint32Array(129);
+  for (let i = 0; i < 129; i++) {
+    positions[i * 3] = i;
+    positions[i * 3 + 1] = i % 2;
+    triangles[i] = i;
+  }
+  const mesh = canonicalize({ positions, triangles });
+  const count = mesh.positions.length / 3;
+  expect(count).toBeGreaterThanOrEqual(128);
+  const data = toInline(encodeNmesh(mesh));
+  const calls: string[] = [];
+  const kept = decodeCaptureMeshWith(data, {
+    maxVertices: count,
+    onAllocate: (kind) => calls.push(kind),
+  });
+  expect(kept.positions).toBeDefined();
+  expect(calls).toEqual(["positions", "triangles", "mm"]);
+  calls.length = 0;
+  const omitted = decodeCaptureMeshWith(data, {
+    maxVertices: count - 1,
+    onAllocate: (kind) => calls.push(kind),
+  });
+  expect(omitted.positions).toBeUndefined();
+  expect(omitted.triangles).toBeUndefined();
+  expect(omitted.vertexCount).toBe(count);
+  expect(omitted.bounds).toEqual(kept.bounds);
+  expect(calls).toEqual([]);
+});

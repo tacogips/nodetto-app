@@ -15,15 +15,20 @@ function lowestVertex(grid: readonly number[]): number {
   return lowest / 2;
 }
 
+export const triangulateWork = { candidateVisits: 0, queries: 0 };
+
 function isEar(
   grid: readonly number[],
-  next: readonly number[],
+  candidateNext: Int32Array,
+  head: number,
   a: number,
   b: number,
   c: number,
 ): boolean {
   if (orientation(grid, a * 2, b * 2, c * 2) <= 0) return false;
 
+  triangulateWork.queries += 1;
+  triangulateWork.candidateVisits += 1;
   // Include the edge of the ear. A collinear vertex on the new diagonal
   // must stay on the boundary so the cap and the prism sides meet.
   const minX = Math.min(
@@ -46,7 +51,9 @@ function isEar(
     coordinate(grid, b * 2 + 1),
     coordinate(grid, c * 2 + 1),
   );
-  for (let p = coordinate(next, c); p !== a; p = coordinate(next, p)) {
+  for (let p = head; p !== -1; p = candidateNext[p] ?? -1) {
+    triangulateWork.candidateVisits += 1;
+    if (p === a || p === c) continue;
     const x = coordinate(grid, p * 2);
     const y = coordinate(grid, p * 2 + 1);
     if (
@@ -103,16 +110,75 @@ export function triangulateSimplePolygon(points: readonly number[]): number[] {
     return triangles;
   }
 
+  const candPrev = new Int32Array(count).fill(-1);
+  const candNext = new Int32Array(count).fill(-1);
+  const isCandidate = new Uint8Array(count);
+  let head = -1;
+  let tail = -1;
+  for (let i = 0; i < count; i += 1) {
+    if (
+      orientation(
+        grid,
+        coordinate(prev, i) * 2,
+        i * 2,
+        coordinate(next, i) * 2,
+      ) <= 0
+    ) {
+      isCandidate[i] = 1;
+      candPrev[i] = tail;
+      if (tail === -1) head = i;
+      else candNext[tail] = i;
+      tail = i;
+    }
+  }
+  function reclassify(v: number): void {
+    triangulateWork.candidateVisits += 1;
+    const candidate =
+      orientation(
+        grid,
+        coordinate(prev, v) * 2,
+        v * 2,
+        coordinate(next, v) * 2,
+      ) <= 0;
+    if (candidate === (isCandidate[v] === 1)) return;
+    if (!candidate) {
+      const before = candPrev[v] ?? -1;
+      const after = candNext[v] ?? -1;
+      if (before === -1) head = after;
+      else candNext[before] = after;
+      if (after === -1) tail = before;
+      else candPrev[after] = before;
+      isCandidate[v] = 0;
+      return;
+    }
+    let after = head;
+    let before = -1;
+    while (after !== -1 && after < v) {
+      triangulateWork.candidateVisits += 1;
+      before = after;
+      after = candNext[after] ?? -1;
+    }
+    candPrev[v] = before;
+    candNext[v] = after;
+    if (before === -1) head = v;
+    else candNext[before] = v;
+    if (after === -1) tail = v;
+    else candPrev[after] = v;
+    isCandidate[v] = 1;
+  }
+
   let b = first;
   let remaining = count;
   let misses = 0;
   while (remaining > 3) {
     const a = coordinate(prev, b);
     const c = coordinate(next, b);
-    if (isEar(grid, next, a, b, c)) {
+    if (isEar(grid, candNext, head, a, b, c)) {
       triangles.push(a, b, c);
       next[a] = c;
       prev[c] = a;
+      reclassify(a);
+      reclassify(c);
       remaining -= 1;
       misses = 0;
     } else {

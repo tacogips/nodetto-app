@@ -17,7 +17,10 @@ sentence and section 19 disagree, section 19 wins. Revision 9 (audit round
 19 and section 20 disagree, section 20 wins. Revision 10 (audit round 3 of
 `0a35708..a964ad5`, 7 major findings) is section 21 here and section 20 of
 `design-docs/specs/design-cad3d.md`; where an earlier section and section
-21 disagree, section 21 wins.
+21 disagree, section 21 wins. Revision 11 (audit round 4 of
+`0a35708..3f9ce78`, 8 findings) is section 22 here and section 21 of
+`design-docs/specs/design-cad3d.md`; it extends NCS1 (offset 36) and the
+reply JSON of section 6.3, and section 22 wins over earlier sections.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -4361,3 +4364,605 @@ Decisions:
   never-flag switch is kept only for the stacked-cap witness delta.
 - The native cases are regression guards. Fail-before evidence is the Rust
   cases, so no older commit or pre-fix binary is built.
+
+## 22. Revision 11: audit round 4 corrections
+
+Source: audit round 4 of the 3D CAD pages and AI capture, base `0a35708`
+to `audit/round-4` at `3f9ce78`. It has eight findings (two high, six
+medium), none deferred. No GitHub issue exists; the round-4 workflow input
+is the issue body. This section states the capture rules R4-1, R4-2, R4-3
+and R4-6 and the plan grouping of all eight findings. The core rules R4-4,
+R4-5, R4-7 and R4-8 are in `design-docs/specs/design-cad3d.md` section 21.
+Where an earlier section and this one disagree, this section wins.
+
+Common rules (those of sections 19 to 21, restated):
+
+- Every fix ships a test that fails on `3f9ce78` and passes after it, in
+  the working tree. A performance test asserts a deterministic operation,
+  visit or byte counter, never a wall clock. For the two duplicated-rule
+  findings (R4-7, R4-8) the failing-before test asserts the single-owner
+  contract.
+- These do not change: NCS1 bytes of documents without a hidden Boolean
+  target, PNG, JPG and SVG bytes, goldens, standalone SVG export, error
+  codes, existing messages and their precedence, package boundaries
+  (`packages/io` never imports `@nodetto/core`; `packages/core/src/pcb`
+  imports only itself) and strict indexed typing.
+- Untouched: `crates/capture/src/raster.rs`, `crates/capture/src/raster/**`,
+  `crates/capture/src/prism.rs`, `crates/capture/src/cast.rs`, the capture
+  goldens and `docs/capture.md`. Every rule below is reachable without
+  them.
+- Per-pixel, per-vertex and per-byte work stays in Rust on the native CLI.
+
+### 22.1 Rules
+
+R4-1 `function-capture-hidden-target-empty-cut` (high).
+
+Cause. `buildCadCaptureModel` registers the tool of a hidden body and then
+drops the body (`packages/core/src/capture/scene.ts:220-226`). A later cut
+or intersect attaches its step only to targets in the visible-body map
+(`:311-315`). The evaluator rejects a Boolean that empties any target
+before it commits any target (`packages/core/src/cad/evaluate.ts:294`,
+`:827-837`). The app therefore keeps the visible body whole while the
+capture applies the cut. Nothing in the scene records the hidden history,
+so the census (`crates/capture/src/census.rs:77`) cannot see the emptying,
+and the hidden-target scene is byte-identical to the visible-only control.
+
+Rule. The capture carries the Boolean history of a hidden target that a
+shared difference or intersection needs. Only the census evaluates it, and
+the emptying step is reported against every visible body that shares it.
+
+- Model (`scene.ts`). A hidden non-reference body (a hidden `op: "new"`
+  extrude or a hidden mesh body) is kept in a separate hidden-body map. It
+  follows the step rules of a visible body: its own union first, then
+  every later add, cut or intersect step whose `targets` list it.
+  - A hidden body is emitted in `CadCaptureModel.hiddenTargets` exactly
+    when at least one of its difference or intersection steps also
+    targets a visible non-reference body.
+  - `hiddenTargets` is an optional field. It is absent or empty when there
+    is no such body, and its entries are `{ id, steps }` in creation order.
+  - `bodies`, `bounds` (camera fit), interference body indices and the
+    report body list never contain a hidden body.
+- NCS1 (`scene-binary.ts` writes it, `crates/capture/src/scene.rs` reads
+  it).
+  - The header word at offset 36, written as zero today, becomes
+    `hiddenCount` (0..20,000).
+  - After the `bodyCount` body records come `hiddenCount` records in the
+    body record format, with flags 0. A reader rejects any set flag with
+    `Invalid capture scene: hidden body flags must be zero.`
+  - Step rules are those of a body: at least one step, a union first, and
+    tool indices in range. The version stays 1.
+  - With no hidden target the word stays 0 and no record follows, so those
+    scenes are byte-identical to today.
+  - `checkScenePreTool` bounds the hidden count like the body count, and
+    `prepareCadCapture` (`cad-request.ts`) passes the count to it.
+- Rust scene. `Scene` gains `pub hidden: Vec<Body>`.
+  - The rasterizers and the interference analysis iterate `scene.bodies`
+    only, so the protected raster files need no edit.
+  - `Scene` struct literals exist only in
+    `crates/capture/src/{scene.rs,tiles.rs,census.rs}` (in tests). The
+    raster and integration tests build scenes by parsing fixtures, so they
+    get an empty `hidden`.
+- Hidden census. It lives in `census.rs` and is called from
+  `lib.rs::render_parsed` after `render_rgb`, only when `scene.hidden` is
+  not empty. Every host goes through `render_parsed`:
+  `apps/cli/native/src/engine.rs:193` directly, and
+  `apps/desktop/src-tauri/src/capture.rs` through `render_scene`.
+  1. `tool_view::classify(scene)` is computed once for this pass.
+  2. Hidden bodies are taken in order, at most `CENSUS_LIMIT` of them, and
+     only those whose first tool is solid. Each is sampled with the census
+     lattice exactly as a picture-absent body (section 6.7): the same cell
+     (`target_cell`), the same weight rule and the same per-axis loop.
+  3. The hidden census has its own allowance, of the same size as the
+     picture census: `budget_million_rays * 10^6` when analysing, and
+     24,000,000 otherwise. The check therefore does not depend on the
+     interference options.
+  4. `lattice::sample_body_axis_with` resolves a body index
+     `i >= bodies.len()` to `hidden[i - bodies.len()]`. Nothing else in
+     `lattice.rs` changes.
+  5. A hidden body whose sampling ends incomplete makes no claim.
+     Otherwise, let `j` be its first step after which no material remains.
+     If step `j` is a difference or intersection with tool `t`, consider
+     every visible body `b` that is not open-source and has a step with
+     the same tool and op; let `k` be the first such step. Body `b` gets
+     the candidate `k` only when its own `emptied_by_step` is -1 or greater
+     than `k`. The smallest candidate per body wins.
+- Report JSON (`report.rs`). `to_json` keeps its output.
+  `to_json_with_hidden(&[Option<i32>])` appends
+  `,"hiddenEmptiedByStep":k` after `"open"` inside a body object, only
+  when that body has a candidate. Reports of scenes without hidden targets
+  are therefore byte-identical. `BodyReport` and `Report` keep their
+  fields, because the protected `raster.rs` constructs both.
+- TypeScript report (`report.ts`, `describe.ts`).
+  - `SolidBodyReport` gains an optional `hiddenEmptiedByStep`. It is
+    either absent or a safe integer >= 0; anything else fails
+    `parseSolidReport`.
+  - In `describeBodies`, when the key is present and `body.steps[k]` names
+    a tool, the body's error replaces the `emptiedByStep` error:
+    `{ id: tool.feature, code: "cad.result.empty", text: "(sampled): leaves no material in a hidden target body; the app rejects this feature and keeps \"<name>\" as it was, this picture applies it" }`.
+  - The body gets `[differs from the app, see errors]` under the existing
+    state condition. The existing `emptiedByStep` text is unchanged.
+- Callers need no change: `apps/cli/src/capture-command.ts:241`,
+  `apps/cli/src/capture-cad.ts:126` and
+  `apps/desktop/src/shell/export-handlers.ts:262` already pass the
+  `describeBodies` errors to `errors:` and to the exit code.
+
+Tests. The fixture has a visible `wide` (20 x 10 x 4 mm), a hidden
+`hidden` (2 x 2 x 4 mm) and a cut `trim`, a 5 x 10 mm strip through `wide`
+that covers `hidden`. The names are test data of this design, not user
+data. Each case runs with the target lists `[wide, hidden]` and `[wide]`,
+with interference off.
+
+- `scene.test.ts`.
+  - Both lists give `bodies` = `[wide]` and equal `bounds`.
+  - Only the two-target list gives a hidden target, with steps
+    `[union hidden-tool, difference trim-tool]`.
+  - The two scenes differ. The control has word 36 = 0 and its pre-change
+    length.
+  - Existing scene and golden byte tests pass unchanged.
+- `scene-binary.test.ts`: the writer layout of one hidden record and the
+  hidden-count bound.
+- `crates/capture/tests/scene.rs`: a hidden record parses. A set hidden
+  flag, a count over the limit and truncated data are rejected. Existing
+  fixtures parse with `hidden` empty.
+- `crates/capture/tests/census.rs`, through `render_parsed` with options 0:
+  - the two-target scene's JSON has `"hiddenEmptiedByStep":1` on `wide`;
+  - the control's JSON has no such key;
+  - an exhausted hidden allowance adds no key;
+  - 1 and 5 threads give the same output.
+- `report.test.ts` and `describe.test.ts`.
+  - The parser accepts the optional key and rejects -1, 1.5 and strings.
+  - The two-target report gives exactly one `cad.result.empty` error, with
+    id `trim`, naming `wide`. The control gives none.
+- `apps/cli/src/native-parity/capture.test.ts`: the native CLI with
+  `--no-interference` prints the `trim` sampled error for the two-target
+  document and no error for the control. In both, `wide` is the only
+  listed body.
+
+R4-2 `performance-capture-repeated-attachment-svg-expansion` (high).
+
+Cause. `resolveAsset` in `apps/cli/src/capture-artwork.ts:114-134` returns
+the full data URL, and `packages/core/src/svg-export/shapes.ts:189-200`
+writes it into every placement. The attachment is read only once, but the
+renderer input holds one payload copy per placement. For a 33,234-byte PNG
+placed 1, 8 and 32 times, the input was 44,810, 356,447 and 1,424,930
+bytes. The whole string also passes through font coverage and rendering
+(`apps/cli/native/src/engine.rs:239-252`).
+
+Rule. In capture only, the SVG embeds each distinct attachment exactly
+once, in an unrendered carrier, and every placement refers to it by a
+deterministic URL. Both real renderers resolve that URL from the carrier.
+Neither renderer ever receives a per-placement copy of the payload.
+
+Contract between the capture SVG and both renderers (owned by this
+section, implemented by car4-f2a and car4-f2b):
+
+- Carrier block. One `<defs>` element inserted directly after the root
+  `<svg ...>` start tag. It contains, for `n = 0, 1, ...` in ascending
+  order, exactly
+  `<image id="nodetto-capture-asset-<n>" href="<data URL>"/>`.
+  `<n>` is decimal and the data URL is the validated
+  `data:image/(png|jpeg|webp|gif);base64,<payload>`. A `<defs>` child that
+  nothing references is never rendered (SVG 1.1 section 5.3.2; usvg
+  converts only referenced or rendered elements), so the carrier adds no
+  pixels.
+- Placement reference. Each placement's `href` is
+  `https://nodetto.invalid/capture-asset/<n>`. The `.invalid` top-level
+  domain never resolves (RFC 2606), and neither renderer fetches anything.
+  The URL is HTTPS-shaped because resvg-js reports only such hrefs through
+  `imagesToResolve()`; the step-3 reviewer probe showed that custom-scheme
+  tokens stay unresolved.
+- Uniqueness. A carrier start sequence `<image id="nodetto-capture-asset-`
+  cannot come from document content: text escapes `<`, attribute values
+  escape `"`, and the exporter writes no `id` on `<image>`
+  (`shapes.ts:189-200`). Only `capture-artwork.ts` writes carriers.
+
+Data flow.
+
+- `capture-artwork.ts`.
+  - `resolveAsset(source)` still reads and validates the attachment once
+    and caches it in `editor.assets`.
+  - It returns the placement URL for index `n`, where `n` is the position
+    of `source` in first-resolution order (export traversal order, so
+    deterministic). The first time, it records the data URL for carrier
+    `n`.
+  - Otherwise the SVG is the exporter's output, so fitting, cropping
+    (`preserveAspectRatio` and the cropping `<svg overflow="hidden">`),
+    opacity, corner clips and masks are untouched. Every placement keeps
+    its own `<image>` element.
+  - After `pixelFrame`, the carrier block is inserted. `fontCoverage` and
+    `backend.rasterize` both receive this one SVG.
+  - `CaptureBackend.rasterize` keeps its signature. A source that is not an
+    attachment still throws `Missing attachment`.
+- Native renderer (`apps/cli/native/src/render.rs`). `render::png` scans
+  the SVG once for carriers, in Rust.
+  1. Indices must run 0, 1, 2, ... in order. A carrier that is malformed,
+     out of order or carries an invalid data URL fails with
+     `Invalid raster attachment.`.
+  2. Each payload is decoded once (with the `base64` crate, already a
+     dependency) into an `Arc<Vec<u8>>`, and its MIME type is kept.
+  3. Only when at least one carrier exists, `render::png` sets
+     `usvg::Options::image_href_resolver.resolve_string`. It maps
+     `https://nodetto.invalid/capture-asset/<n>` to
+     `ImageHrefResolver::default_data_resolver()(mime, arc.clone(), options)`,
+     the call usvg makes for an inline data URL. Every other string goes
+     to the default string resolver.
+  4. Each placement therefore gets the same `ImageKind` as an inline data
+     URL, so the render tree is unchanged.
+
+  An SVG without carriers, such as every raster export, takes today's path
+  unchanged. The `png` host, `engine.rs` and `native-engine.ts` keep their
+  signatures.
+- Bun reference renderer (`apps/cli/src/capture-backend.ts`, pinned
+  `@resvg/resvg-js` 2.6.2).
+  1. It scans the same carriers in the SVG string, keeping each carrier's
+     MIME type with its index, and passes that string unchanged to
+     `new Resvg`.
+  2. It resolves each distinct URL once (`new Set(imagesToResolve())`). One
+     `resolveImage` call resolves every placement of that URL, as the
+     step-3 carrier probe showed.
+  3. It resolves a URL only when the carrier's MIME type is one the pinned
+     backend draws from an inline data URL: `image/png`, `image/jpeg` and
+     `image/gif`. The buffer for `n` is decoded once.
+  4. A carrier of `image/webp` is left unresolved. Version 2.6.2 omits an
+     inline WebP image and renders the rest; its external resolver throws
+     `Unsupported image types` for WebP (step-3 probe `0ddaad`). Leaving the
+     URL unresolved keeps today's successful, image-less Bun output.
+  5. Any other `resolveImage` error propagates unchanged.
+
+  No payload is reinlined at any point. The native renderer resolves every
+  validated MIME type, WebP included (usvg 0.48), so native WebP behavior
+  is unchanged.
+
+Renderer-input bound. Let `M` be the largest single placement markup. At
+both real boundaries:
+
+- the native boundary, the string passed to `native.png`, which
+  `native-engine.ts` passes unchanged to the Rust host;
+- the Bun boundary, the string passed to `new Resvg` plus the distinct
+  buffers passed to `resolveImage`;
+
+the input for 32 placements minus the input for 1 placement is at most
+`31 * M`, and each payload occurs exactly once.
+
+Tests.
+
+- `capture-command.test.ts`, fake backend (this is the native boundary
+  string, because `native-engine.ts` forwards it unchanged). One page has
+  1, 8 and 32 placements of one attachment, with different sizes, fits and
+  a crop. Assert:
+  - one read;
+  - exactly one `base64,` occurrence, inside the carrier;
+  - every placement `href` is the placement URL;
+  - the length bound above.
+- Bun boundary, in `capture-command.test.ts`. `capture-backend.ts` exports
+  the pure step it runs before rendering, `captureRenderInput(svg)`, which
+  returns the string given to `Resvg` and the map from URL to buffer;
+  `rasterize` uses it.
+  - For 1, 8 and 32 placements: the map holds one distinct buffer, and the
+    string length obeys the bound.
+  - PNG parity: the Bun PNG of the capture SVG equals the Bun PNG of the
+    independently embedded SVG, which has every placement's own data URL
+    and no carrier. The cases are meet, slice, fill and crop placements of
+    different sizes, at scales 1 and 2.37.
+  - MIME parity: four placements of one attachment, once per MIME type
+    (PNG, JPEG, GIF and WebP). Each capture succeeds, and its Bun PNG
+    equals the inline control byte for byte. For WebP this means the
+    image-less output of today; the map holds no WebP entry, and the
+    string still holds exactly one WebP payload.
+  - The GIF and WebP fixtures are small byte literals in the test. The
+    WebP is generated once with
+    `cwebp -quiet -lossless apps/desktop/src-tauri/icons/32x32.png -o -`;
+    the GIF is a hand-built 2 x 2 image. Neither comes from user data.
+- `apps/cli/native/src/engine_tests.rs`. This is the first gate of
+  car4-f2a and must pass before car4-f2b starts.
+  - For the same four placement kinds at scales 1 and 2.37, the `png` host
+    output for the carrier SVG equals that of the independently embedded
+    SVG.
+  - `transcode` to JPG gives the same bytes for both.
+  - The carrier scan of a 32-placement SVG yields one decoded payload.
+  - A malformed or out-of-order carrier fails with
+    `Invalid raster attachment.`.
+  - An SVG without carriers renders the same bytes as before.
+- New `apps/cli/src/native-parity/capture-attachment-reuse.test.ts`, run
+  with the release binary. Document A places one attachment three times.
+  Document B places three byte-identical attachment files once each, with
+  the same geometry. The native capture PNG and JPG bytes of A equal those
+  of B.
+- Standalone SVG export is untouched. Only `capture-artwork.ts` writes
+  carriers and placement URLs, and the existing export tests run in the
+  integration gates.
+
+Evidence status.
+
+- Observed by the step-3 reviewer, all exit 0:
+  - `bun tmp/round4-design/resvg-resolve.ts`: HTTPS placeholders gave PNG
+    bytes identical to inline data URLs at zoom 1 and 2.37.
+  - The carrier PNG probe (`d0641f`): the carrier SVG gave identical PNG
+    bytes at both scales, and one `resolveImage` call per URL resolved
+    all four placements.
+  - The carrier WebP probe (`0ddaad`): inline WebP succeeds without the
+    image, while `resolveImage` throws. This is the reason for step 4
+    above.
+- Not yet observed: the GIF and JPEG Bun cases, and the usvg 0.48
+  resolver path. The engine test and the Bun MIME parity test are the
+  first gates of their plans. A failure is reported as blocked; it is
+  never worked around by reinlining.
+
+R4-3 `performance-capture-loop-normalization-pair-scans` (medium).
+
+Cause. `normaliseToolLoops` (`scene.ts:105-130`) scans every loop of a
+depth bucket from the start for each deeper loop. N separate rings
+therefore cost N(N+1)/2 probes: 125,250, 500,500 and 2,001,000 at 500,
+1,000 and 2,000 rings.
+
+Rule. Each depth bucket gets a uniform grid with bounded replication and
+an oversized list.
+
+- Dimensions: `cols = clamp(round(sqrt(n * w / h)), 1, n)` and
+  `rows = clamp(round(sqrt(n * h / w)), 1, n)`, for `n` loops and a bucket
+  span of `w` by `h`. A zero span gives one cell on that axis. There are
+  O(n) cells, and the aspect term keeps a single row or column of rings at
+  about one ring per cell.
+- One monotonic cell mapping, `min(cells - 1, floor((x - min) / span *
+  cells))`, serves both insertion and query.
+- Bounded materialization. A loop's cell range is computed from its bounds
+  before anything is stored.
+  - If the range covers at most `MAX_LOOP_CELLS = 16` cells, the loop is
+    inserted into each of those cells.
+  - Otherwise the loop is appended once to the bucket's oversized list.
+
+  Total entries are therefore at most `16 n + n`, whatever the overlap of
+  the bounds, and this bound holds before the tool-point charge
+  (`scene.ts:282-285`).
+- Each stored entry keeps the loop's original bucket position. Cell lists
+  and the oversized list are filled in bucket order, so each is sorted by
+  position.
+- Query for a point. A two-pointer merge walks the oversized list and the
+  single cell that holds the point (no cell when the point is outside the
+  bucket bounds) in ascending bucket position, and stops at the first
+  containing loop.
+- Probe bound.
+  - A loop whose bounds contain the point is either oversized or stored
+    in that cell, so the first containing loop in merged order is the
+    first containing loop in bucket order, the one today's scan stops at.
+  - The examined candidates are therefore a subsequence of today's
+    examined prefix. For every query and every input, probes are at most
+    today's count, and early exit is preserved.
+- The candidate test is unchanged: bounds first, then `containsPoint`. The
+  result depends only on whether some loop of depth `k` contains the
+  point, never on which one, so the retained loops and their order are
+  identical.
+- `stats` gains an optional `indexEntries`, which counts every stored
+  entry (cell insertions plus oversized appends). `ancestorProbes` keeps
+  counting the candidates examined.
+
+Tests (`scene.test.ts`, next to the perforated-plate test at `:632`).
+
+- Separate rings (an outer square plus one hole) for N = 500, 1,000 and
+  2,000, in a square layout and in a single row. For each doubling of N,
+  `ancestorProbes` and `indexEntries` each grow by at most 2.5 times.
+- The step-3 diagonal strips: N disjoint loops
+  `[0, s, 1000, 1000 + s, 1000, 1000 + s + 0.005, 0, s + 0.005]` with
+  `s = i * 0.01`, plus one hole
+  `[1, 1.001, 2, 2.001, 2, 2.004, 1, 1.004]` inside the first loop, for
+  N = 1,200, 2,400 and 4,800.
+  - `indexEntries` is at most 17N, so construction is linear.
+  - `indexEntries + ancestorProbes` grows by at most 2.5 times per
+    doubling.
+  - All loops are retained, in order.
+  - The reviewer measured 1,428,000, 5,726,208 and 22,420,824 entries for
+    the unbounded grid; each of these strips spans more than 16 cells and
+    goes to the oversized list.
+- The step-3 mixed fixture checks early exit.
+  - The outer square `[500, 0, 504, 0, 504, 4, 500, 4]` comes first in
+    its bucket, followed by N of the diagonal strips above.
+  - N disjoint 0.02 mm square holes lie in that square, at
+    `x = 500.01 + (i % 50) * 0.07` and `y = 0.01 + floor(i / 50) * 0.07`,
+    for N = 500, 1,000 and 2,000.
+  - `ancestorProbes` equals N, one probe per hole, as today. The rejected
+    oversized-first order made 250,500, 1,001,000 and 4,002,000.
+  - `indexEntries` is at most 17 times the bucket size.
+- For every fixture, the retained loops equal those of the oracle, a
+  verbatim copy of the current function kept in the test, and the NCS1
+  bytes written from both are equal.
+- The perforated-plate test passes unchanged.
+
+R4-6 `maintainability-capture-glyph-attribution-scope` (medium).
+
+Cause. `capture-artwork.ts:157-170` and `apps/cli/src/export-command.ts:601-616`
+each attribute missing glyphs to every element of the page when the target
+is a group or frame. The renderer draws only the expanded membership
+(`packages/core/src/svg-export/document.ts:775-779`, `:796-804`).
+
+Rule. Membership has one owner, and the CLI has one attribution helper.
+
+- Core (`document.ts`).
+  - The membership that `renderSelectionSvg` and `renderArtboardSvg`
+    compute today (`expandContainers`, the page filter, the artboard's
+    `excludeIds` and `selfContained`) moves into one internal function.
+    Both renderers use it, so their output is unchanged.
+  - `svgExportMemberIds(store, registry, pageId, ids)` returns the ids of
+    that list for the selection path. As in `renderSelectionSvg`, a single
+    frame id takes the artboard path.
+  - It is exported from `packages/core/src/index.ts`.
+- CLI (`apps/cli/src/glyph-coverage.ts`, already the attribution owner).
+  `attributeTargetGlyphs({ document, page, target, editor, missing })`
+  works as follows.
+  - Without a target, it keeps today's page-wide list.
+  - With a target, it keeps the page's `document.elements` whose id is in
+    `svgExportMemberIds(editor.store, editor.registry, page.id,
+    [target.id])`, in document order.
+  - It then calls `attributeMissingGlyphs`.
+  - `capture-artwork.ts` and `export-command.ts` both call it and keep
+    their warning text and order.
+  - Page-level fallback warnings and image bytes do not change.
+
+Tests.
+
+- Capture (`capture-command.test.ts`) and raster export
+  (`export-command.test.ts`) use a group and a frame. Each has an inside
+  label and an outside label containing U+03BB, and injected coverage
+  reports U+03BB as missing.
+  - For the group and for the frame, only the inside id is warned.
+  - A whole-page run warns both.
+- A core test asserts that `svgExportMemberIds` equals the element set of
+  `renderSelectionSvg` and `renderArtboardSvg` for the same fixtures.
+- Existing SVG export tests pass unchanged.
+
+### 22.2 Plan grouping
+
+Plans are named `car4-*`. Each plan:
+
+- covers one finding aspect, at most about four files and about 150
+  lines, and has a non-empty `acceptanceCriteria`;
+- uses its own `CARGO_TARGET_DIR=target/car4-<plan>`;
+- sets `artifactRoots ["target", "tmp/cad3d"]` exactly. The evidence root
+  `tmp/<taskId>` is outside both;
+- lists every edited file in `writePaths`, including its plan file;
+- runs only its focused gates (below), biome on its touched files, and
+  `cargo fmt --manifest-path` plus clippy after Rust changes.
+
+Plans that edit the same file are chained with `dependsOn`:
+
+| Plan | Finding | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car4-f1a-capture-scene | R4-1 TS model and writer | `packages/core/src/capture/{scene.ts,scene-binary.ts,cad-request.ts,scene.test.ts,scene-binary.test.ts}` | none |
+| car4-f1b-ncs1-hidden-reader | R4-1 Rust reader | `crates/capture/src/{scene.rs,tiles.rs}`, `crates/capture/src/census.rs` (test `Scene` literal only), `crates/capture/tests/scene.rs` | none |
+| car4-f1c-capture-report | R4-1 report and text | `packages/core/src/capture/{report.ts,describe.ts,report.test.ts,describe.test.ts}` | none |
+| car4-f1d-hidden-census | R4-1 census, JSON, end to end | `crates/capture/src/{census.rs,lattice.rs,report.rs,lib.rs}`, `crates/capture/tests/census.rs`, `apps/cli/src/native-parity/capture.test.ts` | f1a, f1b, f1c |
+| car4-f2a-native-assets | R4-2 native carrier resolution | `apps/cli/native/src/{render.rs,engine_tests.rs}` | none |
+| car4-f2b-capture-assets | R4-2 capture carrier and Bun resolution | `apps/cli/src/{capture-artwork.ts,capture-backend.ts,capture-command.test.ts}`, new `apps/cli/src/native-parity/capture-attachment-reuse.test.ts` | f2a |
+| car4-f3-loop-index | R4-3 | `packages/core/src/capture/{scene.ts,scene.test.ts}` | f1a |
+| car4-f4-swept-extents | R4-4 | see design-cad3d section 21 | none |
+| car4-f5-ear-index | R4-5 | see design-cad3d section 21 | none |
+| car4-f6a-export-members | R4-6 core | `packages/core/src/svg-export/document.ts`, `packages/core/src/index.ts`, new `packages/core/src/svg-export/members.test.ts` | none |
+| car4-f6b-glyph-attribution | R4-6 CLI | `apps/cli/src/{glyph-coverage.ts,capture-artwork.ts,export-command.ts,capture-command.test.ts,export-command.test.ts}` | f2b, f6a |
+| car4-f7-nmesh-reader | R4-7 | see design-cad3d section 21 | none |
+| car4-f8-face-resolution | R4-8 | see design-cad3d section 21 | f4 |
+
+Waves:
+
+1. f1a, f1b, f1c, f2a, f4, f5, f6a and f7;
+2. f1d, f2b, f3 and f8;
+3. f6b.
+
+The chains exist only for shared files (`scene.ts`, `capture-artwork.ts`,
+`capture-command.test.ts` and `history.ts`) and for the f1d end-to-end
+test, which needs the TS writer, the reader and the text.
+
+Gates. Each entry exits 0 and runs at least one test that the plan makes
+pass. Lint and build prerequisites are chained with `&&`:
+
+- f1a: `bun test packages/core/src/capture/scene.test.ts packages/core/src/capture/scene-binary.test.ts packages/core/src/capture/cad-request.test.ts packages/core/src/capture/determinism.test.ts`
+- f1b: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f1b cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f1b cargo test --release -p nodetto-capture`
+- f1c: `bun test packages/core/src/capture/report.test.ts packages/core/src/capture/describe.test.ts`
+- f1d:
+  1. the f1b command with `target/car4-f1d`;
+  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f1d cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car4-f1d/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts`
+- f2a: `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f2a cargo clippy -p nodetto-cli --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f2a cargo test --release -p nodetto-cli`
+- f2b:
+  1. `bun test apps/cli/src/capture-command.test.ts`;
+  2. `CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f2b cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/car4-f2b/release/nodetto-cli" bun test apps/cli/src/native-parity/capture-attachment-reuse.test.ts`.
+     `apps/cli/src/native-parity/capture.test.ts` is owned by f1d, which
+     runs at the same time, so it is not in this gate. f1d's gate and
+     integration gate 3 run the full native capture suite.
+- f3: `bun test packages/core/src/capture/scene.test.ts packages/core/src/capture/determinism.test.ts`
+- f6a: `bun test packages/core/src/svg-export/members.test.ts packages/core/src/svg-export.test.ts packages/core/src/frame-title.test.ts packages/core/src/rotation-export.test.ts packages/core/src/svg-paint-order.test.ts`
+- f6b: `bun test apps/cli/src/capture-command.test.ts apps/cli/src/export-command.test.ts apps/cli/src/glyph-coverage.test.ts`
+- f4, f5, f7 and f8: see design-cad3d section 21.
+
+A compile failure caused by a sibling's in-progress edit is rerun after
+the sibling finishes. It is never fixed by editing the sibling's files.
+Timing tests may be retried up to three times under load. A failure after
+that is compared in isolation before it is reported.
+
+Integration gates run once, after every plan lands. Each records its
+command, its exit status and the path of its complete log:
+
+1. `bun run typecheck` and `bun run lint` (biome);
+2. `CARGO_TERM_QUIET=true mise run verify`;
+3. `CARGO_TERM_QUIET=true mise run test-cli`;
+4. no `*.test.ts` file under `target/` or `tmp/` (the scan of section
+   20.3, gate 4).
+
+### 22.3 Decisions
+
+- R4-1 carries hidden histories in a trailing NCS1 section, counted by the
+  former zero word at offset 36.
+  - Version 1 is kept, because the reader and the writer ship together and
+    old scenes have a zero there.
+  - A hidden record never enters `bodies`, so drawing, camera fit,
+    interference and the report body count are unchanged by construction.
+- R4-1 runs the hidden census in `lib.rs` after rendering, not inside
+  `census::resolve_with`. The caller of `resolve_with` and the
+  `BodyReport` and `Report` literals live in the protected `raster.rs`.
+  The JSON key is emitted only when set, so every report without a hidden
+  target is unchanged.
+- R4-1 reports only the first emptying step of a hidden body, and only
+  when it is a shared step earlier than the visible body's own emptying
+  step. This is the rule of section 6.7: after the first rejected step,
+  the capture and the app no longer agree.
+- R4-2 embeds each payload once, in an unreferenced `<defs>` carrier, and
+  keeps every placement's `<image>` element as the exporter writes it.
+  Only the `href` changes.
+  - `<use>` or `<symbol>` reuse was rejected. `<use>` cannot set the
+    geometry or `preserveAspectRatio` of an `<image>`, and a wrapper
+    transform changes the usvg render tree, so byte parity would hold only
+    by accident.
+  - Resolving the placement URL in each renderer to the carrier's decoded
+    bytes gives the same image data and the same element geometry, so the
+    render tree is unchanged.
+  - The `.invalid` HTTPS URL is the form resvg-js reports for resolution
+    (step-3 probe).
+  - The carrier is scanned in Rust on the native path (per-byte work stays
+    out of Boa) and in Bun on the reference path.
+- The R4-3 index and the R4-5 index keep existence semantics: only whether
+  a blocking candidate exists matters. The index changes visit counts and
+  never results.
+- R4-3 bounds replication per loop (at most 16 cells) and sends larger
+  loops to an oversized list that is stored once. Queries merge that list
+  with the point's cell in original bucket position. This keeps
+  construction linear for any overlap of bounds, and keeps every query at
+  or below today's probe count with today's early exit. Walking the
+  oversized list first was rejected in step-3 review: on the mixed
+  fixture it raised the probes from 2,000 to 4,002,000.
+- R4-6 extracts membership in core instead of reimplementing it in the
+  CLI, so the renderer and both CLI callers share one owner.
+- No user decision is pending, so no `design-docs/user-qa/` file is
+  written for round 4.
+
+### 22.4 Intentional differences from the workflow input
+
+- R4-2 has no difference. The capture SVG embeds one payload per distinct
+  attachment, and both real renderer inputs grow only by placement markup.
+  (Revision 11 as first drafted carried the payload beside the SVG; the
+  step-3 review rejected that and it is withdrawn.)
+- R4-2 edits `apps/cli/native/src/render.rs`, which the workflow input
+  lists only as related context. A correct fix needs it, and the workflow
+  scope allows any file a correct fix needs. `engine.rs` is not edited.
+- R4-6. The helper lives in the existing `apps/cli/src/glyph-coverage.ts`
+  instead of a new module, because that file already owns CLI attribution.
+
+### 22.5 Risks
+
+- R4-1 at most doubles census work, and only for scenes with hidden targets
+  of shared cuts. The hidden allowance is bounded like the picture census.
+  A hidden body that the allowance cannot settle makes no claim, so the
+  discrepancy can go unreported there, as for an `unknown` body.
+- R4-1 changes the meaning of NCS1 offset 36 for new scenes. A reader
+  older than this revision rejects a scene with hidden targets as "nonzero
+  padding". Both ship in one binary.
+- R4-2. Byte parity of the carrier form is shown only by the first gates of
+  f2a (usvg 0.48) and f2b (resvg-js 2.6.2). The step-3 probe covers the
+  HTTPS-placeholder path without a carrier. If parity fails, the plan
+  stops and reports blocked; reinlining is not an allowed fallback.
+- R4-2. A placement URL without its carrier renders no image, because both
+  renderers drop an unresolved image. Only `capture-artwork.ts` writes
+  either, and it always writes both.
+- R4-3. A bucket with many oversized loops that precede the containing
+  loop in bucket order still costs as much as today's scan, never more.
+  Separate rings in regular layouts, the diagonal strips and the mixed
+  square-and-strips fixture are linear.
+- Not measured by the audit or by these gates: native image bytes of real
+  user documents, peak memory, Boa elapsed time, desktop latency, and full
+  workspace verification before integration.

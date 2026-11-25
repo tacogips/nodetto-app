@@ -22,6 +22,8 @@ pub struct Scene {
     pub target_cell: f64,
     pub tools: Vec<Tool>,
     pub bodies: Vec<Body>,
+    /// Census-only Boolean histories of hidden targets; never drawn or analysed.
+    pub hidden: Vec<Body>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -258,6 +260,10 @@ impl Reader<'_> {
         if flags & !3 != 0 {
             return Err(invalid("unknown body flags"));
         }
+        self.body_steps(tool_count, flags)
+    }
+
+    fn body_steps(&mut self, tool_count: usize, flags: u32) -> Result<Body, CaptureError> {
         let count = self.u32()? as usize;
         if count == 0 {
             return Err(invalid("body has no steps"));
@@ -334,7 +340,10 @@ pub fn parse_scene(bytes: &[u8]) -> Result<Scene, CaptureError> {
     {
         return Err(invalid("invalid analysis budget"));
     }
-    reader.zero::<4>()?;
+    let hidden_count = reader.u32()? as usize;
+    if hidden_count > MAX_RECORDS {
+        return Err(invalid("too many tools or bodies"));
+    }
 
     let camera = reader.camera()?;
     let tolerance = reader.real()?;
@@ -350,7 +359,7 @@ pub fn parse_scene(bytes: &[u8]) -> Result<Scene, CaptureError> {
     reader.zero::<3>()?;
 
     // The shortest tool is a mesh header and the shortest body has one step.
-    reader.require_records(tool_count + body_count, 16)?;
+    reader.require_records(tool_count + body_count + hidden_count, 16)?;
     let mut points_left = MAX_POINTS;
     let mut tools = Vec::with_capacity(tool_count);
     for _ in 0..tool_count {
@@ -366,6 +375,14 @@ pub fn parse_scene(bytes: &[u8]) -> Result<Scene, CaptureError> {
     let mut bodies = Vec::with_capacity(body_count);
     for _ in 0..body_count {
         bodies.push(reader.body(tool_count)?);
+    }
+    reader.require_records(hidden_count, 16)?;
+    let mut hidden = Vec::with_capacity(hidden_count);
+    for _ in 0..hidden_count {
+        if reader.u32()? != 0 {
+            return Err(invalid("hidden body flags must be zero"));
+        }
+        hidden.push(reader.body_steps(tool_count, 0)?);
     }
     if !reader.rest.is_empty() {
         return Err(invalid("trailing data"));
@@ -385,6 +402,7 @@ pub fn parse_scene(bytes: &[u8]) -> Result<Scene, CaptureError> {
         target_cell,
         tools,
         bodies,
+        hidden,
     })
 }
 

@@ -3,7 +3,7 @@ mod support;
 
 use nodetto_capture::report::BodyState;
 use nodetto_capture::scene::{parse_scene, Op, Tool};
-use nodetto_capture::{render_rgb, render_scene, ImageFormat};
+use nodetto_capture::{render_parsed, render_rgb, render_scene, ImageFormat};
 use support::{body, box_prism, cube_mesh, scene};
 
 #[test]
@@ -103,6 +103,43 @@ fn options_zero_still_censuses_emptied_solid() {
         (report.bodies[0].state, report.bodies[0].emptied_by_step),
         (BodyState::Empty, 1)
     );
+}
+
+#[test]
+fn hidden_shared_cut_is_reported_without_interference() {
+    let mut s = scene(
+        vec![
+            box_prism([-10.0, -5.0, 0.0], 20.0, 10.0, 4.0),
+            box_prism([-2.0, -1.0, 0.0], 2.0, 2.0, 4.0),
+            box_prism([-3.0, -6.0, -1.0], 5.0, 12.0, 6.0),
+        ],
+        vec![body(&[(Op::Union, 0), (Op::Difference, 2)])],
+    );
+    s.hidden = vec![body(&[(Op::Union, 1), (Op::Difference, 2)])];
+    s.analyse = false;
+    s.draw_interference = false;
+    let first = render_parsed(&s, ImageFormat::Png, 1).unwrap();
+    assert!(first.report.contains("\"hiddenEmptiedByStep\":1"));
+    assert_eq!(
+        first.report,
+        render_parsed(&s, ImageFormat::Png, 5).unwrap().report
+    );
+    let (_, report) = render_rgb(&s, 1).unwrap();
+    assert_eq!(
+        nodetto_capture::census::resolve_hidden(
+            &s,
+            &report.bodies,
+            s.target_cell,
+            1,
+            &[true, true, true]
+        ),
+        vec![None]
+    );
+    s.hidden.clear();
+    let control = render_parsed(&s, ImageFormat::Png, 1).unwrap();
+    assert_eq!(control.report, render_rgb(&s, 1).unwrap().1.to_json());
+    assert!(!control.report.contains("hiddenEmptiedByStep"));
+    assert_eq!(first.image, control.image);
 }
 
 #[test]

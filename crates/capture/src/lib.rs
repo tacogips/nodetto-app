@@ -65,9 +65,22 @@ pub fn render_parsed(
         ImageFormat::Jpeg { quality } => encode::jpeg_rgb8(&rgb, width, height, quality),
     }
     .map_err(CaptureError)?;
+    let json = if scene.hidden.is_empty() {
+        report.to_json()
+    } else {
+        let budget = if scene.analyse {
+            u64::from(scene.budget_million_rays) * 1_000_000
+        } else {
+            24_000_000
+        };
+        let solid = tool_view::classify(scene);
+        let hidden =
+            census::resolve_hidden(scene, &report.bodies, scene.target_cell, budget, &solid);
+        report.to_json_with_hidden(&hidden)
+    };
     Ok(CaptureOutput {
         image,
-        report: report.to_json(),
+        report: json,
     })
 }
 

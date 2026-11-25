@@ -66,6 +66,10 @@ pub struct Report {
 
 impl Report {
     pub fn to_json(&self) -> String {
+        self.to_json_with_hidden(&[])
+    }
+
+    pub fn to_json_with_hidden(&self, hidden: &[Option<i32>]) -> String {
         let mut json = format!(
             "{{\"width\":{},\"height\":{},\"bodies\":[",
             self.width, self.height
@@ -74,11 +78,15 @@ impl Report {
             comma(&mut json, index);
             let _ = write!(
                 json,
-                "{{\"state\":\"{}\",\"emptiedByStep\":{},\"open\":{}}}",
+                "{{\"state\":\"{}\",\"emptiedByStep\":{},\"open\":{}",
                 body.state.name(),
                 body.emptied_by_step,
                 body.open
             );
+            if let Some(Some(step)) = hidden.get(index) {
+                let _ = write!(json, ",\"hiddenEmptiedByStep\":{step}");
+            }
+            json.push('}');
         }
         json.push_str("],\"analysis\":");
         if let Some(analysis) = &self.analysis {
@@ -223,6 +231,10 @@ mod tests {
                 },
             ],
         };
+        assert_eq!(report.to_json_with_hidden(&[None]), report.to_json());
+        assert!(report
+            .to_json_with_hidden(&[Some(3)])
+            .contains(r#""open":true,"hiddenEmptiedByStep":3"#));
         assert_eq!(
             report.to_json(),
             concat!(

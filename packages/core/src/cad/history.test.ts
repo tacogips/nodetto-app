@@ -1,11 +1,12 @@
 import { expect, test } from "bun:test";
-import type { CadFaceRef } from "@nodetto/ir";
+import type { CadFaceRef, Element as IrElement } from "@nodetto/ir";
 import { analyzeCadPage, faceBody, faceOutwardSign } from "./index.ts";
 import { visitCadConstruction } from "./construction.ts";
 import {
   cadFailure,
   cadGeometryWork,
   createCadGeometry,
+  extrudeGeometryOf,
   scanCadPage,
   sketchFrameLookup,
 } from "./history.ts";
@@ -370,6 +371,7 @@ function resetWork() {
   cadGeometryWork.profileBuilds = 0;
   cadGeometryWork.statusVisits = 0;
   cadGeometryWork.loopProbes = 0;
+  cadGeometryWork.featureUpdates = 0;
 }
 
 function chain(count: number, distance = 1) {
@@ -393,6 +395,37 @@ function chain(count: number, distance = 1) {
     ];
   }).flat();
 }
+
+test("face resolution shares feature updates and handles failed chains", () => {
+  const valid = chain(2);
+  const suppressed = valid.map((element) =>
+    element.id === "chain-ex-0"
+      ? extrude("chain-ex-0", "f0001", {
+          sketch: "chain-0",
+          distance: 1,
+          op: "new",
+          suppressed: true,
+        })
+      : element,
+  );
+  const broken = valid.filter(({ id }) => id !== "chain-0-edge-0");
+  for (const elements of [valid, suppressed, broken]) {
+    const lookup = sketchFrameLookup(elements);
+    resetWork();
+    const frame = lookup("chain-1");
+    if (elements === valid) expect(cadGeometryWork.featureUpdates).toBe(3);
+    resetWork();
+    const result = extrudeGeometryOf(elements, {
+      name: "test",
+      sketch: "chain-1",
+      distance: 1,
+      op: "new",
+    });
+    if (elements === valid) expect(cadGeometryWork.featureUpdates).toBe(3);
+    expect(frame === null).toBe("ok" in result);
+    if (!("ok" in result)) expect(frame).toEqual(result.frame);
+  }
+});
 
 test.each([40, 80])(
   "face frame lookup shares ancestors for %i sketches",
@@ -501,4 +534,36 @@ test("extrusion preserves frame and entity failure precedence", () => {
   const failure = history.status.get(bad.id);
   if (!failure || failure.ok) throw new Error("expected entity failure");
   expect(geometry.extrude(semantic)).toEqual(failure);
+});
+
+test("extent boundary and entity failure precedence are preserved", () => {
+  const run = (offset: number, invalid = false) => {
+    const entities: IrElement[] = rectangle("profile", 0, 0, 4, 4);
+    if (invalid)
+      entities.push(
+        cadElement("invalid", "cad.circle", "a1", {
+          sketch: "profile",
+          c: [0, 0],
+          r: 0,
+        }),
+      );
+    const geometry = createCadGeometry(
+      scanCadPage([sketch("profile", "a"), ...entities]),
+    );
+    const frame = geometry.sketch({ base: "xy", offset });
+    if ("ok" in frame) throw new Error("invalid frame");
+    geometry.frames.set("profile", frame);
+    return geometry.extrude({
+      name: "tool",
+      sketch: "profile",
+      distance: 1,
+      op: "new",
+    });
+  };
+  expect("loops" in run(9999)).toBe(true);
+  expect(run(9999 + 2e-9)).toMatchObject({ ok: false, code: "cad.limit" });
+  expect(run(9999 + 2e-9, true)).toMatchObject({
+    ok: false,
+    code: "cad.profile.invalid",
+  });
 });

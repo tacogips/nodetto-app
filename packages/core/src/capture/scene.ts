@@ -43,11 +43,17 @@ export interface CaptureBody {
   readonly bounds: Bounds3;
 }
 
+export interface CaptureHiddenTarget {
+  readonly id: ElementId;
+  readonly steps: readonly CaptureStep[];
+}
+
 export interface CadCaptureModel {
   readonly tools: readonly (CaptureTool | CaptureMeshTool)[];
   readonly toolCount: number;
   readonly overLimit?: string;
   readonly bodies: readonly CaptureBody[];
+  readonly hiddenTargets?: readonly CaptureHiddenTarget[];
   readonly errors: readonly { id: ElementId; code: string }[];
   readonly bounds: Bounds3 | null;
   readonly sketches: number;
@@ -89,38 +95,146 @@ function containsPoint(
   return inside;
 }
 
+type LoopEntry = ReturnType<typeof loopBounds> & {
+  loop: CadLoop;
+  position: number;
+};
+
+function indexBucket(entries: LoopEntry[], stats?: { indexEntries?: number }) {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const entry of entries) {
+    minX = Math.min(minX, entry.minX);
+    minY = Math.min(minY, entry.minY);
+    maxX = Math.max(maxX, entry.maxX);
+    maxY = Math.max(maxY, entry.maxY);
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const cols =
+    width === 0
+      ? 1
+      : Math.max(
+          1,
+          Math.min(
+            entries.length,
+            Math.round(Math.sqrt((entries.length * width) / height)),
+          ),
+        );
+  const rows =
+    height === 0
+      ? 1
+      : Math.max(
+          1,
+          Math.min(
+            entries.length,
+            Math.round(Math.sqrt((entries.length * height) / width)),
+          ),
+        );
+  const cell = (value: number, min: number, span: number, count: number) =>
+    span === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(count - 1, Math.floor(((value - min) / span) * count)),
+        );
+  const cells = new Map<number, LoopEntry[]>();
+  const oversized: LoopEntry[] = [];
+  const add = (list: LoopEntry[], entry: LoopEntry) => {
+    list.push(entry);
+    if (stats?.indexEntries !== undefined) stats.indexEntries += 1;
+  };
+  for (const entry of entries) {
+    const x0 = cell(entry.minX, minX, width, cols);
+    const x1 = cell(entry.maxX, minX, width, cols);
+    const y0 = cell(entry.minY, minY, height, rows);
+    const y1 = cell(entry.maxY, minY, height, rows);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 16) {
+      add(oversized, entry);
+      continue;
+    }
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const key = y * cols + x;
+        const list = cells.get(key) ?? [];
+        add(list, entry);
+        cells.set(key, list);
+      }
+  }
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width,
+    height,
+    cols,
+    rows,
+    cells,
+    oversized,
+    cell,
+  };
+}
+
 /** Keep a loop when its parity differs from its nearest selected ancestor's.
  * A loop with no selected ancestor is kept only at an even depth.
  */
 export function normaliseToolLoops(
   loops: readonly CadLoop[],
-  stats?: { ancestorProbes: number },
+  stats?: { ancestorProbes: number; indexEntries?: number },
 ): readonly CadLoop[] {
-  // Disjoint profiles already describe the same region by either rule.
   if (loops.every(({ depth }) => depth === 0)) return loops;
-  const buckets = new Map<
-    number,
-    { loop: CadLoop; minX: number; minY: number; maxX: number; maxY: number }[]
-  >();
+  const buckets = new Map<number, LoopEntry[]>();
   for (const loop of loops) {
     const bucket = buckets.get(loop.depth) ?? [];
-    bucket.push({ loop, ...loopBounds(loop) });
+    bucket.push({ loop, ...loopBounds(loop), position: bucket.length });
     buckets.set(loop.depth, bucket);
   }
+  const indexes = new Map(
+    [...buckets].map(([depth, entries]) => [
+      depth,
+      indexBucket(entries, stats),
+    ]),
+  );
   return loops.filter(({ points, depth }) => {
     if (depth === 0) return true;
     const x = coordinate(points, 0);
     const y = coordinate(points, 1);
     let ancestorDepth = -1;
     for (let k = depth - 1; k >= 0; k -= 1) {
-      for (const { loop, minX, minY, maxX, maxY } of buckets.get(k) ?? []) {
+      const index = indexes.get(k);
+      if (!index) continue;
+      const inside =
+        x >= index.minX &&
+        x <= index.maxX &&
+        y >= index.minY &&
+        y <= index.maxY;
+      const key =
+        index.cell(y, index.minY, index.height, index.rows) * index.cols +
+        index.cell(x, index.minX, index.width, index.cols);
+      const local = inside ? (index.cells.get(key) ?? []) : [];
+      let i = 0;
+      let j = 0;
+      while (i < local.length || j < index.oversized.length) {
+        const a = local[i];
+        const b = index.oversized[j];
+        let entry: LoopEntry;
+        if (a !== undefined && (b === undefined || a.position < b.position)) {
+          entry = a;
+          i += 1;
+        } else if (b !== undefined) {
+          entry = b;
+          j += 1;
+        } else break;
         if (stats) stats.ancestorProbes += 1;
         if (
-          x >= minX &&
-          x <= maxX &&
-          y >= minY &&
-          y <= maxY &&
-          containsPoint(loop.points, x, y)
+          x >= entry.minX &&
+          x <= entry.maxX &&
+          y >= entry.minY &&
+          y <= entry.maxY &&
+          containsPoint(entry.loop.points, x, y)
         ) {
           ancestorDepth = k;
           break;
@@ -200,8 +314,11 @@ export function buildCadCaptureModel(
 ): CadCaptureModel {
   const tools: (CaptureTool | CaptureMeshTool)[] = [];
   const bodies: BuildingBody[] = [];
-  // Hidden bodies are valid targets but have no geometry in a capture.
   const visible = new Map<ElementId, BuildingBody>();
+  const hidden = new Map<
+    ElementId,
+    { id: ElementId; steps: CaptureStep[]; needed: boolean }
+  >();
   const skipped: { id: ElementId; reason: "mesh" }[] = [];
   let sketches = 0;
   let toolCount = 0;
@@ -219,7 +336,15 @@ export function buildCadCaptureModel(
   ): void {
     const step: CaptureStep = { op: "union", tool: toolCount++ };
     if (tool) tools.push(tool);
-    if (feature.visual.hidden) return;
+    if (feature.visual.hidden) {
+      if (!reference)
+        hidden.set(feature.id, {
+          id: feature.id,
+          steps: [step],
+          needed: false,
+        });
+      return;
+    }
     const body = { id: feature.id, name, reference, steps: [step], bounds };
     bodies.push(body);
     // A reference body is drawn but can never be a boolean target.
@@ -308,11 +433,20 @@ export function buildCadCaptureModel(
       };
       if (tool) tools.push(tool);
       const added = step.op === "union" ? bounds : undefined;
+      const sharedVisible =
+        step.op !== "union" && targets.some((target) => visible.has(target));
       for (const target of targets) {
         const body = visible.get(target);
-        if (!body) continue;
-        body.steps.push(step);
-        if (added) includeBounds(body.bounds, added);
+        if (body) {
+          body.steps.push(step);
+          if (added) includeBounds(body.bounds, added);
+        } else {
+          const targetBody = hidden.get(target);
+          if (targetBody) {
+            targetBody.steps.push(step);
+            if (sharedVisible) targetBody.needed = true;
+          }
+        }
       }
     },
   });
@@ -331,6 +465,9 @@ export function buildCadCaptureModel(
     toolCount,
     overLimit,
     bodies,
+    hiddenTargets: [...hidden.values()]
+      .filter(({ needed }) => needed)
+      .map(({ id, steps }) => ({ id, steps })),
     errors,
     bounds,
     sketches,

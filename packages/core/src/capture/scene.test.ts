@@ -647,6 +647,136 @@ test("normalisation probes scale linearly for perforated plates", () => {
   );
 });
 
+function indexedLoop(points: number[], depth: number): CadLoop {
+  return { points, depth, sources: [], reversed: [], members: [] };
+}
+
+function indexedSceneBytes(loops: readonly CadLoop[]): Uint8Array {
+  return writeCaptureScene(
+    {
+      bodies: [],
+      tools: [
+        {
+          kind: "prism",
+          feature: "fixture",
+          frame: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] },
+          t0: 0,
+          t1: 1,
+          loops: loops.map(({ points }) => ({
+            points: new Float64Array(points),
+            faces: new Uint32Array(points.length / 2),
+          })),
+        },
+      ],
+    },
+    {
+      width: 64,
+      height: 64,
+      supersample: 1,
+      camera: {
+        right: [1, 0, 0],
+        up: [0, 1, 0],
+        forward: [0, 0, -1],
+        centre: [0, 0, 0],
+        mmPerPixel: 1,
+        view: "top",
+      },
+      colours: CAPTURE_THEMES.light,
+      referenceOpacity: 0.5,
+      interference: null,
+    },
+  );
+}
+
+function checkIndexedLoops(loops: CadLoop[]) {
+  const stats = { ancestorProbes: 0, indexEntries: 0 };
+  const actual = normaliseToolLoops(loops, stats);
+  const expected = oracleNormalise(loops);
+  expect(actual.length).toBe(loops.length);
+  expect(actual.length).toBe(expected.length);
+  actual.forEach((loop, i) => expect(loop).toBe(expected[i]));
+  expect(indexedSceneBytes(actual)).toEqual(indexedSceneBytes(expected));
+  return stats;
+}
+
+function rectangleLoop(
+  x: number,
+  y: number,
+  size: number,
+  depth: number,
+): CadLoop {
+  return indexedLoop(
+    [x, y, x + size, y, x + size, y + size, x, y + size],
+    depth,
+  );
+}
+
+function stripLoop(i: number): CadLoop {
+  const s = i * 0.01;
+  return indexedLoop(
+    [0, s, 1000, 1000 + s, 1000, 1000 + s + 0.005, 0, s + 0.005],
+    0,
+  );
+}
+
+test("normalisation indexes rings, diagonal strips and mixed bounds", () => {
+  for (const layout of ["square", "row"] as const) {
+    let previous = { ancestorProbes: 0, indexEntries: 0 };
+    for (const n of [500, 1000, 2000]) {
+      const loops: CadLoop[] = [];
+      for (let i = 0; i < n; i++) {
+        const x = (layout === "row" ? i : i % 50) * 4;
+        const y = layout === "row" ? 0 : Math.floor(i / 50) * 4;
+        loops.push(
+          rectangleLoop(x, y, 3, 0),
+          rectangleLoop(x + 1, y + 1, 1, 1),
+        );
+      }
+      const stats = checkIndexedLoops(loops);
+      if (previous.ancestorProbes) {
+        expect(stats.ancestorProbes).toBeLessThanOrEqual(
+          previous.ancestorProbes * 2.5,
+        );
+        expect(stats.indexEntries).toBeLessThanOrEqual(
+          previous.indexEntries * 2.5,
+        );
+      }
+      console.log(`rings ${layout} ${n}: ${JSON.stringify(stats)}`);
+      previous = stats;
+    }
+  }
+  let previousWork = 0;
+  for (const n of [1200, 2400, 4800]) {
+    const loops = Array.from({ length: n }, (_, i) => stripLoop(i));
+    loops.push(indexedLoop([1, 1.001, 2, 2.001, 2, 2.004, 1, 1.004], 1));
+    const stats = checkIndexedLoops(loops);
+    expect(stats.indexEntries).toBeLessThanOrEqual(17 * n);
+    const work = stats.indexEntries + stats.ancestorProbes;
+    if (previousWork) expect(work).toBeLessThanOrEqual(previousWork * 2.5);
+    console.log(`strips ${n}: ${JSON.stringify(stats)}`);
+    previousWork = work;
+  }
+  for (const n of [500, 1000, 2000]) {
+    const loops = [
+      rectangleLoop(500, 0, 4, 0),
+      ...Array.from({ length: n }, (_, i) => stripLoop(i)),
+    ];
+    for (let i = 0; i < n; i++)
+      loops.push(
+        rectangleLoop(
+          500.01 + (i % 50) * 0.07,
+          0.01 + Math.floor(i / 50) * 0.07,
+          0.02,
+          1,
+        ),
+      );
+    const stats = checkIndexedLoops(loops);
+    expect(stats.ancestorProbes).toBe(n);
+    expect(stats.indexEntries).toBeLessThanOrEqual(17 * (2 * n + 1));
+    console.log(`mixed ${n}: ${JSON.stringify(stats)}`);
+  }
+});
+
 test("normalisation preserves oracle identities and order across selections", () => {
   const entities = perforated(5);
   const selections = [
@@ -1038,4 +1168,62 @@ test("exactly four million points retain the original NCS1 bytes", () => {
   expect(createHash("sha256").update(bytes).digest("hex")).toBe(
     "82d5ae99cce242a6503702b85e0e508cb2a1ff6b5b5a644f07d31907f43933b3",
   );
+});
+
+test("shared cuts retain hidden target history without affecting visible bounds", () => {
+  const fixture = (targets: string[]) => [
+    sketch("wide-sketch", "a1"),
+    ...rectangle("wide-sketch", 0, 0, 20, 10),
+    extrude("wide", "a2", { sketch: "wide-sketch", distance: 4, op: "new" }),
+    sketch("hidden-sketch", "a3"),
+    ...rectangle("hidden-sketch", 1, 1, 2, 2),
+    {
+      ...extrude("hidden", "a4", {
+        sketch: "hidden-sketch",
+        distance: 4,
+        op: "new",
+      }),
+      visual: { hidden: true },
+    },
+    sketch("trim-sketch", "a5"),
+    ...rectangle("trim-sketch", 0, 0, 5, 10),
+    extrude("trim", "a6", {
+      sketch: "trim-sketch",
+      distance: 4,
+      op: "cut",
+      bodies: targets,
+    }),
+  ];
+  const request = {
+    width: 64,
+    height: 64,
+    theme: "light" as const,
+    camera: { view: "top" as const },
+    interference: null,
+  };
+  const shared = prepareCadCapture(
+    fixture(["wide", "hidden"]),
+    CAD_TEST_PAGE.id,
+    request,
+  );
+  const control = prepareCadCapture(
+    fixture(["wide"]),
+    CAD_TEST_PAGE.id,
+    request,
+  );
+  expect(shared.model.bodies.map(({ id }) => id)).toEqual(["wide"]);
+  expect(shared.model.hiddenTargets).toEqual([
+    {
+      id: "hidden",
+      steps: [
+        { op: "union", tool: 1 },
+        { op: "difference", tool: 2 },
+      ],
+    },
+  ]);
+  expect(control.model.hiddenTargets).toEqual([]);
+  expect(shared.model.bounds).toEqual(control.model.bounds);
+  expect(shared.scene).not.toEqual(control.scene);
+  expect(new DataView(control.scene.buffer).getUint32(36, true)).toBe(0);
+  expect(shared.scene.length).toBe(control.scene.length + 24);
 });

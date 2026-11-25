@@ -16,6 +16,7 @@ fn reads_the_plate_scene_written_by_typescript() {
     );
     assert_eq!(scene.tools.len(), 7);
     assert_eq!(scene.bodies.len(), 3);
+    assert!(scene.hidden.is_empty());
     assert!(scene.analyse);
     assert!(scene.draw_interference);
     assert_eq!(
@@ -175,11 +176,44 @@ fn rejects_bad_headers_counts_and_options() {
         (28, 0, "analysis budget"),
         (32, 0, "analysis budget"),
         (32, 257, "analysis budget"),
-        (36, 1, "padding"),
+        (36, 20_001, "too many tools or bodies"),
         (172, 1 << 16, "padding"),
     ] {
         plate_word_edit(offset, value, reason);
     }
+}
+
+#[test]
+fn reads_and_validates_hidden_body_records() {
+    let mut bytes = PLATE.to_vec();
+    put(&mut bytes, 36, &1_u32.to_le_bytes());
+    reject(parse_scene(&bytes), "record count exceeds remaining data");
+    for word in [0_u32, 2, 0, 0, 1, 0] {
+        bytes.extend(word.to_le_bytes());
+    }
+    let scene = parse_scene(&bytes).unwrap();
+    assert_eq!(scene.bodies.len(), 3);
+    assert_eq!(scene.hidden.len(), 1);
+    assert!(!scene.hidden[0].reference && !scene.hidden[0].analysed);
+    assert_eq!(
+        scene.hidden[0].steps,
+        [
+            Step {
+                op: Op::Union,
+                tool: 0
+            },
+            Step {
+                op: Op::Difference,
+                tool: 0
+            }
+        ]
+    );
+    let start = PLATE.len();
+    put(&mut bytes, start, &1_u32.to_le_bytes());
+    reject(parse_scene(&bytes), "hidden body flags must be zero");
+    put(&mut bytes, start, &0_u32.to_le_bytes());
+    put(&mut bytes, start + 8, &1_u32.to_le_bytes());
+    reject(parse_scene(&bytes), "body must start with a union");
 }
 
 #[test]

@@ -4,6 +4,7 @@ Status: implemented (slice), design revision 3, base commit `0a35708`,
 branch `feat/cad3d-pages`. Revision 4 (audit round 1 on `feat/ai-capture`,
 `0a35708..eb7d8c9`) adds the editor-side corrections of section 19.
 Revision 5 (audit round 3, `0a35708..a964ad5`) adds section 20.
+Revision 6 (audit round 4, `0a35708..3f9ce78`) adds section 21.
 Implementation plan: `impl-plans/completed/cad3d-00-overview.md`.
 Citations of the form `path:line` are repository evidence at the base commit.
 Citations `[R-n]` are external sources listed in section 17. Measurements
@@ -1754,3 +1755,275 @@ Plans (one wave with the capture plans; no shared file):
 
 `bun run typecheck` is an integration gate (design-ai-capture section
 21.2). Each plan runs biome on its touched files.
+
+## 21. Audit round 4 corrections (core)
+
+Source: audit round 4 (`0a35708..3f9ce78`). The following live in
+`design-docs/specs/design-ai-capture.md` section 22:
+
+- the capture findings (R4-1, R4-2, R4-3 and R4-6);
+- the common test rule: a test that fails on `3f9ce78` and passes after
+  it, deterministic counters for performance findings, single-owner tests
+  for duplicated rules, and no change to golden, NCS1, error code or
+  message bytes;
+- the plan table, the waves and the integration gates.
+
+This section states R4-4, R4-5, R4-7 and R4-8. Where an earlier sentence
+of this document and this section disagree, this section wins.
+
+R4-4 `performance-cad-repeated-swept-extent-scans` (medium).
+
+Cause. Every extrusion projects each selected vertex again for the extent
+check (`packages/core/src/cad/history.ts:415-429`, `:556-557`, six
+endpoint tests per vertex). `checkCadPage` then projects the vertices
+again for swept bounds (`check.ts:47-49`, `bounds.ts:51-75`). A
+1,000-edge outline with 1,000 extrusion distances made 6,014,121
+`Math.abs` calls.
+
+Rule. `bounds.ts` owns per-loop projection.
+
+- `loopExtents(points, frame)` returns the unswept world-axis minimum and
+  maximum of `o + u * x + v * y` over the loop's vertices. The expression
+  and its evaluation order are those of both current loops.
+- It memoises in a module `WeakMap` keyed by the `points` array, holding
+  the last frame and its extrema. A different frame recomputes. Loop
+  `points` arrays are immutable after `buildLoops`, and frames are
+  resolved once per sketch per geometry walk (`frames` in
+  `createCadGeometry`). So each shared profile is projected once per
+  resolved frame, however many extrusions reuse it.
+- `withinExtent` (`history.ts`) uses the extrema per loop. For each axis,
+  and for `t` in `{t0, t1}`, it tests `|min + n * t|` and `|max + n * t|`
+  against the same bound (`CAD_MAX_EXTENT_MM + 1e-9`). This is exact, not
+  approximate: the extreme vertices give the very same floating-point
+  values, and rounding of `b + c` is monotonic in `b`, so no other vertex
+  can exceed both ends.
+- `sweptBounds` keeps its constant-axis branch and takes the other axes'
+  `lower` and `upper` from `loopExtents` (the minimum over loops of the
+  per-loop minimum, and likewise the maximum). The values are bit-equal,
+  so capture `sweptBounds` callers (`scene.ts:294`) and NCS1 bytes are
+  unchanged.
+- The `cad.limit` failure is raised at the same point with the same
+  message, so error precedence is unchanged.
+- `cadBoundsWork.vertexProjections` (exported from `bounds.ts`) counts the
+  vertices projected.
+
+Tests (`check.test.ts` and `history.test.ts`).
+
+- A valid 1,000-edge outline extruded once, and 1,000 times with distinct
+  distances, through `checkCadPage`. `vertexProjections` is equal in both
+  runs.
+- Bounds equal those of the old formula, kept in the test as an oracle,
+  for positive, negative, symmetric and tilted extrusions.
+- A vertex exactly at 10,000 mm passes, and one at 10,000 mm plus
+  `2e-9` fails with `cad.limit`.
+- A failing entity still reports before `cad.limit`.
+- Capture scene bytes: `packages/core/src/capture/determinism.test.ts`
+  passes unchanged.
+
+R4-5 `performance-cad-concave-preview-ear-scans` (medium).
+
+Cause. One reflex vertex disables the convex fan (`triangulate.ts:91-104`).
+Each ear test then scans every other live vertex (`:49`). Preview
+preparation took 997 ms at 18,000 vertices.
+
+Why box indexes fail here (step-3 review). The ear walk is a fan: after an
+ear `(a, b, c)` is clipped, the next candidate is `(a, c, next(c))`. The
+triangles therefore become long slivers from a fixed apex, and their
+axis-aligned boxes contain long live arcs, up to 748, 1,498 and 2,998
+live vertices in one box. Two box indexes were measured on the fixed
+notch series (N = 3,000, 6,000 and 12,000):
+
+- a Morton interval: 2,554,741, 10,216,498 and 40,859,732 visits;
+- a 2-d tree with tight bounds and live counts: 822,551, 3,165,104 and
+  12,388,221 (3.85 and 3.91 times per doubling).
+
+No rule that selects candidates by box can meet the gate. The rule below
+selects by vertex convexity instead.
+
+Rule. Only live vertices that are not strictly convex are blocker
+candidates.
+
+- Classification. With the walk direction already normalised by
+  `direction` (`triangulate.ts:72-89`), a live vertex `v` is strictly
+  convex when `orientation(prev(v), v, next(v)) > 0`. This is the test the
+  convex fan path uses (`:91-96`). Every other live vertex (reflex or
+  collinear) is a candidate.
+- Candidate list. On the fallback path, one pass builds a doubly linked
+  list of candidates in index order, with typed `prev`/`next` arrays and a
+  membership flag.
+- Update after an accepted ear at `b`:
+  - `b` is strictly convex (the ear passed `orientation(a, b, c) > 0`), so
+    it is never in the list;
+  - `a` and `c` are reclassified with their new neighbours and inserted or
+    removed, keeping index order.
+- Query. After `isEar`'s unchanged orientation test and bounding box, only
+  the list is walked. Each candidate other than `a` and `c` gets the
+  unchanged inclusive bounding-box test and the three `orientation` tests,
+  and the walk returns false at the first blocking candidate.
+- Exactness lemma (inclusive predicate). Precondition: the input is a
+  simple polygon on the nanometre grid. That is, no two non-adjacent edges
+  share a point, and adjacent edges do not overlap.
+  - Production input satisfies it. `prismTool` (`tool-solid.ts:42`) is the
+    only caller, and it passes profile loops that `buildProfileLoops`
+    rejected as `cad.profile.intersect` unless every non-adjacent pair is
+    disjoint, touching included, and no adjacent pair doubles back
+    (`loops.ts:177-207`, `:440-442`).
+  - Claim: if some live `p` other than `a`, `b`, `c` lies in the closed
+    triangle `T = (a, b, c)`, then some live candidate does too.
+  - Proof sketch. Let `q` be a blocking vertex at the largest distance
+    from line `ca` toward `b`, and let `L` be the parallel to `ca` through
+    `q`.
+    1. A neighbour `r` of `q` either lies in `T`, at a distance no larger
+       than `q`'s by maximality, or lies outside `T`. In the second case
+       edge `qr` leaves `T` through the open segment `ca`, because by
+       simplicity it cannot cross or touch `ab` or `bc`, nor pass through
+       `a` or `c`. So both neighbours lie on `ca`'s side of `L`, or on `L`.
+    2. The open part of `T` beyond `L`, toward `b`, holds no vertex (by
+       maximality) and no edge crossing (by simplicity). It touches the
+       interior wedge of the convex vertex `b`, so it is polygon interior.
+    3. Then the interior angle at `q` contains a half-plane, so `q` is not
+       strictly convex, and `q` is a candidate.
+  - Each accepted ear has an empty closed triangle, so its diagonal lies
+    inside and the remaining polygon stays simple. The lemma therefore
+    holds at every step.
+  - `isEar` asks only whether a blocker exists. So the ear-removal order,
+    the triangle indices, the collinear-on-diagonal rule and the convex fan
+    path (which never builds the list) are unchanged for every input that
+    meets the precondition.
+- Work counter. `triangulateWork.candidateVisits` (exported from
+  `triangulate.ts`) counts every `isEar` call past the orientation test,
+  plus every candidate examined, plus every reclassification. This is all
+  query and maintenance work, so nothing hides scan cost. The test also
+  reports `triangulateWork.queries` (the `isEar` calls) on its own.
+- Expected growth on the fixed notch series.
+  - Before any clip, only vertex 0 (at radius 50 mm) is not strictly
+    convex. For neighbouring circle vertices the cross product is about
+    1.4e6 nm² at N = 12,000, against a rounding effect below 1e5 nm².
+  - Clipping only shrinks the interior angles at `a` and `c`, so a
+    strictly convex vertex stays strictly convex, and the list holds at
+    most one vertex throughout.
+  - The counter is therefore about the number of `isEar` calls plus twice
+    the number of accepts, close to 2 times per doubling if the calls are
+    linear.
+  - This is analysis. The sandbox of this step cannot run Bun (the command
+    needs approval), so the first gate below is the required measurement.
+- This is our own implementation of the reflex-vertex refinement described
+  in ear-clipping literature. No third-party code is copied, so no notice
+  is needed.
+
+Tests (`triangulate.test.ts` and `preview.test.ts`).
+
+- First gate, the step-3 notch series. Regular polygons of radius 100 mm
+  at N = 3,000, 6,000 and 12,000, with vertex 0 moved to radius 50 mm and
+  coordinates rounded to the production nanometre grid.
+  - `candidateVisits` grows by at most 2.5 times at each doubling, in both
+    windings.
+  - The test records the three counts and the `queries` counts in its
+    assertion message, so the plan reports the measured values.
+  - The threshold, the fixture and the counter definition are fixed. A
+    miss is reported as blocked; it is never relaxed.
+- Ordered triangle indices equal those of the oracle, a verbatim copy of
+  the current scan kept in the test, in both windings:
+  - on the existing fixtures;
+  - on the notch polygon at N = 300, 3,000, 6,000 and 12,000;
+  - on a many-reflex comb (every other vertex reflex), where the
+    candidate list is large.
+- The comb and collinear cases pass unchanged, including a vertex exactly
+  on a new diagonal.
+- The preview mesh bytes of an existing concave fixture are unchanged.
+
+R4-7 `maintainability-nmesh-typescript-validation-owners` (medium).
+
+Cause. `decodeNmesh` and `inspectNmesh` (`packages/nmesh/src/decode.ts:10-97`,
+`:107-201`) each implement the header, minimal-varint, count-before-CRC,
+group, coordinate-limit, first-use-index and trailing-byte rules. The
+capture adapter (`packages/io/src/nmesh/capture-decoder.ts:132-148`) reads
+the vertex count a third time to decide allocation. No divergence was
+reproduced.
+
+Rule. One reader, two storage strategies.
+
+- `decode.ts` gets one internal `readNmesh(bytes, mode, onAllocate?)`.
+  - `mode` is `"full"` or `"inspect"`. It applies every rule in today's
+    order and throws the same `NmeshError` codes.
+  - In `"full"` mode it calls `onAllocate` at today's points and fills
+    `Int32Array` positions and `Uint32Array` triangles.
+  - In `"inspect"` mode it keeps only the per-axis previous value and the
+    minimum and maximum, as today.
+  - Positions decode against the per-axis previous value in both modes,
+    which equals `positions[index - 3]`.
+  - It is exported from `decode.ts` for tests only. The package index does
+    not change.
+- `decodeNmesh` and `inspectNmesh` become thin wrappers with unchanged
+  signatures and results.
+- `capture-decoder.ts` removes its own varint loop. It sets `over` to
+  `inspection.vertexCount > maxVertices`. `needTarget`, the allocation
+  calls and the error order stay as they are. Inspection already ran
+  first, so every invalid input still fails there with the same code.
+- `packages/io` still imports only `@nodetto/nmesh` (never `@nodetto/core`),
+  and the Rust codec is untouched.
+
+Tests.
+
+- `packages/nmesh/src/codec.test.ts`.
+  - Over the existing corruption corpus and the valid fixtures,
+    `readNmesh` in both modes, `decodeNmesh` and `inspectNmesh` agree on
+    error codes, counts and bounds. This fails on `3f9ce78`, where the
+    shared reader does not exist.
+  - The `onAllocate` sequence for a valid mesh is unchanged.
+- New `packages/io/src/nmesh/capture-decoder-budget.test.ts`.
+  - It uses `mock.module("@nodetto/nmesh", ...)` and dynamically imports
+    the adapter. The mock wraps the real module and only for one sentinel
+    payload (unused elsewhere) reports `vertexCount` one above the
+    encoded count. The adapter must omit geometry for it, so the budget
+    decision follows `inspection.vertexCount`. This fails on `3f9ce78`.
+  - The test lives in its own file so that no other suite imports the
+    mock first.
+- `capture-decoder.test.ts`: a mesh whose vertex count needs a two-byte
+  varint, decoded with `maxVertices` equal to the count (geometry kept)
+  and one below it (geometry omitted, counts and bounds still reported).
+  The allocation calls match today's.
+
+R4-8 `maintainability-cad-face-resolution-rules` (medium).
+
+Cause. `geometryFor` (`history.ts:582-598`) and `sketchFrameLookup`
+(`:653-682`) each dispatch sketches, extrusions, PCB references and meshes.
+Section 20 (R3-6, step 3) requires the cached lookup to apply exactly the
+per-item logic of `geometryFor`, but the two copies can drift. No mismatch
+was demonstrated.
+
+Rule.
+
+- One internal `resolveFeatureGeometry(geometry, item): boolean` in
+  `history.ts` applies the current per-type rule:
+  - a sketch sets its frame;
+  - an unsuppressed extrude or PCB reference sets its tool;
+  - an unsuppressed mesh succeeds without geometry;
+  - everything else fails.
+- It increments `cadGeometryWork.featureUpdates`.
+- `geometryFor` returns `null` when the feature's status is not ok or the
+  update fails. `sketchFrameLookup` keeps its dependency traversal,
+  caching and failure propagation, and sets
+  `ok = status ok && dependencies resolved && resolveFeatureGeometry(...)`.
+- No public type, export or UI caller changes.
+
+Tests (`history.test.ts`).
+
+- `extrudeGeometryOf` and `sketchFrameLookup` both raise `featureUpdates`
+  by the number of features they resolve. This fails on `3f9ce78`.
+- On valid, suppressed-extrude and broken face chains, the cached frame
+  resolution and the one-shot preview geometry agree: both resolve, or
+  both report failure for the same chain.
+- The existing profile-build count assertion (`:397-417`) passes
+  unchanged.
+
+Plans (one wave with the capture plans, except that f8 follows f4):
+
+| Plan | Owns | Gate (each exits 0 and runs at least one test) |
+| --- | --- | --- |
+| car4-f4-swept-extents | `packages/core/src/cad/{bounds.ts,history.ts,check.test.ts,history.test.ts}` | `bun test packages/core/src/cad/check.test.ts packages/core/src/cad/history.test.ts packages/core/src/capture/determinism.test.ts` |
+| car4-f5-ear-index | `packages/core/src/cad/{triangulate.ts,triangulate.test.ts,preview.test.ts}` | `bun test packages/core/src/cad/triangulate.test.ts packages/core/src/cad/preview.test.ts packages/core/src/cad/tool-solid.test.ts` |
+| car4-f7-nmesh-reader | `packages/nmesh/src/{decode.ts,codec.test.ts}`, `packages/io/src/nmesh/{capture-decoder.ts,capture-decoder.test.ts}`, new `packages/io/src/nmesh/capture-decoder-budget.test.ts` | `bun test packages/nmesh/src packages/io/src/nmesh` |
+| car4-f8-face-resolution (dependsOn f4) | `packages/core/src/cad/{history.ts,history.test.ts}` | `bun test packages/core/src/cad/history.test.ts packages/core/src/cad/preview.test.ts packages/core/src/cad/frames.test.ts` |
+
+Each plan also runs biome on its touched files.

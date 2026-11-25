@@ -3,6 +3,8 @@ import type { Element } from "@nodetto/ir";
 import { canonicalize, encodeNmesh, toInline } from "@nodetto/io/nmesh";
 import { isFractionalKey } from "../fractional.ts";
 import { isElementIdFormat } from "../ids.ts";
+import { cadBoundsWork, sweptBounds } from "./bounds.ts";
+import type { CadFrame } from "./frames.ts";
 import { checkCadPage } from "./check.ts";
 import { createCadMemo, evaluateCadPage, releaseCadMemo } from "./evaluate.ts";
 import {
@@ -315,4 +317,86 @@ test("check decodes imported meshes and fails a corrupt payload and its dependen
     { id: "corrupt", code: "cad.mesh.invalid" },
     { id: "corrupt-cut", code: "cad.body.missing" },
   ]);
+});
+
+test("shared outline projection work is independent of extrusion count", () => {
+  const vertices = Array.from({ length: 1000 }, (_, i) => {
+    const angle = (2 * Math.PI * i) / 1000;
+    return [
+      Math.round(1000 * Math.cos(angle)),
+      Math.round(1000 * Math.sin(angle)),
+    ];
+  });
+  const edges = vertices.map((a, i) =>
+    cadElement(`edge-${i}`, "cad.line", "a1", {
+      sketch: "profile",
+      a,
+      b: vertices[(i + 1) % vertices.length],
+    }),
+  );
+  const run = (count: number) => {
+    cadBoundsWork.vertexProjections = 0;
+    const result = report([
+      sketch("profile", "a"),
+      ...edges,
+      ...Array.from({ length: count }, (_, i) =>
+        extrude(`tool-${i}`, "b", {
+          sketch: "profile",
+          distance: 1 + i,
+          op: "new",
+        }),
+      ),
+    ]);
+    expect(result.errors).toEqual([]);
+    return cadBoundsWork.vertexProjections;
+  };
+  const single = run(1);
+  const repeated = run(1000);
+  console.log(`Shared outline projections: ${single} and ${repeated}`);
+  expect(single).toBeGreaterThan(0);
+  expect(repeated).toBe(single);
+});
+
+test("swept bounds retain the original projection formula", () => {
+  const frames: CadFrame[] = [
+    { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] },
+    {
+      o: [1.25, -2.5, 4],
+      u: [0.6, 0.8, 0],
+      v: [-0.4, 0.3, 0.866025403784],
+      n: [0.692820323, -0.519615242, 0.5],
+    },
+  ];
+  const loops = [
+    { points: [1.1, -2.2, 3.3, 4.4, -5.5, 6.6] },
+    { points: [-9, 7, 2, -3] },
+  ];
+  for (const frame of frames)
+    for (const [t0, t1] of [
+      [0, 8],
+      [-8, 0],
+      [-4, 4],
+    ] as const) {
+      const min: number[] = [];
+      const max: number[] = [];
+      for (const axis of [0, 1, 2] as const) {
+        const { o, u, v, n } = frame;
+        let lower = o[axis];
+        let upper = o[axis];
+        if (u[axis] !== 0 || v[axis] !== 0) {
+          lower = Number.POSITIVE_INFINITY;
+          upper = Number.NEGATIVE_INFINITY;
+          for (const { points } of loops)
+            for (let i = 0; i < points.length; i += 2) {
+              const base =
+                o[axis] + u[axis] * points[i]! + v[axis] * points[i + 1]!;
+              lower = Math.min(lower, base);
+              upper = Math.max(upper, base);
+            }
+        }
+        min.push(lower + Math.min(n[axis] * t0, n[axis] * t1));
+        max.push(upper + Math.max(n[axis] * t0, n[axis] * t1));
+      }
+      expect<unknown>(sweptBounds(frame, t0, t1, loops)).toEqual({ min, max });
+    }
 });

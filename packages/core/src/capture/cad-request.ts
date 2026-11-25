@@ -199,6 +199,7 @@ export function prepareCadCapture(
     checkScenePreTool(options, {
       tools: model.toolCount,
       bodies: model.bodies.length,
+      hidden: model.hiddenTargets?.length ?? 0,
     });
     if (model.overLimit) throw new RangeError(model.overLimit);
     const scene = writeCaptureScene(model, options);

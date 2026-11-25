@@ -289,6 +289,7 @@ mod tests {
                 analysed: false,
                 steps,
             }],
+            hidden: Vec::new(),
         }
     }
     fn step(op: Op, tool: u32) -> Step {

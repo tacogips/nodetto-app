@@ -129,23 +129,9 @@ export function decodeCaptureMeshWith(
   options: CaptureMeshDecodeOptions = {},
 ): CaptureMeshDecodeResult {
   const bytes = fromInline(data);
-  // Read only a valid first varint here; validation remains with the decoder.
-  let count = 0;
-  let factor = 1;
-  let complete = false;
-  for (let i = 8; i < Math.min(bytes.length - 4, 13); i++) {
-    const value = bytes[i] as number;
-    if (i === 12 && value > 15) break;
-    count += (value % 128) * factor;
-    if (value < 128) {
-      complete = !(i > 8 && value === 0);
-      break;
-    }
-    factor *= 128;
-  }
-  const over =
-    complete && count > (options.maxVertices ?? Number.POSITIVE_INFINITY);
   const inspection = inspectNmesh(bytes);
+  const over =
+    inspection.vertexCount > (options.maxVertices ?? Number.POSITIVE_INFINITY);
   const bounds =
     inspection.min && inspection.max
       ? {

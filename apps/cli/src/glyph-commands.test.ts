@@ -287,3 +287,53 @@ test("non-notation documents preserve no-pages errors unless a selected page has
     expect(missing.stderr).toContain("Document contains no BPMN");
   }
 });
+
+test("raster export attributes missing glyphs to container members", async () => {
+  for (const kind of ["group", "frame"] as const) {
+    const editor = new Editor();
+    const frame =
+      kind === "frame"
+        ? editor.createElement("frame", {
+            semantic: { name: "Frame" },
+            visual: { x: 0, y: 0, width: 100, height: 100 },
+          })
+        : undefined;
+    const inside = editor.createElement("shape.geo", {
+      semantic: { geo: "rect", label: "λ" },
+      visual: { x: 10, y: 10, width: 20, height: 20 },
+    });
+    const outside = editor.createElement("shape.geo", {
+      semantic: { geo: "rect", label: "λ" },
+      visual: { x: 300, y: 10, width: 20, height: 20 },
+    });
+    const target =
+      frame ??
+      editor.createElement("group", {
+        semantic: { memberIds: [inside] },
+        visual: {},
+      });
+    const io: CommandIo = {
+      readText: () => serializeDocument(editor.getSnapshot()),
+      writeText: () => {},
+      writeBytes: () => {},
+      fontCoverage: () => ({ needsFallback: true, missing: [0x03bb] }),
+    };
+    const backend: RasterBackend = {
+      rasterize: async () => new Uint8Array([1]),
+      pngToPdf: async () => new Uint8Array([2]),
+    };
+    const args = ["doc.jsonl", "--format", "png", "--output", "out.png"];
+    const selected = await exportCommand(
+      io,
+      [...args, "--element", target],
+      backend,
+    );
+    expect(selected.exitCode).toBe(0);
+    expect(selected.stderr).toContain(`glyph-missing ${inside}:`);
+    expect(selected.stderr).not.toContain(`glyph-missing ${outside}:`);
+    const page = await exportCommand(io, args, backend);
+    expect(page.exitCode).toBe(0);
+    expect(page.stderr).toContain(`glyph-missing ${inside}:`);
+    expect(page.stderr).toContain(`glyph-missing ${outside}:`);
+  }
+});

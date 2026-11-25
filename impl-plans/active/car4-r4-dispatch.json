@@ -1,0 +1,100 @@
+{
+  "taskId": "car4-r4",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "audit/round-4",
+  "baseBranch": "audit/round-4",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "3f9ce78b9599d35945a7e29fb449a5ca3e89b431",
+  "designDocPaths": [
+    "design-docs/specs/design-ai-capture.md",
+    "design-docs/specs/design-cad3d.md"
+  ],
+  "evidenceRoot": "tmp/car4-r4",
+  "waves": [
+    ["car4-f1d-hidden-census"]
+  ],
+  "reviewContext": {
+    "issueReference": "Round-4 CAD and AI capture audit, 0a35708..audit/round-4@3f9ce78b9599d35945a7e29fb449a5ca3e89b431; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car4-00-overview.md",
+    "userProblem": "The round-4 audit found eight defects in 3D CAD pages and AI capture: a shared cut that the app rejects because it empties a hidden target is captured as if it succeeded; repeated raster attachments are embedded once per placement in 2D capture; loop normalization, swept-extent checks and concave ear clipping do quadratic work; missing-glyph warnings for group and frame targets name elements outside the image; and NMESH validation and CAD face resolution each have two owners that can drift.",
+    "requiredOutcomes": [
+      "function-capture-hidden-target-empty-cut (R4-1; f1a, f1b, f1c, f1d): with interference off, the two-target capture draws only wide and reports trim as a sampled cad.result.empty against wide; the visible-only control reports none; scenes differ; bytes of scenes without hidden targets unchanged.",
+      "performance-capture-repeated-attachment-svg-expansion (R4-2; f2a, f2b): one carrier payload and one read per distinct attachment; renderer input grows only by placement markup at the native and Bun boundaries; PNG parity with independently embedded markup for PNG, JPEG, GIF and WebP (WebP unresolved on Bun as today); native JPG parity; standalone export unchanged.",
+      "performance-capture-loop-normalization-pair-scans (R4-3; f3): rings, diagonal-strip and mixed fixtures meet the 2.5x doubling and 17N entry bounds; probes never exceed today; oracle loops and NCS1 bytes equal.",
+      "performance-cad-repeated-swept-extent-scans (R4-4; f4): vertex projections independent of extrusion count; bounds bit-equal; 10,000 mm boundary and error precedence unchanged.",
+      "performance-cad-concave-preview-ear-scans (R4-5; f5): candidateVisits grows at most 2.5x per doubling on the fixed notch series in both windings; ordered triangles equal the oracle; preview bytes unchanged.",
+      "maintainability-capture-glyph-attribution-scope (R4-6; f6a, f6b): capture and raster export use one membership helper; group and frame targets warn only inside ids; whole page unchanged.",
+      "maintainability-nmesh-typescript-validation-owners (R4-7; f7): one readNmesh owns the rules; the capture budget follows inspection.vertexCount; errors, counts and bounds agree across modes.",
+      "maintainability-cad-face-resolution-rules (R4-8; f8): one single-feature update used by both lookups; parity on valid, suppressed and broken chains; profile-build count unchanged."
+    ],
+    "nonGoals": [
+      "No edits to crates/capture/src/raster.rs, crates/capture/src/raster/**, crates/capture/src/prism.rs, crates/capture/src/cast.rs, capture goldens or docs/capture.md.",
+      "No golden regeneration, no error code or message changes outside the new hidden-target text, no package boundary changes."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, CARGO_TERM_QUIET=true, rustfmt on touched Rust files.",
+      "Each plan uses CARGO_TARGET_DIR=target/<planId> and artifactRoots [\"target\", \"tmp/cad3d\"].",
+      "Per-plan gates are focused; typecheck, lint, mise run verify and mise run test-cli run once at integration."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "NCS1 offset 36 counts trailing hidden body records.", "rationale": "Version 1 kept; zero hidden targets gives identical bytes; hidden bodies never enter bodies."},
+      {"decision": "Hidden census runs in lib.rs after render_rgb.", "rationale": "raster.rs is protected and builds BodyReport and Report."},
+      {"decision": "Capture embeds one <defs> carrier per attachment; placements use https://nodetto.invalid/capture-asset/<n>.", "rationale": "Same image elements and ImageKind give byte parity; resvg-js reports only HTTPS hrefs."},
+      {"decision": "Bun leaves WebP unresolved.", "rationale": "resvg-js 2.6.2 omits inline WebP and throws on resolveImage for WebP."},
+      {"decision": "Loop index with 16-cell replication cap and merged bucket-order query.", "rationale": "Linear construction for any overlap; never more probes than today."},
+      {"decision": "Ear test walks only non-strictly-convex live vertices.", "rationale": "Exact for simple polygons, which loops.ts guarantees; box indexes failed the gate."},
+      {"decision": "Per-loop extrema memoised by points array and frame.", "rationale": "Exact by monotonic rounding; one projection per loop per frame."},
+      {"decision": "Single owners: readNmesh, resolveFeatureGeometry, svgExportMemberIds.", "rationale": "Remove duplicated rules named by the maintainability findings."},
+      {"decision": "Amendment 2026-11-25 round 1: authorize the native parity suite's generated timing files tmp/capture/m09/timing.json and tmp/capture/m23/timing.json as exact car4-f1d-hidden-census writePaths; the other 12 plans are recorded as acceptedDependencies and only car4-f1d-hidden-census is redispatched.", "rationale": "Blocked plan car4-f1d-hidden-census (blocked-wave-scope-or-contract): apps/cli/src/native-parity/capture.test.ts:178, 315-319 and 745-750 write those two files outside artifactRoots and writePaths. Resolved by exact file authorization with no glob, no test redirection and artifactRoots unchanged; the partial census.rs, lattice.rs, report.rs and lib.rs edits resume per the plan's amendment section, with both gates run unchanged."}
+    ],
+    "intentionalTradeoffs": [
+      "Hidden census at most doubles census rays, only for scenes with hidden targets of shared cuts.",
+      "Ear-test exactness relies on the simple-polygon precondition of its only production caller."
+    ],
+    "supportedEdgeCases": [
+      "Scenes without hidden targets, SVGs without carriers, WebP attachments on Bun, collinear and comb polygons, multi-byte NMESH counts at and above budget, suppressed and broken face chains."
+    ],
+    "outOfScopeEdgeCases": [
+      "Reproducing the app's skip-and-fail-dependents behavior in capture; non-simple polygons passed directly to triangulateSimplePolygon."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "design-docs/specs/design-cad3d.md",
+      "impl-plans/active/car4-00-overview.md"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "car4-f1a-capture-scene", "planPath": "impl-plans/active/car4-f1a-capture-scene.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Capture scene carries hidden Boolean targets of shared cuts (NCS1 offset 36 hidden count, trailing hidden records) without drawing them (R4-1)."},
+    {"planId": "car4-f1b-ncs1-hidden-reader", "planPath": "impl-plans/active/car4-f1b-ncs1-hidden-reader.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Rust NCS1 reader exposes Scene.hidden: Vec<Body>, kept out of bodies (R4-1)."},
+    {"planId": "car4-f1c-capture-report", "planPath": "impl-plans/active/car4-f1c-capture-report.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "parseSolidReport accepts hiddenEmptiedByStep; describeBodies reports a sampled cad.result.empty on the visible body (R4-1)."},
+    {"planId": "car4-f2a-native-assets", "planPath": "impl-plans/active/car4-f2a-native-assets.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Native renderer resolves capture-asset carriers with PNG/JPG byte parity (R4-2)."},
+    {"planId": "car4-f2b-capture-assets", "planPath": "impl-plans/active/car4-f2b-capture-assets.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "2D capture embeds one carrier payload per distinct attachment (R4-2)."},
+    {"planId": "car4-f3-loop-index", "planPath": "impl-plans/active/car4-f3-loop-index.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Indexed loop normalization with subquadratic ancestor probes (R4-3)."},
+    {"planId": "car4-f4-swept-extents", "planPath": "impl-plans/active/car4-f4-swept-extents.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Per-loop extrema memoised per frame for extent validation and bounds (R4-4)."},
+    {"planId": "car4-f5-ear-index", "planPath": "impl-plans/active/car4-f5-ear-index.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Ear test walks only non-strictly-convex live vertices (R4-5)."},
+    {"planId": "car4-f6a-export-members", "planPath": "impl-plans/active/car4-f6a-export-members.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Exported svgExportMemberIds membership helper (R4-6)."},
+    {"planId": "car4-f6b-glyph-attribution", "planPath": "impl-plans/active/car4-f6b-glyph-attribution.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Shared attributeTargetGlyphs scoped to the rendered container for capture and raster export (R4-6)."},
+    {"planId": "car4-f7-nmesh-reader", "planPath": "impl-plans/active/car4-f7-nmesh-reader.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Single readNmesh owner; capture budget follows inspection.vertexCount (R4-7)."},
+    {"planId": "car4-f8-face-resolution", "planPath": "impl-plans/active/car4-f8-face-resolution.md", "commit": "f0a424439877d589a70a2f037c1ae42b5470314d", "provides": "Single resolveFeatureGeometry update shared by cached and one-shot lookups (R4-8)."}
+  ],
+  "plans": [
+    {
+      "planId": "car4-f1d-hidden-census",
+      "planPath": "impl-plans/active/car4-f1d-hidden-census.md",
+      "dependsOn": ["car4-f1a-capture-scene", "car4-f1b-ncs1-hidden-reader", "car4-f1c-capture-report"],
+      "writePaths": ["crates/capture/src/census.rs", "crates/capture/src/lattice.rs", "crates/capture/src/report.rs", "crates/capture/src/lib.rs", "crates/capture/tests/census.rs", "apps/cli/src/native-parity/capture.test.ts", "tmp/car4-r4/car4-f1d-hidden-census", "impl-plans/progress/car4-f1d-hidden-census.md", "tmp/capture/m09/timing.json", "tmp/capture/m23/timing.json", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "render_parsed JSON has \"hiddenEmptiedByStep\":1 on wide for the two-target scene with options 0; the control JSON equals today's to_json; threads 1 and 5 equal; exhausted allowance adds no key.",
+        "resolve_with results and raster reference comparisons unchanged.",
+        "Native CLI --no-interference: two-target document prints errors: 1 with the trim hidden-target line naming wide; control prints errors: 0; only wide listed in bodies."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f1d-hidden-census cargo clippy -p nodetto-capture --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f1d-hidden-census cargo test --release -p nodetto-capture",
+        "bunx biome check --diagnostic-level=warn apps/cli/src/native-parity/capture.test.ts && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car4-f1d-hidden-census cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/car4-f1d-hidden-census/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts"
+      ]
+    }
+  ]
+}

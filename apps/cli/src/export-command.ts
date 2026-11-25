@@ -52,7 +52,7 @@ import { helpFor } from "./help.ts";
 import { collapseWarnings } from "./warnings.ts";
 import { resolveId } from "./ids.ts";
 import {
-  attributeMissingGlyphs,
+  attributeTargetGlyphs,
   glyphMissingMessage,
 } from "./glyph-coverage.ts";
 
@@ -602,18 +602,13 @@ export async function exportCommand(
     if (coverage?.missing.length) {
       const target =
         elementId === undefined ? undefined : editor.store.get(elementId);
-      const elements = loaded.document.elements.filter(
-        (element) =>
-          element.page === page.id &&
-          (target === undefined ||
-            target.type === "frame" ||
-            target.type === "group" ||
-            element.id === target.id),
-      );
-      const { rows, unattributed } = attributeMissingGlyphs(
-        elements,
-        new Set(coverage.missing),
-      );
+      const { rows, unattributed } = attributeTargetGlyphs({
+        document: loaded.document,
+        page,
+        target,
+        editor,
+        missing: new Set(coverage.missing),
+      });
       for (const row of rows)
         warnings += `warning: glyph-missing ${row.elementId}: ${glyphMissingMessage(row.codePoints)}\n`;
       if (unattributed.length)

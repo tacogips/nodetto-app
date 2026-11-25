@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { crc32 } from "./crc32.ts";
+import { readNmesh } from "./decode.ts";
 import { MIN_NMESH_FIXED_BYTES, MIN_TRIANGLE_BYTES } from "./encode.ts";
 import {
   NMESH_INLINE_MAX_CHARS,
@@ -411,5 +412,39 @@ test("inspector preserves corruption errors", () => {
     }
     expect(caught).toBeInstanceOf(NmeshError);
     expect(() => inspectNmesh(bytes)).toThrow(caught as NmeshError);
+    expect(() => readNmesh(bytes, "full")).toThrow(caught as NmeshError);
+    expect(() => readNmesh(bytes, "inspect")).toThrow(caught as NmeshError);
+  }
+});
+
+test("reader modes preserve results and allocation behavior", () => {
+  for (const mesh of [
+    canonicalize(prism(64)),
+    canonicalize({
+      positions: new Float64Array(),
+      triangles: new Uint32Array(),
+    }),
+  ]) {
+    const bytes = encodeNmesh(mesh);
+    const calls: [string, number][] = [];
+    const full = readNmesh(bytes, "full", (kind, length) =>
+      calls.push([kind, length]),
+    );
+    const inspected = readNmesh(bytes, "inspect");
+    expect(full).toEqual(decodeNmesh(bytes));
+    expect(inspected).toEqual(inspectNmesh(bytes));
+    expect(inspected.vertexCount).toBe(full.positions.length / 3);
+    expect(inspected.triangleCount).toBe(full.triangles.length / 3);
+    for (let axis = 0; axis < 3 && inspected.min && inspected.max; axis++) {
+      const values = Array.from(full.positions).filter(
+        (_, index) => index % 3 === axis,
+      );
+      expect(inspected.min[axis]).toBe(Math.min(...values));
+      expect(inspected.max[axis]).toBe(Math.max(...values));
+    }
+    expect(calls).toEqual([
+      ["positions", full.positions.length],
+      ["triangles", full.triangles.length],
+    ]);
   }
 });

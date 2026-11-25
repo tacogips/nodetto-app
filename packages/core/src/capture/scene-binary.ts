@@ -34,6 +34,7 @@ export interface CaptureMeshTool {
 interface CaptureSceneModel {
   readonly tools: readonly (CaptureTool | CaptureMeshTool)[];
   readonly bodies: readonly CaptureBody[];
+  readonly hiddenTargets?: readonly { readonly steps: CaptureBody["steps"] }[];
 }
 
 const HEADER_BYTES = 176;
@@ -100,7 +101,11 @@ export function chargeTool(
   return undefined;
 }
 
-function byteLength({ tools, bodies }: CaptureSceneModel): number {
+function byteLength({
+  tools,
+  bodies,
+  hiddenTargets = [],
+}: CaptureSceneModel): number {
   let length = HEADER_BYTES;
   const state: PointCharge = { points: 0 };
   for (const tool of tools) {
@@ -137,7 +142,7 @@ function byteLength({ tools, bodies }: CaptureSceneModel): number {
         (tool.triangles.length % 2) * 4;
     }
   }
-  for (const { steps } of bodies) {
+  for (const { steps } of [...bodies, ...hiddenTargets]) {
     boundedInteger("body step count", steps.length, 1, MAX_U32);
     if (steps[0]?.op !== "union")
       throw new RangeError("Capture scene body must start with a union.");
@@ -213,7 +218,7 @@ export function checkScenePreTool(
     referenceOpacity,
     interference,
   }: CaptureSceneOptions,
-  counts: { tools: number; bodies: number },
+  counts: { tools: number; bodies: number; hidden?: number },
 ): void {
   boundedInteger("width", width, 64, 2048);
   boundedInteger("height", height, 64, 2048);
@@ -232,6 +237,7 @@ export function checkScenePreTool(
   }
   boundedInteger("tool count", counts.tools, 0, 20_000);
   boundedInteger("body count", counts.bodies, 0, 20_000);
+  boundedInteger("hidden body count", counts.hidden ?? 0, 0, 20_000);
 }
 
 /** Write the little-endian NCS1 scene. The native reader validates the geometry. */
@@ -259,7 +265,11 @@ export function writeCaptureScene(
       referenceOpacity,
       interference,
     },
-    { tools: model.tools.length, bodies: model.bodies.length },
+    {
+      tools: model.tools.length,
+      bodies: model.bodies.length,
+      hidden: model.hiddenTargets?.length ?? 0,
+    },
   );
   const selected = interference?.bodies;
   const analysed = selected === undefined ? undefined : new Set(selected);
@@ -275,7 +285,7 @@ export function writeCaptureScene(
   writer.u32(model.bodies.length);
   writer.u32(interference ? (interference.draw ? 3 : 1) : 0);
   writer.u32(interference?.budgetMillionRays ?? 0);
-  writer.u32(0);
+  writer.u32(model.hiddenTargets?.length ?? 0);
   writer.reals(camera.right);
   writer.reals(camera.up);
   writer.reals(camera.forward);
@@ -324,6 +334,14 @@ export function writeCaptureScene(
     const participates =
       interference !== null && (analysed?.has(index) ?? true);
     writer.u32(Number(body.reference) | (Number(participates) << 1));
+    writer.u32(body.steps.length);
+    for (const { op, tool } of body.steps) {
+      writer.u32(OP[op]);
+      writer.u32(tool);
+    }
+  }
+  for (const body of model.hiddenTargets ?? []) {
+    writer.u32(0);
     writer.u32(body.steps.length);
     for (const { op, tool } of body.steps) {
       writer.u32(OP[op]);

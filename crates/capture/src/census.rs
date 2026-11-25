@@ -88,51 +88,18 @@ pub(crate) fn resolve_with(
             report.state = BodyState::Unknown;
             continue;
         }
-        let mut bounds = lattice::empty_bounds();
-        for step in body.steps.iter().filter(|step| step.op == Op::Union) {
-            if let Some(b) = scene
-                .tools
-                .get(step.tool as usize)
-                .and_then(crate::tool_view::tool_bounds)
-            {
-                lattice::extend(&mut bounds, b);
-            }
-        }
-        let (min, max) = bounds;
-        if !(0..3).all(|i| min[i].is_finite() && max[i].is_finite() && min[i] < max[i]) {
-            report.state = BodyState::Unknown;
-            continue;
-        }
-        let side = (0..3).map(|i| max[i] - min[i]).fold(0.0_f64, f64::max);
-        let request = LatticeRequest {
+        if !sample_body(
             scene,
-            bodies: (index as u32, None),
-            min,
-            max,
-            cell: cell.max(side / 256.0),
-            tolerance: scene.tolerance,
-        };
-        let weight = (body.steps.len() as u64).div_ceil(8).max(1);
-        let mut raw_budget = budget / weight;
-        let initial = raw_budget;
-        let mut incomplete = false;
-        for axis in 0..3 {
-            if alive.alive_after.iter().all(|&value| value) {
-                break;
-            }
-            if raw_budget == 0 {
-                incomplete = true;
-                break;
-            }
-            let result =
-                lattice::sample_body_axis_with(&request, axis, &mut alive, &mut raw_budget, solid);
-            incomplete |= result.capped;
-        }
-        let spent = (initial - raw_budget).saturating_mul(weight);
-        budget -= spent;
-        stats.rays += spent;
-        stats.sampled += 1;
-        if incomplete && !alive.alive_after.iter().all(|&value| value) && raw_budget == 0 {
+            body,
+            index,
+            cell,
+            &mut budget,
+            solid,
+            &mut alive,
+            &mut stats,
+        )
+        .0
+        {
             report.state = BodyState::Unknown;
             continue;
         }
@@ -146,6 +113,133 @@ pub(crate) fn resolve_with(
         }
     }
     stats
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sample_body(
+    scene: &Scene,
+    body: &Body,
+    index: usize,
+    cell: f64,
+    budget: &mut u64,
+    solid: &[bool],
+    alive: &mut Liveness,
+    stats: &mut CensusStats,
+) -> (bool, bool) {
+    let mut bounds = lattice::empty_bounds();
+    for step in body.steps.iter().filter(|step| step.op == Op::Union) {
+        if let Some(b) = scene
+            .tools
+            .get(step.tool as usize)
+            .and_then(crate::tool_view::tool_bounds)
+        {
+            lattice::extend(&mut bounds, b);
+        }
+    }
+    let (min, max) = bounds;
+    if !(0..3).all(|i| min[i].is_finite() && max[i].is_finite() && min[i] < max[i]) {
+        return (false, false);
+    }
+    let side = (0..3).map(|i| max[i] - min[i]).fold(0.0_f64, f64::max);
+    let request = LatticeRequest {
+        scene,
+        bodies: (index as u32, None),
+        min,
+        max,
+        cell: cell.max(side / 256.0),
+        tolerance: scene.tolerance,
+    };
+    let weight = (body.steps.len() as u64).div_ceil(8).max(1);
+    let mut raw_budget = *budget / weight;
+    let initial = raw_budget;
+    let mut incomplete = false;
+    for axis in 0..3 {
+        if alive.alive_after.iter().all(|&value| value) {
+            break;
+        }
+        if raw_budget == 0 {
+            incomplete = true;
+            break;
+        }
+        let result = lattice::sample_body_axis_with(&request, axis, alive, &mut raw_budget, solid);
+        incomplete |= result.capped;
+    }
+    let spent = (initial - raw_budget).saturating_mul(weight);
+    *budget -= spent;
+    stats.rays += spent;
+    stats.sampled += 1;
+    (
+        !(incomplete && !alive.alive_after.iter().all(|&value| value) && raw_budget == 0),
+        !incomplete,
+    )
+}
+
+pub fn resolve_hidden(
+    scene: &Scene,
+    reports: &[BodyReport],
+    cell: f64,
+    budget_rays: u64,
+    solid: &[bool],
+) -> Vec<Option<i32>> {
+    let mut result = vec![None; scene.bodies.len()];
+    let mut budget = budget_rays;
+    let mut stats = CensusStats::default();
+    for (index, body) in scene.hidden.iter().take(CENSUS_LIMIT).enumerate() {
+        if budget == 0
+            || !cell.is_finite()
+            || cell <= 0.0
+            || !body
+                .steps
+                .first()
+                .and_then(|step| solid.get(step.tool as usize))
+                .copied()
+                .unwrap_or(false)
+        {
+            continue;
+        }
+        let mut alive = Liveness::new(body.steps.len());
+        if !sample_body(
+            scene,
+            body,
+            scene.bodies.len() + index,
+            cell,
+            &mut budget,
+            solid,
+            &mut alive,
+            &mut stats,
+        )
+        .1
+        {
+            continue;
+        }
+        let Some(step) = alive
+            .alive_after
+            .iter()
+            .position(|&value| !value)
+            .and_then(|i| body.steps.get(i))
+        else {
+            continue;
+        };
+        if !matches!(step.op, Op::Difference | Op::Intersection) {
+            continue;
+        }
+        for (i, (visible, report)) in scene.bodies.iter().zip(reports).enumerate() {
+            if report.open {
+                continue;
+            }
+            if let Some(k) = visible
+                .steps
+                .iter()
+                .position(|candidate| candidate.op == step.op && candidate.tool == step.tool)
+            {
+                let k = i32::try_from(k).unwrap_or(i32::MAX);
+                if report.emptied_by_step == -1 || report.emptied_by_step > k {
+                    result[i] = Some(result[i].map_or(k, |old: i32| old.min(k)));
+                }
+            }
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -198,6 +292,7 @@ mod tests {
                 analysed: true,
                 steps: steps.iter().map(|&(op, tool)| Step { op, tool }).collect(),
             }],
+            hidden: Vec::new(),
         }
     }
 

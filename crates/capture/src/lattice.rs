@@ -655,7 +655,12 @@ pub(crate) fn sample_body_axis_with(
     {
         return empty_sample(request);
     }
-    let Some(body) = request.scene.bodies.get(request.bodies.0 as usize) else {
+    let index = request.bodies.0 as usize;
+    let Some(body) = request.scene.bodies.get(index).or_else(|| {
+        index
+            .checked_sub(request.scene.bodies.len())
+            .and_then(|i| request.scene.hidden.get(i))
+    }) else {
         return empty_sample(request);
     };
     let grid = Grid::new(request, axis);

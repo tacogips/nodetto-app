@@ -18,7 +18,7 @@ import {
 import type { CaptureBackend } from "./capture-command.ts";
 import type { CommandIo } from "./commands.ts";
 import {
-  attributeMissingGlyphs,
+  attributeTargetGlyphs,
   glyphMissingMessage,
 } from "./glyph-coverage.ts";
 
@@ -111,16 +111,23 @@ export async function renderArtworkCapture(
   const fontDir = options.get("--font-dir");
   const editor = new Editor({ document });
   editor.setCurrentPage(page.id);
+  const assetIndices = new Map<string, number>();
+  const assetData: string[] = [];
   const resolveAsset = (source: string): string => {
+    if (isRasterDataUrl(source)) return source;
+    const index = assetIndices.get(source);
+    if (index !== undefined)
+      return `https://nodetto.invalid/capture-asset/${index}`;
     const cached = editor.assets.resolve(source);
-    if (cached) return cached;
     if (
       !isRasterAttachmentPath(source) ||
       (!io.readAttachmentDataUrl && !io.readAttachment)
     )
       throw new Error(`Missing attachment: ${source}`);
     let data: string;
-    if (io.readAttachmentDataUrl) {
+    if (cached) {
+      data = cached;
+    } else if (io.readAttachmentDataUrl) {
       data = io.readAttachmentDataUrl(documentPath, source);
       if (!isRasterDataUrl(data, MAX_ATTACHMENT_IMAGE_BYTES))
         throw new Error("Invalid raster attachment.");
@@ -130,7 +137,10 @@ export async function renderArtworkCapture(
       throw new Error(`Missing attachment: ${source}`);
     }
     editor.assets.set(source, data);
-    return data;
+    const next = assetData.length;
+    assetIndices.set(source, next);
+    assetData.push(data);
+    return `https://nodetto.invalid/capture-asset/${next}`;
   };
 
   let svg: string | null;
@@ -154,20 +164,27 @@ export async function renderArtworkCapture(
     scale: requestedScale === undefined ? undefined : Number(requestedScale),
   });
   svg = pixelFrame(svg, plan.scale, plan.width, plan.height);
+  if (assetData.length) {
+    const carrier = assetData
+      .map(
+        (data, index) =>
+          `<image id="nodetto-capture-asset-${index}" href="${data}"/>`,
+      )
+      .join("");
+    svg = svg.replace(
+      /<svg\b[^>]*>/,
+      (root) => `${root}<defs>${carrier}</defs>`,
+    );
+  }
   const coverage = io.fontCoverage?.(svg, fontDir);
   if (coverage?.missing.length) {
-    const elements = document.elements.filter(
-      (element) =>
-        element.page === page.id &&
-        (!target ||
-          target.type === "frame" ||
-          target.type === "group" ||
-          element.id === target.id),
-    );
-    const { rows, unattributed } = attributeMissingGlyphs(
-      elements,
-      new Set(coverage.missing),
-    );
+    const { rows, unattributed } = attributeTargetGlyphs({
+      document,
+      page,
+      target,
+      editor,
+      missing: new Set(coverage.missing),
+    });
     for (const row of rows)
       warn(
         `glyph-missing ${row.elementId}: ${glyphMissingMessage(row.codePoints)}`,

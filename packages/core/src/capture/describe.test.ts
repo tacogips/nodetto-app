@@ -149,3 +149,49 @@ test("control characters in body names cannot forge report lines", () => {
     "  Alpha errors: 0 x Beta interference: 0: volume not measured, box 0,1,2 .. 3,4,5 mm, approximate (found in the picture only)",
   );
 });
+
+test("describes a hidden target emptied by a shared cut", () => {
+  const model = {
+    bodies: [
+      {
+        id: "wide",
+        name: "wide",
+        reference: false,
+        steps: [
+          { op: "union", tool: 0 },
+          { op: "difference", tool: 2 },
+        ],
+        bounds: { min: [0, 0, 0], max: [1, 1, 1] },
+      },
+    ],
+    tools: [{ feature: "base" }, { feature: "unused" }, { feature: "trim" }],
+  } as unknown as CadCaptureModel;
+  const state = { state: "drawn", emptiedByStep: -1, open: false } as const;
+  const result = describeBodies(
+    { ...report, bodies: [{ ...state, hiddenEmptiedByStep: 1 }] },
+    model,
+  );
+  expect(result.line).toBe(
+    "bodies: 1 (wide [differs from the app, see errors])",
+  );
+  expect(result.errors).toEqual([
+    {
+      id: "trim",
+      code: "cad.result.empty",
+      text: '(sampled): leaves no material in a hidden target body; the app rejects this feature and keeps "wide" as it was, this picture applies it',
+    },
+  ]);
+  expect(describeBodies({ ...report, bodies: [state] }, model)).toEqual({
+    line: "bodies: 1 (wide)",
+    errors: [],
+  });
+  expect(
+    describeBodies(
+      {
+        ...report,
+        bodies: [{ ...state, emptiedByStep: 0, hiddenEmptiedByStep: 1 }],
+      },
+      model,
+    ).errors,
+  ).toEqual(result.errors);
+});

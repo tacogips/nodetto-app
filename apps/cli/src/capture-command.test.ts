@@ -17,6 +17,7 @@ import { CAPTURE_THEMES, Editor, svgRasterDimensions } from "@nodetto/core";
 import { serializeDocument } from "@nodetto/io";
 import { PAGE_KINDS, shortPageId } from "@nodetto/ir";
 import { type CaptureBackend, captureCommand } from "./capture-command.ts";
+import { captureBackend, captureRenderInput } from "./capture-backend.ts";
 import { CAPTURE_HELP } from "./capture-help.ts";
 import { runCliAsync } from "./cli.ts";
 import type { CommandIo } from "./commands.ts";
@@ -690,4 +691,158 @@ test("capture caches native attachment data URLs and retains the legacy fallback
   expect((await legacy.run()).exitCode).toBe(0);
   expect(legacyCalls).toBe(1);
   expect(fast.calls[0]?.[0]).toBe(legacy.calls[0]?.[0]);
+});
+
+test("capture reuses attachment carriers with bounded renderer input", async () => {
+  const sizes: number[] = [];
+  const decodedSizes: number[] = [];
+  for (const count of [1, 2, 8, 32]) {
+    const editor = new Editor();
+    for (let i = 0; i < count; i++)
+      editor.createElement("image.raster", {
+        semantic: { src: "artifacts/logo.png", alt: "Logo" },
+        visual: { x: i * 20, y: 0, width: 10, height: 10 },
+      });
+    const state = harness(editor);
+    let reads = 0;
+    state.io.readAttachment = () => {
+      reads++;
+      return readFileSync("apps/desktop/src-tauri/icons/32x32.png");
+    };
+    expect((await state.run()).exitCode).toBe(0);
+    expect(reads).toBe(1);
+    const svg = state.calls[0]?.[0] ?? "";
+    expect(svg.match(/base64,/g)).toHaveLength(1);
+    expect(
+      svg.match(/https:\/\/nodetto\.invalid\/capture-asset\/0/g),
+    ).toHaveLength(count);
+    const result = captureRenderInput(svg);
+    expect(result.svg).toBe(svg);
+    expect(result.resources.size).toBe(1);
+    sizes.push(svg.length);
+    decodedSizes.push(
+      svg.length +
+        [...result.resources.values()].reduce((sum, b) => sum + b.length, 0),
+    );
+  }
+  for (const lengths of [sizes, decodedSizes])
+    expect((lengths[3] ?? 0) - (lengths[0] ?? 0)).toBeLessThanOrEqual(
+      31 * ((lengths[1] ?? 0) - (lengths[0] ?? 0) + 16),
+    );
+});
+
+test("Bun carrier rendering matches independent embedded images", async () => {
+  const fixtures = [
+    [
+      "png",
+      readFileSync("apps/desktop/src-tauri/icons/32x32.png").toString("base64"),
+    ],
+    [
+      "jpeg",
+      "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAIAAgAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAv/aAAwDAQACEQMRAD8A/Tz9qr9quy/Z5tNP0rS9PTVvEmrI00UMrMsMMCtt8yTbhm3MCFUEZwSSMc/nxP8A8FNvjdHnboPh38be7/8Akuov+CnFz5Pxx0FM/wDMuWx/8m7uvQPHfwA+FfxT+DPwx8LeEPsPh34pXPhOw1axXYtumsIbdGuYpHGA0u8lwzZYZJ+5vK9F4RS5lufC4zEYyriasaVSyjsu/wDwTy6T/gqD8eRuMPh7w4wQbm/0W9OAOMnF5wOetfoF+x/+2FY/tL2up6HrGmx6N4q0WNZ5oYWZoLi3Ztvmxbssu1iFZWJxlSCc4H5Lfs76B4j0/wAPfHbQ9T3aRf8Ahzw9d3V1bTwsXM1lDcoYXXegx87blcOhIU7SVUjvf+CUs2/9onxCP+pWu/8A0usqzTblNONkrWd99O3Q68uxVZSpc1RvmvdNban/0NH/AIKmXHk/Hvw+uevhm1P/AJO3lec/tZeJ7jRPDHwA13wvrKRapoPhu1t45rSUGSOayhtWW4jZTny2ZiqMcZZHGODX6k/tl/scxftMWmma94d1OLR/FejRNbxSXAZre4t2Yv5UhXLLtYsysAepBHOR+Z0n/BKr9pFs41fw1/4GXX/yJXTFxdrvY+OxuX1lVqOEbqVtT0fwt+0t8K/il8GPif4p8YGx8O/FK48J3+k3rb1gXWUa3dbaWNDgNLvIQquWGQPubQvm3/BJuXf+0f4hX/qVrz/0tsqoyf8ABKP9pZumr+Gv/A26/wDkSv0w/Yn/AGKof2XbfVfEniTVIta8Xa5EtvLJbKy21tbKwcxRFwGcu4VmYqv3VAAwSVaMU+V7nRg8JXlVhKpG1j//2Q==",
+    ],
+    ["gif", "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"],
+    [
+      "webp",
+      "UklGRtYEAABXRUJQVlA4TMkEAAAvH8AHEE2oaduA6ThT/ozLIaL/WXDe3kIgkORPO8EcCtq2YbyLYPxRDoDSNpKcudB/jYfzo8f9D4976ZCk1zz6fN75FvlkgIeO+3+KZOe/9MjMzEyRI4aY7dwOmRkiZjgAXcEHYGZmZmaG0U5XBb1mH+DfcjbzS82tf+yWVaHhl271ShXPu8E7gEeqfCQ4tq0de+59f9tJOlutnQmkNqdgO+NIm86lVTq1bft7H6i2bStb1jrfjzukf5BJ/Ikv8qg8Ddkdold3uxtqtm3LlvP5seTW3TONDlOQXTLdZQGmcB3BkrtEZ4GPZwIEhP5AXg/KN9tqlW+Hp0JXeVjK1zzPVrOS+vKb1rBP5QvuRYIrcoK17VP5tHfFemeL+XnVX247tFUI+P9KF25etVy/dLlyiXd02vmvPif401EeTUF5okD520GOIToKhCMcMKbCsS4nyc4yvwtrAn6+7D2D1s8xGP7EoO8zKTAPZHpGgHlEZm4z8xghprqcjzYq4GKmFU2+CCu67CjB3GaGXx0C9mtDNsiYgFcrKIcE/JYEfIyb62RCQhCq4VfzQGhHzG1rHDFzBKEmmHkBC6XzrmpuoYl7z6J/9S2EXw201tBMo1kvo7x313z0IDoF/jqm6vrajLsBAamq98p+1bRBV9M0lhc6Y924CK1ZZdm60GF9547oO3Tk6I6FoS+5tSA6fTdMUqaqKhjqSjC3I57SHeee/Tuw9V8VsoVgHWD9tAdXTIx8/K5tiu6FAAbBttJqzsd0EqPGzDaIDdGxW1Gzf3XTBua2mmR55HDefm0HCvuPB9ZXWUV46Kmf2SjpyGzUVF4Q4+6V/3YsguUQrP/04oZHFnofbW36+HEaCDolQa/08uOrLtF4hrU2y8gjG37tXNCYZebVQjqgcMXeudOYQE+1r/8TpU54mKIba5ocYrx1u/PJB+KR9X92yQ+YhRgjQLCvZcGVAhhZbozxuTOdlDPuk6+IR9b92jVPoTIyJiKB72qitPbdVLZsWkOMfPlMx+dM+uQT8ajqslUyDIwRJAgtP+1dU0BWWTYvIu3lG502FaKBU62d9U3FUyCAVCF9DKK03tlZFizZQrDBgBYfOykXzolLAeckawOT4AF6JQKsBSg/Glj3Y2BuK/7ThsoJrtvXhRpYWppzErEBgFnUZJ0/JVHa0LOXwsZyMBsMnCibJwbXG3GRBpeS2F435JAgoeV7T3oFFcyqUBjqaq0VEpnAa0UXqAFiFp4Ca8QvQJQ2dZMFiiMCbLccvfOE23exXbIIcCiC64ArVSE5JMg5nRE0C7VqjUQ41Rn+c6nqXKUKHmQBEpg6IEpSitYcZfnqfdxxpJWiOxdMwwMghxj+c4l5zMFXk86wjhvSE4TOJ1naFRSF8m6urUjUvZpIFMSAXpB6FEokhBCRU3laKoaykoAUqZMlFYiEfgJr9lLkoM/e4t44IVJbOuM7Ua6OMfdzRAJSnzWpkQP2kjB6SwpTPXUtHMwk4H3a6uQkuf+fNVH3kBCVMcX+QMcpR58mwYZ+qYCTj4M1Mq7a5iTy4GCnpbqfKnKWDiVSRIt/csKRONnRryjg+fo0xj5wjg1OBah234Y6EKoehKoTQlW+1QF+WWAnx79Sr19dQCHgT7+3AA==",
+    ],
+  ];
+  for (const [mime, payload] of fixtures) {
+    const data = `data:image/${mime};base64,${payload}`;
+    const url = "https://nodetto.invalid/capture-asset/0";
+    const carrier = `<defs><image id="nodetto-capture-asset-0" href="${data}"/></defs>`;
+    const placements = `<image x="0" y="0" width="30" height="20" preserveAspectRatio="xMidYMid meet" href="${url}"/><image x="32" y="0" width="20" height="30" preserveAspectRatio="xMidYMid slice" href="${url}"/><image x="54" y="0" width="20" height="20" preserveAspectRatio="none" href="${url}"/><svg x="76" y="0" width="20" height="20" overflow="hidden"><image x="-8" y="-5" width="40" height="30" preserveAspectRatio="none" href="${url}"/></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40">${carrier}${placements}</svg>`;
+    const inline = svg.replace(carrier, "").replaceAll(url, data);
+    const input = captureRenderInput(svg);
+    expect(input.mimes.get(0)).toBe(`image/${mime}`);
+    expect(input.resources.size).toBe(mime === "webp" ? 0 : 1);
+    for (const scale of [1, 2.37])
+      expect(await captureBackend.rasterize(svg, scale, undefined)).toEqual(
+        await captureBackend.rasterize(inline, scale, undefined),
+      );
+  }
+});
+
+test("capture keeps embedded raster sources inline", async () => {
+  const bytes = readFileSync("apps/desktop/src-tauri/icons/32x32.png");
+  const src = `data:image/png;base64,${bytes.toString("base64")}`;
+  const editor = new Editor();
+  editor.createElement("image.raster", {
+    semantic: { src, alt: "embedded" },
+    visual: { x: 0, y: 0, width: 10, height: 10 },
+  });
+  const state = harness(editor);
+  let reads = 0;
+  state.io.readAttachment = () => {
+    reads++;
+    return bytes;
+  };
+  expect((await state.run()).exitCode).toBe(0);
+  expect(reads).toBe(0);
+  const svg = state.calls[0]?.[0] ?? "";
+  expect(svg).toContain(`href="${src}"`);
+  expect(svg).not.toContain('<defs><image id="nodetto-capture-asset-');
+});
+
+test("capture keeps embedded sources inline alongside attachment carriers", async () => {
+  const bytes = readFileSync("apps/desktop/src-tauri/icons/32x32.png");
+  const src = `data:image/png;base64,${bytes.toString("base64")}`;
+  const editor = new Editor();
+  for (const [index, imageSrc] of [src, src, "artifacts/logo.png"].entries())
+    editor.createElement("image.raster", {
+      semantic: { src: imageSrc, alt: "image" },
+      visual: { x: index * 20, y: 0, width: 10, height: 10 },
+    });
+  const state = harness(editor);
+  let reads = 0;
+  state.io.readAttachment = () => {
+    reads++;
+    return bytes;
+  };
+  expect((await state.run()).exitCode).toBe(0);
+  expect(reads).toBe(1);
+  const svg = state.calls[0]?.[0] ?? "";
+  expect(svg.split(`href="${src}"`).length - 1).toBe(3);
+  expect(svg.match(/<image id="nodetto-capture-asset-0"/g)).toHaveLength(1);
+  expect(svg).not.toContain("nodetto-capture-asset-1");
+  expect(
+    svg.match(/href="https:\/\/nodetto\.invalid\/capture-asset\/0"/g),
+  ).toHaveLength(1);
+});
+
+test("capture attributes missing glyphs to container members", async () => {
+  for (const kind of ["group", "frame"] as const) {
+    const { editor, io, run } = harness();
+    const frame =
+      kind === "frame"
+        ? editor.createElement("frame", {
+            semantic: { name: "Frame" },
+            visual: { x: 0, y: 0, width: 100, height: 100 },
+          })
+        : undefined;
+    const inside = editor.createElement("shape.geo", {
+      semantic: { geo: "rect", label: "λ" },
+      visual: { x: 10, y: 10, width: 20, height: 20 },
+    });
+    const outside = editor.createElement("shape.geo", {
+      semantic: { geo: "rect", label: "λ" },
+      visual: { x: 300, y: 10, width: 20, height: 20 },
+    });
+    const target =
+      frame ??
+      editor.createElement("group", {
+        semantic: { memberIds: [inside] },
+        visual: {},
+      });
+    io.fontCoverage = () => ({ needsFallback: true, missing: [0x03bb] });
+    const selected = await run("--element", target);
+    expect(selected.exitCode).toBe(0);
+    expect(selected.stderr).toContain(`glyph-missing ${inside}:`);
+    expect(selected.stderr).not.toContain(`glyph-missing ${outside}:`);
+    const page = await run();
+    expect(page.exitCode).toBe(0);
+    expect(page.stderr).toContain(`glyph-missing ${inside}:`);
+    expect(page.stderr).toContain(`glyph-missing ${outside}:`);
+  }
 });

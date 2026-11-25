@@ -488,3 +488,37 @@ test("existing writer scenes retain baseline sha256", async () => {
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(digest);
   }
 });
+
+test("writes and validates trailing hidden target records", () => {
+  const hiddenTargets = [
+    {
+      steps: [
+        { op: "union" as const, tool: 0 },
+        { op: "difference" as const, tool: 0 },
+      ],
+    },
+  ];
+  const bytes = writeCaptureScene({ ...model, hiddenTargets }, options);
+  const view = new DataView(bytes.buffer);
+  expect(view.getUint32(36, true)).toBe(1);
+  expect(
+    Array.from({ length: 6 }, (_, i) =>
+      view.getUint32(bytes.length - 24 + i * 4, true),
+    ),
+  ).toEqual([0, 2, 0, 0, 1, 0]);
+  expect(() =>
+    writeCaptureScene(
+      {
+        ...model,
+        hiddenTargets: Array.from({ length: 20_001 }, () => hiddenTargets[0]!),
+      },
+      options,
+    ),
+  ).toThrow(RangeError);
+  expect(() =>
+    writeCaptureScene(
+      { ...model, hiddenTargets: [{ steps: [{ op: "difference", tool: 0 }] }] },
+      options,
+    ),
+  ).toThrow(RangeError);
+});

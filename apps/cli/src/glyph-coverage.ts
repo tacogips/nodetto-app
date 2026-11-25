@@ -1,7 +1,9 @@
+import { type Editor, svgExportMemberIds } from "@nodetto/core";
 import {
   type Document,
   type Element,
   isPlainObject,
+  type Page,
   type PageId,
 } from "@nodetto/ir";
 
@@ -53,6 +55,26 @@ export function attributeMissingGlyphs(
       });
   }
   return { rows, unattributed: [...unattributed].sort((a, b) => a - b) };
+}
+
+export function attributeTargetGlyphs(input: {
+  document: Document;
+  page: Page;
+  target: Element | undefined;
+  editor: Editor;
+  missing: ReadonlySet<number>;
+}): ReturnType<typeof attributeMissingGlyphs> {
+  const { document, page, target, editor, missing } = input;
+  const members = target
+    ? svgExportMemberIds(editor.store, editor.registry, page.id, [target.id])
+    : undefined;
+  return attributeMissingGlyphs(
+    document.elements.filter(
+      (element) =>
+        element.page === page.id && (!members || members.has(element.id)),
+    ),
+    missing,
+  );
 }
 
 export function glyphRowsByPage(

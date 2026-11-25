@@ -9,6 +9,7 @@ interface SolidBodyReport {
     | "empty"
     | "unknown";
   readonly emptiedByStep: number;
+  readonly hiddenEmptiedByStep?: number;
   readonly open: boolean;
 }
 
@@ -67,6 +68,8 @@ function body(value: unknown): value is SolidBodyReport {
       value.state === "empty" ||
       value.state === "unknown") &&
     integer(value.emptiedByStep, -1) &&
+    (value.hiddenEmptiedByStep === undefined ||
+      integer(value.hiddenEmptiedByStep)) &&
     typeof value.open === "boolean"
   );
 }

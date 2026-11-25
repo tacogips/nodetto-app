@@ -12,6 +12,7 @@ import {
   isCadTypeName,
   isPlainObject,
 } from "@nodetto/ir";
+import { loopExtents } from "./bounds.ts";
 import { compareFractional } from "../fractional.ts";
 import {
   baseFrame,
@@ -23,7 +24,6 @@ import {
 } from "./frames.ts";
 import { buildLoops, type CadLoop } from "./loops.ts";
 import { pcbBoardOutline } from "./pcb-outline.ts";
-import { coordinate } from "./vec.ts";
 
 export type CadStatus =
   | { readonly ok: true }
@@ -407,7 +407,7 @@ export interface ExtrudeGeometry {
 // as the tool solid and works without creating a mesh or triangulating.
 function withinExtent(
   loops: readonly CadLoop[],
-  { o, u, v, n }: CadFrame,
+  frame: CadFrame,
   { t0, t1 }: ExtrudeGeometry["span"],
 ): boolean {
   // Allow for basis-vector rounding at the 10000 mm boundary.
@@ -416,13 +416,11 @@ function withinExtent(
     Math.abs(base + normal * t0) <= bound &&
     Math.abs(base + normal * t1) <= bound;
   for (const loop of loops) {
-    for (let i = 0; i < loop.points.length; i += 2) {
-      const x = coordinate(loop.points, i);
-      const y = coordinate(loop.points, i + 1);
+    const { min, max } = loopExtents(loop.points, frame);
+    for (const axis of [0, 1, 2] as const) {
       if (
-        !withinAxis(o[0] + u[0] * x + v[0] * y, n[0]) ||
-        !withinAxis(o[1] + u[1] * x + v[1] * y, n[1]) ||
-        !withinAxis(o[2] + u[2] * x + v[2] * y, n[2])
+        !withinAxis(min[axis], frame.n[axis]) ||
+        !withinAxis(max[axis], frame.n[axis])
       )
         return false;
     }
@@ -440,6 +438,7 @@ export const cadGeometryWork = {
   profileBuilds: 0,
   statusVisits: 0,
   loopProbes: 0,
+  featureUpdates: 0,
 };
 
 export function createCadGeometry(
@@ -568,6 +567,29 @@ export function createCadGeometry(
   };
 }
 
+function resolveFeatureGeometry(
+  geometry: ReturnType<typeof createCadGeometry>,
+  item: CadFeature | undefined,
+): boolean {
+  cadGeometryWork.featureUpdates += 1;
+  if (item?.type === "cad.sketch") {
+    const frame = geometry.sketch(item.semantic.plane);
+    if ("ok" in frame) return false;
+    geometry.frames.set(item.id, frame);
+  } else if (item?.type === "cad.extrude" && !item.semantic.suppressed) {
+    const tool = geometry.extrude(item.semantic);
+    if ("ok" in tool) return false;
+    geometry.extrudes.set(item.id, tool);
+  } else if (item?.type === "cad.pcb" && !item.semantic.suppressed) {
+    const tool = geometry.pcb(item.semantic);
+    if ("ok" in tool) return false;
+    geometry.extrudes.set(item.id, tool);
+  } else if (item?.type !== "cad.mesh" || item.semantic.suppressed) {
+    return false;
+  }
+  return true;
+}
+
 function geometryFor(history: HistoryDetails, feature: ElementId) {
   const needed = new Set<ElementId>();
   const todo = [feature];
@@ -579,23 +601,11 @@ function geometryFor(history: HistoryDetails, feature: ElementId) {
   const geometry = createCadGeometry(history);
   for (const { id } of history.features) {
     if (!needed.has(id)) continue;
-    if (!history.status.get(id)?.ok) return null;
-    const item = history.typed.get(id);
-    if (item?.type === "cad.sketch") {
-      const frame = geometry.sketch(item.semantic.plane);
-      if ("ok" in frame) return null;
-      geometry.frames.set(id, frame);
-    } else if (item?.type === "cad.extrude" && !item.semantic.suppressed) {
-      const tool = geometry.extrude(item.semantic);
-      if ("ok" in tool) return null;
-      geometry.extrudes.set(id, tool);
-    } else if (item?.type === "cad.pcb" && !item.semantic.suppressed) {
-      const tool = geometry.pcb(item.semantic);
-      if ("ok" in tool) return null;
-      geometry.extrudes.set(id, tool);
-    } else if (item?.type !== "cad.mesh" || item.semantic.suppressed) {
+    if (
+      !history.status.get(id)?.ok ||
+      !resolveFeatureGeometry(geometry, history.typed.get(id))
+    )
       return null;
-    }
   }
   return geometry;
 }
@@ -651,34 +661,12 @@ export function sketchFrameLookup(
         (positions.get(b) ?? Number.POSITIVE_INFINITY),
     );
     for (const id of ordered) {
-      let ok =
+      const ok =
         history.status.get(id)?.ok === true &&
         (history.dependencies.get(id) ?? []).every(
           (ref) => resolved.get(ref) === true,
-        );
-      const item = history.typed.get(id);
-      if (ok && item?.type === "cad.sketch") {
-        const frame = geometry.sketch(item.semantic.plane);
-        if ("ok" in frame) ok = false;
-        else geometry.frames.set(id, frame);
-      } else if (
-        ok &&
-        item?.type === "cad.extrude" &&
-        !item.semantic.suppressed
-      ) {
-        const tool = geometry.extrude(item.semantic);
-        if ("ok" in tool) ok = false;
-        else geometry.extrudes.set(id, tool);
-      } else if (ok && item?.type === "cad.pcb" && !item.semantic.suppressed) {
-        const tool = geometry.pcb(item.semantic);
-        if ("ok" in tool) ok = false;
-        else geometry.extrudes.set(id, tool);
-      } else if (
-        ok &&
-        (item?.type !== "cad.mesh" || item.semantic.suppressed)
-      ) {
-        ok = false;
-      }
+        ) &&
+        resolveFeatureGeometry(geometry, history.typed.get(id));
       resolved.set(id, ok);
     }
     const frame = resolved.get(sketchId)

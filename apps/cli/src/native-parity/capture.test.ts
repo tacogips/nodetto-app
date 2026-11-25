@@ -568,6 +568,71 @@ nativeTest(
 );
 
 nativeTest(
+  "native capture reports a shared cut that empties a hidden target",
+  () => {
+    const cwd = mkdtempSync(join(tmpdir(), "nodetto-hidden-cut-"));
+    try {
+      for (const shared of [true, false]) {
+        const elements = [
+          sketch("wide-sketch", "a1"),
+          ...rectangle("wide-sketch", 0, 0, 20, 10),
+          extrude("wide", "a2", {
+            sketch: "wide-sketch",
+            distance: 4,
+            op: "new",
+          }),
+          sketch("hidden-sketch", "a3"),
+          ...rectangle("hidden-sketch", 1, 1, 2, 2),
+          {
+            ...extrude("hidden", "a4", {
+              sketch: "hidden-sketch",
+              distance: 4,
+              op: "new",
+            }),
+            visual: { hidden: true },
+          },
+          sketch("trim-sketch", "a5"),
+          ...rectangle("trim-sketch", 0, 0, 5, 10),
+          extrude("trim", "a6", {
+            sketch: "trim-sketch",
+            distance: 4,
+            op: "cut",
+            bodies: shared ? ["wide", "hidden"] : ["wide"],
+          }),
+        ];
+        const path = join(cwd, "scene.jsonl");
+        writeFileSync(
+          path,
+          serializeDocument(document(elements, [CAD_TEST_PAGE])),
+        );
+        const { stdout } = runCad(cwd, path, [
+          "--view",
+          "top",
+          "--no-interference",
+        ]);
+        expect(stdout).toContain(`errors: ${shared ? 1 : 0}`);
+        const bodies = stdout
+          .split("\n")
+          .find((line) => line.startsWith("bodies:"));
+        expect(bodies).toContain("bodies: 1 (wide");
+        expect(bodies).not.toContain("hidden");
+        if (shared) {
+          const error = stdout
+            .split("\n")
+            .find((line) => line.includes("cad.result.empty"));
+          expect(error).toContain("trim");
+          expect(error).toContain("leaves no material in a hidden target body");
+          expect(error).toContain('"wide"');
+        }
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+nativeTest(
   "native capture reports emptied bodies and accepts mesh and PCB bodies",
   () => {
     const cwd = mkdtempSync(join(tmpdir(), "nodetto-cad-cases-"));

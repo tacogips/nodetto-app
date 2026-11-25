@@ -759,6 +759,57 @@ export function renderPageSvg(
  * connector whose endpoints were not both selected is left out rather than
  * exported as a line to nowhere.
  */
+function selectionMembers(
+  store: Store,
+  context: ShapeContext,
+  pageId: PageId,
+  ids: Iterable<ElementId>,
+): Element[] {
+  const expanded = new Set(expandContainers(store, ids, context));
+  return selfContained(
+    store.getPageElements(pageId).filter((element) => expanded.has(element.id)),
+  );
+}
+
+function artboardMembers(
+  store: Store,
+  context: ShapeContext,
+  frame: Element,
+  excludeIds?: Iterable<ElementId>,
+): Element[] {
+  const ids = new Set(expandContainers(store, [frame.id], context));
+  const excluded = excludeIds
+    ? new Set(expandContainers(store, excludeIds, context))
+    : undefined;
+  return selfContained(
+    store
+      .getPageElements(frame.page)
+      .filter((element) => ids.has(element.id) && !excluded?.has(element.id)),
+  );
+}
+
+export function svgExportMemberIds(
+  store: Store,
+  registry: ShapeUtilRegistry,
+  pageId: PageId,
+  ids: Iterable<ElementId>,
+): ReadonlySet<ElementId> {
+  const selected = new Set(ids);
+  const context = createShapeContext(store, registry, 1);
+  if (selected.size === 1) {
+    const id = selected.values().next().value;
+    const frame = id ? store.get(id) : undefined;
+    if (frame?.type === "frame" && frame.page === pageId) {
+      if (context.isHidden?.(frame.id) || !context.boundsOf(frame.id))
+        return new Set();
+      return new Set(artboardMembers(store, context, frame).map((e) => e.id));
+    }
+  }
+  return new Set(
+    selectionMembers(store, context, pageId, selected).map((e) => e.id),
+  );
+}
+
 export function renderSelectionSvg(
   store: Store,
   registry: ShapeUtilRegistry,
@@ -772,11 +823,12 @@ export function renderSelectionSvg(
       return renderArtboardSvg(store, registry, id, options);
   }
   const context = createShapeContext(store, registry, 1);
-  const expanded = new Set(expandContainers(store, ids, context));
-  const picked = store
-    .getPageElements(pageId)
-    .filter((element) => expanded.has(element.id));
-  return renderElementsSvg(selfContained(picked), registry, context, options);
+  return renderElementsSvg(
+    selectionMembers(store, context, pageId, ids),
+    registry,
+    context,
+    options,
+  );
 }
 
 /** Exact-size artboard asset, with descendants but without its editor title. */
@@ -793,14 +845,11 @@ export function renderArtboardSvg(
   const box = context.boundsOf(id);
   if (!box) return null;
   const viewport = rotatedBox(box, frame.visual.rotation ?? 0);
-  const ids = new Set(expandContainers(store, [id], context));
-  const excluded = options.excludeIds
-    ? new Set(expandContainers(store, options.excludeIds, context))
-    : undefined;
-  const elements = selfContained(
-    store
-      .getPageElements(frame.page)
-      .filter((element) => ids.has(element.id) && !excluded?.has(element.id)),
+  const elements = artboardMembers(
+    store,
+    context,
+    frame,
+    options.excludeIds,
   ).map((element) =>
     element.id === id
       ? {

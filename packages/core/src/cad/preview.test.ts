@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { extrudePreviewMesh, prepareExtrudePreview } from "./preview.ts";
-import { plateElements, rectangle } from "./testing/documents.ts";
+import {
+  cadElement,
+  plateElements,
+  rectangle,
+  sketch,
+} from "./testing/documents.ts";
 
 const params = {
   sketch: "base",
@@ -67,4 +72,41 @@ test("drag frames reuse topology, support symmetric distances and enforce world 
     forward.indices[1],
   ]);
   expect(preview.mesh(10_001)).toEqual({ error: "cad.limit" });
+});
+
+test("concave preview mesh bytes remain stable", () => {
+  const vertices = [
+    [0, 0],
+    [4, 0],
+    [4, 1],
+    [1, 1],
+    [1, 4],
+    [0, 4],
+  ] as const;
+  const edges = vertices.map((a, i) =>
+    cadElement(`edge-${i}`, "cad.line", "a1", {
+      sketch: "base",
+      a,
+      b: vertices[(i + 1) % vertices.length],
+    }),
+  );
+  const mesh = extrudePreviewMesh(
+    [sketch("base", "a1"), ...edges],
+    params,
+    "preview",
+  );
+  if ("error" in mesh) throw new Error(mesh.error);
+  expect([...new Uint8Array(mesh.positions.buffer)]).toEqual([
+    ...new Uint8Array(
+      new Float32Array([
+        0, 0, 0, 4, 0, 0, 4, 1, 0, 1, 1, 0, 1, 4, 0, 0, 4, 0, 0, 0, 5, 4, 0, 5,
+        4, 1, 5, 1, 1, 5, 1, 4, 5, 0, 4, 5,
+      ]).buffer,
+    ),
+  ]);
+  expect([...mesh.indices]).toEqual([
+    0, 2, 1, 6, 7, 8, 0, 3, 2, 6, 8, 9, 0, 4, 3, 6, 9, 10, 0, 5, 4, 6, 10, 11,
+    0, 1, 7, 0, 7, 6, 1, 2, 8, 1, 8, 7, 2, 3, 9, 2, 9, 8, 3, 4, 10, 3, 10, 9, 4,
+    5, 11, 4, 11, 10, 5, 0, 6, 5, 6, 11,
+  ]);
 });

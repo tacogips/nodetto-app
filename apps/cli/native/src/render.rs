@@ -1,9 +1,10 @@
+use base64::Engine;
 use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref};
 use resvg::{tiny_skia, usvg};
 use serde::Deserialize;
 use skrifa::MetadataProvider;
 use std::collections::BTreeSet;
-use std::{io::Cursor, path::Path};
+use std::{io::Cursor, path::Path, sync::Arc};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +36,35 @@ fn load_fonts(
         let _ = db.load_font_file(path);
     }
     Ok(())
+}
+
+type CaptureAsset = (String, Arc<Vec<u8>>);
+
+fn capture_assets(svg: &str) -> Result<Vec<CaptureAsset>, String> {
+    const PREFIX: &str = "<image id=\"nodetto-capture-asset-";
+    let invalid = || "Invalid raster attachment.".to_string();
+    let mut rest = svg;
+    let mut assets = Vec::new();
+    while let Some(start) = rest.find(PREFIX) {
+        rest = &rest[start + PREFIX.len()..];
+        let (index, tail) = rest
+            .split_once("\" href=\"data:image/")
+            .ok_or_else(invalid)?;
+        if index != assets.len().to_string() {
+            return Err(invalid());
+        }
+        let (subtype, tail) = tail.split_once(";base64,").ok_or_else(invalid)?;
+        if !matches!(subtype, "png" | "jpeg" | "gif" | "webp") {
+            return Err(invalid());
+        }
+        let (payload, tail) = tail.split_once("\"/>").ok_or_else(invalid)?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(payload)
+            .map_err(|_| invalid())?;
+        assets.push((format!("image/{subtype}"), Arc::new(bytes)));
+        rest = tail;
+    }
+    Ok(assets)
 }
 
 pub fn png(
@@ -80,6 +110,28 @@ pub fn png(
         "Consolas"
     });
     options.font_family = sans.into();
+    let assets = capture_assets(&svg)?;
+    if !assets.is_empty() {
+        options.image_href_resolver = usvg::ImageHrefResolver {
+            resolve_data: usvg::ImageHrefResolver::default_data_resolver(),
+            resolve_string: Box::new(move |href, opts| {
+                if let Some(index) = href.strip_prefix("https://nodetto.invalid/capture-asset/") {
+                    return index
+                        .parse::<usize>()
+                        .ok()
+                        .and_then(|index| assets.get(index))
+                        .and_then(|(mime, bytes)| {
+                            (usvg::ImageHrefResolver::default_data_resolver())(
+                                mime,
+                                Arc::clone(bytes),
+                                opts,
+                            )
+                        });
+                }
+                (usvg::ImageHrefResolver::default_string_resolver())(href, opts)
+            }),
+        };
+    }
     let tree = usvg::Tree::from_str(&svg, &options).map_err(|e| e.to_string())?;
     let width = (tree.size().width() * scale).ceil() as u32;
     let height = (tree.size().height() * scale).ceil() as u32;
@@ -427,6 +479,87 @@ pub fn pdf_pages(pngs: Vec<u8>, spec_json: String) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capture_carrier_validation() {
+        let carrier = r#"<image id="nodetto-capture-asset-0" href="data:image/png;base64,AQ=="/>"#;
+        let svg = format!(
+            "{carrier}{}",
+            r#"<image href="https://nodetto.invalid/capture-asset/0"/>"#.repeat(32)
+        );
+        assert_eq!(capture_assets(&svg).unwrap().len(), 1);
+        for invalid in [
+            carrier.replace("asset-0", "asset-1"),
+            carrier.replace("image/png", "image/svg"),
+            carrier.replace("AQ==", "!!!!"),
+            carrier.replace("/>", "> "),
+        ] {
+            assert_eq!(
+                capture_assets(&invalid).unwrap_err(),
+                "Invalid raster attachment."
+            );
+        }
+        assert!(capture_assets("<svg/>").unwrap().is_empty());
+    }
+
+    #[test]
+    fn capture_carrier_matches_inline_images() {
+        let jpeg = nodetto_capture::encode::jpeg_rgb8(
+            &[255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0],
+            2,
+            2,
+            90,
+        )
+        .unwrap();
+        let cases = [
+            ("png", base64::engine::general_purpose::STANDARD.encode(test_png())),
+            ("jpeg", base64::engine::general_purpose::STANDARD.encode(jpeg)),
+            ("gif", "R0lGODlhAgACAIAAAAAAAP///yH5BAAAAAAALAAAAAACAAIAAAIDhI9WADs=".to_string()),
+            ("webp", "UklGRtYEAABXRUJQVlA4TMkEAAAvH8AHEE2oaduA6ThT/ozLIaL/WXDe3kIgkORPO8EcCtq2YbyLYPxRDoDSNpKcudB/jYfzo8f9D4976ZCk1zz6fN75FvlkgIeO+3+KZOe/9MjMzEyRI4aY7dwOmRkiZjgAXcEHYGZmZmaG0U5XBb1mH+DfcjbzS82tf+yWVaHhl271ShXPu8E7gEeqfCQ4tq0de+59f9tJOlutnQmkNqdgO+NIm86lVTq1bft7H6i2bStb1jrfjzukf5BJ/Ikv8qg8Ddkdold3uxtqtm3LlvP5seTW3TONDlOQXTLdZQGmcB3BkrtEZ4GPZwIEhP5AXg/KN9tqlW+Hp0JXeVjK1zzPVrOS+vKb1rBP5QvuRYIrcoK17VP5tHfFemeL+XnVX247tFUI+P9KF25etVy/dLlyiXd02vmvPif401EeTUF5okD520GOIToKhCMcMKbCsS4nyc4yvwtrAn6+7D2D1s8xGP7EoO8zKTAPZHpGgHlEZm4z8xghprqcjzYq4GKmFU2+CCu67CjB3GaGXx0C9mtDNsiYgFcrKIcE/JYEfIyb62RCQhCq4VfzQGhHzG1rHDFzBKEmmHkBC6XzrmpuoYl7z6J/9S2EXw201tBMo1kvo7x313z0IDoF/jqm6vrajLsBAamq98p+1bRBV9M0lhc6Y924CK1ZZdm60GF9547oO3Tk6I6FoS+5tSA6fTdMUqaqKhjqSjC3I57SHeee/Tuw9V8VsoVgHWD9tAdXTIx8/K5tiu6FAAbBttJqzsd0EqPGzDaIDdGxW1Gzf3XTBua2mmR55HDefm0HCvuPB9ZXWUV46Kmf2SjpyGzUVF4Q4+6V/3YsguUQrP/04oZHFnofbW36+HEaCDolQa/08uOrLtF4hrU2y8gjG37tXNCYZebVQjqgcMXeudOYQE+1r/8TpU54mKIba5ocYrx1u/PJB+KR9X92yQ+YhRgjQLCvZcGVAhhZbozxuTOdlDPuk6+IR9b92jVPoTIyJiKB72qitPbdVLZsWkOMfPlMx+dM+uQT8ajqslUyDIwRJAgtP+1dU0BWWTYvIu3lG502FaKBU62d9U3FUyCAVCF9DKK03tlZFizZQrDBgBYfOykXzolLAeckawOT4AF6JQKsBSg/Glj3Y2BuK/7ThsoJrtvXhRpYWppzErEBgFnUZJ0/JVHa0LOXwsZyMBsMnCibJwbXG3GRBpeS2F435JAgoeV7T3oFFcyqUBjqaq0VEpnAa0UXqAFiFp4Ca8QvQJQ2dZMFiiMCbLccvfOE23exXbIIcCiC64ArVSE5JMg5nRE0C7VqjUQ41Rn+c6nqXKUKHmQBEpg6IEpSitYcZfnqfdxxpJWiOxdMwwMghxj+c4l5zMFXk86wjhvSE4TOJ1naFRSF8m6urUjUvZpIFMSAXpB6FEokhBCRU3laKoaykoAUqZMlFYiEfgJr9lLkoM/e4t44IVJbOuM7Ua6OMfdzRAJSnzWpkQP2kjB6SwpTPXUtHMwk4H3a6uQkuf+fNVH3kBCVMcX+QMcpR58mwYZ+qYCTj4M1Mq7a5iTy4GCnpbqfKnKWDiVSRIt/csKRONnRryjg+fo0xj5wjg1OBah234Y6EKoehKoTQlW+1QF+WWAnx79Sr19dQCHgT7+3AA==".to_string()),
+        ];
+        for (mime, payload) in cases {
+            let data = format!("data:image/{mime};base64,{payload}");
+            let carrier =
+                format!(r#"<defs><image id="nodetto-capture-asset-0" href="{data}"/></defs>"#);
+            for mode in ["xMidYMid meet", "xMidYMid slice", "none", "crop"] {
+                let placement = |href: &str| {
+                    if mode == "crop" {
+                        format!(
+                            r#"<svg x="3" y="2" width="11" height="8" viewBox="1 1 5 4" overflow="hidden"><image width="12" height="10" href="{href}"/></svg>"#
+                        )
+                    } else {
+                        format!(
+                            r#"<image x="1" y="2" width="12" height="9" preserveAspectRatio="{mode}" href="{href}"/><image x="15" y="1" width="7" height="14" preserveAspectRatio="{mode}" href="{href}"/>"#
+                        )
+                    }
+                };
+                let wrap = |body: String| {
+                    format!(
+                        r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="18">{body}</svg>"#
+                    )
+                };
+                let inline = wrap(placement(&data));
+                let shared = wrap(format!(
+                    "{carrier}{}",
+                    placement("https://nodetto.invalid/capture-asset/0")
+                ));
+                for scale in [1.0, 2.37] {
+                    let expected = png(inline.clone(), scale, None, false).unwrap();
+                    let actual = png(shared.clone(), scale, None, false).unwrap();
+                    assert_eq!(actual, expected, "{mime} {mode} {scale}");
+                    let transcode = |bytes| {
+                        nodetto_capture::transcode_png(
+                            bytes,
+                            nodetto_capture::ImageFormat::Jpeg { quality: 90 },
+                            [255, 255, 255],
+                        )
+                        .unwrap()
+                    };
+                    assert_eq!(transcode(&actual), transcode(&expected));
+                }
+            }
+        }
+    }
 
     fn test_png() -> Vec<u8> {
         let mut bytes = Vec::new();

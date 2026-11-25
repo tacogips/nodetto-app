@@ -408,6 +408,7 @@ export {
   type SvgExportOptions,
   type SvgTheme,
 } from "./svg-export.ts";
+export { svgExportMemberIds } from "./svg-export/document.ts";
 export {
   planZOrder,
   reorderCommands,
