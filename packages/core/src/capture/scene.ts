@@ -5,10 +5,16 @@ import {
   sweptBounds,
 } from "../cad/bounds.ts";
 import { visitCadConstruction } from "../cad/construction.ts";
+import {
+  buildEdgeYIndex,
+  type EdgeIndexStats,
+  type EdgeYIndex,
+  crossingParity,
+} from "../cad/edge-y-index.ts";
 import type { CadFrame } from "../cad/frames.ts";
 import type { ExtrudeGeometry } from "../cad/history.ts";
 import type { CadLoop } from "../cad/loops.ts";
-import { coordinate } from "../cad/vec.ts";
+import { coordinate, gridCross, NM_PER_MM } from "../cad/vec.ts";
 import { compareFractional } from "../fractional.ts";
 import type { Bounds3 } from "./camera.ts";
 import type { CaptureMeshDecoder } from "./cad-request.ts";
@@ -60,7 +66,7 @@ export interface CadCaptureModel {
   readonly skipped: readonly { id: ElementId; reason: "mesh" }[];
 }
 
-function loopBounds({ points }: CadLoop) {
+function loopBounds(points: readonly number[]) {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -77,27 +83,39 @@ function loopBounds({ points }: CadLoop) {
 }
 
 function containsPoint(
-  points: readonly number[],
+  entry: LoopEntry,
   x: number,
   y: number,
+  stats?: EdgeIndexStats,
 ): boolean {
-  let inside = false;
-  let ax = coordinate(points, points.length - 2);
-  let ay = coordinate(points, points.length - 1);
-  for (let i = 0; i < points.length; i += 2) {
-    const bx = coordinate(points, i);
-    const by = coordinate(points, i + 1);
-    if (ay > y !== by > y && x < ax + ((bx - ax) * (y - ay)) / (by - ay))
-      inside = !inside;
-    ax = bx;
-    ay = by;
-  }
-  return inside;
+  const points = entry.grid;
+  entry.edges ??= buildEdgeYIndex(points, stats);
+  const index = entry.edges;
+  const n = points.length / 2;
+  return crossingParity(
+    index,
+    x,
+    y,
+    (edge) => {
+      const a = 2 * ((edge + n - 1) % n);
+      const ax = coordinate(points, a);
+      const ay = coordinate(points, a + 1);
+      const bx = coordinate(points, 2 * edge);
+      const by = coordinate(points, 2 * edge + 1);
+      return (
+        ay > y !== by > y &&
+        gridCross(bx - ax, by - ay, x - ax, y - ay) > 0 === by > ay
+      );
+    },
+    stats,
+  );
 }
 
 type LoopEntry = ReturnType<typeof loopBounds> & {
   loop: CadLoop;
+  grid: number[];
   position: number;
+  edges?: EdgeYIndex;
 };
 
 function indexBucket(entries: LoopEntry[], stats?: { indexEntries?: number }) {
@@ -183,67 +201,77 @@ function indexBucket(entries: LoopEntry[], stats?: { indexEntries?: number }) {
  */
 export function normaliseToolLoops(
   loops: readonly CadLoop[],
-  stats?: { ancestorProbes: number; indexEntries?: number },
+  stats?: {
+    ancestorProbes: number;
+    indexEntries?: number;
+    edges?: EdgeIndexStats;
+  },
 ): readonly CadLoop[] {
   if (loops.every(({ depth }) => depth === 0)) return loops;
   const buckets = new Map<number, LoopEntry[]>();
-  for (const loop of loops) {
+  const entries = loops.map((loop) => {
+    const grid = loop.points.map((v) => Math.round(v * NM_PER_MM));
     const bucket = buckets.get(loop.depth) ?? [];
-    bucket.push({ loop, ...loopBounds(loop), position: bucket.length });
+    const entry = { loop, grid, ...loopBounds(grid), position: bucket.length };
+    bucket.push(entry);
     buckets.set(loop.depth, bucket);
-  }
+    return entry;
+  });
   const indexes = new Map(
     [...buckets].map(([depth, entries]) => [
       depth,
       indexBucket(entries, stats),
     ]),
   );
-  return loops.filter(({ points, depth }) => {
-    if (depth === 0) return true;
-    const x = coordinate(points, 0);
-    const y = coordinate(points, 1);
-    let ancestorDepth = -1;
-    for (let k = depth - 1; k >= 0; k -= 1) {
-      const index = indexes.get(k);
-      if (!index) continue;
-      const inside =
-        x >= index.minX &&
-        x <= index.maxX &&
-        y >= index.minY &&
-        y <= index.maxY;
-      const key =
-        index.cell(y, index.minY, index.height, index.rows) * index.cols +
-        index.cell(x, index.minX, index.width, index.cols);
-      const local = inside ? (index.cells.get(key) ?? []) : [];
-      let i = 0;
-      let j = 0;
-      while (i < local.length || j < index.oversized.length) {
-        const a = local[i];
-        const b = index.oversized[j];
-        let entry: LoopEntry;
-        if (a !== undefined && (b === undefined || a.position < b.position)) {
-          entry = a;
-          i += 1;
-        } else if (b !== undefined) {
-          entry = b;
-          j += 1;
-        } else break;
-        if (stats) stats.ancestorProbes += 1;
-        if (
-          x >= entry.minX &&
-          x <= entry.maxX &&
-          y >= entry.minY &&
-          y <= entry.maxY &&
-          containsPoint(entry.loop.points, x, y)
-        ) {
-          ancestorDepth = k;
-          break;
+  return entries
+    .filter(({ loop, grid }) => {
+      const { depth } = loop;
+      if (depth === 0) return true;
+      const x = coordinate(grid, 0);
+      const y = coordinate(grid, 1);
+      let ancestorDepth = -1;
+      for (let k = depth - 1; k >= 0; k -= 1) {
+        const index = indexes.get(k);
+        if (!index) continue;
+        const inside =
+          x >= index.minX &&
+          x <= index.maxX &&
+          y >= index.minY &&
+          y <= index.maxY;
+        const key =
+          index.cell(y, index.minY, index.height, index.rows) * index.cols +
+          index.cell(x, index.minX, index.width, index.cols);
+        const local = inside ? (index.cells.get(key) ?? []) : [];
+        let i = 0;
+        let j = 0;
+        while (i < local.length || j < index.oversized.length) {
+          const a = local[i];
+          const b = index.oversized[j];
+          let entry: LoopEntry;
+          if (a !== undefined && (b === undefined || a.position < b.position)) {
+            entry = a;
+            i += 1;
+          } else if (b !== undefined) {
+            entry = b;
+            j += 1;
+          } else break;
+          if (stats) stats.ancestorProbes += 1;
+          if (
+            x >= entry.minX &&
+            x <= entry.maxX &&
+            y >= entry.minY &&
+            y <= entry.maxY &&
+            containsPoint(entry, x, y, stats?.edges)
+          ) {
+            ancestorDepth = k;
+            break;
+          }
         }
+        if (ancestorDepth !== -1) break;
       }
-      if (ancestorDepth !== -1) break;
-    }
-    return (depth - ancestorDepth) % 2 === 1;
-  });
+      return (depth - ancestorDepth) % 2 === 1;
+    })
+    .map(({ loop }) => loop);
 }
 
 type BuildingBody = Omit<CaptureBody, "steps" | "bounds"> & {

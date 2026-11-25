@@ -49,7 +49,15 @@ only when non-empty; the report key `analysis.incomplete` uses body indices.
 The default private per-user capture directory is under the system temporary
 directory, with a digest-based filename. Identical bytes succeed without a
 rewrite; different bytes at an explicit path need `--force`. Symbolic links
-are refused, and output parent directories are not created. For the Mac App
+are refused, and output parent directories are not created. A new capture is
+written to a short temporary file next to the target. It is then published
+without overwriting, so a file that another process wrote at the same path in
+the meantime is never removed. If writing fails, only that temporary file is
+removed. Publishing needs a no-clobber rename or a hard link. The native CLI
+uses either; the Bun host uses hard links only. On a filesystem that lacks
+the needed primitive (for example VFAT under the Bun host), a new capture fails
+with exit 2 and the message names the path. Capture to the default directory
+there and copy the file. `--force` replacement is unchanged. For the Mac App
 Store CLI, use `--output` inside the authorized folder so another process can
 read the image.
 
@@ -130,6 +138,8 @@ produce the same bytes. Text contains no time or random value.
 
 Call `nodetto_capture` with capture arguments. `--inline` adds the image to
 the MCP result up to 1 MiB; clients may impose lower limits or shrink it.
+The attached image is the one this call wrote (or found identical at the
+path), even if another capture replaces the file before the result is sent.
 Visual token cost follows pixel size: a 1024x768 image costs about 1,036 tokens
 at 28x28 pixels per token. Reduce `--size`, try JPG or open the returned path.
 

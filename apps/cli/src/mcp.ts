@@ -1,5 +1,4 @@
 import { Buffer } from "node:buffer";
-import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
@@ -32,43 +31,35 @@ const outputSchema = {
   stderr: z.string(),
 };
 
+type CaptureWrite = { path: string; byteLength: number; bytes?: Uint8Array };
+
 function inlineContent(
   image: NonNullable<ReturnType<typeof capturedImage>>,
-  readBytes: (path: string) => Uint8Array | number | undefined,
+  written: CaptureWrite,
 ): ContentBlock {
-  try {
-    const data = readBytes(image.path);
-    if (data === undefined)
-      throw new Error("This host cannot read image files.");
-    const size = typeof data === "number" ? data : data.byteLength;
-    if (typeof data === "number" || size > MCP_INLINE_MAX_BYTES) {
-      return {
-        type: "text",
-        text: `Image not inlined: ${size} bytes exceed ${MCP_INLINE_MAX_BYTES}. Open the path instead, or capture with a smaller --size or --format jpg.`,
-      };
-    }
-    return {
-      type: "image",
-      data: Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString(
-        "base64",
-      ),
-      mimeType: image.mimeType,
-    };
-  } catch (cause) {
+  if (written.bytes === undefined) {
     return {
       type: "text",
-      text: `Image not inlined: ${cause instanceof Error ? cause.message : String(cause)}`,
+      text: `Image not inlined: ${written.byteLength} bytes exceed ${MCP_INLINE_MAX_BYTES}. Open the path instead, or capture with a smaller --size or --format jpg.`,
     };
   }
+  const data = written.bytes;
+  return {
+    type: "image",
+    data: Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString(
+      "base64",
+    ),
+    mimeType: image.mimeType,
+  };
 }
 
 /** Use the CLI itself so new options and operations are available immediately. */
 export function createMcpServer(
   io: CommandIo,
   version: string,
-  readInlineBytes = (path: string): Uint8Array | number | undefined =>
-    io.readBytes?.(path),
+  options: { run?: typeof runCliAsync } = {},
 ): McpServer {
+  const run = options.run ?? runCliAsync;
   const server = new McpServer(
     { name: "nodetto-cli", version },
     {
@@ -78,7 +69,7 @@ export function createMcpServer(
   );
   const execute = async (args: string[], stdin?: string) => {
     let result: CommandResult;
-    let writtenPath: string | undefined;
+    let written: CaptureWrite | undefined;
     const capture = wantsInlineImage(args) ? io.capture : undefined;
     try {
       if (
@@ -90,7 +81,7 @@ export function createMcpServer(
           "The MCP server is already running. Use a document command or help mcp.",
         );
       } else {
-        result = await runCliAsync(
+        result = await run(
           args,
           {
             ...io,
@@ -99,7 +90,15 @@ export function createMcpServer(
                 ...capture,
                 write(path, bytes, replace) {
                   const status = capture.write(path, bytes, replace);
-                  if (status !== "exists") writtenPath = capture.absolute(path);
+                  if (status !== "exists") {
+                    written = {
+                      path: capture.absolute(path),
+                      byteLength: bytes.byteLength,
+                      ...(bytes.byteLength <= MCP_INLINE_MAX_BYTES && {
+                        bytes,
+                      }),
+                    };
+                  }
                   return status;
                 },
               },
@@ -125,12 +124,12 @@ export function createMcpServer(
       { type: "text", text: JSON.stringify(structuredContent) },
     ];
     if (
-      writtenPath !== undefined &&
+      written !== undefined &&
       (result.exitCode === 0 || result.exitCode === 1)
     ) {
       const image = capturedImage(result.stdout);
-      if (image?.path === writtenPath) {
-        content.push(inlineContent(image, readInlineBytes));
+      if (image?.path === written.path) {
+        content.push(inlineContent(image, written));
       } else {
         content.push({
           type: "text",
@@ -181,36 +180,6 @@ export function createMcpServer(
   return server;
 }
 
-/** Bound filesystem reads even if the capture changes before it is inlined. */
-function readLocalInlineBytes(path: string): Uint8Array | number {
-  const file = openSync(
-    path,
-    constants.O_RDONLY |
-      (constants.O_NOFOLLOW ?? 0) |
-      (constants.O_NONBLOCK ?? 0),
-  );
-  try {
-    const entry = fstatSync(file);
-    if (!entry.isFile()) throw new Error("The capture is not a regular file.");
-    if (entry.size > MCP_INLINE_MAX_BYTES) return entry.size;
-    const bytes = Buffer.allocUnsafe(entry.size);
-    let length = 0;
-    while (length < bytes.length) {
-      const read = readSync(file, bytes, length, bytes.length - length, null);
-      if (read === 0) break;
-      length += read;
-    }
-    if (fstatSync(file).size !== entry.size || length !== entry.size) {
-      throw new Error("The capture size changed while reading it.");
-    }
-    return bytes;
-  } finally {
-    closeSync(file);
-  }
-}
-
 export async function serveMcp(io: CommandIo, version: string): Promise<void> {
-  await createMcpServer(io, version, readLocalInlineBytes).connect(
-    new StdioServerTransport(),
-  );
+  await createMcpServer(io, version).connect(new StdioServerTransport());
 }

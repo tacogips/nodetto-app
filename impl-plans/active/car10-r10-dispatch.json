@@ -1,0 +1,183 @@
+{
+  "taskId": "car10-r10",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "43197ca051dbca62251631b3f190b150252ee7c9",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car10-r10",
+  "waves": [
+    ["car10-p1-capture-write-rust", "car10-p2-capture-write-bun", "car10-p3-scene-grid-ancestry", "car10-p4-edge-index-ray-origin", "car10-p6-loop-forest"],
+    ["car10-p5-scene-ray-origin"],
+    ["car10-p7-profile-depth-forest"]
+  ],
+  "reviewContext": {
+    "issueReference": "audit-round-10 feat/ai-capture@43197ca051dbca62251631b3f190b150252ee7c9 (base 0a35708): function-capture-failed-create-removes-successful-replacement, performance-cad-containment-crossings-outside-ray, performance-cad-profile-depth-enumerates-all-ancestors, maintainability-capture-hole-containment-precision; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car10-00-overview.md",
+    "userProblem": "The round-10 audit found four defects in AI capture and CAD profile handling. (1) When a new capture fails to write or sync, both CLI backends (crates/native/src/fs.rs write_new and apps/cli/src/capture-io.ts writeNew) unlink the public output path, which can delete another writer's completed forced replacement. (2) The shared edge index (packages/core/src/cad/edge-y-index.ts) prunes only by Y, so loops.ts and capture/scene.ts inspect every crossing behind the ray origin: 8,392,704 exact inspections per pass on a slotted plate with 2,048 slots and holes. (3) buildProfileLoops in loops.ts computes depth by testing all N(N-1)/2 ancestor pairs of a nested chain: 16,781,312 inspections for 4,097 rectangles that produce a 400-byte scene. (4) Capture ancestry in scene.ts interpolates crossings in floating-point millimetres and drops a valid triangular hole that the nanometre grid keeps, so the scene is byte-identical to a solid plate.",
+    "requiredOutcomes": [
+      "function-capture-failed-create-removes-successful-replacement (R10-1; car10-p1, car10-p2): new captures are staged in a short-named owned sibling file and published only by a no-clobber primitive (Rust persist_noclobber, Bun linkSync). A collision keeps the identical/exists decision; any other publish error is returned after removing only the staging file; there is no direct-create fallback. A write-failure regression and a publish-failure regression, each with a competing forced writer, preserve B's exact bytes and an exact directory listing in both backends. A near-limit basename still works in Bun. file_contract.rs and the single-writer cleanup assertions pass.",
+      "performance-cad-containment-crossings-outside-ray (R10-2; car10-p4, car10-p5): crossingParity(index, x, y, exact, stats) skips nodes behind the origin, resolves straddling nodes wholly ahead in bulk and inspects leaves exactly; horizontal edges are not indexed. Slotted-rim regressions in both orientations, with T and H varied independently, bound q = visits + bulk + inspections (q <= 16 H log2(4T+4), T-doubling ratio <= 1.5, both-doubling ratio <= 2.5). Ordered points, depths and scene bytes match expectations built only from the fixture vertex lists. The round-9 detailed-rim tests pass unedited.",
+      "performance-cad-profile-depth-enumerates-all-ancestors (R10-3; car10-p6, car10-p7): loopForest gives parents and depths in one deterministic sweep, with each depth resolved once. buildProfileLoops keeps the pair pass under a 32*E budget and falls back to loopForest. A nested-chain regression in three selections asserts exact ordered points and depths and W(2N)/W(N) <= 2.5, with abandoned pair work included. The 400-byte sparse prism is unchanged.",
+      "maintainability-capture-hole-containment-precision (R10-4; car10-p3): normaliseToolLoops decides ancestry on the nanometre grid with the loops.ts gridCross predicate, using consistent grid bounds, buckets and query vertex, and still serializes millimetre points. Both cyclic starts of the triangular-hole fixture give loop vertex counts [3, 4] and differ from the solid control. The BigInt determinant oracle gives +1. NCS1 goldens are unchanged."
+    ],
+    "nonGoals": [
+      "No change to desktop export (write_export_atomic, write_selected_file_atomic), replace_regular's existing-file branch, write_to_entry, writeEntryAtomic semantics, apps/cli/native/src/files.rs or crates/native/tests/file_contract.rs.",
+      "No change to CadLoop, the buildLoops/buildProfileLoops signatures, intersection validation, first-error order, pcb-outline.ts, history.ts, cad-request.ts, prepareCadCapture output shape, NCS1 layout, goldens or public exports; no plan edits design docs, docs/, lockfiles or indexes."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, indexed reads safe under noUncheckedIndexedAccess, Biome clean on touched files, CARGO_TERM_QUIET=true, no new dependency.",
+      "artifactRoots exactly [\"target\", \"tmp/cad3d\"]; evidence under tmp/car10-r10/<planId>/; no *.test.ts left under target/ or tmp/.",
+      "Per-plan gates are focused; typecheck, lint, mise run verify and the release-binary parity run once at integration.",
+      "The timing rule of design 26.2 applies; new performance behaviour is asserted with counters only; at most two bun test or cargo test processes run at once."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R10-1 publishes only through persist_noclobber (Rust) or linkSync (Bun), with no direct-create fallback.", "rationale": "A fallback that writes and unlinks the public path brings the race back; failing closed keeps another writer's file safe."},
+      {"decision": "R10-1 staging names have a fixed short length that does not depend on the target name.", "rationale": "A valid near-limit target basename must not overflow NAME_MAX."},
+      {"decision": "R10-2 resolves parity from node aggregates, and leaves are always exact.", "rationale": "Moving the scan inside the index cannot pass the counters, and the round-9 inspection assertions still hold."},
+      {"decision": "R10-4 lands before R10-2's scene half.", "rationale": "X pruning is exact only with the integer grid predicate."},
+      {"decision": "R10-3 keeps the pair pass under a 32*E budget and falls back to a treap sweep that resolves each depth once.", "rationale": "Ordinary sketches and the existing counter tests stay on the fast path, and total work stays O(E log E)."}
+    ],
+    "intentionalTradeoffs": [
+      "New captures fail with exit 2 where the capture backend lacks its primitive (native CLI: no no-clobber rename and no hard link; Bun host: no hard link). Desktop export is unaffected.",
+      "One in-mock line of the existing Bun partial-write test and the scene.test.ts brute-force oracle helper are adapted (design 28.4); every other assertion is kept.",
+      "The ratio bounds carry a log factor."
+    ],
+    "supportedEdgeCases": [
+      "Dangling links, directories and identical or different existing targets; a collision at publish time; write, sync and publish failures with a competing forced writer; near-limit basenames.",
+      "Downward edges whose crossing lies exactly at x, horizontal edges, padding leaves, mirrored orientation, omitted intermediate ancestors, rays through another contour's local-minimum or local-maximum vertex, both windings, winding 0 (reported as empty)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Real VFAT, exFAT or network-filesystem runs, real cross-process race frequency, Boa elapsed time, desktop latency, peak memory and Tauri delivery."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car10-00-overview.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car10-p1-capture-write-rust",
+      "planPath": "impl-plans/active/car10-p1-capture-write-rust.md",
+      "dependsOn": [],
+      "writePaths": ["crates/native/src/fs.rs", "impl-plans/active/car10-p1-capture-write-rust.md", "impl-plans/progress/car10-p1-capture-write-rust.md", "tmp/car10-r10/car10-p1-capture-write-rust", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "write_new_with keeps its signature and delegates to a crate-internal write_new_inner(path, bytes, write_contents, publish), whose publish defaults to persist_noclobber. The flow is lstat pre-check, then tempfile staging with 0o666 permissions and the default name, then write and sync, then publish. AlreadyExists gives the identical/exists decision; any other error is returned after the staging file is dropped. The public path is never removed or opened for writing.",
+        "New failed_new_capture_keeps_a_concurrent_forced_replacement fails before the fix and passes after: injected write error, the path holds B, the directory holds exactly [image.png]. New failed_publish_keeps_a_concurrent_forced_replacement passes: Unsupported error, the path holds B, exactly [image.png].",
+        "The existing single-writer cleanup test and every crates/native/tests/file_contract.rs test pass unedited; fmt and clippy -D warnings are clean."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-native -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car10-p1 cargo clippy -p nodetto-native --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car10-p1 cargo test -p nodetto-native"
+      ]
+    },
+    {
+      "planId": "car10-p2-capture-write-bun",
+      "planPath": "impl-plans/active/car10-p2-capture-write-bun.md",
+      "dependsOn": [],
+      "writePaths": ["apps/cli/src/capture-io.ts", "apps/cli/src/capture-io.test.ts", "apps/cli/src/write-atomic.ts", "impl-plans/active/car10-p2-capture-write-bun.md", "impl-plans/progress/car10-p2-capture-write-bun.md", "tmp/car10-r10/car10-p2-capture-write-bun", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "write-atomic.ts exports siblingPath(target, name), and writeEntryAtomic uses it with its unchanged name. writeNew runs an lstat pre-check, opens a staging file .nodetto-<16 hex>.tmp with openSync wx 0o666, writes it with writeFileSync, fsyncs, then calls linkSync. EEXIST gives the identical/exists decision; other errors are rethrown; the staging file is unlinked in a finally. There is no unlink of the public path and no fallback.",
+        "New 'a failed new capture keeps a concurrent forced replacement' fails before the fix and passes after; new 'a failed publish keeps a concurrent forced replacement' and 'a new capture accepts a near-limit basename' pass. Each asserts B's exact bytes, or the target's bytes, and the exact folder listing.",
+        "The existing partial-write test changes only its in-mock public-path line (design 28.4); all other tests in capture-io.test.ts and write-atomic.test.ts pass unedited."
+      ],
+      "verification": [
+        "bunx biome check apps/cli/src/capture-io.ts apps/cli/src/capture-io.test.ts apps/cli/src/write-atomic.ts && bun test apps/cli/src/capture-io.test.ts apps/cli/src/write-atomic.test.ts"
+      ]
+    },
+    {
+      "planId": "car10-p3-scene-grid-ancestry",
+      "planPath": "impl-plans/active/car10-p3-scene-grid-ancestry.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/scene.ts", "packages/core/src/capture/scene.test.ts", "impl-plans/active/car10-p3-scene-grid-ancestry.md", "impl-plans/progress/car10-p3-scene-grid-ancestry.md", "tmp/car10-r10/car10-p3-scene-grid-ancestry", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "LoopEntry carries a grid computed with Math.round(v * NM_PER_MM). Bounds, the bucket grid, the query vertex and the edge index all use the grid, and containsPoint applies the loops.ts gridCross predicate. The kept CadLoop objects (millimetre points) and their order are unchanged.",
+        "The scene.test.ts brute-force oracle uses its own BigInt determinant on the same grid; existing callers keep their assertions.",
+        "New sloped-rim triangular-hole test: the BigInt determinant is 1n; both cyclic starts give tool loop vertex counts [3, 4]; each scene differs from the solid control. It fails before the fix (the tip start gives [4]) and passes after.",
+        "All existing scene tests, including NCS1 digests, pass."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts"
+      ]
+    },
+    {
+      "planId": "car10-p4-edge-index-ray-origin",
+      "planPath": "impl-plans/active/car10-p4-edge-index-ray-origin.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/edge-y-index.ts", "packages/core/src/cad/loops.ts", "packages/core/src/cad/loops.test.ts", "impl-plans/active/car10-p4-edge-index-ray-origin.md", "impl-plans/progress/car10-p4-edge-index-ray-origin.md", "tmp/car10-r10/car10-p4-edge-index-ray-origin", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "edge-y-index.ts indexes only non-horizontal edges, stores minHigh, minX and maxX, and adds bulk?: number to EdgeIndexStats. It exports crossingParity(index, x, y, exact, stats): it skips on start >= limit, maxHigh <= y or maxX < x, resolves internal nodes in bulk (min(end, m) <= limit, minHigh > y, minX > x), and inspects leaves exactly. forEachEdgeAtY is kept.",
+        "loops.ts contains uses crossingParity with its unchanged exact predicate.",
+        "New slotted-rim test, both orientations, (T, H) in {(256,256), (512,256), (256,512), (512,512)}, ids a<jjjjj> / h<kkkkk>-<j>: plate first at depth 0 and holes at depth 1, with exact points from the vertex lists; q <= 16 H log2(4T+4); T-doubling ratio <= 1.5; both-doubling ratio <= 2.5; builds <= total vertices. It fails before the fix and passes after.",
+        "The round-9 detailed-rim test, the round-8 tests and pcb-outline.test.ts pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/edge-y-index.ts packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/pcb-outline.test.ts"
+      ]
+    },
+    {
+      "planId": "car10-p5-scene-ray-origin",
+      "planPath": "impl-plans/active/car10-p5-scene-ray-origin.md",
+      "dependsOn": ["car10-p3-scene-grid-ancestry", "car10-p4-edge-index-ray-origin"],
+      "writePaths": ["packages/core/src/capture/scene.ts", "packages/core/src/capture/scene.test.ts", "packages/core/src/cad/edge-y-index.ts", "impl-plans/active/car10-p5-scene-ray-origin.md", "impl-plans/progress/car10-p5-scene-ray-origin.md", "tmp/car10-r10/car10-p5-scene-ray-origin", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "scene.ts containsPoint calls crossingParity with p3's grid predicate on grid integers, and forEachEdgeAtY is deleted (rg finds no references).",
+        "New slotted-rim scene test, both orientations, same sizes and bounds as p4: ordered points equal the vertex-list expectation; indexedSceneBytes(actual) equals sceneBytesOfPoints(expected); actual equals oracleNormalise element-wise. It fails before the fix and passes after.",
+        "The round-9 detailed-rim scene test and all existing tests in scene.test.ts and loops.test.ts pass unedited; indexedSceneBytes output is unchanged."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/edge-y-index.ts packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts packages/core/src/cad/loops.test.ts"
+      ]
+    },
+    {
+      "planId": "car10-p6-loop-forest",
+      "planPath": "impl-plans/active/car10-p6-loop-forest.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/loop-forest.ts", "packages/core/src/cad/loop-forest.test.ts", "impl-plans/active/car10-p6-loop-forest.md", "impl-plans/progress/car10-p6-loop-forest.md", "tmp/car10-r10/car10-p6-loop-forest", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "New internal loop-forest.ts exports ForestStats and loopForest(grids, windings, stats) returning { parents, depths }. It imports only ./vec.ts and is not re-exported.",
+        "The upward sweep uses a deterministic treap and the exact gridCross comparator, and processes removals, then inserts, then answers. Each depth is resolved once from the already-answered neighbour; no parent chain is walked.",
+        "Tests pass: parents and depths equal an independent BigInt oracle on nested, sibling, shared-y, local-min, local-max and both-winding fixtures, and events + steps grows at most 2.5 times per doubling of a nested chain."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/loop-forest.ts packages/core/src/cad/loop-forest.test.ts && bun test packages/core/src/cad/loop-forest.test.ts"
+      ]
+    },
+    {
+      "planId": "car10-p7-profile-depth-forest",
+      "planPath": "impl-plans/active/car10-p7-profile-depth-forest.md",
+      "dependsOn": ["car10-p4-edge-index-ray-origin", "car10-p5-scene-ray-origin", "car10-p6-loop-forest"],
+      "writePaths": ["packages/core/src/cad/loops.ts", "packages/core/src/cad/loops.test.ts", "packages/core/src/capture/scene.test.ts", "impl-plans/active/car10-p7-profile-depth-forest.md", "impl-plans/progress/car10-p7-profile-depth-forest.md", "tmp/car10-r10/car10-p7-profile-depth-forest", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "overlappingPairs accepts an optional stop callback, and intersection passes none. The depth pass counts work internally (pairs plus edge-index work) against a budget of DEPTH_WORK_PER_VERTEX = 32 times E. When the budget is exceeded, it uses loopForest(...).depths. The abandoned work stays in stats, and LoopStats gains forest?: ForestStats.",
+        "New nested-chain test, N in {1025, 2049, 4097}, with all, omitted-ancestor and sparse selections: exact ordered points and depths of every returned loop, and W(2N)/W(N) <= 2.5. It fails before the fix and passes after.",
+        "New sparse nested-chain scene test: prepareCadCapture gives 400 bytes and one loop with rect 0's corners.",
+        "The progress log records the pair work of the round-8, round-9 and slotted fixtures against their budgets, all on the pair path. All existing tests pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/loop-forest.test.ts packages/core/src/cad/pcb-outline.test.ts packages/core/src/cad/history.test.ts packages/core/src/capture/scene.test.ts"
+      ]
+    }
+  ],
+  "integration": [
+    "bun run typecheck && bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

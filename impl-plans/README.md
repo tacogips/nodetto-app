@@ -101,6 +101,85 @@ and `mise run test-cli` exited 0 (`/private/tmp/car2-final-review/test-cli.log`)
 Open item: 753 round-1 `*.test.ts` copies under `tmp/car1-r1/` (listed in
 `tmp/car2-r2b/reconcile-wave-005/stray-tests.txt`) must still be removed.
 
+### AI capture audit round 8 (car8-r8)
+
+These two plans fix the two performance findings of the eighth audit of
+`feat/ai-capture` (base 0a35708, head fc22c03). See the
+[design](../design-docs/specs/design-ai-capture.md) (section 26). Evidence is
+under `tmp/car8-r8/<planId>/`; progress logs remain in `progress/`.
+
+| Plan | Scope |
+| --- | --- |
+| [car8-f1-loops-box-query](completed/car8-f1-loops-box-query.md) | Sketch validation in `loops.ts` finds candidate pairs with an X sweep and a max-maxY tree (R8-1) |
+| [car8-f2-describe-source-index](completed/car8-f2-describe-source-index.md) | `describeBodies` indexes sources by (tool, op) and walks each body's history once (R8-2) |
+
+Integration: the combined focused tests (22 pass), typecheck and lint exited
+0 (`tmp/car8-r8/reconcile-wave-001/`), and the caller-path suites passed
+(419 pass). The [overview](active/car8-00-overview.md) and
+`active/car8-r8-dispatch.json` stay in `active/` until
+`CARGO_TERM_QUIET=true mise run verify` and the native CAD determinism case
+pass on the combined tree. The manifest's `planPath` values name the
+pre-archive `active/` locations, and it must not be dispatched again.
+
+### AI capture audit round 9 (car9-r9)
+
+These four plans fix the two findings of the ninth audit of `feat/ai-capture`
+(base 0a35708, head aede81d): performance-cad-containment-perimeter-rescans
+(R9-1) and function-mcp-inline-image-replaced-before-readback (R9-2). See the
+[design](../design-docs/specs/design-ai-capture.md) (section 27). Evidence is
+under `tmp/car9-r9/<planId>/`; progress logs remain in `progress/`.
+
+| Plan | Scope |
+| --- | --- |
+| [car9-p1-edge-index-loops](completed/car9-p1-edge-index-loops.md) | Internal edge Y-interval index `cad/edge-y-index.ts`; sketch-depth `contains()` in `loops.ts` queries it (R9-1) |
+| [car9-p2-scene-edge-index](completed/car9-p2-scene-edge-index.md) | Selected-ancestor `containsPoint()` in `capture/scene.ts` queries the same index (R9-1) |
+| [car9-p3-mcp-bun](completed/car9-p3-mcp-bun.md) | Bun MCP inline image built from the call's own write, no readback (R9-2) |
+| [car9-p4-mcp-native](completed/car9-p4-mcp-native.md) | Native MCP inline image kept in Rust from the call's own write (R9-2) |
+
+Integration: native capture and mcp-stdio parity (23 pass,
+`/tmp/car9-integ-native-parity.log`), the Cargo workspace
+(`/tmp/car9-integ-cargo-workspace.log`), workspace `bun test` (4944 pass, 0
+fail) and lint (`tmp/car9-r9/reconcile-wave-002/`) exited 0. There is no
+browser E2E suite. The [overview](active/car9-00-overview.md) and
+`active/car9-r9-dispatch.json` stay in `active/`; the manifest's `planPath`
+values name the pre-archive `active/` locations, and it must not be
+dispatched again.
+
+### AI capture audit round 10 (car10-r10)
+
+These seven plans fix the four findings of the tenth audit of `feat/ai-capture`
+(base 0a35708, head 43197ca): function-capture-failed-create-removes-successful-replacement
+(R10-1), performance-cad-containment-crossings-outside-ray (R10-2),
+performance-cad-profile-depth-enumerates-all-ancestors (R10-3) and
+maintainability-capture-hole-containment-precision (R10-4). See the
+[design](../design-docs/specs/design-ai-capture.md) (section 28) and the
+[capture guide](../docs/capture.md). Evidence is under `tmp/car10-r10/<planId>/`;
+progress logs remain in `progress/`.
+
+| Plan | Scope |
+| --- | --- |
+| [car10-p1-capture-write-rust](completed/car10-p1-capture-write-rust.md) | Native new captures staged in an owned sibling file and published with `persist_noclobber`; cleanup removes only the staging file (R10-1) |
+| [car10-p2-capture-write-bun](completed/car10-p2-capture-write-bun.md) | Bun new captures staged in a short-named owned file and published with `linkSync`; no direct-create fallback (R10-1) |
+| [car10-p3-scene-grid-ancestry](completed/car10-p3-scene-grid-ancestry.md) | Capture ancestry in `capture/scene.ts` decided on the nanometre grid with `gridCross` (R10-4) |
+| [car10-p4-edge-index-ray-origin](completed/car10-p4-edge-index-ray-origin.md) | `crossingParity` in `cad/edge-y-index.ts` prunes nodes behind the ray origin and resolves straddling nodes in bulk; used by `loops.ts` (R10-2) |
+| [car10-p5-scene-ray-origin](completed/car10-p5-scene-ray-origin.md) | `capture/scene.ts` queries `crossingParity`; `forEachEdgeAtY` removed (R10-2) |
+| [car10-p6-loop-forest](completed/car10-p6-loop-forest.md) | Internal `cad/loop-forest.ts`: deterministic treap sweep giving parents and depths, each depth resolved once (R10-3) |
+| [car10-p7-profile-depth-forest](completed/car10-p7-profile-depth-forest.md) | `buildProfileLoops` keeps the pair pass under a 32*E budget and falls back to `loopForest` (R10-3) |
+
+Integration: workspace `bun test` (4858 pass, 0 fail,
+`tmp/car10-r10/reconcile-wave-004/bun-full.log`), typecheck
+(`tmp/car10-r10/reconcile-wave-004/typecheck.log`), lint
+(`/tmp/car10-integration/lint-ts-2.log`), `cargo test -p nodetto-cli` (41 pass,
+`/tmp/car10-integration/cargo-test-cli-2.log`), the release build
+(`/tmp/car10-integration/release-build-2.log`) and native capture and
+mcp-stdio parity (23 pass, `/tmp/car10-integration/native-parity-2.log`)
+exited 0. The integration repair replaced `Math.imul` in the `loop-forest.ts`
+treap priority so the CAD determinism guard passes. There is no browser E2E
+suite. The [overview](active/car10-00-overview.md) and
+`active/car10-r10-dispatch.json` stay in `active/`; the manifest's `planPath`
+values name the pre-archive `active/` locations, and it must not be
+dispatched again.
+
 ### iPhone app design
 
 Precise layers, iOS kit, layout, prototyping, lint and comparison are implemented

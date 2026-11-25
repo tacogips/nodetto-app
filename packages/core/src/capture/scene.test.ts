@@ -567,7 +567,7 @@ function perforated(count: number): Element[] {
 }
 
 // Original implementation retained as a selection oracle.
-function loopBounds({ points }: CadLoop) {
+function loopBounds(points: readonly number[]) {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -594,8 +594,10 @@ function containsPoint(
   for (let i = 0; i < points.length; i += 2) {
     const bx = coordinate(points, i);
     const by = coordinate(points, i + 1);
-    if (ay > y !== by > y && x < ax + ((bx - ax) * (y - ay)) / (by - ay))
-      inside = !inside;
+    const cross =
+      (BigInt(bx) - BigInt(ax)) * (BigInt(y) - BigInt(ay)) -
+      (BigInt(by) - BigInt(ay)) * (BigInt(x) - BigInt(ax));
+    if (ay > y !== by > y && cross > 0n === by > ay) inside = !inside;
     ax = bx;
     ay = by;
   }
@@ -605,28 +607,41 @@ function containsPoint(
 function oracleNormalise(loops: readonly CadLoop[]): readonly CadLoop[] {
   // Disjoint profiles already describe the same region by either rule.
   if (loops.every(({ depth }) => depth === 0)) return loops;
-  const candidates = loops.map((loop) => ({ loop, ...loopBounds(loop) }));
-  return loops.filter(({ points, depth }) => {
-    if (depth === 0) return true;
-    const x = coordinate(points, 0);
-    const y = coordinate(points, 1);
-    let ancestorDepth = -1;
-    for (const { loop, minX, minY, maxX, maxY } of candidates) {
-      if (
-        loop.depth < depth &&
-        loop.depth > ancestorDepth &&
-        x >= minX &&
-        x <= maxX &&
-        y >= minY &&
-        y <= maxY &&
-        containsPoint(loop.points, x, y)
-      ) {
-        ancestorDepth = loop.depth;
-        if (ancestorDepth === depth - 1) break;
-      }
-    }
-    return (depth - ancestorDepth) % 2 === 1;
+  const candidates = loops.map((loop) => {
+    const grid = loop.points.map((v) => Math.round(v * 1_000_000));
+    return { loop, grid, ...loopBounds(grid) };
   });
+  return candidates
+    .filter(({ loop, grid }) => {
+      const { depth } = loop;
+      if (depth === 0) return true;
+      const x = coordinate(grid, 0);
+      const y = coordinate(grid, 1);
+      let ancestorDepth = -1;
+      for (const {
+        loop,
+        grid: candidateGrid,
+        minX,
+        minY,
+        maxX,
+        maxY,
+      } of candidates) {
+        if (
+          loop.depth < depth &&
+          loop.depth > ancestorDepth &&
+          x >= minX &&
+          x <= maxX &&
+          y >= minY &&
+          y <= maxY &&
+          containsPoint(candidateGrid, x, y)
+        ) {
+          ancestorDepth = loop.depth;
+          if (ancestorDepth === depth - 1) break;
+        }
+      }
+      return (depth - ancestorDepth) % 2 === 1;
+    })
+    .map(({ loop }) => loop);
 }
 
 test("normalisation probes scale linearly for perforated plates", () => {
@@ -652,6 +667,12 @@ function indexedLoop(points: number[], depth: number): CadLoop {
 }
 
 function indexedSceneBytes(loops: readonly CadLoop[]): Uint8Array {
+  return sceneBytesOfPoints(loops.map(({ points }) => points));
+}
+
+function sceneBytesOfPoints(
+  points: readonly (readonly number[])[],
+): Uint8Array {
   return writeCaptureScene(
     {
       bodies: [],
@@ -662,7 +683,7 @@ function indexedSceneBytes(loops: readonly CadLoop[]): Uint8Array {
           frame: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] },
           t0: 0,
           t1: 1,
-          loops: loops.map(({ points }) => ({
+          loops: points.map((points) => ({
             points: new Float64Array(points),
             faces: new Uint32Array(points.length / 2),
           })),
@@ -1226,4 +1247,257 @@ test("shared cuts retain hidden target history without affecting visible bounds"
   expect(shared.scene).not.toEqual(control.scene);
   expect(new DataView(control.scene.buffer).getUint32(36, true)).toBe(0);
   expect(shared.scene.length).toBe(control.scene.length + 24);
+});
+
+test("normalisation queries the detailed rim through one edge index", () => {
+  let previous = 0;
+  for (const h of [256, 512, 1024]) {
+    const entities: Element[] = [];
+    const top = (i: number): CadXY => [(256 * i) / h, i % 2 === 0 ? 512 : 513];
+    for (let i = 0; i < h; i += 1) {
+      entities.push(
+        cadElement(`rim-${i}`, "cad.line", "a1", {
+          sketch: "profile",
+          a: top(i),
+          b: top(i + 1),
+        }),
+      );
+    }
+    const sides: [CadXY, CadXY][] = [
+      [top(h), [256, 0]],
+      [
+        [256, 0],
+        [0, 0],
+      ],
+      [[0, 0], top(0)],
+    ];
+    for (const [i, [a, b]] of sides.entries()) {
+      entities.push(
+        cadElement(`side-${i}`, "cad.line", "a1", { sketch: "profile", a, b }),
+      );
+    }
+    for (let k = 0; k < h; k += 1) {
+      entities.push(
+        circle(
+          `hole-${k}`,
+          "profile",
+          [2.5 + 3 * (k % 64), 2.5 + 3 * Math.floor(k / 64)],
+          1,
+        ),
+      );
+    }
+    const loops = selectedLoops(entities);
+    const stats = {
+      ancestorProbes: 0,
+      indexEntries: 0,
+      edges: { builds: 0, visits: 0, inspections: 0 },
+    };
+    const actual = normaliseToolLoops(loops, stats);
+    const expected = oracleNormalise(loops);
+    expect(actual.length).toBe(expected.length);
+    actual.forEach((loop, i) => expect(loop).toBe(expected[i]));
+    expect(indexedSceneBytes(actual)).toEqual(indexedSceneBytes(expected));
+    const { builds, visits, inspections } = stats.edges;
+    console.log(
+      `detailed rim ${h}: builds=${builds} visits=${visits} inspections=${inspections}`,
+    );
+    expect(builds).toBeGreaterThan(0);
+    expect(visits).toBeGreaterThan(0);
+    expect(inspections).toBeGreaterThan(0);
+    expect(builds).toBeLessThanOrEqual(
+      loops.reduce((sum, loop) => sum + loop.points.length / 2, 0),
+    );
+    expect(inspections).toBeLessThanOrEqual(4 * h);
+    const total = builds + visits + inspections;
+    if (previous) expect(total).toBeLessThanOrEqual(previous * 2.5);
+    previous = total;
+  }
+});
+
+test("capture keeps a sloped-rim triangular hole decided on the nanometre grid", () => {
+  const rim: CadXY[] = [
+    [970, 0],
+    [1000, 0],
+    [1100.000003, 100.000001],
+    [970, 100.000001],
+  ];
+  const hole: CadXY[] = [
+    [1050.000002, 50.000001],
+    [1010, 65],
+    [1000, 35],
+  ];
+  const lines = (prefix: string, points: CadXY[]) =>
+    points.map((a, i) =>
+      cadElement(`${prefix}-${i}`, "cad.line", "a1", {
+        sketch: "tri",
+        a,
+        b: points[(i + 1) % points.length],
+      }),
+    );
+  const capture = (triangle: CadXY[]) =>
+    prepareCadCapture(
+      [
+        sketch("tri", "a1"),
+        ...lines("rim", rim),
+        ...lines("hole", triangle),
+        extrude("plate", "a2", { sketch: "tri", distance: 5, op: "new" }),
+      ],
+      CAD_TEST_PAGE.id,
+      {
+        width: 256,
+        height: 256,
+        theme: "light",
+        camera: { view: "top" },
+        interference: null,
+      },
+    );
+  const determinant =
+    (1100000003n - 1000000000n) * 50000001n -
+    100000001n * (1050000002n - 1000000000n);
+  expect(determinant).toBe(1n);
+  const control = capture([]);
+  for (const triangle of [hole, [...hole.slice(1), ...hole.slice(0, 1)]]) {
+    const result = capture(triangle);
+    const tool = result.model.tools[0];
+    expect(tool?.kind).toBe("prism");
+    if (!tool || tool.kind !== "prism") throw new Error("expected prism");
+    expect(tool.loops.map((loop) => loop.points.length / 2)).toEqual([3, 4]);
+    expect(result.scene).not.toEqual(control.scene);
+  }
+});
+
+test("normalisation resolves slotted-rim holes without scanning crossings behind the ray", () => {
+  for (const mirrored of [false, true]) {
+    const counts: number[] = [];
+    for (const [slots, holes] of [
+      [256, 256],
+      [512, 256],
+      [256, 512],
+      [512, 512],
+    ] as const) {
+      const width = 2 * slots + 136;
+      const plate: CadXY[] = [
+        [0, 0],
+        [width, 0],
+        [width, 100],
+        [2 * slots, 100],
+      ];
+      for (let i = slots - 1; i >= 0; i -= 1)
+        plate.push(
+          [2 * i + 2, 10],
+          [2 * i + 1, 10],
+          [2 * i + 1, 100],
+          [2 * i, 100],
+        );
+      const vertices: CadXY[][] = [plate];
+      for (let k = 0; k < holes; k += 1) {
+        const x = 2 * slots + 4 + 2 * (k % 64);
+        const y = 12 + 2 * Math.floor(k / 64);
+        vertices.push([
+          [x, y],
+          [x + 1, y],
+          [x + 1, y + 1],
+          [x, y + 1],
+        ]);
+      }
+      const entities: Element[] = [];
+      const expected = vertices.map((points, k) => {
+        const transformed: CadXY[] = points.map(([x, y]) => [
+          mirrored ? width - x : x,
+          y,
+        ]);
+        for (let j = 0; j < transformed.length; j += 1) {
+          const a = transformed[j];
+          const b = transformed[(j + 1) % transformed.length];
+          if (!a || !b) throw new Error("Missing vertex");
+          entities.push(
+            cadElement(
+              k === 0
+                ? `a${String(j).padStart(5, "0")}`
+                : `h${String(k - 1).padStart(5, "0")}-${j}`,
+              "cad.line",
+              "a1",
+              { sketch: "profile", a, b },
+            ),
+          );
+        }
+        const ordered = mirrored
+          ? [transformed[0], ...transformed.slice(1).reverse()]
+          : transformed;
+        return ordered.flatMap((point) => point ?? []);
+      });
+      const loops = selectedLoops(entities);
+      const stats = {
+        ancestorProbes: 0,
+        indexEntries: 0,
+        edges: { builds: 0, visits: 0, inspections: 0, bulk: 0 },
+      };
+      const actual = normaliseToolLoops(loops, stats);
+      const oracle = oracleNormalise(loops);
+      expect(actual.map((loop) => [...loop.points])).toEqual(expected);
+      expect(indexedSceneBytes(actual)).toEqual(sceneBytesOfPoints(expected));
+      expect(actual.length).toBe(oracle.length);
+      actual.forEach((loop, i) => expect(loop).toBe(oracle[i]));
+      const q = stats.edges.visits + stats.edges.bulk + stats.edges.inspections;
+      counts.push(q);
+      console.log(
+        "scene slotted rim",
+        JSON.stringify({ mirrored, slots, holes, ...stats.edges, q }),
+      );
+      expect(q).toBeLessThanOrEqual(16 * holes * Math.log2(4 * slots + 4));
+      expect(stats.edges.builds).toBeLessThanOrEqual(
+        loops.reduce((sum, loop) => sum + loop.points.length / 2, 0),
+      );
+    }
+    expect(counts[1] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+      1.5 * (counts[0] ?? 0),
+    );
+    expect(counts[3] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+      2.5 * (counts[0] ?? 0),
+    );
+  }
+});
+
+test("a sparse nested-chain selection keeps the 400-byte outer prism", () => {
+  const n = 1025;
+  const size = 2 * n + 2;
+  const elements: Element[] = [sketch("chain", "a1")];
+  for (let i = 0; i < n; i++) {
+    const vertices: CadXY[] = [
+      [i, i],
+      [size - i, i],
+      [size - i, size - i],
+      [i, size - i],
+    ];
+    for (let j = 0; j < 4; j++) {
+      elements.push(
+        cadElement(`r${String(i).padStart(5, "0")}-${j}`, "cad.line", "a1", {
+          sketch: "chain",
+          a: vertices[j],
+          b: vertices[(j + 1) % 4],
+        }),
+      );
+    }
+  }
+  elements.push(
+    extrude("chain-solid", "a2", {
+      sketch: "chain",
+      loops: ["r00000-0", "r01024-0"],
+      distance: 1,
+      op: "new",
+    }),
+  );
+  const result = prepareCadCapture(elements, CAD_TEST_PAGE.id, {
+    width: 256,
+    height: 256,
+    theme: "light",
+    camera: { view: "top" },
+    interference: null,
+  });
+  expect(result.scene.length).toBe(400);
+  const tool = result.model.tools[0];
+  if (!tool || tool.kind !== "prism") throw new Error("expected prism");
+  expect(tool.loops.map((loop) => Array.from(loop.points))).toEqual([
+    [0, 0, size, 0, size, size, 0, size],
+  ]);
 });

@@ -6,6 +6,13 @@ import type {
   Element,
   ElementId,
 } from "@nodetto/ir";
+import {
+  buildEdgeYIndex,
+  crossingParity,
+  type EdgeIndexStats,
+  type EdgeYIndex,
+} from "./edge-y-index.ts";
+import { loopForest, type ForestStats } from "./loop-forest.ts";
 import { tessellateArc, tessellateCircle } from "./tessellate.ts";
 import { coordinate, gridCross, NM_PER_MM, orientation } from "./vec.ts";
 
@@ -209,51 +216,157 @@ function segmentIntersection(a: Segment, b: Segment): boolean {
 interface LoopStats {
   segmentPairs: number;
   containmentPairs: number;
+  edges?: EdgeIndexStats;
+  forest?: ForestStats;
 }
 
-// Count one-dimensional overlaps before choosing the less crowded axis.
+/**
+ * A sweep along one axis visits every pair whose extents overlap on that
+ * axis. It is the cheapest search while such pairs are few, which holds for
+ * ordinary sketches, and it is the one the interpreter in the native CLI runs
+ * fastest. Beyond this many candidates per box the indexed search below takes
+ * over, so crowded sketches stay near n log n.
+ */
+const SWEEP_PAIRS_PER_BOX = 8;
+const DEPTH_WORK_PER_VERTEX = 32;
+
 function overlappingPairs(
   boxes: readonly Bounds[],
   visit: (i: number, j: number) => void,
   count: () => void,
+  stop?: () => boolean,
 ): void {
   const sorted = (axis: "X" | "Y") =>
     boxes
       .map((box, i) => ({ i, min: box[`min${axis}`], max: box[`max${axis}`] }))
       .sort((a, b) => a.min - b.min || a.i - b.i);
-  const x = sorted("X");
-  const y = sorted("Y");
-  const overlapCount = (items: typeof x): number => {
+  const overlapCount = (items: ReturnType<typeof sorted>): number => {
     const ends = items.map((item) => item.max).sort((a, b) => a - b);
     let expired = 0;
     let total = 0;
-    for (const [i, item] of items.entries()) {
+    for (let i = 0; i < items.length; i += 1) {
+      const min = items[i]?.min ?? 0;
       while (
         expired < ends.length &&
-        (ends[expired] ?? Number.POSITIVE_INFINITY) < item.min
+        (ends[expired] ?? Number.POSITIVE_INFINITY) < min
       )
         expired += 1;
       total += i - expired;
     }
     return total;
   };
-  const items = overlapCount(x) <= overlapCount(y) ? x : y;
-  for (const [index, a] of items.entries()) {
-    for (let j = index + 1; j < items.length; j += 1) {
-      const b = items[j];
-      if (b === undefined || b.min > a.max) break;
-      count();
+  const x = sorted("X");
+  const y = sorted("Y");
+  const alongX = overlapCount(x);
+  const alongY = overlapCount(y);
+  if (Math.min(alongX, alongY) <= boxes.length * SWEEP_PAIRS_PER_BOX) {
+    const items = alongX <= alongY ? x : y;
+    for (let index = 0; index < items.length; index += 1) {
+      const a = items[index];
+      if (a === undefined) continue;
       const first = boxes[a.i];
-      const second = boxes[b.i];
-      if (first === undefined || second === undefined) continue;
-      if (
-        first.minX <= second.maxX &&
-        second.minX <= first.maxX &&
-        first.minY <= second.maxY &&
-        second.minY <= first.maxY
-      )
-        visit(a.i, b.i);
+      if (first === undefined) continue;
+      for (let j = index + 1; j < items.length; j += 1) {
+        const b = items[j];
+        if (b === undefined || b.min > a.max) break;
+        count();
+        if (stop?.()) return;
+        const second = boxes[b.i];
+        if (
+          second !== undefined &&
+          first.minX <= second.maxX &&
+          second.minX <= first.maxX &&
+          first.minY <= second.maxY &&
+          second.minY <= first.maxY
+        )
+          visit(a.i, b.i);
+      }
     }
+    return;
+  }
+  const indices = boxes.map((_, i) => i);
+  const byMinX = indices
+    .slice()
+    .sort((a, b) => (boxes[a]?.minX ?? 0) - (boxes[b]?.minX ?? 0) || a - b);
+  const byMaxX = indices
+    .slice()
+    .sort((a, b) => (boxes[a]?.maxX ?? 0) - (boxes[b]?.maxX ?? 0) || a - b);
+  const byMinY = indices
+    .slice()
+    .sort((a, b) => (boxes[a]?.minY ?? 0) - (boxes[b]?.minY ?? 0) || a - b);
+  const minYs = byMinY.map((i) => boxes[i]?.minY ?? 0);
+  const leafOf = new Map<number, number>();
+  byMinY.forEach((index, leaf) => leafOf.set(index, leaf));
+  let size = 1;
+  while (size < boxes.length) size *= 2;
+  const tree = new Float64Array(size * 2);
+  tree.fill(Number.NEGATIVE_INFINITY);
+  const update = (index: number, value: number) => {
+    const leaf = leafOf.get(index);
+    if (leaf === undefined) return;
+    let node = size + leaf;
+    tree[node] = value;
+    while (node > 1) {
+      node = Math.floor(node / 2);
+      tree[node] = Math.max(
+        tree[node * 2] ?? Number.NEGATIVE_INFINITY,
+        tree[node * 2 + 1] ?? Number.NEGATIVE_INFINITY,
+      );
+    }
+  };
+  let expired = 0;
+  for (const index of byMinX) {
+    const a = boxes[index];
+    if (a === undefined) continue;
+    while (expired < byMaxX.length) {
+      const old = byMaxX[expired];
+      if (
+        old === undefined ||
+        (boxes[old]?.maxX ?? Number.POSITIVE_INFINITY) >= a.minX
+      )
+        break;
+      update(old, Number.NEGATIVE_INFINITY);
+      expired += 1;
+    }
+    let low = 0;
+    let high = minYs.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if ((minYs[mid] ?? Number.POSITIVE_INFINITY) <= a.maxY) low = mid + 1;
+      else high = mid;
+    }
+    const limit = low;
+    let stopped = false;
+    const query = (node: number, start: number, end: number): void => {
+      if (stopped) return;
+      count();
+      if (stop?.()) {
+        stopped = true;
+        return;
+      }
+      if (start >= limit || (tree[node] ?? Number.NEGATIVE_INFINITY) < a.minY)
+        return;
+      if (end - start === 1) {
+        const other = byMinY[start];
+        const b = other === undefined ? undefined : boxes[other];
+        if (
+          other !== undefined &&
+          b !== undefined &&
+          a.minX <= b.maxX &&
+          b.minX <= a.maxX &&
+          a.minY <= b.maxY &&
+          b.minY <= a.maxY
+        )
+          visit(other, index);
+        return;
+      }
+      const mid = Math.floor((start + end) / 2);
+      query(node * 2, start, mid);
+      query(node * 2 + 1, mid, end);
+    };
+    query(1, 0, size);
+    if (stopped) return;
+    update(index, a.maxY);
   }
 }
 
@@ -301,23 +414,34 @@ function intersection(
   return segments[first];
 }
 
-function contains({ grid, bounds }: Profile, x: number, y: number): boolean {
+function contains(
+  { grid, bounds }: Profile,
+  x: number,
+  y: number,
+  getIndex: () => EdgeYIndex,
+  stats?: EdgeIndexStats,
+): boolean {
   if (x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY)
     return false;
-  let inside = false;
-  let ax = coordinate(grid, grid.length - 2);
-  let ay = coordinate(grid, grid.length - 1);
-  for (let i = 0; i < grid.length; i += 2) {
-    const bx = coordinate(grid, i);
-    const by = coordinate(grid, i + 1);
-    if (ay > y !== by > y) {
-      const side = gridCross(bx - ax, by - ay, x - ax, y - ay);
-      if (side > 0 === by > ay) inside = !inside;
-    }
-    ax = bx;
-    ay = by;
-  }
-  return inside;
+  const n = grid.length / 2;
+  return crossingParity(
+    getIndex(),
+    x,
+    y,
+    (edge) => {
+      const previous = (edge + n - 1) % n;
+      const ax = coordinate(grid, previous * 2);
+      const ay = coordinate(grid, previous * 2 + 1);
+      const bx = coordinate(grid, edge * 2);
+      const by = coordinate(grid, edge * 2 + 1);
+      if (ay > y !== by > y) {
+        const side = gridCross(bx - ax, by - ay, x - ax, y - ay);
+        return side > 0 === by > ay;
+      }
+      return false;
+    },
+    stats,
+  );
 }
 
 function counterClockwise(profile: Profile, depth: number): CadLoop {
@@ -442,22 +566,76 @@ export function buildProfileLoops(
     return { error: "cad.profile.intersect", at: crossing.id };
 
   const selected = pick === undefined ? undefined : new Set(pick);
-  const depths = profiles.map(() => 0);
+  let depths = profiles.map(() => 0);
+  const edgeWork: EdgeIndexStats = {
+    builds: 0,
+    visits: 0,
+    inspections: 0,
+    bulk: 0,
+  };
+  let pairWork = 0;
+  const budget =
+    DEPTH_WORK_PER_VERTEX *
+    profiles.reduce((sum, p) => sum + p.grid.length / 2, 0);
+  const stop = () =>
+    pairWork +
+      edgeWork.builds +
+      edgeWork.visits +
+      edgeWork.inspections +
+      (edgeWork.bulk ?? 0) >
+    budget;
+  const indexes: (EdgeYIndex | undefined)[] = profiles.map(() => undefined);
+  const getIndex = (profile: Profile, i: number): EdgeYIndex => {
+    const index = indexes[i] ?? buildEdgeYIndex(profile.grid, edgeWork);
+    indexes[i] = index;
+    return index;
+  };
   overlappingPairs(
     profiles.map((profile) => profile.bounds),
     (i, j) => {
       const a = profiles[i];
       const b = profiles[j];
       if (a === undefined || b === undefined) return;
-      if (contains(b, coordinate(a.grid, 0), coordinate(a.grid, 1)))
+      if (
+        contains(
+          b,
+          coordinate(a.grid, 0),
+          coordinate(a.grid, 1),
+          () => getIndex(b, j),
+          edgeWork,
+        )
+      )
         depths[i] = (depths[i] ?? 0) + 1;
-      if (contains(a, coordinate(b.grid, 0), coordinate(b.grid, 1)))
+      if (
+        contains(
+          a,
+          coordinate(b.grid, 0),
+          coordinate(b.grid, 1),
+          () => getIndex(a, i),
+          edgeWork,
+        )
+      )
         depths[j] = (depths[j] ?? 0) + 1;
     },
     () => {
+      pairWork += 1;
       if (stats !== undefined) stats.containmentPairs += 1;
     },
+    stop,
   );
+  if (stats?.edges !== undefined) {
+    stats.edges.builds += edgeWork.builds;
+    stats.edges.visits += edgeWork.visits;
+    stats.edges.inspections += edgeWork.inspections;
+    if (stats.edges.bulk !== undefined) stats.edges.bulk += edgeWork.bulk ?? 0;
+  }
+  if (stop()) {
+    depths = loopForest(
+      profiles.map((p) => p.grid),
+      profiles.map((p) => p.winding),
+      stats?.forest,
+    ).depths;
+  }
   const loops: CadLoop[] = [];
   for (const [index, profile] of profiles.entries()) {
     if (profile.winding === 0)

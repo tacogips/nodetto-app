@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { CadXY } from "@nodetto/ir";
+import type { CadXY, Element } from "@nodetto/ir";
 import { element } from "../test-helpers.ts";
 import {
   baseFrame,
@@ -278,4 +278,269 @@ test("intersection reports the first segment in the original nested scan", () =>
     error: "cad.profile.intersect",
     at: expected,
   });
+});
+
+test("holes along two perpendicular edges have near-linear candidate counts", () => {
+  const fixture = (holes: number, tangent = false) => {
+    const side = 9 + 3 * (holes / 2);
+    const entities: Element[] = [...rectangle("plate", 0, 0, side, side)];
+    for (let k = 0; k < holes / 2; k += 1) {
+      entities.push(
+        circle(`h-${k}`, [6 + 3 * k, tangent && k === 0 ? 1 : 2.5], 1),
+      );
+      entities.push(circle(`v-${k}`, [2.5, 6 + 3 * k], 1));
+    }
+    return entities;
+  };
+  const counts = [128, 256, 512].map((holes) => {
+    const stats = { segmentPairs: 0, containmentPairs: 0 };
+    const result = buildLoops(fixture(holes), undefined, stats);
+    if (!("loops" in result)) throw new Error(result.error);
+    expect(result.loops).toHaveLength(holes + 1);
+    expect(result.loops.filter((loop) => loop.depth === 0)).toHaveLength(1);
+    expect(result.loops.find((loop) => loop.depth === 0)?.members).toContain(
+      "plate-a",
+    );
+    expect(result.loops.filter((loop) => loop.depth === 1)).toHaveLength(holes);
+    return stats;
+  });
+  console.log("two-row counts", JSON.stringify(counts));
+  for (let i = 1; i < counts.length; i += 1) {
+    const previous = counts[i - 1];
+    const current = counts[i];
+    if (!previous || !current) throw new Error("Missing counts");
+    for (const key of ["segmentPairs", "containmentPairs"] as const) {
+      expect(previous[key]).toBeGreaterThan(0);
+      expect(current[key]).toBeGreaterThan(0);
+      expect(current[key]).toBeLessThanOrEqual(previous[key] * 2.5);
+    }
+  }
+  const tangent = buildLoops(fixture(128, true));
+  expect(tangent).toMatchObject({ error: "cad.profile.intersect" });
+  if ("error" in tangent) expect(tangent.at).toBeDefined();
+});
+
+test("a detailed rim with many holes queries the perimeter through one edge index", () => {
+  const counts = [256, 512, 1024].map((holes) => {
+    const height = (i: number) => (i % 2 === 0 ? 512 : 513);
+    const entities: Element[] = [];
+    for (let i = 0; i < holes; i += 1) {
+      entities.push(
+        line(
+          `rim-${i}`,
+          [(256 * i) / holes, height(i)],
+          [(256 * (i + 1)) / holes, height(i + 1)],
+        ),
+      );
+    }
+    entities.push(
+      line("right", [256, height(holes)], [256, 0]),
+      line("bottom", [256, 0], [0, 0]),
+      line("left", [0, 0], [0, 512]),
+    );
+    for (let k = 0; k < holes; k += 1) {
+      entities.push(
+        circle(
+          `hole-${k}`,
+          [2.5 + 3 * (k % 64), 2.5 + 3 * Math.floor(k / 64)],
+          1,
+        ),
+      );
+    }
+    const stats = {
+      segmentPairs: 0,
+      containmentPairs: 0,
+      edges: { builds: 0, visits: 0, inspections: 0 },
+    };
+    const result = buildLoops(entities, undefined, stats);
+    if (!("loops" in result)) throw new Error(result.error);
+    expect(result.loops).toHaveLength(holes + 1);
+    const outer = result.loops.filter((loop) => loop.depth === 0);
+    expect(outer).toHaveLength(1);
+    expect(outer[0]?.members).toContain("rim-0");
+    expect(result.loops.filter((loop) => loop.depth === 1)).toHaveLength(holes);
+    expect(stats.edges.builds).toBeGreaterThan(0);
+    expect(stats.edges.visits).toBeGreaterThan(0);
+    expect(stats.edges.inspections).toBeGreaterThan(0);
+    expect(stats.edges.builds).toBeLessThanOrEqual(
+      result.loops.reduce((sum, loop) => sum + loop.points.length / 2, 0),
+    );
+    expect(stats.edges.inspections).toBeLessThanOrEqual(4 * holes);
+    return stats.edges;
+  });
+  console.log("detailed rim edge counts", JSON.stringify(counts));
+  for (let i = 1; i < counts.length; i += 1) {
+    const previous = counts[i - 1];
+    const current = counts[i];
+    if (!previous || !current) throw new Error("Missing counts");
+    expect(
+      current.builds + current.visits + current.inspections,
+    ).toBeLessThanOrEqual(
+      2.5 * (previous.builds + previous.visits + previous.inspections),
+    );
+  }
+});
+
+test("a slotted rim resolves hole containment without scanning crossings behind the ray", () => {
+  for (const mirrored of [false, true]) {
+    const counts: number[] = [];
+    for (const [slots, holes] of [
+      [256, 256],
+      [512, 256],
+      [256, 512],
+      [512, 512],
+    ] as const) {
+      const width = 2 * slots + 136;
+      const plate: CadXY[] = [
+        [0, 0],
+        [width, 0],
+        [width, 100],
+        [2 * slots, 100],
+      ];
+      for (let i = slots - 1; i >= 0; i -= 1)
+        plate.push(
+          [2 * i + 2, 10],
+          [2 * i + 1, 10],
+          [2 * i + 1, 100],
+          [2 * i, 100],
+        );
+      const vertices: CadXY[][] = [plate];
+      for (let k = 0; k < holes; k += 1) {
+        const x = 2 * slots + 4 + 2 * (k % 64);
+        const y = 12 + 2 * Math.floor(k / 64);
+        vertices.push([
+          [x, y],
+          [x + 1, y],
+          [x + 1, y + 1],
+          [x, y + 1],
+        ]);
+      }
+      const entities: Element[] = [];
+      const expected = vertices.map((points, k) => {
+        const transformed: CadXY[] = points.map(([x, y]) => [
+          mirrored ? width - x : x,
+          y,
+        ]);
+        for (let j = 0; j < transformed.length; j += 1) {
+          const a = transformed[j];
+          const b = transformed[(j + 1) % transformed.length];
+          if (!a || !b) throw new Error("Missing vertex");
+          entities.push(
+            line(
+              k === 0
+                ? `a${String(j).padStart(5, "0")}`
+                : `h${String(k - 1).padStart(5, "0")}-${j}`,
+              a,
+              b,
+            ),
+          );
+        }
+        const ordered = mirrored
+          ? [transformed[0], ...transformed.slice(1).reverse()]
+          : transformed;
+        return ordered.flatMap((point) => point ?? []);
+      });
+      const stats = {
+        segmentPairs: 0,
+        containmentPairs: 0,
+        edges: { builds: 0, visits: 0, inspections: 0, bulk: 0 },
+      };
+      const result = buildLoops(entities, undefined, stats);
+      if (!("loops" in result)) throw new Error(result.error);
+      expect(result.loops).toHaveLength(holes + 1);
+      for (let k = 0; k < result.loops.length; k += 1) {
+        expect(result.loops[k]?.depth).toBe(k === 0 ? 0 : 1);
+        expect(result.loops[k]?.points).toEqual(expected[k]);
+      }
+      const q = stats.edges.visits + stats.edges.bulk + stats.edges.inspections;
+      counts.push(q);
+      console.log(
+        "slotted rim",
+        JSON.stringify({ mirrored, slots, holes, ...stats.edges, q }),
+      );
+      expect(q).toBeLessThanOrEqual(16 * holes * Math.log2(4 * slots + 4));
+      expect(stats.edges.builds).toBeLessThanOrEqual(
+        vertices.reduce((sum, points) => sum + points.length, 0),
+      );
+    }
+    expect(counts[1] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+      1.5 * (counts[0] ?? 0),
+    );
+    expect(counts[3] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+      2.5 * (counts[0] ?? 0),
+    );
+  }
+});
+
+test("nested chains derive depth from immediate parents", () => {
+  const series: number[][] = [[], [], []];
+  for (const n of [1025, 2049, 4097]) {
+    const size = 2 * n + 2;
+    const entities: ReturnType<typeof line>[] = [];
+    const points: number[][] = [];
+    const ids: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const vertices: CadXY[] = [
+        [i, i],
+        [size - i, i],
+        [size - i, size - i],
+        [i, size - i],
+      ];
+      const id = `r${String(i).padStart(5, "0")}`;
+      ids.push(`${id}-0`);
+      points.push(vertices.flat());
+      for (let j = 0; j < 4; j++) {
+        const a = vertices[j];
+        const b = vertices[(j + 1) % 4];
+        if (a === undefined || b === undefined)
+          throw new Error("missing vertex");
+        entities.push(line(`${id}-${j}`, a, b));
+      }
+    }
+    const selections = [
+      undefined,
+      ids.filter((_, i) => i !== Math.floor(n / 2)),
+      [ids[0] ?? "", ids[n - 1] ?? ""],
+    ];
+    for (const [selectionIndex, selection] of selections.entries()) {
+      const stats = {
+        segmentPairs: 0,
+        containmentPairs: 0,
+        edges: { builds: 0, visits: 0, inspections: 0, bulk: 0 },
+        forest: { events: 0, steps: 0 },
+      };
+      const result = buildLoops(entities, selection, stats);
+      if (!("loops" in result)) throw new Error(result.error);
+      const indices =
+        selectionIndex === 0
+          ? ids.map((_, i) => i)
+          : selectionIndex === 1
+            ? ids.map((_, i) => i).filter((i) => i !== Math.floor(n / 2))
+            : [0, n - 1];
+      expect(result.loops.length).toBe(indices.length);
+      for (const [j, i] of indices.entries()) {
+        expect(result.loops[j]?.depth).toBe(i);
+        expect(result.loops[j]?.points).toEqual(points[i]);
+      }
+      const { builds, visits, inspections, bulk } = stats.edges;
+      const work =
+        stats.containmentPairs +
+        builds +
+        visits +
+        inspections +
+        bulk +
+        stats.forest.events +
+        stats.forest.steps;
+      series[selectionIndex]?.push(work);
+    }
+  }
+  console.log("nested chain work", JSON.stringify(series));
+  for (const values of series) {
+    expect(
+      (values[1] ?? Number.POSITIVE_INFINITY) / (values[0] ?? 1),
+    ).toBeLessThanOrEqual(2.5);
+    expect(
+      (values[2] ?? Number.POSITIVE_INFINITY) / (values[1] ?? 1),
+    ).toBeLessThanOrEqual(2.5);
+  }
 });

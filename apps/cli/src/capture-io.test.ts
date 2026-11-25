@@ -96,7 +96,13 @@ test("capture removes a partly written file and returns the write error", () => 
     if (typeof descriptor !== "number")
       throw new Error("expected a descriptor");
     fs.writeSync(descriptor, "cap");
-    expect(readFileSync(image, "utf8")).toBe("cap");
+    expect(() => lstatSync(image)).toThrow(
+      expect.objectContaining({ code: "ENOENT" }),
+    );
+    const entries = readdirSync(folder);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.startsWith(".nodetto-")).toBe(true);
+    expect(readFileSync(join(folder, entries[0] ?? ""), "utf8")).toBe("cap");
     throw failure;
   });
   try {
@@ -108,6 +114,84 @@ test("capture removes a partly written file and returns the write error", () => 
   } finally {
     write.mockRestore();
   }
+});
+
+test("a failed new capture keeps a concurrent forced replacement", () => {
+  const image = join(folder, "image.png");
+  const replacement = Buffer.from("replacement");
+  const failure = new Error("injected write failure");
+  const originalWrite = fs.writeFileSync;
+  let first = true;
+  const write = spyOn(fs, "writeFileSync").mockImplementation((...args) => {
+    if (first) {
+      first = false;
+      const descriptor = args[0];
+      if (typeof descriptor !== "number")
+        throw new Error("expected a descriptor");
+      fs.writeSync(descriptor, "cap");
+      expect(captureIo.write(image, replacement, true)).toBe("written");
+      throw failure;
+    }
+    return originalWrite(...args);
+  });
+  try {
+    expect(() => captureIo.write(image, Buffer.from("capture"), false)).toThrow(
+      failure,
+    );
+    expect(readFileSync(image)).toEqual(replacement);
+    expect(readdirSync(folder)).toEqual(["image.png"]);
+  } finally {
+    write.mockRestore();
+  }
+});
+
+test("a failed publish keeps a concurrent forced replacement", () => {
+  const image = join(folder, "image.png");
+  const replacement = Buffer.from("replacement");
+  const failure = Object.assign(new Error("not supported"), {
+    code: "ENOTSUP",
+  });
+  const originalLink = fs.linkSync;
+  let first = true;
+  const link = spyOn(fs, "linkSync").mockImplementation((...args) => {
+    if (first) {
+      first = false;
+      expect(captureIo.write(image, replacement, true)).toBe("written");
+      throw failure;
+    }
+    return originalLink(...args);
+  });
+  try {
+    expect(() => captureIo.write(image, Buffer.from("capture"), false)).toThrow(
+      failure,
+    );
+    expect(link).toHaveBeenCalled();
+    expect(readFileSync(image)).toEqual(replacement);
+    expect(readdirSync(folder)).toEqual(["image.png"]);
+  } finally {
+    link.mockRestore();
+  }
+});
+
+test("a new capture accepts a near-limit basename", () => {
+  const name = `${"a".repeat(251)}.png`;
+  const image = join(folder, name);
+  const bytes = Buffer.from("capture");
+  try {
+    writeFileSync(image, bytes);
+    rmSync(image);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "ENAMETOOLONG"
+    )
+      return;
+    throw error;
+  }
+  expect(captureIo.write(image, bytes, false)).toBe("written");
+  expect(readFileSync(image)).toEqual(bytes);
+  expect(readdirSync(folder)).toEqual([name]);
 });
 
 test("capture directory has a per-user name and is reused", () => {

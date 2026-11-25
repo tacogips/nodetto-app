@@ -1303,6 +1303,10 @@ grow near-linearly per doubling (fails before for the vertical row in the
 segment sweep and for both rows in the depth loop). Existing intersection,
 nesting, winding and error-id assertions pass unchanged.
 
+Superseded in part by R8-1 of `design-ai-capture.md` section 26: the
+one-axis choice is replaced by an X sweep with a Y interval index. The pair
+contract, the reported segment and the depths are unchanged.
+
 F12 `performance-stl-inline-refusal` (medium). Canonicalisation in
 `packages/nmesh/src/canonical.ts` has no duplicate removal after the
 sort, so the number of triangles that survive welding and degenerate

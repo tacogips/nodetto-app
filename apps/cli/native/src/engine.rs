@@ -9,7 +9,19 @@ use boa_engine::{
 };
 use nodetto_capture::{render_parsed, scene::parse_scene, transcode_png, ImageFormat};
 use serde::{Deserialize, Serialize};
-use std::{io::Read, path::PathBuf, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    io::Read,
+    path::PathBuf,
+    rc::Rc,
+};
+
+pub(crate) const MCP_INLINE_MAX_BYTES: usize = 1_048_576;
+pub struct CaptureWrite {
+    pub path: PathBuf,
+    pub len: u64,
+    pub bytes: Option<Vec<u8>>,
+}
 use unicode_segmentation::UnicodeSegmentation;
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +48,8 @@ pub enum Input {
 struct HostState {
     input: Input,
     directory: PathBuf,
+    retain_capture: Cell<bool>,
+    capture: RefCell<Option<CaptureWrite>>,
 }
 
 fn host_error(error: impl std::fmt::Display) -> boa_engine::JsError {
@@ -138,7 +152,22 @@ fn host(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValu
             let path = string(args, 0, ctx)?;
             let data = bytes(args.get_or_undefined(1), ctx)?;
             let replace = args.get_or_undefined(2).to_boolean();
-            Ok(js_string!(files::write_capture(&path, &data, replace).map_err(host_error)?).into())
+            let state = ctx.get_data::<HostState>().expect("host state installed");
+            let absolute = if state.retain_capture.get() {
+                Some(std::path::absolute(&path).map_err(host_error)?)
+            } else {
+                None
+            };
+            let outcome = files::write_capture(&path, &data, replace).map_err(host_error)?;
+            if let Some(path) = absolute.filter(|_| matches!(outcome, "written" | "identical")) {
+                let len = data.len() as u64;
+                *state.capture.borrow_mut() = Some(CaptureWrite {
+                    path,
+                    len,
+                    bytes: (data.len() <= MCP_INLINE_MAX_BYTES).then_some(data),
+                });
+            }
+            Ok(js_string!(outcome).into())
         }
         "nmeshDecode" => byte_value(
             nodetto_capture::nmesh::decode_inline(&string(args, 0, ctx)?)
@@ -336,6 +365,8 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
         .set_loop_iteration_limit(100_000_000);
     ctx.insert_data(HostState {
         input,
+        retain_capture: Cell::new(false),
+        capture: RefCell::new(None),
         directory: directory
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| ".".into())),
     });
@@ -367,10 +398,38 @@ pub fn context(input: Input, directory: Option<PathBuf>) -> Result<Context, Stri
     Ok(ctx)
 }
 
-pub fn run(mut args: Vec<String>, input: Input) -> CommandResult {
+pub(crate) fn inline_context(input: Input, directory: Option<PathBuf>) -> Result<Context, String> {
+    let ctx = context(input, directory)?;
+    ctx.get_data::<HostState>()
+        .expect("host state installed")
+        .retain_capture
+        .set(true);
+    Ok(ctx)
+}
+pub(crate) fn take_capture_write(ctx: &Context) -> Option<CaptureWrite> {
+    ctx.get_data::<HostState>()
+        .expect("host state installed")
+        .capture
+        .borrow_mut()
+        .take()
+}
+pub fn run(args: Vec<String>, input: Input) -> CommandResult {
+    run_impl(args, input, false).0
+}
+pub fn run_inline(args: Vec<String>, input: Input) -> (CommandResult, Option<CaptureWrite>) {
+    run_impl(args, input, true)
+}
+fn run_impl(
+    mut args: Vec<String>,
+    input: Input,
+    retain: bool,
+) -> (CommandResult, Option<CaptureWrite>) {
     let directory = if args.first().is_some_and(|arg| arg == "--cwd") {
         if args.len() < 3 {
-            return CommandResult::error("--cwd requires a project directory and a command");
+            return (
+                CommandResult::error("--cwd requires a project directory and a command"),
+                None,
+            );
         }
         let folder = PathBuf::from(args.remove(1));
         args.remove(0);
@@ -378,11 +437,17 @@ pub fn run(mut args: Vec<String>, input: Input) -> CommandResult {
     } else {
         None
     };
-    let mut ctx = match context(input, directory) {
-        Ok(ctx) => ctx,
-        Err(error) => return CommandResult::error(error),
+    let result = if retain {
+        inline_context(input, directory)
+    } else {
+        context(input, directory)
     };
-    execute(&mut ctx, args).unwrap_or_else(CommandResult::error)
+    let mut ctx = match result {
+        Ok(ctx) => ctx,
+        Err(error) => return (CommandResult::error(error), None),
+    };
+    let output = execute(&mut ctx, args).unwrap_or_else(CommandResult::error);
+    (output, take_capture_write(&ctx))
 }
 
 fn execute(ctx: &mut Context, args: Vec<String>) -> Result<CommandResult, String> {

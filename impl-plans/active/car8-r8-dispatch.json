@@ -1,0 +1,95 @@
+{
+  "taskId": "car8-r8",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "fc22c037a21b75d9b48d7bbe74cda1055e2d3104",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md", "design-docs/specs/design-cad3d.md"],
+  "evidenceRoot": "tmp/car8-r8",
+  "waves": [
+    ["car8-f1-loops-box-query", "car8-f2-describe-source-index"]
+  ],
+  "reviewContext": {
+    "issueReference": "audit-round-8:feat/ai-capture@fc22c037a21b75d9b48d7bbe74cda1055e2d3104 (base 0a35708; findings performance-sketch-profile-pair-scans, performance-capture-sibling-attribution-rescans); no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car8-00-overview.md",
+    "userProblem": "The round-8 audit found two performance defects that run in the slow embedded interpreter of the native CLI and in the desktop webview. Sketch validation in packages/core/src/cad/loops.ts picks one sweep axis for the whole sketch, so a valid plate with holes along two perpendicular edges costs quadratic candidate visits (1,024 holes: 24,213,509 segment and 131,840 contour visits) before the capture point limit is charged. describeBodies in packages/core/src/capture/describe.ts searches every closed body's history once per other emptied body, so one cut that empties many bodies costs quadratic step reads (2,048 bodies: 16,775,168 reads) while the capture report is built.",
+    "requiredOutcomes": [
+      "performance-sketch-profile-pair-scans (R8-1; car8-f1): overlappingPairs uses an X sweep with a static max-maxY tree over the (minY, index) order; every closed-box overlapping pair is visited exactly once; LoopStats counters count query node entries; the two-row fixture (128/256/512 holes) grows <= 2.5x per doubling on both counters (fails before at ~3.9x), loops have depth 0 (plate) and 1 (holes), and the tangent hole reports cad.profile.intersect; existing loops tests pass unedited.",
+      "performance-capture-sibling-attribution-rescans (R8-2; car8-f2): describeBodies indexes sources by (tool, op) keeping the first two in model order, skips the walk when no other source exists, and walks each closed body's steps once; the shared-cut fixture (256/512/1024 bodies) grows <= 2.5x in getter-counted step reads (fails before at ~4x) with B+1 errors in body order and the sibling text naming e-0; the no-source case reads 0 steps; self-exclusion picks the second indexed source; existing describe tests pass unedited."
+    ],
+    "nonGoals": [
+      "No change to exported signatures, LoopStats field names, error codes, diagnostic texts or order, callers (history.ts, construction.ts, cad-request.ts, scene.ts, capture-cad.ts, export-handlers.ts), goldens, NCS1 or Rust code.",
+      "No edits to existing tests or thresholds; no test-only parameter on describeBodies."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, noUncheckedIndexedAccess-safe indexed reads, Biome clean on touched files, CARGO_TERM_QUIET=true.",
+      "artifactRoots exactly [\"target\", \"tmp/cad3d\"]; evidence under tmp/car8-r8/<planId>/; no *.test.ts left under target/ or tmp/.",
+      "Per-plan gates are focused; typecheck, lint, mise run verify and the native determinism case run once at integration.",
+      "Round-8 timing rule (design 26.2): up to three attempts on timing-only failures, then isolated rerun; an isolated pass satisfies that failure, every stage skipped by the && chain must still run; all nonzero statuses and complete logs kept."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R8-1 uses an X sweep with a static max-maxY tree over the minY order instead of a uniform grid.", "rationale": "A grid degrades when the plate contour or a long edge box covers every cell; the tree costs O((k + 1) log n) per query for any box sizes."},
+      {"decision": "R8-1 keeps LoopStats field names and redefines their unit as query node entries.", "rationale": "The existing single-row test keeps its 2.5 bound unedited and no caller changes."},
+      {"decision": "R8-2 keeps the first two sources per (tool, op) and skips the walk when no other source exists.", "rationale": "Self-exclusion needs at most one skip; the shortcut preserves today's zero reads for pages without eligible sources."},
+      {"decision": "R8-2 counts work with getters on fixture step objects.", "rationale": "No production test hook is needed."}
+    ],
+    "intentionalTradeoffs": [
+      "The 2.5 growth bound includes a log factor; expected post-fix growth is about 2.1 to 2.3."
+    ],
+    "supportedEdgeCases": [
+      "Touching boxes (b.maxX === a.minX), equal minX, zero-height and zero-width segment boxes, tangent holes, nested contours; bodies with no eligible sources, a body that is its own only source, sibling at an index equal to the existing attribution, hidden attribution precedence, open and unknown bodies."
+    ],
+    "outOfScopeEdgeCases": [
+      "Boa elapsed time, desktop latency, peak memory, end-to-end CLI or desktop runs, Tauri IPC and MCP delivery."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "design-docs/specs/design-cad3d.md",
+      "impl-plans/active/car8-00-overview.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car8-f1-loops-box-query",
+      "planPath": "impl-plans/active/car8-f1-loops-box-query.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/loops.ts", "packages/core/src/cad/loops.test.ts", "impl-plans/active/car8-f1-loops-box-query.md", "impl-plans/progress/car8-f1-loops-box-query.md", "tmp/car8-r8/car8-f1-loops-box-query", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "overlappingPairs keeps its signature, no longer chooses an axis, and visits every closed-box overlapping pair exactly once through an X sweep with a static max-maxY tree; count() is called once per tree node entered by a query.",
+        "New loops.test.ts two-row test (128/256/512 holes): plate depth 0, all holes depth 1, h + 1 loops; segmentPairs and containmentPairs > 0 and <= 2.5x per doubling; the tangent hole at [6, 1] gives cad.profile.intersect with at defined.",
+        "The doubling assertion fails on the unmodified source (log recorded) and passes after the fix.",
+        "Existing loops tests (including :51, :125, :209, :234) pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts"
+      ]
+    },
+    {
+      "planId": "car8-f2-describe-source-index",
+      "planPath": "impl-plans/active/car8-f2-describe-source-index.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/capture/describe.ts", "packages/core/src/capture/describe.test.ts", "impl-plans/active/car8-f2-describe-source-index.md", "impl-plans/progress/car8-f2-describe-source-index.md", "tmp/car8-r8/car8-f2-describe-source-index", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "describeBodies builds a (tool, op) index with at most two sources each in model order, skips the history walk when there is no source other than the body, and otherwise walks each closed body's steps once; no per-source findIndex remains; signature unchanged.",
+        "New shared-cut test (256/512/1024 emptied bodies plus stand): B + 1 errors in body order, own text with id cut for each e-<i>, last error the sibling text naming e-0 and stand; getter-counted reads <= 2.5x per doubling; fails before (log recorded), passes after.",
+        "No-source case (256 bodies x 256 steps) returns no errors with 0 reads; self-exclusion case gives a the sibling text naming b, and a alone its own text.",
+        "Existing describe tests (including :180, :243, :290) pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/capture/describe.ts packages/core/src/capture/describe.test.ts && bun test packages/core/src/capture/describe.test.ts"
+      ]
+    }
+  ],
+  "integration": [
+    "bun run typecheck && bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts --test-name-pattern '^CAD capture is deterministic, discoverable, and within the native budget$'",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

@@ -74,8 +74,11 @@ function memoryIo() {
   return { io, files, bytes, opened };
 }
 
-async function connect(io: CommandIo) {
-  const server = createMcpServer(io, "test");
+async function connect(
+  io: CommandIo,
+  options: Parameters<typeof createMcpServer>[2] = {},
+) {
+  const server = createMcpServer(io, "test", options);
   const client = new Client({ name: "test-client", version: "1" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -374,8 +377,6 @@ test("MCP capture appends opt-in images and read notes while preserving the CLI 
   try {
     expect(session.client.getInstructions()).toContain("nodetto_capture");
     const notes = {
-      large: "1048577 bytes exceed 1048576",
-      unreadable: "Permission denied",
       ambiguous: "Try --json",
     };
     const scenarios: {
@@ -390,11 +391,11 @@ test("MCP capture appends opt-in images and read notes while preserving the CLI 
         options: ["--inline", "--json"],
         mode: "image",
       },
-      { path: "/mock/large.png", options: ["--inline"], mode: "large" },
+      { path: "/mock/large.png", options: ["--inline"], mode: "image" },
       {
         path: "/mock/unreadable.png",
         options: ["--inline"],
-        mode: "unreadable",
+        mode: "image",
       },
       {
         path: "/mock/plan view.png\nother.png",
@@ -433,13 +434,175 @@ test("MCP capture appends opt-in images and read notes while preserving the CLI 
         expect(extra.text).toContain(notes[mode]);
       }
     }
-    expect(reads).toEqual([
-      "/mock/plan view.png",
-      "/mock/json.png",
-      "/mock/large.png",
-      "/mock/unreadable.png",
-    ]);
+    expect(reads).toEqual([]);
   } finally {
     await session.close();
+  }
+});
+
+test("MCP inline capture attaches each call's own write", async () => {
+  const memory = memoryIo();
+  const a = Uint8Array.from({ length: 4096 }, (_, i) => i & 255);
+  const b = Uint8Array.from({ length: 4096 }, (_, i) => 255 - (i & 255));
+  let signalA = () => {};
+  let signalB = () => {};
+  const aWritten = new Promise<void>((resolve) => {
+    signalA = resolve;
+  });
+  const bWritten = new Promise<void>((resolve) => {
+    signalB = resolve;
+  });
+  const path = "/mock/shared.png";
+  const sharedIo: CommandIo = {
+    ...memory.io,
+    capture: {
+      dir: () => "/mock",
+      absolute: (p) => p,
+      digest: () => "0".repeat(16),
+      write(p, bytes) {
+        memory.bytes.set(p, bytes);
+        return "written";
+      },
+    },
+    readBytes: (p) => {
+      const stored = memory.bytes.get(p);
+      if (stored === undefined) throw new Error("ENOENT");
+      return stored;
+    },
+  };
+  const result = { exitCode: 0, stdout: `path: ${path}\n`, stderr: "" };
+  const runA: typeof runCliAsync = async (_args, io) => {
+    io.capture?.write(path, a, true);
+    signalA();
+    await bWritten;
+    return result;
+  };
+  const runB: typeof runCliAsync = async (_args, io) => {
+    await aWritten;
+    io.capture?.write(path, b, true);
+    signalB();
+    return result;
+  };
+  const first = await connect(sharedIo, { run: runA });
+  const second = await connect(sharedIo, { run: runB });
+  try {
+    const [responseA, responseB] = await Promise.all(
+      [first, second].map((session) =>
+        session.client.callTool({
+          name: "nodetto_capture",
+          arguments: { args: ["--inline", "--output", path] },
+        }),
+      ),
+    );
+    if (!responseA || !responseB) throw new Error("Missing responses");
+    expect(responseA.isError).toBe(false);
+    expect(responseB.isError).toBe(false);
+    expect(output(responseA)).toEqual(result);
+    expect(output(responseB)).toEqual(result);
+    expect(memory.bytes.get(path)).toEqual(b);
+    const imageA = CallToolResultSchema.parse(responseA).content[1];
+    const imageB = CallToolResultSchema.parse(responseB).content[1];
+    if (imageA?.type !== "image" || imageB?.type !== "image")
+      throw new Error("Missing images");
+    const actualA = new Uint8Array(Buffer.from(imageA.data, "base64"));
+    const actualB = new Uint8Array(Buffer.from(imageB.data, "base64"));
+    expect(actualA).toEqual(a);
+    expect(actualB).toEqual(b);
+
+    async function checkWrite(
+      bytes: Uint8Array,
+      status: "written" | "identical" | "exists" | "throw",
+      exitCode: number,
+      outputPath = "/mock/front.png",
+      stdoutPath = outputPath,
+    ) {
+      const single: CommandIo = {
+        ...memoryIo().io,
+        capture: {
+          dir: () => "/mock",
+          absolute: (p) => p,
+          digest: () => "0".repeat(16),
+          write() {
+            if (status === "throw") throw new Error("write failed");
+            return status;
+          },
+        },
+      };
+      const fakeResult = {
+        exitCode,
+        stdout: `path: ${stdoutPath}\n`,
+        stderr: "",
+      };
+      const run: typeof runCliAsync = async (_args, io) => {
+        io.capture?.write(outputPath, bytes, true);
+        return fakeResult;
+      };
+      const session = await connect(single, { run });
+      try {
+        const response = CallToolResultSchema.parse(
+          await session.client.callTool({
+            name: "nodetto_capture",
+            arguments: { args: ["--inline", "--output", outputPath] },
+          }),
+        );
+        if (status !== "throw")
+          expect(response.structuredContent).toEqual(fakeResult);
+        expect(response.isError).toBe(exitCode !== 0 || status === "throw");
+        return response;
+      } finally {
+        await session.close();
+      }
+    }
+    const exitOne = await checkWrite(a, "written", 1);
+    expect(exitOne.content[1]?.type).toBe("image");
+    const identical = await checkWrite(a, "identical", 0);
+    const identicalImage = identical.content[1];
+    if (identicalImage?.type !== "image")
+      throw new Error("Missing identical image");
+    expect(new Uint8Array(Buffer.from(identicalImage.data, "base64"))).toEqual(
+      a,
+    );
+    expect((await checkWrite(a, "exists", 2)).content).toHaveLength(1);
+    const thrown = await checkWrite(a, "throw", 2);
+    expect(thrown.content).toHaveLength(1);
+    expect(
+      (thrown.structuredContent as unknown as CommandResult).exitCode,
+    ).toBe(2);
+    const exact = await checkWrite(
+      new Uint8Array(MCP_INLINE_MAX_BYTES),
+      "written",
+      0,
+    );
+    const exactImage = exact.content[1];
+    if (exactImage?.type !== "image") throw new Error("Missing boundary image");
+    expect(Buffer.from(exactImage.data, "base64").byteLength).toBe(
+      MCP_INLINE_MAX_BYTES,
+    );
+    const oversized = await checkWrite(
+      new Uint8Array(MCP_INLINE_MAX_BYTES + 1),
+      "written",
+      0,
+    );
+    const note = oversized.content[1];
+    if (note?.type !== "text") throw new Error("Missing oversize note");
+    expect(note.text).toContain("1048577 bytes exceed 1048576");
+    const jpeg = await checkWrite(a, "written", 0, "/mock/front.jpg");
+    const jpegImage = jpeg.content[1];
+    if (jpegImage?.type !== "image") throw new Error("Missing JPEG image");
+    expect(jpegImage.mimeType).toBe("image/jpeg");
+    const mismatch = await checkWrite(
+      a,
+      "written",
+      0,
+      "/mock/front.png",
+      "/mock/other.png",
+    );
+    expect(mismatch.content[1]).toEqual({
+      type: "text",
+      text: "Image not inlined: could not read the written path from capture output. Try --json.",
+    });
+  } finally {
+    await first.close();
+    await second.close();
   }
 });

@@ -3,14 +3,9 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rmcp::{model::*, service::RequestContext, ErrorData, RoleServer, ServerHandler, ServiceExt};
 use serde::Deserialize;
 use serde_json::json;
-use std::{
-    borrow::Cow,
-    io::{self, Read},
-    path::Path,
-    sync::Arc,
-};
+use std::{borrow::Cow, io, path::Path, sync::Arc};
 
-const MCP_INLINE_MAX_BYTES: u64 = 1_048_576;
+use engine::MCP_INLINE_MAX_BYTES;
 
 /// The capture tokens of a tool call and its `--cwd` folder, when the call
 /// is a capture. The global options are the ones the engine itself accepts
@@ -72,37 +67,28 @@ fn capture_path_matches(path: &Path, args: &[String]) -> io::Result<bool> {
     Ok(path.parent() == Some(directory.as_path()))
 }
 
-fn read_inline_image(path: &Path, mime_type: &'static str) -> io::Result<ContentBlock> {
-    let (mut file, opened) = nodetto_native::fs::open_regular(path, "capture")?;
-    let size = opened.len();
-    if size > MCP_INLINE_MAX_BYTES {
-        return Ok(ContentBlock::text(format!(
-            "Image not inlined: {size} bytes exceed {MCP_INLINE_MAX_BYTES}. Open the path instead, or capture with a smaller --size or --format jpg."
-        )));
-    }
-    let mut bytes = Vec::with_capacity(size as usize);
-    (&mut file).take(size).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 != size || file.metadata()?.len() != size {
-        return Err(io::Error::other(
-            "The capture size changed while reading it.",
-        ));
-    }
-    Ok(ContentBlock::image(STANDARD.encode(bytes), mime_type))
-}
-
-fn capture_content(args: &[String], output: &CommandResult) -> Option<ContentBlock> {
+fn capture_content(
+    args: &[String],
+    output: &CommandResult,
+    written: Option<&engine::CaptureWrite>,
+) -> Option<ContentBlock> {
+    let written = written?;
     if !matches!(output.exit_code, 0 | 1) || !wants_inline_image(args) {
         return None;
     }
     let (path, mime_type) = captured_image(&output.stdout)?;
     let path = Path::new(path.as_ref());
     let block = capture_path_matches(path, args).and_then(|matches| {
-        if !matches {
+        if !matches || path != written.path {
             return Err(io::Error::other(
                 "could not read the written path from capture output. Try --json.",
             ));
         }
-        read_inline_image(path, mime_type)
+        Ok(if let Some(bytes) = &written.bytes {
+            ContentBlock::image(STANDARD.encode(bytes), mime_type)
+        } else {
+            ContentBlock::text(format!("Image not inlined: {} bytes exceed {}. Open the path instead, or capture with a smaller --size or --format jpg.", written.len, MCP_INLINE_MAX_BYTES))
+        })
     });
     Some(block.unwrap_or_else(|error| ContentBlock::text(format!("Image not inlined: {error}"))))
 }
@@ -192,8 +178,12 @@ impl ServerHandler for Server {
         }
         let response = tokio::task::spawn_blocking(move || {
             // Keep the actual argument tokens available for the capture readback.
-            let output = engine::run(args.clone(), Input::Mcp(stdin));
-            let image = capture_content(&args, &output);
+            let (output, written) = if wants_inline_image(&args) {
+                engine::run_inline(args.clone(), Input::Mcp(stdin))
+            } else {
+                (engine::run(args.clone(), Input::Mcp(stdin)), None)
+            };
+            let image = capture_content(&args, &output, written.as_ref());
             let mut response = result(output);
             response.content.extend(image);
             response
@@ -333,9 +323,15 @@ mod tests {
             stdout: format!("path: {path}\n"),
             stderr: String::new(),
         };
-        let image = vec![91; MCP_INLINE_MAX_BYTES as usize];
+        let image = vec![91; MCP_INLINE_MAX_BYTES];
+        let written = engine::CaptureWrite {
+            path: path.into(),
+            len: image.len() as u64,
+            bytes: Some(image.clone()),
+        };
         fs::write(path, &image).unwrap();
-        let block = serde_json::to_value(capture_content(&args, &output).unwrap()).unwrap();
+        let block =
+            serde_json::to_value(capture_content(&args, &output, Some(&written)).unwrap()).unwrap();
         assert_eq!(block["type"], "image");
         assert_eq!(block["mimeType"], "image/jpeg");
         assert_eq!(
@@ -343,13 +339,13 @@ mod tests {
             image
         );
 
-        fs::OpenOptions::new()
-            .write(true)
-            .open(path)
-            .unwrap()
-            .set_len(MCP_INLINE_MAX_BYTES + 1)
-            .unwrap();
-        let block = serde_json::to_value(capture_content(&args, &output).unwrap()).unwrap();
+        let written = engine::CaptureWrite {
+            path: path.into(),
+            len: MCP_INLINE_MAX_BYTES as u64 + 1,
+            bytes: None,
+        };
+        let block =
+            serde_json::to_value(capture_content(&args, &output, Some(&written)).unwrap()).unwrap();
         assert_eq!(block["type"], "text");
         assert!(block["text"]
             .as_str()
@@ -364,9 +360,45 @@ mod tests {
             "--output",
             &different_path,
         ]);
-        let block = serde_json::to_value(capture_content(&args, &output).unwrap()).unwrap();
+        let block =
+            serde_json::to_value(capture_content(&args, &output, Some(&written)).unwrap()).unwrap();
         assert!(block["text"].as_str().unwrap().contains("Try --json"));
         output.exit_code = 2;
-        assert!(capture_content(&args, &output).is_none());
+        assert!(capture_content(&args, &output, Some(&written)).is_none());
+    }
+    #[test]
+    fn inline_capture_attaches_each_calls_own_write() {
+        let folder = tempfile::tempdir().unwrap();
+        let mut a = engine::inline_context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+        let mut b = engine::inline_context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+        a.eval(boa_engine::Source::from_bytes("native.writeCapture(native.path('shared.png'), Uint8Array.from({ length: 4096 }, (_, i) => i & 255), true)")).unwrap();
+        b.eval(boa_engine::Source::from_bytes("native.writeCapture(native.path('shared.png'), Uint8Array.from({ length: 4096 }, (_, i) => 255 - (i & 255)), true)")).unwrap();
+        let first = engine::take_capture_write(&a).unwrap();
+        let second = engine::take_capture_write(&b).unwrap();
+        let path = folder.path().join("shared.png");
+        let args = tokens(&[
+            "capture",
+            "doc.jsonl",
+            "--inline",
+            "--output",
+            path.to_str().unwrap(),
+        ]);
+        let output = CommandResult {
+            exit_code: 0,
+            stdout: format!("path: {}\n", path.display()),
+            stderr: String::new(),
+        };
+        let expected_a: Vec<u8> = (0..4096).map(|i| (i & 255) as u8).collect();
+        let expected_b: Vec<u8> = expected_a.iter().map(|n| 255 - n).collect();
+        assert_eq!(fs::read(path).unwrap(), expected_b);
+        for (record, expected) in [(&first, expected_a), (&second, expected_b)] {
+            let block =
+                serde_json::to_value(capture_content(&args, &output, Some(record)).unwrap())
+                    .unwrap();
+            assert_eq!(
+                STANDARD.decode(block["data"].as_str().unwrap()).unwrap(),
+                expected
+            );
+        }
     }
 }

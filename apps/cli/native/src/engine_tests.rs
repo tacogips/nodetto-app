@@ -782,3 +782,81 @@ fn attachment_data_url_preserves_formats_and_refusals() {
         ])
     );
 }
+
+#[test]
+fn capture_writes_are_retained_per_call_only_when_inline() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut ctx = inline_context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+    let eval = |ctx: &mut Context, source: &str| {
+        ctx.eval(Source::from_bytes(source)).unwrap();
+    };
+    eval(
+        &mut ctx,
+        "native.writeCapture(native.path('image.png'), new Uint8Array(1048576).fill(7), true)",
+    );
+    let first = take_capture_write(&ctx).unwrap();
+    assert_eq!(
+        first.path,
+        std::path::absolute(folder.path().join("image.png")).unwrap()
+    );
+    assert_eq!(first.len, 1_048_576);
+    assert_eq!(first.bytes.unwrap(), vec![7; 1_048_576]);
+    eval(
+        &mut ctx,
+        "native.writeCapture(native.path('image.png'), new Uint8Array(1048577).fill(8), true)",
+    );
+    let large = take_capture_write(&ctx).unwrap();
+    assert_eq!(large.len, 1_048_577);
+    assert!(large.bytes.is_none());
+    eval(
+        &mut ctx,
+        "native.writeCapture(native.path('image.png'), new Uint8Array(1048577).fill(8), false)",
+    );
+    eval(
+        &mut ctx,
+        "native.writeCapture(native.path('image.png'), Uint8Array.of(1), false)",
+    );
+    eval(&mut ctx, "try { native.writeCapture(native.path('missing/image.png'), Uint8Array.of(1), true); } catch (_) {} ");
+    let identical = take_capture_write(&ctx).unwrap();
+    assert_eq!(identical.len, 1_048_577);
+    assert!(identical.bytes.is_none());
+    eval(&mut ctx, "try { native.writeCapture(native.path('missing/image.png'), Uint8Array.of(1), true); } catch (_) {} ");
+    assert!(take_capture_write(&ctx).is_none());
+    let mut ordinary = context(Input::Mcp(None), Some(folder.path().into())).unwrap();
+    eval(
+        &mut ordinary,
+        "native.writeCapture(native.path('ordinary.png'), Uint8Array.of(1), true)",
+    );
+    assert!(take_capture_write(&ordinary).is_none());
+}
+
+#[test]
+fn run_inline_retains_the_written_capture() {
+    let folder = tempfile::tempdir().unwrap();
+    std::fs::write(folder.path().join("drawing.jsonl"), concat!(
+        "{\"kind\":\"document\",\"schemaVersion\":1,\"id\":\"doc\",\"title\":\"Drawing\"}\n",
+        "{\"kind\":\"page\",\"id\":\"p1\",\"name\":\"Draft\",\"pageKind\":\"freeform\"}\n",
+        "{\"kind\":\"element\",\"id\":\"rect\",\"page\":\"p1\",\"type\":\"shape.geo\",\"index\":\"a0\",\"semantic\":{\"geo\":\"rect\",\"label\":\"\"},\"visual\":{\"x\":0,\"y\":0,\"width\":100,\"height\":100}}\n"
+    )).unwrap();
+    let args = [
+        "--cwd",
+        folder.path().to_str().unwrap(),
+        "capture",
+        "drawing.jsonl",
+        "--inline",
+        "--json",
+        "--output",
+        "one.png",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    let (output, record) = run_inline(args, Input::Mcp(None));
+    assert_eq!(output.exit_code, 0, "{}", output.stderr);
+    let record = record.unwrap();
+    assert_eq!(
+        record.bytes.unwrap(),
+        std::fs::read(folder.path().join("one.png")).unwrap()
+    );
+    let report: Value = serde_json::from_str(&output.stdout).unwrap();
+    assert_eq!(record.len, report["bytes"].as_u64().unwrap());
+}

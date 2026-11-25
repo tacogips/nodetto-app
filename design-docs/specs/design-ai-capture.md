@@ -31,6 +31,17 @@ Revision 14 (audit round 7 of `0a35708..2be9db1` plus the uncommitted
 round 6 tree, 2 high findings and one fixture typing error) is section 25;
 it finishes the unlanded part of R6-2, bounds picture mesh-bin traversal,
 and wins over earlier sections.
+Revision 15 (audit round 8 of `0a35708..fc22c03`, 2 findings) is section
+26. Revision 16 (audit round 9 of `0a35708..aede81d`, 2 findings) is
+section 27; it rewrites the MCP attachment rule of sections 4.5 and 11
+(per-call bytes, no readback) and adds an internal edge index for CAD
+containment. Section 27 wins over earlier sections.
+Revision 17 (audit round 10 of `0a35708..43197ca`, 4 findings) is section
+28; it stages new captures before a no-clobber publish (sections 4.3 and
+12), makes the edge index answer ray parity from the ray origin, derives
+crowded profile depths from immediate parents, and decides capture
+ancestry on the nanometre grid (section 6.1). Section 28 wins over earlier
+sections.
 
 Implementation status (revision 7): implemented (slice); every milestone accepted. Milestones M1 to M15, M17 to M20, M22, M23a to M23f and M16 (M16a, M16b, M16c) are accepted by their per-plan reviews and the targeted gates of section 8.5. Full
 repository verification (`mise run verify`, browser tests, the whole
@@ -445,12 +456,32 @@ errors.
   of a 64-bit FNV-1a digest of the image bytes. Equal pictures get equal
   names, so a repeated capture is a no-op; a name that exists with other
   bytes gets the suffix `-2`, `-3`, and so on.
-- Any target: created with exclusive creation (`O_EXCL`), which fails on
-  an existing file and on a link, including a dangling one. If the target
-  exists with identical bytes the command succeeds without writing. If it
-  exists with different bytes the command fails with exit 2 and names
-  `--force`. With `--force` the existing atomic writer replaces a regular
-  file; a symbolic link is refused.
+- Any target: never clobbered. An existing entry, including a link (also
+  a dangling one), is never written. A new capture is written and synced
+  to a sibling staging file owned by this invocation, then published with
+  an atomic no-clobber operation (section 28, R10-1). If the target
+  exists, before or at publish, with identical bytes the command succeeds
+  without writing. If it exists with different bytes the command fails
+  with exit 2 and names `--force`. With `--force` the existing atomic
+  writer replaces a regular file; a symbolic link is refused.
+- Failed-write cleanup belongs to the failing invocation and covers only
+  its own short-named staging file. A new capture never creates, writes
+  or removes the public path directly, so a failure cannot delete another
+  writer's completed capture.
+- Publication support depends on the CLI capture backend (section 28,
+  R10-1).
+  - The native CLI (`write_new` through `apps/cli/native/src/files.rs`)
+    needs a no-clobber rename or a hard link on the target filesystem;
+    Windows needs no extra support.
+  - The Bun reference host needs hard links.
+  - Where the backend's primitive is missing, a new capture fails with
+    exit 2 and the publish error, and nothing appears at the path.
+  - `--force` over an existing regular file is unchanged in both.
+- These rules and exit codes cover only the `capture` command. Desktop
+  export does not use them: it saves a user-selected file through
+  `write_export_atomic` and `write_selected_file_atomic` (Foundation's
+  atomic writer on macOS, `write_atomic` elsewhere) and reports errors
+  in its UI (section 13). R10-1 does not change that writer.
 - Parent directories of `--output` are not created.
 - The Store CLI's temporary directory is inside its container, which
   another process may not be allowed to read; the help says to use
@@ -489,10 +520,15 @@ errors.
 
 `nodetto_capture` takes the same argument tokens. The result text is the
 stdout of section 4.2. With `--inline` and exit code 0 or 1 the server
-reads the written file and appends `{"type":"image","data":<base64>,
-"mimeType":"image/png"|"image/jpeg"}` [S-9] when the file is at most
-1,048,576 bytes; above that it appends a text line that says so.
-`structuredContent` is unchanged and never contains the image.
+appends `{"type":"image","data":<base64>,
+"mimeType":"image/png"|"image/jpeg"}` [S-9] built from the bytes that
+this call itself wrote (outcome `written` or `identical`), when they are
+at most 1,048,576 bytes; above that it appends a text line that says so.
+The server never reopens the output path for the attachment, so a
+concurrent capture that replaces the same path cannot change this call's
+image (revision 16, section 27, R9-2). A call whose write failed or was
+refused gets no attachment. `structuredContent` is unchanged and never
+contains the image.
 
 Size for the model: a picture costs `ceil(width/28) * ceil(height/28)`
 visual tokens [S-11], so the default 1024 x 768 picture costs 37 x 28 =
@@ -578,7 +614,10 @@ loops, starting with even, so "inside an odd number of loops" equals the
 kernel rule, and the scene needs no depth field. Containment among the
 selected loops is decided with a bounding-box test followed by a
 point-in-polygon test of one vertex (loops never cross,
-`packages/core/src/cad/loops.ts:376-378`). Body bounds use the kept loops.
+`packages/core/src/cad/loops.ts:376-378`). That test uses the same integer
+nanometre grid and exact `gridCross` predicate as sketch construction. The
+loop's millimetre coordinates are what gets serialized (section 28,
+R10-4). Body bounds use the kept loops.
 
 Failed and suppressed features contribute nothing and their bodies pass
 through unchanged, as in the evaluator
@@ -2018,8 +2057,10 @@ same path and byte count; this observation does not establish byte identity.
   truncated and mutated fixtures).
 - Documents: element limits of the CAD design apply before the scene is
   built; nothing from a document is evaluated as code.
-- MCP: `--inline` reads only the file the command just wrote, at most
-  1 MiB. The server keeps the permissions it has today.
+- MCP: `--inline` attaches only the bytes the call's own write stored, and
+  reads no file for it. Only inline calls retain them, at most 1 MiB per
+  call (above that only the byte count), until the response is built. The
+  server keeps the permissions it has today.
 - Resource limits: picture size, work limit with edge and triangle
   occupancy, bounded lookup tables, a budget of weighted rays for the
   analysis, the same again for refinement and for body sampling, a
@@ -2043,7 +2084,7 @@ same path and byte count; this observation does not establish byte identity.
 | Scene rejected by the reader, or work limit exceeded | Exit 2 with the reader's message |
 | Candidate pairs do not fit the ray budget | The cell grows and is printed; pairs that still do not fit are listed as not checked; exit 0, or 1 with `--fail-on-interference` |
 | Refinement of a checked pair reaches its cap | The pair ends with `, approximate`; the `refinement capped` line of section 4.2; exit code unchanged |
-| Write fails | Exit 2; a partly written new file is removed |
+| Write, sync or no-clobber publish fails, including a target filesystem that lacks the capture backend's primitive (native CLI: no-clobber rename or hard link; Bun host: hard link). Desktop export is not covered here (section 13) | Exit 2 with the original error; the failing invocation removes only its own staging file, and the public path is untouched (section 28, R10-1) |
 
 ## 13. Desktop
 
@@ -6438,3 +6479,1302 @@ run verify`, the release CLI build with the native capture suite, and no
   must then fail too); it never relaxes the case.
 - Sibling Rust plans compile each other's in-progress edits in one tree.
 - Not run by these gates: Tauri IPC, MCP delivery and `mise run test-cli`.
+
+## 26. Revision 15: audit round 8 corrections
+
+Source: audit round 8 of the 3D CAD pages and AI capture, base `0a35708`
+to `fc22c03`. Two performance findings, none deferred. No GitHub issue
+exists; the round-8 workflow input is the issue body. Where an earlier
+section (including F8 of `design-cad3d.md` section 19) and this one
+disagree, this section wins. The common rules of section 24 apply
+(a regression test that fails before and passes after in this tree,
+deterministic work counters instead of clocks, and unchanged bytes,
+goldens, error codes, messages and caller interfaces), except that the
+timing disposition is the round-8 timing rule of 26.2.
+
+### 26.1 Rules
+
+R8-1 `performance-sketch-profile-pair-scans` (high, recurrence of F8).
+
+Cause. `overlappingPairs` (`packages/core/src/cad/loops.ts:215-258`) picks
+one sweep axis for the whole sketch and enumerates every pair that overlaps
+on it before rejecting on the other axis. Holes along two perpendicular
+edges put one row inside a single slab of either axis, so both segment
+intersection and contour containment become quadratic (1,024 holes:
+24,213,509 segment and 131,840 contour candidate visits).
+
+Rule. Only the body of `overlappingPairs` changes. Its signature
+`(boxes, visit, count)`, both callers (`intersection` and the depth loop in
+`buildProfileLoops`), `segmentIntersection`, `contains`, the `(minX, minY)`
+sort of `segments`, `buildLoops`, `buildProfileLoops` and `LoopStats` keep
+their shapes.
+
+- Pair contract (unchanged, now stated). `visit(i, j)` is called exactly
+  once for every unordered pair of distinct boxes whose closed bounds
+  overlap on both axes (`minX <= other.maxX && other.minX <= maxX`, same
+  for Y), and for no other pair. Both callers depend only on this set: the
+  intersection keeps `first = min(first, i, j)` over intersecting pairs
+  and the depth loop adds symmetrically, so the reported segment and every
+  depth are identical to today whatever the visiting order. Argument order
+  inside a pair is not part of the contract (today it already depends on
+  the chosen axis). `visit` stays guarded by the existing four-comparison
+  test.
+- Query. X sweep with a static interval index on Y:
+  1. `byMinX`: box indices sorted by `(minX, index)`. `byMaxX`: sorted by
+     `(maxX, index)`. `byMinY`: sorted by `(minY, index)`; a box's
+     position in `byMinY` is its leaf, and `minYs` holds the sorted minY
+     values.
+  2. A complete binary tree over the leaves (array layout; typed numeric
+     arrays allowed) stores in each node the largest `maxY` among active
+     leaves below it, `-Infinity` when none.
+  3. For each box `a` in `byMinX` order: first deactivate (leaf set to
+     `-Infinity`, ancestors recomputed) every box from the `byMaxX`
+     pointer with `maxX < a.minX` (strict, so touching boxes stay active);
+     then query; then activate `a` (leaf set to `a.maxY`, ancestors
+     updated).
+  4. Query: `limit` = number of leaves with `minY <= a.maxY` (upper-bound
+     binary search on `minYs`). Descend from the root, skipping any node
+     whose leaf range starts at or after `limit` or whose stored max is
+     `< a.minY`. Every leaf reached is active (so `b.minX <= a.minX <=
+     b.maxX`) and overlaps `a` in Y, so it is a true overlap and is
+     visited.
+
+  Every overlapping pair is found exactly once, by the later box in
+  `byMinX` order. Boxes with equal `minX` find the earlier ones because
+  those are still active. Cost is O(n log n) for build and updates plus
+  O((k + 1) log n) per query for k reported pairs.
+- Work counter. `count()` is called once per tree node entered by a query,
+  pruned nodes and reported leaves included. `stats.segmentPairs` and
+  `stats.containmentPairs` keep their names and now count these query
+  steps (candidate-search work). No new export.
+- Typing. Indexed reads of arrays and typed arrays are guarded for
+  `noUncheckedIndexedAccess` (for example `?? Number.NEGATIVE_INFINITY`).
+  Tree depth stays below about 30 at the page and loop limits, so a
+  recursive descent is safe; an explicit stack is equally acceptable.
+
+Tests (`packages/core/src/cad/loops.test.ts`, appended; existing tests
+unchanged and passing):
+
+- "holes along two perpendicular edges have near-linear candidate counts".
+  For `h` in 128, 256 and 512 holes (half per row): plate
+  `rectangle("plate", 0, 0, L, L)` with `L = 9 + 3 * (h / 2)`; horizontal
+  row `circle("h-<k>", [6 + 3k, 2.5], 1)` and vertical row
+  `circle("v-<k>", [2.5, 6 + 3k], 1)` for `k < h / 2`. All holes are
+  disjoint from each other and from the plate. `buildLoops(entities,
+  undefined, stats)` returns `loops` with `h + 1` loops: the plate loop at
+  depth 0 and every hole at depth 1. Per doubling, both
+  `stats.segmentPairs` and `stats.containmentPairs` are positive and grow
+  by at most 2.5 times. Before the fix the growth is about 3.9 (audit:
+  388,869 to 1,531,397 to 6,077,445 segment visits), so the test fails;
+  after it the expected growth is about 2.1 to 2.3.
+- In the same test, the 128-hole fixture with hole `h-0` moved to `[6, 1]`
+  (tangent to the plate edge `y = 0`) returns
+  `{ error: "cad.profile.intersect" }` with `at` defined. This checks
+  inclusive bounds against a zero-height edge box under the new query.
+- First-error identity, touching contours, nesting and the single-row
+  counts stay covered by the existing tests at `loops.test.ts:51`, `:125`,
+  `:209` and `:234`, which must pass unedited.
+
+R8-2 `performance-capture-sibling-attribution-rescans` (medium).
+
+Cause. `describeBodies` (`packages/core/src/capture/describe.ts:190-200`)
+runs `body.steps.findIndex` once per other source for every closed body.
+One cut that empties B bodies gives B sources with the same key, so the
+cost is O(B^2) (2,048 bodies: 16,775,168 step-property reads).
+
+Rule. The R5-1 attribution of 23.1 is kept exactly; only its evaluation
+changes. `describeBodies` keeps its signature and return value.
+
+- Source index. After `sources` is built (unchanged, model order), build
+  once a nested map `tool -> op -> first two sources` holding, per
+  `(step.tool, step.op)` key, the first two entries of `sources` in model
+  order. Each body yields at most one source, so they are distinct bodies.
+  Nested maps keyed by the numeric tool and the op string avoid composed
+  string keys.
+- No-sibling shortcut (preserves today's zero reads). The history walk
+  below is skipped, and the body has no sibling candidate, when `sources`
+  is empty or when its only entry is the body itself (`sources.length ===
+  1 && sources[0].i === i`). Today's loop reads no step in either case. A
+  page whose bodies have no eligible sources therefore still reads no
+  `op` or `tool` of any step for sibling attribution.
+- Sibling candidate. Otherwise, for a body `i` with `state.open` false,
+  walk `body.steps` once in order. At step `k`, look up its key; the
+  candidate
+  is the first indexed source whose `i` differs from the body's own index,
+  else the second. Stop at the first `k` that yields a candidate:
+  `sibling = { index: k, source }`. This equals today's result: the
+  smallest first-match index over all other sources is the first step
+  whose key has any other source, and at that step the earliest other
+  source in model order is the first or second indexed entry
+  (self-exclusion needs at most one skip).
+- Unchanged. `sources`, `existingIndex`, the strict `<` that lets the
+  existing hidden or own attribution win at an equal index, the error
+  texts, error order (model order of bodies), names, notes and
+  `notSampled`.
+
+Tests (`packages/core/src/capture/describe.test.ts`, appended; existing
+tests unchanged and passing):
+
+- "a cut shared by many emptied bodies is attributed with linear step
+  reads". For `B` in 256, 512 and 1024: one union tool per body (feature
+  `base-<i>`) plus one shared cut tool (feature `cut`); bodies `e-<i>` with
+  steps `[{ op: "union", tool: <own union> }, { op: "difference", tool:
+  <cut> }]` and state `{ state: "empty", open: false, emptiedByStep: 1 }`,
+  plus one last body `stand` with the same two steps and state
+  `{ state: "drawn", open: false, emptiedByStep: -1 }`. Every step object
+  exposes `op` and `tool` through getters that increment one shared
+  counter (test-only instrumentation; no production hook). Assert:
+  `errors` has `B + 1` entries in body order, each `e-<i>` with the own
+  text and `stand` last with the sibling text naming `e-0` (first-source
+  tie-break); per doubling the read count grows by at most 2.5 times.
+  Before the fix it grows by about 4 (step-3 reviewer getter counts on
+  this fixture: 394,241 to 1,574,913 to 6,295,553 reads), so the test
+  fails.
+- No-source zero reads, in the same appended test. 256 bodies, each with
+  256 instrumented steps, state `{ state: "drawn", open: false,
+  emptiedByStep: -1 }` and no `hiddenEmptiedByStep`: `describeBodies`
+  returns no errors and the getter counter stays at 0. This holds before
+  and after the fix and guards the no-sibling shortcut.
+- Self-exclusion through the second index entry: body `a` with steps
+  `[union, difference cut, difference cut]` and `emptiedByStep: 2`, body
+  `b` with `[union, difference cut]` and `emptiedByStep: 1`. `a` gets the
+  sibling text naming `b` (index 1 < own 2, its own entry skipped); with
+  `a` alone it gets its own text.
+- Equal-index precedence, hidden precedence, open bodies and unknown
+  bodies stay covered by the existing tests at `describe.test.ts:243` and
+  `:290`, which must pass unedited.
+
+### 26.2 Plan grouping
+
+Plans `car8-*`, one wave, no `dependsOn`: the two plans share no file.
+Each has a non-empty `acceptanceCriteria`, uses
+`CARGO_TARGET_DIR=target/car8-<plan>` (no Rust is built), sets
+`artifactRoots ["target", "tmp/cad3d"]` exactly with evidence under
+`tmp/car8-r8/<planId>/`, lists every edited file including its plan and
+progress files in `writePaths`, and leaves no `*.test.ts` under `target/`
+or `tmp/`. Each plan first adds its test and records the failing run, then
+applies the fix and records the passing run.
+
+| Plan | Rule | Owns |
+| --- | --- | --- |
+| car8-f1-loops-box-query | R8-1 | `packages/core/src/cad/loops.ts`, `packages/core/src/cad/loops.test.ts` |
+| car8-f2-describe-source-index | R8-2 | `packages/core/src/capture/describe.ts`, `packages/core/src/capture/describe.test.ts` |
+
+Gates (each exits 0 and runs the new test):
+
+- f1: `bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts`.
+- f2: `bunx biome check packages/core/src/capture/describe.ts packages/core/src/capture/describe.test.ts && bun test packages/core/src/capture/describe.test.ts`.
+
+Integration, once after both land, in this order:
+
+1. `bun run typecheck`, `bun run lint` and `CARGO_TERM_QUIET=true mise run
+   verify` (determinism and golden tests run there without regenerating
+   goldens).
+2. Native CAD determinism, which `mise run verify` skips because it does
+   not set `NODETTO_CLI_TEST_BINARY`
+   (`apps/cli/src/native-parity/harness.ts:6-13`):
+   `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli" bun test apps/cli/src/native-parity/capture.test.ts --test-name-pattern '^CAD capture is deterministic, discoverable, and within the native budget$'`.
+   The binary is built from the integrated working tree. Evidence: build
+   exit 0, exactly one matching case reported as passed (not skipped),
+   its repeated PNG byte assertions passing, and the timing output that
+   the case already writes at `tmp/capture/m09/timing.json`. Native
+   assertions, deadlines and NCS1 goldens are not edited. This step is
+   integration-only and is never part of either plan gate.
+3. No `*.test.ts` under `target/` or `tmp/`.
+
+Round-8 timing rule (replaces the 24.2 disposition for this round; 24.2
+itself is unchanged). It applies to every plan gate and integration
+command. Only existing timing or deadline tests are covered (for example
+`packages/core/src/capture/scene-binary.test.ts` "the Plate fixture is
+stable and serializes within 100 ms", the native budget case above, tile
+deadlines and `release_*_budget`):
+
+- A command may be rerun up to three times in all when its only failures
+  are such timing tests.
+- If a timing-only failure remains, each failing timing test is rerun
+  alone (for example `bun test packages/core/src/capture/scene-binary.test.ts --test-name-pattern '^the Plate fixture is stable and serializes within 100 ms$'`).
+  An isolated pass satisfies that timing failure. The evidence keeps every
+  original nonzero exit status, the complete aggregate logs and the
+  complete isolated log; the earlier failures are never rewritten as
+  passes.
+- Skipped checks still run. A command that chains stages with `&&` stops
+  at the failing stage, so an isolated pass alone never closes the gate.
+  Every stage after the failing one is then run separately, in chain
+  order, each with its own exit status and complete log and each under
+  this same rule. `CARGO_TERM_QUIET=true mise run verify` expands
+  (`mise.toml:73-107`) to `bun run typecheck && CARGO_TERM_QUIET=true
+  cargo check --workspace`, then `mise run lint-ts && mise run fmt-check
+  && mise run lint-rust`, then `bun run typecheck && bun test &&
+  CARGO_TERM_QUIET=true cargo test --workspace`. Example: when the Plate
+  serialization test (`scene-binary.test.ts:316-336`) is the only failure
+  of `bun test` and passes alone, `CARGO_TERM_QUIET=true cargo test
+  --workspace` must then run and exit 0, or exit nonzero only on timing
+  tests that pass alone (for example `cargo test --workspace --
+  <test name> --exact`). Only then does step 1 pass.
+- The gate passes only when every stage of every listed command has either
+  exited 0 or failed solely on timing tests that each passed alone. Each
+  numbered integration step starts only after the previous one has passed.
+- Any functional failure, or a timing test that also fails alone, fails
+  the gate. Deadlines and assertions are never relaxed.
+
+### 26.3 Decisions
+
+- R8-1 uses an X sweep with a static max-augmented tree over the minY
+  order instead of a uniform grid. A grid degrades when one box (the plate
+  contour or a long edge) covers every cell; the tree costs
+  O((k + 1) log n) per query for any box sizes. The sweep axis is fixed to
+  X and the axis heuristic is removed, because the Y index makes it
+  unnecessary.
+- R8-1 keeps the `LoopStats` field names and redefines their unit as query
+  steps, so the existing single-row test keeps its 2.5 bound unedited
+  (expected growth about 2.1 per doubling there) and no caller changes.
+- R8-2 counts work with getters on fixture step objects instead of a
+  production counter, so `describeBodies` gains no test-only parameter.
+- R8-2 keeps today's skip when no other source exists, so pages without
+  emptied bodies read no step history at all (step-3 review R8-D1).
+- The round-8 timing rule lets an isolated pass satisfy a timing-only
+  aggregate failure, as the workflow input requires, while keeping every
+  nonzero status and log (step-3 review R8-D2).
+- Integration runs the existing native CAD determinism case with a release
+  binary built from the integrated tree, because `mise run verify` skips
+  it without `NODETTO_CLI_TEST_BINARY` (step-3 review R8-D3). It stays out
+  of the plan gates, which build no Rust.
+- No user decision is pending; no `design-docs/user-qa/` file.
+
+### 26.4 Intentional differences from the workflow input
+
+- The workflow input lists `history.ts`, `construction.ts`,
+  `cad-request.ts`, `scene.ts`, `capture-cad.ts` and `export-handlers.ts`
+  as possible callers to change. Neither rule changes an interface, so
+  they are not edited.
+- The workflow verification hint lists `bun run typecheck` per plan; per
+  the input's own constraint it runs once at integration only.
+
+### 26.5 Risks
+
+- If the new query ever missed or duplicated a pair, first-error identity
+  or depths would change; the existing first-error, touching and nesting
+  tests plus the new tangent and depth checks guard this.
+- The 2.5 bound carries a log factor; at the chosen sizes the expected
+  growth is about 2.1 to 2.3. If a bound fails after a correct fix, the
+  plan reports the measured counts; it never relaxes the bound.
+- Not measured: Boa elapsed time, desktop latency, peak memory, end-to-end
+  CLI or desktop runs, Tauri IPC, MCP delivery and native parity.
+
+## 27. Revision 16: audit round 9 corrections
+
+Source: audit round 9 of the 3D CAD pages and AI capture, base `0a35708`
+to `aede81d`. Two findings, none deferred. No GitHub issue exists; the
+round-9 workflow input is the issue body. Where an earlier section and
+this one disagree, this section wins. The common rules of section 24 and
+the round-8 timing rule of 26.2 apply unchanged: a regression test that
+fails before and passes after in this tree, deterministic work counters
+instead of clocks, and unchanged bytes, goldens, error codes, messages,
+NCS1 layout and caller interfaces.
+
+### 27.1 Rules
+
+R9-1 `performance-cad-containment-perimeter-rescans` (high).
+
+Cause. Two point-in-contour predicates walk every edge of the enclosing
+contour for each query: `contains` in `packages/core/src/cad/loops.ts`
+(about 342-360, called from the depth pass at about 490-493) and
+`containsPoint` in `packages/core/src/capture/scene.ts` (about 79-95,
+called from `normaliseToolLoops` at about 237). H holes in a plate with
+P = H + 3 edges cost H(H+3) edge reads per pass (67,133,440 at H = 8,192).
+
+Rule. A new internal module `packages/core/src/cad/edge-y-index.ts` holds
+a static per-contour index of edge Y intervals. It is not re-exported from
+`packages/core/src/cad/index.ts` or `packages/core/src/index.ts`, and it
+imports nothing (it reads plain numbers).
+
+Revision 17 note: section 28 supersedes three parts of this rule. R10-2
+replaces the Y-only query `forEachEdgeAtY` with a ray-origin parity
+query and stops indexing horizontal edges. R10-4 replaces the
+floating-point capture predicate described under "Exactness" below with
+the grid predicate. R10-3 adds a parent-forest fallback to the depth
+pass. The text below records revision 16.
+
+- Edge numbering. For a flat array of n vertices, edge `e` runs from
+  vertex `(e + n - 1) % n` to vertex `e`, the order both predicates
+  already walk (they start at the last vertex).
+- Build: `buildEdgeYIndex(points: ArrayLike<number>, stats?)`. For every
+  edge, `lo = min(ay, by)` and `hi = max(ay, by)` come from the caller's
+  own array (grid integers in `loops.ts`, millimetre doubles in
+  `scene.ts`; both are exact doubles, so nothing is converted). Horizontal
+  edges are kept. Edges are sorted by `(lo, e)`. A complete binary tree in
+  array layout (typed arrays allowed) stores in each node the largest `hi`
+  below it. Cost O(n log n).
+- Query: `forEachEdgeAtY(index, y, visit, stats?)`. `limit` is the number
+  of leaves with `lo <= y` (upper-bound binary search). Descend from the
+  root and skip a node whose leaf range starts at or after `limit` or whose
+  max `hi < y`. Every leaf reached has `lo <= y <= hi` (closed) and is
+  passed to `visit(e)` exactly once. Cost O((k + 1) log n) for k reported
+  edges. Tree depth stays below 30 at the loop limits, so recursion and an
+  explicit stack are both acceptable.
+- Exactness. The closed stab is a superset of every edge the existing
+  predicates can count, because `ay > y !== by > y` implies
+  `lo <= y < hi`. Each caller keeps its own predicate unchanged and applies
+  it to each reported edge: `loops.ts` keeps `ay > y !== by > y` with
+  `gridCross(...) > 0 === by > ay` on grid numbers; `scene.ts` keeps
+  `ay > y !== by > y && x < ax + ((bx - ax) * (y - ay)) / (by - ay)` on
+  millimetre numbers. Parity is an XOR, so the visiting order does not
+  matter, and every depth, kept loop and error is identical to today.
+- Counters: `EdgeIndexStats { builds: number; visits: number;
+  inspections: number }`, exported from the new module for the two callers
+  and tests only. `builds` grows by n per index built, `visits` by 1 per
+  tree node a query enters (pruned nodes included), and `inspections` by 1
+  per reported edge (the caller's exact predicate runs once for each).
+- `loops.ts`. `contains` keeps its bounds early exit, then queries the
+  profile's index. Indexes are built lazily, at most once per profile per
+  `buildProfileLoops` call (kept in an array next to `profiles`), so a
+  profile rejected by bounds never pays for a build. `LoopStats` gains an
+  optional `edges?: EdgeIndexStats`. `segmentPairs`, `containmentPairs`,
+  `overlappingPairs`, `intersection`, the first-error rule, the
+  `buildLoops` and `buildProfileLoops` signatures and results, `CadLoop`
+  and the `pcb-outline.ts` caller are unchanged.
+- `scene.ts`. `containsPoint` keeps its predicate and uses the index of
+  its `LoopEntry`, built lazily at most once per entry per
+  `normaliseToolLoops` call and stored on that local entry. The bucket
+  grid, probe order, `ancestorProbes`, `indexEntries`, kept-loop order,
+  the return value of `normaliseToolLoops` and `prepareCadCapture` are
+  unchanged. Its stats parameter gains an optional
+  `edges?: EdgeIndexStats`.
+- One module, two index instances. `loops.ts` indexes grid outlines and
+  `scene.ts` indexes the counter-clockwise millimetre `CadLoop.points`.
+  `CadLoop` cannot carry an index without changing its shape, so each
+  pass builds its own, once per contour.
+
+Detailed-rim fixture (both tests). One sketch with a plate from x = 0 to
+256. Its bottom edge is y = 0 and its left and right sides are vertical.
+Its top is H `cad.line` segments from `(256 i / H, y_i)` to
+`(256 (i + 1) / H, y_(i+1))`, with `y_i = 512` for even i and `513` for
+odd i, so P = H + 3 lines. It also has H circles of radius 1 at
+`(2.5 + 3 (k % 64), 2.5 + 3 floor(k / 64))`. Sizes: H = 256, 512, 1024.
+Each test file builds it with its own element helpers.
+
+Tests (appended; existing tests unchanged and passing):
+
+- `packages/core/src/cad/loops.test.ts`, "a detailed rim with many holes
+  queries the perimeter through one edge index". For each H,
+  `buildLoops(entities, undefined, stats)` with `stats = { segmentPairs:
+  0, containmentPairs: 0, edges: { builds: 0, visits: 0, inspections: 0
+  } }` returns H + 1 loops: one at depth 0 whose members contain a rim
+  line, and H at depth 1. Each of the three edge counters is positive.
+  `builds` is at most the sum of the edge counts of the returned loops, so
+  no contour is built twice. `inspections <= 4 * H`. Per doubling,
+  `builds + visits + inspections` grows by at most 2.5 times. Before the
+  fix the counters stay 0, so the test fails (the old predicate reads
+  H(H+3) edges).
+- `packages/core/src/capture/scene.test.ts`, "normalisation queries the
+  detailed rim through one edge index". For each H, the fixture's loops
+  (through the file's `selectedLoops` helper) go through
+  `normaliseToolLoops` with `stats = { ancestorProbes: 0, indexEntries:
+  0, edges: { builds: 0, visits: 0, inspections: 0 } }`. The result equals
+  `oracleNormalise` element by element, and `indexedSceneBytes` of both
+  are equal. The same counter assertions apply: `builds` is at most the
+  total edge count of the input loops, `inspections <= 4 * H`, and growth
+  is at most 2.5 per doubling. Before the fix the counters stay 0, so the
+  test fails.
+- Kept unedited and passing: touching contours and first-error identity
+  (`loops.test.ts` "touching or overlapping contours count as an
+  intersection" and "intersection reports the first segment in the
+  original nested scan"), nesting depth, the round-8 two-row and
+  single-row tests, `pcb-outline.test.ts`, and in `scene.test.ts` the
+  omitted-intermediate-ancestor tests ("omits leading odd levels ...",
+  the `nestedSelections` table, "finds the containing ancestor among two
+  disjoint islands ...") and the oracle and scene-byte checks of
+  `checkIndexedLoops`.
+
+R9-2 `function-mcp-inline-image-replaced-before-readback` (medium).
+
+Cause. Both MCP servers build the inline attachment by reopening the
+output path after the command returns. In `apps/cli/src/mcp.ts` the write
+wrapper (about 100-103) keeps only the path and `inlineContent` reads it
+(about 40). In `apps/cli/native/src/mcp.rs`, `read_inline_image` (about
+75-90) runs from `capture_content` after `engine::run`. Another writer can
+replace the file in between.
+
+Rule. The attachment is the call's own write. At a successful write the
+server takes a per-call record `{ path (absolute), byteLength, bytes when
+byteLength <= 1,048,576 }` and builds the attachment from it.
+
+- Recording. Only inline calls record. Only the outcomes `written` and
+  `identical` record; `exists` and a thrown write do not. A later recorded
+  write in the same call replaces the earlier record, which is today's
+  "last successful write" rule for `writtenPath`. The bytes are the array
+  that the command passed to the write.
+- Content (both servers; order and texts unchanged). If the exit code is
+  not 0 or 1, or there is no record, no block is added (failed-write
+  suppression). Otherwise the stdout path (`capturedImage` /
+  `captured_image`, unchanged) must equal the record's path; if it does
+  not, the existing "could not read the written path from capture output.
+  Try --json." note is added. When stdout has no path, Bun still adds that
+  note and native still adds no block (today's behaviour of each). Native
+  also keeps its `capture_path_matches` check before the comparison. Then
+  `byteLength > 1,048,576` gives the existing "Image not inlined: <n>
+  bytes exceed 1048576. ..." text; otherwise the block is an image with
+  the base64 of the recorded bytes and the MIME type from the extension.
+  `structuredContent`, `isError`, exit codes and path reporting are
+  unchanged.
+- Bun (`apps/cli/src/mcp.ts`). The per-request `capture.write` wrapper
+  stores the record. It keeps a reference to `bytes` without copying, and
+  for an oversize image only the length. `inlineContent` takes the record
+  instead of a reader. The third parameter of `createMcpServer` becomes an
+  options object, `{ run?: typeof runCliAsync }` (default `runCliAsync`).
+  `run` is a test seam that lets tests control the written bytes and the
+  write order. `readLocalInlineBytes` and the reader are removed, and
+  `serveMcp` passes no options. Callers that pass two arguments
+  (`cad-command.test.ts`, `mcp.test.ts`) are unaffected.
+- Bun staging inside p3 (so the regression fails on the old readback, not
+  on a signature). Stage 1 changes only the parameter: the options object
+  is `{ readInlineBytes?, run? }`. `readInlineBytes` defaults to
+  `io.readBytes` as today, `serveMcp` passes `{ readInlineBytes:
+  readLocalInlineBytes }`, `execute` calls `run` instead of `runCliAsync`,
+  and the path readback is unchanged. The new two-writer test, which passes
+  only `{ run }`, is added and run. The plan records that both writes
+  complete, both responses report exit 0, and A's attachment equals B's
+  bytes, so the test fails on A's byte comparison. Stage 2 adds retention,
+  removes `readInlineBytes` and `readLocalInlineBytes`, and reruns the same
+  unchanged test, which passes both byte comparisons.
+- Native (`apps/cli/native/src/engine.rs` and `mcp.rs`). `HostState`
+  gains `retain_capture: Cell<bool>` and
+  `capture: RefCell<Option<CaptureWrite>>`, with
+  `pub struct CaptureWrite { pub path: PathBuf, pub len: u64,
+  pub bytes: Option<Vec<u8>> }`. When `retain_capture` is set, the
+  `writeCapture` host op computes `std::path::absolute` of its path
+  argument before writing. That argument is already `native.path(...)`, so
+  the result equals `captureAbsolute`. After a `written` or `identical`
+  result the op stores the record and moves into it the `Vec<u8>` it
+  already copied out of Boa. There is no second copy and no per-byte work
+  in JavaScript. A new
+  `pub fn run_inline(args, input) -> (CommandResult, Option<CaptureWrite>)`
+  shares the body of `run` with retention on, and takes the record from
+  the context after `execute`. It is built from two crate-internal
+  helpers that the tests also use: `inline_context(input, directory)`
+  (`context` with `retain_capture` set) and
+  `take_capture_write(&Context) -> Option<CaptureWrite>`. `run` keeps its
+  signature and never retains. `CommandResult` and its serialization are unchanged, so the
+  bytes never enter it. The inline limit constant moves to `engine.rs` as
+  `pub(crate) const MCP_INLINE_MAX_BYTES: usize = 1_048_576`, and `mcp.rs`
+  uses it. `call_tool` calls `run_inline` when `wants_inline_image(&args)`
+  and `run` otherwise. `capture_content(args, output,
+  written: Option<&CaptureWrite>)` builds the block as above.
+  `read_inline_image` is removed. The per-server mutex is unchanged.
+- Native staging inside p4 (so the regression fails on the old readback,
+  not on compilation). Stage 1 adds the engine retention, the two helpers
+  and `run_inline`, and gives `capture_content` the `written` parameter.
+  It uses the parameter only for presence (no record means no block) and
+  still builds the image with `read_inline_image` from the path. The new
+  two-context test is added and run, and the plan records that it fails on
+  A's byte comparison (A's attachment equals B). Stage 2 builds the block
+  from the record, removes `read_inline_image`, and reruns the same
+  unchanged test, which passes both byte comparisons.
+
+Tests (fail before, pass after; existing assertions kept):
+
+- `apps/cli/src/mcp.test.ts`, new "MCP inline capture attaches each call's
+  own write". Two servers from `createMcpServer(io, "test", { run })`, one
+  per call, share one memory `io`. Its `capture.write` stores into a map and its `readBytes`
+  returns the current map entry, so a readback would see the replacement.
+  Images A and B have equal length and different content. Fake run A
+  writes A to `/mock/shared.png`, resolves a barrier, waits until B has
+  written, then returns `path: /mock/shared.png`. Fake run B waits for A's
+  write, writes B to the same path and returns. Both calls report exit 0.
+  The map entry for the shared path then holds B. A's decoded attachment
+  equals A and B's equals B. Before stage 2 (see the Bun staging above) it
+  fails because A's attachment equals B. The same test also checks, with one server
+  each: exit 1 after a write (image present, `isError` true,
+  `structuredContent` equal to the fake result); an inner write that
+  returns `identical` (image equal to the call's bytes); an inner write
+  that returns `exists` with exit 2, and an inner write that throws (one
+  content block only); exactly 1,048,576 bytes (an image whose decoded
+  length is 1,048,576); 1,048,577 bytes (text containing "1048577 bytes
+  exceed 1048576"); and a `.jpg` path (`image/jpeg`).
+- `apps/cli/src/mcp.test.ts`, existing "MCP capture appends opt-in images
+  and read notes while preserving the CLI result". Its `large` and
+  `unreadable` scenarios, whose fake `readBytes` returns other data or
+  throws, now expect an image equal to `direct.bytes.get(path)` (the
+  call's own bytes), and `reads` must be `[]` (no readback). All other
+  scenarios and assertions are unchanged. The oversize note moves to the
+  new test above, with a real 1,048,577-byte write.
+- `apps/cli/native/src/engine_tests.rs`, new "capture writes are retained
+  per call only when inline". In a context with `retain_capture` set:
+  `native.writeCapture` of a 1,048,576-byte array records `len` 1,048,576
+  with equal bytes and the absolute path; a 1,048,577-byte write records
+  only `len` (`bytes` is None); an `identical` write records; an `exists`
+  write leaves the previous record; a write into a missing directory
+  throws and records nothing. With `retain_capture` unset, nothing is
+  recorded.
+- `apps/cli/native/src/mcp.rs` tests, new
+  `inline_capture_attaches_each_calls_own_write`. Two independent
+  invocation contexts, A and B, come from `engine::inline_context` on the
+  same temporary folder. Both write the explicit path
+  `<tmp>/shared.png` through the real `writeCapture` host op with
+  `replace` true. A is 4,096 bytes with `A[i] = i & 255`, and B is 4,096
+  bytes with `B[i] = 255 - (i & 255)`. Each context builds its array in
+  the evaluated script (`Uint8Array.from({ length: 4096 }, ...)`), and the
+  test computes the same expected arrays in Rust, so they have equal length
+  and different content. Order: A
+  writes, and the test saves A's bytes; then B writes, and the test saves
+  B's bytes; then both responses are built. Each record is taken with
+  `take_capture_write`. Each response is built by
+  `capture_content(args, output, Some(&record))`, where `args` is
+  `capture doc.jsonl --inline --output <tmp>/shared.png` and `output` is
+  exit 0 with stdout `path: <tmp>/shared.png`. Assertions: the file at the
+  shared path equals B; A's decoded attachment equals A's saved bytes and
+  B's equals B's. With stage 1 readback, A's comparison fails (A receives
+  B), and the plan records that run. A second new test,
+  `run_inline_retains_the_written_capture`, runs a real
+  `capture <doc> --inline --json --output <tmp>/one.png` on a one-element
+  freeform document through `engine::run_inline`. It checks that the
+  record's bytes equal the file and its `len` equals the reported
+  `bytes`, which covers the wiring of `run_inline`. The existing
+  `inline_capture_preserves_exit_one_and_checks_file_size_and_path` now
+  passes records instead of files and keeps every assertion: an exit-1
+  image of exactly 1,048,576 bytes with `image/jpeg`, the 1,048,577 note,
+  "Try --json", and no block at exit 2.
+  `explicit_output_is_matched_inside_the_cwd_folder` stays unedited.
+- `apps/cli/src/mcp-stdio.test.ts` stays unedited. Its single-call
+  comparison with the file on disk is still valid.
+
+### 27.2 Plan grouping
+
+Plans `car9-*` run in one wave, except for one real dependency. Each plan
+has a non-empty `acceptanceCriteria`, sets `artifactRoots ["target",
+"tmp/cad3d"]` exactly, keeps evidence under `tmp/car9-r9/<planId>/`, uses
+its own `CARGO_TARGET_DIR=target/car9-<plan>`, lists every edited file
+(its plan and progress files included) in `writePaths`, and leaves no
+`*.test.ts` under `target/` or `tmp/`. Each plan first adds its test and
+records the failing run, then applies the fix and records the passing run.
+p3 and p4 do this through the two stages described in 27.1, so the
+recorded failure is A receiving B's bytes, not a type or compile error.
+Focused regression commands for those runs:
+`bun test apps/cli/src/mcp.test.ts --test-name-pattern '^MCP inline capture attaches each call.s own write$'`
+and
+`CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car9-p4 cargo test -p nodetto-cli inline_capture_attaches_each_calls_own_write`.
+Each runs exactly one case. The stage 1 failure log is evidence only and
+is never listed as a gate.
+This revision already updates sections 4.5 and 11, so no plan edits this
+document.
+
+| Plan | Rule | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car9-p1-edge-index-loops | R9-1 index and depth pass | new `packages/core/src/cad/edge-y-index.ts`, `packages/core/src/cad/loops.ts`, `packages/core/src/cad/loops.test.ts` | - |
+| car9-p2-scene-edge-index | R9-1 ancestor pass | `packages/core/src/capture/scene.ts`, `packages/core/src/capture/scene.test.ts` | p1 |
+| car9-p3-mcp-bun | R9-2 Bun | `apps/cli/src/mcp.ts`, `apps/cli/src/mcp.test.ts` | - |
+| car9-p4-mcp-native | R9-2 native | `apps/cli/native/src/engine.rs`, `apps/cli/native/src/mcp.rs`, `apps/cli/native/src/engine_tests.rs` | - |
+
+Gates (each exits 0 and runs its new test):
+
+- p1: `bunx biome check packages/core/src/cad/edge-y-index.ts packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/pcb-outline.test.ts`.
+- p2: `bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts`.
+- p3: `bunx biome check apps/cli/src/mcp.ts apps/cli/src/mcp.test.ts && bun test apps/cli/src/mcp.test.ts apps/cli/src/mcp-image.test.ts apps/cli/src/mcp-stdio.test.ts`.
+- p4: `CARGO_TERM_QUIET=true cargo fmt -p nodetto-cli -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car9-p4 cargo clippy -p nodetto-cli --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car9-p4 cargo test -p nodetto-cli`.
+
+At most two `bun test` or `cargo test` processes run at once.
+
+Integration runs once after all plans land, in this order and under the
+round-8 timing rule:
+
+1. `bun run typecheck`, `bun run lint`, and `CARGO_TERM_QUIET=true mise
+   run verify`. Goldens are checked and never regenerated.
+2. `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`, then,
+   with `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli"`,
+   `bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts`.
+   This covers native CAD determinism and parity, and inline capture over
+   stdio with the compiled binary.
+3. No `*.test.ts` remains under `target/` or `tmp/`.
+
+### 27.3 Decisions
+
+- R9-1 uses a max-augmented static tree over edges sorted by `lo`, the
+  same structure as R8-1, instead of an interval tree or Y buckets. A query
+  costs O((k + 1) log n) for any edge lengths, and the code shape has
+  already been reviewed.
+- R9-1 returns a closed superset and leaves the exact predicate with each
+  caller, so endpoint conventions, horizontal edges and numeric
+  representation cannot drift.
+- R9-1 builds indexes lazily, once per contour per pass. The two passes do
+  not share instances, because `CadLoop` keeps its shape.
+- R9-1 counters are an optional nested `edges` object, so the existing
+  stats literals in tests and callers type-check unchanged.
+- R9-2 keeps a reference to the command's own array in Bun and moves the
+  already-copied `Vec<u8>` in native. Inline calls retain at most 1 MiB
+  each; other calls retain nothing.
+- R9-2 turns the third parameter of `createMcpServer` into an options
+  object with a `run` seam, because no real renderer can produce on demand
+  two different images of equal length, or an image of exactly 1,048,576
+  bytes. The object form lets stage 1 keep the old reader next to the seam,
+  so the same test shows the readback failure before retention and passes
+  after it (step-3 review car9-design-bun-regression-baseline).
+- R9-2 native proves isolation with two independent invocation contexts
+  that write the same path through the real host op. Both responses are
+  built after both writes, so a record that one invocation replaced or
+  consumed in another would fail a byte comparison. Stage 1 keeps the
+  readback, so the failure is functional (step-3 review
+  car9-design-native-two-call-coverage). Contexts are used instead of two
+  real renders, because real renders cannot produce equal-length images on
+  demand.
+- R9-2 keeps native `capture_path_matches` and its test. The record
+  comparison makes it redundant, but the fix does not need to remove it.
+- Sections 4.5 and 11 are updated in this revision. `docs/capture.md`
+  already states the intended behaviour and is not edited.
+- No user decision is pending, so there is no `design-docs/user-qa/` file.
+
+### 27.4 Intentional differences from the workflow input
+
+- The intake gives the 4.5 and 11 edit to the Bun MCP plan. This design
+  step makes it instead, so no implementation plan edits this file and P3
+  and P4 stay disjoint.
+- The `large` and `unreadable` scenarios and the `reads` list of the
+  existing Bun capture test assert the readback that R9-2 removes. They
+  become stronger per-call assertions: the call's own bytes despite a
+  misleading or failing `readBytes`, and zero reads. The oversize note
+  moves to a real 1,048,577-byte write. No scenario is deleted and no
+  bound is loosened.
+- The existing native inline test changes only its fixture (records
+  instead of a file on disk); every assertion stays.
+- Per-plan gates leave out `bun run typecheck` and `mise run verify`;
+  those run once at integration.
+
+### 27.5 Risks
+
+- `cargo test -p nodetto-cli` bundles the TypeScript sources. While p1 or
+  p2 is mid-edit in the shared tree, the p4 gate can fail for an
+  unrelated reason. p4 is then rerun after p1 and p2 settle; such a
+  failure is not a p4 defect.
+- If the edge query missed or duplicated an edge, parity would flip. The
+  oracle comparison, the scene-byte checks and the existing first-error,
+  touching and nesting tests guard against this.
+- The 2.5 growth bound carries a log factor (expected about 2.1 to 2.3).
+  If it fails after a correct fix, the plan reports the counts and never
+  relaxes the bound.
+- Not measured: Boa elapsed time, desktop latency, peak memory, how often
+  the race happens across real OS processes, and Tauri delivery. Compiled
+  native MCP and JPEG inline delivery are covered only by the integration
+  step and the `.jpg` cases of the tests above.
+
+## 28. Revision 17: audit round 10 corrections
+
+Source: audit round 10 of the 3D CAD pages and AI capture, base `0a35708`
+to `43197ca`. Four findings, none deferred. No GitHub issue exists; the
+round-10 workflow input is the issue body. Where an earlier section and
+this one disagree, this section wins. The common rules of section 24 and
+the timing rule of 26.2 still apply. Each fix needs a regression test that
+fails before the change and passes after it in this tree. Performance is
+asserted with deterministic work counters, never clocks. Bytes, goldens,
+error codes, NCS1 layout, first-error identity, loop order, PCB-outline
+results and the CLI, MCP and desktop contracts stay unchanged unless a
+rule below says otherwise.
+
+### 28.1 Rules
+
+R10-1 `function-capture-failed-create-removes-successful-replacement`
+(medium).
+
+Cause. `write_new` (`crates/native/src/fs.rs:25-46`) and Bun `writeNew`
+(`apps/cli/src/capture-io.ts:100-124`) create the public path
+exclusively, write and sync it, and on failure unlink the public path.
+Another invocation's forced replacement can publish into that path in
+between: `replace_regular` calls `write_to_entry` and then `persist`, and
+`writeCapture` calls `writeEntryAtomic` and then `renameSync`. The unlink
+then deletes the other writer's completed capture.
+
+Rule. A new capture is not visible at the public path until it is
+complete. A failing invocation removes only the entry it owns.
+
+1. Pre-check. `lstat` the target. If an entry exists (a link, a dangling
+   link, a directory or a file), return today's identical-versus-exists
+   decision (`existing_matches` / `existingMatches`) without staging
+   anything. If the target is absent, continue. Any other lstat error is
+   returned. This keeps the common repeat capture, whose default name is
+   digest-based, a no-op, and keeps links refused.
+2. Staging. Create a sibling staging file in the target's parent
+   directory, exclusively, with today's creation mode (0o666 filtered by
+   the umask). Write the bytes to it and sync it.
+   The staging basename has a fixed short length that does not depend on
+   the target basename. Any target name the old direct create accepted
+   therefore still works (a 255-byte basename on a NAME_MAX = 255
+   filesystem, for example).
+   - Rust: `tempfile::Builder` with `permissions(0o666)` on unix, as
+     `write_to_entry` does, and tempfile's default short random name
+     (no prefix derived from the target), then `tempfile_in(parent)`.
+     tempfile is already a dependency, so no new license is needed.
+   - Bun: the name is `.nodetto-<16 hex>.tmp` (27 bytes; the hex comes
+     from `randomBytes(8)`). It is joined to the parent by a new exported
+     helper `siblingPath(target, name)` in `apps/cli/src/write-atomic.ts`.
+     The helper is the parent-joining code that `writeEntryAtomic`
+     already has, so parent traversal stays intact. `writeEntryAtomic`
+     calls it with its own unchanged name. The file is opened with
+     `openSync(staging, "wx", 0o666)`, written with
+     `writeFileSync(descriptor, bytes)` (the existing test seam), then
+     `fsyncSync` and `closeSync`.
+3. Publish without clobbering. This is the only way a new capture reaches
+   the public path; there is no direct-create fallback.
+   - Rust: `NamedTempFile::persist_noclobber(path)`.
+   - Bun: `linkSync(staging, path)`.
+   - When publishing reports that the target already exists (Rust
+     `ErrorKind::AlreadyExists`, Bun `EEXIST`), return the decision of
+     step 1 for the public path.
+   - Any other publish error is returned unchanged after cleanup (step
+     4). The CLI reports it as today's `Cannot write <path>: <message>`
+     with exit 2, and nothing is written to the public path.
+   - Support depends on the backend, because the primitives differ:
+     - Rust (the native CLI's `write_new`, reached through
+       `write_capture` in `apps/cli/native/src/files.rs:67-76`) publishes
+       wherever tempfile 3.27's
+       `persist_noclobber` has a primitive. That is a no-clobber rename
+       first (Linux `renameat2` `RENAME_NOREPLACE`, Apple `renamex_np`
+       `RENAME_EXCL`), then a hard link where the rename is unavailable.
+       Windows uses `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING`. So
+       Rust can publish onto a filesystem that has only one of these, for
+       example Linux VFAT, which implements `RENAME_NOREPLACE` but has no
+       hard links.
+     - Bun (reference host) publishes only by hard link. Node offers no
+       no-clobber rename. A filesystem without hard links therefore
+       rejects a new Bun capture, even where Rust succeeds.
+     - Neither backend picks a different primitive at run time or adds a
+       platform adapter. 4.3 and 12 state the per-backend boundary.
+     - Out of scope: desktop export. It saves through
+       `write_export_atomic` and then `write_selected_file_atomic`
+       (`apps/desktop/src-tauri/src/fs.rs`, `crates/native/src/fs.rs`),
+       which R10-1 does not edit. Its support and UI error path stay as
+       in section 13. p1 must not touch that writer.
+4. Cleanup ownership. Every exit after step 2 created the staging file
+   removes that staging file, and nothing else.
+   - Rust: drop the `NamedTempFile` or `PersistError::file`.
+   - Bun: `unlinkSync(staging)` in a `finally`, ignoring its error. After
+     a successful `linkSync` this removes the staging name.
+   - The original write, sync or publish error is returned unchanged.
+     `write_new` and `writeNew` never create, write or unlink the public
+     path directly, on any path.
+5. Unchanged:
+   - the `NewFile` / `"written" | "identical" | "exists"` results;
+   - `replace_regular` and the Bun forced path for an existing regular
+     file. Their NotFound branch goes through `write_new` / `writeNew`
+     and so gets this rule.
+   - link refusal and the readonly-directory `PermissionDenied` kind;
+   - permissions of a new file;
+   - `apps/cli/native/src/files.rs`, the MCP result and the image bytes.
+6. Test seams.
+   - Rust keeps `write_new_with(path, bytes, write_contents)` with its
+     signature. It delegates to a crate-internal
+     `write_new_inner(path, bytes, write_contents, publish)`, where
+     `publish: impl FnOnce(NamedTempFile, &Path) -> Result<(), PersistError>`
+     defaults to `|file, path| file.persist_noclobber(path).map(drop)`.
+   - Bun needs no new seam (`spyOn(fs, ...)` with the original function
+     saved first).
+
+Tests (each new test fails before the fix and passes after it):
+
+- `crates/native/src/fs.rs` tests, new
+  `failed_new_capture_keeps_a_concurrent_forced_replacement`.
+  - Setup: path `<tmp>/image.png` is absent, and `B` is
+    `b"replacement capture"`. Call
+    `write_new_with(&path, b"capture", |file| { file.write_all(b"cap")?; replace_regular(&path, B).unwrap(); Err(io::Error::other("injected write failure")) })`.
+  - Assert: the error text is `injected write failure`, `fs::read(&path)`
+    equals `B`, and the directory's entry names are exactly
+    `["image.png"]`.
+  - Before the fix, B replaces A's partial public file, A's cleanup
+    deletes B, and the read fails.
+- `crates/native/src/fs.rs` tests, new
+  `failed_publish_keeps_a_concurrent_forced_replacement`.
+  - Path `<tmp>/image.png` is absent. Call
+    `write_new_inner(&path, b"capture", |file| file.write_all(b"capture"), publish)`.
+    The injected `publish` first runs `replace_regular(target, B)`
+    (asserting `Ok`), then returns
+    `Err(PersistError { error: io::Error::new(io::ErrorKind::Unsupported, "injected publish failure"), file })`.
+  - Assert: the error kind is `Unsupported` with the text `injected
+    publish failure`, `fs::read(&path)` equals `B`, and the directory's
+    entry names are exactly `["image.png"]` (the staging file is gone).
+  - This covers the unsupported-filesystem outcome together with a
+    competing writer.
+- `write_new_removes_a_partly_written_file_on_error` and every assertion
+  in `crates/native/tests/file_contract.rs` stay unedited and pass.
+- `apps/cli/src/capture-io.test.ts`, new "a failed new capture keeps a
+  concurrent forced replacement".
+  - Save `const original = fs.writeFileSync` before `spyOn`. The mock's
+    first call writes `cap` to its descriptor. It then checks that
+    `captureIo.write(image, B, true)` returns `"written"`, and throws
+    `failure`. Later calls delegate to `original`.
+  - Assert: the outer call throws `failure`, `readFileSync(image)` equals
+    `B`, and `readdirSync(folder)` equals `["image.png"]`.
+  - Before the fix, B's `writeEntryAtomic` renames over A's partial file,
+    and A's unlink deletes it.
+- `apps/cli/src/capture-io.test.ts`, new "a failed publish keeps a
+  concurrent forced replacement".
+  - Save `const originalLink = fs.linkSync` before
+    `spyOn(fs, "linkSync")`. The mock's first call checks that
+    `captureIo.write(image, B, true)` returns `"written"`, then throws
+    `publishFailure`, an `Error` with code `ENOTSUP`. Later calls
+    delegate to `originalLink`, which B's own publish needs.
+  - Assert: the outer call throws `publishFailure`, `readFileSync(image)`
+    equals `B`, and `readdirSync(folder)` equals `["image.png"]`.
+  - Before the fix `linkSync` is never called, so the test fails on the
+    mock call count, which is asserted to be at least 1.
+- `apps/cli/src/capture-io.test.ts`, new "a new capture accepts a
+  near-limit basename". This guards behaviour; it passes before and
+  after.
+  - The target is `join(folder, "a".repeat(251) + ".png")` (255 bytes).
+    A direct `writeFileSync` probe of a different 255-byte name in the
+    folder (removed afterwards) decides support. The test returns early
+    only if that probe fails with `ENAMETOOLONG`, so it runs on APFS,
+    ext4 and tmpfs.
+  - Assert: `captureIo.write(target, bytes, false)` returns `"written"`,
+    the file holds the exact bytes, and the folder equals the target
+    name alone.
+- Existing test "capture removes a partly written file and returns the
+  write error". One in-mock line,
+  `expect(readFileSync(image, "utf8")).toBe("cap")`, asserts partial
+  bytes at the public path, which R10-1 forbids. It becomes two checks:
+  `lstatSync(image)` throws `ENOENT`, and the folder's single entry (name
+  starting `.nodetto-`) holds `cap`. The thrown `failure`, the single
+  call and the empty folder at the end stay unedited. See 28.4.
+- `apps/cli/src/write-atomic.test.ts` stays unedited and passes.
+
+R10-2 `performance-cad-containment-crossings-outside-ray` (high).
+
+Cause. `forEachEdgeAtY` (`packages/core/src/cad/edge-y-index.ts:44-75`)
+prunes only by Y. `contains` in `loops.ts` and `containsPoint` in
+`scene.ts` therefore run their exact predicate on every edge at the query
+height, including edges behind the ray origin. On a rim with T slots left
+of H holes that is H(2T + 2) inspections per pass.
+
+Rule. The index returns the crossing parity of the rightward ray from
+`(x, y)` itself.
+
+- Indexed edges. Only non-horizontal edges are indexed. A horizontal edge
+  never satisfies `ay > y !== by > y`, so neither predicate counts it
+  today. Edge numbering, the `(lo, e)` sort, lazy builds and
+  `builds += n` per index (n = contour vertices) are unchanged.
+- Node data. Array layout, typed arrays allowed. Each node stores
+  `maxHigh` (existing), `minHigh`, `minX` and `maxX` over its edges'
+  endpoint X. Padding leaves are neutral (+inf, +inf, -inf). A node's
+  real-leaf count and its largest `lo` follow from its leaf range.
+- Query:
+  `crossingParity(index, x, y, exact: (edge) => boolean, stats?): boolean`.
+  - `limit` is the number of leaves with `lo <= y`.
+  - Skip a node when `start >= limit`, `maxHigh <= y` or `maxX < x`.
+  - Resolve an internal node in bulk when `min(end, m) <= limit`,
+    `minHigh > y` and `minX > x` (m = indexed edges). The parity flips
+    when its real-leaf count is odd.
+  - Otherwise inspect a leaf with `exact(edge)`, or descend into an
+    internal node.
+  - Leaves are never resolved in bulk, so `inspections` keeps counting
+    exact work, and the round-9 "each counter positive" assertions hold.
+- Exactness. `ay > y !== by > y` is exactly `lo <= y < hi`, and the
+  crossing X of such an edge lies within its endpoint X range. Both
+  callers use the grid predicate
+  `gridCross(bx - ax, by - ay, x - ax, y - ay) > 0 === by > ay`. It
+  counts an edge whose crossing is right of `x`, never one left of `x`,
+  and decides a crossing at exactly `x` by direction. Skipping on strict
+  `maxX < x` and bulk on strict `minX > x` are therefore exact, and ties
+  go to `exact`. `scene.ts` gets this predicate from R10-4, so R10-2's
+  scene plan follows R10-4.
+- Counters. `EdgeIndexStats` gains an optional `bulk?: number`, which
+  grows by 1 per bulk-resolved node when present. `visits` grows by 1 per
+  node entered, including skipped and bulk nodes. `inspections` grows by
+  1 per `exact` call. Existing stats literals still type-check.
+- Callers keep their bounds early exits and lazy indexes. `contains`
+  (`loops.ts`) and `containsPoint` (`scene.ts`) call `crossingParity`
+  with their own predicate. Once both callers have moved,
+  `forEachEdgeAtY` is removed.
+
+Slotted-rim fixture. It is original and built in each test file with
+that file's helpers. All elements are `cad.line`. Each contour is a
+vertex list in counter-clockwise order (original orientation). Line j of
+a contour runs from vertex j to vertex j + 1 (wrapping). Ids are
+zero-padded and lexically ordered, because `buildLoops` sorts ids as
+strings (`loops.ts:469-471`) and walks contours in that order
+(`:538-543`). Plate lines are `a<jjjjj>` in list order, and hole k's
+lines are `h<kkkkk>-<j>`. Since `a` sorts before `h`, the plate comes
+first. Both test files use this same id contract in both orientations.
+`buildLoops` therefore returns the plate first, then holes by k, and
+walks every contour from its first listed vertex, in list order.
+
+- Plate. W = 2T + 136. Vertex list:
+  - (0,0), (W,0), (W,100), (2T,100);
+  - then for i = T - 1 down to 0: (2i + 2, 10), (2i + 1, 10),
+    (2i + 1, 100), (2i, 100);
+  - the last of these is (0,100), and the closing line returns to (0,0).
+  - So slot i spans x = 2i + 1 to 2i + 2 and reaches down to y = 10.
+- Holes. H squares of 1 mm. Hole k has the vertex list (x0,y0),
+  (x0+1,y0), (x0+1,y0+1), (x0,y0+1), where
+  x0 = 2T + 4 + 2 (k % 64) and y0 = 12 + 2 floor(k / 64). H <= 2048
+  keeps every hole below y = 76.
+- Each hole's query height meets the two sides and the 2T slot sides.
+  Only the right side is ahead of the ray origin.
+- Mirrored orientation: x -> W - x for every vertex, with the same ids
+  and list order. Then the 2T + 1 crossings ahead are genuine.
+- Independent expectation, built only from the vertex lists, never from
+  `buildLoops` or `normaliseToolLoops` output:
+  - Loop order: the plate, then holes k = 0..H-1.
+  - Depths: 0 for the plate, 1 for every hole.
+  - Points: the original orientation lists its vertices as given
+    (already counter-clockwise). A mirrored list v0..v(n-1) is clockwise,
+    so it is expected as v0, v(n-1), ..., v1, the order
+    `counterClockwise` produces for a clockwise outline.
+  - Retained capture loops: all of them, because every hole's depth
+    parity differs from the plate's.
+
+Tests (new; existing tests unedited):
+
+- `packages/core/src/cad/loops.test.ts`, "a slotted rim resolves hole
+  containment without scanning crossings behind the ray".
+  - Run both orientations at (T, H) in {(256,256), (512,256), (256,512),
+    (512,512)} through `buildLoops(entities, undefined, stats)`. `stats`
+    has `edges: { builds: 0, visits: 0, inspections: 0, bulk: 0 }`.
+  - Loops: H + 1. Each loop's depth and exact `points` array equal the
+    independent expectation, in order.
+  - Work bounds, with q = visits + bulk + inspections:
+    - q <= 16 H log2(4T + 4);
+    - q(512,256) / q(256,256) <= 1.5 (T doubles, H fixed);
+    - q(512,512) / q(256,256) <= 2.5 (both double);
+    - `builds` is at most the total edge count of the returned loops.
+  - Before the fix, `inspections` alone is H(2T + 2), which breaks the
+    first two bounds in both orientations.
+- `packages/core/src/capture/scene.test.ts`, "normalisation resolves
+  slotted-rim holes without scanning crossings behind the ray". Same
+  fixture, sizes and bounds, run through `selectedLoops` and
+  `normaliseToolLoops`.
+  - Ordered output: the retained loops' `points` arrays equal the
+    independent expectation, in order.
+  - Bytes: the actual retained loops' `indexedSceneBytes` equal the bytes
+    serialized from the expected point lists with the same writer and
+    camera. The file's serializer gets a points-only form
+    `sceneBytesOfPoints(points[])`, and `indexedSceneBytes` delegates to
+    it.
+  - Ancestry: the result also equals `oracleNormalise` of the same
+    input, as a separate check.
+- Kept passing: the round-9 detailed-rim tests in both files, the round-8
+  tests, first-error, touching and nesting tests, and
+  `pcb-outline.test.ts`.
+
+R10-3 `performance-cad-profile-depth-enumerates-all-ancestors` (medium).
+
+Cause. The depth pass (`loops.ts:556-594`) runs `contains` on every pair
+of contours whose boxes overlap. A chain of N nested contours has
+N(N - 1)/2 such pairs, even when the extrusion selects only two loops.
+
+Rule.
+
+- New internal module `packages/core/src/cad/loop-forest.ts`. It is not
+  re-exported and imports only `./vec.ts`. Its API is
+  `loopForest(grids, windings, stats?): { parents: number[]; depths: number[] }`,
+  where `grids` and `windings` come from `Profile`. It returns each
+  contour's immediate parent index (or -1) and its nesting depth. Its
+  precondition is what `intersection()` guarantees: the contours neither
+  cross nor touch.
+  `ForestStats { events: number; steps: number }`.
+- Sweep. Move upward through the distinct Y values of the vertices.
+  - The active set holds the non-horizontal edges with `lo <= y < hi`,
+    ordered left to right just above `y`. It is a treap whose priorities
+    are an integer hash of the insertion number, so it is deterministic
+    and expected O(log E) per operation.
+  - At each Y, in this order:
+    1. remove edges with `hi = y`;
+    2. insert edges with `lo = y`;
+    3. in increasing x, answer each contour whose lowest-then-leftmost
+       vertex v lies at that Y.
+- Answer.
+  - t is the rightmost active edge strictly left of v. The test is
+    `gridCross` of v against t, which is never zero across contours. If
+    no t exists, the parent is -1.
+  - Otherwise Q owns t. v is inside Q exactly when t points downward in
+    Q's counter-clockwise orientation: its stored direction is downward,
+    XOR Q's winding is negative.
+  - The parent is Q when v is inside Q, and Q's parent otherwise.
+  - Q was answered before v, because its lowest vertex is lower, or at
+    the same height and to the left.
+  - Depth is resolved once, in the same answer step, from Q's
+    already-resolved depth: no t gives 0, v inside Q gives depth(Q) + 1,
+    and otherwise depth(Q). That is O(1) per contour. Nothing walks a
+    parent chain, in the module or in `loops.ts`.
+  - Why this is correct: the segment from t to v crosses no edge, so for
+    every contour C other than Q, v is in C exactly when Q is in C.
+- Edge order.
+  - To compare two active edges s and t, take y_c = max(lo_s, lo_t).
+    Test the lower endpoint at y_c against the other edge with
+    `gridCross`.
+  - A zero result means a shared lower endpoint, which only adjacent
+    edges of one contour can have. In that case test one edge's upper
+    endpoint against the other edge.
+  - Removal searches with the same comparator plus edge identity.
+- Counters. `events` grows by 1 per insert, removal and answer. The
+  answer event includes the parent and depth resolution. `steps` grows by
+  1 per comparison or tree node visited.
+- Winding 0. A contour with winding 0 is treated as counter-clockwise.
+  Its result is discarded, because the unchanged empty-profile check
+  returns `cad.profile.empty` afterwards.
+- Integration in `buildProfileLoops`, after the unchanged intersection
+  validation:
+  - Today's pair pass runs under a work budget of 32 E, where E is the
+    total vertex count of all profiles.
+  - Work is the pass's containment-pair count plus its edge-index builds,
+    visits, bulk resolutions and inspections. It is always counted
+    internally and added to `stats` when `stats` is given.
+  - If the pass finishes within the budget, its depths are used, as
+    today.
+  - If not, `overlappingPairs` stops through a new optional `stop`
+    callback (`intersection` passes none). The pass's depths are
+    discarded and replaced by `loopForest(...).depths` as returned.
+  - `LoopStats` gains an optional `forest?: ForestStats`.
+  - Unchanged: `CadLoop` members, sources and order, all errors and
+    their order, the signatures, and `pcb-outline.ts`.
+  - 32 keeps ordinary sketches and the round-8, round-9 and R10-2
+    fixtures on the pair path, and their counter assertions need that.
+    The plan records each fixture's pair work against its budget. A
+    nested chain leaves the pair path once N > 256.
+
+Tests:
+
+- `packages/core/src/cad/loop-forest.test.ts` (new).
+  - Oracle: the smallest-area container, decided by an independent
+    BigInt point-in-polygon determinant.
+  - Fixtures: a nested rectangle chain; sibling islands inside holes;
+    contours sharing vertex heights; rays through another contour's
+    local-minimum and local-maximum vertex; triangles and diamonds in
+    both windings.
+  - Assert: parents and depths equal the oracle (depth = number of
+    containers), and `events + steps` grows at most 2.5 times per
+    doubling of the chain.
+- `packages/core/src/cad/loops.test.ts`, "nested chains derive depth
+  from immediate parents".
+  - Fixture: N in {1025, 2049, 4097} rectangles. With S = 2N + 2, rect i
+    has the counter-clockwise vertex list (i,i), (S-i,i), (S-i,S-i),
+    (i,S-i). Each rectangle is four `cad.line` from vertex j to vertex
+    j + 1, with zero-padded ids `r<iiiii>-<j>`. Loops therefore come
+    back in rectangle order, starting at (i,i).
+  - Selections, each checked at every N. Every returned loop's depth and
+    exact `points` array must equal the expectation built from the vertex
+    lists, in order:
+    - all loops: N loops, rect i at depth i;
+    - rect floor(N/2) omitted: N - 1 loops, the others keeping depth i;
+    - sparse, rect 0 and rect N - 1: two loops at depths 0 and N - 1.
+  - Work W = containmentPairs + edges.builds + visits + inspections +
+    bulk + forest.events + forest.steps, where `forest.events` already
+    counts each contour's one-time parent and depth resolution. The
+    abandoned pair work is part of W. Assert W(2N) / W(N) <= 2.5 for
+    each selection. Before the fix W grows about 4 times.
+- `packages/core/src/capture/scene.test.ts`, "a sparse nested-chain
+  selection keeps the 400-byte outer prism". This guards behaviour; it
+  passes before and after.
+  - Fixture: N = 1025, and the extrusion selects one line of rect 0 and
+    one of rect N - 1.
+  - Assert: `prepareCadCapture` gives a 400-byte scene whose only loop
+    has rect 0's four corners.
+- Kept passing unedited: first-error identity, touching contours,
+  nesting, the round-8 and round-9 tests, `pcb-outline.test.ts`, and the
+  omitted-ancestor tests in `scene.test.ts`.
+
+R10-4 `maintainability-capture-hole-containment-precision` (medium).
+
+Cause. `containsPoint` in `scene.ts:105` interpolates the crossing in
+floating-point millimetres. Sketch construction decides the same question
+on the nanometre grid (`loops.ts:425-427`). For the fixture below the
+grid determinant is +1, but the interpolated crossing equals the tip X,
+so capture drops the hole.
+
+Rule.
+
+- `normaliseToolLoops` decides ancestry on the grid. Each `LoopEntry`
+  gets `grid = loop.points.map((v) => Math.round(v * NM_PER_MM))`, the
+  expression `makeProfile` uses on the same values that `buildLoops`
+  already validated.
+- Entry bounds, the bucket grid, the query vertex and the edge index all
+  use `grid`.
+- The predicate equals the one in `loops.ts`:
+  `ay > y !== by > y && (gridCross(bx - ax, by - ay, x - ax, y - ay) > 0 === by > ay)`.
+- Unchanged: the kept `CadLoop` objects with millimetre points in input
+  order, `makeTool`, face numbering, NCS1 bytes, the all-depth-0 early
+  return, lazy indexing, stats and public types.
+- The test oracle in `scene.test.ts` (`containsPoint` at about 586-603
+  and the `oracleNormalise` bounds) moves to the same grid with its own
+  BigInt determinant, so it no longer repeats the floating-point
+  comparison. Its existing callers keep their assertions.
+
+Tests:
+
+- `packages/core/src/capture/scene.test.ts`, "capture keeps a
+  sloped-rim triangular hole decided on the nanometre grid".
+  - An XY sketch with a rim loop
+    [[970,0],[1000,0],[1100.000003,100.000001],[970,100.000001]] and a
+    triangle [[1050.000002,50.000001],[1010,65],[1000,35]], all
+    `cad.line`.
+  - Three variants: the triangle starting at its first vertex, the
+    triangle starting at (1010,65), and a solid control with no
+    triangle.
+  - Each variant extrudes all loops 5 mm into a new body, and
+    `prepareCadCapture` runs at 256x256 with a top view.
+  - Oracle: the BigInt determinant of the edge (1000,0) ->
+    (1100.000003,100.000001) and the tip, in nanometres, equals +1.
+  - Assert: both perforated variants keep tool loop vertex counts
+    [3, 4] in order, and each scene's bytes differ from the control's.
+  - The plan records the control's SHA-256, which is expected to be
+    `4e79a49509e7e31ca09f07bc252b57affc87f814f798a5d13b22584843ca93b0`.
+  - Before the fix, the first start keeps only [4] and matches the
+    control.
+- NCS1 goldens and digest tests stay unedited.
+
+### 28.2 Plan grouping
+
+Plans `car10-*` follow the 27.2 rules:
+
+- a non-empty `acceptanceCriteria`;
+- `artifactRoots ["target", "tmp/cad3d"]` exactly;
+- evidence under `tmp/car10-r10/<planId>/`;
+- its own `CARGO_TARGET_DIR=target/car10-<plan>`;
+- `writePaths` that list every edited file, including the plan's own plan
+  and progress files;
+- no `*.test.ts` left under `target/` or `tmp/`.
+
+Each plan first adds its regression and records the failing run, then
+fixes and records the passing run. A failing log is evidence only and is
+never a gate.
+
+This revision already updates sections 4.3, 6.1, 12 and 27.1, so no
+plan edits this document and R10-1 stays independent of the geometry
+plans.
+
+| Plan | Rule | Owns | dependsOn |
+| --- | --- | --- | --- |
+| car10-p1-capture-write-rust | R10-1 Rust | `crates/native/src/fs.rs` | - |
+| car10-p2-capture-write-bun | R10-1 Bun | `apps/cli/src/capture-io.ts`, `apps/cli/src/capture-io.test.ts`, `apps/cli/src/write-atomic.ts` | - |
+| car10-p3-scene-grid-ancestry | R10-4 | `packages/core/src/capture/scene.ts`, `packages/core/src/capture/scene.test.ts` | - |
+| car10-p4-edge-index-ray-origin | R10-2 index and `loops.ts` | `packages/core/src/cad/edge-y-index.ts`, `packages/core/src/cad/loops.ts`, `packages/core/src/cad/loops.test.ts` | - |
+| car10-p5-scene-ray-origin | R10-2 `scene.ts` and removal of `forEachEdgeAtY` | `packages/core/src/capture/scene.ts`, `packages/core/src/capture/scene.test.ts`, `packages/core/src/cad/edge-y-index.ts` | p3, p4 |
+| car10-p6-loop-forest | R10-3 module | new `packages/core/src/cad/loop-forest.ts`, new `packages/core/src/cad/loop-forest.test.ts` | - |
+| car10-p7-profile-depth-forest | R10-3 integration | `packages/core/src/cad/loops.ts`, `packages/core/src/cad/loops.test.ts`, `packages/core/src/capture/scene.test.ts` | p4, p5, p6 |
+
+Waves: p1, p2, p3, p4 and p6 run first, then p5, then p7. In p4,
+`scene.ts` keeps calling `forEachEdgeAtY`. That is still exact, because
+dropping horizontal edges removes only edges its predicate never counts.
+
+Gates (each exits 0 and runs its new tests):
+
+- p1: `CARGO_TERM_QUIET=true cargo fmt -p nodetto-native -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car10-p1 cargo clippy -p nodetto-native --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car10-p1 cargo test -p nodetto-native`.
+- p2: `bunx biome check apps/cli/src/capture-io.ts apps/cli/src/capture-io.test.ts apps/cli/src/write-atomic.ts && bun test apps/cli/src/capture-io.test.ts apps/cli/src/write-atomic.test.ts`.
+- p3: `bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts`.
+- p4: `bunx biome check packages/core/src/cad/edge-y-index.ts packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/pcb-outline.test.ts`.
+- p5: `bunx biome check packages/core/src/cad/edge-y-index.ts packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts packages/core/src/cad/loops.test.ts`.
+- p6: `bunx biome check packages/core/src/cad/loop-forest.ts packages/core/src/cad/loop-forest.test.ts && bun test packages/core/src/cad/loop-forest.test.ts`.
+- p7: `bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/loop-forest.test.ts packages/core/src/cad/pcb-outline.test.ts packages/core/src/cad/history.test.ts packages/core/src/capture/scene.test.ts`.
+
+At most two `bun test` or `cargo test` processes run at once.
+
+Integration runs once after all plans land, in this order and under the
+26.2 timing rule:
+
+1. `bun run typecheck`, `bun run lint`, then `CARGO_TERM_QUIET=true mise
+   run verify`. Goldens are checked and never regenerated.
+2. `CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli`. Then, with
+   `NODETTO_CLI_TEST_BINARY="$PWD/target/release/nodetto-cli"`, run
+   `bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts`.
+3. Check that no `*.test.ts` remains under `target/` or `tmp/`.
+
+### 28.3 Decisions
+
+- R10-1 publishes with `persist_noclobber` in Rust and `linkSync` in Bun.
+  It adds no dependency. Rust's tempfile selects the platform no-clobber
+  rename or a hard link itself. A pathname identity check followed by an
+  unlink was rejected, because it leaves a replacement window.
+- R10-1 keeps the lstat pre-check, so an occupied target is still decided
+  without writing anything. A collision at publish time falls back to
+  the same decision.
+- R10-1 has no direct-create fallback (step-3 review
+  r10-design-unsafe-publish-fallback). A fallback that writes the public
+  path and removes it on failure brings back the data-loss race, and no
+  identity check binds the unlink to the checked entry. Any non-collision
+  publish error is returned after the staging file is removed. Where the
+  selected backend lacks its primitive (Rust: no-clobber rename or hard
+  link; Bun: hard link), a new capture therefore fails cleanly instead of
+  risking another writer's file (4.3, 12, 28.4; step-3 review
+  r10-design-backend-publish-compatibility).
+- R10-1 staging names have a fixed short length that does not depend on
+  the target name (Bun `.nodetto-<16 hex>.tmp`, Rust tempfile's default
+  name). A near-limit target basename therefore still works (step-3
+  review r10-design-bun-staging-name-overflow). Forced replacement keeps
+  `writeEntryAtomic`'s existing names; only the parent-joining helper is
+  shared.
+- R10-2 resolves parity from node aggregates instead of reporting
+  crossings, so moving the scan inside the index cannot pass the
+  counters. Leaves stay exact, so the existing inspection counters and
+  the half-open endpoint and direction tie rules stay with the callers.
+- R10-2 lands its scene half after R10-4. That way the scene's X pruning
+  only ever meets an exact predicate.
+- R10-3 keeps the existing pair pass, because it is fast in the native
+  interpreter for ordinary sketches and the existing counter tests
+  depend on it. It caps that pass at a linear budget and falls back to
+  an O(E log E) parent sweep, so total work stays subquadratic,
+  including the abandoned part.
+- R10-2 and R10-3 regressions compare ordered points, depths and scene
+  bytes with expectations built from the fixture vertex lists, not from
+  the code under test. `oracleNormalise` remains a separate ancestry
+  check (step-3 review r10-design-slotted-scene-shared-oracle).
+- R10-3 uses a treap with hashed deterministic priorities. A sorted array
+  with splices would hide quadratic element moves outside the counters.
+- R10-3 resolves each depth once, at the contour's sweep answer, from
+  its already-resolved neighbour. That work is counted in
+  `forest.events` and included in W (step-3 review
+  r10-design-nested-depth-verification-gap).
+- R10-4 converts with `makeProfile`'s own expression, so capture and
+  sketch construction decide containment on identical integers.
+  Millimetre values are still what gets serialized.
+- No user decision is pending, so there is no `design-docs/user-qa/`
+  file.
+
+### 28.4 Intentional differences from the workflow input
+
+- The intake gives the design-document edits to the implementation
+  plans. This step makes them instead, so p1 and p2 need no ordering
+  against the geometry plans.
+- R10-2 and R10-3 each become two plans (p4/p5 and p6/p7), to respect
+  the limits of about four files and about 150 lines per plan.
+- The existing Bun test "capture removes a partly written file and
+  returns the write error" changes one in-mock line. That line asserts
+  partial bytes at the public path, which is exactly what R10-1 removes.
+  The line now checks that the public path is absent and the staging
+  file holds the partial bytes. Every cleanup assertion stays.
+- When the staging file cannot be created, the error keeps its
+  `ErrorKind` or `code`. Its OS message may now name the staging file
+  instead of the target, and the CLI still prefixes `Cannot write
+  <path>:`. No test asserts that text.
+- A new capture now fails with exit 2, instead of being written by a
+  racy direct create, where the backend lacks its primitive. For Rust
+  that means no no-clobber rename and no hard link; for Bun it means no
+  hard link, for example on VFAT, where Rust still succeeds. Data safety,
+  which the finding requires, outweighs that compatibility. `--force`
+  over an existing regular file and all other targets are unchanged.
+- The Bun regression for a failed write keeps the finding's
+  write-failure ordering. A second regression per backend injects a
+  publish failure while a competing forced writer completes.
+- Per-plan gates leave out `bun run typecheck` and `mise run verify`.
+  Those run once at integration.
+
+### 28.5 Risks
+
+- A wrong bulk or skip condition, or a comparator error in the forest,
+  flips parity or depth. Guards: the oracle comparisons, scene-byte
+  equality, the BigInt forest oracle, and the unedited first-error,
+  touching and nesting tests.
+- The R10-2 ratio bounds carry a log factor (expected about 1.1 and 2.2).
+  If a bound fails after a correct fix, the plan reports the counts and
+  never relaxes it.
+- If an existing fixture exceeds the 32 E budget, it moves to the forest
+  path and a round-9 counter assertion could fail. p7 records each
+  fixture's pair work. A change to the constant must stay linear in E
+  and be recorded.
+- `cargo test -p nodetto-cli` and the parity tests bundle the TypeScript
+  sources. While the geometry plans are mid-edit, those tests can fail
+  for unrelated reasons, so they run at integration only.
+- Users of the Bun reference host who write new captures onto a
+  filesystem without hard links now get an error where they previously
+  got a file. So do native CLI users on a filesystem with neither a
+  no-clobber rename nor hard links. The message names the path and exits
+  2. They can capture to the default directory and copy the file.
+  Desktop export is unaffected.
+- Not measured: Boa elapsed time and memory, Tauri delivery, real
+  cross-process write races, and real VFAT, exFAT or network-filesystem
+  publication. The per-backend boundary follows from the primitives'
+  documented behaviour; no such filesystem was run.

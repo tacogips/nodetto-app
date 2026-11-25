@@ -408,3 +408,148 @@ test("lists every unknown body beyond the summary", () => {
   expect(result.errors).toEqual([]);
   expect(result.line).toContain("Bracket [not sampled]");
 });
+
+test("a cut shared by many emptied bodies is attributed with linear step reads", () => {
+  const counts: number[] = [];
+  for (const size of [256, 512, 1024]) {
+    let reads = 0;
+    const step = (op: string, tool: number) => ({
+      get op() {
+        reads++;
+        return op;
+      },
+      get tool() {
+        reads++;
+        return tool;
+      },
+    });
+    const model = {
+      tools: [
+        ...Array.from({ length: size }, (_, i) => ({ feature: `base-${i}` })),
+        { feature: "cut" },
+        { feature: "base-stand" },
+      ],
+      bodies: [
+        ...Array.from({ length: size }, (_, i) => ({
+          id: `e-${i}`,
+          name: `e-${i}`,
+          steps: [step("union", i), step("difference", size)],
+        })),
+        {
+          id: "stand",
+          name: "stand",
+          steps: [step("union", size + 1), step("difference", size)],
+        },
+      ],
+    } as unknown as CadCaptureModel;
+    const result = describeBodies(
+      {
+        ...report,
+        bodies: [
+          ...Array.from({ length: size }, () => ({
+            state: "empty" as const,
+            open: false,
+            emptiedByStep: 1,
+          })),
+          { state: "drawn", open: false, emptiedByStep: -1 },
+        ],
+      },
+      model,
+    );
+    expect(result.errors).toHaveLength(size + 1);
+    for (let i = 0; i < size; i++) {
+      expect(result.errors[i]).toEqual({
+        id: "cut",
+        code: "cad.result.empty",
+        text: `(sampled): leaves no material in "e-${i}"; the app rejects this feature and keeps the body, this picture applies it`,
+      });
+    }
+    expect(result.errors[size]).toEqual({
+      id: "cut",
+      code: "cad.result.empty",
+      text: '(sampled): leaves no material in "e-0"; the app rejects this feature and keeps "stand" as it was, this picture applies it',
+    });
+    counts.push(reads);
+  }
+  console.log(`shared-cut reads: ${counts.join(", ")}`);
+  expect(counts[1] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (counts[0] ?? 0) * 2.5,
+  );
+  expect(counts[2] ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (counts[1] ?? 0) * 2.5,
+  );
+
+  let reads = 0;
+  const steps = Array.from({ length: 256 }, () => ({
+    get op() {
+      reads++;
+      return "union";
+    },
+    get tool() {
+      reads++;
+      return 0;
+    },
+  }));
+  const model = {
+    tools: [{ feature: "base" }],
+    bodies: Array.from({ length: 256 }, (_, i) => ({
+      id: String(i),
+      name: String(i),
+      steps,
+    })),
+  } as unknown as CadCaptureModel;
+  expect(
+    describeBodies(
+      {
+        ...report,
+        bodies: model.bodies.map(() => ({
+          state: "drawn",
+          open: false,
+          emptiedByStep: -1,
+        })),
+      },
+      model,
+    ).errors,
+  ).toEqual([]);
+  expect(reads).toBe(0);
+});
+
+test("self-exclusion uses the second indexed source", () => {
+  const model = {
+    tools: [{ feature: "base" }, { feature: "cut" }],
+    bodies: [
+      {
+        id: "a",
+        name: "a",
+        steps: [
+          { op: "union", tool: 0 },
+          { op: "difference", tool: 1 },
+          { op: "difference", tool: 1 },
+        ],
+      },
+      {
+        id: "b",
+        name: "b",
+        steps: [
+          { op: "union", tool: 0 },
+          { op: "difference", tool: 1 },
+        ],
+      },
+    ],
+  } as unknown as CadCaptureModel;
+  const a = { state: "empty", open: false, emptiedByStep: 2 } as const;
+  const b = { state: "empty", open: false, emptiedByStep: 1 } as const;
+  expect(
+    describeBodies({ ...report, bodies: [a, b] }, model).errors[0]?.text,
+  ).toBe(
+    '(sampled): leaves no material in "b"; the app rejects this feature and keeps "a" as it was, this picture applies it',
+  );
+  expect(
+    describeBodies(
+      { ...report, bodies: [a] },
+      { ...model, bodies: model.bodies.slice(0, 1) },
+    ).errors[0]?.text,
+  ).toBe(
+    '(sampled): leaves no material in "a"; the app rejects this feature and keeps the body, this picture applies it',
+  );
+});

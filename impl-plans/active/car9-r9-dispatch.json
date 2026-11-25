@@ -1,0 +1,129 @@
+{
+  "taskId": "car9-r9",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/ai-capture",
+  "baseBranch": "feat/ai-capture",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "aede81d4f21f42d701a081bc1e80e29ae4f5524e",
+  "designDocPaths": ["design-docs/specs/design-ai-capture.md"],
+  "evidenceRoot": "tmp/car9-r9",
+  "waves": [
+    ["car9-p1-edge-index-loops", "car9-p3-mcp-bun", "car9-p4-mcp-native"],
+    ["car9-p2-scene-edge-index"]
+  ],
+  "reviewContext": {
+    "issueReference": "audit-round-9 feat/ai-capture@aede81d4f21f42d701a081bc1e80e29ae4f5524e (base 0a35708): performance-cad-containment-perimeter-rescans, function-mcp-inline-image-replaced-before-readback; no GitHub issue; workflowInput.requestedOutcome is the issue body",
+    "overview": "impl-plans/active/car9-00-overview.md",
+    "userProblem": "The round-9 audit found two defects in CAD capture and MCP delivery. First, CAD capture preparation walks the whole enclosing perimeter for every hole twice, once for sketch depth in packages/core/src/cad/loops.ts and once for selected-ancestor normalisation in packages/core/src/capture/scene.ts, so H holes in a plate of H+3 edges cost H(H+3) edge reads per pass (67,133,440 at 8,192 holes) in TypeScript before Rust renders, in Boa for the native CLI and in the desktop webview. Second, both MCP servers (apps/cli/src/mcp.ts and apps/cli/native/src/mcp.rs) build the inline image by reopening the output path after the capture, so a concurrent capture to the same path can give call A call B's image together with A's report.",
+    "requiredOutcomes": [
+      "performance-cad-containment-perimeter-rescans (R9-1; car9-p1, car9-p2): an internal packages/core/src/cad/edge-y-index.ts edge Y-interval index is built lazily once per contour per pass and queried by loops.ts contains() and scene.ts containsPoint(), each keeping its exact predicate; detailed-rim tests (H = 256/512/1024) show positive builds/visits/inspections counters, builds <= total edges, inspections <= 4H and total growth <= 2.5x per doubling; depths, oracle equality and scene bytes unchanged; existing tests pass unedited.",
+      "function-mcp-inline-image-replaced-before-readback (R9-2; car9-p3, car9-p4): each inline MCP response carries the bytes its own successful write stored (written or identical; at most 1,048,576 bytes, else only the length); two-writer regressions with equal-length distinct images fail at stage 1 (readback, A receives B) and pass after the fix in Bun and native; exit 1, identical, failed-write suppression, 1,048,576 / 1,048,577 boundaries, MIME types, structuredContent and exit codes unchanged; native bytes stay in Rust and out of CommandResult."
+    ],
+    "nonGoals": [
+      "No change to CadLoop, buildLoops/buildProfileLoops signatures and results, LoopStats existing fields, normaliseToolLoops results, prepareCadCapture, NCS1, goldens, or callers (pcb-outline.ts, history.ts, cad-request.ts, capture-cad.ts, export-handlers.ts).",
+      "No change to CommandResult, engine::run signature, files.rs, native-engine.ts, capture-command.ts, mcp-image.ts, tool schemas, instruction texts or note texts; docs/capture.md and design docs are not edited by any plan."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, strict typing, noUncheckedIndexedAccess-safe indexed reads, Biome clean on touched files, CARGO_TERM_QUIET=true.",
+      "artifactRoots exactly [\"target\", \"tmp/cad3d\"]; evidence under tmp/car9-r9/<planId>/; no *.test.ts left under target/ or tmp/.",
+      "Per-plan gates are focused; typecheck, lint, mise run verify and the release-binary parity run once at integration.",
+      "Timing rule of design 26.2 applies; at most two bun test or cargo test processes at once."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "R9-1 uses a max-augmented static tree over edges sorted by lo with a closed stab query.", "rationale": "O((k + 1) log n) per query for any edge lengths; the closed superset lets each caller keep its exact predicate, endpoint convention and numeric representation."},
+      {"decision": "R9-1 indexes are built lazily once per contour per pass; the passes do not share instances.", "rationale": "CadLoop must keep its shape; contours rejected by bounds never pay."},
+      {"decision": "R9-2 retains the call's own write (reference in Bun, moved Vec in native) only for inline calls, bounded at 1 MiB.", "rationale": "Ties the attachment to the call without readback and without extra copies or per-byte work in Boa."},
+      {"decision": "R9-2 uses a run seam in Bun and inline_context/take_capture_write in native, staged so the regression first fails on the old readback.", "rationale": "Real renderers cannot produce equal-length distinct images on demand; staging makes the pre-fix failure functional."}
+    ],
+    "intentionalTradeoffs": [
+      "The 2.5 growth bound includes a log factor (expected about 2.1 to 2.3).",
+      "The existing Bun test's large/unreadable scenarios and reads list, and the existing native inline test fixture, are adapted to per-call assertions (design 27.4)."
+    ],
+    "supportedEdgeCases": [
+      "Horizontal edges, vertex-on-scanline queries, wrap-around edge 0, contours rejected by bounds, omitted intermediate ancestors; identical outcome, exists outcome, thrown write, exit 1, exactly 1,048,576 and 1,048,577 bytes, JPEG paths, stdout path mismatch."
+    ],
+    "outOfScopeEdgeCases": [
+      "Boa elapsed time, desktop latency, peak memory, race frequency across real OS processes, Tauri delivery."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-ai-capture.md",
+      "impl-plans/active/car9-00-overview.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "car9-p1-edge-index-loops",
+      "planPath": "impl-plans/active/car9-p1-edge-index-loops.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/cad/edge-y-index.ts", "packages/core/src/cad/loops.ts", "packages/core/src/cad/loops.test.ts", "impl-plans/active/car9-p1-edge-index-loops.md", "impl-plans/progress/car9-p1-edge-index-loops.md", "tmp/car9-r9/car9-p1-edge-index-loops", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "New internal packages/core/src/cad/edge-y-index.ts exports exactly EdgeIndexStats, EdgeYIndex, buildEdgeYIndex and forEachEdgeAtY; it is not re-exported.",
+        "loops.ts contains() keeps its bounds early exit and exact predicate and reads only edges returned by forEachEdgeAtY; each profile's index is built at most once per buildProfileLoops call; LoopStats gains optional edges.",
+        "New detailed-rim test (H = 256/512/1024): H + 1 loops, one at depth 0 containing rim-0 and H at depth 1; edges counters > 0; builds <= total edges; inspections <= 4H; total <= 2.5x per doubling; fails before (counters 0), passes after.",
+        "Existing loops tests and pcb-outline.test.ts pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/cad/edge-y-index.ts packages/core/src/cad/loops.ts packages/core/src/cad/loops.test.ts && bun test packages/core/src/cad/loops.test.ts packages/core/src/cad/pcb-outline.test.ts"
+      ]
+    },
+    {
+      "planId": "car9-p2-scene-edge-index",
+      "planPath": "impl-plans/active/car9-p2-scene-edge-index.md",
+      "dependsOn": ["car9-p1-edge-index-loops"],
+      "writePaths": ["packages/core/src/capture/scene.ts", "packages/core/src/capture/scene.test.ts", "impl-plans/active/car9-p2-scene-edge-index.md", "impl-plans/progress/car9-p2-scene-edge-index.md", "tmp/car9-r9/car9-p2-scene-edge-index", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "scene.ts containsPoint() keeps its exact millimetre predicate and reads only edges from forEachEdgeAtY; each LoopEntry builds its index at most once, after the bounds check; stats gains optional edges.",
+        "New detailed-rim test (H = 256/512/1024): normaliseToolLoops result equals oracleNormalise element by element and indexedSceneBytes are equal; edges counters > 0; builds <= total edges; inspections <= 4H; total <= 2.5x per doubling; fails before (counters 0), passes after.",
+        "Existing scene tests, including the omitted-intermediate-ancestor tests, pass unedited."
+      ],
+      "verification": [
+        "bunx biome check packages/core/src/capture/scene.ts packages/core/src/capture/scene.test.ts && bun test packages/core/src/capture/scene.test.ts"
+      ]
+    },
+    {
+      "planId": "car9-p3-mcp-bun",
+      "planPath": "impl-plans/active/car9-p3-mcp-bun.md",
+      "dependsOn": [],
+      "writePaths": ["apps/cli/src/mcp.ts", "apps/cli/src/mcp.test.ts", "impl-plans/active/car9-p3-mcp-bun.md", "impl-plans/progress/car9-p3-mcp-bun.md", "tmp/car9-r9/car9-p3-mcp-bun", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "createMcpServer's third parameter is { run?: typeof runCliAsync }; the per-request write wrapper records the call's own written or identical bytes (length only above 1,048,576); readInlineBytes and readLocalInlineBytes are gone; no file is read for the attachment.",
+        "New two-server test with equal-length distinct images: stage 1 (readback kept) fails with A receiving B (log recorded); after the fix A and B each get their own bytes while the shared entry holds B.",
+        "Same test covers exit 1, identical, exists with exit 2, thrown write, 1,048,576 bytes attached, 1,048,577 bytes note and image/jpeg; the existing capture test's large/unreadable scenarios expect own bytes and reads is []; everything else unchanged.",
+        "mcp-image.test.ts and mcp-stdio.test.ts pass unedited."
+      ],
+      "verification": [
+        "bunx biome check apps/cli/src/mcp.ts apps/cli/src/mcp.test.ts && bun test apps/cli/src/mcp.test.ts apps/cli/src/mcp-image.test.ts apps/cli/src/mcp-stdio.test.ts"
+      ]
+    },
+    {
+      "planId": "car9-p4-mcp-native",
+      "planPath": "impl-plans/active/car9-p4-mcp-native.md",
+      "dependsOn": [],
+      "writePaths": ["apps/cli/native/src/engine.rs", "apps/cli/native/src/mcp.rs", "apps/cli/native/src/engine_tests.rs", "impl-plans/active/car9-p4-mcp-native.md", "impl-plans/progress/car9-p4-mcp-native.md", "tmp/car9-r9/car9-p4-mcp-native", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "engine.rs adds CaptureWrite, MCP_INLINE_MAX_BYTES, HostState retain_capture/capture, inline_context, take_capture_write and run_inline; writeCapture records written/identical writes only when retaining, moving the existing Vec; run and CommandResult unchanged.",
+        "mcp.rs calls run_inline for inline calls and builds the attachment from the record after the unchanged path checks; read_inline_image is removed.",
+        "New inline_capture_attaches_each_calls_own_write (two contexts, same path, equal-length distinct bytes, both responses built after both writes) fails at stage 1 (A receives B, log recorded) and passes after; new retention and run_inline tests pass; the existing inline test keeps every assertion with record fixtures.",
+        "fmt, clippy -D warnings and cargo test -p nodetto-cli exit 0."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt -p nodetto-cli -- --check && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car9-p4 cargo clippy -p nodetto-cli --all-targets -- -D warnings && CARGO_TERM_QUIET=true CARGO_TARGET_DIR=target/car9-p4 cargo test -p nodetto-cli"
+      ]
+    }
+  ],
+  "integration": [
+    "bun run typecheck && bun run lint",
+    "CARGO_TERM_QUIET=true mise run verify",
+    "CARGO_TERM_QUIET=true cargo build --release -p nodetto-cli && NODETTO_CLI_TEST_BINARY=\"$PWD/target/release/nodetto-cli\" bun test apps/cli/src/native-parity/capture.test.ts apps/cli/src/mcp-stdio.test.ts",
+    "sh -c 'for root in target tmp; do if [ -d \"$root\" ]; then matches=$(find \"$root\" -name \"*.test.ts\" -print) || exit 1; if [ -n \"$matches\" ]; then printf \"%s\\n\" \"$matches\"; exit 1; fi; fi; done'"
+  ]
+}

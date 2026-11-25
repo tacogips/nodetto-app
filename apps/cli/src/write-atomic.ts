@@ -35,6 +35,14 @@ export function writeFileAtomic(path: string, text: string | Uint8Array): void {
   writeEntryAtomic(target, text, mode);
 }
 
+/** Join a sibling name while preserving parent traversal. */
+export function siblingPath(target: string, name: string): string {
+  const parent = dirname(target);
+  return process.platform === "win32"
+    ? join(parent, name)
+    : `${parent.endsWith("/") ? parent : `${parent}/`}${name}`;
+}
+
 /** Atomically replace the named entry without resolving its final component. */
 export function writeEntryAtomic(
   target: string,
@@ -43,11 +51,7 @@ export function writeEntryAtomic(
 ): void {
   const parent = dirname(target);
   const name = `.${basename(target)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
-  // Keep parent traversal intact so both entries use the same directory.
-  const temporary =
-    process.platform === "win32"
-      ? join(parent, name)
-      : `${parent.endsWith("/") ? parent : `${parent}/`}${name}`;
+  const temporary = siblingPath(target, name);
   const descriptor = openSync(temporary, "wx", mode ?? 0o666);
   try {
     try {

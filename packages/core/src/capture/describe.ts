@@ -168,6 +168,25 @@ export function describeBodies(
       return [];
     return [{ i, body, step }];
   });
+  const sourceIndex = new Map<
+    number,
+    Map<string, (typeof sources)[number][]>
+  >();
+  for (const source of sources) {
+    const tool = source.step.tool;
+    const op = source.step.op;
+    let operations = sourceIndex.get(tool);
+    if (!operations) {
+      operations = new Map();
+      sourceIndex.set(tool, operations);
+    }
+    let entries = operations.get(op);
+    if (!entries) {
+      entries = [];
+      operations.set(op, entries);
+    }
+    if (entries.length < 2) entries.push(source);
+  }
   const names = model.bodies.map((body, i) => {
     const state = report.bodies[i];
     if (!state) return plain(body.name);
@@ -187,15 +206,20 @@ export function describeBodies(
     let sibling:
       | { index: number; source: (typeof sources)[number] }
       | undefined;
-    if (!state.open) {
-      for (const source of sources) {
-        if (source.i === i) continue;
-        const index = body.steps.findIndex(
-          (step) =>
-            step.tool === source.step.tool && step.op === source.step.op,
-        );
-        if (index !== -1 && (sibling === undefined || index < sibling.index))
+    if (
+      !state.open &&
+      sources.length > 0 &&
+      !(sources.length === 1 && sources[0]?.i === i)
+    ) {
+      for (const [index, step] of body.steps.entries()) {
+        const tool = step.tool;
+        const op = step.op;
+        const entries = sourceIndex.get(tool)?.get(op);
+        const source = entries?.find((entry) => entry.i !== i);
+        if (source) {
           sibling = { index, source };
+          break;
+        }
       }
     }
     const selectedSibling =

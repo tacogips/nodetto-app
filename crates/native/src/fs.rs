@@ -22,28 +22,52 @@ fn write_new_with(
     bytes: &[u8],
     write_contents: impl FnOnce(&mut fs::File) -> io::Result<()>,
 ) -> io::Result<NewFile> {
-    let mut file = match fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-    {
-        Ok(file) => file,
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            return Ok(if existing_matches(path, bytes).unwrap_or(false) {
-                NewFile::Identical
-            } else {
-                NewFile::Exists
-            });
+    write_new_inner(path, bytes, write_contents, |file, path| {
+        file.persist_noclobber(path).map(drop)
+    })
+}
+
+fn write_new_inner(
+    path: &Path,
+    bytes: &[u8],
+    write_contents: impl FnOnce(&mut fs::File) -> io::Result<()>,
+    publish: impl FnOnce(tempfile::NamedTempFile, &Path) -> Result<(), tempfile::PersistError>,
+) -> io::Result<NewFile> {
+    let collision = || {
+        if existing_matches(path, bytes).unwrap_or(false) {
+            NewFile::Identical
+        } else {
+            NewFile::Exists
         }
-        Err(error) => return Err(error),
     };
-    let result = write_contents(&mut file).and_then(|()| file.sync_all());
-    drop(file);
-    if let Err(error) = result {
-        let _ = fs::remove_file(path);
-        return Err(error);
+    match path.symlink_metadata() {
+        Ok(_) => return Ok(collision()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
     }
-    Ok(NewFile::Written)
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(fs::Permissions::from_mode(0o666));
+    }
+    let mut file = builder.tempfile_in(parent)?;
+    write_contents(file.as_file_mut()).and_then(|()| file.as_file().sync_all())?;
+    match publish(file, path) {
+        Ok(()) => Ok(NewFile::Written),
+        Err(tempfile::PersistError { error, file }) => {
+            drop(file);
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                Ok(collision())
+            } else {
+                Err(error)
+            }
+        }
+    }
 }
 
 fn existing_matches(path: &Path, bytes: &[u8]) -> io::Result<bool> {
@@ -267,6 +291,58 @@ pub use write_atomic as write_selected_file_atomic;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_new_capture_keeps_a_concurrent_forced_replacement() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("image.png");
+        let replacement = b"replacement capture";
+        let error = write_new_with(&path, b"capture", |file| {
+            file.write_all(b"cap")?;
+            replace_regular(&path, replacement).unwrap();
+            Err(io::Error::other("injected write failure"))
+        })
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "injected write failure");
+        assert_eq!(fs::read(&path).unwrap(), replacement);
+        let mut names: Vec<_> = fs::read_dir(folder.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["image.png"]);
+    }
+
+    #[test]
+    fn failed_publish_keeps_a_concurrent_forced_replacement() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("image.png");
+        let replacement = b"replacement capture";
+        let error = write_new_inner(
+            &path,
+            b"capture",
+            |file| file.write_all(b"capture"),
+            |file, target| {
+                replace_regular(target, replacement).unwrap();
+                Err(tempfile::PersistError {
+                    error: io::Error::new(io::ErrorKind::Unsupported, "injected publish failure"),
+                    file,
+                })
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+        assert_eq!(error.to_string(), "injected publish failure");
+        assert_eq!(fs::read(&path).unwrap(), replacement);
+        let mut names: Vec<_> = fs::read_dir(folder.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["image.png"]);
+    }
 
     #[test]
     fn write_new_removes_a_partly_written_file_on_error() {

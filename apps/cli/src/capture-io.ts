@@ -1,9 +1,11 @@
+import { randomBytes } from "node:crypto";
 import {
   closeSync,
   constants,
   fstatSync,
   fsyncSync,
   lstatSync,
+  linkSync,
   mkdirSync,
   openSync,
   readSync,
@@ -13,7 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import type { CommandIo } from "./commands.ts";
-import { writeEntryAtomic } from "./write-atomic.ts";
+import { siblingPath, writeEntryAtomic } from "./write-atomic.ts";
 
 type CaptureIo = NonNullable<CommandIo["capture"]>;
 type WriteResult = ReturnType<CaptureIo["write"]>;
@@ -98,13 +100,17 @@ function existingMatches(path: string, bytes: Uint8Array): boolean {
 }
 
 function writeNew(path: string, bytes: Uint8Array): WriteResult {
-  let descriptor: number;
   try {
-    descriptor = openSync(path, "wx");
-  } catch (error) {
-    if (!hasCode(error, "EEXIST")) throw error;
+    lstatSync(path);
     return existingMatches(path, bytes) ? "identical" : "exists";
+  } catch (error) {
+    if (!hasCode(error, "ENOENT")) throw error;
   }
+  const staging = siblingPath(
+    path,
+    `.nodetto-${randomBytes(8).toString("hex")}.tmp`,
+  );
+  const descriptor = openSync(staging, "wx", 0o666);
   try {
     try {
       writeFileSync(descriptor, bytes);
@@ -112,15 +118,20 @@ function writeNew(path: string, bytes: Uint8Array): WriteResult {
     } finally {
       closeSync(descriptor);
     }
-  } catch (error) {
     try {
-      unlinkSync(path);
-    } catch {
-      // Keep the error that caused the write to fail.
+      linkSync(staging, path);
+    } catch (error) {
+      if (!hasCode(error, "EEXIST")) throw error;
+      return existingMatches(path, bytes) ? "identical" : "exists";
     }
-    throw error;
+    return "written";
+  } finally {
+    try {
+      unlinkSync(staging);
+    } catch {
+      // Preserve the original result or error.
+    }
   }
-  return "written";
 }
 
 function writeCapture(
