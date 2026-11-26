@@ -1,4 +1,4 @@
-import type { BreadboardNetlist } from "@nodetto/ir";
+import type { BreadboardNetlistNet } from "@nodetto/ir";
 import type { BreadboardFormatterResult } from "./index.ts";
 import { referenceWarnings } from "./bom.ts";
 
@@ -6,8 +6,20 @@ function quote(value: string): string {
   return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
+export interface KicadNetlistInput {
+  readonly documentTitle: string;
+  readonly components: readonly {
+    readonly reference: string;
+    readonly value: string;
+    readonly footprint: string;
+    readonly partName: string;
+    readonly description: string;
+  }[];
+  readonly nets: readonly BreadboardNetlistNet[];
+}
+
 export function exportBreadboardKicadNetlist(
-  netlist: BreadboardNetlist,
+  netlist: KicadNetlistInput,
 ): BreadboardFormatterResult {
   const lines = [
     '(export (version "E")',

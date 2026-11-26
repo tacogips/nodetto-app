@@ -13,7 +13,16 @@ test("export format groups retain their labels and order", () => {
     { label: "Artwork", ids: ["svg", "png", "pdf", "image3d", "artboards"] },
     {
       label: "Diagram source",
-      ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
+      ids: [
+        "mermaid",
+        "d2",
+        "drawio",
+        "sql",
+        "bpmn",
+        "breadboard",
+        "schematic",
+        "gerber",
+      ],
     },
     { label: "Fabrication", ids: ["pcb", "stl"] },
     { label: "Web & developer", ids: ["html", "prototype", "code"] },

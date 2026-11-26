@@ -23,6 +23,8 @@ import {
   type CadEngine,
   collectCadInput,
   computeBreadboardConnectivity,
+  computeSchematicConnectivity,
+  toSchematicNetlist,
   type Editor,
   encodeBreadboardPcbZip,
   encodePcbBoardZip,
@@ -66,6 +68,7 @@ export interface ExportHandlers {
   readonly exportBreadboard: (
     kind: "bom" | "kicad" | "spice" | "gerber",
   ) => Promise<void>;
+  readonly exportSchematic: (kind: "text" | "kicad") => Promise<void>;
   readonly exportGerber: () => Promise<void>;
   readonly exportPcbGerber: () => Promise<void>;
   readonly exportStl: () => Promise<void>;
@@ -487,6 +490,41 @@ export function createExportHandlers(
     }
   };
 
+  const exportSchematic = async (kind: "text" | "kicad"): Promise<void> => {
+    setExportError(null);
+    const pageId = source.editor.currentPageId;
+    const page = source.editor.store.getPage(pageId);
+    if (page?.kind !== "schematic") return;
+    try {
+      const snapshot = source.editor.getSnapshot();
+      const netlist = toSchematicNetlist(
+        snapshot,
+        pageId,
+        computeSchematicConnectivity(snapshot, pageId),
+      );
+      const io = await import("@nodetto/io");
+      const report =
+        kind === "text"
+          ? io.exportSchematicNetlistText(netlist)
+          : io.exportSchematicKicadNetlist(netlist);
+      const extension = kind === "text" ? "txt" : "net";
+      const name = `${exportBaseName(page.name)}.${extension}`;
+      if (!source.exportBackend.available) {
+        downloadBlob(new Blob([report.text], { type: "text/plain" }), name);
+      } else {
+        const path = await source.exportBackend.pickExportPath(name, extension);
+        if (path === null) return;
+        await source.exportBackend.writeText(path, report.text);
+      }
+      if (report.warnings.length > 0)
+        setExportError(`Export notes: ${report.warnings.join("; ")}`);
+    } catch (error) {
+      setExportError(
+        `could not export: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   return {
     saveArtwork,
     exportDocumentPdf,
@@ -494,6 +532,7 @@ export function createExportHandlers(
     exportDocumentBundle,
     exportBpmn,
     exportBreadboard,
+    exportSchematic,
     exportGerber,
     exportPcbGerber,
     exportStl,

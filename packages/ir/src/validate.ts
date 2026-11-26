@@ -1,4 +1,8 @@
 import { PAGE_FLOWS } from "./semantics/document.ts";
+import {
+  isSchematicElementType,
+  SCHEMATIC_COORDINATE_LIMIT,
+} from "./semantics/schematic.ts";
 import { connectorEndpointIssues } from "./connector-policy.ts";
 // Document-level validation.
 //
@@ -899,6 +903,23 @@ function validateElement(
   }
 
   validateVisual(out, raw["visual"], `${path}.visual`);
+  if (isSchematicElementType(type) && isPlainObject(raw["visual"])) {
+    for (const field of ["x", "y"] as const) {
+      const value = raw["visual"][field];
+      if (
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        Math.abs(value) > SCHEMATIC_COORDINATE_LIMIT
+      )
+        out.push(
+          error(
+            "schematic.coordinateRange",
+            `${path}.visual.${field}`,
+            "coordinate exceeds limit",
+          ),
+        );
+    }
+  }
   out.push(
     ...validateAccessibilityMetadata(
       raw["accessibility"],

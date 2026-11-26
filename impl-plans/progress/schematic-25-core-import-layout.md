@@ -1,0 +1,7 @@
+# schematic-25-core-import-layout progress
+
+Redispatch finding SCH-W6-NO-PROGRESS-25: implemented `layoutSchematicImport` and focused tests. The importer validates pin ownership and capacity before constructing a document, maps parts and pin numbers, reserves unique net names, and creates deterministic lattice placement and labeled stubs. Tests cover both KiCad fixtures, partition preservation, switch and IC mapping, header limits, invalid inputs, names, validation and deterministic serialization.
+
+Final focused verification: `bun test packages/core/src/schematic/import-layout.test.ts packages/core/src/schematic/netlist.test.ts` passed 7 tests; `bunx biome check packages/core/src/schematic/import-layout.ts packages/core/src/schematic/import-layout.test.ts` passed. Logs and pre-edit intents are under `tmp/schematic-s933/schematic-25-core-import-layout/`. Independent test-integrity and adversarial reviews remain pending.
+
+Revision INT-939-W2-TSC-25-IMPORT-LAYOUT-TEST: widened the read-only `expected` helper parameter to `readonly Net[]`; production code, fixtures and assertions remain unchanged. The focused test passed 5 tests and Biome passed. The TypeScript probe reports no diagnostics in `import-layout.test.ts`; it exits 2 on five pending plan 35 `shape-palette.ts` diagnostics. Revision logs and hashes are under `tmp/schematic-s933/schematic-25-core-import-layout/`. Formal review and the final serial integration gate remain pending.

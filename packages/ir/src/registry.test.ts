@@ -29,6 +29,12 @@ const DESIGN_TABLE_TYPES: readonly string[] = [
   "group",
 ];
 
+/** Design section 3.2 specifies empty semantic payloads for these types. */
+const FIELDLESS_TYPES: ReadonlySet<string> = new Set([
+  "schematic.junction",
+  "schematic.noConnect",
+]);
+
 describe("registry contents", () => {
   test("registers the design table plus assets and token resources", () => {
     expect(Array.from<string>(ELEMENT_TYPES).sort()).toEqual(
@@ -67,6 +73,24 @@ describe("registry contents", () => {
         "bpmn.messageFlow",
         "bpmn.association",
         "bpmn.dataAssociation",
+        "schematic.resistor",
+        "schematic.capacitor",
+        "schematic.inductor",
+        "schematic.diode",
+        "schematic.led",
+        "schematic.bjt",
+        "schematic.mosfet",
+        "schematic.switch",
+        "schematic.potentiometer",
+        "schematic.battery",
+        "schematic.voltageSource",
+        "schematic.connector",
+        "schematic.ic",
+        "schematic.power",
+        "schematic.wire",
+        "schematic.junction",
+        "schematic.label",
+        "schematic.noConnect",
         "breadboard.board",
         "breadboard.wire",
         "breadboard.resistor",
@@ -102,8 +126,15 @@ describe("registry contents", () => {
   });
 
   test("every definition declares a key order covering its own fields", () => {
+    for (const type of FIELDLESS_TYPES) {
+      expect(getElementTypeDefinition(type)).toBeDefined();
+    }
     for (const definition of listElementTypeDefinitions()) {
-      expect(definition.keyOrder.keys.length).toBeGreaterThan(0);
+      if (FIELDLESS_TYPES.has(definition.type)) {
+        expect(definition.keyOrder.keys).toEqual([]);
+      } else {
+        expect(definition.keyOrder.keys.length).toBeGreaterThan(0);
+      }
       const declared = new Set(definition.keyOrder.keys);
       for (const child of Object.keys(definition.keyOrder.children ?? {})) {
         expect(declared.has(child)).toBe(true);

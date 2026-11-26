@@ -1,0 +1,19 @@
+{"kind":"document","schemaVersion":1,"id":"led-switch","title":"LED and switch"}
+{"kind":"page","id":"circuit","name":"LED and switch","pageKind":"schematic"}
+{"kind":"element","id":"battery","page":"circuit","type":"schematic.battery","index":"a000","semantic":{"reference":"BT1","value":"9V"},"visual":{"x":-5,"y":-15}}
+{"kind":"element","id":"branch-wire","page":"circuit","type":"schematic.wire","index":"a008","semantic":{"points":[{"x":180,"y":0},{"x":180,"y":100},{"x":200,"y":100}]},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"capacitor","page":"circuit","type":"schematic.capacitor","index":"a004","semantic":{"reference":"C1","value":"100n","polarized":false},"visual":{"x":195,"y":85}}
+{"kind":"element","id":"capacitor-ground","page":"circuit","type":"schematic.wire","index":"a011","semantic":{"points":[{"x":240,"y":100},{"x":240,"y":150}]},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"ground","page":"circuit","type":"schematic.power","index":"a016","semantic":{"style":"ground","net":"GND"},"visual":{"x":25,"y":-5}}
+{"kind":"element","id":"ground-return","page":"circuit","type":"schematic.wire","index":"a010","semantic":{"points":[{"x":240,"y":150},{"x":340,"y":150},{"x":340,"y":0}]},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"ground-wire","page":"circuit","type":"schematic.wire","index":"a009","semantic":{"points":[{"x":40,"y":0},{"x":40,"y":150},{"x":240,"y":150}]},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"junction","page":"circuit","type":"schematic.junction","index":"a012","semantic":{},"visual":{"x":180,"y":0}}
+{"kind":"element","id":"label","page":"circuit","type":"schematic.label","index":"a013","semantic":{"net":"SW_OUT"},"visual":{"x":150,"y":0}}
+{"kind":"element","id":"led","page":"circuit","type":"schematic.led","index":"a003","semantic":{"reference":"D1","value":"LED"},"visual":{"x":295,"y":-25}}
+{"kind":"element","id":"led-net-label","page":"circuit","type":"schematic.label","index":"a014","semantic":{"net":"N_R1_2"},"visual":{"x":270,"y":0}}
+{"kind":"element","id":"resistor","page":"circuit","type":"schematic.resistor","index":"a002","semantic":{"reference":"R1","value":"470"},"visual":{"x":195,"y":-15}}
+{"kind":"element","id":"resistor-wire","page":"circuit","type":"schematic.wire","index":"a007","semantic":{"points":[{"x":240,"y":0},{"x":300,"y":0}]},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"switch","page":"circuit","type":"schematic.switch","index":"a001","semantic":{"reference":"SW1","value":"toggle","style":"toggle"},"visual":{"x":95,"y":-15}}
+{"kind":"element","id":"switch-wire","page":"circuit","type":"schematic.wire","index":"a006","semantic":{"points":[{"x":140,"y":0},{"x":200,"y":0}]},"visual":{"x":0,"y":0}}
+{"kind":"element","id":"vcc","page":"circuit","type":"schematic.power","index":"a015","semantic":{"style":"rail","net":"VCC"},"visual":{"x":-15,"y":-25}}
+{"kind":"element","id":"vcc-wire","page":"circuit","type":"schematic.wire","index":"a005","semantic":{"points":[{"x":0,"y":0},{"x":0,"y":-50},{"x":100,"y":-50},{"x":100,"y":0}]},"visual":{"x":0,"y":0}}

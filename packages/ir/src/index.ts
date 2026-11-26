@@ -78,7 +78,9 @@ export {
 } from "./issues.ts";
 export {
   COORDINATE_PRECISION,
+  coordinateKey,
   type KeyOrder,
+  roundCoordinate,
   VISUAL_KEY_ORDER,
   VISUAL_STYLE_KEY_ORDER,
 } from "./keyOrder.ts";
@@ -394,6 +396,44 @@ export {
   type BreadboardNetlistSemantic,
 } from "./semantics.ts";
 export {
+  SCHEMATIC_PITCH,
+  SCHEMATIC_COORDINATE_LIMIT,
+  SCHEMATIC_ELEMENT_TYPES,
+  SCHEMATIC_PART_TYPES,
+  isSchematicElementType,
+  isSchematicPartType,
+  SCHEMATIC_REFERENCE_PREFIX,
+  SCHEMATIC_BJT_POLARITIES,
+  SCHEMATIC_MOSFET_CHANNELS,
+  SCHEMATIC_SWITCH_STYLES,
+  SCHEMATIC_POWER_STYLES,
+  SCHEMATIC_IC_SIDES,
+  SCHEMATIC_CONNECTOR_MAX_PINS,
+  SCHEMATIC_IC_MAX_PINS,
+  type SchematicElementType,
+  type SchematicPartType,
+  type SchematicPartBaseSemantic,
+  type SchematicPartSemantic,
+  type SchematicResistorSemantic,
+  type SchematicCapacitorSemantic,
+  type SchematicInductorSemantic,
+  type SchematicDiodeSemantic,
+  type SchematicLedSemantic,
+  type SchematicBjtSemantic,
+  type SchematicMosfetSemantic,
+  type SchematicSwitchSemantic,
+  type SchematicPotentiometerSemantic,
+  type SchematicBatterySemantic,
+  type SchematicVoltageSourceSemantic,
+  type SchematicConnectorSemantic,
+  type SchematicIcSemantic,
+  type SchematicPowerSemantic,
+  type SchematicWireSemantic,
+  type SchematicJunctionSemantic,
+  type SchematicLabelSemantic,
+  type SchematicNoConnectSemantic,
+} from "./semantics.ts";
+export {
   parseComponentValue,
   compareReferences,
   type BreadboardNetlist,
@@ -469,3 +509,13 @@ export {
 } from "./cad.ts";
 export { pageAcceptsElementType } from "./page-content.ts";
 export { splitLines } from "./split-lines.ts";
+export {
+  sweepAxisContacts,
+  type AxisSegment,
+  type AxisQuery,
+  type SweepStats,
+} from "./segment-sweep.ts";
+export type {
+  SchematicNetlist,
+  SchematicNetlistComponent,
+} from "./schematic.ts";

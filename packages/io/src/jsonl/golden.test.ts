@@ -35,6 +35,7 @@ const GOLDEN = [
   "forward-compat",
   "bpmn",
   "breadboard",
+  "schematic",
   "pcb",
   "ui-icon",
   "slide-settings",

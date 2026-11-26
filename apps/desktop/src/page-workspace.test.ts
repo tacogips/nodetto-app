@@ -10,6 +10,7 @@ import { selectWorkspacePage } from "./shell/workspace.ts";
 
 describe("dedicated page workspaces", () => {
   test("maps dedicated page kinds to their workspaces", () => {
+    expect(dedicatedWorkspaceFor("schematic")).toBe("schematic");
     expect(dedicatedWorkspaceFor("breadboard")).toBe("breadboard");
     expect(dedicatedWorkspaceFor("bpmn")).toBe("bpmn");
     expect(dedicatedWorkspaceFor("pcb")).toBe("pcb");
@@ -18,6 +19,7 @@ describe("dedicated page workspaces", () => {
   });
 
   test("maps dedicated workspaces back to page kinds", () => {
+    expect(dedicatedPageKindFor("schematic")).toBe("schematic");
     expect(dedicatedPageKindFor("breadboard")).toBe("breadboard");
     expect(dedicatedPageKindFor("bpmn")).toBe("bpmn");
     expect(dedicatedPageKindFor("pcb")).toBe("pcb");

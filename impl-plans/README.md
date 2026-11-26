@@ -60,6 +60,16 @@ manifest `car2-r2b-dispatch.json` also stays in `active/` with its
 pre-archive `planPath` values and must not be dispatched again; it replaced
 `car2-r2-dispatch.json`, which was removed.
 
+Schematic pages overview:
+[schematic-00-overview](active/schematic-00-overview.md) lists the waves,
+the shared-file owner chains, the per-worker protocol and the final gate.
+Its 47 plans are complete (see "Schematic pages (schematic-s933)" below).
+The overview stays active as the reference for the final gate and the
+remaining manual light and dark desktop walkthrough of wire-point keyboard
+editing. The dispatch manifest `schematic-s933-dispatch.json` stays in
+`active/` with its pre-archive `planPath` values and must not be dispatched
+again.
+
 ## Completed
 
 ### 3D CAD pages
@@ -871,3 +881,66 @@ remain in `active/`; the archive node moves the plans.
 | [dps-17f-cli-parity](completed/dps-17f-cli-parity.md) | CLI Markdown and native parity tests |
 | [dps-17g-docs-examples](completed/dps-17g-docs-examples.md) | docs and examples |
 | [dps-17-final](completed/dps-17-final.md) | final integration gates |
+
+## Schematic pages (schematic-s933)
+
+Schematic page kind (session 933 and its interrupted predecessor; design:
+`design-docs/specs/design-schematic.md` revision 12). Accepted by the serial
+integration review on the combined tree. Final gate logs:
+`tmp/schematic-s933/reconcile-wave-018/`. `bun run typecheck`, `bun run lint`
+and `mise run verify` exited 0. `mise run test-cli` and the native parity run
+exited 1 only on timing tests that pass when run alone
+(`rerun-cad-deadline-1.log`, `rerun-box-align-1.log`). Per-plan evidence is
+under `tmp/schematic-s933/<planId>/`. Overview:
+[schematic-00-overview](active/schematic-00-overview.md) (still active, see
+above). User docs: `docs/schematic.md`.
+
+| Plan | Scope |
+| --- | --- |
+| [schematic-01-ir-semantics](completed/schematic-01-ir-semantics.md) | `schematic` page kind and semantic types |
+| [schematic-02-ir-registry](completed/schematic-02-ir-registry.md) | Registry entries for the 18 `schematic.*` types |
+| [schematic-03-ir-coordinate](completed/schematic-03-ir-coordinate.md) | `coordinateKey` and range limits in `keyOrder.ts` |
+| [schematic-04-ir-sweep-netlist-model](completed/schematic-04-ir-sweep-netlist-model.md) | Shared segment sweep and netlist model |
+| [schematic-05-ir-range-golden](completed/schematic-05-ir-range-golden.md) | Range validation and JSONL golden |
+| [schematic-06-io-kicad-netlist-linear](completed/schematic-06-io-kicad-netlist-linear.md) | Linear KiCad netlist import |
+| [schematic-07-io-kicad-diagonal-lookup](completed/schematic-07-io-kicad-diagonal-lookup.md) | Budgeted diagonal lookup for KiCad schematic import |
+| [schematic-08-core-symbols](completed/schematic-08-core-symbols.md) | Symbol geometry and pins |
+| [schematic-09-core-coordinates-snap](completed/schematic-09-core-coordinates-snap.md) | Coordinates and grid snapping |
+| [schematic-10-core-shape-utils](completed/schematic-10-core-shape-utils.md) | Shape utils |
+| [schematic-11-core-transform-extraction](completed/schematic-11-core-transform-extraction.md) | Rotate and mirror transforms |
+| [schematic-12-io-formatters](completed/schematic-12-io-formatters.md) | Text and KiCad netlist formatters |
+| [schematic-13-io-breadboard-target](completed/schematic-13-io-breadboard-target.md) | Breadboard target projection |
+| [schematic-14-io-skip-collab](completed/schematic-14-io-skip-collab.md) | Mermaid/D2 skip and collab round trip |
+| [schematic-15-io-kicad-schematic-contacts](completed/schematic-15-io-kicad-schematic-contacts.md) | KiCad schematic contacts |
+| [schematic-16-core-editor-intents](completed/schematic-16-core-editor-intents.md) | Editor intents |
+| [schematic-17-core-move-contract](completed/schematic-17-core-move-contract.md) | Canonical move deltas |
+| [schematic-18-core-connectivity](completed/schematic-18-core-connectivity.md) | Connectivity engine |
+| [schematic-19-core-notation](completed/schematic-19-core-notation.md) | Notation primitives |
+| [schematic-20-io-kicad-schematic-labels](completed/schematic-20-io-kicad-schematic-labels.md) | KiCad import through net labels |
+| [schematic-21-core-netlist-names](completed/schematic-21-core-netlist-names.md) | Net naming |
+| [schematic-22-core-erc](completed/schematic-22-core-erc.md) | Electrical rule checks |
+| [schematic-23-core-connectivity-roundtrip](completed/schematic-23-core-connectivity-roundtrip.md) | Live versus reloaded connectivity |
+| [schematic-24-core-svg-export](completed/schematic-24-core-svg-export.md) | SVG export |
+| [schematic-25-core-import-layout](completed/schematic-25-core-import-layout.md) | Import layout |
+| [schematic-26-core-breadboard-target-intent](completed/schematic-26-core-breadboard-target-intent.md) | Breadboard target intent |
+| [schematic-27-core-pcb-parity](completed/schematic-27-core-pcb-parity.md) | PCB parity against the first schematic page |
+| [schematic-28-core-exports](completed/schematic-28-core-exports.md) | Core exports |
+| [schematic-29-core-tools-catalogue](completed/schematic-29-core-tools-catalogue.md) | Tools and shape catalogue |
+| [schematic-30-cli-move-absolute](completed/schematic-30-cli-move-absolute.md) | CLI absolute moves |
+| [schematic-31-ui-shape-view](completed/schematic-31-ui-shape-view.md) | Canvas shape views |
+| [schematic-32-ui-inspector](completed/schematic-32-ui-inspector.md) | Inspector section |
+| [schematic-33-cli-lint-types](completed/schematic-33-cli-lint-types.md) | CLI lint and types |
+| [schematic-34-ui-export-dialog](completed/schematic-34-ui-export-dialog.md) | Export dialog |
+| [schematic-35-ui-workspace-palette](completed/schematic-35-ui-workspace-palette.md) | Workspace and palette |
+| [schematic-36-ui-creation](completed/schematic-36-ui-creation.md) | Element creation |
+| [schematic-37-ui-problems-panel](completed/schematic-37-ui-problems-panel.md) | Problems panel |
+| [schematic-38-cli-schematic-command](completed/schematic-38-cli-schematic-command.md) | `nodetto-cli schematic` command |
+| [schematic-39-ui-wire-tool](completed/schematic-39-ui-wire-tool.md) | Wire tool and CAD emitter audit |
+| [schematic-40-example-goldens](completed/schematic-40-example-goldens.md) | Example and golden outputs |
+| [schematic-41-ui-keys-drag](completed/schematic-41-ui-keys-drag.md) | Rotate/mirror keys and drag snapping |
+| [schematic-42-desktop](completed/schematic-42-desktop.md) | Desktop wiring |
+| [schematic-43-docs-readme](completed/schematic-43-docs-readme.md) | `docs/schematic.md` and README |
+| [schematic-44-native-parity](completed/schematic-44-native-parity.md) | Native CLI parity |
+| [schematic-45-ui-wire-overlay](completed/schematic-45-ui-wire-overlay.md) | Wire draft overlay, notice and keyboard handles |
+| [schematic-46-ui-wire-point-edit](completed/schematic-46-ui-wire-point-edit.md) | Wire point editing |
+| [schematic-47-core-snap-exclude](completed/schematic-47-core-snap-exclude.md) | Snap target exclusion |

@@ -7,6 +7,7 @@ import {
   type BreadboardElementType,
   type Element,
   isCadTypeName,
+  isSchematicElementType,
 } from "@nodetto/ir";
 import { Tool, type ToolKind, creationFor } from "../tools.ts";
 import type { CircuitTools } from "./circuit.ts";
@@ -29,6 +30,7 @@ export function createCreationTools(
   const { editor, options } = ctx;
 
   const placeShape = (point: Vec, tool: ToolKind): void => {
+    if (tool === Tool.SchematicWire) return;
     const creation = creationFor(tool);
     // CAD tools are handled by the CAD viewport's sketch and feature gestures.
     if (
@@ -49,6 +51,20 @@ export function createCreationTools(
     if (creation.type.startsWith("breadboard.")) {
       const id = editor.createBreadboardPart(
         creation.type as BreadboardElementType,
+        point,
+        typeof creation.semantic === "object" && creation.semantic !== null
+          ? (creation.semantic as Readonly<Record<string, unknown>>)
+          : undefined,
+      );
+      if (id) {
+        editor.selection.set([id]);
+        options.setTool(Tool.Select);
+      }
+      return;
+    }
+    if (isSchematicElementType(creation.type)) {
+      const id = editor.createSchematicElement(
+        creation.type,
         point,
         typeof creation.semantic === "object" && creation.semantic !== null
           ? (creation.semantic as Readonly<Record<string, unknown>>)

@@ -23,7 +23,7 @@ import {
   renderMarkdownSnippet,
   type Box,
 } from "@nodetto/core";
-import { isBreadboardElementType } from "@nodetto/ir";
+import { isBreadboardElementType, isSchematicElementType } from "@nodetto/ir";
 import { isPcbElementType } from "@nodetto/ir";
 import type { AccessibilityRole, Element } from "@nodetto/ir";
 import { type JSX, Match, Show, Switch } from "solid-js";
@@ -41,6 +41,7 @@ import { TextNoteView } from "./TextNoteView.tsx";
 import { UmlClassView } from "./UmlClassView.tsx";
 import { BpmnShapeView } from "./BpmnShapeView.tsx";
 import { BreadboardShapeView } from "./BreadboardShapeView.tsx";
+import { SchematicShapeView } from "./SchematicShapeView.tsx";
 import { PcbShapeView } from "./PcbShapeView.tsx";
 import type { Accessor } from "solid-js";
 import { layerAppearanceStyle } from "./visual.ts";
@@ -201,6 +202,9 @@ export function ShapeView(props: ShapeViewProps): JSX.Element {
               box={props.box}
               inert={props.breadboardInert}
             />
+          </Match>
+          <Match when={isSchematicElementType(props.element.type)}>
+            <SchematicShapeView element={props.element} box={props.box} />
           </Match>
           <Match when={isPcbElementType(props.element.type)}>
             <PcbShapeView

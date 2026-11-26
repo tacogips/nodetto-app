@@ -59,6 +59,7 @@ import {
 } from "./registry/bpmn.ts";
 import { PRESENTATION_SLIDE } from "./registry/presentation-slide.ts";
 import { BREADBOARD_DEFINITIONS } from "./registry/breadboard.ts";
+import { SCHEMATIC_DEFINITIONS } from "./registry/schematic.ts";
 import { PCB_DEFINITIONS } from "./registry/pcb.ts";
 import { CAD_DEFINITIONS } from "./registry/cad.ts";
 import {
@@ -78,6 +79,7 @@ export type {
 
 const DEFINITIONS: readonly ElementTypeDefinition[] = [
   ...BREADBOARD_DEFINITIONS,
+  ...SCHEMATIC_DEFINITIONS,
   ...PCB_DEFINITIONS,
   ...CAD_DEFINITIONS,
   DESIGN_GUIDE,

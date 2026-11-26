@@ -8,6 +8,9 @@ import {
   generateDatabaseDdl,
   lintBpmnPage,
   lintBreadboardPage,
+  lintSchematicPage,
+  firstSchematicPageId,
+  schematicPcbParityFindings,
   lintTextLayoutPage,
   lintAppDesignPage,
   isAppLintPage,
@@ -62,6 +65,7 @@ import { drawCommand } from "./draw-command.ts";
 import { editCommand } from "./edit-command.ts";
 import { diffCommand } from "./diff-command.ts";
 import { breadboardCommand } from "./breadboard-command.ts";
+import { schematicCommand } from "./schematic-command.ts";
 import { gerberCommand } from "./gerber-command.ts";
 import { pcbCommand } from "./pcb-command.ts";
 import { cadCommand } from "./cad-command.ts";
@@ -296,6 +300,7 @@ interface LintFindingRow {
   readonly message: string;
   readonly ruleId: string;
   readonly pin?: number;
+  readonly pageId?: string;
   readonly context?: {
     readonly screenId?: string;
     readonly instanceId?: string;
@@ -369,6 +374,7 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
   }
 
   let appEditor = new Editor({ document });
+  const schematicPageId = firstSchematicPageId(document);
   const lintableDocumentPages = document.pages.filter(
     ({ kind }) => kind !== CAD_PAGE_KIND,
   );
@@ -376,6 +382,8 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
     (page) =>
       page.kind === "bpmn" ||
       page.kind === "breadboard" ||
+      page.kind === "schematic" ||
+      (page.kind === "pcb" && schematicPageId !== undefined) ||
       TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind) ||
       diagramLintApplies(document, page) ||
       isAppLintPage(appEditor.store, page),
@@ -386,6 +394,8 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
         (page) =>
           page.kind === "bpmn" ||
           page.kind === "breadboard" ||
+          page.kind === "schematic" ||
+          (page.kind === "pcb" && schematicPageId !== undefined) ||
           TEXT_LAYOUT_LINT_PAGE_KINDS.includes(page.kind) ||
           diagramLintApplies(document, page),
       )
@@ -494,14 +504,18 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
                   ...(pin === undefined ? {} : { pin }),
                 }),
               )
-            : lintTextLayoutPage(document, page.id).map(
-                ({ elementId, severity, message, ruleId }) => ({
-                  elementId,
-                  severity,
-                  message,
-                  ruleId,
-                }),
-              )
+            : page.kind === "schematic"
+              ? lintSchematicPage(document, page.id)
+              : page.kind === "pcb" && schematicPageId !== undefined
+                ? schematicPcbParityFindings(document, page.id, schematicPageId)
+                : lintTextLayoutPage(document, page.id).map(
+                    ({ elementId, severity, message, ruleId }) => ({
+                      elementId,
+                      severity,
+                      message,
+                      ruleId,
+                    }),
+                  )
         : []),
       ...(glyphRows.get(page.id) ?? []).map((row) => ({
         elementId: row.elementId,
@@ -548,9 +562,8 @@ function lintCommand(io: CommandIo, args: readonly string[]): CommandResult {
           ...(finding.context === undefined
             ? {}
             : { context: finding.context }),
-          ...(page.kind === "breadboard" && finding.pin !== undefined
-            ? { pin: finding.pin }
-            : {}),
+          ...(finding.pin !== undefined ? { pin: finding.pin } : {}),
+          ...(finding.pageId === undefined ? {} : { pageId: finding.pageId }),
         })),
       })),
       ...(parsed.flags.has("--fix") ? { fixes: diagram.fixes } : {}),
@@ -1137,6 +1150,8 @@ function dispatchCli(
       return drawioCommand(io, rest);
     case "breadboard":
       return breadboardCommand(io, rest);
+    case "schematic":
+      return schematicCommand(io, rest);
     case "gerber":
       return gerberCommand(io, rest);
     case "pcb":

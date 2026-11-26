@@ -98,6 +98,27 @@ import type {
   BreadboardNetlistSemantic,
 } from "./semantics/breadboard.ts";
 
+import type {
+  SchematicResistorSemantic,
+  SchematicCapacitorSemantic,
+  SchematicInductorSemantic,
+  SchematicDiodeSemantic,
+  SchematicLedSemantic,
+  SchematicBjtSemantic,
+  SchematicMosfetSemantic,
+  SchematicSwitchSemantic,
+  SchematicPotentiometerSemantic,
+  SchematicBatterySemantic,
+  SchematicVoltageSourceSemantic,
+  SchematicConnectorSemantic,
+  SchematicIcSemantic,
+  SchematicPowerSemantic,
+  SchematicWireSemantic,
+  SchematicJunctionSemantic,
+  SchematicLabelSemantic,
+  SchematicNoConnectSemantic,
+} from "./semantics/schematic.ts";
+
 export * from "./semantics/connectors.ts";
 export * from "./semantics/erd.ts";
 export * from "./semantics/uml.ts";
@@ -105,6 +126,7 @@ export * from "./semantics/drawing.ts";
 export * from "./semantics/design.ts";
 export * from "./semantics/bpmn.ts";
 export * from "./semantics/breadboard.ts";
+export * from "./semantics/schematic.ts";
 export * from "./semantics/table.ts";
 export * from "./semantics/document.ts";
 
@@ -181,6 +203,24 @@ export interface SemanticByType {
   "breadboard.header": BreadboardHeaderSemantic;
   "breadboard.battery": BreadboardBatterySemantic;
   "breadboard.netlist": BreadboardNetlistSemantic;
+  "schematic.resistor": SchematicResistorSemantic;
+  "schematic.capacitor": SchematicCapacitorSemantic;
+  "schematic.inductor": SchematicInductorSemantic;
+  "schematic.diode": SchematicDiodeSemantic;
+  "schematic.led": SchematicLedSemantic;
+  "schematic.bjt": SchematicBjtSemantic;
+  "schematic.mosfet": SchematicMosfetSemantic;
+  "schematic.switch": SchematicSwitchSemantic;
+  "schematic.potentiometer": SchematicPotentiometerSemantic;
+  "schematic.battery": SchematicBatterySemantic;
+  "schematic.voltageSource": SchematicVoltageSourceSemantic;
+  "schematic.connector": SchematicConnectorSemantic;
+  "schematic.ic": SchematicIcSemantic;
+  "schematic.power": SchematicPowerSemantic;
+  "schematic.wire": SchematicWireSemantic;
+  "schematic.junction": SchematicJunctionSemantic;
+  "schematic.label": SchematicLabelSemantic;
+  "schematic.noConnect": SchematicNoConnectSemantic;
   "pcb.board": PcbBoardSemantic;
   "pcb.footprint": PcbFootprintSemantic;
   "pcb.track": PcbTrackSemantic;

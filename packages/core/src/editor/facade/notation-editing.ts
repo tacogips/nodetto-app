@@ -1,5 +1,7 @@
 import type {
   BreadboardElementType,
+  BreadboardNetlistSemantic,
+  SchematicElementType,
   ConnectorPort,
   ConnectorPorts,
   ElementId,
@@ -48,9 +50,81 @@ import {
   pcbInsertIndex,
   roundPcbTrackInput,
 } from "../../pcb-board/edit.ts";
+import {
+  buildSchematicElement,
+  planSchematicSemanticUpdate,
+} from "../schematic.ts";
+import {
+  planSchematicRotation,
+  planSchematicMirror,
+  planSchematicAnnotation,
+} from "../../schematic/transform.ts";
+import { planBreadboardTarget } from "../../schematic/target-card.ts";
 import { PageEditing } from "./page-editing.ts";
 
 export class NotationEditing extends PageEditing {
+  createSchematicElement(
+    type: SchematicElementType,
+    at: Vec,
+    semantic?: Readonly<Record<string, unknown>>,
+    options: ApplyOptions = {},
+  ): ElementId | null {
+    const element = buildSchematicElement(this, this.rng, type, at, semantic);
+    if (!element) return null;
+    this.apply([{ type: "createElement", element }], options);
+    return element.id;
+  }
+
+  rotateSchematicElements(
+    ids: readonly ElementId[],
+    turns: 1 | -1,
+    options: ApplyOptions = {},
+  ): boolean {
+    const commands = planSchematicRotation(this.store, ids, turns);
+    if (!commands.length) return false;
+    this.apply(commands, options);
+    return true;
+  }
+
+  mirrorSchematicParts(
+    ids: readonly ElementId[],
+    options: ApplyOptions = {},
+  ): boolean {
+    const commands = planSchematicMirror(this.store, ids);
+    if (!commands.length) return false;
+    this.apply(commands, options);
+    return true;
+  }
+
+  updateSchematicSemantic(
+    id: ElementId,
+    patch: Readonly<Record<string, unknown>>,
+    options: ApplyOptions = {},
+  ): boolean {
+    const commands = planSchematicSemanticUpdate(this.store, id, patch);
+    if (!commands?.length) return false;
+    this.apply(commands, options);
+    return true;
+  }
+
+  annotateSchematic(pageId: PageId, options: ApplyOptions = {}): boolean {
+    const commands = planSchematicAnnotation(this.store, pageId);
+    if (!commands.length) return false;
+    this.apply(commands, options);
+    return true;
+  }
+
+  setBreadboardTarget(
+    pageId: PageId,
+    target: BreadboardNetlistSemantic,
+    options: ApplyOptions = {},
+  ): boolean {
+    const commands = planBreadboardTarget(this, pageId, target);
+    if (!commands.length) return false;
+    this.apply(commands, options);
+    return true;
+  }
+
   // ------------------------------------------------------------ breadboard
 
   createBreadboardPart(

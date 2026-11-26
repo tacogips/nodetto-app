@@ -14,7 +14,11 @@ import type {
   UmlAssociationSemantic,
   UmlClassSemantic,
 } from "@nodetto/ir";
-import { erdEndpointColumnIds, isBreadboardElementType } from "@nodetto/ir";
+import {
+  erdEndpointColumnIds,
+  isBreadboardElementType,
+  isSchematicElementType,
+} from "@nodetto/ir";
 
 export interface D2ExportWarning {
   readonly elementId?: string;
@@ -570,9 +574,15 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
   );
   if (hasSkippedBreadboard)
     warnings.push({ message: "Breadboard elements are not exported to D2." });
+  const hasSkippedSchematic = visibleBeforeBreadboard.some((element) =>
+    isSchematicElementType(element.type),
+  );
+  if (hasSkippedSchematic)
+    warnings.push({ message: "Schematic elements are not exported to D2." });
   const visible = visibleBeforeBreadboard.filter(
     (element) =>
       !isBreadboardElementType(element.type) &&
+      !isSchematicElementType(element.type) &&
       element.type !== "presentation.slide",
   );
   const alias = aliases(visible);
@@ -821,7 +831,7 @@ export function exportD2(document: Document, pageId: string): D2ExportReport {
     relationCount += sequence.relations;
   }
   const elementCount = exportable.length + (sequence?.elements ?? 0);
-  if (elementCount === 0 && !hasSkippedBreadboard)
+  if (elementCount === 0 && !hasSkippedBreadboard && !hasSkippedSchematic)
     warnings.push({
       message: "The page contains no layers that D2 export can represent.",
     });

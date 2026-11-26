@@ -23,6 +23,9 @@ export interface GestureLifecycle {
 export function createGestureLifecycle(
   ctx: InteractionContext,
   applyPointerMove: (event: PointerEvent) => void,
+  finishWirePoint: (
+    gesture: import("./types.ts").GestureOf<"breadboard-wire-point">,
+  ) => "commit" | "abort",
 ): GestureLifecycle {
   const { editor, state } = ctx;
 
@@ -81,7 +84,13 @@ export function createGestureLifecycle(
       gesture.kind === "rotating" ||
       gesture.kind === "rotating-selection"
     ) {
-      editor.endBatch();
+      if (
+        gesture.kind === "breadboard-wire-point" &&
+        editor.store.get(gesture.id)?.type === "schematic.wire" &&
+        finishWirePoint(gesture) === "abort"
+      )
+        editor.abortBatch();
+      else editor.endBatch();
     }
     state.gesture = { kind: "idle" };
     ctx.clearTransient();

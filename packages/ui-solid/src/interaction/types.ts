@@ -239,6 +239,12 @@ export interface Interaction {
     index: number,
     event: PointerEvent,
   ): void;
+  nudgeSchematicWirePoint(
+    id: ElementId,
+    index: number,
+    dx: number,
+    dy: number,
+  ): number | null;
   /** Drag one end of a connector to another element. */
   startReconnect(id: ElementId, end: ConnectorEnd, event: PointerEvent): void;
   /** Drag a new connector out of `from`, as the edge tool would. */
@@ -263,6 +269,7 @@ export interface Interaction {
   /** True for an active hand, space, middle-button or right-button pan. */
   readonly panning: Accessor<boolean>;
   readonly wireDraft: Accessor<readonly Vec[] | null>;
+  readonly schematicWireNotice: Accessor<string | null>;
   readonly breadboardHover: Accessor<
     BreadboardPinRef | { wireId: ElementId } | null
   >;

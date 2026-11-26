@@ -7,6 +7,7 @@ import {
   type ImageSemantic,
   isBreadboardElementType,
   isPcbElementType,
+  isSchematicElementType,
   type PathSemantic,
   UmlComponentType,
 } from "@nodetto/ir";
@@ -14,6 +15,10 @@ import { isBpmnShapeType } from "../bpmn/notation.ts";
 import type { BreadboardNotation } from "../breadboard/notation.ts";
 import { resolvedCornerRadii, roundedRectPath } from "../corner-radii.ts";
 import type { Box } from "../geometry.ts";
+import {
+  schematicNotation,
+  type SchematicNotation,
+} from "../schematic/notation.ts";
 import { gradientId } from "../gradient.ts";
 import { croppedImageBox } from "../image-crop.ts";
 import {
@@ -41,6 +46,7 @@ import {
   renderBpmnShape,
   renderBreadboardShape,
   renderNotationPrimitive,
+  renderSchematicShape,
 } from "./notation.ts";
 import { styled, textStyled } from "./paint.ts";
 import { rectStrokeMarkup, rectStrokeParts } from "./rect-strokes.ts";
@@ -64,9 +70,15 @@ export function renderShape(
   theme: SvgTheme,
   resolveAsset?: (source: string) => string,
   breadboard?: BreadboardNotation,
+  schematic?: SchematicNotation,
 ): string {
   if (isBreadboardElementType(element.type))
     return renderBreadboardShape(element, box, breadboard);
+  if (isSchematicElementType(element.type))
+    return renderSchematicShape(
+      box,
+      schematic ?? schematicNotation(element, box, theme),
+    );
   if (isBpmnShapeType(element.type)) return renderBpmnShape(element, box);
   if (isPcbElementType(element.type)) return renderPcbShape(element);
   switch (element.type) {

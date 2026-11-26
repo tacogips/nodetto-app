@@ -139,6 +139,11 @@ export function createPointerHandlers(
       return;
     }
 
+    if (tool === Tool.SchematicWire) {
+      circuit.placeSchematicWirePoint(point, event.shiftKey);
+      return;
+    }
+
     if (creationFor(tool)) {
       creation.placeShape(point, tool);
       return;

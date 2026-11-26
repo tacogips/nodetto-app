@@ -5,6 +5,7 @@ export {
   GEO_TOOLS,
   BPMN_TOOLS,
   BREADBOARD_TOOLS,
+  SCHEMATIC_TOOLS,
   PCB_TOOLS,
   PCB_CREATIONS,
   canUseTool,
@@ -16,6 +17,7 @@ export {
   type ToolKind,
   type BpmnToolKind,
   type BreadboardToolKind,
+  type SchematicToolKind,
   type PcbToolKind,
   type CreationTool,
 } from "@nodetto/core";

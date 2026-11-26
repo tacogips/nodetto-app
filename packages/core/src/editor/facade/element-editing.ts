@@ -1,6 +1,7 @@
 import {
   type ConnectorPorts,
   type ElementId,
+  isSchematicElementType,
   pageAcceptsElementType,
   type PageId,
   type TextMark,
@@ -21,6 +22,7 @@ import {
   textNoteMarks,
   toggleTextMarkRange,
 } from "../../rich-text.ts";
+import { canonicalTarget } from "../../schematic/coordinates.ts";
 import { EditorCore } from "./core.ts";
 
 export class ElementEditing extends EditorCore {
@@ -71,7 +73,7 @@ export class ElementEditing extends EditorCore {
 
   // ------------------------------------------------------- move and resize
 
-  /** Move elements by a page-space delta, relative to given origins. */
+  /** Move elements to absolute page-space destinations. */
   moveElements(
     moves: readonly {
       readonly id: ElementId;
@@ -80,7 +82,13 @@ export class ElementEditing extends EditorCore {
     }[],
     applyOptions: ApplyOptions = {},
   ): void {
-    const commands = planElementMoves(this.store, moves);
+    const destinations = moves.map((move) => {
+      const element = this.store.get(move.id);
+      return element && isSchematicElementType(element.type)
+        ? { ...move, x: canonicalTarget(move.x), y: canonicalTarget(move.y) }
+        : move;
+    });
+    const commands = planElementMoves(this.store, destinations);
     if (commands.length > 0) {
       this.apply(commands, applyOptions);
     }

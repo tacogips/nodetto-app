@@ -1,9 +1,19 @@
 import {
   compareReferences,
+  sweepAxisContacts,
+  type AxisSegment,
+  type AxisQuery,
   type BreadboardImportDiagnostic,
   type BreadboardImportPart,
   type BreadboardImportPlan,
 } from "@nodetto/ir";
+import {
+  diagonalBudgetLimit,
+  diagonalCandidates,
+  type DiagonalSegment,
+} from "./diagonal-lookup.ts";
+import type { KicadImportStats } from "./index.ts";
+export { diagonalBudgetLimit } from "./diagonal-lookup.ts";
 import {
   atomAt,
   child,
@@ -110,7 +120,9 @@ export function importSchematic(
   root: SexprList,
   fileName: string,
   diagnostics: BreadboardImportDiagnostic[],
-): BreadboardImportPlan {
+  stats?: KicadImportStats,
+  diagonalBudget?: "schematic",
+): BreadboardImportPlan | undefined {
   const library = child(root, "lib_symbols");
   const libs = new Map<string, Pin[]>();
   const powerLibraries = new Set<string>();
@@ -374,21 +386,89 @@ export function importSchematic(
     if (x !== y) parent[y] = x;
   };
   const pointIndex = new Map<string, number[]>();
-  points.forEach((p, i) =>
-    pointIndex.set(key(p), [...(pointIndex.get(key(p)) ?? []), i]),
-  );
+  points.forEach((p, i) => {
+    const bucket = pointIndex.get(key(p));
+    if (bucket) bucket.push(i);
+    else pointIndex.set(key(p), [i]);
+  });
   const joinAll = ([first, ...rest]: readonly number[]) => {
     if (first !== undefined) for (const other of rest) join(first, other);
   };
   for (const indices of pointIndex.values()) joinAll(indices);
-  const segmentPointIndices: number[][] = segments.map(([a, b]) =>
-    points.map((p, i) => (onSegment(p, a, b) ? i : -1)).filter((i) => i >= 0),
-  );
-  for (const ids of segmentPointIndices) joinAll(ids);
+  const candidates: number[][] = segments.map(() => []);
+  const horizontal: AxisSegment[] = [];
+  const vertical: AxisSegment[] = [];
+  const diagonal: DiagonalSegment[] = [];
+  segments.forEach(([a, b], id) => {
+    if (a.x === b.x && a.y === b.y) {
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (const i of pointIndex.get(key({ x: a.x + dx, y: a.y + dy })) ??
+            []) {
+            candidates[id]?.push(i);
+            if (stats) stats.segmentCandidates++;
+          }
+    } else if (a.y === b.y) {
+      horizontal.push({
+        id,
+        line: a.y,
+        from: Math.min(a.x, b.x) - 1,
+        to: Math.max(a.x, b.x) + 1,
+      });
+    } else if (a.x === b.x) {
+      vertical.push({
+        id,
+        line: a.x,
+        from: Math.min(a.y, b.y) - 1,
+        to: Math.max(a.y, b.y) + 1,
+      });
+    } else diagonal.push({ id, a, b });
+  });
+  const queries = (axis: "x" | "y"): AxisQuery[] =>
+    points.flatMap((p, id) =>
+      [-1, 0, 1].map((offset) => ({
+        id,
+        line: p[axis] + offset,
+        at: p[axis === "x" ? "y" : "x"],
+      })),
+    );
+  const record = (segmentId: number, pointId: number) => {
+    candidates[segmentId]?.push(pointId);
+    if (stats) stats.segmentCandidates++;
+  };
+  sweepAxisContacts(horizontal, queries("y"), record);
+  sweepAxisContacts(vertical, queries("x"), record);
+  const work = { diagonalWork: 0 };
+  const limit =
+    diagonalBudget && diagonal.length
+      ? diagonalBudgetLimit(diagonal.length, points.length)
+      : undefined;
+  if (stats && limit !== undefined) stats.diagonalBudgetLimit = limit;
+  const result = diagonalCandidates(points, diagonal, record, work, limit);
+  if (stats) stats.diagonalWork += work.diagonalWork;
+  if (result.exceeded) {
+    diagnostics.push({
+      severity: "error",
+      code: "schematic.importTooComplex",
+      message: `Diagonal wires need more than ${limit} lookup steps; straighten diagonal wires or import as a breadboard`,
+    });
+    return undefined;
+  }
+  candidates.forEach((ids, segmentId) => {
+    const segment = segments[segmentId];
+    if (!segment) return;
+    ids.sort((a, b) => a - b);
+    joinAll(
+      ids.filter((i) => {
+        const p = points[i];
+        return p !== undefined && onSegment(p, segment[0], segment[1]);
+      }),
+    );
+  });
   const labelRoots = new Map<string, number>();
   const powerRoots = new Map<string, string>();
-  for (const anchor of anchors) {
-    const rootIndex = find(points.indexOf(anchor.point));
+  for (const [anchorIndex, anchor] of anchors.entries()) {
+    const rootIndex = find(points.length - anchors.length + anchorIndex);
     if (anchor.label) {
       const first = labelRoots.get(anchor.label);
       if (first !== undefined) join(first, rootIndex);
@@ -406,6 +486,16 @@ export function importSchematic(
     const idx = pointIndex.get(pointKey)?.[0];
     if (idx !== undefined) powerRoots.set(String(find(idx)), value);
   }
+  const labelsByRoot = new Map<number, string[]>();
+  for (const [index, anchor] of anchors.entries()) {
+    if (stats) stats.labelVisits++;
+    if (!anchor.label) continue;
+    const root = find(points.length - anchors.length + index);
+    const labels = labelsByRoot.get(root);
+    if (labels) labels.push(anchor.label);
+    else labelsByRoot.set(root, [anchor.label]);
+  }
+  for (const labels of labelsByRoot.values()) labels.sort();
   const pinOffset = 0;
   const nodesByRoot = new Map<
     number,
@@ -413,10 +503,13 @@ export function importSchematic(
   >();
   pinPoints.forEach((pin, index) => {
     const rootIndex = find(pinOffset + index);
-    nodesByRoot.set(rootIndex, [
-      ...(nodesByRoot.get(rootIndex) ?? []),
-      { reference: pin.reference, pin: pin.mapped, source: pin.source },
-    ]);
+    const nodes = nodesByRoot.get(rootIndex) ?? [];
+    nodes.push({
+      reference: pin.reference,
+      pin: pin.mapped,
+      source: pin.source,
+    });
+    nodesByRoot.set(rootIndex, nodes);
   });
   const sortedParts = [...componentMap.values()].sort((a, b) =>
     compareReferences(a.reference, b.reference),
@@ -445,16 +538,8 @@ export function importSchematic(
   const usedNames = new Set<string>();
   const nets = netData.map(({ rootIndex, nodes }) => {
     const power = powerRoots.get(String(find(rootIndex)));
-    const labels = anchors
-      .filter(
-        (a) =>
-          a.label &&
-          pointIndex
-            .get(key(a.point))
-            ?.some((i) => find(i) === find(rootIndex)),
-      )
-      .map((a) => a.label as string)
-      .sort();
+    if (stats) stats.labelVisits++;
+    const labels = labelsByRoot.get(rootIndex) ?? [];
     const [first] = nodes;
     const [firstLabel] = labels;
     const raw =

@@ -4,6 +4,7 @@ import type { Element } from "@nodetto/ir";
 import { bpmnNotation, type NotationPrimitive } from "../bpmn/notation.ts";
 import { breadboardNotation } from "../breadboard/notation.ts";
 import type { Box } from "../geometry.ts";
+import type { SchematicNotation } from "../schematic/notation.ts";
 import { escapeXml, fmt, tag, wrap } from "./markup.ts";
 
 export function renderNotationPrimitive(
@@ -87,6 +88,19 @@ export function renderBreadboardShape(
     { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` },
     notation.body
       .map((primitive) => renderNotationPrimitive(primitive, "breadboard"))
+      .join(""),
+  );
+}
+
+export function renderSchematicShape(
+  box: Box,
+  notation: SchematicNotation,
+): string {
+  return wrap(
+    "g",
+    { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` },
+    notation.body
+      .map((primitive) => renderNotationPrimitive(primitive, "schematic"))
       .join(""),
   );
 }

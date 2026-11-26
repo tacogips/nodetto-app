@@ -99,6 +99,37 @@ describe("KiCad netlist import", () => {
     expect(result.plan?.target.nets).toEqual([]);
   });
 
+  test("indexes net nodes with linear work", () => {
+    const count = 500;
+    const components = Array.from(
+      { length: count },
+      (_, index) =>
+        `(comp (ref R${index + 1}) (value 10k) (libsource (lib Device) (part R)))`,
+    ).join(" ");
+    const nets = Array.from(
+      { length: count },
+      (_, index) =>
+        `(net (name N${index + 1}) (node (ref R${index + 1}) (pin 1)) (node (ref R${((index + 1) % count) + 1}) (pin 2)))`,
+    ).join(" ");
+    const stats = {
+      nodeVisits: 0,
+      segmentCandidates: 0,
+      diagonalWork: 0,
+      labelVisits: 0,
+    };
+    const result = importKicad(
+      `(export (components ${components}) (nets ${nets}))`,
+      {
+        fileName: "linear.net",
+        stats,
+      },
+    );
+    expect(result.plan?.parts).toHaveLength(count);
+    expect(result.plan?.target.nets).toHaveLength(count);
+    expect(stats.nodeVisits).toBeGreaterThan(0);
+    expect(stats.nodeVisits).toBeLessThanOrEqual(2 * count * 2 + count);
+  });
+
   test("returns errors without a plan for legacy and unknown roots", () => {
     expect(
       importKicad(fixture("legacy.sch"), { fileName: "legacy.sch" }),

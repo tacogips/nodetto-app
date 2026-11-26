@@ -1,0 +1,12 @@
+# nodetto schematic netlist 1
+# document "LED and switch"
+# page "LED and switch"
+component BT1 9V Battery
+component C1 100n Capacitor
+component D1 LED LED
+component R1 470 Resistor
+component SW1 toggle SW_Push
+net 1 VCC BT1.1 SW1.1
+net 2 GND BT1.2 C1.2 D1.2
+net 3 SW_OUT C1.1 R1.1 SW1.2
+net 4 N_R1_2 D1.1 R1.2

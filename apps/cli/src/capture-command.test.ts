@@ -469,7 +469,7 @@ test("capture uses an artboard viewport for a frame and the padded bounds for an
 });
 
 test("capture is discoverable in the overview and explains every option", () => {
-  expect(OVERVIEW.split("\n")).toHaveLength(37);
+  expect(OVERVIEW.split("\n")).toHaveLength(38);
   for (const command of ["capture", "export", "compare"])
     expect(OVERVIEW).toContain(`nodetto-cli ${command}`);
   const [usage = "", ...body] = CAPTURE_HELP.split("\n\n");

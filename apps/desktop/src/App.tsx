@@ -45,6 +45,7 @@ import {
   AppDesignProblemsPanel,
   CompareDialog,
   BreadboardProblemsPanel,
+  SchematicProblemsPanel,
   createEditorSignals,
   NodettoCanvas,
   getAction,
@@ -500,6 +501,18 @@ export function App(props: AppProps): JSX.Element {
     );
   };
 
+  const showSchematicProblems = (): boolean => {
+    editorSignals.rev();
+    const kind = props.editor.store.getPage(props.editor.currentPageId)?.kind;
+    return (
+      kind === "schematic" ||
+      (kind === "pcb" &&
+        props.editor.store
+          .listPages()
+          .some((page) => page.kind === "schematic"))
+    );
+  };
+
   followPageWorkspace(props, editorSignals.rev, defaultWorkspace, setWorkspace);
 
   onMount(() => {
@@ -771,6 +784,7 @@ export function App(props: AppProps): JSX.Element {
           exportDocumentBundle={exportHandlers.exportDocumentBundle}
           exportBpmn={exportHandlers.exportBpmn}
           exportBreadboard={exportHandlers.exportBreadboard}
+          exportSchematic={exportHandlers.exportSchematic}
           exportGerber={exportHandlers.exportGerber}
           exportPcb={exportHandlers.exportPcbGerber}
           exportStl={exportHandlers.exportStl}
@@ -817,6 +831,7 @@ export function App(props: AppProps): JSX.Element {
         problemsPanelOpen={
           isBpmnPage() ||
           isBreadboardPage() ||
+          showSchematicProblems() ||
           workspace() === "app" ||
           workspace() === "web"
         }
@@ -1187,6 +1202,9 @@ export function App(props: AppProps): JSX.Element {
               viewport={viewport}
               importWarnings={file().importWarnings}
             />
+          </Show>
+          <Show when={showSchematicProblems()}>
+            <SchematicProblemsPanel editor={props.editor} viewport={viewport} />
           </Show>
         </SidePane>
       </div>

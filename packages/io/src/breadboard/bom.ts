@@ -52,7 +52,9 @@ export function exportBreadboardBomCsv(
   return { text: `${rows.join("\n")}\n`, warnings: referenceWarnings(netlist) };
 }
 
-export function referenceWarnings(netlist: BreadboardNetlist): string[] {
+export function referenceWarnings(netlist: {
+  readonly components: readonly { readonly reference: string }[];
+}): string[] {
   const counts = new Map<string, number>();
   for (const component of netlist.components)
     counts.set(component.reference, (counts.get(component.reference) ?? 0) + 1);

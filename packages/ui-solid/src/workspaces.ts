@@ -128,6 +128,19 @@ export const WORKSPACES = [
     ],
   },
   {
+    id: "schematic",
+    label: "Schematic",
+    design: false,
+    shapes: false,
+    tools: [
+      { tool: Tool.SchematicResistor, label: "Resistor" },
+      { tool: Tool.SchematicCapacitor, label: "Capacitor" },
+      { tool: Tool.SchematicGround, label: "Ground" },
+      { tool: Tool.SchematicWire, label: "Wire" },
+      { tool: Tool.SchematicLabel, label: "Label" },
+    ],
+  },
+  {
     id: "pcb",
     label: "PCB",
     design: false,

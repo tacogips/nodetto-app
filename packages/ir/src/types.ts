@@ -36,6 +36,7 @@ export const PAGE_KINDS = [
   "breadboard",
   "pcb",
   CAD_PAGE_KIND,
+  "schematic",
 ] as const;
 
 export type PageKind = (typeof PAGE_KINDS)[number];
@@ -60,6 +61,7 @@ export const PAGE_MODES = [
   "breadboard",
   "pcb",
   "cad3d",
+  "schematic",
   "all",
 ] as const;
 
@@ -71,6 +73,7 @@ const DEDICATED_PAGE_MODES: Readonly<Partial<Record<string, PageMode>>> = {
   breadboard: "breadboard",
   pcb: "pcb",
   cad3d: "cad3d",
+  schematic: "schematic",
 };
 
 /** Notation pages open in their notation's mode until another is chosen. */

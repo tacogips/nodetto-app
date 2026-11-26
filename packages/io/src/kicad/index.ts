@@ -11,9 +11,21 @@ import { atomAt, readSexpr, SEXPR_SLOT } from "./sexpr.ts";
 export { readSexpr } from "./sexpr.ts";
 export type { SexprAtom, SexprList, SexprNode } from "./sexpr.ts";
 
+export interface KicadImportStats {
+  nodeVisits: number;
+  segmentCandidates: number;
+  diagonalWork: number;
+  diagonalBudgetLimit?: number;
+  labelVisits: number;
+}
+
 export function importKicad(
   text: string,
-  options: { fileName: string },
+  options: {
+    fileName: string;
+    stats?: KicadImportStats;
+    diagonalBudget?: "schematic";
+  },
 ): BreadboardImportResult {
   const trimmed = text.trimStart();
   if (trimmed.startsWith("EESchema"))
@@ -31,14 +43,19 @@ export function importKicad(
   const root = parsed.root;
   if (!root) return { diagnostics };
   const rootName = atomAt(root, SEXPR_SLOT.keyword);
-  if (rootName === "kicad_sch")
-    return {
-      plan: importSchematic(root, options.fileName, diagnostics),
+  if (rootName === "kicad_sch") {
+    const plan = importSchematic(
+      root,
+      options.fileName,
       diagnostics,
-    };
+      options.stats,
+      options.diagonalBudget,
+    );
+    return plan ? { plan, diagnostics } : { diagnostics };
+  }
   if (rootName === "export")
     return {
-      plan: importNetlist(root, options.fileName, diagnostics),
+      plan: importNetlist(root, options.fileName, diagnostics, options.stats),
       diagnostics,
     };
   if (rootName === "kicad_pcb")

@@ -18,6 +18,7 @@ import { groupOf, memberIdsOf } from "../group.ts";
 import type { IdSource } from "../ids.ts";
 import type { Store } from "../store.ts";
 import { planPastedBreadboardReferences } from "./breadboard.ts";
+import { planPastedSchematicReferences } from "./schematic.ts";
 
 /** Ids in `ids` that no group in `ids` claims as a member. */
 export function topLevelAmong(
@@ -80,7 +81,9 @@ export function planInsertCopies(
   const annotation: Command[] =
     page.kind === "breadboard"
       ? planPastedBreadboardReferences(store, pageId, plan.commands)
-      : [];
+      : page.kind === "schematic"
+        ? planPastedSchematicReferences(store, pageId, plan.commands)
+        : [];
   const membership: Command[] = [];
   if (preserveParents) {
     const context = editor.createShapeContext();

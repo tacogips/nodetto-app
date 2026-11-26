@@ -22,6 +22,11 @@ import {
   breadboardExportEnabled,
   type BreadboardExportKind,
 } from "./breadboard-export.ts";
+import {
+  SCHEMATIC_EXPORTS,
+  schematicExportEnabled,
+  type SchematicExportKind,
+} from "./schematic-export.ts";
 import { pcbExportEnabled } from "./pcb-export.ts";
 import {
   createMemo,
@@ -66,6 +71,7 @@ type Format =
   | "sql"
   | "bpmn"
   | "breadboard"
+  | "schematic"
   | "gerber"
   | "pcb"
   | "stl"
@@ -98,6 +104,7 @@ export interface ExportDialogProps {
   readonly exportDocumentBundle?: () => Promise<void>;
   readonly exportBpmn: () => Promise<void>;
   readonly exportBreadboard?: (kind: BreadboardExportKind) => Promise<void>;
+  readonly exportSchematic?: (kind: SchematicExportKind) => Promise<void>;
   /** Gerber and drill ZIP of a page drawn by Gerber import. */
   readonly exportGerber?: () => Promise<void>;
   readonly exportPcb?: () => Promise<void>;
@@ -118,7 +125,16 @@ export const EXPORT_FORMAT_GROUPS: readonly {
   { label: "Artwork", ids: ["svg", "png", "pdf", "image3d", "artboards"] },
   {
     label: "Diagram source",
-    ids: ["mermaid", "d2", "drawio", "sql", "bpmn", "breadboard", "gerber"],
+    ids: [
+      "mermaid",
+      "d2",
+      "drawio",
+      "sql",
+      "bpmn",
+      "breadboard",
+      "schematic",
+      "gerber",
+    ],
   },
   { label: "Fabrication", ids: ["pcb", "stl"] },
   { label: "Web & developer", ids: ["html", "prototype", "code"] },
@@ -230,6 +246,14 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
         ),
       },
       {
+        id: "schematic",
+        label: "Schematic",
+        enabled: schematicExportEnabled(
+          page()?.kind,
+          props.exportSchematic !== undefined,
+        ),
+      },
+      {
         id: "gerber",
         label: "Gerber",
         enabled:
@@ -273,6 +297,7 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     bpmn: "BPMN 2.0 XML for other process modeling tools.",
     breadboard:
       "BOM and netlists for other circuit tools, and PCB files for board houses such as JLCPCB.",
+    schematic: "Netlists for circuit tools.",
     gerber:
       "The imported board's Gerber and drill files with your edits, for a board house. Nothing is checked.",
     pcb: "Gerber copper, solder mask, silkscreen, outline and drill files.",
@@ -622,6 +647,18 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                   <button
                     type="button"
                     onClick={() => void props.exportBreadboard?.(item.kind)}
+                  >
+                    {item.label}
+                  </button>
+                )}
+              </For>
+            </Match>
+            <Match when={active() === "schematic"}>
+              <For each={SCHEMATIC_EXPORTS}>
+                {(item) => (
+                  <button
+                    type="button"
+                    onClick={() => void props.exportSchematic?.(item.kind)}
                   >
                     {item.label}
                   </button>

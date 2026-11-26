@@ -6,6 +6,7 @@ export const DEDICATED_WORKSPACES: Readonly<
 > = {
   bpmn: "bpmn",
   breadboard: "breadboard",
+  schematic: "schematic",
   pcb: "pcb",
   cad3d: "cad3d",
 };
@@ -14,6 +15,7 @@ export const DEDICATED_PAGE_NAMES: Readonly<Partial<Record<PageKind, string>>> =
   {
     bpmn: "Process",
     breadboard: "Breadboard",
+    schematic: "Schematic",
     pcb: "PCB",
     cad3d: "3D CAD",
   };

@@ -256,3 +256,28 @@ test("scoped validation matches full writing for tokens and cross-page reference
     ).toBe(true);
   }
 });
+
+test("batch move stores canonical absolute schematic targets", () => {
+  const editor = new Editor({
+    document: {
+      schemaVersion: 1,
+      id: "doc-1",
+      title: "Test",
+      pages: [{ id: "p1", name: "Schematic", kind: "schematic" }],
+      elements: [
+        {
+          id: "junction",
+          page: "p1",
+          type: "schematic.junction",
+          index: "a0",
+          semantic: {},
+          visual: { x: -0.125, y: 0 },
+        },
+      ],
+    },
+  });
+  const batch = new Batch(editor);
+  batch.apply({ op: "move", id: "junction", x: 0.875, y: 0 }, 0);
+  expect(editor.store.get("junction")?.visual.x).toBe(0.88);
+  batch.dispose();
+});

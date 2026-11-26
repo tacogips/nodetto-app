@@ -164,6 +164,8 @@ const classifiedEmitters = {
   "packages/core/src/frame-selection.ts": "B",
   "packages/core/src/group.ts": "B",
   "packages/core/src/screen-transition.ts": "B",
+  "packages/core/src/schematic/target-card.ts": "B",
+  "packages/ui-solid/src/interaction/circuit.ts": "C",
   "packages/ui-solid/src/interaction/connectors.ts": "C",
   "packages/ui-solid/src/interaction/creation.ts": "C",
   "packages/ui-solid/src/cad/mesh-io.ts": "C",

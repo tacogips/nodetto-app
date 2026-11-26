@@ -14,11 +14,17 @@ import {
   rotateElement,
   rotateSelectionBy,
   snapBreadboardDelta,
+  snapSchematicDelta,
+  shiftedTarget,
   snapResize,
   snapTranslate,
   unionBoxes,
 } from "@nodetto/core";
-import { type ElementId, isDatabaseObjectType } from "@nodetto/ir";
+import {
+  type ElementId,
+  isDatabaseObjectType,
+  isSchematicElementType,
+} from "@nodetto/ir";
 import type { InteractionContext } from "./context.ts";
 import { CLICK_SLOP_PX } from "./events.ts";
 import {
@@ -208,7 +214,38 @@ export function createTransformGestures(
     let dx = point.x - gesture.startPage.x;
     let dy = point.y - gesture.startPage.y;
     const snap = snapFor(event, gesture.layoutGrid);
-    if (
+    const ids = [...gesture.origins.keys()];
+    const hasSchematic = ids.some((id) => {
+      const element = editor.store.get(id);
+      return element !== undefined && isSchematicElementType(element.type);
+    });
+    if (hasSchematic) {
+      const moving = new Set(ids);
+      const anchor = editor.store
+        .getPageElements(editor.currentPageId)
+        .find(
+          (element) =>
+            moving.has(element.id) && isSchematicElementType(element.type),
+        );
+      const origin = anchor && gesture.origins.get(anchor.id);
+      const offset =
+        snap && anchor && origin
+          ? {
+              x: (anchor.visual.x ?? 0) - origin.x,
+              y: (anchor.visual.y ?? 0) - origin.y,
+            }
+          : { x: 0, y: 0 };
+      const delta = snapSchematicDelta(
+        editor.store,
+        editor.currentPageId,
+        ids,
+        { x: dx - offset.x, y: dy - offset.y },
+        Boolean(snap),
+      );
+      dx = delta.x + offset.x;
+      dy = delta.y + offset.y;
+      ctx.clearGuides();
+    } else if (
       snap &&
       isBreadboardSnapTarget(editor.store, [...gesture.origins.keys()])
     ) {
@@ -241,11 +278,16 @@ export function createTransformGestures(
       ctx.clearGuides();
     }
     editor.moveElements(
-      [...gesture.origins].map(([id, origin]) => ({
-        id,
-        x: origin.x + dx,
-        y: origin.y + dy,
-      })),
+      [...gesture.origins].map(([id, origin]) => {
+        const element = editor.store.get(id);
+        const schematic =
+          element !== undefined && isSchematicElementType(element.type);
+        return {
+          id,
+          x: schematic ? shiftedTarget(origin.x, dx) : origin.x + dx,
+          y: schematic ? shiftedTarget(origin.y, dy) : origin.y + dy,
+        };
+      }),
     );
   };
 

@@ -87,6 +87,7 @@ export interface InteractionContext {
   discardDragFrame(): void;
   isPcbPage(): boolean;
   isBreadboardPage(): boolean;
+  isSchematicPage(): boolean;
   setMarquee(rect: Box | null): void;
   clearGuides(): void;
   clearTransient(): void;
@@ -155,6 +156,9 @@ export function createInteractionContext(
     editor.store.getPage(editor.currentPageId)?.kind === "pcb";
   const isBreadboardPage = (): boolean =>
     editor.store.getPage(editor.currentPageId)?.kind === "breadboard";
+
+  const isSchematicPage = (): boolean =>
+    editor.store.getPage(editor.currentPageId)?.kind === "schematic";
 
   const setMarquee = (rect: Box | null): void => {
     if (rect === null && marquee() === null) {
@@ -255,6 +259,7 @@ export function createInteractionContext(
     discardDragFrame,
     isPcbPage,
     isBreadboardPage,
+    isSchematicPage,
     setMarquee,
     clearGuides,
     clearTransient,

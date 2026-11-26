@@ -24,6 +24,45 @@ export interface KeyOrder {
 /** Coordinates are serialized to 0.01 units. Design section 6. */
 export const COORDINATE_PRECISION = 0.01;
 
+/**
+ * Round to {@link COORDINATE_PRECISION}, half away from zero, normalizing
+ * `-0` to `0` so it never shows up as `-0` in a diff.
+ *
+ * ONE INVARIANT: rounding is TOTAL over the finite doubles. A finite input
+ * always yields a finite output. This matters because the only JSON spelling
+ * of a non-finite number is `null`, and `null` fails validation on reload —
+ * so any finite-to-non-finite transition here would hand the user a file
+ * this build had just certified and can no longer open. The guard below is
+ * on the rounded *result*, not on the intermediate, so it holds no matter
+ * which step of the arithmetic overflows.
+ *
+ * `Math.round` alone rounds halves towards +Infinity, which would make
+ * `-1.005` and `1.005` disagree; taking the magnitude first keeps rounding
+ * symmetric about zero. Exact .005 inputs are unrepresentable in binary
+ * anyway, so which way they land is decided by the stored double — the
+ * guarantee here is determinism, not decimal half-up semantics.
+ */
+export function roundCoordinate(value: number): number {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+  const scale = 1 / COORDINATE_PRECISION;
+  const magnitude = Math.round(Math.abs(value) * scale) / scale;
+  if (!Number.isFinite(magnitude)) {
+    // |value| > MAX_VALUE / scale, so scaling overflowed. Nothing is lost by
+    // skipping the rounding: at this magnitude the gap between adjacent
+    // doubles is vastly larger than 0.01, so the value is already an exact
+    // multiple of the precision we round to.
+    return value;
+  }
+  const result = value < 0 ? -magnitude : magnitude;
+  return result === 0 ? 0 : result;
+}
+
+export function coordinateKey(value: number): number {
+  return Math.round(roundCoordinate(value) / COORDINATE_PRECISION);
+}
+
 export const VISUAL_STYLE_KEY_ORDER: KeyOrder = {
   keys: [
     "fill",

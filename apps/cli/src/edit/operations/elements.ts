@@ -1,8 +1,14 @@
-import { planScale, replaceText, textMatcher } from "@nodetto/core";
+import {
+  canonicalTarget,
+  planScale,
+  replaceText,
+  textMatcher,
+} from "@nodetto/core";
 import {
   getElementTypeDefinition,
   isKnownElementType,
   isPlainObject,
+  isSchematicElementType,
   type Element,
 } from "@nodetto/ir";
 import type { Batch } from "../batch.ts";
@@ -200,11 +206,14 @@ export function moveElement(
   index: number,
 ): void {
   const element = batch.element(operation["id"], index);
+  const x = requireNumber(operation["x"], "x", index);
+  const y = requireNumber(operation["y"], "y", index);
+  const schematic = isSchematicElementType(element.type);
   batch.editor.moveElements([
     {
       id: element.id,
-      x: requireNumber(operation["x"], "x", index),
-      y: requireNumber(operation["y"], "y", index),
+      x: schematic ? canonicalTarget(x) : x,
+      y: schematic ? canonicalTarget(y) : y,
     },
   ]);
   batch.touchedPages.add(element.page);

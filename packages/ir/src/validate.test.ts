@@ -856,3 +856,27 @@ test("scoped element validation retains global duplicate checks and indices", ()
   ).toBe(true);
   expect(actual.some((issue) => issue.path === "elements[3].page")).toBe(true);
 });
+
+test("schematic visual coordinate range is bounded without affecting other types", () => {
+  const issues = (type: string, visual: { x?: number; y?: number }) =>
+    validateDocument(
+      withElements([
+        {
+          id: "e1",
+          page: "p1",
+          type,
+          index: "a0",
+          semantic: type === "breadboard.board" ? { size: "half" } : {},
+          visual,
+        },
+      ] as Document["elements"]),
+    ).filter((issue) => issue.code === "schematic.coordinateRange");
+  expect(issues("schematic.junction", { x: 2e307 })).toMatchObject([
+    { severity: "error", path: "elements[0].visual.x" },
+  ]);
+  expect(issues("schematic.junction", { y: -2e9 })).toMatchObject([
+    { severity: "error", path: "elements[0].visual.y" },
+  ]);
+  expect(issues("schematic.junction", { x: 1e9, y: -1e9 })).toEqual([]);
+  expect(issues("breadboard.board", { x: 2e9 })).toEqual([]);
+});

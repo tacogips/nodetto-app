@@ -329,6 +329,44 @@ export const BREADBOARD_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.BreadboardWire, label: "Wire", icon: "wire" },
 ];
 
+export const SCHEMATIC_SHAPES: readonly ShapePaletteItem[] = [
+  { tool: Tool.SchematicResistor, label: "Resistor", icon: "resistor" },
+  { tool: Tool.SchematicCapacitor, label: "Capacitor", icon: "capacitor" },
+  {
+    tool: Tool.SchematicCapacitorPolarized,
+    label: "Polarized capacitor",
+    icon: "capacitor",
+  },
+  { tool: Tool.SchematicInductor, label: "Inductor", icon: "wire" },
+  { tool: Tool.SchematicDiode, label: "Diode", icon: "led" },
+  { tool: Tool.SchematicLed, label: "LED", icon: "led" },
+  { tool: Tool.SchematicNpn, label: "NPN transistor", icon: "transistor" },
+  { tool: Tool.SchematicPnp, label: "PNP transistor", icon: "transistor" },
+  { tool: Tool.SchematicNmos, label: "N-channel MOSFET", icon: "transistor" },
+  { tool: Tool.SchematicPmos, label: "P-channel MOSFET", icon: "transistor" },
+  { tool: Tool.SchematicSwitch, label: "Switch", icon: "node" },
+  { tool: Tool.SchematicPushButton, label: "Push button", icon: "node" },
+  {
+    tool: Tool.SchematicPotentiometer,
+    label: "Potentiometer",
+    icon: "resistor",
+  },
+  { tool: Tool.SchematicBattery, label: "Battery", icon: "node" },
+  {
+    tool: Tool.SchematicVoltageSource,
+    label: "Voltage source",
+    icon: "ellipse",
+  },
+  { tool: Tool.SchematicConnector, label: "Connector", icon: "node" },
+  { tool: Tool.SchematicIc, label: "IC", icon: "component" },
+  { tool: Tool.SchematicGround, label: "Ground", icon: "triangle" },
+  { tool: Tool.SchematicPowerRail, label: "Power rail", icon: "wire" },
+  { tool: Tool.SchematicWire, label: "Wire", icon: "wire" },
+  { tool: Tool.SchematicJunction, label: "Junction", icon: "ellipse" },
+  { tool: Tool.SchematicLabel, label: "Label", icon: "text" },
+  { tool: Tool.SchematicNoConnect, label: "No connect", icon: "cross" },
+];
+
 export const PCB_SHAPES: readonly ShapePaletteItem[] = [
   { tool: Tool.PcbTrack, label: "Track", icon: "wire" },
   { tool: Tool.PcbVia, label: "Via", icon: "ellipse" },
@@ -403,6 +441,13 @@ const PRIMARY_TOOLS = {
     Tool.BreadboardLed,
     Tool.BreadboardButton,
     Tool.BreadboardWire,
+  ],
+  schematic: [
+    Tool.SchematicResistor,
+    Tool.SchematicCapacitor,
+    Tool.SchematicGround,
+    Tool.SchematicWire,
+    Tool.SchematicLabel,
   ],
   pcb: [Tool.PcbTrack, Tool.PcbVia],
   cad3d: CAD_CREATION_TOOLS.map(({ tool }) => tool),
@@ -492,6 +537,7 @@ const PALETTE_SHAPES = [
   ...ARTBOARD_SHAPES,
   ...BPMN_SHAPES,
   ...BREADBOARD_SHAPES,
+  ...SCHEMATIC_SHAPES,
   ...PCB_SHAPES,
   ...CAD_SHAPES,
 ];
@@ -516,9 +562,11 @@ export function additionalShapes(id: WorkspaceId): readonly ShapePaletteItem[] {
       ? [...BPMN_SHAPES, ...COMMON_SHAPES]
       : id === "breadboard"
         ? [...BREADBOARD_SHAPES, ...COMMON_SHAPES]
-        : id === "pcb"
-          ? [...PCB_SHAPES, ...COMMON_SHAPES]
-          : COMMON_SHAPES
+        : id === "schematic"
+          ? [...SCHEMATIC_SHAPES, ...COMMON_SHAPES]
+          : id === "pcb"
+            ? [...PCB_SHAPES, ...COMMON_SHAPES]
+            : COMMON_SHAPES
   ).filter((item) => !primary.has(item.tool));
 }
 
@@ -600,6 +648,7 @@ export function shapePaletteGroups(
     if (BPMN_SHAPES.some((item) => item.tool === tool)) return "BPMN";
     if (BREADBOARD_SHAPES.some((item) => item.tool === tool))
       return "Breadboard";
+    if (SCHEMATIC_SHAPES.some((item) => item.tool === tool)) return "Schematic";
     if (PCB_SHAPES.some((item) => item.tool === tool)) return "PCB";
     if (ARTBOARD_SHAPES.some((item) => item.tool === tool)) return "Artboards";
     return "General";

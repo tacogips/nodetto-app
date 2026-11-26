@@ -13,13 +13,25 @@ export function annotateBreadboardParts(
     readonly reference: string;
   }[],
 ): readonly string[] {
+  return annotateReferences(
+    existing,
+    incoming.map(({ type, reference }) => ({
+      prefix: BREADBOARD_REFERENCE_PREFIX[type],
+      reference,
+    })),
+  );
+}
+
+export function annotateReferences(
+  existing: readonly string[],
+  incoming: readonly { prefix: string; reference: string }[],
+): readonly string[] {
   const used = new Set(existing);
-  return incoming.map(({ type, reference }) => {
+  return incoming.map(({ prefix, reference }) => {
     if (!reference.endsWith("?") && !used.has(reference)) {
       used.add(reference);
       return reference;
     }
-    const prefix = BREADBOARD_REFERENCE_PREFIX[type];
     let number = 1;
     while (used.has(`${prefix}${number}`)) number += 1;
     const next = `${prefix}${number}`;

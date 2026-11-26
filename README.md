@@ -86,6 +86,12 @@ Document export produces a multi-page PDF or a Markdown ZIP with SVG assets;
 the CLI also writes Markdown and a sibling assets directory. See
 [Document export](docs/import-export.md#document-export).
 
+## Schematic pages
+
+Draw circuits with symbols, orthogonal wires and named nets, check electrical
+connections, and export netlists or send a circuit to a breadboard. See
+[Schematic pages](docs/schematic.md).
+
 ## Command line
 
 Use `edit --ops` to create snippets and page frames and set page flow. Export a
@@ -102,6 +108,10 @@ nodetto-cli ddl schema.jsonl --dialect postgresql --check schema.sql
 nodetto-cli gerber import board-gerbers.zip --output board.jsonl
 nodetto-cli pcb import board.kicad_pcb --output board.jsonl
 ```
+
+| CLI command | Purpose |
+| --- | --- |
+| `schematic` | Export netlists, import KiCad schematics, or update a breadboard target. |
 
 ## KiCad PCB boards
 

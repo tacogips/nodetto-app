@@ -141,6 +141,17 @@ export {
   type BreadboardProblemRow,
 } from "./breadboard-problems.ts";
 
+export {
+  SchematicProblemsPanel,
+  type SchematicProblemsPanelProps,
+} from "./SchematicProblemsPanel.tsx";
+export {
+  schematicProblemRows,
+  canFixSchematicReferences,
+  sendSchematicToBreadboard,
+  type SchematicProblemRow,
+} from "./schematic-problems.ts";
+
 export { ExportDialog } from "./LazyExportDialog.tsx";
 
 export { Icon } from "./Icon.tsx";

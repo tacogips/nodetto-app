@@ -118,6 +118,26 @@ const TYPICAL: Readonly<Record<PageKind, readonly string[]>> = {
     "pcb.graphic",
   ],
   cad3d: CAD_ELEMENT_TYPES,
+  schematic: [
+    "schematic.resistor",
+    "schematic.capacitor",
+    "schematic.inductor",
+    "schematic.diode",
+    "schematic.led",
+    "schematic.bjt",
+    "schematic.mosfet",
+    "schematic.switch",
+    "schematic.potentiometer",
+    "schematic.battery",
+    "schematic.voltageSource",
+    "schematic.connector",
+    "schematic.ic",
+    "schematic.power",
+    "schematic.wire",
+    "schematic.junction",
+    "schematic.label",
+    "schematic.noConnect",
+  ],
 };
 
 function isPageKind(value: string): value is PageKind {

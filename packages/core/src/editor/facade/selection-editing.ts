@@ -1,8 +1,9 @@
-import type {
-  BooleanOperation,
-  ElementId,
-  PageId,
-  TextResizeMode,
+import {
+  type BooleanOperation,
+  type ElementId,
+  isSchematicElementType,
+  type PageId,
+  type TextResizeMode,
 } from "@nodetto/ir";
 import {
   type AlignMode,
@@ -35,6 +36,7 @@ import {
 } from "../../frame-selection.ts";
 import type { Vec } from "../../geometry.ts";
 import { planGroup, planUngroup } from "../../group.ts";
+import { shiftedTarget } from "../../schematic/coordinates.ts";
 import {
   planElementOrder,
   planZOrder,
@@ -189,11 +191,15 @@ export class SelectionEditing extends ElementEditing {
     if (dx === 0 && dy === 0) {
       return false;
     }
-    const moves = this.movableSelection().map((origin) => ({
-      id: origin.id,
-      x: origin.x + dx,
-      y: origin.y + dy,
-    }));
+    const moves = this.movableSelection().map((origin) => {
+      const element = this.store.get(origin.id);
+      const schematic = element && isSchematicElementType(element.type);
+      return {
+        id: origin.id,
+        x: schematic ? shiftedTarget(origin.x, dx) : origin.x + dx,
+        y: schematic ? shiftedTarget(origin.y, dy) : origin.y + dy,
+      };
+    });
     if (moves.length === 0) {
       return false;
     }

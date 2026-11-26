@@ -53,6 +53,30 @@ export const Tool = {
   BreadboardHeader: "breadboard:header",
   BreadboardBattery: "breadboard:battery",
   BreadboardWire: "breadboard:wire",
+  SchematicResistor: "schematic:resistor",
+  SchematicCapacitor: "schematic:capacitor",
+  SchematicCapacitorPolarized: "schematic:capacitor-polarized",
+  SchematicInductor: "schematic:inductor",
+  SchematicDiode: "schematic:diode",
+  SchematicLed: "schematic:led",
+  SchematicNpn: "schematic:npn",
+  SchematicPnp: "schematic:pnp",
+  SchematicNmos: "schematic:nmos",
+  SchematicPmos: "schematic:pmos",
+  SchematicSwitch: "schematic:switch",
+  SchematicPushButton: "schematic:push-button",
+  SchematicPotentiometer: "schematic:potentiometer",
+  SchematicBattery: "schematic:battery",
+  SchematicVoltageSource: "schematic:voltage-source",
+  SchematicConnector: "schematic:connector",
+  SchematicIc: "schematic:ic",
+  SchematicGround: "schematic:ground",
+  SchematicPowerRail: "schematic:power-rail",
+  SchematicWire: "schematic:wire",
+  SchematicJunction: "schematic:junction",
+  SchematicLabel: "schematic:label",
+  SchematicNoConnect: "schematic:no-connect",
+
   PcbTrack: "pcb:track",
   PcbVia: "pcb:via",
   CadSketch: "cad:sketch",
@@ -275,6 +299,77 @@ export const BREADBOARD_TOOLS = [
   Tool.BreadboardWire,
 ] as const;
 export type BreadboardToolKind = (typeof BREADBOARD_TOOLS)[number];
+
+export const SCHEMATIC_TOOLS = [
+  Tool.SchematicResistor,
+  Tool.SchematicCapacitor,
+  Tool.SchematicCapacitorPolarized,
+  Tool.SchematicInductor,
+  Tool.SchematicDiode,
+  Tool.SchematicLed,
+  Tool.SchematicNpn,
+  Tool.SchematicPnp,
+  Tool.SchematicNmos,
+  Tool.SchematicPmos,
+  Tool.SchematicSwitch,
+  Tool.SchematicPushButton,
+  Tool.SchematicPotentiometer,
+  Tool.SchematicBattery,
+  Tool.SchematicVoltageSource,
+  Tool.SchematicConnector,
+  Tool.SchematicIc,
+  Tool.SchematicGround,
+  Tool.SchematicPowerRail,
+  Tool.SchematicWire,
+  Tool.SchematicJunction,
+  Tool.SchematicLabel,
+  Tool.SchematicNoConnect,
+] as const;
+export type SchematicToolKind = (typeof SCHEMATIC_TOOLS)[number];
+
+const SCHEMATIC_CREATIONS: Readonly<Record<SchematicToolKind, CreationTool>> = {
+  [Tool.SchematicResistor]: { type: "schematic.resistor" },
+  [Tool.SchematicCapacitor]: { type: "schematic.capacitor" },
+  [Tool.SchematicCapacitorPolarized]: {
+    type: "schematic.capacitor",
+    semantic: { polarized: true },
+  },
+  [Tool.SchematicInductor]: { type: "schematic.inductor" },
+  [Tool.SchematicDiode]: { type: "schematic.diode" },
+  [Tool.SchematicLed]: { type: "schematic.led" },
+  [Tool.SchematicNpn]: { type: "schematic.bjt", semantic: { polarity: "npn" } },
+  [Tool.SchematicPnp]: { type: "schematic.bjt", semantic: { polarity: "pnp" } },
+  [Tool.SchematicNmos]: {
+    type: "schematic.mosfet",
+    semantic: { channel: "n" },
+  },
+  [Tool.SchematicPmos]: {
+    type: "schematic.mosfet",
+    semantic: { channel: "p" },
+  },
+  [Tool.SchematicSwitch]: { type: "schematic.switch" },
+  [Tool.SchematicPushButton]: {
+    type: "schematic.switch",
+    semantic: { style: "push" },
+  },
+  [Tool.SchematicPotentiometer]: { type: "schematic.potentiometer" },
+  [Tool.SchematicBattery]: { type: "schematic.battery" },
+  [Tool.SchematicVoltageSource]: { type: "schematic.voltageSource" },
+  [Tool.SchematicConnector]: { type: "schematic.connector" },
+  [Tool.SchematicIc]: { type: "schematic.ic" },
+  [Tool.SchematicGround]: {
+    type: "schematic.power",
+    semantic: { style: "ground", net: "GND" },
+  },
+  [Tool.SchematicPowerRail]: {
+    type: "schematic.power",
+    semantic: { style: "rail", net: "VCC" },
+  },
+  [Tool.SchematicWire]: { type: "schematic.wire" },
+  [Tool.SchematicJunction]: { type: "schematic.junction" },
+  [Tool.SchematicLabel]: { type: "schematic.label" },
+  [Tool.SchematicNoConnect]: { type: "schematic.noConnect" },
+};
 
 export const PCB_TOOLS = [Tool.PcbTrack, Tool.PcbVia] as const;
 export type PcbToolKind = (typeof PCB_TOOLS)[number];
@@ -543,6 +638,30 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.BreadboardBattery:
     case Tool.BreadboardWire:
       return BREADBOARD_CREATIONS[tool];
+    case Tool.SchematicResistor:
+    case Tool.SchematicCapacitor:
+    case Tool.SchematicCapacitorPolarized:
+    case Tool.SchematicInductor:
+    case Tool.SchematicDiode:
+    case Tool.SchematicLed:
+    case Tool.SchematicNpn:
+    case Tool.SchematicPnp:
+    case Tool.SchematicNmos:
+    case Tool.SchematicPmos:
+    case Tool.SchematicSwitch:
+    case Tool.SchematicPushButton:
+    case Tool.SchematicPotentiometer:
+    case Tool.SchematicBattery:
+    case Tool.SchematicVoltageSource:
+    case Tool.SchematicConnector:
+    case Tool.SchematicIc:
+    case Tool.SchematicGround:
+    case Tool.SchematicPowerRail:
+    case Tool.SchematicWire:
+    case Tool.SchematicJunction:
+    case Tool.SchematicLabel:
+    case Tool.SchematicNoConnect:
+      return SCHEMATIC_CREATIONS[tool];
     case Tool.PcbTrack:
     case Tool.PcbVia:
       return PCB_CREATIONS[tool];

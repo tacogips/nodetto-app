@@ -30,12 +30,13 @@ Convert and check
   nodetto-cli ddl <doc>           Database DDL from an ERD page
   nodetto-cli format <doc>        Canonical JSONL formatting
   nodetto-cli bundle pack|unpack  One .nodetto file with a document and its images
-  nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages
+  nodetto-cli lint <doc|bpmn>     Lint BPMN, breadboard, schematic, architecture, freeform, flowchart, ERD, state and UML pages
   nodetto-cli bpmn import|export  BPMN 2.0 XML conversion
   nodetto-cli drawio import       draw.io (.drawio) to nodetto JSONL
   nodetto-cli gerber ...          Gerber and drill files to a PCB page and back
   nodetto-cli pcb import|gerber   KiCad board to a PCB page, Gerber and drill export
   nodetto-cli cad check <doc>     Check 3D CAD history, profiles and tool bounds
+  nodetto-cli schematic ...       Netlist, KiCad import and breadboard target
   nodetto-cli breadboard ...      BOM, netlist, PCB Gerber and KiCad import
 MCP server
   nodetto-cli mcp                 Serve all CLI operations over stdio
@@ -139,7 +140,7 @@ changes it.
 
   --format  text (default) or json (an array of page summaries).
   --kind    Only pages of this kind (freeform, erd, uml, sequence, state,
-            flowchart, architecture, bpmn, breadboard, pcb or cad3d). Original
+            flowchart, architecture, bpmn, breadboard, schematic, pcb or cad3d). Original
             display numbers are retained.
 
 Short IDs are stable 11-character URL-safe aliases derived from stored page
@@ -202,7 +203,7 @@ visual fields and a minimal "add" operation for nodetto-cli edit.
 "nodetto-cli types sequence.message" describes self-messages.
 
   --kind     Only types typically drawn on this page kind (freeform, erd,
-             uml, sequence, state, flowchart, architecture, bpmn, breadboard
+             uml, sequence, state, flowchart, architecture, bpmn, breadboard, schematic
              or pcb).
   --format   text (default) or json.
 
@@ -423,7 +424,7 @@ Operations (a JSON array, or JSON Lines; --ops - reads stdin):
     add-page also takes "mode", and set-page-mode sets a page's editing mode
     (the tool palette the app shows on it; null follows the page kind):
     flow, app, web, erd, class, component, usecase, sequence, state,
-    flowchart, bpmn, breadboard, pcb or all.
+    flowchart, bpmn, breadboard, schematic, pcb or all.
 
   --arrange   Run Tidy layout on every page the batch touched.
   --dry-run   Validate and report without writing.
@@ -446,7 +447,7 @@ category. Draw one with "nodetto-cli draw <doc> <shape-id>" or with
                    contains every word (case-insensitive), e.g. actor.
   --category       Only this category, by ID or label: general, flowchart,
                    uml-class, uml-component, uml-use-case, uml-sequence,
-                   uml-state, erd, bpmn, breadboard, pcb, artboard,
+                   uml-state, erd, bpmn, breadboard, schematic, pcb, artboard,
                    ui-control or screen. A prefix before a hyphen selects a
                    family: "uml" lists every UML category.
   --connectors     Only connectors (drawn between two elements).
@@ -683,6 +684,7 @@ architecture, uml, erd
 bpmn                              pools and lanes as rows / yes / yes
 sequence                          excluded: participant and message order define geometry
 breadboard                        excluded: physical holes and electrical wires
+schematic                         excluded: electrical wiring geometry
 pcb                               excluded: physical footprints and tracks
 cad3d                             excluded: parametric 3D geometry
 ERD column ends get no ports and are not spread. On bpmn, columns are global;
@@ -746,14 +748,14 @@ Instance descendants are checked with instance context in text and JSON findings
 Text: metrics <page name>: <n> edge crossing(s), <m> edge-label overlap(s), <k> overlapping segment pair(s).
 JSON contains edgeCrossings, labelOverlaps and segmentOverlaps per page and in summary.
 Metrics cover bpmn, erd, state, uml, flowchart, architecture and freeform.
-Rules: bpmn and breadboard: existing rules and image-missing; architecture and
+Rules: bpmn, breadboard and schematic: existing rules and image-missing; architecture and
 freeform: text layout and image-missing; flowchart: text layout, node-overlap
 and image-missing; erd, state and uml: node-overlap and image-missing; other
 pages with images: image-missing.
 node-overlap and image-missing rules cover diagram pages and attachments.
 ERD frame-straddle warns when a table crosses a frame edge, naming both;
 this warning does not change the exit code.
-Lint BPMN, breadboard, architecture, freeform, flowchart, ERD, state and UML pages from a
+Lint BPMN, breadboard, schematic, architecture, freeform, flowchart, ERD, state and UML pages from a
 nodetto document or BPMN XML. Use cad check for 3D CAD pages.
 Text output is empty when clean; --format json always prints a report. A
 .bpmnlintrc in the working directory is used when --config is not given and a
@@ -774,6 +776,11 @@ export geometry fits. These stable rule ids can be used in check scripts;
 findings match export geometry, except for that wide-character width.
 
 Exit codes: 0 clean, 1 error findings, 2 usage, parse or config errors.`,
+
+  schematic: `Usage: nodetto-cli schematic netlist <document.jsonl> --format text|kicad [--page <id|name>] [--output <file>|--check <file>] [--strict]
+       nodetto-cli schematic import <file.kicad_sch|file.net> [--output <file.jsonl>] [--strict]
+       nodetto-cli schematic to-breadboard <document.jsonl> [--page <id|name>] [--breadboard <id|name>] [--output <file.jsonl>]
+`,
 
   breadboard: `Usage: nodetto-cli breadboard bom <document.jsonl> [--page <short-id|id|name>]
                                   [--output <file.csv> | --check <file.csv>] [--strict]

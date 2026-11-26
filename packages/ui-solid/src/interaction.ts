@@ -88,8 +88,10 @@ export function createInteraction(
   const snapping = createSnapping(ctx);
   // The lifecycle flushes the last queued drag sample through the pointer
   // handlers, which are built on top of it; bind late.
-  const baseLifecycle = createGestureLifecycle(ctx, (event) =>
-    pointer.applyPointerMove(event),
+  const baseLifecycle = createGestureLifecycle(
+    ctx,
+    (event) => pointer.applyPointerMove(event),
+    (gesture) => circuit.finishSchematicWirePoint(gesture),
   );
   const lifecycle = {
     ...baseLifecycle,
@@ -169,6 +171,7 @@ export function createInteraction(
     startRouteBend: editableGesture(connectors.startRouteBend),
     startRouteWaypoint: editableGesture(connectors.startRouteWaypoint),
     startBreadboardWirePoint: editableGesture(circuit.startBreadboardWirePoint),
+    nudgeSchematicWirePoint: circuit.nudgeSchematicWirePoint,
     startReconnect: editableGesture(connectors.startReconnect),
     startConnect: editableGesture(connectors.startConnect),
     flushNudge,
@@ -179,6 +182,7 @@ export function createInteraction(
     temporaryHand: ctx.temporaryHand,
     panning: ctx.panning,
     wireDraft: ctx.wireDraft,
+    schematicWireNotice: circuit.schematicWireNotice,
     breadboardHover: ctx.breadboardHover,
     pcbHover: ctx.pcbHover,
     pcbDraft: ctx.pcbDraftPoints,

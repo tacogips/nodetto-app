@@ -11,6 +11,7 @@ import {
   type ImageSemantic,
   isBreadboardElementType,
   isPcbElementType,
+  isSchematicElementType,
   type PageId,
 } from "@nodetto/ir";
 import { connectorBackdropIds } from "../backdrops.ts";
@@ -27,6 +28,10 @@ import {
   breadboardLabelBounds,
   breadboardNotation,
 } from "../breadboard/notation.ts";
+import {
+  schematicLabelBounds,
+  schematicNotation,
+} from "../schematic/notation.ts";
 import { collectCadInput } from "../cad/engine.ts";
 import { cadPageWireframe } from "../cad/wireframe.ts";
 import { intersectClip, isRasterMaskSource } from "../clipping.ts";
@@ -270,14 +275,17 @@ export function renderElementsSvg(
               activeNetlists.get(element.page) !== element.id,
           })
         : undefined;
-      const uprightLabels = breadboard?.labels.length
+      const schematic = isSchematicElementType(element.type)
+        ? schematicNotation(element, box, theme)
+        : undefined;
+      const labels = breadboard?.labels ?? schematic?.labels;
+      const prefix = schematic ? "schematic" : "breadboard";
+      const uprightLabels = labels?.length
         ? wrap(
             "g",
             { transform: `translate(${fmt(box.x)} ${fmt(box.y)})` },
-            breadboard.labels
-              .map((primitive) =>
-                renderNotationPrimitive(primitive, "breadboard"),
-              )
+            labels
+              .map((primitive) => renderNotationPrimitive(primitive, prefix))
               .join(""),
           )
         : "";
@@ -287,7 +295,14 @@ export function renderElementsSvg(
           elementGroup(
             element,
             box,
-            renderShape(element, box, theme, options.resolveAsset, breadboard),
+            renderShape(
+              element,
+              box,
+              theme,
+              options.resolveAsset,
+              breadboard,
+              schematic,
+            ),
             filter,
           ) + uprightLabels,
         ),
@@ -320,6 +335,11 @@ export function renderElementsSvg(
     if (box && isBreadboardElementType(element.type)) {
       const notation = breadboardNotation(element, box);
       boxes.push(...breadboardLabelBounds(notation, box));
+    }
+    if (box && isSchematicElementType(element.type)) {
+      boxes.push(
+        ...schematicLabelBounds(schematicNotation(element, box, theme), box),
+      );
     }
     if (box && element.type === "state.node") {
       const label = stateNodeLabelBox(element, box);

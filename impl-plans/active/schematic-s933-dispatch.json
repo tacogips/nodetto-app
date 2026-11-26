@@ -1,0 +1,909 @@
+{
+  "taskId": "schematic-s933",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-1",
+  "implementationBranch": "feat/schematic-mode",
+  "baseBranch": "feat/schematic-mode",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "da5c2570874441075652ba1274f8ba288cf099cf",
+  "designDocPaths": [
+    "design-docs/specs/design-schematic.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/schematic-00-overview.md",
+  "evidenceRoot": "tmp/schematic-s933",
+  "evidenceLayout": "Per-plan evidence under tmp/schematic-s933/<planId>/, with per-attempt subdirectories (attempt-<n>/) for repeated gate runs. tmp/schematic-s933 holds only data (.log, .md intent snapshots, .txt, .json, .jsonl), never *.test.ts or other source files. It lies outside the artifact roots target and tmp/cad3d. Cargo output goes to plan-local CARGO_TARGET_DIR under target/.",
+  "reviewContext": {
+    "issueReference": "workflowInput:opus-terra-design-and-implement-review-loop-session-933 (no GitHub issue; design accepted comm-022747; plan reviews comm-022749, comm-022751, comm-022753; plan revision comm-022752)",
+    "userProblem": "nodetto has no way to draw electrical schematics. Users and AI agents need a `schematic` page kind, like the breadboard and PCB modes, where they can place schematic symbols, connect pins with orthogonal wires and explicit junctions, name nets with labels and get connectivity and electrical rule checks. The desktop editor, SVG/PNG export, the Bun CLI and the native CLI must be able to create, edit, lint, export and capture these pages, and the pages must interoperate with breadboard/PCB parity and KiCad import.",
+    "requiredOutcomes": [
+      "A document with a schematic page can be created, edited, saved, reloaded and rendered in the desktop editor, the SVG export and the CLI capture, in both themes.",
+      "Connectivity and the electrical rule checks are covered by unit tests, including the junction and crossing rules and same-named net labels.",
+      "The native CLI (embedded interpreter) and the Bun CLI give the same lint and export results for schematic pages (native parity test, plan schematic-44).",
+      "Existing documents and all existing tests are unaffected; mise run verify and mise run test-cli pass; bun run typecheck passes under noUncheckedIndexedAccess-compatible typing.",
+      "docs/schematic.md describes the mode, the element types, the rules checked and the CLI usage; README mentions it.",
+      "Final integration gate, serial, after all plans land: bun run typecheck; bun run lint; CARGO_TERM_QUIET=true mise run verify; CARGO_TERM_QUIET=true mise run test-cli; CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/schematic-native-parity\" cargo build --release -p nodetto-cli then NODETTO_CLI_TEST_BINARY=\"$PWD/target/schematic-native-parity/release/nodetto-cli\" bun test apps/cli/src/native-parity."
+    ],
+    "nonGoals": [
+      "Multi-sheet or hierarchical schematics, buses, global versus local label scopes.",
+      "Rubber-banding wires when a symbol moves; net highlight overlay and canvas-to-panel cross-probing.",
+      "Simulation, SPICE export, BOM export and footprint assignment for schematic pages.",
+      "User-defined symbol libraries (the IC box with an editable pin table is the escape hatch).",
+      "Writing .kicad_sch, back-annotation, or changing the desktop KiCad open flow (KiCad files keep opening as breadboard imports).",
+      "Native (Rust) awareness of schematic types; no Rust source changes.",
+      "No SCHEMA_VERSION bump, no change to existing page kinds, element types, file formats or other modes' tests.",
+      "No server, auth, secrets or deployment code; no push, no history rewrite."
+    ],
+    "constraints": [
+      "Additive only: SCHEMA_VERSION stays 1; existing documents load and render unchanged.",
+      "packages/io never imports @nodetto/core; packages/core/src/pcb imports only itself; no DOM or Node APIs in packages/ir, packages/core or packages/io.",
+      "Indexed reads typed for noUncheckedIndexedAccess.",
+      "No new dependencies; bun.lock unchanged. English only, no emojis. Cargo runs with CARGO_TERM_QUIET=true.",
+      "Symbols, fixtures, rule texts and names are nodetto's own; nothing copied from KiCad, Fritzing or any other project; no names or data from user screenshots or issues.",
+      "Heavy per-pixel/per-vertex/per-byte work stays in Rust; per-element work linear; no regex-heavy or per-character loops in hot paths; new performance behaviour asserted with work counters, never wall-clock.",
+      "UI uses existing CSS tokens only, works in light and dark themes and is keyboard reachable.",
+      "Plans edit only their writePaths; files shared between plans are chained with dependsOn (overview 'Shared files and their single owner chain'); every successor on a chained file reruns the earlier owner's tests.",
+      "Per-plan gates are focused bun test runs plus bunx biome check on owned files; never bun run typecheck, bun run lint or mise run verify as a plan gate. At most two bun test or cargo processes at once across workers.",
+      "Workers follow the overview per-worker protocol: pre/post hashes, intent snapshots under tmp/schematic-s933/<planId>/, own progress log impl-plans/progress/<planId>.md, foreground commands with full logs, no git write operations, no repo-wide formatter.",
+      "Timing or deadline tests that fail in an aggregate gate but pass alone count as passing (record both logs, up to three attempts); existing tests and deadlines are never relaxed or deleted.",
+      "Never leave *.test.ts files under target/ or tmp/."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "One element type per symbol (18 schematic.* types: 13 parts plus power, wire, junction, label, noConnect); polarity variants are fields.", "rationale": "Breadboard precedent; per-type registry defaults keep types, edit add and validation simple (design 13 item 1)."},
+      {"decision": "Mirror reuses Visual.flipX; pitch 10 equals breadboard so snapBreadboardPoint is reused; rotation and mirror keep the anchor pin exactly fixed.", "rationale": "Reuse existing semantics and snapping without changing breadboard results (design 13 items 2-4)."},
+      {"decision": "Only pins, power pins, wire ends, junctions and label anchors join by coincidence; bends never do; a crossing without a junction is not a connection; the wire tool adds a junction only for a deliberate T.", "rationale": "Prevents polyline edits, labels or snaps from shorting crossing wires (design 13 item 5)."},
+      {"decision": "One label namespace per page; labels join power nets of the same name.", "rationale": "Single-sheet scope (design 13 item 6)."},
+      {"decision": "ERC: unconnected pins, dangling wire ends and single-pin nets are warnings; duplicate references and shorted power nets are errors.", "rationale": "Breadboard precedent; drafts must lint (design 13 item 7)."},
+      {"decision": "Schematic as breadboard netlist source goes through the existing breadboard target card via mapKicadSymbol; invalid projections fail explicitly and leave the card untouched.", "rationale": "No breadboard type, enum or rule change; equivalence test pins it to the KiCad netlist round trip (design 13 item 9)."},
+      {"decision": "PCB parity is live against the first schematic page; PCB pages are linted only when a schematic page exists.", "rationale": "PCB pages have no card and adding a pcb.* type is not additive-only; PCB-only documents unchanged (design 13 item 10)."},
+      {"decision": "KiCad import onto a schematic page connects through net labels on pin stubs; KiCad files still open as breadboard imports on desktop; schematic import is the CLI schematic import.", "rationale": "nodetto symbols have their own pin geometry (design 13 item 11)."},
+      {"decision": "Netlist text format is nodetto's own, versioned by its first line; the KiCad netlist reuses the existing writer through a widened structural input type.", "rationale": "Small, documented, reuses writer infrastructure (design 13 item 13, plan schematic-12)."},
+      {"decision": "Wires must be orthogonal (schematic.wireDiagonal); the row/column sweep lives in packages/ir/src/segment-sweep.ts shared by core and io.", "rationale": "Bounds all path lookups without a diagonal fallback; io cannot import core (design 13 items 15-16)."},
+      {"decision": "Electrical identity uses coordinateKey over roundCoordinate moved unchanged to packages/ir/src/keyOrder.ts; schematic coordinates limited to +-1e9; moves use canonical shared deltas.", "rationale": "Live and reloaded connectivity identical without changing JSONL output (design 13 item 18)."},
+      {"decision": "Existing KiCad importers are made linear without changing results, with brute-force oracle tests and work counters; diagonal lookups are counted and budgeted only on the schematic import path.", "rationale": "The native interpreter must not inherit all-pairs scans (design 13 item 19, 14)."},
+      {"decision": "UI wire draft reuses state.wirePoints and ctx.wireDraft; plan schematic-39 adds exactly one schematicWireNotice field to interaction.ts and interaction/types.ts; plan schematic-45 renders the notice with role=status.", "rationale": "Review decisions SCH-PLAN-001 and SCH-PLAN-004 (comm-022753)."},
+      {"decision": "Shared files are owned by single dependsOn chains and successors rerun predecessor tests.", "rationale": "Review decisions SCH-PLAN-002 and SCH-PLAN-003 (comm-022753)."},
+      {"decision": "Wire drawing and wire point editing share one target classification (plan 39 classifySchematicWireTarget); Shift comes from the pointer event (plan 39 owns one pointer.ts branch); start and finish junctions are committed with the wire in one batch; point edits keep untouched endpoints fixed with local orthogonal elbows, classify released ends like clicks, abort on a labelled crossing, and are keyboard operable through focusable handles (plan 46 edit logic, plan 45 handles).", "rationale": "Design 7.3 revisions 9-10 and design 13 item 20 (revision 10 adds core exclusion before ranking in plan 47, classify-once commits, and resulting-index focus, comm-000050); review findings SCH-DESIGN-WIRE-SHIFT, SCH-DESIGN-WIRE-TWO-JUNCTIONS, SCH-DESIGN-DRAG-LABEL, SCH-DESIGN-DRAG-ANCHORS, SCH-DESIGN-HANDLE-KEYBOARD (comm-000048)."}
+    ],
+    "intentionalTradeoffs": [
+      "Plan schematic-39 touches 6 source files in 122 lines, slightly above the about-4-files guide; the two extra files get one-line edits requested by review.",
+      "Between plans 01 and 35, PAGE_MODES and WorkspaceId typing is temporarily inconsistent; only the final typecheck sees it.",
+      "The UI chain ends in wave 12 and wave 8 runs 8 plans in parallel; the hash and drift protocol is the mitigation.",
+      "Plan line numbers for existing code are approximate; workers read the current file before editing.",
+      "Adversarial diagonal-heavy KiCad schematic inputs are refused with schematic.importTooComplex instead of a slow import."
+    ],
+    "supportedEdgeCases": [
+      "Wire crossing without a junction stays two nets; junction on a crossing joins all wires through it.",
+      "Same-named labels and power symbols join nets on one page.",
+      "Off-grid parts, negative-coordinate ties and group moves give identical live and reloaded connectivity.",
+      "Sparse IC pin numbering and up to 256 IC pins; connectors up to 40 pins.",
+      "Duplicate or unannotated references fail the breadboard projection explicitly.",
+      "Empty schematic pages in all PAGE_KINDS-looping tests."
+    ],
+    "outOfScopeEdgeCases": [
+      "Hierarchical sheets, buses and global/local label scopes.",
+      "Wire rubber-banding on symbol move.",
+      "Writing .kicad_sch or back-annotation.",
+      "Diagonal wires on schematic pages (rejected by validation)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-schematic.md",
+      "design-docs/specs/design-breadboard.md",
+      "design-docs/specs/design-bpmn.md",
+      "impl-plans/active/schematic-00-overview.md",
+      "packages/core/src/breadboard",
+      "packages/io/src/kicad/schematic.ts",
+      "packages/io/src/kicad/netlist.ts",
+      "packages/ui-solid/src/interaction/keyboard.ts"
+    ]
+  },
+  "acceptedDependencies": [],
+  "plans": [
+    {
+      "planId": "schematic-01-ir-semantics",
+      "planPath": "impl-plans/active/schematic-01-ir-semantics.md",
+      "progressPath": "impl-plans/progress/schematic-01-ir-semantics.md",
+      "dependsOn": [],
+      "writePaths": ["packages/ir/src/types.ts", "packages/ir/src/semantics/schematic.ts", "packages/ir/src/semantics.ts", "packages/ir/src/index.ts", "packages/ir/src/semantics/schematic.test.ts", "apps/cli/src/types-command.ts", "impl-plans/progress/schematic-01-ir-semantics.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "schematic is appended to PAGE_KINDS and PAGE_MODES and DEDICATED_PAGE_MODES; existing entries and order unchanged.",
+        "semantics/schematic.ts defines the 18 SCHEMATIC_ELEMENT_TYPES, 13 part types, reference prefixes, enums, payload types, SCHEMATIC_PITCH and SCHEMATIC_COORDINATE_LIMIT; exported via semantics.ts and ir index.",
+        "types-command.ts TYPICAL gains only the schematic entry.",
+        "New semantics/schematic.test.ts passes with at least 4 tests; existing PAGE_KINDS-looping tests pass unedited."
+      ],
+      "verification": [
+        "bun test packages/ir/src/semantics/schematic.test.ts",
+        "bun test packages/ir/src/page-content.test.ts packages/ir/src/breadboard.test.ts packages/ui-solid/src/canvas/canvas-background.test.ts apps/cli/src/capture-command.test.ts",
+        "bunx biome check packages/ir/src/types.ts packages/ir/src/semantics/schematic.ts packages/ir/src/semantics.ts packages/ir/src/index.ts packages/ir/src/semantics/schematic.test.ts apps/cli/src/types-command.ts"
+      ]
+    },
+    {
+      "planId": "schematic-02-ir-registry",
+      "planPath": "impl-plans/active/schematic-02-ir-registry.md",
+      "progressPath": "impl-plans/progress/schematic-02-ir-registry.md",
+      "dependsOn": ["schematic-01-ir-semantics"],
+      "writePaths": ["packages/ir/src/registry/schematic.ts", "packages/ir/src/registry.ts", "packages/ir/src/registry/schematic.test.ts", "packages/ir/src/registry.test.ts", "impl-plans/progress/schematic-02-ir-registry.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The 18 schematic.* types are registered with defaults, key order and structural validation.",
+        "registry.test.ts change is only the 18 added names; all registry tests pass."
+      ],
+      "verification": [
+        "bun test packages/ir/src/registry/schematic.test.ts packages/ir/src/registry.test.ts",
+        "bunx biome check packages/ir/src/registry/schematic.ts packages/ir/src/registry.ts packages/ir/src/registry/schematic.test.ts packages/ir/src/registry.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-03-ir-coordinate",
+      "planPath": "impl-plans/active/schematic-03-ir-coordinate.md",
+      "progressPath": "impl-plans/progress/schematic-03-ir-coordinate.md",
+      "dependsOn": ["schematic-01-ir-semantics"],
+      "writePaths": ["packages/ir/src/keyOrder.ts", "packages/io/src/jsonl/canonical.ts", "packages/ir/src/index.ts", "packages/ir/src/coordinate-key.test.ts", "impl-plans/progress/schematic-03-ir-coordinate.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "roundCoordinate moved unchanged into packages/ir/src/keyOrder.ts and coordinateKey added; both exported from ir index; canonical.ts imports it.",
+        "JSONL output byte-identical: canonical.test.ts unedited and passing, golden.test.ts passing; plan 01 test still passes on the shared ir index."
+      ],
+      "verification": [
+        "bun test packages/ir/src/coordinate-key.test.ts packages/io/src/jsonl/canonical.test.ts packages/ir/src/semantics/schematic.test.ts",
+        "bun test packages/io/src/jsonl/golden.test.ts",
+        "bunx biome check packages/ir/src/keyOrder.ts packages/io/src/jsonl/canonical.ts packages/ir/src/index.ts packages/ir/src/coordinate-key.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-04-ir-sweep-netlist-model",
+      "planPath": "impl-plans/active/schematic-04-ir-sweep-netlist-model.md",
+      "progressPath": "impl-plans/progress/schematic-04-ir-sweep-netlist-model.md",
+      "dependsOn": ["schematic-01-ir-semantics", "schematic-03-ir-coordinate"],
+      "writePaths": ["packages/ir/src/segment-sweep.ts", "packages/ir/src/segment-sweep.test.ts", "packages/ir/src/schematic.ts", "packages/ir/src/index.ts", "impl-plans/progress/schematic-04-ir-sweep-netlist-model.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "ir exports sweepAxisContacts with its types and the SchematicNetlist data model.",
+        "Sweep work is pinned by work-count tests for the ordinary and crowded same-row cases; plans 01 and 03 tests still pass."
+      ],
+      "verification": [
+        "bun test packages/ir/src/segment-sweep.test.ts packages/ir/src/semantics/schematic.test.ts packages/ir/src/coordinate-key.test.ts",
+        "bunx biome check packages/ir/src/segment-sweep.ts packages/ir/src/segment-sweep.test.ts packages/ir/src/schematic.ts packages/ir/src/index.ts"
+      ]
+    },
+    {
+      "planId": "schematic-05-ir-range-golden",
+      "planPath": "impl-plans/active/schematic-05-ir-range-golden.md",
+      "progressPath": "impl-plans/progress/schematic-05-ir-range-golden.md",
+      "dependsOn": ["schematic-02-ir-registry"],
+      "writePaths": ["packages/ir/src/validate.ts", "packages/ir/src/validate.test.ts", "packages/io/src/jsonl/golden.test.ts", "packages/io/src/__fixtures__/schematic.jsonl", "impl-plans/progress/schematic-05-ir-range-golden.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "validate.ts adds a schematic-only coordinate range branch; validate.test.ts gains cases only.",
+        "A schematic.jsonl golden fixture covers all 18 types and GOLDEN gains only schematic; all pre-existing golden fixtures still pass."
+      ],
+      "verification": [
+        "bun test packages/ir/src/validate.test.ts packages/io/src/jsonl/golden.test.ts",
+        "bunx biome check packages/ir/src/validate.ts packages/ir/src/validate.test.ts packages/io/src/jsonl/golden.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-06-io-kicad-netlist-linear",
+      "planPath": "impl-plans/active/schematic-06-io-kicad-netlist-linear.md",
+      "progressPath": "impl-plans/progress/schematic-06-io-kicad-netlist-linear.md",
+      "dependsOn": [],
+      "writePaths": ["packages/io/src/kicad/netlist.ts", "packages/io/src/kicad/index.ts", "packages/io/src/kicad/netlist.test.ts", "impl-plans/progress/schematic-06-io-kicad-netlist-linear.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The KiCad .net importer is linear (node rows indexed by reference) with identical results; importKicad gains the optional stats option.",
+        "Existing netlist assertions untouched and passing; new work-count test passes; breadboard KiCad golden unchanged."
+      ],
+      "verification": [
+        "bun test packages/io/src/kicad/netlist.test.ts packages/io/src/kicad/symbol-map.test.ts packages/core/src/breadboard/kicad-golden.test.ts",
+        "bunx biome check packages/io/src/kicad/netlist.ts packages/io/src/kicad/index.ts packages/io/src/kicad/netlist.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-07-io-kicad-diagonal-lookup",
+      "planPath": "impl-plans/active/schematic-07-io-kicad-diagonal-lookup.md",
+      "progressPath": "impl-plans/progress/schematic-07-io-kicad-diagonal-lookup.md",
+      "dependsOn": [],
+      "writePaths": ["packages/io/src/kicad/diagonal-lookup.ts", "packages/io/src/kicad/diagonal-lookup.test.ts", "impl-plans/progress/schematic-07-io-kicad-diagonal-lookup.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "A pure diagonal-lookup module returns candidate (segment, point) pairs for diagonal KiCad wires with counted, bounded work and the budget policy contract.",
+        "Tests assert work counts, never wall-clock time."
+      ],
+      "verification": [
+        "bun test packages/io/src/kicad/diagonal-lookup.test.ts",
+        "bunx biome check packages/io/src/kicad/diagonal-lookup.ts packages/io/src/kicad/diagonal-lookup.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-08-core-symbols",
+      "planPath": "impl-plans/active/schematic-08-core-symbols.md",
+      "progressPath": "impl-plans/progress/schematic-08-core-symbols.md",
+      "dependsOn": ["schematic-01-ir-semantics"],
+      "writePaths": ["packages/core/src/union-find.ts", "packages/core/src/union-find.test.ts", "packages/core/src/schematic/symbols.ts", "packages/core/src/schematic/symbols.test.ts", "impl-plans/progress/schematic-08-core-symbols.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "symbols.ts provides pin tables, boxes and page pin positions for every schematic type under rotation and mirror.",
+        "A shared union-find helper exists with tests; breadboard behaviour untouched."
+      ],
+      "verification": [
+        "bun test packages/core/src/union-find.test.ts packages/core/src/schematic/symbols.test.ts",
+        "bunx biome check packages/core/src/union-find.ts packages/core/src/union-find.test.ts packages/core/src/schematic/symbols.ts packages/core/src/schematic/symbols.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-09-core-coordinates-snap",
+      "planPath": "impl-plans/active/schematic-09-core-coordinates-snap.md",
+      "progressPath": "impl-plans/progress/schematic-09-core-coordinates-snap.md",
+      "dependsOn": ["schematic-03-ir-coordinate", "schematic-08-core-symbols"],
+      "writePaths": ["packages/core/src/schematic/coordinates.ts", "packages/core/src/schematic/coordinates.test.ts", "packages/core/src/schematic/snap.ts", "packages/core/src/schematic/snap.test.ts", "impl-plans/progress/schematic-09-core-coordinates-snap.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Pure helpers for serialization-stable electrical keys, canonical move targets (canonicalTarget, shiftedTarget) and the schematic snap delta exist with passing tests."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/coordinates.test.ts packages/core/src/schematic/snap.test.ts",
+        "bunx biome check packages/core/src/schematic/coordinates.ts packages/core/src/schematic/coordinates.test.ts packages/core/src/schematic/snap.ts packages/core/src/schematic/snap.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-10-core-shape-utils",
+      "planPath": "impl-plans/active/schematic-10-core-shape-utils.md",
+      "progressPath": "impl-plans/progress/schematic-10-core-shape-utils.md",
+      "dependsOn": ["schematic-08-core-symbols"],
+      "writePaths": ["packages/core/src/shapes/schematic.ts", "packages/core/src/shapes/schematic.test.ts", "packages/core/src/shapes/index.ts", "impl-plans/progress/schematic-10-core-shape-utils.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Shape utils for the 18 schematic types (bounds, hit-test, no resize) and the two wire-tool lookup helpers are registered and tested."
+      ],
+      "verification": [
+        "bun test packages/core/src/shapes/schematic.test.ts",
+        "bunx biome check packages/core/src/shapes/schematic.ts packages/core/src/shapes/schematic.test.ts packages/core/src/shapes/index.ts"
+      ]
+    },
+    {
+      "planId": "schematic-11-core-transform-extraction",
+      "planPath": "impl-plans/active/schematic-11-core-transform-extraction.md",
+      "progressPath": "impl-plans/progress/schematic-11-core-transform-extraction.md",
+      "dependsOn": ["schematic-08-core-symbols", "schematic-09-core-coordinates-snap"],
+      "writePaths": ["packages/core/src/breadboard/rotate.ts", "packages/core/src/breadboard/annotate.ts", "packages/core/src/schematic/transform.ts", "packages/core/src/schematic/transform.test.ts", "impl-plans/progress/schematic-11-core-transform-extraction.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Breadboard rotation and annotation logic is extracted into shared helpers with identical breadboard results (breadboard tests unchanged and passing).",
+        "Schematic rotate, mirror and annotate planners keep the anchor position key exactly."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/transform.test.ts packages/core/src/breadboard/annotate.test.ts packages/core/src/breadboard/editor-breadboard.test.ts",
+        "bunx biome check packages/core/src/breadboard/rotate.ts packages/core/src/breadboard/annotate.ts packages/core/src/schematic/transform.ts packages/core/src/schematic/transform.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-12-io-formatters",
+      "planPath": "impl-plans/active/schematic-12-io-formatters.md",
+      "progressPath": "impl-plans/progress/schematic-12-io-formatters.md",
+      "dependsOn": ["schematic-04-ir-sweep-netlist-model"],
+      "writePaths": ["packages/io/src/schematic/netlist-text.ts", "packages/io/src/schematic/index.ts", "packages/io/src/breadboard/kicad-netlist.ts", "packages/io/src/breadboard/bom.ts", "packages/io/src/schematic/formatters.test.ts", "impl-plans/progress/schematic-12-io-formatters.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "exportSchematicNetlistText produces the documented, versioned netlist text format.",
+        "The KiCad netlist writer accepts a widened structural KicadNetlistInput; breadboard formatter tests unchanged and passing."
+      ],
+      "verification": [
+        "bun test packages/io/src/schematic/formatters.test.ts packages/io/src/breadboard/formatters.test.ts",
+        "bunx biome check packages/io/src/schematic/netlist-text.ts packages/io/src/schematic/index.ts packages/io/src/breadboard/kicad-netlist.ts packages/io/src/breadboard/bom.ts packages/io/src/schematic/formatters.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-13-io-breadboard-target",
+      "planPath": "impl-plans/active/schematic-13-io-breadboard-target.md",
+      "progressPath": "impl-plans/progress/schematic-13-io-breadboard-target.md",
+      "dependsOn": ["schematic-12-io-formatters"],
+      "writePaths": ["packages/io/src/schematic/breadboard-target.ts", "packages/io/src/schematic/breadboard-target.test.ts", "packages/io/src/schematic/index.ts", "packages/io/src/index.ts", "impl-plans/progress/schematic-13-io-breadboard-target.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "breadboardTargetFromSchematic projects a SchematicNetlist into a BreadboardNetlistSemantic target via mapKicadSymbol, or fails explicitly for invalid projections.",
+        "Equivalence with the KiCad netlist round trip is tested; plan 12 formatter tests still pass."
+      ],
+      "verification": [
+        "bun test packages/io/src/schematic/breadboard-target.test.ts packages/io/src/kicad/symbol-map.test.ts packages/io/src/schematic/formatters.test.ts",
+        "bunx biome check packages/io/src/schematic/breadboard-target.ts packages/io/src/schematic/breadboard-target.test.ts packages/io/src/schematic/index.ts packages/io/src/index.ts"
+      ]
+    },
+    {
+      "planId": "schematic-14-io-skip-collab",
+      "planPath": "impl-plans/active/schematic-14-io-skip-collab.md",
+      "progressPath": "impl-plans/progress/schematic-14-io-skip-collab.md",
+      "dependsOn": ["schematic-02-ir-registry"],
+      "writePaths": ["packages/io/src/d2/export.ts", "packages/io/src/schematic/skip.test.ts", "packages/collab/src/test-fixtures.ts", "packages/collab/src/schematic.test.ts", "impl-plans/progress/schematic-14-io-skip-collab.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Mermaid and D2 exports skip schematic elements cleanly.",
+        "Collab Y.Doc round trip and concurrent edits cover schematic elements; existing breadboard collab tests pass."
+      ],
+      "verification": [
+        "bun test packages/io/src/schematic/skip.test.ts packages/io/src/d2/export.test.ts packages/collab/src/schematic.test.ts packages/collab/src/breadboard.test.ts",
+        "bunx biome check packages/io/src/d2/export.ts packages/io/src/schematic/skip.test.ts packages/collab/src/test-fixtures.ts packages/collab/src/schematic.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-15-io-kicad-schematic-contacts",
+      "planPath": "impl-plans/active/schematic-15-io-kicad-schematic-contacts.md",
+      "progressPath": "impl-plans/progress/schematic-15-io-kicad-schematic-contacts.md",
+      "dependsOn": ["schematic-04-ir-sweep-netlist-model", "schematic-06-io-kicad-netlist-linear", "schematic-07-io-kicad-diagonal-lookup"],
+      "writePaths": ["packages/io/src/kicad/schematic.ts", "packages/io/src/kicad/index.ts", "packages/io/src/kicad/schematic.test.ts", "impl-plans/progress/schematic-15-io-kicad-schematic-contacts.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The .kicad_sch importer replaces the all-pairs segment/point scan with sweep and diagonal-lookup candidates confirmed by the unchanged onSegment.",
+        "Opt-in diagonalBudget: \"schematic\" policy added; a brute-force oracle test pins identical results; existing KiCad and breadboard tests pass."
+      ],
+      "verification": [
+        "bun test packages/io/src/kicad/schematic.test.ts packages/io/src/kicad/netlist.test.ts packages/core/src/breadboard/kicad-golden.test.ts",
+        "bunx biome check packages/io/src/kicad/schematic.ts packages/io/src/kicad/index.ts packages/io/src/kicad/schematic.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-16-core-editor-intents",
+      "planPath": "impl-plans/active/schematic-16-core-editor-intents.md",
+      "progressPath": "impl-plans/progress/schematic-16-core-editor-intents.md",
+      "dependsOn": ["schematic-02-ir-registry", "schematic-11-core-transform-extraction"],
+      "writePaths": ["packages/core/src/editor/schematic.ts", "packages/core/src/editor/facade/notation-editing.ts", "packages/core/src/editor/paste.ts", "packages/core/src/schematic/editor-schematic.test.ts", "impl-plans/progress/schematic-16-core-editor-intents.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Editor facade methods for schematic creation, rotation, mirror, parameter edits and annotation, plus the paste annotation hook, are implemented and tested.",
+        "Breadboard editor tests unchanged and passing."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/editor-schematic.test.ts packages/core/src/breadboard/editor-breadboard.test.ts",
+        "bunx biome check packages/core/src/editor/schematic.ts packages/core/src/editor/facade/notation-editing.ts packages/core/src/editor/paste.ts packages/core/src/schematic/editor-schematic.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-17-core-move-contract",
+      "planPath": "impl-plans/active/schematic-17-core-move-contract.md",
+      "progressPath": "impl-plans/progress/schematic-17-core-move-contract.md",
+      "dependsOn": ["schematic-02-ir-registry", "schematic-09-core-coordinates-snap"],
+      "writePaths": ["packages/core/src/editor/facade/element-editing.ts", "packages/core/src/editor/facade/selection-editing.ts", "packages/core/src/editor/schematic-move.test.ts", "impl-plans/progress/schematic-17-core-move-contract.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Keyboard nudge builds schematic destinations from one shared canonical delta; Editor.moveElements keeps schematic destinations canonical.",
+        "Existing editor tests pass unchanged."
+      ],
+      "verification": [
+        "bun test packages/core/src/editor/schematic-move.test.ts packages/core/src/editor.test.ts",
+        "bunx biome check packages/core/src/editor/facade/element-editing.ts packages/core/src/editor/facade/selection-editing.ts packages/core/src/editor/schematic-move.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-18-core-connectivity",
+      "planPath": "impl-plans/active/schematic-18-core-connectivity.md",
+      "progressPath": "impl-plans/progress/schematic-18-core-connectivity.md",
+      "dependsOn": ["schematic-04-ir-sweep-netlist-model", "schematic-08-core-symbols", "schematic-09-core-coordinates-snap"],
+      "writePaths": ["packages/core/src/schematic/connectivity.ts", "packages/core/src/schematic/connectivity.test.ts", "impl-plans/progress/schematic-18-core-connectivity.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The connectivity engine forms nets from pins, power pins, wire ends, junctions and same-named labels on integer keys.",
+        "Tests cover junction joins, crossing without junction is not a connection, T without junction separate, label rules, and work-count linearity."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/connectivity.test.ts",
+        "bunx biome check packages/core/src/schematic/connectivity.ts packages/core/src/schematic/connectivity.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-19-core-notation",
+      "planPath": "impl-plans/active/schematic-19-core-notation.md",
+      "progressPath": "impl-plans/progress/schematic-19-core-notation.md",
+      "dependsOn": ["schematic-08-core-symbols"],
+      "writePaths": ["packages/core/src/schematic/notation.ts", "packages/core/src/schematic/notation.test.ts", "impl-plans/progress/schematic-19-core-notation.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Original IEC/IEEE-style line-art primitives exist for every schematic type, shared by canvas and SVG export, drawn by nodetto's own code."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/notation.test.ts",
+        "bunx biome check packages/core/src/schematic/notation.ts packages/core/src/schematic/notation.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-20-io-kicad-schematic-labels",
+      "planPath": "impl-plans/active/schematic-20-io-kicad-schematic-labels.md",
+      "progressPath": "impl-plans/progress/schematic-20-io-kicad-schematic-labels.md",
+      "dependsOn": ["schematic-15-io-kicad-schematic-contacts"],
+      "writePaths": ["packages/io/src/kicad/schematic.ts", "packages/io/src/kicad/schematic.test.ts", "impl-plans/progress/schematic-20-io-kicad-schematic-labels.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Label texts are resolved once per final union-find root with identical names; labelVisits work counter bounded by anchors + nets.",
+        "Oracle equality and plan 15 tests still pass; breadboard KiCad golden unchanged."
+      ],
+      "verification": [
+        "bun test packages/io/src/kicad/schematic.test.ts packages/core/src/breadboard/kicad-golden.test.ts",
+        "bunx biome check packages/io/src/kicad/schematic.ts packages/io/src/kicad/schematic.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-21-core-netlist-names",
+      "planPath": "impl-plans/active/schematic-21-core-netlist-names.md",
+      "progressPath": "impl-plans/progress/schematic-21-core-netlist-names.md",
+      "dependsOn": ["schematic-18-core-connectivity"],
+      "writePaths": ["packages/core/src/schematic/net-names.ts", "packages/core/src/schematic/netlist.ts", "packages/core/src/schematic/netlist.test.ts", "impl-plans/progress/schematic-21-core-netlist-names.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "toSchematicNetlist builds a SchematicNetlist from connectivity with unique, deterministic net names (explicit names first, generated names checked against all reserved names)."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/netlist.test.ts",
+        "bunx biome check packages/core/src/schematic/net-names.ts packages/core/src/schematic/netlist.ts packages/core/src/schematic/netlist.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-22-core-erc",
+      "planPath": "impl-plans/active/schematic-22-core-erc.md",
+      "progressPath": "impl-plans/progress/schematic-22-core-erc.md",
+      "dependsOn": ["schematic-18-core-connectivity"],
+      "writePaths": ["packages/core/src/schematic/erc.ts", "packages/core/src/schematic/erc.test.ts", "impl-plans/progress/schematic-22-core-erc.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "lintSchematicPage implements the five ERC rules (unconnected pins, dangling wire ends, single-pin nets as warnings; duplicate references and shorted power nets as errors) with tests."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/erc.test.ts",
+        "bunx biome check packages/core/src/schematic/erc.ts packages/core/src/schematic/erc.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-23-core-connectivity-roundtrip",
+      "planPath": "impl-plans/active/schematic-23-core-connectivity-roundtrip.md",
+      "progressPath": "impl-plans/progress/schematic-23-core-connectivity-roundtrip.md",
+      "dependsOn": ["schematic-05-ir-range-golden", "schematic-11-core-transform-extraction", "schematic-17-core-move-contract", "schematic-18-core-connectivity"],
+      "writePaths": ["packages/core/src/schematic/connectivity-roundtrip.test.ts", "impl-plans/progress/schematic-23-core-connectivity-roundtrip.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Live and reloaded connectivity agree for off-grid positions, negative ties, rotations and moves through the real move path; coordinate range validation is exercised."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/connectivity-roundtrip.test.ts",
+        "bunx biome check packages/core/src/schematic/connectivity-roundtrip.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-24-core-svg-export",
+      "planPath": "impl-plans/active/schematic-24-core-svg-export.md",
+      "progressPath": "impl-plans/progress/schematic-24-core-svg-export.md",
+      "dependsOn": ["schematic-19-core-notation"],
+      "writePaths": ["packages/core/src/svg-export/notation.ts", "packages/core/src/svg-export/shapes.ts", "packages/core/src/svg-export/document.ts", "packages/core/src/schematic/svg-export.test.ts", "impl-plans/progress/schematic-24-core-svg-export.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "SVG export renders schematic elements from the shared notation in light and dark themes (so PNG/JPG capture works); breadboard SVG export tests unchanged and passing."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/svg-export.test.ts packages/core/src/breadboard/svg-export-breadboard.test.ts",
+        "bunx biome check packages/core/src/svg-export/notation.ts packages/core/src/svg-export/shapes.ts packages/core/src/svg-export/document.ts packages/core/src/schematic/svg-export.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-25-core-import-layout",
+      "planPath": "impl-plans/active/schematic-25-core-import-layout.md",
+      "progressPath": "impl-plans/progress/schematic-25-core-import-layout.md",
+      "dependsOn": ["schematic-02-ir-registry", "schematic-21-core-netlist-names"],
+      "writePaths": ["packages/core/src/schematic/import-layout.ts", "packages/core/src/schematic/import-layout.test.ts", "impl-plans/progress/schematic-25-core-import-layout.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "A BreadboardImportPlan is laid out as a new schematic document whose netlist reproduces the plan's partition through net labels on pin stubs; invalid inputs fail with errors and write nothing."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/import-layout.test.ts",
+        "bunx biome check packages/core/src/schematic/import-layout.ts packages/core/src/schematic/import-layout.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-26-core-breadboard-target-intent",
+      "planPath": "impl-plans/active/schematic-26-core-breadboard-target-intent.md",
+      "progressPath": "impl-plans/progress/schematic-26-core-breadboard-target-intent.md",
+      "dependsOn": ["schematic-13-io-breadboard-target", "schematic-16-core-editor-intents", "schematic-21-core-netlist-names"],
+      "writePaths": ["packages/core/src/schematic/target-card.ts", "packages/core/src/editor/facade/notation-editing.ts", "packages/core/src/schematic/interop.test.ts", "impl-plans/progress/schematic-26-core-breadboard-target-intent.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Editor.setBreadboardTarget writes or replaces the breadboard target card from a projected schematic target; interop test proves breadboard parity end to end.",
+        "Plan 16 editor-schematic tests and breadboard parity tests still pass."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/interop.test.ts packages/core/src/breadboard/parity.test.ts packages/core/src/schematic/editor-schematic.test.ts",
+        "bunx biome check packages/core/src/schematic/target-card.ts packages/core/src/editor/facade/notation-editing.ts packages/core/src/schematic/interop.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-27-core-pcb-parity",
+      "planPath": "impl-plans/active/schematic-27-core-pcb-parity.md",
+      "progressPath": "impl-plans/progress/schematic-27-core-pcb-parity.md",
+      "dependsOn": ["schematic-21-core-netlist-names"],
+      "writePaths": ["packages/core/src/schematic/pcb-parity.ts", "packages/core/src/schematic/pcb-parity.test.ts", "impl-plans/progress/schematic-27-core-pcb-parity.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Live schematic-to-PCB parity findings for a PCB page against the first schematic page, with missing parts reported on the schematic part with its pageId; packages/core/src/pcb not modified."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/pcb-parity.test.ts",
+        "bunx biome check packages/core/src/schematic/pcb-parity.ts packages/core/src/schematic/pcb-parity.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-28-core-exports",
+      "planPath": "impl-plans/active/schematic-28-core-exports.md",
+      "progressPath": "impl-plans/progress/schematic-28-core-exports.md",
+      "dependsOn": ["schematic-10-core-shape-utils", "schematic-16-core-editor-intents", "schematic-17-core-move-contract", "schematic-22-core-erc", "schematic-23-core-connectivity-roundtrip", "schematic-24-core-svg-export", "schematic-25-core-import-layout", "schematic-26-core-breadboard-target-intent", "schematic-27-core-pcb-parity"],
+      "writePaths": ["packages/core/src/schematic/index.ts", "packages/core/src/index.ts", "packages/core/src/schematic/index.test.ts", "impl-plans/progress/schematic-28-core-exports.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The schematic core API is exposed through @nodetto/core via schematic/index.ts in one serial step; all schematic core tests pass."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/index.test.ts",
+        "bun test packages/core/src/schematic",
+        "bunx biome check packages/core/src/schematic/index.ts packages/core/src/index.ts packages/core/src/schematic/index.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-29-core-tools-catalogue",
+      "planPath": "impl-plans/active/schematic-29-core-tools-catalogue.md",
+      "progressPath": "impl-plans/progress/schematic-29-core-tools-catalogue.md",
+      "dependsOn": ["schematic-28-core-exports"],
+      "writePaths": ["packages/core/src/tools.ts", "packages/core/src/shape-catalogue.ts", "packages/core/src/index.ts", "packages/core/src/schematic/tools.test.ts", "impl-plans/progress/schematic-29-core-tools-catalogue.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Schematic tool ids, creation table and shape-search category exist so the UI palette and CLI shapes/edit add see schematic symbols; plan 28 index test still passes."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/tools.test.ts packages/core/src/schematic/index.test.ts",
+        "bunx biome check packages/core/src/tools.ts packages/core/src/shape-catalogue.ts packages/core/src/index.ts packages/core/src/schematic/tools.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-30-cli-move-absolute",
+      "planPath": "impl-plans/active/schematic-30-cli-move-absolute.md",
+      "progressPath": "impl-plans/progress/schematic-30-cli-move-absolute.md",
+      "dependsOn": ["schematic-28-core-exports"],
+      "writePaths": ["apps/cli/src/edit/operations/elements.ts", "apps/cli/src/edit/apply-batch.test.ts", "impl-plans/progress/schematic-30-cli-move-absolute.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "CLI edit absolute moves of schematic elements store canonicalTarget values; relative offsets use the shared-delta rule; existing move assertions pass unchanged."
+      ],
+      "verification": [
+        "bun test apps/cli/src/edit/apply-batch.test.ts",
+        "bunx biome check apps/cli/src/edit/operations/elements.ts apps/cli/src/edit/apply-batch.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-31-ui-shape-view",
+      "planPath": "impl-plans/active/schematic-31-ui-shape-view.md",
+      "progressPath": "impl-plans/progress/schematic-31-ui-shape-view.md",
+      "dependsOn": ["schematic-28-core-exports"],
+      "writePaths": ["packages/ui-solid/src/shapes/SchematicShapeView.tsx", "packages/ui-solid/src/shapes/schematic-view.ts", "packages/ui-solid/src/shapes/schematic-view.test.ts", "packages/ui-solid/src/shapes/ShapeView.tsx", "impl-plans/progress/schematic-31-ui-shape-view.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Schematic elements draw on the canvas from the same notation primitives as SVG export, themed with existing CSS tokens; breadboard view tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/shapes/schematic-view.test.ts packages/ui-solid/src/shapes/breadboard-view.test.ts",
+        "bunx biome check packages/ui-solid/src/shapes/SchematicShapeView.tsx packages/ui-solid/src/shapes/schematic-view.ts packages/ui-solid/src/shapes/schematic-view.test.ts packages/ui-solid/src/shapes/ShapeView.tsx"
+      ]
+    },
+    {
+      "planId": "schematic-32-ui-inspector",
+      "planPath": "impl-plans/active/schematic-32-ui-inspector.md",
+      "progressPath": "impl-plans/progress/schematic-32-ui-inspector.md",
+      "dependsOn": ["schematic-28-core-exports"],
+      "writePaths": ["packages/ui-solid/src/inspector/SchematicSection.tsx", "packages/ui-solid/src/inspector/schematic-edits.ts", "packages/ui-solid/src/inspector/schematic-edits.test.ts", "packages/ui-solid/src/Inspector.tsx", "impl-plans/progress/schematic-32-ui-inspector.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Inspector section for schematic elements: reference, value, type fields, IC pin table, net names, rotate/mirror buttons and per-pin net list; keyboard reachable with existing tokens; breadboard inspector tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/inspector/schematic-edits.test.ts packages/ui-solid/src/inspector/breadboard-edits.test.ts",
+        "bunx biome check packages/ui-solid/src/inspector/SchematicSection.tsx packages/ui-solid/src/inspector/schematic-edits.ts packages/ui-solid/src/inspector/schematic-edits.test.ts packages/ui-solid/src/Inspector.tsx"
+      ]
+    },
+    {
+      "planId": "schematic-33-cli-lint-types",
+      "planPath": "impl-plans/active/schematic-33-cli-lint-types.md",
+      "progressPath": "impl-plans/progress/schematic-33-cli-lint-types.md",
+      "dependsOn": ["schematic-28-core-exports"],
+      "writePaths": ["apps/cli/src/commands.ts", "apps/cli/src/lint-schematic.test.ts", "impl-plans/progress/schematic-33-cli-lint-types.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "nodetto-cli lint covers schematic pages (and PCB pages only when a schematic page exists) in text and JSON; types --kind schematic lists the 18 types; breadboard command tests pass."
+      ],
+      "verification": [
+        "bun test apps/cli/src/lint-schematic.test.ts apps/cli/src/breadboard-commands.test.ts",
+        "bunx biome check apps/cli/src/commands.ts apps/cli/src/lint-schematic.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-34-ui-export-dialog",
+      "planPath": "impl-plans/active/schematic-34-ui-export-dialog.md",
+      "progressPath": "impl-plans/progress/schematic-34-ui-export-dialog.md",
+      "dependsOn": ["schematic-13-io-breadboard-target", "schematic-28-core-exports"],
+      "writePaths": ["packages/ui-solid/src/ExportDialog.tsx", "packages/ui-solid/src/schematic-export.ts", "packages/ui-solid/src/schematic-export.test.ts", "impl-plans/progress/schematic-34-ui-export-dialog.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The export dialog offers a schematic format on schematic pages with Netlist (text) and KiCad netlist (.net) outputs; breadboard export tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-export.test.ts packages/ui-solid/src/breadboard-export.test.ts",
+        "bunx biome check packages/ui-solid/src/ExportDialog.tsx packages/ui-solid/src/schematic-export.ts packages/ui-solid/src/schematic-export.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-35-ui-workspace-palette",
+      "planPath": "impl-plans/active/schematic-35-ui-workspace-palette.md",
+      "progressPath": "impl-plans/progress/schematic-35-ui-workspace-palette.md",
+      "dependsOn": ["schematic-29-core-tools-catalogue"],
+      "writePaths": ["packages/ui-solid/src/workspaces.ts", "packages/ui-solid/src/shape-palette.ts", "packages/ui-solid/src/tools.ts", "packages/ui-solid/src/schematic-palette.test.ts", "impl-plans/progress/schematic-35-ui-workspace-palette.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "A Schematic workspace and tool palette (SCHEMATIC_TOOLS, SCHEMATIC_SHAPES) exist using existing icons; workspace and breadboard palette tests pass.",
+        "Continuation (SERIAL-W9-PLAN35-REDISPATCH): confirm-only. The four owned source files are not edited, workspaces.test.ts stays byte-identical to da5c257, and there is no writePaths amendment. The gate exits 0 with at least 14 pass and 0 fail, and biome exits 0, with logs under tmp/schematic-s933/schematic-35-ui-workspace-palette/attempt-<n>/. The progress log marks the stale failing-gate and amendment entries as superseded. Test-integrity and adversarial decisions are recorded by the review nodes."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-palette.test.ts packages/ui-solid/src/workspaces.test.ts packages/ui-solid/src/breadboard-palette.test.ts",
+        "bunx biome check packages/ui-solid/src/workspaces.ts packages/ui-solid/src/shape-palette.ts packages/ui-solid/src/tools.ts packages/ui-solid/src/schematic-palette.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-36-ui-creation",
+      "planPath": "impl-plans/active/schematic-36-ui-creation.md",
+      "progressPath": "impl-plans/progress/schematic-36-ui-creation.md",
+      "dependsOn": ["schematic-29-core-tools-catalogue"],
+      "writePaths": ["packages/ui-solid/src/interaction/creation.ts", "packages/ui-solid/src/interaction/context.ts", "packages/ui-solid/src/schematic-interaction.test.ts", "impl-plans/progress/schematic-36-ui-creation.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Clicking a schematic palette tool creates the element through editor.createSchematicElement at the snapped point; label creation selects the label; breadboard interaction tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-interaction.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
+        "bunx biome check packages/ui-solid/src/interaction/creation.ts packages/ui-solid/src/interaction/context.ts packages/ui-solid/src/schematic-interaction.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-37-ui-problems-panel",
+      "planPath": "impl-plans/active/schematic-37-ui-problems-panel.md",
+      "progressPath": "impl-plans/progress/schematic-37-ui-problems-panel.md",
+      "dependsOn": ["schematic-13-io-breadboard-target", "schematic-28-core-exports"],
+      "writePaths": ["packages/ui-solid/src/SchematicProblemsPanel.tsx", "packages/ui-solid/src/schematic-problems.ts", "packages/ui-solid/src/schematic-problems.test.ts", "packages/ui-solid/src/index.ts", "impl-plans/progress/schematic-37-ui-problems-panel.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "A schematic problems panel lists ERC and PCB parity findings with focusable rows, exported from ui-solid index; breadboard problems tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-problems.test.ts packages/ui-solid/src/breadboard-problems.test.ts",
+        "bunx biome check packages/ui-solid/src/SchematicProblemsPanel.tsx packages/ui-solid/src/schematic-problems.ts packages/ui-solid/src/schematic-problems.test.ts packages/ui-solid/src/index.ts"
+      ]
+    },
+    {
+      "planId": "schematic-38-cli-schematic-command",
+      "planPath": "impl-plans/active/schematic-38-cli-schematic-command.md",
+      "progressPath": "impl-plans/progress/schematic-38-cli-schematic-command.md",
+      "dependsOn": ["schematic-13-io-breadboard-target", "schematic-20-io-kicad-schematic-labels", "schematic-33-cli-lint-types"],
+      "writePaths": ["apps/cli/src/schematic-command.ts", "apps/cli/src/commands.ts", "apps/cli/src/help.ts", "apps/cli/src/schematic-commands.test.ts", "impl-plans/progress/schematic-38-cli-schematic-command.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The schematic CLI command group (netlist text and KiCad, import, breadboard target) and all help-text updates exist; plan 33 lint tests and breadboard command tests pass."
+      ],
+      "verification": [
+        "bun test apps/cli/src/schematic-commands.test.ts apps/cli/src/breadboard-commands.test.ts apps/cli/src/lint-schematic.test.ts",
+        "bunx biome check apps/cli/src/schematic-command.ts apps/cli/src/commands.ts apps/cli/src/help.ts apps/cli/src/schematic-commands.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-47-core-snap-exclude",
+      "planPath": "impl-plans/active/schematic-47-core-snap-exclude.md",
+      "progressPath": "impl-plans/progress/schematic-47-core-snap-exclude.md",
+      "dependsOn": ["schematic-09-core-coordinates-snap", "schematic-10-core-shape-utils", "schematic-28-core-exports"],
+      "writePaths": ["packages/core/src/shapes/schematic.ts", "packages/core/src/shapes/schematic.test.ts", "packages/core/src/schematic/coordinates.ts", "packages/core/src/schematic/index.ts", "impl-plans/progress/schematic-47-core-snap-exclude.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "schematicPinAt(store, pageId, point, excludeId?) skips the excluded element before ranking, ranking by raw distance stays unchanged, and every returned SchematicSnapTarget carries key: KeyPoint (pinKey, wire end of wirePointKeys, or pointElementKey). Without excludeId, results are unchanged for existing callers, and schematicWireInteriorAt is not modified.",
+        "schematicContactsAt(store, pageId, key, excludeId?) returns {wires, labels, joinables} at exactly the stored-field key, in one linear pass, skipping hidden and excluded elements. wires uses the connectivity interior rule (on an axis segment of wirePointKeys, not that wire's first or last key, bends included). It is re-exported from packages/core/src/schematic/index.ts.",
+        "coordinates.ts adds keyCoordinate(k) = roundCoordinate(k * 0.01) and localCoordinateForKey(k, originField), whose key plus coordinateKey(originField) equals k. Test: localCoordinateForKey(-1000, -0.125) = -9.87.",
+        "Regression: wire A (-20,0)-(20,0), wire B at visual.x=0.004 with local points (0,-20),(0,20), label CLK at (0,0). schematicContactsAt at key (0,0) returns wires [A,B], labels [CLK] and joinables 0, or [A] with B excluded, both live and after serializeDocument/parseDocument. The exclusion test (wire end at (0,0), pin at (3,0), query (1,0)) passes. Existing assertions are unchanged."
+      ],
+      "verification": [
+        "bun test packages/core/src/shapes/schematic.test.ts",
+        "bunx biome check packages/core/src/shapes/schematic.ts packages/core/src/shapes/schematic.test.ts packages/core/src/schematic/coordinates.ts packages/core/src/schematic/index.ts"
+      ]
+    },
+    {
+      "planId": "schematic-39-ui-wire-tool",
+      "planPath": "impl-plans/active/schematic-39-ui-wire-tool.md",
+      "progressPath": "impl-plans/progress/schematic-39-ui-wire-tool.md",
+      "dependsOn": ["schematic-36-ui-creation", "schematic-47-core-snap-exclude"],
+      "writePaths": ["packages/ui-solid/src/interaction/schematic-wire.ts", "packages/ui-solid/src/schematic-wire.test.ts", "packages/ui-solid/src/interaction/circuit.ts", "packages/ui-solid/src/interaction/pointer.ts", "packages/ui-solid/src/interaction.ts", "packages/ui-solid/src/interaction/types.ts", "packages/core/src/cad/emitters.test.ts", "design-docs/specs/design-cad3d.md", "impl-plans/progress/schematic-39-ui-wire-tool.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Checkpoint amendment round 1 (INT-S933-W14-CAD-EMITTER-CIRCUIT): packages/core/src/cad/emitters.test.ts classifiedEmitters gains exactly one entry \"packages/ui-solid/src/interaction/circuit.ts\": \"C\" next to the connectors.ts and creation.ts entries, and design-docs/specs/design-cad3d.md section 4 row 'C. Canvas interaction' lists interaction/circuit.ts; no other entry, row, M22 or rule-R text changes; circuit.ts, pointer.ts, interaction.ts, interaction/types.ts, lifecycle.ts and schematic-wire*.ts are not edited (plan 45 and 46 post-hashes still verify); bun test packages/core/src/cad/emitters.test.ts exits 0 with 7 pass / 0 fail.",
+        "The schematic wire tool snaps to grid and pins, finishes on joinable targets, adds a junction only for a deliberate T or an interior-label snap and rejects labelled crossings, reusing state.wirePoints and ctx.wireDraft with existing Enter and Esc paths.",
+        "Canvas clicks route Tool.SchematicWire through interaction/pointer.ts with event.shiftKey before the creationFor branch, so a Shift-click commits the vertical-first corner the preview showed; a regression drives interaction.onPointerDown for both corner orders; placeTool palette drops of the wire tool stay inert (creation.ts unchanged).",
+        "Start and finish junctions are tracked independently and committed with the wire in one apply batch; one undo removes the wire and both junctions; Esc after a pending start junction leaves the document unchanged.",
+        "classifySchematicWireTarget(store, pageId, point, excludeWireId?) is exported from interaction/schematic-wire.ts for plan 46. It ranks with schematicPinAt(..., excludeWireId), takes key from the winner or the lattice point, and counts contacts once with plan 47 schematicContactsAt at that stored-field key (never with the raw schematicWireInteriorAt). It returns {snapped = keyCoordinate(key), key, kind, junctionAt?}, and a lattice key with joinables > 0 is joinable with no junction.",
+        "Key-preserving commit: finishWireDraft stores the wire at visual = keyCoordinate(K0) with local points localCoordinateForKey(Ki, visual), and each junction at keyCoordinate(K). Regression: wire A (-20,0)-(20,0), wire B at visual.x=0.004 with local points (0,-20),(0,20), CLK at (0,0). A click at (0,0) is rejected with the exact notice, no junction and A and B on separate nets, both live and after serializeDocument/parseDocument into a fresh store.",
+        "Double-click disposition: handleDoubleClick does nothing when the latest pointer-down was rejected or the draft is empty, and otherwise finishes like Enter from the kept last point. Regression: two accepted points, then two rejected pointer-downs on a labelled crossing plus handleDoubleClick, leave draft, document, undo stack and notice unchanged. An accepted double-click commits exactly one wire.",
+        "Range check before mutation (design 3.3): finishWireDraft clamps the new wire origin per axis to keyCoordinate(clamp(K0, -1e11, 1e11)) and checks every derived field (origin, local points, junction visuals) against SCHEMATIC_COORDINATE_LIMIT before applying. A failing finish applies nothing, leaves the draft, kept results, pending junctions and undo history as before the finishing action (a finishing target click is not appended and counts as rejected), and shows SCHEMATIC_COORDINATE_RANGE_MESSAGE \"Wire is outside the coordinate range\". Regressions: from the far end of S (visual.x=1e9, local points (0,0),(10,0)), a new wire is stored at visual.x=1e9 with local x 10 and serializes and reloads (boundary write). A draft needing local y 1.5e9 is declined with document, undo stack and draft unchanged and serializeDocument still succeeding.",
+        "Each accepted click is classified once and its result kept; Enter, double-click and target-click finishes use the kept result and never re-snap a stored point; regression: wire A (-20,0)-(20,0), pin at (3,0), click (4.9,4.9) then Enter gives a junction at (0,0) joining A in the wire's undo step while the pin stays separate.",
+        "Every accepted T or interior-label click yields a pending junction candidate; the latest one (lastJunction) is replaced or cleared by the next accepted click and committed only if its point is the final endpoint; regression: after (4.9,4.9) clicking (0,-30) then Enter leaves (0,0) an interior bend with no junction and A on a separate net.",
+        "interaction.ts and interaction/types.ts each gain exactly one schematicWireNotice field with the exact design 7.3 text, cleared on accepted click, finish and empty draft, null outside SchematicWire.",
+        "Plan 36 interaction tests and breadboard interaction tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-wire.test.ts packages/ui-solid/src/schematic-interaction.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
+        "bunx biome check packages/ui-solid/src/interaction/schematic-wire.ts packages/ui-solid/src/schematic-wire.test.ts packages/ui-solid/src/interaction/circuit.ts packages/ui-solid/src/interaction/pointer.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/interaction/types.ts",
+        "bun test packages/core/src/cad/emitters.test.ts",
+        "bunx biome check packages/core/src/cad/emitters.test.ts",
+        "shasum -a 256 -c tmp/schematic-s933/schematic-46-ui-wire-point-edit/post-hashes.txt",
+        "shasum -a 256 -c tmp/schematic-s933/schematic-45-ui-wire-overlay/post-hashes.txt"
+      ]
+    },
+    {
+      "planId": "schematic-40-example-goldens",
+      "planPath": "impl-plans/active/schematic-40-example-goldens.md",
+      "progressPath": "impl-plans/progress/schematic-40-example-goldens.md",
+      "dependsOn": ["schematic-13-io-breadboard-target", "schematic-28-core-exports"],
+      "writePaths": ["examples/schematic/led-switch.jsonl", "examples/schematic/README.md", "examples/schematic/led-switch.netlist.txt", "examples/schematic/led-switch.net", "packages/core/src/schematic/export-golden.test.ts", "impl-plans/progress/schematic-40-example-goldens.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "An original LED/switch example schematic with netlist text and KiCad netlist goldens generated from the real pipeline; export-golden test pins them."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/export-golden.test.ts",
+        "bunx biome check packages/core/src/schematic/export-golden.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-41-ui-keys-drag",
+      "planPath": "impl-plans/active/schematic-41-ui-keys-drag.md",
+      "progressPath": "impl-plans/progress/schematic-41-ui-keys-drag.md",
+      "dependsOn": ["schematic-39-ui-wire-tool"],
+      "writePaths": ["packages/ui-solid/src/interaction/circuit.ts", "packages/ui-solid/src/interaction/transform.ts", "packages/ui-solid/src/schematic-keys-move.test.ts", "impl-plans/progress/schematic-41-ui-keys-drag.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Rotate and mirror keys work on schematic parts and drag uses the schematic snap delta with canonical shared deltas; plan 39 wire tests and breadboard interaction tests pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-keys-move.test.ts packages/ui-solid/src/breadboard-interaction.test.ts packages/ui-solid/src/schematic-wire.test.ts",
+        "bunx biome check packages/ui-solid/src/interaction/circuit.ts packages/ui-solid/src/interaction/transform.ts packages/ui-solid/src/schematic-keys-move.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-42-desktop",
+      "planPath": "impl-plans/active/schematic-42-desktop.md",
+      "progressPath": "impl-plans/progress/schematic-42-desktop.md",
+      "dependsOn": ["schematic-34-ui-export-dialog", "schematic-35-ui-workspace-palette", "schematic-37-ui-problems-panel"],
+      "writePaths": ["apps/desktop/src/page-workspace.ts", "apps/desktop/src/App.tsx", "apps/desktop/src/shell/export-handlers.ts", "apps/desktop/src/page-workspace.test.ts", "impl-plans/progress/schematic-42-desktop.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Desktop follows schematic pages to the schematic workspace, mounts the schematic problems panel on schematic and PCB pages, and wires schematic export handlers; page-workspace tests pass (additions only)."
+      ],
+      "verification": [
+        "bun test apps/desktop/src/page-workspace.test.ts",
+        "bunx biome check apps/desktop/src/page-workspace.ts apps/desktop/src/App.tsx apps/desktop/src/shell/export-handlers.ts apps/desktop/src/page-workspace.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-43-docs-readme",
+      "planPath": "impl-plans/active/schematic-43-docs-readme.md",
+      "progressPath": "impl-plans/progress/schematic-43-docs-readme.md",
+      "dependsOn": ["schematic-38-cli-schematic-command"],
+      "writePaths": ["docs/schematic.md", "README.md", "packages/core/src/schematic/docs.test.ts", "impl-plans/progress/schematic-43-docs-readme.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "docs/schematic.md (ASCII) describes the mode, the 18 element types, the ERC rules, the netlist format and CLI usage; README has a Schematic pages section and CLI table entry; docs test pins them."
+      ],
+      "verification": [
+        "bun test packages/core/src/schematic/docs.test.ts",
+        "bunx biome check packages/core/src/schematic/docs.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-44-native-parity",
+      "planPath": "impl-plans/active/schematic-44-native-parity.md",
+      "progressPath": "impl-plans/progress/schematic-44-native-parity.md",
+      "dependsOn": ["schematic-38-cli-schematic-command", "schematic-40-example-goldens"],
+      "writePaths": ["apps/cli/src/native-parity/schematic.test.ts", "impl-plans/progress/schematic-44-native-parity.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The native CLI (embedded interpreter) and the Bun CLI give identical schematic lint, netlist and SVG export output; at least 5 comparisons pass and none are skipped, with the native binary built first in a plan-local CARGO_TARGET_DIR."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true CARGO_TARGET_DIR=\"$PWD/target/schematic-44\" cargo build --release -p nodetto-cli",
+        "NODETTO_CLI_TEST_BINARY=\"$PWD/target/schematic-44/release/nodetto-cli\" bun test apps/cli/src/native-parity/schematic.test.ts",
+        "bunx biome check apps/cli/src/native-parity/schematic.test.ts"
+      ]
+    },
+    {
+      "planId": "schematic-46-ui-wire-point-edit",
+      "planPath": "impl-plans/active/schematic-46-ui-wire-point-edit.md",
+      "progressPath": "impl-plans/progress/schematic-46-ui-wire-point-edit.md",
+      "dependsOn": ["schematic-41-ui-keys-drag"],
+      "writePaths": ["packages/ui-solid/src/interaction/schematic-wire-edit.ts", "packages/ui-solid/src/schematic-wire-edit.test.ts", "packages/ui-solid/src/interaction/circuit.ts", "packages/ui-solid/src/interaction/lifecycle.ts", "packages/ui-solid/src/interaction.ts", "packages/ui-solid/src/interaction/types.ts", "impl-plans/progress/schematic-46-ui-wire-point-edit.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "Editing a schematic wire point moves only that point: untouched endpoints keep their page position (pin attachments survive), local orthogonal elbows keep the original axis at each fixed neighbour, the whole polyline is orthogonal, and a non-orthogonal or degenerate result is not written.",
+        "Each pointer move classifies the raw pointer once with plan 39 classifySchematicWireTarget excluding the edited wire before ranking, writes its snapped point as the end and keeps the result; release commits that kept result exactly and never re-classifies or re-snaps the stored end: a deliberate T or a single-wire interior label adds its junction at the committed end inside the gesture batch (one undo step); a labelled crossing aborts the batch, leaves geometry, topology and history unchanged and shows the exact design 7.3 notice.",
+        "Regressions: the nearby-pin deliberate T (wire A (-20,0)-(20,0), pin at (3,0), last pointer (4.9,4.9) gives end and junction at (0,0), pin separate) and the own-end-does-not-mask case pass.",
+        "Cancelling a drag leaves document and history unchanged; no junction is created from hover samples.",
+        "rerouteSchematicWirePoint returns {points, index} with the moved or merged point's resulting index; nudgeSchematicWirePoint(id, index, dx, dy): number | null applies the same rules as one undo step, returns that index (null on rejection) and is exposed by exactly one field each in interaction.ts and interaction/types.ts; two successive nudges on the bend of [(0,0),(30,0),(30,20)] return 2 and 2 and two undos restore the original.",
+        "Rejection precedence: moveWirePoint classifies before rerouting. A label-crossing sample becomes the release disposition even when its reroute is null, and replaces an earlier accepted sample. Release then aborts the whole gesture batch. Regression: edited wire (0,30)-(0,0), CLK at (0,0) on two crossing wire interiors. Dragging the start to (0,40) then (0,0) and releasing through endGesture restores the original geometry, nets and undo stack, adds no junction and shows the notice. nudgeSchematicWirePoint checks rejection before the reroute.",
+        "Key-preserving endpoint: the reroute works on stored local fields with the origin unchanged. The moved point stores localCoordinateForKey(K, visual), the junction is at keyCoordinate(K), and elbows copy exact local fields, for both drag and keyboard nudge (target key = stored key + delta*100). Regression: wire E at visual {x:-0.125,y:0} with local points [(10,30),(10,10)], A vertical (-10,-20)-(-10,20). Dragging E's end to (-10,0) gives an end key equal to the junction key (-1000,0), an unchanged fixed end, and E and A on one net before and after serializeDocument/parseDocument. One undo restores, and the nudge path gives the same key equality.",
+        "Range check before mutation (design 3.3, 7.3 rule 4): moveWirePoint writes a non-rejected sample only when every written local field and the junction keyCoordinate(junctionAt) satisfy SCHEMATIC_COORDINATE_LIMIT. Otherwise it writes nothing, keeps the previous drop and geometry, shows SCHEMATIC_COORDINATE_RANGE_MESSAGE, and never throws. nudgeSchematicWirePoint checks before opening a batch and returns null. Regressions: S at visual {x:1e9,y:0} with local points (0,0),(10,0). Dragging the start to page (0,0) writes local x -1e9 (boundary). Moving on to (-10,0) writes nothing with the range notice, release keeps the boundary position, and the document serializes and reloads. A one-pitch-left nudge returns null with no batch. A T junction at page x 1000000010 is never applied, and the document stays serializable.",
+        "Breadboard wire-point behaviour unchanged; plan 39 and 41 tests still pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-wire-edit.test.ts packages/ui-solid/src/schematic-keys-move.test.ts packages/ui-solid/src/schematic-wire.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
+        "bunx biome check packages/ui-solid/src/interaction/schematic-wire-edit.ts packages/ui-solid/src/schematic-wire-edit.test.ts packages/ui-solid/src/interaction/circuit.ts packages/ui-solid/src/interaction/lifecycle.ts packages/ui-solid/src/interaction.ts packages/ui-solid/src/interaction/types.ts"
+      ]
+    },
+    {
+      "planId": "schematic-45-ui-wire-overlay",
+      "planPath": "impl-plans/active/schematic-45-ui-wire-overlay.md",
+      "progressPath": "impl-plans/progress/schematic-45-ui-wire-overlay.md",
+      "dependsOn": ["schematic-39-ui-wire-tool", "schematic-41-ui-keys-drag", "schematic-46-ui-wire-point-edit"],
+      "writePaths": ["packages/ui-solid/src/SchematicOverlay.tsx", "packages/ui-solid/src/schematic-overlay.ts", "packages/ui-solid/src/schematic-overlay.test.ts", "packages/ui-solid/src/Canvas.tsx", "impl-plans/progress/schematic-45-ui-wire-overlay.md", "target", "tmp/cad3d"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d"],
+      "acceptanceCriteria": [
+        "The canvas shows the schematic wire draft and the crossing-reject notice (role=status, aria-live=polite, existing tokens only).",
+        "A selected schematic wire shows one handle per point; each handle is focusable (tabindex 0, role button, aria-label Wire start / Wire end / Wire bend N of M) with a visible focus ring, starts the wire-point drag on pointer down, and moves one lattice pitch per arrow key through interaction.nudgeSchematicWirePoint with preventDefault so the canvas nudge does not run.",
+        "Focus after an arrow edit goes to the handle at the index returned by nudgeSchematicWirePoint (schematicFocusAfterNudge), never the old index; on rejection focus stays. A two-press regression on [(0,0),(30,0),(30,20)] keeps moving the same point (focus 2, then 2 after the merge) with the untouched end fixed, and two undos restore it; the integration step records a desktop walkthrough in the light and the dark theme (focus, two arrow presses, undo).",
+        "circuit.ts, lifecycle.ts, interaction.ts and interaction/types.ts are not edited; the breadboard overlay is unchanged; plan 39 and 46 tests still pass."
+      ],
+      "verification": [
+        "bun test packages/ui-solid/src/schematic-overlay.test.ts packages/ui-solid/src/schematic-wire-edit.test.ts packages/ui-solid/src/schematic-wire.test.ts packages/ui-solid/src/breadboard-interaction.test.ts",
+        "bunx biome check packages/ui-solid/src/SchematicOverlay.tsx packages/ui-solid/src/schematic-overlay.ts packages/ui-solid/src/schematic-overlay.test.ts packages/ui-solid/src/Canvas.tsx"
+      ]
+    }
+  ]
+}

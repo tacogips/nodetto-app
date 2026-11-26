@@ -12,6 +12,7 @@ import {
   type SexprList,
 } from "./sexpr.ts";
 import { mapKicadSymbol } from "./symbol-map.ts";
+import type { KicadImportStats } from "./index.ts";
 
 const atom = (list: SexprList | undefined, key: string) => {
   const item = list ? child(list, key) : undefined;
@@ -27,6 +28,7 @@ export function importNetlist(
   root: SexprList,
   fileName: string,
   diagnostics: BreadboardImportDiagnostic[],
+  stats?: KicadImportStats,
 ): BreadboardImportPlan {
   const components = child(root, "components");
   const libparts = child(root, "libparts");
@@ -49,6 +51,19 @@ export function importNetlist(
           })
         : [],
     );
+  }
+  const netRows = child(root, "nets");
+  const sourceNets = netRows ? listHead(netRows, "net") : [];
+  const nodesByReference = new Map<string, SexprList[]>();
+  for (const net of sourceNets) {
+    for (const node of listHead(net, "node")) {
+      if (stats) stats.nodeVisits += 1;
+      const reference = atom(node, "ref");
+      if (reference === undefined) continue;
+      const rows = nodesByReference.get(reference);
+      if (rows) rows.push(node);
+      else nodesByReference.set(reference, [node]);
+    }
   }
   const parts = new Map<string, Part>();
   for (const row of componentRows) {
@@ -76,13 +91,7 @@ export function importNetlist(
     const name = atom(libsource, "part") ?? "";
     const key = `${lib}:${name}`;
     const listedPins = libPins.get(key) ?? [];
-    const nodeRows = child(root, "nets")
-      ? listHead(child(root, "nets") as SexprList, "net").flatMap((net) =>
-          listHead(net, "node").filter(
-            (node) => atom(node, "ref") === reference,
-          ),
-        )
-      : [];
+    const nodeRows = nodesByReference.get(reference) ?? [];
     const nodePins = nodeRows.map((node) => atom(node, "pin") ?? "");
     const largest = nodePins.reduce(
       (max, pin) => (/^\d+$/.test(pin) ? Math.max(max, Number(pin)) : max),
@@ -128,44 +137,39 @@ export function importNetlist(
     });
   }
 
-  const netRows = child(root, "nets");
+  const connectedPins = new Set<string>();
   const netParts: {
     name: string;
     nodes: { reference: string; pin: number; order: number }[];
     order: number;
   }[] = [];
-  if (netRows)
-    for (const [netIndex, net] of listHead(netRows, "net").entries()) {
-      const name = atom(net, "name") ?? `N_${netIndex + 1}`;
-      const nodes: { reference: string; pin: number; order: number }[] = [];
-      for (const [nodeIndex, node] of listHead(net, "node").entries()) {
-        const reference = atom(node, "ref") ?? "";
-        const sourcePin = atom(node, "pin") ?? "";
-        const part = parts.get(reference);
-        if (!part) continue;
-        const pin = part.sourcePins.get(sourcePin);
-        if (!pin || !/^[1-9]\d*$/.test(sourcePin)) {
-          diagnostics.push({
-            severity: "warning",
-            code: "kicad.unmappedPin",
-            reference,
-            message: `Pin '${sourcePin}' on '${reference}' cannot be mapped.`,
-          });
-          continue;
-        }
-        nodes.push({ reference, pin, order: netIndex * 10000 + nodeIndex });
+  for (const [netIndex, net] of sourceNets.entries()) {
+    const name = atom(net, "name") ?? `N_${netIndex + 1}`;
+    const nodes: { reference: string; pin: number; order: number }[] = [];
+    for (const [nodeIndex, node] of listHead(net, "node").entries()) {
+      if (stats) stats.nodeVisits += 1;
+      const reference = atom(node, "ref") ?? "";
+      const sourcePin = atom(node, "pin") ?? "";
+      const part = parts.get(reference);
+      if (!part) continue;
+      const pin = part.sourcePins.get(sourcePin);
+      if (!pin || !/^[1-9]\d*$/.test(sourcePin)) {
+        diagnostics.push({
+          severity: "warning",
+          code: "kicad.unmappedPin",
+          reference,
+          message: `Pin '${sourcePin}' on '${reference}' cannot be mapped.`,
+        });
+        continue;
       }
-      if (nodes.length) netParts.push({ name, nodes, order: netIndex });
+      nodes.push({ reference, pin, order: netIndex * 10000 + nodeIndex });
+      connectedPins.add(`${reference}\u0000${pin}`);
     }
+    if (nodes.length) netParts.push({ name, nodes, order: netIndex });
+  }
   for (const part of parts.values())
     for (const pin of new Set(part.sourcePins.values())) {
-      if (
-        !netParts.some((net) =>
-          net.nodes.some(
-            (node) => node.reference === part.reference && node.pin === pin,
-          ),
-        )
-      ) {
+      if (!connectedPins.has(`${part.reference}\u0000${pin}`)) {
         netParts.push({
           name: `N_${part.reference}_${pin}`,
           nodes: [

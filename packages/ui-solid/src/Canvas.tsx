@@ -73,6 +73,7 @@ import { PrototypeViewLayer } from "./PrototypeViewLayer.tsx";
 import { FlowsPanel } from "./FlowsPanel.tsx";
 import { ConnectorMarkers } from "./shapes/ConnectorView.tsx";
 import { BreadboardOverlay } from "./BreadboardOverlay.tsx";
+import { SchematicOverlay } from "./SchematicOverlay.tsx";
 import { PcbOverlay } from "./PcbOverlay.tsx";
 import { PcbLayersPanel } from "./PcbLayersPanel.tsx";
 import { pcbHiddenLayers } from "./pcb-state.ts";
@@ -318,6 +319,13 @@ function DiagramCanvas(
       "breadboard"
     );
   });
+  const isSchematicPage = createMemo(() => {
+    signals.rev();
+    return (
+      props.editor.store.getPage(props.editor.currentPageId)?.kind ===
+      "schematic"
+    );
+  });
   const isPcbPage = createMemo(() => {
     signals.rev();
     return (
@@ -548,6 +556,18 @@ function DiagramCanvas(
               probeRevision={probeRevision}
               wireDraft={interaction.wireDraft}
               startWirePoint={interaction.startBreadboardWirePoint}
+            />
+          </Show>
+          <Show when={isSchematicPage()}>
+            <SchematicOverlay
+              editor={props.editor}
+              revision={signals.rev}
+              selection={signals.selection}
+              wireDraft={interaction.wireDraft}
+              notice={interaction.schematicWireNotice}
+              startWirePoint={interaction.startBreadboardWirePoint}
+              nudgeWirePoint={interaction.nudgeSchematicWirePoint}
+              flushNudge={interaction.flushNudge}
             />
           </Show>
           <Show when={isPcbPage()}>

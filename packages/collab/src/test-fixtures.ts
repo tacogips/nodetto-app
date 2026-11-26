@@ -540,6 +540,63 @@ export function freeformDocument(): Document {
   };
 }
 
+export function schematicDocument(): Document {
+  return {
+    schemaVersion: 1,
+    id: "schematic-doc",
+    title: "Circuit",
+    pages: [{ id: "sch-page", name: "Circuit", kind: "schematic" }],
+    elements: [
+      {
+        id: "sch-resistor",
+        page: "sch-page",
+        index: "a0",
+        type: "schematic.resistor",
+        semantic: { reference: "R1", value: "10k" },
+        visual: { x: 0, y: 0 },
+      },
+      {
+        id: "sch-wire",
+        page: "sch-page",
+        index: "a1",
+        type: "schematic.wire",
+        semantic: {
+          points: [
+            { x: 0, y: 0 },
+            { x: 20, y: 0 },
+            { x: 20, y: 10 },
+          ],
+        },
+        visual: { x: 10, y: 0 },
+      },
+      {
+        id: "sch-junction",
+        page: "sch-page",
+        index: "a2",
+        type: "schematic.junction",
+        semantic: {},
+        visual: { x: 30, y: 0 },
+      },
+      {
+        id: "sch-label",
+        page: "sch-page",
+        index: "a3",
+        type: "schematic.label",
+        semantic: { net: "SIGNAL" },
+        visual: { x: 30, y: 10 },
+      },
+      {
+        id: "sch-power",
+        page: "sch-page",
+        index: "a4",
+        type: "schematic.power",
+        semantic: { style: "ground", net: "GND" },
+        visual: { x: 50, y: 0 },
+      },
+    ],
+  };
+}
+
 /** Every fixture, for suites that assert a property across all of them. */
 export function allFixtures(): readonly Document[] {
   return [

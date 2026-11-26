@@ -120,3 +120,9 @@ export {
   readStl,
   writeBinaryStl,
 } from "./stl/index.ts";
+
+export {
+  breadboardTargetFromSchematic,
+  exportSchematicNetlistText,
+  exportSchematicKicadNetlist,
+} from "./schematic/index.ts";

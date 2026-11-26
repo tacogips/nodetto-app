@@ -32,6 +32,7 @@ import { BatchRenameSection } from "./inspector/BatchRenameSection.tsx";
 import { ReplaceNoteTextSection } from "./inspector/ReplaceNoteTextSection.tsx";
 import { BpmnSection } from "./inspector/BpmnSection.tsx";
 import { BreadboardSection } from "./inspector/BreadboardSection.tsx";
+import { SchematicSection } from "./inspector/SchematicSection.tsx";
 import { CadSection } from "./cad-ui.tsx";
 import { PcbSection } from "./inspector/PcbSection.tsx";
 import {
@@ -39,6 +40,7 @@ import {
   type ElementId,
   getElementTypeDefinition,
   isBreadboardPartType,
+  isSchematicPartType,
   isCadTypeName,
 } from "@nodetto/ir";
 import {
@@ -204,6 +206,8 @@ export function Inspector(props: InspectorProps): JSX.Element {
     if (Object.values(UmlComponentType).some((candidate) => candidate === type))
       return "Component";
     if (type.startsWith("bpmn.")) return "BPMN";
+    if (type.startsWith("schematic."))
+      return isSchematicPartType(type) ? "Symbol" : "Schematic";
     if (type === "breadboard.netlist") return "Target netlist";
     if (type.startsWith("breadboard."))
       return isBreadboardPartType(type) ? "Part" : "Breadboard";
@@ -371,6 +375,9 @@ export function Inspector(props: InspectorProps): JSX.Element {
               element={element()}
               viewport={props.viewport}
             />
+          </Match>
+          <Match when={element().type.startsWith("schematic.")}>
+            <SchematicSection editor={props.editor} element={element()} />
           </Match>
           <Match when={element().type.startsWith("pcb.")}>
             <PcbSection editor={props.editor} element={element()} />
