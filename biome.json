@@ -16,7 +16,8 @@
       "apps/*/scripts/**/*.mjs",
       "apps/*/vite.config.ts",
       "apps/*/scripts/**/*.ts",
-      "apps/*/scripts/**/*.tsx"
+      "apps/*/scripts/**/*.tsx",
+      "formal/scripts/**/*.ts"
     ]
   },
   "formatter": {

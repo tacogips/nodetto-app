@@ -22,3 +22,10 @@ test("empty input and single empty field", () => {
   expect(parseTsv("")).toEqual([]);
   expect(parseTsv(serializeTsv([[""]]))).toEqual([[""]]);
 });
+
+test("TSV characterizes zero-field rows", () => {
+  expect(parseTsv(serializeTsv([["a"], []]))).toEqual([["a"]]);
+  expect(parseTsv(serializeTsv([[]]))).toEqual([]);
+  expect(parseTsv(serializeTsv([[], ["a"]]))).toEqual([[""], ["a"]]);
+  expect(parseTsv(serializeTsv([[""]]))).toEqual([[""]]);
+});

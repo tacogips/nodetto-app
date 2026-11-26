@@ -1,0 +1,686 @@
+{
+  "taskId": "fv-s942",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-942",
+  "implementationBranch": "feat/lean-spec",
+  "baseBranch": "main",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "4f0ef4d5074f0fbae50116728b039d1f23209404",
+  "designDocPaths": [
+    "design-docs/specs/design-formal-verification.md",
+    "design-docs/specs/design-table-sheet.md",
+    "design-docs/specs/design-cli-layout-merge-lint.md",
+    "design-docs/specs/design-breadboard.md"
+  ],
+  "overviewPlanPath": "impl-plans/active/fv-00-overview.md",
+  "evidenceRoot": "tmp/fv-s942",
+  "evidenceLayout": "Per-plan evidence under tmp/fv-s942/<planId>/, with per-attempt subdirectories for repeated gate runs. tmp/ is git-ignored and holds only .log, .txt and .json data, never *.test.ts files. Lean build output goes to formal/.lake, Cargo output to target, and existing CAD tests write measurement files to tmp/cad3d; these three are the artifactRoots of every plan. Never run lake clean or cargo clean.",
+  "reviewContext": {
+    "issueReference": "none (workflow opus-terra-design-and-implement-review-loop-session-942; intake comm-023858; design accepted comm-023864; plan review comm-023866; plan revision comm-023867; plans accepted comm-023868)",
+    "userProblem": "Key parts of the nodetto specification (fractional keys, z-order, NMESH codec, TSV round trip, anchored rotation, undo/redo history, three-way merge, overlap search) are only tested, not proved. The user wants a Lean 4 project in formal/ that models these algorithms, states the specified invariants as theorems, proves them with no gaps, ties each model to the real TypeScript through Lean-generated test vectors, and fixes every counterexample in code or design text.",
+    "requiredOutcomes": [
+      "mise run prove exits 0 on a clean checkout with the mise toolchain: every module builds, the audit finds no sorry/admit/axiom/native_decide and only propext, Classical.choice and Quot.sound, and regenerated vectors equal the committed ones.",
+      "Every theorem named in design-docs/specs/design-formal-verification.md section 6 (66 required, 3 open) exists in formal/ with exactly the stated signature, or the design records the counterexample and the corrected statement; open statements that are not proved are listed under '## Open' in docs/formal.md.",
+      "For each of the eight modules a bun test next to the TypeScript source checks the real implementation against formal/vectors/<module>.json and passes.",
+      "Findings D1-D7 are resolved as decided in design section 5: D2 (merge canonicalJson and own-member semantics), D3 (z-order duplicate ids refused), D6 (fractional NaN rng) and D7 (fractional no-room descent made iterative, no stack overflow on long valid keys) fixed in code with regression tests; D1 (TSV zero-field rows) and D4 (rotation lattice) fixed in design text; D5 intended. All are listed in docs/formal.md.",
+      "Existing tests are unaffected: mise run verify and mise run test-cli pass; bun run typecheck and biome pass (integration step).",
+      "docs/formal.md lists what is proved, under which assumptions (B1-B8), and what is not proved; README mentions formal/."
+    ],
+    "nonGoals": [
+      "No Mathlib, Batteries or other Lake dependency; core Lean and its Std only.",
+      "No proof about floating point; integer bridging assumptions B1-B8 are stated instead.",
+      "No Rust models in this delivery.",
+      "prove is not added to verify, test, ci or .github/workflows/linux.yml.",
+      "Schematic-mode modules (design section 11) are not implemented.",
+      "No change to packages/core/src/index.ts, no new npm dependency, no THIRD_PARTY_NOTICES.md change.",
+      "No push, rebase, merge, worktree or branch; no server, auth, secret or deployment code."
+    ],
+    "constraints": [
+      "Plans edit only their writePaths; writePaths are disjoint except each module root formal/Nodetto/<M>.lean, created by the module's model plan and given one import line per proof plan, with those plans chained by dependsOn. formal/Nodetto.lean, mise.toml, README.md and docs/formal.md belong only to fv-50-docs.",
+      "Lean runs only as `cd formal && mise exec -- lake build <own target>` or `mise exec -- lake exe <exe>` (and formal/scripts/audit). Never lake clean; retry a build-lock failure up to three times and log it.",
+      "Proof integrity: no sorry, admit, axiom, native_decide, unsafe, partial, opaque, implemented_by, extern, skipKernelTC or #exit in formal/**/*.lean, no maxHeartbeats above 400000, decide only on small literals. Theorems copy the design section 6 statements verbatim; no added hypothesis, narrowed type or changed conclusion.",
+      "Counterexample procedure: a false required statement stops the plan with a Lean example and the matching TypeScript input/output in the progress log (needs_design_revision); the worker never alters the statement or TS code on its own.",
+      "Models are total, executable, mirror the TS structure and name the source path and function in a doc comment; models import only other model files.",
+      "Workers read fresh before each edit and record git hash-object before and after in their own progress log impl-plans/progress/<planId>.md; no git state changes, lockfile changes or broad formatters.",
+      "At most two bun test or cargo test processes at a time across branches; the orchestrator serializes wave-4 conformance bun tests. Timing tests that fail under load but pass alone count as passing with both logs recorded.",
+      "Per-plan gates never include workspace-wide bun run typecheck or mise run verify; those run once at integration. Strict TypeScript compatible with noUncheckedIndexedAccess; biome must pass on touched files.",
+      "Evidence lives under tmp/fv-s942/<planId>/ only; no *.test.ts files under tmp/ or target/ after a plan finishes."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "D1: the TSV round trip parseTsv(serializeTsv(grid)) = grid is stated for grids whose rows each have at least one field; the three zero-field counterexamples are proved as theorems and delimited.ts is unchanged.", "rationale": "Confirmed at runtime by a Bun probe; a zero-field row has no TSV spelling distinct from a one-empty-field row or the final newline, and clipboardGrid never produces one for a valid table."},
+      {"decision": "D2: merge equality uses a new canonicalJson with own-member semantics (Object.hasOwn reads, Object.defineProperty writes); canonicalValue is removed; mergeValue and mergeById are exported.", "rationale": "JSON.stringify comparison is key-order sensitive and loses the only real change in the reordered-object example; canonicalValue drops own __proto__ members created by JSON.parse."},
+      {"decision": "D3: reorderCommands also refuses an order with a duplicate id.", "rationale": "A duplicate id of the right length emits two reorders for one element and leaves another untouched, contradicting the documented contract."},
+      {"decision": "D4: rotation identities carry the lattice hypothesis; rotate_anchor_snapped states the general behaviour; design-breadboard.md 4.2 is clarified.", "rationale": "Clockwise then counter-clockwise is the identity only when pin 1 is on the lattice; otherwise the first turn snaps the anchor."},
+      {"decision": "D5: reorderCommands_spec has the hypothesis that the target differs from the current order; reorderCommands_unchanged covers the other case.", "rationale": "The sameOrder early return is intended: nothing is emitted when nothing has to move."},
+      {"decision": "D6: randomDigitBetween maps a NaN offset to 0.", "rationale": "Rng is typed () => number, and NaN made keyBetween return undefined; with the fix every reachable offset maps to a Lean draw (B2), so keyBetween_between covers every rng."},
+      {"decision": "Strings are modelled as List Nat code units (fractional, NMESH armour, TSV) or as the fixed-width hex encoding E (ids, merge keys and values).", "rationale": "E is injective on JavaScript strings including lone surrogates, which Lean Char cannot hold, and keeps code-unit order."},
+      {"decision": "Vectors are integer-only; non-integer quantities are emitted pre-scaled (Rotate localBox2/pinDefs2 hold twice the pitch values).", "rationale": "Json.Value.num is Int, keeping vectors exact and inside the bridging assumptions."},
+      {"decision": "Conformance gates build Nodetto.<M>.Model rather than the module root.", "rationale": "The root may be mid-edit by a concurrent proof plan of the same module; root builds and theorem checks run in the proof plans and in mise run prove."},
+      {"decision": "Open statements decodeNmesh_encodeNmesh, treeSearch_visits_overlaps and overlappingPairs_visits_overlaps may stay open.", "rationale": "Targeted if feasible per the request; fv-50 lists unproved ones under '## Open' and the full audit enforces it."},
+      {"decision": "D7: midpoint runs the upper-null no-room descent iteratively; outputs and rng consumption are unchanged and no key-length limit is added (fv-40).", "rationale": "keyBetween(\"y\" + \"z\".repeat(32768), \"z\", () => 0) and keyAfter(\"z\".repeat(32768), () => 0) throw RangeError (maximum call stack size exceeded) on valid keys before the change, as the plan reviewer reproduced with bun -e."},
+      {"decision": "Continuation checkpoint (2026-11-26): the run interrupted after commit 9ab7c78 resumes on that HEAD with the same taskId, evidenceRoot and 42 plans. fv-03 tightens test 3 (key-order-only difference: non-null commit, isEmptyCommit true), and the D7 amendment is applied to fv-40, fv-50 and the design.", "rationale": "Infrastructure interruption, not a defect. The uncommitted work of fv-01 to fv-05 and the partial fv-10 to fv-18 stays in the working tree; implementers check it against their plan and finish what is missing without reverting. The plans have no commit yet, so acceptedDependencies is empty."},
+      {"decision": "Continuation checkpoint session 2 (2026-11-26): resumes on HEAD 4f0ef4d with the same taskId fv-s942, evidenceRoot tmp/fv-s942 and the 42 plans adopted unchanged; originalHead moves to 4f0ef4d, the parent of this checkpoint commit.", "rationale": "Plan review comm-000012 accepted the plan set with no material defect. The uncommitted status-only edits in 11 plan files and the impl-plans/progress files are implementation progress, not plan changes, so they stay uncommitted; each implementer re-verifies against its plan gate and does not trust those checkboxes. No plan has a commit yet, so acceptedDependencies stays empty."}
+    ],
+    "intentionalTradeoffs": [
+      "TSV zero-field rows keep their lossy serialization; only the design text and characterization tests change.",
+      "The live mergeValue and the CLI mergeDocumentVersions routines are fixed separately and not unified (design 6.7 proof boundary); only the live routines are proved.",
+      "Conformance gates build only the model module, so a root-level break is caught by the proof plans and the final prove run rather than the conformance plan.",
+      "Concurrent lake builds share formal/.lake, mitigated by the three-retry rule."
+    ],
+    "supportedEdgeCases": [
+      "Fractional keys with absent bounds, foreign (non-fractional) bounds, inverted or invalid bounds, and NaN or infinite rng values.",
+      "Z-order with everything selected, nothing to move, duplicate-id orders and tied foreign keys.",
+      "NMESH overlong and truncated varints, zigzag extremes, first-use index coding and base64 armour round trips.",
+      "TSV grids with trailing, only and inner zero-field rows and the [[\"\"]] round trip.",
+      "Rotation with anchors on and off the lattice, all four quarter turns.",
+      "Undo batches, abortBatch, empty batches and create/delete/update on a finite-map store including presence failures.",
+      "Merge key-order-only differences, own __proto__ members, lone surrogate keys and both-sides-changed conflicts.",
+      "Overlap closed-box touching boxes on the integer grid for the sweep branch, with tree-branch cases covered by vectors."
+    ],
+    "outOfScopeEdgeCases": [
+      "Floating-point values outside the stated integer domains (B3-B6).",
+      "mergeDocumentVersions (CLI merge) and the both-added page example are not proved.",
+      "Element validation, references, cascades and pages in the undo store (B8).",
+      "Schematic-mode connectivity, coordinate keys, net naming and segment sweep (future modules).",
+      "Rust implementations."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-formal-verification.md",
+      "design-docs/specs/design-table-sheet.md",
+      "design-docs/specs/design-cli-layout-merge-lint.md",
+      "design-docs/specs/design-breadboard.md",
+      "design-docs/specs/design-z-order.md",
+      "design-docs/specs/design-cad3d.md",
+      "impl-plans/active/fv-00-overview.md",
+      "packages/core/src/fractional.ts",
+      "packages/core/src/z-order.ts",
+      "packages/nmesh/src",
+      "packages/core/src/table-sheet/delimited.ts",
+      "packages/core/src/breadboard/rotate.ts",
+      "packages/core/src/history.ts",
+      "packages/core/src/commands.ts",
+      "packages/core/src/document-merge.ts",
+      "packages/core/src/cad/loops.ts"
+    ],
+    "finalVerification": [
+      "mise run prove",
+      "bun run typecheck",
+      "bun run lint",
+      "CARGO_TERM_QUIET=true mise run verify",
+      "CARGO_TERM_QUIET=true mise run test-cli"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "fv-01-scaffold",
+      "planPath": "impl-plans/active/fv-01-scaffold.md",
+      "dependsOn": [],
+      "writePaths": ["formal/lakefile.toml", "formal/lean-toolchain", "formal/lake-manifest.json", "formal/Nodetto/Json.lean", ".gitignore", "impl-plans/progress/fv-01-scaffold.md", "tmp/fv-s942/fv-01-scaffold", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["formal/lakefile.toml parses and declares exactly the eight exes; Nodetto.Json builds with no forbidden token; .gitignore ignores formal/.lake/."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Json > ../tmp/fv-s942/fv-01-scaffold/build.log 2>&1",
+        "git check-ignore -q formal/.lake/x",
+        "! grep -rnwE 'sorry|admit|axiom|native_decide|unsafe|partial|opaque|implemented_by|extern|skipKernelTC' formal/Nodetto/Json.lean",
+        "test \"$(grep -c '^\\[\\[lean_exe\\]\\]' formal/lakefile.toml)\" = 8"
+      ]
+    },
+    {
+      "planId": "fv-02-audit",
+      "planPath": "impl-plans/active/fv-02-audit.md",
+      "dependsOn": [],
+      "writePaths": ["formal/scripts/audit", "formal/scripts/audit.ts", "tsconfig.json", "biome.json", "impl-plans/progress/fv-02-audit.md", "tmp/fv-s942/fv-02-audit", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The list mode reports 66 required and 3 open statements, grouped as Fractional 10, ZOrder 15, Nmesh 9 (+1 open), Tsv 4, Rotate 6, Undo 10, Merge 10, Overlap 2 (+2 open).", "Biome and the TypeScript compiler accept the script."],
+      "verification": [
+        "formal/scripts/audit --list > tmp/fv-s942/fv-02-audit/list.log && grep -q 'required 66, open 3' tmp/fv-s942/fv-02-audit/list.log",
+        "sh -c '! formal/scripts/audit --module Nope --vectors'",
+        "sh -c '! formal/scripts/audit --module Fractional --theorem keyBetween_between --theorem no_such_statement' > tmp/fv-s942/fv-02-audit/args.log 2>&1 && grep -q 'unknown statement no_such_statement' tmp/fv-s942/fv-02-audit/args.log && ! grep -q 'unknown statement --theorem' tmp/fv-s942/fv-02-audit/args.log",
+        "sh -c '! formal/scripts/audit --theorem keyBetween_between'",
+        "bunx biome check formal/scripts/audit.ts tsconfig.json biome.json",
+        "bunx tsc --noEmit -p tsconfig.json > tmp/fv-s942/fv-02-audit/tsc.log 2>&1; ! grep '^formal/scripts' tmp/fv-s942/fv-02-audit/tsc.log"
+      ]
+    },
+    {
+      "planId": "fv-03-merge-fix",
+      "planPath": "impl-plans/active/fv-03-merge-fix.md",
+      "dependsOn": [],
+      "writePaths": ["packages/core/src/document-merge.ts", "packages/core/src/document-merge.test.ts", "impl-plans/progress/fv-03-merge-fix.md", "tmp/fv-s942/fv-03-merge-fix", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Tests 1-5 pass; every pre-existing test in document-merge.test.ts and document-merge-versions.test.ts passes unmodified.", "Test 3 asserts that a key-order-only extensions difference yields a non-null commit for which isEmptyCommit is true; test 4 asserts null (the full-reload signal) for the own __proto__ metadata edit.", "mergeValue and mergeById are exported; canonicalValue no longer exists."],
+      "verification": [
+        "bun test packages/core/src/document-merge.test.ts packages/core/src/document-merge-versions.test.ts > tmp/fv-s942/fv-03-merge-fix/test.log 2>&1",
+        "bunx biome check packages/core/src/document-merge.ts packages/core/src/document-merge.test.ts",
+        "! grep -n canonicalValue packages/core/src/document-merge.ts",
+        "test -s tmp/fv-s942/fv-03-merge-fix/before.log",
+        "test \"$(grep -c 'isEmptyCommit(' packages/core/src/document-merge.test.ts)\" -ge 2"
+      ]
+    },
+    {
+      "planId": "fv-04-stubs-a",
+      "planPath": "impl-plans/active/fv-04-stubs-a.md",
+      "dependsOn": ["fv-01-scaffold"],
+      "writePaths": ["formal/Nodetto/Fractional/Vectors.lean", "formal/Nodetto/ZOrder/Vectors.lean", "formal/Nodetto/Nmesh/Vectors.lean", "formal/Nodetto/Tsv/Vectors.lean", "impl-plans/progress/fv-04-stubs-a.md", "tmp/fv-s942/fv-04-stubs-a", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The four exes build."],
+      "verification": [
+        "cd formal && mise exec -- lake build vectors-fractional vectors-z-order vectors-nmesh vectors-tsv > ../tmp/fv-s942/fv-04-stubs-a/build.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-05-stubs-b",
+      "planPath": "impl-plans/active/fv-05-stubs-b.md",
+      "dependsOn": ["fv-01-scaffold"],
+      "writePaths": ["formal/Nodetto/Rotate/Vectors.lean", "formal/Nodetto/Undo/Vectors.lean", "formal/Nodetto/Merge/Vectors.lean", "formal/Nodetto/Overlap/Vectors.lean", "impl-plans/progress/fv-05-stubs-b.md", "tmp/fv-s942/fv-05-stubs-b", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The four exes build."],
+      "verification": [
+        "cd formal && mise exec -- lake build vectors-rotate vectors-undo vectors-merge vectors-overlap > ../tmp/fv-s942/fv-05-stubs-b/build.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-10-fractional-model",
+      "planPath": "impl-plans/active/fv-10-fractional-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-04-stubs-a"],
+      "writePaths": ["formal/Nodetto/Fractional/Model.lean", "formal/Nodetto/Fractional/Vectors.lean", "formal/Nodetto/Fractional.lean", "formal/vectors/fractional.json", "impl-plans/progress/fv-10-fractional-model.md", "tmp/fv-s942/fv-10-fractional-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Fractional builds; the vector file is fresh, has 200+ cases and 20+ per fn."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Fractional > ../tmp/fv-s942/fv-10-fractional-model/build.log 2>&1",
+        "formal/scripts/audit --module Fractional --vectors > tmp/fv-s942/fv-10-fractional-model/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-11-zorder-model",
+      "planPath": "impl-plans/active/fv-11-zorder-model.md",
+      "dependsOn": ["fv-02-audit", "fv-04-stubs-a", "fv-10-fractional-model"],
+      "writePaths": ["formal/Nodetto/ZOrder/Model.lean", "formal/Nodetto/ZOrder/Vectors.lean", "formal/Nodetto/ZOrder.lean", "formal/vectors/z-order.json", "impl-plans/progress/fv-11-zorder-model.md", "tmp/fv-s942/fv-11-zorder-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.ZOrder builds; vectors are fresh with 200+ cases, 20+ per fn."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s942/fv-11-zorder-model/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --vectors > tmp/fv-s942/fv-11-zorder-model/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-12-nmesh-primitives-model",
+      "planPath": "impl-plans/active/fv-12-nmesh-primitives-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-04-stubs-a"],
+      "writePaths": ["formal/Nodetto/Nmesh/Model.lean", "formal/Nodetto/Nmesh.lean", "impl-plans/progress/fv-12-nmesh-primitives-model.md", "tmp/fv-s942/fv-12-nmesh-primitives-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Nmesh builds with the listed names; no forbidden token."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh > ../tmp/fv-s942/fv-12-nmesh-primitives-model/build.log 2>&1",
+        "! grep -rnwE 'sorry|admit|axiom|native_decide|unsafe|partial|opaque|implemented_by|extern|skipKernelTC' formal/Nodetto/Nmesh.lean formal/Nodetto/Nmesh/Model.lean"
+      ]
+    },
+    {
+      "planId": "fv-13-tsv-model",
+      "planPath": "impl-plans/active/fv-13-tsv-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-04-stubs-a"],
+      "writePaths": ["formal/Nodetto/Tsv/Model.lean", "formal/Nodetto/Tsv/Vectors.lean", "formal/Nodetto/Tsv.lean", "formal/vectors/tsv.json", "impl-plans/progress/fv-13-tsv-model.md", "tmp/fv-s942/fv-13-tsv-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Tsv builds; vectors are fresh with 200+ cases, 20+ per fn."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Tsv > ../tmp/fv-s942/fv-13-tsv-model/build.log 2>&1",
+        "formal/scripts/audit --module Tsv --vectors > tmp/fv-s942/fv-13-tsv-model/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-14-rotate-model",
+      "planPath": "impl-plans/active/fv-14-rotate-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-05-stubs-b"],
+      "writePaths": ["formal/Nodetto/Rotate/Model.lean", "formal/Nodetto/Rotate/Vectors.lean", "formal/Nodetto/Rotate.lean", "formal/vectors/rotate.json", "impl-plans/progress/fv-14-rotate-model.md", "tmp/fv-s942/fv-14-rotate-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Rotate builds; vectors are fresh, 200+ cases, 20+ per non-fixture fn."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Rotate > ../tmp/fv-s942/fv-14-rotate-model/build.log 2>&1",
+        "formal/scripts/audit --module Rotate --vectors > tmp/fv-s942/fv-14-rotate-model/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-15-undo-model",
+      "planPath": "impl-plans/active/fv-15-undo-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-05-stubs-b"],
+      "writePaths": ["formal/Nodetto/Undo/Model.lean", "formal/Nodetto/Undo/Vectors.lean", "formal/Nodetto/Undo.lean", "formal/vectors/undo.json", "impl-plans/progress/fv-15-undo-model.md", "tmp/fv-s942/fv-15-undo-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Undo builds; vectors are fresh, 200+ cases, 20+ per fn."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Undo > ../tmp/fv-s942/fv-15-undo-model/build.log 2>&1",
+        "formal/scripts/audit --module Undo --vectors > tmp/fv-s942/fv-15-undo-model/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-16-merge-model",
+      "planPath": "impl-plans/active/fv-16-merge-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-05-stubs-b"],
+      "writePaths": ["formal/Nodetto/Merge/Model.lean", "formal/Nodetto/Merge/Vectors.lean", "formal/Nodetto/Merge.lean", "formal/vectors/merge.json", "impl-plans/progress/fv-16-merge-model.md", "tmp/fv-s942/fv-16-merge-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Merge builds; vectors are fresh, 200+ cases, 20+ per fn, surrogate cases present (grep for \\ud800 in the file)."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Merge > ../tmp/fv-s942/fv-16-merge-model/build.log 2>&1",
+        "formal/scripts/audit --module Merge --vectors > tmp/fv-s942/fv-16-merge-model/audit.log 2>&1",
+        "test \"$(grep -c 'ud800' formal/vectors/merge.json)\" -ge 3"
+      ]
+    },
+    {
+      "planId": "fv-17-overlap-model",
+      "planPath": "impl-plans/active/fv-17-overlap-model.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-05-stubs-b"],
+      "writePaths": ["formal/Nodetto/Overlap/Model.lean", "formal/Nodetto/Overlap/Vectors.lean", "formal/Nodetto/Overlap.lean", "formal/vectors/overlap.json", "impl-plans/progress/fv-17-overlap-model.md", "tmp/fv-s942/fv-17-overlap-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Overlap builds; vectors are fresh, 200+ cases, the discriminating and tree cases present."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Overlap > ../tmp/fv-s942/fv-17-overlap-model/build.log 2>&1",
+        "formal/scripts/audit --module Overlap --vectors > tmp/fv-s942/fv-17-overlap-model/audit.log 2>&1",
+        "test \"$(grep -c '\"tree\":true' formal/vectors/overlap.json)\" -ge 20"
+      ]
+    },
+    {
+      "planId": "fv-18-nmesh-codec-model",
+      "planPath": "impl-plans/active/fv-18-nmesh-codec-model.md",
+      "dependsOn": ["fv-12-nmesh-primitives-model"],
+      "writePaths": ["formal/Nodetto/Nmesh/Codec.lean", "formal/Nodetto/Nmesh/Vectors.lean", "formal/Nodetto/Nmesh.lean", "formal/vectors/nmesh.json", "impl-plans/progress/fv-18-nmesh-codec-model.md", "tmp/fv-s942/fv-18-nmesh-codec-model", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Nmesh builds; vectors are fresh, 200+ cases, 20+ per fn."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh > ../tmp/fv-s942/fv-18-nmesh-codec-model/build.log 2>&1",
+        "formal/scripts/audit --module Nmesh --vectors > tmp/fv-s942/fv-18-nmesh-codec-model/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-20-fractional-midpoint",
+      "planPath": "impl-plans/active/fv-20-fractional-midpoint.md",
+      "dependsOn": ["fv-10-fractional-model"],
+      "writePaths": ["formal/Nodetto/Fractional/Midpoint.lean", "formal/Nodetto/Fractional.lean", "impl-plans/progress/fv-20-fractional-midpoint.md", "tmp/fv-s942/fv-20-fractional-midpoint", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Fractional builds with the lemmas; no forbidden token; vectors unchanged."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Fractional > ../tmp/fv-s942/fv-20-fractional-midpoint/build.log 2>&1",
+        "formal/scripts/audit --module Fractional --vectors > tmp/fv-s942/fv-20-fractional-midpoint/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-21-fractional-keys",
+      "planPath": "impl-plans/active/fv-21-fractional-keys.md",
+      "dependsOn": ["fv-20-fractional-midpoint"],
+      "writePaths": ["formal/Nodetto/Fractional/KeyBetween.lean", "formal/Nodetto/Fractional.lean", "impl-plans/progress/fv-21-fractional-keys.md", "tmp/fv-s942/fv-21-fractional-keys", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for all ten names (signature, existence, axioms)."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Fractional > ../tmp/fv-s942/fv-21-fractional-keys/build.log 2>&1",
+        "formal/scripts/audit --module Fractional --theorem keyBetween_between --theorem keyBetween_below --theorem keyBetween_above --theorem keyBetween_unbounded --theorem keyBetween_rejects_lower --theorem keyBetween_rejects_upper --theorem keyBetween_rejects_inverted --theorem keyAfter_gt --theorem keyAfter_valid --theorem keyAfter_none_valid > tmp/fv-s942/fv-21-fractional-keys/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-22-zorder-target",
+      "planPath": "impl-plans/active/fv-22-zorder-target.md",
+      "dependsOn": ["fv-11-zorder-model"],
+      "writePaths": ["formal/Nodetto/ZOrder/TargetOrder.lean", "formal/Nodetto/ZOrder.lean", "impl-plans/progress/fv-22-zorder-target.md", "tmp/fv-s942/fv-22-zorder-target", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the six names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s942/fv-22-zorder-target/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem targetOrder_perm --theorem targetOrder_selected_order --theorem targetOrder_unselected_order --theorem targetOrder_front_idem --theorem targetOrder_back_idem --theorem targetOrder_all_selected > tmp/fv-s942/fv-22-zorder-target/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-23-zorder-relative",
+      "planPath": "impl-plans/active/fv-23-zorder-relative.md",
+      "dependsOn": ["fv-22-zorder-target"],
+      "writePaths": ["formal/Nodetto/ZOrder/RelativeOrder.lean", "formal/Nodetto/ZOrder.lean", "impl-plans/progress/fv-23-zorder-relative.md", "tmp/fv-s942/fv-23-zorder-relative", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the six names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s942/fv-23-zorder-relative/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem relativeOrder_perm --theorem relativeOrder_moved_order --theorem relativeOrder_unmoved_order --theorem relativeOrder_no_anchor --theorem relativeOrder_before --theorem relativeOrder_after > tmp/fv-s942/fv-23-zorder-relative/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-24-zorder-reorder",
+      "planPath": "impl-plans/active/fv-24-zorder-reorder.md",
+      "dependsOn": ["fv-21-fractional-keys", "fv-23-zorder-relative"],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "formal/Nodetto/ZOrder.lean", "impl-plans/progress/fv-24-zorder-reorder.md", "tmp/fv-s942/fv-24-zorder-reorder", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the three names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s942/fv-24-zorder-reorder/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged --theorem reorderCommands_spec > tmp/fv-s942/fv-24-zorder-reorder/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-25-nmesh-varint",
+      "planPath": "impl-plans/active/fv-25-nmesh-varint.md",
+      "dependsOn": ["fv-18-nmesh-codec-model"],
+      "writePaths": ["formal/Nodetto/Nmesh/Varint.lean", "formal/Nodetto/Nmesh.lean", "impl-plans/progress/fv-25-nmesh-varint.md", "tmp/fv-s942/fv-25-nmesh-varint", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the six names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh > ../tmp/fv-s942/fv-25-nmesh-varint/build.log 2>&1",
+        "formal/scripts/audit --module Nmesh --theorem writeVarint_bytes --theorem readVarint_writeVarint --theorem readVarint_canonical --theorem readVarint_truncated --theorem unzigzag_zigzag --theorem zigzag_unzigzag > tmp/fv-s942/fv-25-nmesh-varint/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-26-nmesh-indices",
+      "planPath": "impl-plans/active/fv-26-nmesh-indices.md",
+      "dependsOn": ["fv-25-nmesh-varint"],
+      "writePaths": ["formal/Nodetto/Nmesh/Indices.lean", "formal/Nodetto/Nmesh.lean", "impl-plans/progress/fv-26-nmesh-indices.md", "tmp/fv-s942/fv-26-nmesh-indices", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the two names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh > ../tmp/fv-s942/fv-26-nmesh-indices/build.log 2>&1",
+        "formal/scripts/audit --module Nmesh --theorem decodeIndices_encodeIndices --theorem encodeIndices_decodeIndices > tmp/fv-s942/fv-26-nmesh-indices/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-27-nmesh-armor",
+      "planPath": "impl-plans/active/fv-27-nmesh-armor.md",
+      "dependsOn": ["fv-26-nmesh-indices"],
+      "writePaths": ["formal/Nodetto/Nmesh/Armor.lean", "formal/Nodetto/Nmesh.lean", "impl-plans/progress/fv-27-nmesh-armor.md", "tmp/fv-s942/fv-27-nmesh-armor", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for fromInline_toInline."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh > ../tmp/fv-s942/fv-27-nmesh-armor/build.log 2>&1",
+        "formal/scripts/audit --module Nmesh --theorem fromInline_toInline > tmp/fv-s942/fv-27-nmesh-armor/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-28-nmesh-payload",
+      "planPath": "impl-plans/active/fv-28-nmesh-payload.md",
+      "dependsOn": ["fv-27-nmesh-armor"],
+      "writePaths": ["formal/Nodetto/Nmesh/Payload.lean", "formal/Nodetto/Nmesh.lean", "impl-plans/progress/fv-28-nmesh-payload.md", "tmp/fv-s942/fv-28-nmesh-payload", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Either the audit passes for decodeNmesh_encodeNmesh, or the progress log states \"open\" with the last unproved lemma statement, and the build plus the vector audit pass."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh > ../tmp/fv-s942/fv-28-nmesh-payload/build.log 2>&1",
+        "formal/scripts/audit --module Nmesh --vectors > tmp/fv-s942/fv-28-nmesh-payload/audit.log 2>&1",
+        "sh -c 'if grep -rqE \"theorem decodeNmesh_encodeNmesh( |$)\" formal/Nodetto; then formal/scripts/audit --module Nmesh --theorem decodeNmesh_encodeNmesh > tmp/fv-s942/fv-28-nmesh-payload/theorem.log 2>&1; fi'"
+      ]
+    },
+    {
+      "planId": "fv-29-tsv-proofs",
+      "planPath": "impl-plans/active/fv-29-tsv-proofs.md",
+      "dependsOn": ["fv-13-tsv-model"],
+      "writePaths": ["formal/Nodetto/Tsv/Theorems.lean", "formal/Nodetto/Tsv.lean", "impl-plans/progress/fv-29-tsv-proofs.md", "tmp/fv-s942/fv-29-tsv-proofs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the four names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Tsv > ../tmp/fv-s942/fv-29-tsv-proofs/build.log 2>&1",
+        "formal/scripts/audit --module Tsv --theorem parseTsv_serializeTsv --theorem tsv_trailing_empty_row_lost --theorem tsv_only_empty_row_lost --theorem tsv_inner_empty_row_reads_as_empty_field > tmp/fv-s942/fv-29-tsv-proofs/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-30-rotate-proofs",
+      "planPath": "impl-plans/active/fv-30-rotate-proofs.md",
+      "dependsOn": ["fv-14-rotate-model"],
+      "writePaths": ["formal/Nodetto/Rotate/Theorems.lean", "formal/Nodetto/Rotate.lean", "impl-plans/progress/fv-30-rotate-proofs.md", "tmp/fv-s942/fv-30-rotate-proofs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the six names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Rotate > ../tmp/fv-s942/fv-30-rotate-proofs/build.log 2>&1",
+        "formal/scripts/audit --module Rotate --theorem rotate_anchor_snapped --theorem rotate_anchor_fixed --theorem rotate_pins_on_lattice --theorem rotate_cw_ccw --theorem rotate_ccw_cw --theorem rotate_four > tmp/fv-s942/fv-30-rotate-proofs/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-31-undo-stack-proofs",
+      "planPath": "impl-plans/active/fv-31-undo-stack-proofs.md",
+      "dependsOn": ["fv-15-undo-model"],
+      "writePaths": ["formal/Nodetto/Undo/Stack.lean", "formal/Nodetto/Undo.lean", "impl-plans/progress/fv-31-undo-stack-proofs.md", "tmp/fv-s942/fv-31-undo-stack-proofs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the nine names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Undo > ../tmp/fv-s942/fv-31-undo-stack-proofs/build.log 2>&1",
+        "formal/scripts/audit --module Undo --theorem undo_then_redo --theorem redo_then_undo --theorem push_clears_redo --theorem push_empty --theorem abortBatch_keeps_stacks --theorem batch_one_step --theorem batch_noop --theorem abortBatch_reverts --theorem batch_inverts > tmp/fv-s942/fv-31-undo-stack-proofs/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-32-undo-store-proofs",
+      "planPath": "impl-plans/active/fv-32-undo-store-proofs.md",
+      "dependsOn": ["fv-31-undo-stack-proofs"],
+      "writePaths": ["formal/Nodetto/Undo/StoreUndo.lean", "formal/Nodetto/Undo.lean", "impl-plans/progress/fv-32-undo-store-proofs.md", "tmp/fv-s942/fv-32-undo-store-proofs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for applyCommands_undo."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Undo > ../tmp/fv-s942/fv-32-undo-store-proofs/build.log 2>&1",
+        "formal/scripts/audit --module Undo --theorem applyCommands_undo > tmp/fv-s942/fv-32-undo-store-proofs/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-33-merge-canon",
+      "planPath": "impl-plans/active/fv-33-merge-canon.md",
+      "dependsOn": ["fv-16-merge-model"],
+      "writePaths": ["formal/Nodetto/Merge/Canon.lean", "formal/Nodetto/Merge.lean", "impl-plans/progress/fv-33-merge-canon.md", "tmp/fv-s942/fv-33-merge-canon", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Merge builds; vectors unchanged; no forbidden token."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Merge > ../tmp/fv-s942/fv-33-merge-canon/build.log 2>&1",
+        "formal/scripts/audit --module Merge --vectors > tmp/fv-s942/fv-33-merge-canon/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-34-merge-diff",
+      "planPath": "impl-plans/active/fv-34-merge-diff.md",
+      "dependsOn": ["fv-33-merge-canon"],
+      "writePaths": ["formal/Nodetto/Merge/Diff.lean", "formal/Nodetto/Merge.lean", "impl-plans/progress/fv-34-merge-diff.md", "tmp/fv-s942/fv-34-merge-diff", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Nodetto.Merge builds; vectors unchanged."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Merge > ../tmp/fv-s942/fv-34-merge-diff/build.log 2>&1",
+        "formal/scripts/audit --module Merge --vectors > tmp/fv-s942/fv-34-merge-diff/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-35-merge-value",
+      "planPath": "impl-plans/active/fv-35-merge-value.md",
+      "dependsOn": ["fv-34-merge-diff"],
+      "writePaths": ["formal/Nodetto/Merge/Value.lean", "formal/Nodetto/Merge.lean", "impl-plans/progress/fv-35-merge-value.md", "tmp/fv-s942/fv-35-merge-value", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the five names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Merge > ../tmp/fv-s942/fv-35-merge-value/build.log 2>&1",
+        "formal/scripts/audit --module Merge --theorem mergeValue_unchanged_ours --theorem mergeValue_unchanged_theirs --theorem mergeValue_same_change --theorem mergeValue_symm --theorem mergeValue_conflict_iff > tmp/fv-s942/fv-35-merge-value/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-36-merge-records",
+      "planPath": "impl-plans/active/fv-36-merge-records.md",
+      "dependsOn": ["fv-35-merge-value"],
+      "writePaths": ["formal/Nodetto/Merge/Records.lean", "formal/Nodetto/Merge.lean", "impl-plans/progress/fv-36-merge-records.md", "tmp/fv-s942/fv-36-merge-records", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the five names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Merge > ../tmp/fv-s942/fv-36-merge-records/build.log 2>&1",
+        "formal/scripts/audit --module Merge --theorem mergeById_unchanged_ours --theorem mergeById_unchanged_theirs --theorem mergeById_same_change --theorem mergeById_symm --theorem mergeById_conflict_iff > tmp/fv-s942/fv-36-merge-records/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-37-overlap-sweep",
+      "planPath": "impl-plans/active/fv-37-overlap-sweep.md",
+      "dependsOn": ["fv-17-overlap-model"],
+      "writePaths": ["formal/Nodetto/Overlap/Sweep.lean", "formal/Nodetto/Overlap.lean", "impl-plans/progress/fv-37-overlap-sweep.md", "tmp/fv-s942/fv-37-overlap-sweep", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The audit passes for the two names."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Overlap > ../tmp/fv-s942/fv-37-overlap-sweep/build.log 2>&1",
+        "formal/scripts/audit --module Overlap --theorem sweep_visits_overlaps --theorem overlappingPairs_sweep > tmp/fv-s942/fv-37-overlap-sweep/audit.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-38-overlap-tree",
+      "planPath": "impl-plans/active/fv-38-overlap-tree.md",
+      "dependsOn": ["fv-37-overlap-sweep"],
+      "writePaths": ["formal/Nodetto/Overlap/Tree.lean", "formal/Nodetto/Overlap.lean", "impl-plans/progress/fv-38-overlap-tree.md", "tmp/fv-s942/fv-38-overlap-tree", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["Either the audit passes for both names, or the progress log states which are open with the last unproved lemma, and the build plus vector audit pass."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Overlap > ../tmp/fv-s942/fv-38-overlap-tree/build.log 2>&1",
+        "formal/scripts/audit --module Overlap --vectors > tmp/fv-s942/fv-38-overlap-tree/audit.log 2>&1",
+        "sh -c 'for n in treeSearch_visits_overlaps overlappingPairs_visits_overlaps; do if grep -rqE \"theorem $n( |$)\" formal/Nodetto; then formal/scripts/audit --module Overlap --theorem \"$n\" > \"tmp/fv-s942/fv-38-overlap-tree/theorem-$n.log\" 2>&1 || exit 1; fi; done'"
+      ]
+    },
+    {
+      "planId": "fv-40-fractional-conformance",
+      "planPath": "impl-plans/active/fv-40-fractional-conformance.md",
+      "dependsOn": ["fv-10-fractional-model"],
+      "writePaths": ["packages/core/src/fractional.ts", "packages/core/src/fractional.test.ts", "packages/core/src/fractional.formal.test.ts", "impl-plans/progress/fv-40-fractional-conformance.md", "tmp/fv-s942/fv-40-fractional-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["All tests pass; existing fractional tests unchanged; the D6 tests failed before the fix (log before.log).", "D7: midpoint runs the upper-null no-room descent iteratively with unchanged outputs and rng consumption; keyBetween(\"y\" + \"z\".repeat(32768), \"z\", () => 0) is exactly lo + \"1\" and keyAfter(\"z\".repeat(32768), () => 0) is exactly last + \"1\", both valid and correctly ordered; these two regressions failed before the change (log before-d7.log); the conformance test still matches formal/vectors/fractional.json."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Fractional.Model > ../tmp/fv-s942/fv-40-fractional-conformance/build.log 2>&1",
+        "bun test packages/core/src/fractional.formal.test.ts packages/core/src/fractional.test.ts > tmp/fv-s942/fv-40-fractional-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/fractional.ts packages/core/src/fractional.test.ts packages/core/src/fractional.formal.test.ts",
+        "test -s tmp/fv-s942/fv-40-fractional-conformance/before.log",
+        "test -s tmp/fv-s942/fv-40-fractional-conformance/before-d7.log",
+        "grep -q 'repeat(32768)' packages/core/src/fractional.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-41-zorder-conformance",
+      "planPath": "impl-plans/active/fv-41-zorder-conformance.md",
+      "dependsOn": ["fv-11-zorder-model"],
+      "writePaths": ["packages/core/src/z-order.ts", "packages/core/src/z-order.test.ts", "packages/core/src/z-order.formal.test.ts", "impl-plans/progress/fv-41-zorder-conformance.md", "tmp/fv-s942/fv-41-zorder-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["All tests pass; the D3 regression failed before the fix (before.log)."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.ZOrder.Model > ../tmp/fv-s942/fv-41-zorder-conformance/build.log 2>&1",
+        "bun test packages/core/src/z-order.formal.test.ts packages/core/src/z-order.test.ts > tmp/fv-s942/fv-41-zorder-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/z-order.ts packages/core/src/z-order.test.ts packages/core/src/z-order.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-42-nmesh-conformance",
+      "planPath": "impl-plans/active/fv-42-nmesh-conformance.md",
+      "dependsOn": ["fv-18-nmesh-codec-model"],
+      "writePaths": ["packages/nmesh/src/codec.formal.test.ts", "impl-plans/progress/fv-42-nmesh-conformance.md", "tmp/fv-s942/fv-42-nmesh-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The test passes; isolation.test.ts still passes."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Nmesh.Codec > ../tmp/fv-s942/fv-42-nmesh-conformance/build.log 2>&1",
+        "bun test packages/nmesh/src/codec.formal.test.ts packages/nmesh/src/isolation.test.ts > tmp/fv-s942/fv-42-nmesh-conformance/test.log 2>&1",
+        "bunx biome check packages/nmesh/src/codec.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-43-tsv-conformance",
+      "planPath": "impl-plans/active/fv-43-tsv-conformance.md",
+      "dependsOn": ["fv-13-tsv-model"],
+      "writePaths": ["packages/core/src/table-sheet/delimited.test.ts", "packages/core/src/table-sheet/delimited.formal.test.ts", "impl-plans/progress/fv-43-tsv-conformance.md", "tmp/fv-s942/fv-43-tsv-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["All tests pass; the existing five tests pass unchanged."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Tsv.Model > ../tmp/fv-s942/fv-43-tsv-conformance/build.log 2>&1",
+        "bun test packages/core/src/table-sheet/delimited.formal.test.ts packages/core/src/table-sheet/delimited.test.ts > tmp/fv-s942/fv-43-tsv-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/table-sheet/delimited.test.ts packages/core/src/table-sheet/delimited.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-44-rotate-conformance",
+      "planPath": "impl-plans/active/fv-44-rotate-conformance.md",
+      "dependsOn": ["fv-14-rotate-model"],
+      "writePaths": ["packages/core/src/breadboard/rotate.formal.test.ts", "impl-plans/progress/fv-44-rotate-conformance.md", "tmp/fv-s942/fv-44-rotate-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The test passes."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Rotate.Model > ../tmp/fv-s942/fv-44-rotate-conformance/build.log 2>&1",
+        "bun test packages/core/src/breadboard/rotate.formal.test.ts > tmp/fv-s942/fv-44-rotate-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/breadboard/rotate.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-45-undo-conformance",
+      "planPath": "impl-plans/active/fv-45-undo-conformance.md",
+      "dependsOn": ["fv-15-undo-model"],
+      "writePaths": ["packages/core/src/history.formal.test.ts", "impl-plans/progress/fv-45-undo-conformance.md", "tmp/fv-s942/fv-45-undo-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The test passes; history.test.ts passes unchanged."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Undo.Model > ../tmp/fv-s942/fv-45-undo-conformance/build.log 2>&1",
+        "bun test packages/core/src/history.formal.test.ts packages/core/src/history.test.ts > tmp/fv-s942/fv-45-undo-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/history.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-46-merge-conformance",
+      "planPath": "impl-plans/active/fv-46-merge-conformance.md",
+      "dependsOn": ["fv-03-merge-fix", "fv-16-merge-model"],
+      "writePaths": ["packages/core/src/document-merge.formal.test.ts", "impl-plans/progress/fv-46-merge-conformance.md", "tmp/fv-s942/fv-46-merge-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The test passes; document-merge.test.ts still passes."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Merge.Model > ../tmp/fv-s942/fv-46-merge-conformance/build.log 2>&1",
+        "bun test packages/core/src/document-merge.formal.test.ts packages/core/src/document-merge.test.ts > tmp/fv-s942/fv-46-merge-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/document-merge.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-47-overlap-conformance",
+      "planPath": "impl-plans/active/fv-47-overlap-conformance.md",
+      "dependsOn": ["fv-17-overlap-model"],
+      "writePaths": ["packages/core/src/cad/loops.ts", "packages/core/src/cad/loops.formal.test.ts", "impl-plans/progress/fv-47-overlap-conformance.md", "tmp/fv-s942/fv-47-overlap-conformance", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["The test passes; loops.test.ts passes unchanged."],
+      "verification": [
+        "cd formal && mise exec -- lake build Nodetto.Overlap.Model > ../tmp/fv-s942/fv-47-overlap-conformance/build.log 2>&1",
+        "bun test packages/core/src/cad/loops.formal.test.ts packages/core/src/cad/loops.test.ts > tmp/fv-s942/fv-47-overlap-conformance/test.log 2>&1",
+        "bunx biome check packages/core/src/cad/loops.ts packages/core/src/cad/loops.formal.test.ts"
+      ]
+    },
+    {
+      "planId": "fv-50-docs",
+      "planPath": "impl-plans/active/fv-50-docs.md",
+      "dependsOn": ["fv-01-scaffold", "fv-02-audit", "fv-03-merge-fix", "fv-04-stubs-a", "fv-05-stubs-b", "fv-10-fractional-model", "fv-11-zorder-model", "fv-12-nmesh-primitives-model", "fv-13-tsv-model", "fv-14-rotate-model", "fv-15-undo-model", "fv-16-merge-model", "fv-17-overlap-model", "fv-18-nmesh-codec-model", "fv-20-fractional-midpoint", "fv-21-fractional-keys", "fv-22-zorder-target", "fv-23-zorder-relative", "fv-24-zorder-reorder", "fv-25-nmesh-varint", "fv-26-nmesh-indices", "fv-27-nmesh-armor", "fv-28-nmesh-payload", "fv-29-tsv-proofs", "fv-30-rotate-proofs", "fv-31-undo-stack-proofs", "fv-32-undo-store-proofs", "fv-33-merge-canon", "fv-34-merge-diff", "fv-35-merge-value", "fv-36-merge-records", "fv-37-overlap-sweep", "fv-38-overlap-tree", "fv-40-fractional-conformance", "fv-41-zorder-conformance", "fv-42-nmesh-conformance", "fv-43-tsv-conformance", "fv-44-rotate-conformance", "fv-45-undo-conformance", "fv-46-merge-conformance", "fv-47-overlap-conformance"],
+      "writePaths": ["docs/formal.md", "README.md", "mise.toml", "formal/Nodetto.lean", "impl-plans/progress/fv-50-docs.md", "tmp/fv-s942/fv-50-docs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["mise run prove exits 0: all modules build, 66 required statements check with only the three axioms, open statements are proved or listed, vectors are fresh.", "docs/formal.md lists every statement once."],
+      "verification": [
+        "mise run prove > tmp/fv-s942/fv-50-docs/prove.log 2>&1 && grep -q 'audit: ok' tmp/fv-s942/fv-50-docs/prove.log",
+        "test \"$(grep -c '^| `' docs/formal.md)\" -ge 69",
+        "sh -c 'for n in decodeNmesh_encodeNmesh treeSearch_visits_overlaps overlappingPairs_visits_overlaps; do grep -rqE \"theorem $n( |$)\" formal/Nodetto || grep -q \"^## Open\" docs/formal.md || exit 1; done'",
+        "grep -n 'formal/' README.md"
+      ]
+    }
+  ]
+}

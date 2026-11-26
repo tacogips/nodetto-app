@@ -50,7 +50,7 @@ export function compareFractional(left: string, right: string): number {
 function randomDigitBetween(low: number, high: number, rng: Rng): number {
   const span = high - low - 1;
   const raw = Math.floor(rng() * span);
-  const offset = Math.max(0, Math.min(raw, span - 1));
+  const offset = Number.isNaN(raw) ? 0 : Math.max(0, Math.min(raw, span - 1));
   return low + 1 + offset;
 }
 
@@ -91,8 +91,17 @@ function midpoint(lower: string, upper: string | null, rng: Rng): string {
     // truncating it lands strictly between the two.
     return upper.slice(0, 1);
   }
-  // No room at this digit: keep `lower`'s digit and descend one place.
-  return (DIGITS[low] as string) + midpoint(lower.slice(1), null, rng);
+  // No room: keep the first digit, then descend without growing the stack.
+  let index = 1;
+  while (BASE - digitValue(lower, index) <= 1) {
+    index += 1;
+  }
+  const next = digitValue(lower, index);
+  return (
+    (DIGITS[low] as string) +
+    lower.slice(1, index) +
+    (DIGITS[randomDigitBetween(next, BASE, rng)] as string)
+  );
 }
 
 /**

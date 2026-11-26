@@ -22,12 +22,26 @@ export interface MergeResult {
   readonly conflicts: readonly MergeConflict[];
 }
 
+function canonicalJson(value: unknown): string {
+  if (value === undefined) return "\u0000undefined";
+  if (Array.isArray(value))
+    return `[${Array.from(value, (item) => (item === undefined ? "null" : canonicalJson(item))).join(",")}]`;
+  if (isPlainObject(value)) {
+    const members = Object.keys(value)
+      .sort(compareVersionStrings)
+      .filter((key) => value[key] !== undefined)
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`);
+    return `{${members.join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function same(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return canonicalJson(left) === canonicalJson(right);
 }
 
 /** Merge one JSON value; `conflict` is set when local overrode a remote change. */
-function mergeValue(
+export function mergeValue(
   base: unknown,
   local: unknown,
   remote: unknown,
@@ -44,8 +58,19 @@ function mergeValue(
       ...Object.keys(remote),
     ]);
     for (const key of keys) {
-      const merged = mergeValue(base[key], local[key], remote[key], conflict);
-      if (merged !== undefined) result[key] = merged;
+      const merged = mergeValue(
+        Object.hasOwn(base, key) ? base[key] : undefined,
+        Object.hasOwn(local, key) ? local[key] : undefined,
+        Object.hasOwn(remote, key) ? remote[key] : undefined,
+        conflict,
+      );
+      if (merged !== undefined)
+        Object.defineProperty(result, key, {
+          value: merged,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
     }
     return result;
   }
@@ -53,7 +78,7 @@ function mergeValue(
   return local;
 }
 
-function mergeById<T extends { readonly id: string }>(
+export function mergeById<T extends { readonly id: string }>(
   kind: "element" | "page",
   base: readonly T[],
   local: readonly T[],
@@ -255,14 +280,20 @@ export function mergeDocumentVersions(
       ].sort(compareVersionStrings);
       for (const key of keys) {
         const v = value(
-          objectBase[key],
-          o[key],
-          t[key],
+          Object.hasOwn(objectBase, key) ? objectBase[key] : undefined,
+          Object.hasOwn(o, key) ? o[key] : undefined,
+          Object.hasOwn(t, key) ? t[key] : undefined,
           record,
           path ? `${path}.${key}` : key,
           added,
         );
-        if (v !== undefined) result[key] = v;
+        if (v !== undefined)
+          Object.defineProperty(result, key, {
+            value: v,
+            enumerable: true,
+            writable: true,
+            configurable: true,
+          });
       }
       return result;
     }
@@ -431,16 +462,8 @@ export function mergeDocumentVersions(
     "extensions",
     false,
   ) as Document["extensions"];
-  const canonicalValue = (v: unknown): unknown => {
-    if (Array.isArray(v)) return v.map(canonicalValue);
-    if (!isPlainObject(v)) return v;
-    const result: Record<string, unknown> = {};
-    for (const key of Object.keys(v).sort(compareVersionStrings))
-      result[key] = canonicalValue(v[key]);
-    return result;
-  };
   const unknownKey = (r: NonNullable<Document["unknownRecords"]>[number]) =>
-    JSON.stringify([r.kind, canonicalValue(r.data)]);
+    `${JSON.stringify(r.kind)}:${canonicalJson(r.data)}`;
   const bm = new Map(
     (base.unknownRecords ?? []).map((r) => [unknownKey(r), r]),
   );

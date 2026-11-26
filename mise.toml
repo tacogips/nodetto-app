@@ -18,6 +18,7 @@ fi
 
 [tools]
 bun = "1.4.4"
+"github:leanprover/lean4" = "4.36.0"
 gitleaks = "latest"
 pre-commit = "latest"
 rust = "1.98"
@@ -69,6 +70,10 @@ CARGO_TERM_QUIET=true bun --cwd=apps/desktop run tauri build --config src-tauri/
 [tasks.release-macos-dmg-local]
 description = "Sign, notarize, validate, and upload macOS DMG release assets from the local keychain (pass v<version>)"
 run = 'bash scripts/release-macos-dmg-local.sh "$@"'
+
+[tasks.prove]
+description = "Build the Lean proofs, audit them and check the committed vectors"
+run = "formal/scripts/audit"
 
 [tasks.test]
 description = "Run frontend and backend tests"

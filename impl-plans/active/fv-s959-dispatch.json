@@ -1,0 +1,235 @@
+{
+  "taskId": "fv-s959",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-959",
+  "implementationBranch": "feat/lean-spec",
+  "baseBranch": "feat/lean-spec",
+  "remote": "origin",
+  "gitPush": false,
+  "originalHead": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053",
+  "designDocPaths": ["design-docs/specs/design-formal-verification.md"],
+  "overviewPlanPath": "impl-plans/active/fv-00-overview.md",
+  "evidenceRoot": "tmp/fv-s959",
+  "evidenceLayout": "Per-plan evidence under tmp/fv-s959/<planId>/ (.log, .txt, .json only; never *.test.ts). Lean output goes to formal/.lake, Cargo output to target, and existing CAD tests write to tmp/cad3d; these three are the artifactRoots of every plan. Never run lake clean or cargo clean.",
+  "acceptedDependencies": [
+    {"planId": "fv-01-scaffold", "planPath": "impl-plans/active/fv-01-scaffold.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-02-audit", "planPath": "impl-plans/active/fv-02-audit.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-03-merge-fix", "planPath": "impl-plans/active/fv-03-merge-fix.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-04-stubs-a", "planPath": "impl-plans/active/fv-04-stubs-a.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-05-stubs-b", "planPath": "impl-plans/active/fv-05-stubs-b.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-10-fractional-model", "planPath": "impl-plans/active/fv-10-fractional-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-11-zorder-model", "planPath": "impl-plans/active/fv-11-zorder-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-12-nmesh-primitives-model", "planPath": "impl-plans/active/fv-12-nmesh-primitives-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-13-tsv-model", "planPath": "impl-plans/active/fv-13-tsv-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-14-rotate-model", "planPath": "impl-plans/active/fv-14-rotate-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-15-undo-model", "planPath": "impl-plans/active/fv-15-undo-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-16-merge-model", "planPath": "impl-plans/active/fv-16-merge-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-17-overlap-model", "planPath": "impl-plans/active/fv-17-overlap-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-18-nmesh-codec-model", "planPath": "impl-plans/active/fv-18-nmesh-codec-model.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-20-fractional-midpoint", "planPath": "impl-plans/active/fv-20-fractional-midpoint.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-21-fractional-keys", "planPath": "impl-plans/active/fv-21-fractional-keys.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-22-zorder-target", "planPath": "impl-plans/active/fv-22-zorder-target.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-23-zorder-relative", "planPath": "impl-plans/active/fv-23-zorder-relative.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-25-nmesh-varint", "planPath": "impl-plans/active/fv-25-nmesh-varint.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-26-nmesh-indices", "planPath": "impl-plans/active/fv-26-nmesh-indices.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-27-nmesh-armor", "planPath": "impl-plans/active/fv-27-nmesh-armor.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-28-nmesh-payload", "planPath": "impl-plans/active/fv-28-nmesh-payload.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs (whole-payload round trip recorded allowed-open); plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-29-tsv-proofs", "planPath": "impl-plans/active/fv-29-tsv-proofs.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-30-rotate-proofs", "planPath": "impl-plans/active/fv-30-rotate-proofs.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-31-undo-stack-proofs", "planPath": "impl-plans/active/fv-31-undo-stack-proofs.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-32-undo-store-proofs", "planPath": "impl-plans/active/fv-32-undo-store-proofs.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-33-merge-canon", "planPath": "impl-plans/active/fv-33-merge-canon.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-34-merge-diff", "planPath": "impl-plans/active/fv-34-merge-diff.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-35-merge-value", "planPath": "impl-plans/active/fv-35-merge-value.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-36-merge-records", "planPath": "impl-plans/active/fv-36-merge-records.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-37-overlap-sweep", "planPath": "impl-plans/active/fv-37-overlap-sweep.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-38-overlap-tree", "planPath": "impl-plans/active/fv-38-overlap-tree.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-40-fractional-conformance", "planPath": "impl-plans/active/fv-40-fractional-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-41-zorder-conformance", "planPath": "impl-plans/active/fv-41-zorder-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-42-nmesh-conformance", "planPath": "impl-plans/active/fv-42-nmesh-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-43-tsv-conformance", "planPath": "impl-plans/active/fv-43-tsv-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-44-rotate-conformance", "planPath": "impl-plans/active/fv-44-rotate-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-45-undo-conformance", "planPath": "impl-plans/active/fv-45-undo-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-46-merge-conformance", "planPath": "impl-plans/active/fv-46-merge-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."},
+    {"planId": "fv-47-overlap-conformance", "planPath": "impl-plans/active/fv-47-overlap-conformance.md", "commit": "6b2b8413ddfedba76bb9fe66f0fe2c49e95e7053", "provides": "Accepted in earlier runs; plan committed at 6b2b841, implementation in the working tree; not redispatched."}
+  ],
+  "reviewContext": {
+    "issueReference": "none (workflow opus-terra-design-and-implement-review-loop-session-959; intake comm-024231; design accepted comm-024233; plans comm-024234; plan review accepted comm-024235)",
+    "userProblem": "The Lean 4 formal verification of nodetto is almost finished: 40 of 42 plans are accepted, but reorderCommands_spec (design section 6.2) is still unproved after twelve continuations, and docs/formal.md, the umbrella module formal/Nodetto.lean and the mise prove task do not exist yet, so mise run prove cannot pass. The user wants the theorem proved exactly as stated (in small one-sitting plans following the design 6.2.1 proof architecture) and the documentation written, so that mise run prove passes on the whole project.",
+    "requiredOutcomes": [
+      "reorderCommands_refuses, reorderCommands_unchanged and reorderCommands_spec exist in formal/Nodetto/ZOrder/Reorder.lean with exactly the design section 6.2 signatures and the ZOrder audit passes with only propext, Classical.choice and Quot.sound.",
+      "mise run prove exits 0 for the whole project (all modules build, no forbidden tokens, 66 required statements checked, open statements listed, vectors fresh).",
+      "docs/formal.md documents how to run, the statement table with statuses, B1-B8, D1-D7, the Open list, what is not proved and the two known conformance limitations; README.md mentions it.",
+      "bun run typecheck, bun run lint and the *.formal.test.ts conformance tests pass at integration."
+    ],
+    "nonGoals": [
+      "No redesign, re-plan or re-implementation of the 40 accepted plans; their files are not edited.",
+      "No change to theorem statements in design section 6, to formal/Nodetto/ZOrder/Model.lean, to vectors or to packages/.",
+      "No Reorder/*.lean submodules; formal/Nodetto/ZOrder.lean and formal/scripts/audit.ts are unchanged.",
+      "The open statements decodeNmesh_encodeNmesh, treeSearch_visits_overlaps and overlappingPairs_visits_overlaps are not attempted.",
+      "The mergeById Map comparison and thin NMESH edge-case vectors are recorded as limitations, not fixed.",
+      "prove is not added to verify, test, ci or any CI workflow. No push, worktree, branch or history change; no server, auth, secret or deployment code."
+    ],
+    "constraints": [
+      "fv-24a to fv-24f all edit formal/Nodetto/ZOrder/Reorder.lean and run strictly in sequence (dependsOn chain); fv-50-docs runs after fv-24f.",
+      "Lean runs only as `cd formal && mise exec -- lake build Nodetto.ZOrder` (fv-24 plans) or through formal/scripts/audit and mise run prove (fv-50). Never lake clean; retry a build-lock failure up to three times and log it.",
+      "Proof integrity: no sorry, admit, axiom, native_decide, unsafe, partial, opaque, implemented_by, extern, skipKernelTC or #exit anywhere in formal/**/*.lean (comments included), no maxHeartbeats option.",
+      "Private helpers from design 6.2.1 may be strengthened or have their loop argument list adapted (recorded in the progress file); the three section 6.2 theorems are copied verbatim and never weakened. A false statement stops the plan with a Lean counterexample plus TypeScript input (needs_design_revision).",
+      "Workers read fresh before each edit and record git hash-object before and after in impl-plans/progress/<planId>.md; no git state changes.",
+      "Per-plan gates never include bun run typecheck, bun run lint or mise run verify; those run once at integration. At most two bun test processes at a time."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "FD1: refuses and unchanged already match section 6.2 verbatim; only reorderCommands_spec remains.", "rationale": "Reorder.lean lines 403-419 equal design lines 330-336; the prior audit reports only allowed axioms for both."},
+      {"decision": "FD2: no counterexample expected; the proof follows design 6.2.1 (scan, LoopInv, between_bounds, renumber fallback, untouched_element).", "rationale": "Hand proof in the design; the step 3 review found no gap."},
+      {"decision": "FD3: all lemmas stay in Reorder.lean; no submodules.", "rationale": "Avoids import-list and audit changes that risk the whole-project prove."},
+      {"decision": "FD4/FD5: a named scanStep and four loop equation lemmas isolate do-notation unfolding; loop_ok is generic over P.", "rationale": "Makes each sitting small and independent of elaboration details."},
+      {"decision": "FD6: the actual reorderCommands.loop signature is recorded by fv-24b and used by fv-24e/fv-24f.", "rationale": "The design sandbox could not run Lean, so the captured-argument order was not observed."},
+      {"decision": "FD7: the two low conformance findings are documented as known limitations.", "rationale": "They concern only the evidence of accepted plans, and fixing them could expose model differences outside this run's scope."},
+      {"decision": "FD8: fv-50-docs creates formal/Nodetto.lean and the mise prove task and depends only on fv-24f.", "rationale": "Both are missing and required by full-mode prove; other plans are accepted."}
+    ],
+    "intentionalTradeoffs": [
+      "Serial seven-plan chain (FD3): every fv-24 plan edits formal/Nodetto/ZOrder/Reorder.lean, so there is no parallelism; longer wall-clock time is accepted in exchange for no edit conflicts.",
+      "Private helper lemmas may be adapted with a recorded note when do-notation elaboration differs (FD6); the section 6.2 statements stay verbatim.",
+      "The mergeById Map comparison and the thin NMESH edge-case vectors are documented as known limitations in docs/formal.md instead of being fixed (FD7)."
+    ],
+    "supportedEdgeCases": [
+      "reorderCommands guard false (refuses) and no-change (unchanged) paths.",
+      "Renumber branch of reorderCommands (reorderCommands_renumber_spec).",
+      "Loop paths: empty list, kept element, keyBetween/keyAfter failure falling back to renumber, moved element bounded by between_bounds.",
+      "Untouched elements keep their keys (untouched_element frame lemma).",
+      "Shared formal/.lake build lock: retry up to three times, never lake clean."
+    ],
+    "outOfScopeEdgeCases": [
+      "decodeNmesh_encodeNmesh, treeSearch_visits_overlaps and overlappingPairs_visits_overlaps stay allowed-open.",
+      "Floating-point inputs outside the integer bridging assumption stated in the design.",
+      "Running prove in verify or CI (linux.yml has no verify job)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-formal-verification.md",
+      "impl-plans/active/fv-24-zorder-reorder.md",
+      "formal/Nodetto/ZOrder/Model.lean",
+      "formal/Nodetto/ZOrder/Reorder.lean",
+      "formal/scripts/audit.ts",
+      "impl-plans/progress/fv-24-zorder-reorder.md",
+      "impl-plans/active/fv-00-overview.md"
+    ],
+    "finalVerification": [
+      "mise run prove",
+      "bun run typecheck",
+      "bun run lint",
+      "bun test packages/core/src/breadboard/rotate.formal.test.ts packages/core/src/cad/loops.formal.test.ts packages/core/src/document-merge.formal.test.ts packages/core/src/fractional.formal.test.ts packages/core/src/history.formal.test.ts packages/core/src/table-sheet/delimited.formal.test.ts packages/core/src/z-order.formal.test.ts packages/nmesh/src/codec.formal.test.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "fv-24a-reorder-scan",
+      "planPath": "impl-plans/active/fv-24a-reorder-scan.md",
+      "dependsOn": [],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "impl-plans/progress/fv-24a-reorder-scan.md", "tmp/fv-s959/fv-24a-reorder-scan", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["scanStep, scanStep_mem, scanStep_preserved and scan_kept_sorted exist in Reorder.lean (design 6.2.1 G1), Nodetto.ZOrder builds, and the audit of reorderCommands_refuses and reorderCommands_unchanged exits 0."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-24a-reorder-scan",
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s959/fv-24a-reorder-scan/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged > tmp/fv-s959/fv-24a-reorder-scan/audit.log 2>&1",
+        "test \"$(grep -cE '^private (def|theorem) (scanStep|scanStep_mem|scanStep_preserved|scan_kept_sorted) ' formal/Nodetto/ZOrder/Reorder.lean)\" -eq 4"
+      ]
+    },
+    {
+      "planId": "fv-24b-reorder-loop-eqs",
+      "planPath": "impl-plans/active/fv-24b-reorder-loop-eqs.md",
+      "dependsOn": ["fv-24a-reorder-scan"],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "impl-plans/progress/fv-24b-reorder-loop-eqs.md", "tmp/fv-s959/fv-24b-reorder-loop-eqs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["cmdsOf, loop_nil_eq, loop_kept_eq, loop_fallback_eq and loop_moved_eq exist (design 6.2.1 G2), the actual reorderCommands.loop signature is recorded in the progress file, no #check remains, Nodetto.ZOrder builds, and the audit of the two finished theorems exits 0."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-24b-reorder-loop-eqs",
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s959/fv-24b-reorder-loop-eqs/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged > tmp/fv-s959/fv-24b-reorder-loop-eqs/audit.log 2>&1",
+        "test \"$(grep -cE '^private (def|theorem) (cmdsOf|loop_nil_eq|loop_kept_eq|loop_fallback_eq|loop_moved_eq) ' formal/Nodetto/ZOrder/Reorder.lean)\" -eq 5",
+        "sh -c '! grep -n \"#check\" formal/Nodetto/ZOrder/Reorder.lean'",
+        "grep -n 'reorderCommands.loop' impl-plans/progress/fv-24b-reorder-loop-eqs.md"
+      ]
+    },
+    {
+      "planId": "fv-24c-reorder-invariant",
+      "planPath": "impl-plans/active/fv-24c-reorder-invariant.md",
+      "dependsOn": ["fv-24b-reorder-loop-eqs"],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "impl-plans/progress/fv-24c-reorder-invariant.md", "tmp/fv-s959/fv-24c-reorder-invariant", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["last_bound, find_first_kept, LoopInv, loop_init and inv_bounds exist (design 6.2.1 G3), Nodetto.ZOrder builds, and the audit of the two finished theorems exits 0."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-24c-reorder-invariant",
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s959/fv-24c-reorder-invariant/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged > tmp/fv-s959/fv-24c-reorder-invariant/audit.log 2>&1",
+        "test \"$(grep -cE '^private (theorem|structure) (last_bound|find_first_kept|LoopInv|loop_init|inv_bounds) ' formal/Nodetto/ZOrder/Reorder.lean)\" -eq 5"
+      ]
+    },
+    {
+      "planId": "fv-24d-reorder-steps",
+      "planPath": "impl-plans/active/fv-24d-reorder-steps.md",
+      "dependsOn": ["fv-24c-reorder-invariant"],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "impl-plans/progress/fv-24d-reorder-steps.md", "tmp/fv-s959/fv-24d-reorder-steps", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["inv_kept and inv_moved exist (design 6.2.1 G4), Nodetto.ZOrder builds, and the audit of the two finished theorems exits 0."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-24d-reorder-steps",
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s959/fv-24d-reorder-steps/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged > tmp/fv-s959/fv-24d-reorder-steps/audit.log 2>&1",
+        "test \"$(grep -cE '^private theorem (inv_kept|inv_moved) ' formal/Nodetto/ZOrder/Reorder.lean)\" -eq 2"
+      ]
+    },
+    {
+      "planId": "fv-24e-reorder-loop",
+      "planPath": "impl-plans/active/fv-24e-reorder-loop.md",
+      "dependsOn": ["fv-24d-reorder-steps"],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "impl-plans/progress/fv-24e-reorder-loop.md", "tmp/fv-s959/fv-24e-reorder-loop", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["done_applied_keys, loop_final and loop_ok exist (design 6.2.1 G5), Nodetto.ZOrder builds, and the audit of the two finished theorems exits 0."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-24e-reorder-loop",
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s959/fv-24e-reorder-loop/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged > tmp/fv-s959/fv-24e-reorder-loop/audit.log 2>&1",
+        "test \"$(grep -cE '^private theorem (done_applied_keys|loop_final|loop_ok) ' formal/Nodetto/ZOrder/Reorder.lean)\" -eq 3"
+      ]
+    },
+    {
+      "planId": "fv-24f-reorder-spec",
+      "planPath": "impl-plans/active/fv-24f-reorder-spec.md",
+      "dependsOn": ["fv-24e-reorder-loop"],
+      "writePaths": ["formal/Nodetto/ZOrder/Reorder.lean", "impl-plans/progress/fv-24f-reorder-spec.md", "tmp/fv-s959/fv-24f-reorder-spec", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["reorderCommands_spec exists with exactly the design section 6.2 statement, and the audit passes for reorderCommands_refuses, reorderCommands_unchanged and reorderCommands_spec with only propext, Classical.choice and Quot.sound; z-order vectors stay fresh."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-24f-reorder-spec",
+        "cd formal && mise exec -- lake build Nodetto.ZOrder > ../tmp/fv-s959/fv-24f-reorder-spec/build.log 2>&1",
+        "formal/scripts/audit --module ZOrder --theorem reorderCommands_refuses --theorem reorderCommands_unchanged --theorem reorderCommands_spec > tmp/fv-s959/fv-24f-reorder-spec/audit.log 2>&1",
+        "formal/scripts/audit --module ZOrder --vectors > tmp/fv-s959/fv-24f-reorder-spec/vectors.log 2>&1"
+      ]
+    },
+    {
+      "planId": "fv-50-docs",
+      "planPath": "impl-plans/active/fv-50-docs.md",
+      "dependsOn": ["fv-24f-reorder-spec"],
+      "writePaths": ["docs/formal.md", "README.md", "mise.toml", "formal/Nodetto.lean", "impl-plans/progress/fv-50-docs.md", "tmp/fv-s959/fv-50-docs", "target", "tmp/cad3d", "formal/.lake"],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tmp/cad3d", "formal/.lake"],
+      "acceptanceCriteria": ["mise run prove exits 0 with 'audit: ok': all modules build, 66 required statements check with only the three axioms, open statements are listed under '## Open', vectors are fresh.", "docs/formal.md has at least 69 statement rows plus B1-B8, D1-D7, the not-proved list and the two known limitations; README.md mentions docs/formal.md."],
+      "verification": [
+        "mkdir -p tmp/fv-s959/fv-50-docs",
+        "mise run prove > tmp/fv-s959/fv-50-docs/prove.log 2>&1 && grep -q 'audit: ok' tmp/fv-s959/fv-50-docs/prove.log",
+        "test \"$(grep -c '^| `' docs/formal.md)\" -ge 69",
+        "sh -c 'for n in decodeNmesh_encodeNmesh treeSearch_visits_overlaps overlappingPairs_visits_overlaps; do grep -rqE \"theorem $n( |$)\" formal/Nodetto || grep -q \"$n\" docs/formal.md || exit 1; done'",
+        "grep -n '^## Open' docs/formal.md",
+        "sh -c 'for t in B1 B8 D1 D7 mergeDocumentVersions mergeById; do grep -q \"$t\" docs/formal.md || exit 1; done'",
+        "grep -n 'docs/formal.md' README.md"
+      ]
+    }
+  ]
+}

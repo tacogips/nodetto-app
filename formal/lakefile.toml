@@ -1,0 +1,42 @@
+name = "Nodetto"
+version = "0.1.0"
+defaultTargets = ["Nodetto"]
+
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+
+[[lean_lib]]
+name = "Nodetto"
+
+[[lean_exe]]
+name = "vectors-fractional"
+root = "Nodetto.Fractional.Vectors"
+
+[[lean_exe]]
+name = "vectors-z-order"
+root = "Nodetto.ZOrder.Vectors"
+
+[[lean_exe]]
+name = "vectors-nmesh"
+root = "Nodetto.Nmesh.Vectors"
+
+[[lean_exe]]
+name = "vectors-tsv"
+root = "Nodetto.Tsv.Vectors"
+
+[[lean_exe]]
+name = "vectors-rotate"
+root = "Nodetto.Rotate.Vectors"
+
+[[lean_exe]]
+name = "vectors-undo"
+root = "Nodetto.Undo.Vectors"
+
+[[lean_exe]]
+name = "vectors-merge"
+root = "Nodetto.Merge.Vectors"
+
+[[lean_exe]]
+name = "vectors-overlap"
+root = "Nodetto.Overlap.Vectors"

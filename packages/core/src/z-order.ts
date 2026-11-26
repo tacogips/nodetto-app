@@ -137,7 +137,10 @@ export function reorderCommands(
 ): Command[] {
   const byId = new Map(elements.map((element) => [element.id, element]));
   const target = order.filter((id) => byId.has(id));
-  if (target.length !== elements.length) {
+  if (
+    target.length !== elements.length ||
+    new Set(target).size !== target.length
+  ) {
     return [];
   }
   if (

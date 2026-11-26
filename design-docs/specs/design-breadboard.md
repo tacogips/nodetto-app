@@ -439,6 +439,11 @@ holes to page space through the same rotation transform the renderers use.
   - Each part's `visual.rotation` becomes `(rotation + 90 * quarterTurns)`
     mod 360. Then `visual.x/y` are translated so that pin 1 keeps its page
     position. That position is re-rounded to the lattice.
+  - So every pin is on the lattice after a rotation. When pin 1 was already
+    on the lattice it does not move, a turn followed by the opposite turn
+    restores the part, and four turns restore it. When pin 1 was off the
+    lattice the first turn snaps it, so the pair moves the part by the snap
+    offset (proved in `formal/`, see `design-formal-verification.md` D4).
   - Several parts in one call each rotate in place. They are not rotated as
     a group about a common centre. This matches KiCad's per-item rotation.
   - It is one undo step.

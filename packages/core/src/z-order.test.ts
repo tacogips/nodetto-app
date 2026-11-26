@@ -159,6 +159,11 @@ describe("reorderCommands", () => {
     expect(reorderCommands(elements, [], RNG)).toEqual([]);
   });
 
+  test("duplicate target ids are refused", () => {
+    const elements = page(["a1", "a2"]);
+    expect(reorderCommands(elements, ["A", "A"], RNG)).toEqual([]);
+  });
+
   test("ids that are not on the page are ignored", () => {
     const elements = page(["a1", "a2"]);
     const commands = reorderCommands(elements, ["B", "A", "elsewhere"], RNG);

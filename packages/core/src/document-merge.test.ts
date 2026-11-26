@@ -4,6 +4,7 @@ import {
   diffDocuments,
   isEmptyCommit,
   mergeDocuments,
+  mergeValue,
 } from "./document-merge.ts";
 
 function element(id: string, label: string, x = 0): Element {
@@ -88,4 +89,64 @@ test("diffDocuments expresses element and page changes, and refuses metadata cha
   expect(commit?.remove).toEqual(["b"]);
   expect(isEmptyCommit(diffDocuments(current, current) ?? {})).toBe(true);
   expect(diffDocuments(current, doc([], "Renamed"))).toBeNull();
+});
+
+test("key order does not hide a remote array change", () => {
+  const base = [{ a: 1, b: 2 }];
+  const ours = [{ b: 2, a: 1 }];
+  const theirs = [{ a: 3, b: 2 }];
+  const conflict = { value: false };
+  expect(mergeValue(base, ours, theirs, conflict)).toEqual(theirs);
+  expect(conflict.value).toBe(false);
+  const withSemantic = (semantic: unknown) => ({
+    ...element("a", "A"),
+    semantic: { data: semantic },
+  });
+  const merged = mergeDocuments(
+    doc([withSemantic(base)]),
+    doc([withSemantic(ours)]),
+    doc([withSemantic(theirs)]),
+  );
+  expect(merged.document.elements[0]?.semantic).toEqual({ data: theirs });
+  expect(merged.conflicts).toEqual([]);
+});
+
+test("merge preserves own prototype-named members", () => {
+  const base = JSON.parse('{"x":1,"__proto__":1}');
+  const ours = JSON.parse('{"x":2,"__proto__":1}');
+  const theirs = JSON.parse('{"x":1,"__proto__":2}');
+  const conflict = { value: false };
+  const result = mergeValue(base, ours, theirs, conflict) as Record<
+    string,
+    unknown
+  >;
+  expect(result.x).toBe(2);
+  expect(Object.hasOwn(result, "__proto__")).toBe(true);
+  expect(result.__proto__).toBe(2);
+  expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  expect(conflict.value).toBe(false);
+});
+
+test("metadata equality ignores object key order but detects own prototype members", () => {
+  const base = doc([]);
+  const commit = diffDocuments(
+    { ...base, extensions: { data: [{ a: 1, b: 2 }] } },
+    { ...base, extensions: { data: [{ b: 2, a: 1 }] } },
+  );
+  expect(commit).not.toBeNull();
+  expect(isEmptyCommit(commit ?? {})).toBe(true);
+  expect(
+    diffDocuments(
+      { ...base, extensions: { data: JSON.parse('[{"__proto__":1}]') } },
+      { ...base, extensions: { data: JSON.parse('[{"__proto__":2}]') } },
+    ),
+  ).toBeNull();
+});
+
+test("own-member edits and divergent changes are retained", () => {
+  const conflict = { value: false };
+  expect(mergeValue({ a: 1 }, { a: 2 }, { a: 1 }, conflict)).toEqual({ a: 2 });
+  expect(conflict.value).toBe(false);
+  expect(mergeValue({ a: 1 }, { a: 2 }, { a: 3 }, conflict)).toEqual({ a: 2 });
+  expect(conflict.value).toBe(true);
 });
