@@ -109,3 +109,52 @@ describe("keyAfter", () => {
     expect(compareFractional("a0", key)).toBe(-1);
   });
 });
+
+describe("fractional regression cases", () => {
+  test("D6 handles NaN draws", () => {
+    expect(keyBetween("1", "3", () => Number.NaN)).toBe("2");
+    const first = keyAfter(null, () => Number.NaN);
+    expect(first).toBe("1");
+    expect(isFractionalKey(first)).toBe(true);
+    const next = keyAfter("V", () => Number.NaN);
+    expect(next).toBe("W");
+    expect(isFractionalKey(next) && next > "V").toBe(true);
+    expect(keyAfter("x!", () => Number.NaN)).toBe("x!1");
+    expect(keyAfter("x!", () => Number.NaN) > "x!").toBe(true);
+  });
+
+  test("D7 handles long lower bounds between keys", () => {
+    const lo = `y${"z".repeat(32768)}`;
+    let draws = 0;
+    const key = keyBetween(lo, "z", () => {
+      draws += 1;
+      return 0;
+    });
+    expect(key).toBe(`${lo}1`);
+    expect(isFractionalKey(key) && lo < key && key < "z").toBe(true);
+    expect(draws).toBe(1);
+  });
+
+  test("D7 handles long last keys", () => {
+    const last = "z".repeat(32768);
+    let draws = 0;
+    const key = keyAfter(last, () => {
+      draws += 1;
+      return 0;
+    });
+    expect(key).toBe(`${last}1`);
+    expect(isFractionalKey(key) && last < key).toBe(true);
+    expect(draws).toBe(1);
+  });
+
+  test("preserves numeric draw results", () => {
+    for (const [draw, between, after] of [
+      [0, "yzz1", "zz1"],
+      [0.5, "yzzV", "zzV"],
+    ] as const) {
+      expect(keyBetween("1", "3", () => draw)).toBe("2");
+      expect(keyBetween("yzz", "z", () => draw)).toBe(between);
+      expect(keyAfter("zz", () => draw)).toBe(after);
+    }
+  });
+});

@@ -736,9 +736,29 @@ Inputs:
 
 Merge model (new `mergeDocumentVersions` in `packages/core/src/document-merge.ts`):
 
-- It shares the recursive value merge with the existing `mergeDocuments`. That
-  shared code is extended to collect field paths, and `mergeDocuments` keeps
-  its exact current results, so the app's live merge does not change.
+- It has its own recursive routines, `value` and `records` inside
+  `mergeDocumentVersions`, which collect field paths. They are separate from
+  the live editor's `mergeValue` and `mergeById`, which `mergeDocuments`
+  uses, so the app's live merge keeps its own conflict policy. The two
+  policies differ for records added on both sides. The CLI carries the
+  `added` flag through nested objects and merges every both-added nested
+  object against `{}`. The live merge supplies `{}` only at the record root.
+  Example: both sides add page `q`, ours with `extensions` `{ours: 1}` and
+  theirs with `extensions` `{theirs: 2}`. `mergeDocuments` reports
+  `both-changed` and keeps ours' `extensions`; `mergeDocumentVersions` keeps
+  both fields with no conflict. The Lean theorems in
+  `design-formal-verification.md` section 6.7 cover only the live helpers.
+- Both paths share one equality rule, `same`, used by `diffDocuments` too.
+  It compares values as JSON values through a module-scope `canonicalJson`
+  text: own enumerable members only, keys sorted by code unit, recursively,
+  with no intermediate objects. So a difference in key order alone is not a
+  change, and every own member counts, `__proto__` included. Both recursive
+  merges read members with `Object.hasOwn` and write them with
+  `Object.defineProperty`, so no member is read through, or lost to, the
+  prototype. This replaces the earlier key-order-sensitive comparison, which
+  could report a conflict and drop the only real change when one side only
+  reordered keys inside an array, and the old `canonicalValue` helper, which
+  dropped own `__proto__` members (`design-formal-verification.md` D2).
 - Records are keyed by record kind and id: the document header, pages by id,
   elements by id. Unknown records are merged as a set of canonical lines: a
   line deleted on one side is dropped, and lines added on either side are kept.

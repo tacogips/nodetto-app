@@ -430,7 +430,12 @@ Interaction lives in new ui-solid modules under
 
     A field that contains a tab, `\r`, `\n` or a quote is wrapped in quotes
     with inner quotes doubled, the same as Excel. Rows are joined with `\n`.
-    `parseTsv(serializeTsv(grid))` must equal `grid` exactly. Cut writes the
+    `parseTsv(serializeTsv(grid))` must equal `grid` exactly for every grid
+    whose rows each have at least one field, which every `clipboardGrid` of
+    a valid table is (a table has at least one column). A row with zero
+    fields has no TSV spelling: it is written as an empty line, which reads
+    back as nothing at the end of the text and as one empty field elsewhere
+    (proved in `formal/`, see `design-formal-verification.md` D1). Cut writes the
     clipboard first and then clears the range with one `clearRange` →
     `updateSemantic`, so Cut is one undo step.
   - Paste reads `text/plain`. The parser accepts `\r\n` or `\n`, quoted

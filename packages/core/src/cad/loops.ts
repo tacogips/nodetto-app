@@ -234,7 +234,7 @@ interface LoopStats {
 const SWEEP_PAIRS_PER_BOX = 8;
 const DEPTH_WORK_PER_VERTEX = 32;
 
-function overlappingPairs(
+export function overlappingPairs(
   boxes: readonly Bounds[],
   visit: (i: number, j: number) => void,
   count: () => void,

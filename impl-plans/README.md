@@ -871,3 +871,30 @@ remain in `active/`; the archive node moves the plans.
 | [dps-17f-cli-parity](completed/dps-17f-cli-parity.md) | CLI Markdown and native parity tests |
 | [dps-17g-docs-examples](completed/dps-17g-docs-examples.md) | docs and examples |
 | [dps-17-final](completed/dps-17-final.md) | final integration gates |
+
+## Lean 4 formal verification (fv-s942 / fv-s959)
+
+The Lean 4 models, proofs and conformance vectors under `formal/` are
+implemented (design: `design-docs/specs/design-formal-verification.md`;
+user documentation: `docs/formal.md`; no GitHub issue). Evidence is under
+`tmp/fv-s959/`; progress logs remain in `progress/`.
+
+Integration gates (session 959, wave 007): `mise run prove` exited 0 with
+`audit: ok` (66 required statements, 3 allowed-open statements:
+`decodeNmesh_encodeNmesh`, `treeSearch_visits_overlaps`,
+`overlappingPairs_visits_overlaps`); `bun run typecheck` and `bun run lint`
+exited 0; the `*.formal.test.ts` conformance tests reported 768 pass and
+0 fail. Logs: `tmp/fv-s959/reconcile-wave-007/`. There is no browser E2E
+suite, and no UI code changed.
+
+All fv plans except the overview (`fv-01-scaffold.md` through
+`fv-50-docs.md`, including `fv-24-zorder-reorder.md`, whose theorems were
+finished by the split units `fv-24a` to `fv-24f`) are archived to
+`completed/` by the workflow plan-archive node.
+
+The [overview](active/fv-00-overview.md) stays in `active/`: its final
+verification also lists `mise run verify` and `mise run test-cli`, which
+were not run in session 959. The dispatch manifests `fv-s942-dispatch.json`
+and `fv-s959-dispatch.json` stay in `active/` with their pre-archive
+`planPath` values; s959 was the final dispatch, and neither may be
+dispatched again.

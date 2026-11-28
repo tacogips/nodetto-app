@@ -127,6 +127,8 @@ This repository is the public half of Nodetto: the editor packages and the
 Tauri desktop app. The hosted cloud edition lives in a private repository. See
 [Development](docs/development.md) for the layout, tasks and release process.
 
+The Lean models in `formal/` and their verification are described in [Formal verification](docs/formal.md).
+
 ### Layout, selection, and merging
 
 `arrange --mode tidy|overlaps|layered|route` offers `--direction`, `--page`, `--frames`, `--ids`, `--reset-manual`, `--write` and `--check`. Layered and route support state, flowchart, freeform, architecture, uml, erd and bpmn; sequence, breadboard and pcb have specialized geometry. `lint --fix` wraps text and moves labels; `lint --metrics` reports crossings, label overlaps and overlapping segment pairs. `--quiet` suppresses warnings.
