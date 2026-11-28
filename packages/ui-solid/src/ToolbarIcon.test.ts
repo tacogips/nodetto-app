@@ -42,6 +42,7 @@ const expectedIcons = {
   distributeHorizontal: "align-horizontal-distribute-center",
   distributeVertical: "align-vertical-distribute-center",
   cadSelect: "mouse-pointer-2",
+  cadMeasure: "ruler",
   cadSketch: "pencil",
   cadLine: "slash",
   cadRect: "rectangle-horizontal",
@@ -52,9 +53,9 @@ const expectedIcons = {
 } as const;
 
 test("toolbar icon mapping matches the accepted contract", () => {
-  expect(Object.keys(TOOLBAR_ICONS)).toHaveLength(46);
+  expect(Object.keys(TOOLBAR_ICONS)).toHaveLength(47);
   expect(TOOLBAR_ICONS).toEqual(expectedIcons);
-  expect(new Set(Object.values(TOOLBAR_ICONS)).size).toBe(46);
+  expect(new Set(Object.values(TOOLBAR_ICONS)).size).toBe(47);
 });
 
 test("every toolbar icon exists in the registry", () => {

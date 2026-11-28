@@ -1,4 +1,9 @@
-import { type Command, layerName, renameLayer } from "@nodetto/core";
+import {
+  type Command,
+  layerName,
+  renameLayer,
+  sketchParentOf,
+} from "@nodetto/core";
 import { CAD_OPERATIONS, isPlainObject } from "@nodetto/ir";
 import {
   createMemo,
@@ -16,6 +21,7 @@ import {
   selectTargets,
 } from "../cad/extrude-targets.ts";
 import { pcbBoardChoices, pcbBoardOptions } from "../cad/pcb-insert.ts";
+import { cadInspectionFor, formatCadLength } from "../cad/inspection.ts";
 import { useCadStatus } from "../cad/status-store.ts";
 import {
   setCadBoard,
@@ -53,6 +59,63 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
     return isPlainObject(value) ? value : {};
   };
   const type = () => current().type;
+  const inspection = cadInspectionFor(props.editor);
+  const body = () => {
+    const details = inspection.details();
+    return details?.elementId === current().id ? details : undefined;
+  };
+  const sketchParentName = () => {
+    const id = sketchParentOf(current());
+    const sketch = id && props.editor.store.get(id);
+    return sketch ? layerName(sketch) : undefined;
+  };
+  const bodyName = (id: string) => {
+    const element = props.editor.store.get(id);
+    if (!element) return "";
+    signals.scene.record(element.id);
+    return layerName(element);
+  };
+  const selectionName = () => {
+    const hit = body();
+    if (hit?.face)
+      return `Face · ${layerName(current())} → ${bodyName(hit.bodyId)}`;
+    if (hit)
+      return `${hit.reference ? "Reference body" : "Body"} · ${layerName(current())}`;
+    const sketch = sketchParentName();
+    switch (type()) {
+      case "cad.circle":
+      case "cad.arc":
+      case "cad.line": {
+        const entity = type().slice(4);
+        return `Sketch ${entity}${sketch ? ` · ${sketch}` : ""}`;
+      }
+      case "cad.sketch":
+        return "Sketch";
+      default:
+        return "Feature";
+    }
+  };
+  const sketchRadius = createMemo(() => {
+    if (type() !== "cad.sketch") return undefined;
+    signals.rev();
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const element of props.editor.store.getPageElements(current().page)) {
+      if (
+        element.type !== "cad.circle" ||
+        sketchParentOf(element) !== current().id
+      )
+        continue;
+      const radius = isPlainObject(element.semantic) && element.semantic.r;
+      if (typeof radius !== "number" || !Number.isFinite(radius)) continue;
+      min = Math.min(min, radius);
+      max = Math.max(max, radius);
+    }
+    if (!Number.isFinite(min)) return undefined;
+    return min === max
+      ? formatCadLength(min)
+      : `${formatCadLength(min)}–${formatCadLength(max)}`;
+  });
   const readOnly = () => signals.readOnly() || current().visual.locked === true;
   const [validation, setValidation] = createSignal("");
   const edit = (change: Command | { error: string }): void => {
@@ -158,6 +221,32 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
 
   return (
     <Section title="3D CAD">
+      <Field label="Selection">
+        <output aria-label="CAD selection">{selectionName()}</output>
+      </Field>
+      <Show when={body()}>
+        {(selected) => (
+          <>
+            <Field label="Body size (X × Y × Z)">
+              <output aria-label="CAD body size">
+                {selected().size.map(formatCadLength).join(" × ")} mm
+              </output>
+            </Field>
+            <Show when={selected().face}>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = selected().bodyId;
+                  inspection.setFace(undefined);
+                  props.editor.selection.set([id]);
+                }}
+              >
+                Select body
+              </button>
+            </Show>
+          </>
+        )}
+      </Show>
       <Show when={name() !== undefined}>
         <Field label="Name">
           <TextInput
@@ -173,6 +262,13 @@ export function CadSection(props: ElementSectionProps): JSX.Element {
       </Show>
       <Switch>
         <Match when={type() === "cad.sketch"}>
+          <Show when={sketchRadius()}>
+            {(radius) => (
+              <Field label="Circle radius (mm)">
+                <output aria-label="Sketch circle radius">{radius()}</output>
+              </Field>
+            )}
+          </Show>
           <Show when={offset() !== undefined}>
             <>
               <Field label="Base plane">

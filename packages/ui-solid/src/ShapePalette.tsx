@@ -376,6 +376,16 @@ export function ShapePalette(props: {
             <ToolbarIcon name="cadSelect" class="" />
             Select
           </button>
+          <button
+            type="button"
+            class="nodetto-palette-action"
+            aria-label="Measure"
+            aria-pressed={props.tool === Tool.CadMeasure}
+            onClick={() => props.onToolChange(Tool.CadMeasure)}
+          >
+            <ToolbarIcon name="cadMeasure" class="" />
+            Measure
+          </button>
           {cadViewButton("zoomIn", "Zoom in")}
           {cadViewButton("zoomOut", "Zoom out")}
           {cadViewButton("fit", "Fit model")}

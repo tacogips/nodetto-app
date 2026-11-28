@@ -120,19 +120,23 @@
 }
 
 .nodetto-cad-tools {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   margin-bottom: 8px;
 }
 
 .nodetto-cad-tools > button {
   display: flex;
-  flex: 1 0 auto;
+  grid-column: span 2;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   padding: 5px 4px;
+}
+
+.nodetto-cad-tools > button:nth-child(-n + 2) {
+  grid-column: span 3;
 }
 
 .nodetto-cad-tools svg {

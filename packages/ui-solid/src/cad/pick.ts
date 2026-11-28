@@ -4,6 +4,7 @@ import type { ElementId } from "@nodetto/ir";
 export interface CadPick {
   readonly bodyId: ElementId;
   readonly faceName: string;
+  readonly triangle: number;
   readonly t: number;
   readonly point: Vec3;
 }
@@ -20,6 +21,7 @@ export function pickBodies(
   let nearest = Number.POSITIVE_INFINITY;
   let bodyId: ElementId | undefined;
   let faceName = "";
+  let triangle = 0;
 
   for (const { id, positions, indices, triFace, faceNames } of bodies) {
     for (let i = 0; i + 2 < indices.length; i += 3) {
@@ -94,6 +96,7 @@ export function pickBodies(
       nearest = t;
       bodyId = id;
       faceName = name;
+      triangle = i / 3;
     }
   }
 
@@ -101,6 +104,7 @@ export function pickBodies(
   return {
     bodyId,
     faceName,
+    triangle,
     t: nearest,
     point: [ox + nearest * dx, oy + nearest * dy, oz + nearest * dz],
   };

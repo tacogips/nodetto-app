@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { CadDisplayBody } from "@nodetto/core";
 import { pickBodies } from "./pick.ts";
+import { connectedFacePositions } from "./inspection.ts";
 
 function box(id: string, z: number): CadDisplayBody {
   return {
@@ -47,12 +48,14 @@ test("picks the nearest named box face, including back faces from inside", () =>
   expect(pickBodies(bodies, { origin: [0, 0, 8], dir: [0, 0, -2] })).toEqual({
     bodyId: "box",
     faceName: "top",
+    triangle: 2,
     t: 3.5,
     point: [0, 0, 1],
   });
   expect(pickBodies(bodies, { origin: [0, 0, 0.5], dir: [0, 0, -1] })).toEqual({
     bodyId: "box",
     faceName: "bottom",
+    triangle: 0,
     t: 0.5,
     point: [0, 0, 0],
   });
@@ -81,10 +84,27 @@ test("the nearest of two bodies wins in either order", () => {
     expect(pickBodies(bodies, { origin: [0, 0, 0], dir: [0, 0, -1] })).toEqual({
       bodyId: "near",
       faceName: "top",
+      triangle: 2,
       t: 3,
       point: [0, 0, -3],
     });
   }
+});
+
+test("highlights only the connected patch with the picked face name", () => {
+  const body: CadDisplayBody = {
+    id: "tray",
+    reference: false,
+    positions: new Float32Array([
+      0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 3, 0, 1, 4, 0, 1, 3, 1, 1,
+    ]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3, 4, 5, 6]),
+    triFace: new Uint32Array([0, 0, 0]),
+    faceNames: ["posts:end"],
+    edges: new Float32Array(),
+  };
+  expect(connectedFacePositions(body, 0)).toHaveLength(18);
+  expect(connectedFacePositions(body, 2)).toEqual(body.positions.slice(12));
 });
 
 test("collapsed display triangles are skipped without discarding small valid faces", () => {

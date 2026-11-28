@@ -4,6 +4,7 @@ import {
   collectCadInput,
   type Editor,
   parseFaceName,
+  type Vec3,
   type ViewportSize,
 } from "@nodetto/core";
 import type { ElementId, PageId } from "@nodetto/ir";
@@ -35,6 +36,13 @@ import {
 import { createCadEvaluation } from "./evaluation.ts";
 import { createExtrudeAuthoring } from "./extrude-authoring.ts";
 import { CAD_DRAG_THRESHOLD } from "./extrude-interaction.ts";
+import {
+  boundsOfPositions,
+  cadInspectionFor,
+  connectedFacePositions,
+  formatCadLength,
+} from "./inspection.ts";
+import { CadMeasurement } from "./CadMeasurement.tsx";
 import { type CadPick, pickBodies } from "./pick.ts";
 import { type CadRenderer, createWebgl2Renderer } from "./renderer.ts";
 import { handleCadSelectionKey } from "./selection-keys.ts";
@@ -76,26 +84,10 @@ function fitBodies(
   aspect: number,
   lines: readonly { segments: Float32Array }[] = [],
 ): Camera3d {
-  const high = Number.POSITIVE_INFINITY;
-  const low = Number.NEGATIVE_INFINITY;
-  const min: [number, number, number] = [high, high, high];
-  const max: [number, number, number] = [low, low, low];
-  for (const positions of [
+  const { min, max } = boundsOfPositions([
     ...bodies.map((body) => body.positions),
     ...lines.map((line) => line.segments),
-  ]) {
-    for (let i = 0; i < positions.length; i += 3) {
-      for (let axis = 0; axis < 3; axis++) {
-        const value = positions[i + axis];
-        const lower = min[axis];
-        const upper = max[axis];
-        if (value === undefined || lower === undefined || upper === undefined)
-          continue;
-        min[axis] = Math.min(lower, value);
-        max[axis] = Math.max(upper, value);
-      }
-    }
-  }
+  ]);
   return fitBounds(min, max, aspect);
 }
 
@@ -104,12 +96,13 @@ export function CadViewport(props: CadViewportProps) {
   let canvas!: HTMLCanvasElement;
   const pageId = props.pageId ?? props.editor.currentPageId;
   const statusStore = cadStatusStoreFor(props.editor);
+  const inspection = cadInspectionFor(props.editor);
   const [revision, setRevision] = createSignal(props.editor.revision);
   const [selection, setSelection] = createSignal(props.editor.selection.ids());
   const [renderer, setRenderer] = createSignal<CadRenderer | null>(null);
   let mounted = false;
   const [themeUnavailable, setThemeUnavailable] = createSignal(false);
-  const [picked, setPicked] = createSignal<CadPick | null>(null);
+  const [measurement, setMeasurement] = createSignal<readonly Vec3[]>([]);
   const [camera, setCamera] = createSignal(
     props.initialCamera ?? fitBodies([], 1),
   );
@@ -122,6 +115,7 @@ export function CadViewport(props: CadViewportProps) {
         readonly pointerId: number;
         readonly mode: "pan" | "orbit";
         readonly hit: CadPick | null;
+        readonly hitBody: CadDisplayBody | undefined;
         readonly entity: ElementId | null;
         readonly startX: number;
         readonly startY: number;
@@ -131,6 +125,7 @@ export function CadViewport(props: CadViewportProps) {
       }
     | undefined;
   const tool = () => props.tool ?? Tool.Select;
+  const measuring = () => tool() === Tool.CadMeasure;
   const collected = createMemo(() =>
     collectCadInput(props.editor.getSnapshot(), pageId, revision()),
   );
@@ -148,7 +143,11 @@ export function CadViewport(props: CadViewportProps) {
     changeCamera,
     size,
   };
-  const sketch = createSketchAuthoring({ ...authoring, picked, renderer });
+  const sketch = createSketchAuthoring({
+    ...authoring,
+    picked: () => inspection.face()?.hit ?? null,
+    renderer,
+  });
   const extrude = createExtrudeAuthoring(authoring);
   const board = createBoardPicker({ ...authoring, canvas: () => canvas });
   const stl = createStlImport({
@@ -234,6 +233,8 @@ export function CadViewport(props: CadViewportProps) {
       mounted = false;
       registerImportPicker?.(undefined);
       registerViewControls?.(undefined);
+      inspection.setFace(undefined);
+      inspection.setDetails(undefined);
       unsubscribe();
       unsubscribeSelection();
       document.removeEventListener("pointerdown", board.dismiss, true);
@@ -286,6 +287,11 @@ export function CadViewport(props: CadViewportProps) {
   );
   createEffect(() => renderer()?.setBodies(drawnBodies()));
   createEffect(() => {
+    measuring();
+    drawnBodies();
+    setMeasurement([]);
+  });
+  createEffect(() => {
     const { width, height } = size();
     if (fitted || width <= 0 || height <= 0 || sketch.drawing()) return;
     if (drawnBodies().length > 0) {
@@ -298,28 +304,53 @@ export function CadViewport(props: CadViewportProps) {
       }
     }
   });
+  const selectedFace = createMemo(() => {
+    const face = inspection.face();
+    if (!face) return undefined;
+    const id = parseFaceName(face.hit.faceName)?.feature ?? face.body.id;
+    return selection().has(id) && drawnBodies().includes(face.body)
+      ? face
+      : undefined;
+  });
   createEffect(() => {
-    const view = renderer();
-    const ids = selection();
-    const hit = picked();
-    const definingFeature = hit && parseFaceName(hit.faceName)?.feature;
-    const current =
-      hit &&
-      (definingFeature ? ids.has(definingFeature) : ids.has(hit.bodyId)) &&
-      drawnBodies().some(
-        (body) =>
-          body.id === hit.bodyId && body.faceNames.includes(hit.faceName),
-      )
-        ? hit
-        : null;
-    if (hit && !current) setPicked(null);
-    const body = drawnBodies().find(({ id }) => ids.has(id));
-    view?.setHighlight(
-      current
-        ? { bodyId: current.bodyId, faceName: current.faceName }
-        : body
-          ? { bodyId: body.id }
-          : null,
+    if (inspection.face() && !selectedFace()) inspection.setFace(undefined);
+  });
+  const selectedBody = createMemo(
+    () =>
+      selectedFace()?.body ??
+      drawnBodies().find(({ id }) => selection().has(id)),
+  );
+  const facePositions = createMemo(() => {
+    const face = selectedFace();
+    return face && connectedFacePositions(face.body, face.hit.triangle);
+  });
+  createEffect(() => {
+    const body = selectedBody();
+    renderer()?.setHighlight(
+      body ? { bodyId: body.id, facePositions: facePositions() } : null,
+    );
+  });
+  const bodySize = createMemo(() => {
+    const body = selectedBody();
+    if (!body) return undefined;
+    const { min, max } = boundsOfPositions([body.positions]);
+    return [max[0] - min[0], max[1] - min[1], max[2] - min[2]] as const;
+  });
+  createEffect(() => {
+    const body = selectedBody();
+    const size = bodySize();
+    const face = selectedFace()?.hit;
+    inspection.setDetails(
+      body && size?.every(Number.isFinite)
+        ? {
+            elementId:
+              (face && parseFaceName(face.faceName)?.feature) || body.id,
+            bodyId: body.id,
+            reference: body.reference,
+            face,
+            size,
+          }
+        : undefined,
     );
   });
   createEffect(() => renderer()?.setGridVisible?.(props.showGrid !== false));
@@ -337,7 +368,7 @@ export function CadViewport(props: CadViewportProps) {
     props.showGrid;
     drawnBodies();
     selection();
-    picked();
+    facePositions();
     revision();
     sketch.entityLines();
     sketch.previewLines();
@@ -416,6 +447,9 @@ export function CadViewport(props: CadViewportProps) {
       pointerId: event.pointerId,
       mode: panning ? "pan" : "orbit",
       hit,
+      hitBody: hit
+        ? drawnBodies().find(({ id }) => id === hit.bodyId)
+        : undefined,
       entity,
       startX: event.clientX,
       startY: event.clientY,
@@ -472,19 +506,35 @@ export function CadViewport(props: CadViewportProps) {
       return;
     }
     if (drag?.pointerId !== event.pointerId) return;
-    const { hit, entity, mode, moved } = drag;
+    const { hit, hitBody, entity, mode, moved } = drag;
     drag = undefined;
     if (event.type !== "pointerup" || moved || mode === "pan") return;
+    const currentHit =
+      hit && hitBody && drawnBodies().includes(hitBody) ? hit : null;
+    if (measuring()) {
+      if (currentHit) {
+        setMeasurement((points) =>
+          points.length === 1
+            ? [...points, currentHit.point]
+            : [currentHit.point],
+        );
+      }
+      return;
+    }
     const selectableEntity =
       entity && props.editor.store.has(entity) ? entity : null;
-    const feature = hit && (parseFaceName(hit.faceName)?.feature ?? hit.bodyId);
-    const selected =
-      !selectableEntity && hit && feature && props.editor.store.has(feature)
-        ? hit
-        : null;
+    const feature =
+      currentHit &&
+      (parseFaceName(currentHit.faceName)?.feature ?? currentHit.bodyId);
+    const selectableFace =
+      feature && props.editor.store.has(feature) ? feature : undefined;
     batch(() => {
-      setPicked(selected);
-      const id = selectableEntity ?? (selected ? feature : undefined);
+      inspection.setFace(
+        !selectableEntity && selectableFace && currentHit && hitBody
+          ? { hit: currentHit, body: hitBody }
+          : undefined,
+      );
+      const id = selectableEntity ?? selectableFace;
       props.editor.selection.set(id ? [id] : []);
     });
   }
@@ -510,12 +560,33 @@ export function CadViewport(props: CadViewportProps) {
           ? "The CAD canvas colours are unavailable."
           : failure());
 
+  const measuredLength = createMemo(() => {
+    const [a, b] = measurement();
+    return a && b
+      ? `${formatCadLength(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]))} mm`
+      : undefined;
+  });
+
   function keyDown(event: KeyboardEvent): void {
     if (board.open() && ["Escape", "Backspace", "Delete"].includes(event.key)) {
       if (isComposing(event)) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.key === "Escape") board.close();
+      return;
+    }
+    if (
+      measuring() &&
+      ["Escape", "Backspace", "Delete"].includes(event.key) &&
+      !isComposing(event) &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      if (measurement().length) setMeasurement([]);
+      else if (event.key === "Escape") authoring.selectTool();
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
     if (
@@ -539,6 +610,7 @@ export function CadViewport(props: CadViewportProps) {
       class="nodetto-canvas nodetto-cad-viewport"
       classList={{
         [CANVAS_DARK_CLASS]: props.canvasMode === "dark",
+        "nodetto-cad-measuring": measuring(),
       }}
       tabindex="0"
       on:keydown={keyDown}
@@ -567,9 +639,19 @@ export function CadViewport(props: CadViewportProps) {
         onPointerCancel={endDrag}
         onLostPointerCapture={endDrag}
         onWheel={zoom}
-        onDblClick={fit}
+        onDblClick={() => {
+          if (!measuring()) fit();
+        }}
       />
       <board.Menu />
+      <Show when={measuring() && !status()}>
+        <CadMeasurement
+          points={measurement()}
+          camera={camera()}
+          size={size()}
+          length={measuredLength()}
+        />
+      </Show>
       <Show when={stl.notice() || status()}>
         <div class="nodetto-cad-status" role="status">
           {[stl.notice(), status()].filter(Boolean).join(" ")}

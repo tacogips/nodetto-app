@@ -25,6 +25,7 @@ import {
 } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
 import { handleCadSelectionKey } from "./cad/selection-keys.ts";
+import { cadInspectionFor } from "./cad/inspection.ts";
 import { useCadStatus } from "./cad/status-store.ts";
 import { ComponentLibrary } from "./ComponentLibrary.tsx";
 import { ColorTokens } from "./ColorTokens.tsx";
@@ -525,6 +526,8 @@ export function Layers(props: {
                             `${layerName(row().element)} (${row().element.type})`
                           }
                           onClick={(event) => {
+                            if (cad())
+                              cadInspectionFor(props.editor).setFace(undefined);
                             selectionAnchor = selectLayerRow(
                               props.editor,
                               rows(),
@@ -571,7 +574,11 @@ export function Layers(props: {
                             event.stopPropagation();
                             if (navigation.action !== "select")
                               toggle(navigation.id);
-                            else
+                            else {
+                              if (cad())
+                                cadInspectionFor(props.editor).setFace(
+                                  undefined,
+                                );
                               selectionAnchor = selectLayerRow(
                                 props.editor,
                                 rows(),
@@ -579,6 +586,7 @@ export function Layers(props: {
                                 selectionAnchor,
                                 { range: event.shiftKey },
                               );
+                            }
                             revealRow(navigation.id);
                             queueMicrotask(() => {
                               const button = nameButtons.get(navigation.id);

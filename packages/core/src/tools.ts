@@ -62,6 +62,7 @@ export const Tool = {
   CadCircle: "cad:circle",
   CadExtrude: "cad:extrude",
   CadPcb: "cad:pcb",
+  CadMeasure: "cad:measure",
 
   Select: "select",
   Hand: "hand",
@@ -507,7 +508,12 @@ const PARTICIPANT_KINDS = {
 >;
 
 export function canUseTool(tool: ToolKind, readOnly: boolean): boolean {
-  return !readOnly || tool === Tool.Select || tool === Tool.Hand;
+  return (
+    !readOnly ||
+    tool === Tool.Select ||
+    tool === Tool.Hand ||
+    tool === Tool.CadMeasure
+  );
 }
 
 export interface CreationTool {
@@ -848,6 +854,7 @@ export function creationFor(tool: ToolKind): CreationTool | null {
     case Tool.Class:
       return { type: tool };
     case Tool.Select:
+    case Tool.CadMeasure:
     case Tool.Hand:
     case Tool.Comment:
     case Tool.Connector:

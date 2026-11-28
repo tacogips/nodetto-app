@@ -3,7 +3,7 @@ import type { ElementId } from "@nodetto/ir";
 import { type Camera3d, viewProjection } from "./camera3d.ts";
 import type { CadTheme, Rgb } from "./theme.ts";
 
-type Highlight = { bodyId: ElementId; faceName?: string };
+type Highlight = { bodyId: ElementId; facePositions?: Float32Array };
 type Mesh = { positions: Float32Array; indices: Uint32Array };
 
 export interface CadRenderer {
@@ -102,56 +102,6 @@ function link(gl: WebGL2RenderingContext, fragment: string): Program | null {
   };
 }
 
-type Range = { offset: number; count: number };
-
-function groupFaces(body: CadDisplayBody): {
-  indices: Uint32Array;
-  ranges: ReadonlyMap<string, Range>;
-} {
-  const counts = new Uint32Array(body.faceNames.length);
-  for (let tri = 0; tri < body.triFace.length; tri++) {
-    const face = body.triFace[tri];
-    if (
-      face === undefined ||
-      face >= counts.length ||
-      tri * 3 + 2 >= body.indices.length
-    )
-      continue;
-    counts[face] = (counts[face] ?? 0) + 3;
-  }
-  const cursors = new Uint32Array(counts.length);
-  const ranges = new Map<string, Range>();
-  let offset = 0;
-  for (const [face, name] of body.faceNames.entries()) {
-    const count = counts[face] ?? 0;
-    cursors[face] = offset;
-    ranges.set(name, { offset, count });
-    offset += count;
-  }
-
-  const indices = new Uint32Array(body.indices.length);
-  for (let tri = 0; tri < body.triFace.length; tri++) {
-    const face = body.triFace[tri];
-    if (face === undefined) continue;
-    const target = cursors[face];
-    const a = body.indices[tri * 3];
-    const b = body.indices[tri * 3 + 1];
-    const c = body.indices[tri * 3 + 2];
-    if (
-      target === undefined ||
-      a === undefined ||
-      b === undefined ||
-      c === undefined
-    )
-      continue;
-    indices[target] = a;
-    indices[target + 1] = b;
-    indices[target + 2] = c;
-    cursors[face] = target + 3;
-  }
-  return { indices, ranges };
-}
-
 interface Geometry {
   readonly vao: WebGLVertexArrayObject | null;
   readonly positions: WebGLBuffer | null;
@@ -217,16 +167,15 @@ export function createWebgl2Renderer(
     reference: boolean;
     mesh: Geometry;
     edges: Geometry;
-    ranges: ReadonlyMap<string, Range>;
   }[] = [];
   let overlayLines: Geometry | null = null;
   let overlayMesh: Geometry | null = null;
   let sketchGrid: Geometry | null = null;
   let sketchLines: Geometry | null = null;
   let sketchHighlight: Geometry | null = null;
-  let drawingSketch = false;
   let theme: CadTheme | undefined;
   let highlight: Highlight | null = null;
+  let highlightedFace: Geometry | null = null;
   let showGrid = true;
   const grid = upload(gridLines());
   gl.disable(gl.CULL_FACE);
@@ -279,22 +228,24 @@ export function createWebgl2Renderer(
     diagnostics: { programsLinked: true, renderer },
     setBodies(next) {
       clearBodies();
-      bodies = next.map((body) => {
-        const { indices, ranges } = groupFaces(body);
-        return {
-          id: body.id,
-          reference: body.reference,
-          mesh: upload(body.positions, indices),
-          edges: upload(body.edges),
-          ranges,
-        };
-      });
+      bodies = next.map((body) => ({
+        id: body.id,
+        reference: body.reference,
+        mesh: upload(body.positions, body.indices),
+        edges: upload(body.edges),
+      }));
       bodies.sort((a, b) => Number(a.reference) - Number(b.reference));
     },
     setTheme(next) {
       theme = next;
     },
     setHighlight(pick) {
+      if (pick?.facePositions !== highlight?.facePositions) {
+        release(highlightedFace);
+        highlightedFace = pick?.facePositions?.length
+          ? upload(pick.facePositions)
+          : null;
+      }
       highlight = pick;
     },
     setOverlay(nextLines, nextMesh) {
@@ -305,12 +256,11 @@ export function createWebgl2Renderer(
     setGridVisible(visible) {
       showGrid = visible;
     },
-    setSketchLines(nextLines, highlighted, drawing) {
+    setSketchLines(nextLines, highlighted) {
       release(sketchLines);
       release(sketchHighlight);
       sketchLines = nextLines.length ? upload(nextLines) : null;
       sketchHighlight = highlighted.length ? upload(highlighted) : null;
-      drawingSketch = drawing;
     },
     setSketchGrid(next) {
       release(sketchGrid);
@@ -335,28 +285,19 @@ export function createWebgl2Renderer(
       gl.uniformMatrix4fv(faces.projection, false, projection);
       gl.enable(gl.POLYGON_OFFSET_FILL);
       gl.polygonOffset(1, 1);
-      for (const { id, mesh, reference, ranges } of bodies) {
-        const selected = highlight?.bodyId === id ? highlight : null;
-        const opacity = reference ? 0.45 : 1;
-        const range =
-          selected?.faceName === undefined
-            ? undefined
-            : ranges.get(selected.faceName);
+      for (const { id, mesh, reference } of bodies) {
+        const selected = highlight?.bodyId === id && !highlight.facePositions;
         color(
           faces,
-          selected && !selected.faceName ? theme.highlight : theme.body,
-          opacity,
+          selected ? theme.highlight : theme.body,
+          reference ? 0.45 : 1,
         );
-        triangles(mesh, 0, range?.offset ?? mesh.count);
-        if (range) {
-          triangles(
-            mesh,
-            range.offset + range.count,
-            mesh.count - range.offset - range.count,
-          );
-          color(faces, theme.highlight, opacity);
-          triangles(mesh, range.offset, range.count);
-        }
+        triangles(mesh, 0, mesh.count);
+      }
+      if (highlightedFace) {
+        color(faces, theme.highlight);
+        gl.bindVertexArray(highlightedFace.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, highlightedFace.count);
       }
       if (overlayMesh) {
         // Show the tool volume even where an inward extrusion is inside the body.
@@ -374,7 +315,8 @@ export function createWebgl2Renderer(
       // so it stays behind the solid contours at intersections.
       gl.depthMask(true);
       for (const body of bodies) {
-        const selected = highlight?.bodyId === body.id && !highlight.faceName;
+        const selected =
+          highlight?.bodyId === body.id && !highlight.facePositions;
         color(
           lines,
           selected ? theme.highlight : theme.line,
@@ -392,8 +334,8 @@ export function createWebgl2Renderer(
         color(lines, theme.line);
         segments(sketchLines);
       }
-      if (drawingSketch) gl.disable(gl.DEPTH_TEST);
       if (sketchHighlight) {
+        gl.disable(gl.DEPTH_TEST);
         color(lines, theme.highlight);
         segments(sketchHighlight);
       }
@@ -402,7 +344,7 @@ export function createWebgl2Renderer(
         color(lines, theme.highlight);
         segments(overlayLines);
       }
-      if (drawingSketch || overlayLines) gl.enable(gl.DEPTH_TEST);
+      if (sketchHighlight || overlayLines) gl.enable(gl.DEPTH_TEST);
       gl.depthMask(true);
       gl.bindVertexArray(null);
     },
@@ -412,6 +354,7 @@ export function createWebgl2Renderer(
       release(sketchGrid);
       release(sketchLines);
       release(sketchHighlight);
+      release(highlightedFace);
       release(grid);
       gl.deleteProgram(faces.id);
       gl.deleteProgram(lines.id);

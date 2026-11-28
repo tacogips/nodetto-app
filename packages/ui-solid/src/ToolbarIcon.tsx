@@ -41,6 +41,7 @@ export const TOOLBAR_ICONS = {
   distributeHorizontal: "align-horizontal-distribute-center",
   distributeVertical: "align-vertical-distribute-center",
   cadSelect: "mouse-pointer-2",
+  cadMeasure: "ruler",
   cadSketch: "pencil",
   cadLine: "slash",
   cadRect: "rectangle-horizontal",

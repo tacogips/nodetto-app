@@ -18,12 +18,14 @@ import {
 } from "../../../core/src/cad/testing/documents.ts";
 import { document as makeDocument } from "../../../core/src/test-helpers.ts";
 import { type Camera3d, fitBounds, viewProjection } from "../cad/camera3d.ts";
+import { projectExtrudePoint } from "../cad/extrude-interaction.ts";
 import type { CadRenderer } from "../cad/renderer.ts";
 import type { CadTheme } from "../cad/theme.ts";
 import { NodettoCanvas, type NodettoCanvasProps } from "../Canvas.tsx";
 import { Layers } from "../Layers.tsx";
+import { Inspector } from "../Inspector.tsx";
 import { ShapePalette } from "../ShapePalette.tsx";
-import { Tool } from "../tools.ts";
+import { Tool, type ToolKind } from "../tools.ts";
 import { preloadCadUi } from "../cad-ui.tsx";
 
 await preloadCadUi();
@@ -43,7 +45,7 @@ const body: CadDisplayBody = {
   positions: new Float32Array([-20, -20, 0, 20, -20, 0, 0, 20, 0]),
   indices: new Uint32Array([0, 1, 2]),
   triFace: new Uint32Array([0]),
-  faceNames: ["ex1:end"],
+  faceNames: ["ex2:end"],
   edges: new Float32Array(),
   reference: false,
 };
@@ -111,6 +113,7 @@ for (const theme of ["light", "dark"] as const) {
   const [available, setAvailable] = createSignal(true);
   const [engineAvailable, setEngineAvailable] = createSignal(true);
   const [mode, setMode] = createSignal(theme);
+  const [tool, setTool] = createSignal<ToolKind>(Tool.Select);
   const [drop, setDrop] = createSignal<NodettoCanvasProps["shapeDrop"]>();
   const [viewControls, setViewControls] =
     createSignal<
@@ -135,6 +138,7 @@ for (const theme of ["light", "dark"] as const) {
     highlights: Parameters<CadRenderer["setHighlight"]>[0][];
     themes: CadTheme[];
     cameras: Camera3d[];
+    sketchHighlights: Float32Array[];
     disposed: boolean;
   }[] = [];
   function createRenderer(): CadRenderer | null {
@@ -144,6 +148,7 @@ for (const theme of ["light", "dark"] as const) {
       highlights: [],
       themes: [],
       cameras: [],
+      sketchHighlights: [],
       disposed: false,
     };
     mounts.push(mount);
@@ -159,6 +164,9 @@ for (const theme of ["light", "dark"] as const) {
         mount.themes.push(theme);
       },
       setOverlay: () => {},
+      setSketchLines: (_, highlighted) => {
+        mount.sketchHighlights.push(highlighted);
+      },
       draw: (camera) => {
         mount.cameras.push(camera);
       },
@@ -175,8 +183,8 @@ for (const theme of ["light", "dark"] as const) {
         <ShapePalette
           editor={editor}
           workspace="cad3d"
-          tool={Tool.Select}
-          onToolChange={() => {}}
+          tool={tool()}
+          onToolChange={setTool}
           context={{
             editor,
             viewport: { width: viewportWidth, height: viewportHeight },
@@ -187,7 +195,8 @@ for (const theme of ["light", "dark"] as const) {
         />
         <NodettoCanvas
           editor={editor}
-          tool={Tool.Rectangle}
+          tool={tool()}
+          onToolChange={setTool}
           cadEngine={engineAvailable() ? engine : undefined}
           createCadRenderer={createRenderer}
           canvasBackground={{ diagram: mode(), pcb: mode() }}
@@ -197,6 +206,7 @@ for (const theme of ["light", "dark"] as const) {
           onCadViewControls={setViewControls}
         />
         <Layers editor={editor} simple />
+        <Inspector editor={editor} />
       </>
     ),
     root,
@@ -238,16 +248,49 @@ for (const theme of ["light", "dark"] as const) {
   );
   const uploads = mount.uploads.length;
   const before = editor.getSnapshot();
-  point(canvas, "pointerdown", 200, 200);
-  point(canvas, "pointerup", 200, 200);
-  assert.deepEqual([...editor.selection.ids()], ["ex1"]);
-  assert.deepEqual(mount.highlights.at(-1), {
-    bodyId: "ex1",
-    faceName: "ex1:end",
-  });
-
   const fitted = mount.cameras.at(-1);
   assert.ok(fitted);
+  const clickSurface = (x: number, y: number) => {
+    const ndc = projectExtrudePoint(viewProjection(fitted, 1), [x, y, 0]);
+    assert.ok(ndc);
+    const px = (ndc.x + 1) * 200;
+    const py = (1 - ndc.y) * 200;
+    point(canvas, "pointerdown", px, py);
+    point(canvas, "pointerup", px, py);
+  };
+  clickSurface(-8, -12);
+  assert.deepEqual([...editor.selection.ids()], ["ex2"]);
+  assert.deepEqual(mount.highlights.at(-1), {
+    bodyId: "ex1",
+    facePositions: body.positions,
+  });
+  const selectionText = () =>
+    root.querySelector('[aria-label="CAD selection"]')?.textContent;
+  assert.equal(selectionText(), "Face · ex2 → ex1");
+  assert.equal(
+    root.querySelector('[aria-label="CAD body size"]')?.textContent?.trim(),
+    "40 × 40 × 0 mm",
+  );
+  const selectBody = [...root.querySelectorAll("button")].find(
+    (button) => button.textContent?.trim() === "Select body",
+  );
+  assert.ok(selectBody);
+  selectBody.click();
+  assert.equal(selectionText(), "Body · ex1");
+  assert.equal(mount.highlights.at(-1)?.facePositions, undefined);
+  editor.selection.set(["holes"]);
+  assert.equal(
+    root.querySelector('[aria-label="Sketch circle radius"]')?.textContent,
+    "3",
+  );
+  editor.selection.set(["hole-0"]);
+  assert.equal(selectionText(), "Sketch circle · holes");
+  assert.equal(
+    root.querySelector<HTMLInputElement>('[aria-label="Radius (mm)"]')?.value,
+    "3",
+  );
+  assert.ok(mount.sketchHighlights.at(-1)?.length);
+
   const viewButton = (label: string) => {
     const button = root.querySelector<HTMLButtonElement>(
       `[aria-label="CAD tools"] button[aria-label="${label}"]`,
@@ -255,6 +298,21 @@ for (const theme of ["light", "dark"] as const) {
     assert.ok(button, label);
     return button;
   };
+  viewButton("Measure").click();
+  assert.match(messages() ?? "", /first point/);
+  for (const x of [-5, 5]) {
+    clickSurface(x, 0);
+  }
+  assert.match(messages() ?? "", /Distance: 10 mm/);
+  assert.ok(root.querySelector(".nodetto-cad-measure-overlay line"));
+  assert.deepEqual([...editor.selection.ids()], ["hole-0"]);
+  canvas.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
+  );
+  assert.match(messages() ?? "", /first point/);
+  assert.ok(editor.store.has("hole-0"));
+  viewButton("Select").click();
+  assert.equal(root.querySelector(".nodetto-cad-measure-overlay"), null);
   viewButton("Zoom in").click();
   await painted();
   const zoomedIn = mount.cameras.at(-1);

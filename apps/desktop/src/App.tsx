@@ -19,6 +19,7 @@
 // and cloud presence.
 
 import {
+  canUseTool,
   createDesignTemplate,
   createReviewComment,
   slideList,
@@ -353,7 +354,7 @@ export function App(props: AppProps): JSX.Element {
   };
 
   const setActiveTool = (next: ToolKind): void => {
-    if (props.editor.readOnly && next !== "select" && next !== "hand") return;
+    if (!canUseTool(next, props.editor.readOnly)) return;
     if (next !== "comment") setPendingComment(null);
     setTool(next);
   };
