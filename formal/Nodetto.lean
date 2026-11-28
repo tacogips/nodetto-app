@@ -6,3 +6,4 @@ import Nodetto.Rotate
 import Nodetto.Undo
 import Nodetto.Merge
 import Nodetto.Overlap
+import Nodetto.CadEnclosure

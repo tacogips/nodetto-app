@@ -118,43 +118,70 @@ by git, `.gitignore:41`), run with Bun 1.4.4 on Apple Silicon
 
 ### 2.1 Goal
 
-A page of kind `cad3d` is a part studio: sketches on planes, features that
-turn sketch profiles into solids, a 3D viewport, parameter edits that
-regenerate the model, the same undo/redo, page list, toolbar, inspector,
-layers panel and theming as every other page. PCB boards can be referenced as
-solid reference bodies so that an enclosure can be modelled around them.
+A page of kind `cad3d` is a lightweight part modeller focused strictly on
+**enclosures and simple mechanical parts** (project boxes, lids, brackets,
+mounts, spacers, and standoffs — especially around Nodetto PCB pages). It
+provides sketches on planes, planar extrusion features, enclosure authoring
+helpers, a 3D viewport, parameter edits that regenerate the model, and the
+same undo/redo, page list, toolbar, inspector, layers panel and theming as
+every other page. It is intentionally **not** a general-purpose industrial
+product CAD system.
 
-### 2.2 First shippable slice (this plan, milestones M1 to M22)
+### 2.2 Shipped and enclosure-focused scope
 
 - Page kind and mode `cad3d`, with the content rule enforced at every entry
   point (section 4).
-- Sketch entities: line, three-point arc, circle (rectangle is four lines).
+- Sketch entities: line, three-point arc, circle, plus compositional authoring
+  helpers for rectangles (four lines), **rounded rectangles** (lines + corner
+  arcs), and **slots / obrounds** (two parallel lines + two semicircular arcs,
+  for port cutouts and adjustable mounting holes).
 - Features: extrude with operations new, add, cut, intersect; sketch on a
-  base plane or on a planar face of an earlier extrude.
-- Bodies from other sources: a PCB board as a reference body (`cad.pcb`)
-  and an imported mesh as an ordinary body (`cad.mesh`).
-- 3D viewport (orbit, pan, zoom, face and body picking), feature list in the
+  base plane or on a planar face of an earlier extrude; **enclosure shell /
+  hollow** authoring (outer solid + inset cavity cut on the open face with
+  wall and floor thickness).
+- Bodies from other sources: a PCB board as a reference body (`cad.pcb`),
+  **PCB enclosure helpers** (clearance-offset shell around a board, corner
+  mounting standoffs with optional screw holes, component keep-out volume),
+  and an imported reference mesh (`cad.mesh`).
+- 3D viewport (orbit, pan, zoom, view controls, face and body picking,
+  selection identification, 2-point distance measurement), feature list in the
   layers panel, parameter editing in the inspector, preview while dragging.
-- STL import and export; kernel-free wireframe in SVG/PDF/PNG export.
-- CLI: authoring through `edit`, structural check through `cad check`.
+- STL import and export (for 3D printing); kernel-free wireframe in
+  SVG/PDF/PNG export.
+- CLI: authoring through `edit`, structural check through `cad check`,
+  shaded inspection and interference check through `capture`.
 
-### 2.3 Later phases (designed here, not in this plan)
+### 2.3 Focused future scope (enclosures and simple parts only)
 
-- Phase 2: revolve, patterns, named parameters with expressions, a
-  `cad.settings` resource (tessellation tolerance, units display), external
-  mesh attachments (`artifacts/<sha256>.nmesh`), derived mesh cache in
-  `.nodetto` bundles, STEP AP214 export (planar faces as `ADVANCED_FACE`,
-  curved faces faceted), 3MF export, per-footprint component heights, a
-  body-as-tool boolean feature (for example board clearance pockets).
-- Phase 3: sketch constraint solver, fillet and chamfer, exact curved
-  surfaces and STEP import, which need a B-rep kernel behind the kernel port
-  (section 6.1).
+- 3MF export through the existing stored-zip writer (`packages/core/src/zip.ts`)
+  for unit-aware 3D printing.
+- Simple rectangular and circular hole/boss patterns (for mounting holes and
+  ventilation slots).
+- Per-footprint PCB component heights and keep-out prisms, drilled holes from
+  pads and vias, and body-as-tool boolean pockets for board clearance.
+- Optional `cad.settings` resource (display units / tessellation tolerance),
+  external mesh attachments (`artifacts/<sha256>.nmesh`), and derived mesh
+  cache in `.nodetto` bundles if needed.
 
-### 2.4 Non-goals
+### 2.4 Non-goals (explicitly cut)
 
-Assemblies and mates, drawings with dimensions, CAM, simulation, surfacing,
-server code, auth and deployment config (the latter three never live in this
-repository; section 15 lists the cloud follow-up).
+Complex industrial product CAD capabilities are out of scope and will not be
+added:
+
+- **B-rep kernel migration and exact curved surfaces**: Nodetto stays on the
+  Manifold triangle-mesh kernel; faceted curves are sufficient for 3D-printed
+  enclosures and simple parts.
+- **STEP import and STEP export** (AP214 / B-rep exchange).
+- **2D sketch constraint solver** (coincident, tangent, parallel, dimensional
+  constraint systems).
+- **General 3D edge fillet and chamfer** (use 2D rounded rectangles, slots,
+  and arcs in sketches instead).
+- **Complex solid/surface modelling**: revolve, loft, sweep, surfacing, draft
+  angles, sheet-metal bending.
+- **General parametric expression / spreadsheet engine**.
+- **Assemblies and mates**, 2D engineering drawings with GD&T/dimensions, CAM,
+  simulation, server code, auth and deployment config (the latter three never
+  live in this repository; section 15 lists the cloud follow-up).
 
 ## 3. Data model
 
@@ -287,8 +314,9 @@ never persisting an index into kernel output. A face reference is
   maps back to (tool, face) (`tmp/cad3d-spike/spike.log`).
 - Known limits, documented failure modes of every creator-based scheme
   [R-10, R-11]: a split face yields several regions with the same name (all
-  are selected together); edges and vertices have no persisted names in the
-  slice, which is why fillet and chamfer are phase 3.
+  are selected together); edges and vertices have no persisted names, which
+  fits the enclosure/simple-parts scope where 3D edge fillet and chamfer are
+  explicitly out of scope (use 2D rounded rectangles and arcs instead).
 
 ## 4. The content rule and its enforcement
 
@@ -452,7 +480,7 @@ palette, layers panel, inspector, selection store, history shortcuts.
 | --- | --- | --- | --- |
 | Open CASCADE (opencascade.js, occt-wasm, Replicad) [R-1, R-2, R-3] | LGPL-2.1 with an exception that covers header material only | 21 to 49 MB raw, 4.5 to 9 MB brotli | Rejected for the slice: static WASM plus closed distribution through the Mac App Store has no authoritative clearance [R-1]; 40 to 90 times the size of the alternative; cannot run in the CLI; no reproducibility guarantee |
 | Manifold (`manifold-3d` 3.5.5) [R-4] | Apache-2.0 | 542,744 bytes raw, 205,307 gzip, 159,215 brotli (spike) | Chosen for the slice |
-| Rust B-rep kernels (truck, arris, brepkit, Fornjot) [R-5] | Apache/MIT, AGPL (brepkit), archived (Fornjot) | not measured | Not mature or not licensable today; revisit for phase 3 |
+| Rust B-rep kernels (truck, arris, brepkit, Fornjot) [R-5] | Apache/MIT, AGPL (brepkit), archived (Fornjot) | not measured | Out of scope: B-rep migration is not planned for enclosure/simple-part CAD |
 | JSCAD modelling [R-6] | MIT, pure JS | 1.6 MB | Rejected: float BSP booleans without a robustness guarantee |
 | Own boolean kernel in TypeScript | - | - | Rejected: robust 3D booleans are the hard part (the prior debate is right on this point) |
 
@@ -468,8 +496,9 @@ renderer choices are not, for licence, size and CLI reasons.
 The kernel sits behind a port (`packages/core/src/cad/kernel.ts`):
 `solid(toolMesh, faceNames)`, `boolean(op, target, tools)`, `mesh(handle)`
 returning triangles with face names, `measure(handle)`, `release(handle)`.
-Nothing persisted depends on kernel output, so a B-rep kernel can replace
-Manifold in phase 3 without a format change.
+Nothing persisted depends on kernel output, keeping the data model
+independent of the Manifold adapter while intentionally avoiding B-rep
+complexity.
 
 The adapter lives in a new workspace package `packages/cad-kernel`
 (`@nodetto/cad-kernel`). `packages/core` must not import it, because core is
@@ -896,9 +925,9 @@ reverse direction (deriving `Edge.Cuts` from a CAD face).
   entity changes. Imported meshes contribute their axis-aligned bounding
   boxes. The construction view uses the same kernel-free path in the editor
   and native CLI. A hidden-line view needs the phase 2 cache.
-- Phase 2: STEP AP214 with a hand-written writer (planar faces merged per
-  face name into `ADVANCED_FACE` on `PLANE`), 3MF through the existing
-  stored-zip writer (`packages/core/src/zip.ts`).
+- Future export: 3MF through the existing stored-zip writer
+  (`packages/core/src/zip.ts`) for unit-aware 3D printing. STEP export is
+  explicitly out of scope.
 
 ## 10. CLI and MCP
 
@@ -1181,7 +1210,7 @@ immutable, canonical, size-capped inline mesh.
 
 | Risk | Mitigation |
 | --- | --- |
-| Faceted geometry disappoints mechanical users | Stated scope; kernel port and kernel-independent format allow a B-rep kernel later |
+| Faceted geometry disappoints industrial mechanical users | Intentional scope: `cad3d` targets enclosures and simple 3D-printed parts, not industrial B-rep CAD |
 | Provenance behaviour changes in a Manifold release | Version pinned exactly; M5 tests assert names through cut, add and intersect |
 | WASM blocked by CSP in a host | Section 13 fallback; cloud follow-up item 3 |
 | Inline meshes bloat documents | 1 MiB cap per element; attachments in phase 2 |

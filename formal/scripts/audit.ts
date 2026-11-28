@@ -18,6 +18,7 @@ const modules: Record<string, string> = {
   Undo: "undo",
   Merge: "merge",
   Overlap: "overlap",
+  CadEnclosure: "cad-enclosure",
 };
 const checkOpens: Record<string, readonly string[]> = {
   ZOrder: ["Nodetto.Fractional"],
@@ -32,6 +33,7 @@ const requiredCases: Record<string, readonly string[]> = {
   Undo: ["history", "applyCommands"],
   Merge: ["mergeValue", "mergeById"],
   Overlap: ["overlappingPairs"],
+  CadEnclosure: ["pageAccepts", "computeShellSpec", "computePcbEnclosureDims"],
 };
 type Statement = {
   module: string;

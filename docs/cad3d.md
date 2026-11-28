@@ -1,9 +1,10 @@
 # 3D CAD pages
 
-Add a page in **3D CAD** mode to model a part alongside your drawings and
-PCB pages. CAD pages accept sketches, features and document resources.
-Drawings and PCB shapes stay on their own pages. The 3D editor uses the
-diagram canvas colour preference.
+Add a page in **3D CAD** mode to model **enclosures and simple mechanical
+parts** (project boxes, lids, mounts, brackets, spacers) alongside your
+drawings and PCB pages. CAD pages accept sketches, features and document
+resources. Drawings and PCB shapes stay on their own pages. The 3D editor
+uses the diagram canvas colour preference.
 
 ## Sketch and extrude
 
@@ -80,21 +81,26 @@ git config merge.nodetto.name "nodetto three-way merge"
 git config merge.nodetto.driver "nodetto-cli merge %O %A %B --output %A"
 ```
 
-## Limits and planned work
+## Limits, scope and planned work
 
 - Model coordinates stay within 10 m of the origin. CAD pages have a limit
   of 20,000 elements, a loop can have up to 20,000 vertices, and a body can
   have up to 2,000,000 triangles. Imported mesh payloads have an inline cap
   of about 1 MiB. CAD parameters use a one-nanometre grid.
-- The solid kernel uses faceted surfaces. Build closed, non-self-intersecting
-  profiles within the model limits. If WebGL2, workers or WASM are
-  unavailable, the viewport shows a message and the panels remain editable.
-- Phase 2 covers revolve, patterns, parameter expressions, tessellation and
-  display settings, external mesh attachments and optional cached meshes,
-  planar/faceted STEP and 3MF export, component heights and body-as-tool
-  Boolean operations.
-- Phase 3 covers sketch constraints, fillets and chamfers, exact curved
-  surfaces and STEP import.
+- The solid kernel uses faceted surfaces (Manifold). Build closed,
+  non-self-intersecting profiles within the model limits. If WebGL2, workers
+  or WASM are unavailable, the viewport shows a message and the panels remain
+  editable.
+- **Focused scope (enclosures and simple parts):** Nodetto provides 2D
+  rounded rectangles and slots, hollow enclosure shells (wall and floor
+  thickness), and PCB enclosure helpers (clearance shell, corner standoffs,
+  component keep-out). Planned follow-ups stay within this scope: 3MF export,
+  simple hole patterns, per-footprint PCB component heights, and body-as-tool
+  board clearance pockets.
+- **Out of scope:** Complex industrial CAD features — B-rep kernels, STEP
+  import/export, 2D sketch constraint solvers, 3D edge fillets/chamfers,
+  revolve/loft/sweep/surfacing, assemblies/mates, 2D engineering drawings,
+  CAM, and simulation — are intentionally omitted.
 
 ## Hosted CAD follow-up
 

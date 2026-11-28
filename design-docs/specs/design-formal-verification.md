@@ -1111,6 +1111,62 @@ statements carry no well-formedness hypothesis (min at most max): the sweep
 only skips pairs whose sweep-axis intervals are disjoint. If the open pair is
 not finished, the tree branch is covered by vectors and listed as open.
 
+### 6.9 CAD enclosure and page content rules (`design-cad3d.md` 2.2, 4, `packages/ir/src/page-content.ts`, `packages/core/src/cad/enclosure.ts`)
+
+`Nodetto.CadEnclosure` models Rule R (`pageAcceptsElementType`), hollow
+enclosure shell parameter normalization (`computeShellSpec`), and PCB
+enclosure dimensioning (`computePcbEnclosureDims`) on exact integer nanometre
+coordinates (1 mm = 1,000,000 nm).
+
+```lean Nodetto.CadEnclosure
+theorem cad_type_only_on_cad3d (kind elemType : String) (isResource : Bool)
+    (hcad : isCadType elemType = true)
+    (hacc : pageAccepts kind elemType isResource = true) :
+    kind = "cad3d"
+
+theorem cad3d_accepts_resource (elemType : String)
+    (hnot : isCadType elemType = false) :
+    pageAccepts "cad3d" elemType true = true
+
+theorem cad3d_rejects_non_cad_non_resource (elemType : String)
+    (hnot : isCadType elemType = false) :
+    pageAccepts "cad3d" elemType false = false
+
+theorem shell_inner_strictly_inside (inp : ShellInput) (s : ShellSpec)
+    (h : computeShellSpec inp = some s) :
+    s.outerX0 < s.innerX0 ∧ s.innerX0 < s.innerX1 ∧ s.innerX1 < s.outerX1 ∧
+    s.outerY0 < s.innerY0 ∧ s.innerY0 < s.innerY1 ∧ s.innerY1 < s.outerY1
+
+theorem shell_wall_margins (inp : ShellInput) (s : ShellSpec)
+    (h : computeShellSpec inp = some s) :
+    s.innerX0 - s.outerX0 = s.wallThickness ∧
+    s.outerX1 - s.innerX1 = s.wallThickness ∧
+    s.innerY0 - s.outerY0 = s.wallThickness ∧
+    s.outerY1 - s.innerY1 = s.wallThickness
+
+theorem shell_cavity_bounds (inp : ShellInput) (s : ShellSpec)
+    (h : computeShellSpec inp = some s) :
+    0 < s.cavityDepth ∧ s.cavityDepth ≤ s.height ∧
+    s.cavityDepth + s.floorThickness = s.height
+
+theorem shell_radius_safe (inp : ShellInput) (s : ShellSpec)
+    (h : computeShellSpec inp = some s) :
+    0 ≤ s.innerRadius ∧ 2 * s.innerRadius ≤ s.innerWidth ∧ 2 * s.innerRadius ≤ s.innerHeight
+
+theorem pcb_enclosure_clearance (inp : PcbEnclosureInput) (d : PcbEnclosureDims)
+    (h : computePcbEnclosureDims inp = some d) :
+    d.shell.innerX0 = min inp.boardMinX inp.boardMaxX - inp.clearance ∧
+    d.shell.innerX1 = max inp.boardMinX inp.boardMaxX + inp.clearance ∧
+    d.shell.innerY0 = min inp.boardMinY inp.boardMaxY - inp.clearance ∧
+    d.shell.innerY1 = max inp.boardMinY inp.boardMaxY + inp.clearance
+
+theorem pcb_enclosure_vertical_stack (inp : PcbEnclosureInput) (d : PcbEnclosureDims)
+    (h : computePcbEnclosureDims inp = some d) :
+    d.shell.height = inp.floorThickness + inp.standoffHeight + inp.boardThickness + inp.componentHeadroom ∧
+    d.shell.cavityDepth = inp.standoffHeight + inp.boardThickness + inp.componentHeadroom ∧
+    d.baseOffsetZ + inp.floorThickness + inp.standoffHeight = 0
+```
+
 ## 7. Vectors
 
 Each `lake exe vectors-<file>` prints one JSON document to stdout,

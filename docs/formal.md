@@ -81,6 +81,15 @@ The specification column identifies the section and model; each theorem name des
 | `overlappingPairs_sweep` | [6.8](../design-docs/specs/design-formal-verification.md) (Overlap) | `overlappingPairs` | proved |
 | `treeSearch_visits_overlaps` | [6.8](../design-docs/specs/design-formal-verification.md) (Overlap) | `overlappingPairs` | open |
 | `overlappingPairs_visits_overlaps` | [6.8](../design-docs/specs/design-formal-verification.md) (Overlap) | `overlappingPairs` | open |
+| `cad_type_only_on_cad3d` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `pageAcceptsElementType` | proved |
+| `cad3d_accepts_resource` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `pageAcceptsElementType` | proved |
+| `cad3d_rejects_non_cad_non_resource` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `pageAcceptsElementType` | proved |
+| `shell_inner_strictly_inside` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `computeShellSpec` | proved |
+| `shell_wall_margins` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `computeShellSpec` | proved |
+| `shell_cavity_bounds` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `computeShellSpec` | proved |
+| `shell_radius_safe` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `computeShellSpec` | proved |
+| `pcb_enclosure_clearance` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `computePcbEnclosureDims` | proved |
+| `pcb_enclosure_vertical_stack` | [6.9](../design-docs/specs/design-formal-verification.md) (CadEnclosure) | `computePcbEnclosureDims` | proved |
 
 ## Trust assumptions
 

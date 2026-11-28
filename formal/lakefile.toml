@@ -40,3 +40,7 @@ root = "Nodetto.Merge.Vectors"
 [[lean_exe]]
 name = "vectors-overlap"
 root = "Nodetto.Overlap.Vectors"
+
+[[lean_exe]]
+name = "vectors-cad-enclosure"
+root = "Nodetto.CadEnclosure.Vectors"

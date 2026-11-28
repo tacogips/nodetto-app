@@ -1,6 +1,7 @@
 export * from "./authoring.ts";
 export * from "./check.ts";
 export * from "./display.ts";
+export * from "./enclosure.ts";
 export * from "./engine.ts";
 export * from "./evaluate.ts";
 export * from "./feature-list.ts";
