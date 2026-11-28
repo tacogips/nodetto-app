@@ -75,7 +75,8 @@
   background: var(--app-chrome-hover, #f1f3f4);
 }
 
-.nodetto-shape-tile[aria-pressed="true"] {
+.nodetto-shape-tile[aria-pressed="true"],
+.nodetto-cad-tools > [aria-pressed="true"] {
   border-color: var(--nodetto-accent, #335c67);
   background: var(--app-chrome-active, #e5e9eb);
   color: var(--nodetto-accent, #335c67);
@@ -114,8 +115,29 @@
   cursor: pointer;
 }
 
-.nodetto-palette-action:first-child {
+.nodetto-palette-actions > .nodetto-palette-action:first-child {
   flex-basis: 100%;
+}
+
+.nodetto-cad-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.nodetto-cad-tools > button {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 4px;
+}
+
+.nodetto-cad-tools svg {
+  width: 16px;
+  height: 16px;
 }
 
 .nodetto-palette-section {

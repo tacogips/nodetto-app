@@ -36,6 +36,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ExportDialog,
   type Camera3d,
+  type CadViewControls,
   CopyShapesDialog,
   effectiveShowSlideArea,
   Icon,
@@ -408,6 +409,7 @@ export function App(props: AppProps): JSX.Element {
   };
   const cadPageActive = createMemo(isCadPage);
   let openCadImport: (() => void) | undefined;
+  const [cadViewControls, setCadViewControls] = createSignal<CadViewControls>();
   const [cadEngine, setCadEngine] =
     createSignal<ReturnType<typeof getCadEngine>>();
   // Keep the kernel worker for a while after leaving a CAD page: going back
@@ -966,6 +968,7 @@ export function App(props: AppProps): JSX.Element {
             onToolChange={setActiveTool}
             context={actionContext()}
             onShapeDrop={(tool, client) => setShapeDrop({ tool, client })}
+            cadViewControls={cadViewControls()}
             onImportStl={cadPageActive() ? () => openCadImport?.() : undefined}
           />
           <Layers
@@ -1018,6 +1021,7 @@ export function App(props: AppProps): JSX.Element {
               onCadImportPicker={(open) => {
                 openCadImport = open;
               }}
+              onCadViewControls={setCadViewControls}
               canvasBackground={{
                 diagram: resolveCanvasMode(canvasBackground(), resolvedTheme()),
                 pcb: resolveCanvasMode(pcbCanvasBackground(), resolvedTheme()),

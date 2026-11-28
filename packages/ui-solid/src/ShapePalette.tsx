@@ -10,8 +10,10 @@ import {
 } from "@nodetto/core";
 import type { FrameSemantic } from "@nodetto/ir";
 import { IconPicker } from "./IconPicker.tsx";
+import { Icon } from "./Icon.tsx";
 import { For, Show, createSignal, type JSX, onCleanup } from "solid-js";
 import { createEditorSignals } from "./adapter.ts";
+import type { CadViewControls } from "./cad/CadViewport.tsx";
 import {
   PALETTE_ICONS,
   type ShapePaletteItem,
@@ -104,6 +106,7 @@ export function ShapePalette(props: {
   readonly context: ActionContext;
   readonly onShapeDrop?: (tool: ToolKind, client: Vec) => void;
   readonly onImportStl?: () => void;
+  readonly cadViewControls?: CadViewControls;
 }): JSX.Element {
   let drag:
     | {
@@ -313,6 +316,21 @@ export function ShapePalette(props: {
       {label}
     </button>
   );
+  const cadViewButton = (id: "zoomIn" | "zoomOut" | "fit", label: string) => (
+    <button
+      type="button"
+      class="nodetto-palette-action"
+      aria-label={label}
+      disabled={
+        !props.cadViewControls ||
+        (id === "fit" && !props.cadViewControls.canFit())
+      }
+      onClick={() => props.cadViewControls?.[id]()}
+    >
+      <Icon name={id} />
+      {label}
+    </button>
+  );
   return (
     <section
       class="nodetto-shape-palette"
@@ -345,6 +363,23 @@ export function ShapePalette(props: {
             </div>
           </Portal>
         )}
+      </Show>
+      <Show when={props.workspace === "cad3d"}>
+        <div class="nodetto-cad-tools" role="group" aria-label="CAD tools">
+          <button
+            type="button"
+            class="nodetto-palette-action"
+            aria-label="Select"
+            aria-pressed={props.tool === Tool.Select}
+            onClick={() => props.onToolChange(Tool.Select)}
+          >
+            <ToolbarIcon name="cadSelect" class="" />
+            Select
+          </button>
+          {cadViewButton("zoomIn", "Zoom in")}
+          {cadViewButton("zoomOut", "Zoom out")}
+          {cadViewButton("fit", "Fit model")}
+        </div>
       </Show>
       <input
         type="search"

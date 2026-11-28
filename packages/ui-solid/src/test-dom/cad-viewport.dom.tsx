@@ -22,6 +22,7 @@ import type { CadRenderer } from "../cad/renderer.ts";
 import type { CadTheme } from "../cad/theme.ts";
 import { NodettoCanvas, type NodettoCanvasProps } from "../Canvas.tsx";
 import { Layers } from "../Layers.tsx";
+import { ShapePalette } from "../ShapePalette.tsx";
 import { Tool } from "../tools.ts";
 import { preloadCadUi } from "../cad-ui.tsx";
 
@@ -111,6 +112,10 @@ for (const theme of ["light", "dark"] as const) {
   const [engineAvailable, setEngineAvailable] = createSignal(true);
   const [mode, setMode] = createSignal(theme);
   const [drop, setDrop] = createSignal<NodettoCanvasProps["shapeDrop"]>();
+  const [viewControls, setViewControls] =
+    createSignal<
+      Parameters<NonNullable<NodettoCanvasProps["onCadViewControls"]>>[0]
+    >();
   const requests: {
     input: CadEngineInput;
     resolve: (result: CadEngineResult) => void;
@@ -167,6 +172,19 @@ for (const theme of ["light", "dark"] as const) {
   const dispose = render(
     () => (
       <>
+        <ShapePalette
+          editor={editor}
+          workspace="cad3d"
+          tool={Tool.Select}
+          onToolChange={() => {}}
+          context={{
+            editor,
+            viewport: { width: viewportWidth, height: viewportHeight },
+            requestEdit: () => {},
+            exportSvg: () => {},
+          }}
+          cadViewControls={viewControls()}
+        />
         <NodettoCanvas
           editor={editor}
           tool={Tool.Rectangle}
@@ -176,6 +194,7 @@ for (const theme of ["light", "dark"] as const) {
           snap={{ grid: false, objects: false }}
           showGrid={false}
           shapeDrop={drop()}
+          onCadViewControls={setViewControls}
         />
         <Layers editor={editor} simple />
       </>
@@ -229,6 +248,22 @@ for (const theme of ["light", "dark"] as const) {
 
   const fitted = mount.cameras.at(-1);
   assert.ok(fitted);
+  const viewButton = (label: string) => {
+    const button = root.querySelector<HTMLButtonElement>(
+      `[aria-label="CAD tools"] button[aria-label="${label}"]`,
+    );
+    assert.ok(button, label);
+    return button;
+  };
+  viewButton("Zoom in").click();
+  await painted();
+  const zoomedIn = mount.cameras.at(-1);
+  assert.ok(zoomedIn && zoomedIn.distance < fitted.distance);
+  viewButton("Zoom out").click();
+  await painted();
+  assert.ok(
+    Math.abs((mount.cameras.at(-1)?.distance ?? 0) - fitted.distance) < 1e-9,
+  );
   movePointer(canvas, 25, 25);
   await painted();
   assert.notEqual(mount.cameras.at(-1)?.yaw, fitted.yaw);
@@ -241,6 +276,10 @@ for (const theme of ["light", "dark"] as const) {
   );
   await painted();
   assert.ok((mount.cameras.at(-1)?.distance ?? 0) > (orbited?.distance ?? 0));
+  viewButton("Fit model").click();
+  await painted();
+  assert.deepEqual(mount.cameras.at(-1), fitted);
+  movePointer(canvas, 25, 25);
   canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
   await painted();
   assert.deepEqual(mount.cameras.at(-1), fitted);
@@ -281,6 +320,7 @@ for (const theme of ["light", "dark"] as const) {
   const savedCamera = mount.cameras.at(-1);
   editor.setCurrentPage("drawing");
   assert.equal(root.querySelector(surface), null);
+  assert.equal(viewButton("Zoom in").disabled, true);
   assert.equal(layer(), true);
   assert.equal(mount.disposed, true);
   assert.equal(editor.store.getPageElements("drawing").length, 0);

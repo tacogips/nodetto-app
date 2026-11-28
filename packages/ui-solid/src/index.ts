@@ -4,6 +4,7 @@
 export { createEditorSignals, type EditorSignals } from "./adapter.ts";
 export { HelpHint } from "./HelpHint.tsx";
 export { type NodettoCanvasProps, NodettoCanvas } from "./Canvas.tsx";
+export type { CadViewControls } from "./cad/CadViewport.tsx";
 export type { CadViewportProps } from "./cad/CadViewport.tsx";
 export type { CadRenderer } from "./cad/renderer.ts";
 export { preloadCadUi } from "./cad-ui.tsx";

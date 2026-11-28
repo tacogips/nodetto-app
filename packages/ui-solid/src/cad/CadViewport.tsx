@@ -48,6 +48,13 @@ import { createStlImport } from "./stl-import.tsx";
 import { readCadTheme } from "./theme.ts";
 import "./CadViewport.css";
 
+export interface CadViewControls {
+  readonly zoomIn: () => void;
+  readonly zoomOut: () => void;
+  readonly fit: () => void;
+  readonly canFit: () => boolean;
+}
+
 export interface CadViewportProps {
   readonly editor: Editor;
   readonly engine: CadEngine | undefined;
@@ -56,6 +63,7 @@ export interface CadViewportProps {
   readonly tool?: ToolKind;
   readonly onToolChange?: (tool: ToolKind) => void;
   readonly onImportPicker?: (open: (() => void) | undefined) => void;
+  readonly onViewControls?: (controls: CadViewControls | undefined) => void;
   readonly createRenderer?: (canvas: HTMLCanvasElement) => CadRenderer | null;
   readonly pageId?: PageId;
   readonly initialCamera?: Camera3d;
@@ -155,9 +163,15 @@ export function CadViewport(props: CadViewportProps) {
     props.onCameraChange?.(next);
   }
 
+  const canFit = () =>
+    size().width > 0 &&
+    size().height > 0 &&
+    !sketch.drawing() &&
+    !extrude.dragging();
+
   function fit(): void {
+    if (!canFit()) return;
     const { width, height } = size();
-    if (sketch.drawing()) return;
     const bodies = drawnBodies();
     changeCamera(
       fitBodies(
@@ -168,10 +182,21 @@ export function CadViewport(props: CadViewportProps) {
     );
   }
 
+  function zoomBy(factor: number): void {
+    if (!extrude.dragging()) changeCamera(zoomAt(camera(), factor));
+  }
+
   onMount(() => {
     mounted = true;
     const registerImportPicker = props.onImportPicker;
+    const registerViewControls = props.onViewControls;
     registerImportPicker?.(stl.openPicker);
+    registerViewControls?.({
+      zoomIn: () => zoomBy(1 / 1.25),
+      zoomOut: () => zoomBy(1.25),
+      fit,
+      canFit,
+    });
     const initialize = () =>
       setRenderer((props.createRenderer ?? createWebgl2Renderer)(canvas));
     initialize();
@@ -208,6 +233,7 @@ export function CadViewport(props: CadViewportProps) {
     onCleanup(() => {
       mounted = false;
       registerImportPicker?.(undefined);
+      registerViewControls?.(undefined);
       unsubscribe();
       unsubscribeSelection();
       document.removeEventListener("pointerdown", board.dismiss, true);
@@ -465,14 +491,11 @@ export function CadViewport(props: CadViewportProps) {
 
   function zoom(event: WheelEvent): void {
     event.preventDefault();
-    if (extrude.dragging()) return;
     const unit =
       event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size().height : 1;
     const delta = event.deltaY * unit;
     if (Number.isFinite(delta))
-      changeCamera(
-        zoomAt(camera(), Math.exp(Math.max(-4, Math.min(4, delta / 400)))),
-      );
+      zoomBy(Math.exp(Math.max(-4, Math.min(4, delta / 400))));
   }
 
   const status = () =>

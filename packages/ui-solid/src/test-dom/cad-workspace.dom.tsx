@@ -69,8 +69,14 @@ for (const theme of ["light", "dark"]) {
       />
     ),
     (host) => {
-      assert.equal(host.querySelectorAll(".nodetto-shape-tile").length, 8);
+      assert.equal(host.querySelectorAll(".nodetto-shape-tile").length, 7);
       assert.equal(host.querySelector('[aria-label="Grouping"]'), null);
+      const selectTool = button(host, "Select");
+      assert.equal(
+        selectTool.closest('[aria-label="CAD tools"]')?.tagName,
+        "DIV",
+      );
+      assert.equal(selectTool.getAttribute("aria-pressed"), "true");
       const arc = button(host, "Arc");
       assert.ok(arc.querySelector('svg [stroke="currentColor"] path'));
       arc.click();
@@ -80,12 +86,14 @@ for (const theme of ["light", "dark"]) {
       assert.ok(board.querySelector('svg [stroke="currentColor"]'));
       board.click();
       assert.equal(tool(), Tool.CadPcb);
-      button(host, "Select").click();
+      assert.equal(selectTool.getAttribute("aria-pressed"), "false");
+      selectTool.click();
       assert.equal(tool(), Tool.Select);
       const search = host.querySelector<HTMLInputElement>('[type="search"]');
       assert.ok(search);
       search.value = "rectangle";
       search.dispatchEvent(new Event("input", { bubbles: true }));
+      assert.equal(button(host, "Select"), selectTool);
       assert.deepEqual(
         [...host.querySelectorAll(".nodetto-shape-tile")].map((item) =>
           item.textContent?.trim(),

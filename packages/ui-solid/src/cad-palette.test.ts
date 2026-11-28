@@ -27,7 +27,7 @@ test("the CAD workspace exposes only select and the CAD creation tools", () => {
     shapePaletteGroups("cad3d").flatMap(({ items }) =>
       items.map(({ tool }) => tool),
     ),
-  ).toEqual(all);
+  ).toEqual(primary);
   for (const [tool, type] of cadTools)
     expect(creationFor(tool)).toEqual({ type });
 

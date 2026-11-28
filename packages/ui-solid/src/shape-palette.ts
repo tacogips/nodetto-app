@@ -541,10 +541,7 @@ export function shapePaletteGroups(
     return [
       {
         label: workspaceById(id).label,
-        items: [
-          { tool: Tool.Select, label: "Select", toolbarIcon: "cadSelect" },
-          ...workspaceShapes(id),
-        ],
+        items: workspaceShapes(id),
       },
     ];
   const items = [

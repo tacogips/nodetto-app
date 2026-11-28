@@ -100,6 +100,7 @@ export interface NodettoCanvasProps {
   readonly onCadCameraChange?: (pageId: PageId, camera: Camera3d) => void;
   readonly createCadRenderer?: CadViewportProps["createRenderer"];
   readonly onCadImportPicker?: CadViewportProps["onImportPicker"];
+  readonly onCadViewControls?: CadViewportProps["onViewControls"];
   readonly tool: ToolKind;
   readonly onToolChange?: (tool: ToolKind) => void;
   readonly shapeDrop?: { readonly tool: ToolKind; readonly client: Vec };
@@ -182,6 +183,7 @@ export function NodettoCanvas(props: NodettoCanvasProps): JSX.Element {
           tool={props.tool}
           onToolChange={props.onToolChange}
           onImportPicker={props.onCadImportPicker}
+          onViewControls={props.onCadViewControls}
           createRenderer={props.createCadRenderer}
           initialCamera={cameras.get(id)}
           onCameraChange={(camera) => {
